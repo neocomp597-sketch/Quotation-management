@@ -53,7 +53,7 @@ export const resolveImageUrl = (url) => {
     if (!url) return null;
     if (url.startsWith('http')) return url;
     // For local development, assuming backend on 5000
-    const base = 'http://localhost:5000';
+    const base = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
     let cleanUrl = url.replace(/\\/g, '/'); // Fix windows backslashes
 
     // If it's just a filename (no slashes), prepend /uploads/

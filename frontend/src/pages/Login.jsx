@@ -19,7 +19,8 @@ const Login = () => {
         e.preventDefault();
         try {
             // Adjust API URL as needed
-            const res = await axios.post('http://localhost:5000/api/auth/login', formData);
+            const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+            const res = await axios.post(`${baseUrl}/auth/login`, formData);
             localStorage.setItem('token', res.data.token);
             localStorage.setItem('user', JSON.stringify(res.data.user)); // Store user info
 
