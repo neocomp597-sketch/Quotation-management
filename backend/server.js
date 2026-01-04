@@ -23,7 +23,8 @@ const uploadRoutes = require('./routes/uploadRoutes');
 const salespersonRoutes = require('./routes/salespersonRoutes');
 const siteRoutes = require('./routes/siteRoutes');
 const path = require('path');
-// const userRoutes = require('./routes/userRoutes');
+const userRoutes = require('./routes/userRoutes');
+const authRoutes = require('./routes/authRoutes');
 
 // API Routes
 app.use('/api/quotations', quotationRoutes);
@@ -33,6 +34,8 @@ app.use('/api/terms', termsRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/salespersons', salespersonRoutes);
 app.use('/api/sites', siteRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
 
 // Serve Static Files
 // Serve Static Files with logging

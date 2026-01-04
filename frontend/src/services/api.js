@@ -52,6 +52,11 @@ export const termsService = {
 export const salespersonService = {
     getAll: () => api.get('/salespersons'),
     create: (data) => api.post('/salespersons', data),
+    delete: (id) => api.delete(`/salespersons/${id}`),
+};
+
+export const userService = {
+    updateProfile: (data) => api.put('/users/profile', data),
 };
 
 export const siteService = {

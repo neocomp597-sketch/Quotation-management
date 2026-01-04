@@ -9,22 +9,23 @@ const {
     finalizeQuotation
 } = require('../controllers/quotationController');
 
+const { protect } = require('../middlewares/authMiddleware');
+
 // POST: Create Quotation
-router.post('/', createQuotation);
-
-// PUT: Update Quotation
-router.put('/:id', updateQuotation);
-
-// DELETE: Delete Quotation
-router.delete('/:id', deleteQuotation);
-
-// PATCH: Finalize Quotation
-router.patch('/:id/finalize', finalizeQuotation);
-
-// GET: Get a specific quotation
-router.get('/:id', getQuotationById);
+router.post('/', protect, createQuotation);
 
 // GET: Get all quotations
-router.get('/', getAllQuotations);
+router.get('/', protect, getAllQuotations);
+
+// GET: Get a specific quotation
+router.get('/:id', protect, getQuotationById);
+
+// PUT: Update Quotation
+router.put('/:id', protect, updateQuotation);
+
+// DELETE: Delete Quotation
+router.delete('/:id', protect, deleteQuotation);
+
+// PATCH: Finalize Quotation
 
 module.exports = router;

@@ -2,6 +2,8 @@ const mongoose = require('mongoose');
 const Customer = require('./models/Customer');
 const Product = require('./models/Product');
 const TermsTemplate = require('./models/TermsTemplate');
+const User = require('./models/User');
+const bcrypt = require('bcryptjs');
 require('dotenv').config();
 
 const seedData = async () => {
@@ -10,12 +12,37 @@ const seedData = async () => {
         console.log("Connected to MongoDB for seeding...");
 
         // Clear existing data
+        await User.deleteMany({});
         await Customer.deleteMany({});
         await Product.deleteMany({});
         await TermsTemplate.deleteMany({});
 
-        // Seed Customers
-        const customers = await Customer.insertMany([
+        // 1. Create Users
+        const salt = await bcrypt.genSalt(10);
+        const adminHash = await bcrypt.hash('123456', salt); // Password: 123456
+        const salesHash = await bcrypt.hash('123456', salt); // Password: 123456 for ease of testing
+
+        const users = await User.insertMany([
+            {
+                name: 'System Admin',
+                email: 'Admin@gmail.com',
+                passwordHash: adminHash,
+                role: 'admin'
+            },
+            {
+                name: 'John Sales',
+                email: 'sales@example.com',
+                passwordHash: salesHash,
+                role: 'sales'
+            }
+        ]);
+
+        const salesUser = users[1];
+        console.log('Admin User Created: Admin@gmail.com / 123456');
+        console.log('Sales User Created: sales@example.com / 123456');
+
+        // 2. Seed Customers (assigned to Sales User)
+        await Customer.insertMany([
             {
                 customerName: 'John Doe',
                 companyName: 'JD Interiors & Designs',
@@ -23,7 +50,8 @@ const seedData = async () => {
                 billingAddress: { line1: '101, Business Park', city: 'Mumbai', state: 'Maharashtra', pincode: '400001' },
                 mobile: '9876543210',
                 email: 'john@jdinteriors.com',
-                defaultDiscount: 10
+                defaultDiscount: 10,
+                createdBy: salesUser._id
             },
             {
                 customerName: 'Sarah Smith',
@@ -32,11 +60,12 @@ const seedData = async () => {
                 billingAddress: { line1: 'Sector 5, Hiranandani', city: 'Ahmedabad', state: 'Gujarat', pincode: '380001' },
                 mobile: '9988776655',
                 email: 'sarah@alphabuilders.in',
-                defaultDiscount: 15
+                defaultDiscount: 15,
+                createdBy: salesUser._id
             }
         ]);
 
-        // Seed Products
+        // 3. Seed Products
         await Product.insertMany([
             {
                 productCode: 'JAG-WC-001',
@@ -55,29 +84,15 @@ const seedData = async () => {
                 basePrice: 4200,
                 mrp: 6500,
                 uom: 'Nos'
-            },
-            {
-                productCode: 'JAG-SHW-015',
-                productName: 'Overhead Rain Shower 200x200mm',
-                hsnCode: '84818020',
-                gstPercentage: 18,
-                basePrice: 2800,
-                mrp: 4200,
-                uom: 'Nos'
             }
         ]);
 
-        // Seed Terms Templates
+        // 4. Seed Terms Templates
         await TermsTemplate.insertMany([
             {
                 templateName: 'Standard Sanitaryware T&C',
                 content: '1. Delivery: Within 7 days.\n2. Payment: 50% advance.\n3. Warranty: 10 years on ceramic.',
                 isDefault: true
-            },
-            {
-                templateName: 'CP Fittings Project T&C',
-                content: '1. Delivery: Immediate.\n2. Payment: On delivery.\n3. Warranty: 5 years on plating.',
-                isDefault: false
             }
         ]);
 

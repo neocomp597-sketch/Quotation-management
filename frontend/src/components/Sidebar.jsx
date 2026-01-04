@@ -11,8 +11,12 @@ import {
 } from 'react-icons/md';
 
 const Sidebar = ({ isOpen, toggleSidebar }) => {
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const isAdmin = user.role === 'admin';
+
     const menuItems = [
-        { name: 'Dashboard', icon: <MdDashboard size={22} />, path: '/' },
+        { name: 'Dashboard', icon: <MdDashboard size={22} />, path: '/dashboard' },
+        ...(isAdmin ? [{ name: 'Salespersons', icon: <MdPeople size={22} />, path: '/salespersons' }] : []),
         { name: 'Customers', icon: <MdPeople size={22} />, path: '/customers' },
         { name: 'Products', icon: <MdInventory size={22} />, path: '/products' },
         { name: 'Quotations', icon: <MdDescription size={22} />, path: '/quotations' },

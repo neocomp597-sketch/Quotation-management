@@ -15,6 +15,7 @@ const createCustomer = async (req, res) => {
             email,
             logoUrl,
             defaultDiscount,
+            createdBy: req.user ? req.user.id : null
         });
 
         await newCustomer.save();
@@ -28,7 +29,11 @@ const createCustomer = async (req, res) => {
 // Get All Customers
 const getAllCustomers = async (req, res) => {
     try {
-        const customers = await Customer.find();
+        let query = {};
+        if (req.user && req.user.role !== 'admin') {
+            query.createdBy = req.user.id;
+        }
+        const customers = await Customer.find(query);
         res.json(customers);
     } catch (error) {
         console.error(error);

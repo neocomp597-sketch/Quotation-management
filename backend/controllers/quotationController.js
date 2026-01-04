@@ -44,6 +44,8 @@ const createQuotation = async (req, res) => {
             status
         } = req.body;
 
+        // console.log("Received Quotation Request:", JSON.stringify(req.body, null, 2));
+
         const customer = await Customer.findById(customerId);
         if (!customer) return res.status(404).json({ message: 'Customer not found' });
 
@@ -60,10 +62,12 @@ const createQuotation = async (req, res) => {
         const seqStr = sequence.toString().padStart(4, '0');
         const quotationNo = `JAG/QTN/${year}/${seqStr}`;
 
-        const subtotal = calculateSubtotal(items);
-        const totalDiscount = calculateTotalDiscount(items);
-        const gstBreakup = calculateGST(items, customer.billingAddress.state);
-        const tempGrandTotal = calculateGrandTotal(items);
+        const customerState = customer.billingAddress?.state || ''; // Safe access
+
+        const subtotal = calculateSubtotal(items || []); // Safe array access
+        const totalDiscount = calculateTotalDiscount(items || []);
+        const gstBreakup = calculateGST(items || [], customerState);
+        const tempGrandTotal = calculateGrandTotal(items || []);
         const roundedGrandTotal = Math.round(tempGrandTotal);
         const roundOff = (roundedGrandTotal - tempGrandTotal).toFixed(2);
 
@@ -73,9 +77,12 @@ const createQuotation = async (req, res) => {
             quotationDate: new Date(),
             validTill,
             salespersonName,
-            siteId,
+            siteId: siteId || undefined, // Ensure empty string becomes undefined
             paymentTerms,
-            items,
+            items: items.map(item => ({
+                ...item,
+                siteId: item.siteId || undefined
+            })),
             subtotal,
             totalDiscount,
             gstBreakup,
@@ -84,14 +91,14 @@ const createQuotation = async (req, res) => {
             termsTemplateId: termsTemplateId || undefined,
             customTerms,
             status: status || 'draft',
-            createdBy: req.user ? req.user.id : null,
+            createdBy: req.user ? req.user.id : undefined, // Safely handle createdBy
         });
 
         await newQuotation.save();
         res.status(201).json(newQuotation);
     } catch (error) {
-        console.error("Create Quotation Error:", error);
-        res.status(500).json({ message: 'Error creating quotation', error: error.message });
+        console.error("Create Quotation Error Stack:", error); // Log full stack
+        res.status(500).json({ message: 'Error creating quotation', error: error.message, stack: error.stack });
     }
 };
 
@@ -114,16 +121,21 @@ const updateQuotation = async (req, res) => {
         const customer = await Customer.findById(customerId);
         if (!customer) return res.status(404).json({ message: 'Customer not found' });
 
-        const subtotal = calculateSubtotal(items);
-        const totalDiscount = calculateTotalDiscount(items);
-        const gstBreakup = calculateGST(items, customer.billingAddress.state);
-        const tempGrandTotal = calculateGrandTotal(items);
+        const customerState = customer.billingAddress?.state || '';
+
+        const subtotal = calculateSubtotal(items || []);
+        const totalDiscount = calculateTotalDiscount(items || []);
+        const gstBreakup = calculateGST(items || [], customerState);
+        const tempGrandTotal = calculateGrandTotal(items || []);
         const roundedGrandTotal = Math.round(tempGrandTotal);
         const roundOff = (roundedGrandTotal - tempGrandTotal).toFixed(2);
 
         const updatedQuotation = await Quotation.findByIdAndUpdate(id, {
             customerId,
-            items,
+            items: items.map(item => ({
+                ...item,
+                siteId: item.siteId || undefined
+            })),
             validTill,
             salespersonName,
             siteId,
@@ -184,7 +196,11 @@ module.exports = {
     },
     getAllQuotations: async (req, res) => {
         try {
-            const quotations = await Quotation.find()
+            let query = {};
+            if (req.user && req.user.role !== 'admin') {
+                query.createdBy = req.user.id;
+            }
+            const quotations = await Quotation.find(query)
                 .populate('customerId')
                 .populate('siteId')
                 .sort({ createdAt: -1 });

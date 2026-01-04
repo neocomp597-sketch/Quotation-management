@@ -22,6 +22,7 @@ const CustomerSchema = new mongoose.Schema({
     email: String,
     logoUrl: String,
     defaultDiscount: Number,
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     createdAt: { type: Date, default: Date.now },
 });
 
