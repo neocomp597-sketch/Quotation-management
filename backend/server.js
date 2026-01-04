@@ -10,7 +10,14 @@ const app = express();
 connectDB();
 
 // Middleware
-app.use(cors());
+app.use(cors({
+    origin: [
+        'https://quotation-management-2znu.onrender.com',
+        'http://localhost:5173',
+        'http://localhost:3000'
+    ],
+    credentials: true
+}));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
