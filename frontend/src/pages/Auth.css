@@ -22,6 +22,12 @@
     overflow: hidden;
 }
 
+@media (max-width: 640px) {
+    .auth-card {
+        padding: 1.5rem;
+    }
+}
+
 /* Decorative band at top of card */
 .auth-card::before {
     content: '';

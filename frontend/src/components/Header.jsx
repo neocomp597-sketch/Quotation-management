@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MdSearch, MdNotifications, MdAccountCircle, MdSettings, MdLogout } from 'react-icons/md';
+import { MdSearch, MdNotifications, MdAccountCircle, MdSettings, MdLogout, MdMenu } from 'react-icons/md';
 
 import { useNavigate } from 'react-router-dom';
 
-const Header = ({ sidebarOpen }) => {
+const Header = ({ sidebarOpen, toggleSidebar }) => {
     const navigate = useNavigate();
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -30,35 +30,48 @@ const Header = ({ sidebarOpen }) => {
     }, []);
 
     return (
-        <header className={`fixed top-0 right-0 h-20 bg-white/80 backdrop-blur-md border-b border-slate-200 z-40 transition-all duration-300 ${sidebarOpen ? 'left-64' : 'left-20'}`}>
-            <div className="h-full px-8 flex items-center justify-between">
-                <div className="relative w-96">
-                    <MdSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-                    <input
-                        type="text"
-                        placeholder="Search quotations, customers..."
-                        className="w-full pl-10 pr-4 py-2 bg-slate-100 border-none rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none text-sm"
-                    />
+        <header className={`fixed top-0 right-0 h-20 bg-white/80 backdrop-blur-md border-b border-slate-200 z-40 transition-all duration-300 left-0 ${sidebarOpen ? 'md:left-64' : 'md:left-20'}`}>
+            <div className="h-full px-4 md:px-8 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-4 flex-1">
+                    <button
+                        onClick={toggleSidebar}
+                        className="p-2 -ml-2 text-slate-500 hover:bg-slate-100 rounded-lg md:hidden"
+                    >
+                        <MdMenu size={24} />
+                    </button>
+
+                    <div className="relative w-full max-w-md hidden sm:block">
+                        <MdSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+                        <input
+                            type="text"
+                            placeholder="Search..."
+                            className="w-full pl-10 pr-4 py-2 bg-slate-100 border-none rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none text-sm"
+                        />
+                    </div>
                 </div>
 
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2 md:gap-4">
+                    <button className="sm:hidden p-2 text-slate-500 hover:bg-slate-100 rounded-full transition-colors">
+                        <MdSearch size={24} />
+                    </button>
+
                     <button className="p-2 text-slate-500 hover:bg-slate-100 rounded-full transition-colors relative">
                         <MdNotifications size={24} />
                         <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
                     </button>
 
-                    <div className="h-8 w-[1px] bg-slate-200 mx-2"></div>
+                    <div className="h-8 w-[1px] bg-slate-200 mx-1 md:mx-2"></div>
 
                     <div className="relative" ref={dropdownRef}>
                         <button
                             onClick={() => setIsProfileOpen(!isProfileOpen)}
-                            className="flex items-center gap-3 pl-2 hover:bg-slate-50 p-2 rounded-xl transition-colors outline-none"
+                            className="flex items-center gap-2 md:gap-3 pl-1 md:pl-2 hover:bg-slate-50 p-1 md:p-2 rounded-xl transition-colors outline-none"
                         >
                             <div className="text-right hidden md:block">
                                 <p className="text-sm font-semibold text-slate-900 leading-tight">{user.name || 'User'}</p>
                                 <p className="text-xs text-slate-500 capitalize">{user.role || 'Sales'}</p>
                             </div>
-                            <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center text-primary-700 overflow-hidden ring-2 ring-transparent group-hover:ring-primary-100 transition-all">
+                            <div className="w-8 h-8 md:w-10 md:h-10 bg-primary-100 rounded-full flex items-center justify-center text-primary-700 overflow-hidden ring-2 ring-transparent group-hover:ring-primary-100 transition-all">
                                 <MdAccountCircle size={28} />
                             </div>
                         </button>

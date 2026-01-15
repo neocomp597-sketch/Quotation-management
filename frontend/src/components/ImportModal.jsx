@@ -149,11 +149,11 @@ const ImportModal = ({ isOpen, onClose, title, onImport, onDownloadTemplate, typ
                     onDragOver={handleDrag}
                     onDrop={handleDrop}
                     onClick={() => fileInputRef.current?.click()}
-                    className={`relative border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all ${dragActive
-                            ? 'border-primary-500 bg-primary-50'
-                            : file
-                                ? 'border-emerald-300 bg-emerald-50'
-                                : 'border-slate-200 bg-slate-50 hover:border-primary-300 hover:bg-primary-50/30'
+                    className={`relative border-2 border-dashed rounded-2xl p-4 md:p-8 text-center cursor-pointer transition-all ${dragActive
+                        ? 'border-primary-500 bg-primary-50'
+                        : file
+                            ? 'border-emerald-300 bg-emerald-50'
+                            : 'border-slate-200 bg-slate-50 hover:border-primary-300 hover:bg-primary-50/30'
                         }`}
                 >
                     <input

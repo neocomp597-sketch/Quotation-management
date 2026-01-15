@@ -32,14 +32,14 @@ const Modal = ({ isOpen, onClose, title, children, footer, maxWidth = 'max-w-2xl
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}
-                <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-white">
+                <div className="px-5 py-4 md:px-8 md:py-6 border-b border-slate-100 flex justify-between items-center bg-white">
                     <div>
-                        <h3 className="text-2xl font-black text-slate-900 tracking-tight">{title}</h3>
+                        <h3 className="text-lg md:text-2xl font-black text-slate-900 tracking-tight">{title}</h3>
                         <div className="h-1.5 w-12 bg-primary-600 rounded-full mt-1.5"></div>
                     </div>
                     <button
                         onClick={onClose}
-                        className="p-2.5 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-2xl transition-all duration-200"
+                        className="p-2 md:p-2.5 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-2xl transition-all duration-200"
                         aria-label="Close modal"
                     >
                         <MdClose size={24} />
@@ -47,13 +47,13 @@ const Modal = ({ isOpen, onClose, title, children, footer, maxWidth = 'max-w-2xl
                 </div>
 
                 {/* Content Area */}
-                <div className="px-8 py-8 overflow-y-auto custom-scrollbar flex-1">
+                <div className="px-5 py-5 md:px-8 md:py-8 overflow-y-auto custom-scrollbar flex-1">
                     {children}
                 </div>
 
                 {/* Footer */}
                 {footer && (
-                    <div className="px-8 py-6 border-t border-slate-100 bg-slate-50 flex justify-end items-center gap-4">
+                    <div className="px-5 py-4 md:px-8 md:py-6 border-t border-slate-100 bg-slate-50 flex flex-col md:flex-row justify-end items-center gap-3 md:gap-4">
                         {footer}
                     </div>
                 )}

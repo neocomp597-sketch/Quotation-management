@@ -97,69 +97,59 @@ const Quotations = () => {
                     </div>
                 </div>
 
-                <div className="overflow-x-auto">
+                <div>
                     {loading ? (
                         <div className="p-20 text-center">
                             <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-primary-500 border-t-transparent mb-4"></div>
                             <p className="text-slate-400 font-black uppercase tracking-widest text-xs">Syncing Quotation Data...</p>
                         </div>
                     ) : (
-                        <table className="w-full text-left">
-                            <thead className="bg-slate-50 text-slate-400 text-[10px] uppercase font-black tracking-widest border-b border-slate-100">
-                                <tr>
-                                    <th className="px-8 py-5">Ref Number</th>
-                                    <th className="px-8 py-5">Customer Info</th>
-                                    <th className="px-8 py-5">Validity</th>
-                                    <th className="px-8 py-5 text-right">Net Amount</th>
-                                    <th className="px-8 py-5 text-center">Status</th>
-                                    <th className="px-8 py-5 text-right">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-50">
+                        <>
+                            {/* Mobile Card View */}
+                            <div className="md:hidden p-4 space-y-4 bg-slate-50/50">
                                 {filteredQuotations.map((q) => (
-                                    <tr key={q._id} className="hover:bg-slate-50/50 transition-colors group">
-                                        <td className="px-8 py-5">
-                                            <div className="font-black text-slate-900 tracking-tight">{q.quotationNo}</div>
-                                            <div className="text-[10px] text-slate-400 font-bold uppercase">{formatDate(q.quotationDate)}</div>
-                                        </td>
-                                        <td className="px-8 py-5">
-                                            <div className="font-bold text-slate-700">{q.customerId?.companyName}</div>
-                                            <div className="text-[10px] text-slate-400 font-black uppercase tracking-tighter">{q.customerId?.customerName}</div>
-                                        </td>
-                                        <td className="px-8 py-5">
-                                            <div className="text-xs font-bold text-rose-500 uppercase tracking-tighter flex items-center gap-1">
-                                                Expires {formatDate(q.validTill)}
-                                            </div>
-                                        </td>
-                                        <td className="px-8 py-5 text-right">
-                                            <div className="text-lg font-black text-slate-900">₹{q.grandTotal?.toLocaleString()}</div>
-                                            <div className="text-[10px] text-slate-400 font-bold uppercase">Incl Txs</div>
-                                        </td>
-                                        <td className="px-8 py-5">
-                                            <div className="flex justify-center">
-                                                <span className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest border ${q.status === 'final'
+                                    <div key={q._id} className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                                        <div className="p-5 border-b border-slate-50">
+                                            <div className="flex justify-between items-start mb-2">
+                                                <div>
+                                                    <span className="text-[10px] font-black uppercase tracking-widest text-primary-600 bg-primary-50 px-2 py-1 rounded-md">{q.quotationNo}</span>
+                                                    <h3 className="font-bold text-slate-900 mt-2 text-sm">{q.customerId?.companyName}</h3>
+                                                    <p className="text-xs text-slate-400 font-medium">{q.customerId?.customerName}</p>
+                                                </div>
+                                                <span className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border ${q.status === 'final'
                                                     ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
                                                     : 'bg-amber-50 text-amber-600 border-amber-100'
                                                     }`}>
                                                     {q.status}
                                                 </span>
                                             </div>
-                                        </td>
-                                        <td className="px-8 py-5 text-right">
-                                            <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <div className="flex justify-between items-end mt-4">
+                                                <div>
+                                                    <p className="text-[10px] text-slate-400 font-bold uppercase">Net Amount</p>
+                                                    <p className="text-lg font-black text-slate-900">₹{q.grandTotal?.toLocaleString()}</p>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="text-[10px] text-slate-400 font-bold uppercase">Expires</p>
+                                                    <p className="text-xs font-bold text-rose-500">{formatDate(q.validTill)}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="bg-slate-50/50 px-4 py-3 flex justify-between items-center">
+                                            <div className="text-[10px] font-bold text-slate-400 uppercase">
+                                                {formatDate(q.quotationDate)}
+                                            </div>
+                                            <div className="flex gap-1">
                                                 {q.status === 'draft' && (
                                                     <>
                                                         <button
                                                             onClick={() => navigate(`/quotations/${q._id}`)}
-                                                            className="p-2.5 text-amber-600 hover:bg-amber-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
-                                                            title="Edit Draft"
+                                                            className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
                                                         >
                                                             <MdEdit size={18} />
                                                         </button>
                                                         <button
                                                             onClick={() => handleFinalize(q._id)}
-                                                            className="p-2.5 text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
-                                                            title="Finalize"
+                                                            className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
                                                         >
                                                             <MdCheckCircle size={18} />
                                                         </button>
@@ -167,42 +157,138 @@ const Quotations = () => {
                                                 )}
                                                 <button
                                                     onClick={() => handleViewDetails(q._id)}
-                                                    className="p-2.5 text-primary-600 hover:bg-primary-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
-                                                    title="View Profile"
+                                                    className="p-2 text-primary-600 hover:bg-primary-50 rounded-lg transition-all"
                                                 >
                                                     <MdVisibility size={18} />
                                                 </button>
-
                                                 <PDFDownloadLink document={<QuotationPDF quotation={q} />} fileName={`${q.quotationNo.replace(/\//g, '-')}.pdf`}>
                                                     {({ loading }) => (
                                                         <button
                                                             disabled={loading}
-                                                            className="p-2.5 text-rose-500 hover:bg-rose-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100 disabled:opacity-50"
-                                                            title="Export PDF"
+                                                            className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-all disabled:opacity-50"
                                                         >
                                                             <MdPictureAsPdf size={18} />
                                                         </button>
                                                     )}
                                                 </PDFDownloadLink>
-
                                                 <button
                                                     onClick={() => handleDelete(q._id)}
-                                                    className="p-2.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
-                                                    title="Purge Record"
+                                                    className="p-2 text-slate-400 hover:text-rose-600 hover:bg-white rounded-lg transition-all"
                                                 >
                                                     <MdDelete size={18} />
                                                 </button>
                                             </div>
-                                        </td>
-                                    </tr>
+                                        </div>
+                                    </div>
                                 ))}
-                                {filteredQuotations.length === 0 && !loading && (
-                                    <tr>
-                                        <td colSpan="6" className="p-20 text-center text-slate-400 font-bold uppercase text-xs tracking-[0.2em]">No quotations found</td>
-                                    </tr>
+                                {filteredQuotations.length === 0 && (
+                                    <div className="text-center p-8 text-slate-400 text-xs font-bold uppercase tracking-widest">No quotations found</div>
                                 )}
-                            </tbody>
-                        </table>
+                            </div>
+
+                            {/* Desktop Table View */}
+                            <div className="hidden md:block overflow-x-auto">
+                                <table className="w-full text-left">
+                                    <thead className="bg-slate-50 text-slate-400 text-[10px] uppercase font-black tracking-widest border-b border-slate-100">
+                                        <tr>
+                                            <th className="px-8 py-5">Ref Number</th>
+                                            <th className="px-8 py-5">Customer Info</th>
+                                            <th className="px-8 py-5">Validity</th>
+                                            <th className="px-8 py-5 text-right">Net Amount</th>
+                                            <th className="px-8 py-5 text-center">Status</th>
+                                            <th className="px-8 py-5 text-right">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-50">
+                                        {filteredQuotations.map((q) => (
+                                            <tr key={q._id} className="hover:bg-slate-50/50 transition-colors group">
+                                                <td className="px-8 py-5">
+                                                    <div className="font-black text-slate-900 tracking-tight">{q.quotationNo}</div>
+                                                    <div className="text-[10px] text-slate-400 font-bold uppercase">{formatDate(q.quotationDate)}</div>
+                                                </td>
+                                                <td className="px-8 py-5">
+                                                    <div className="font-bold text-slate-700">{q.customerId?.companyName}</div>
+                                                    <div className="text-[10px] text-slate-400 font-black uppercase tracking-tighter">{q.customerId?.customerName}</div>
+                                                </td>
+                                                <td className="px-8 py-5">
+                                                    <div className="text-xs font-bold text-rose-500 uppercase tracking-tighter flex items-center gap-1">
+                                                        Expires {formatDate(q.validTill)}
+                                                    </div>
+                                                </td>
+                                                <td className="px-8 py-5 text-right">
+                                                    <div className="text-lg font-black text-slate-900">₹{q.grandTotal?.toLocaleString()}</div>
+                                                    <div className="text-[10px] text-slate-400 font-bold uppercase">Incl Txs</div>
+                                                </td>
+                                                <td className="px-8 py-5">
+                                                    <div className="flex justify-center">
+                                                        <span className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest border ${q.status === 'final'
+                                                            ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                                                            : 'bg-amber-50 text-amber-600 border-amber-100'
+                                                            }`}>
+                                                            {q.status}
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-8 py-5 text-right">
+                                                    <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        {q.status === 'draft' && (
+                                                            <>
+                                                                <button
+                                                                    onClick={() => navigate(`/quotations/${q._id}`)}
+                                                                    className="p-2.5 text-amber-600 hover:bg-amber-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
+                                                                    title="Edit Draft"
+                                                                >
+                                                                    <MdEdit size={18} />
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleFinalize(q._id)}
+                                                                    className="p-2.5 text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
+                                                                    title="Finalize"
+                                                                >
+                                                                    <MdCheckCircle size={18} />
+                                                                </button>
+                                                            </>
+                                                        )}
+                                                        <button
+                                                            onClick={() => handleViewDetails(q._id)}
+                                                            className="p-2.5 text-primary-600 hover:bg-primary-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
+                                                            title="View Profile"
+                                                        >
+                                                            <MdVisibility size={18} />
+                                                        </button>
+
+                                                        <PDFDownloadLink document={<QuotationPDF quotation={q} />} fileName={`${q.quotationNo.replace(/\//g, '-')}.pdf`}>
+                                                            {({ loading }) => (
+                                                                <button
+                                                                    disabled={loading}
+                                                                    className="p-2.5 text-rose-500 hover:bg-rose-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100 disabled:opacity-50"
+                                                                    title="Export PDF"
+                                                                >
+                                                                    <MdPictureAsPdf size={18} />
+                                                                </button>
+                                                            )}
+                                                        </PDFDownloadLink>
+
+                                                        <button
+                                                            onClick={() => handleDelete(q._id)}
+                                                            className="p-2.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
+                                                            title="Purge Record"
+                                                        >
+                                                            <MdDelete size={18} />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                        {filteredQuotations.length === 0 && !loading && (
+                                            <tr>
+                                                <td colSpan="6" className="p-20 text-center text-slate-400 font-bold uppercase text-xs tracking-[0.2em]">No quotations found</td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </>
                     )}
                 </div>
             </div>

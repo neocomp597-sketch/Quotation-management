@@ -212,7 +212,7 @@ const Terms = () => {
                         <textarea
                             value={formData.content}
                             onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                            className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-xs font-mono leading-relaxed h-96 resize-none"
+                            className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-xs font-mono leading-relaxed h-64 md:h-96 resize-none"
                             placeholder="Enter the detailed terms and conditions here..."
                             required
                         />

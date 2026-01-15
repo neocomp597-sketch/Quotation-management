@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MdAdd, MdSearch, MdEdit, MdDelete, MdInventory, MdCategory, MdQrCode, MdPayments, MdProductionQuantityLimits, MdCloudUpload, MdVisibility, MdFileUpload, MdCheckBox, MdCheckBoxOutlineBlank, MdDeleteSweep, MdSync } from 'react-icons/md';
+import { MdAdd, MdSearch, MdEdit, MdDelete, MdInventory, MdCategory, MdQrCode, MdPayments, MdProductionQuantityLimits, MdCloudUpload, MdVisibility, MdFileUpload, MdCheckBox, MdCheckBoxOutlineBlank, MdDeleteSweep, MdSync, MdImage } from 'react-icons/md';
 import { productService, uploadService, importService } from '../services/api';
 import Modal from '../components/Modal';
 import ImportModal from '../components/ImportModal';
@@ -261,7 +261,7 @@ const Products = () => {
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
                     </div>
-                    <div className="flex gap-2">
+                    <div className="hidden md:flex gap-2">
                         <button
                             onClick={() => setViewMode('list')}
                             className={`p-3 rounded-xl transition-all ${viewMode === 'list' ? 'bg-primary-50 text-primary-600' : 'bg-white text-slate-400 border border-slate-200 hover:bg-slate-50'}`}
@@ -283,178 +283,256 @@ const Products = () => {
                     </div>
                 </div>
 
-                <div className="overflow-x-auto">
+                <div>
                     {loading ? (
                         <div className="p-20 text-center text-slate-400 font-medium">
                             <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-primary-500 border-t-transparent mb-4"></div>
                             <p className="text-xs uppercase font-black tracking-widest">Loading Catalog...</p>
                         </div>
-                    ) : viewMode === 'list' ? (
-                        <table className="w-full text-left">
-                            <thead className="bg-slate-50 text-slate-400 text-[10px] uppercase font-black tracking-widest border-b border-slate-100">
-                                <tr>
-                                    <th className="px-4 py-5 w-12">
-                                        <button
-                                            onClick={toggleSelectAll}
-                                            className="p-1 hover:bg-slate-200 rounded-lg transition-colors"
-                                        >
-                                            {selectedIds.length === filteredProducts.length && filteredProducts.length > 0 ? (
-                                                <MdCheckBox size={20} className="text-primary-600" />
-                                            ) : (
-                                                <MdCheckBoxOutlineBlank size={20} />
-                                            )}
-                                        </button>
-                                    </th>
-                                    <th className="px-4 py-5">Product Info</th>
-                                    <th className="px-8 py-5">Code & HSN</th>
-                                    <th className="px-8 py-5 text-right">Pricing (Base / MRP)</th>
-                                    <th className="px-8 py-5 text-center">Status</th>
-                                    <th className="px-8 py-5 text-right">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
+                    ) : (
+                        <>
+                            {/* Mobile Card View */}
+                            <div className="md:hidden p-4 space-y-4 bg-slate-50/50">
                                 {filteredProducts.map((p) => (
-                                    <tr key={p._id} className={`hover:bg-slate-50 transition-colors group ${selectedIds.includes(p._id) ? 'bg-primary-50/50' : ''}`}>
-                                        <td className="px-4 py-5">
-                                            <button
-                                                onClick={() => toggleSelectOne(p._id)}
-                                                className="p-1 hover:bg-slate-200 rounded-lg transition-colors"
+                                    <div key={p._id} className={`bg-white rounded-2xl border shadow-sm overflow-hidden ${selectedIds.includes(p._id) ? 'border-primary-500 ring-1 ring-primary-500' : 'border-slate-100'}`}>
+                                        <div className="p-4 flex gap-4">
+                                            <div
+                                                className="h-20 w-20 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-center flex-shrink-0 cursor-pointer overflow-hidden"
+                                                onClick={() => handleOpenModal(p)}
                                             >
-                                                {selectedIds.includes(p._id) ? (
-                                                    <MdCheckBox size={20} className="text-primary-600" />
+                                                {p.productImageUrl ? (
+                                                    <img src={resolveImageUrl(p.productImageUrl)} alt={p.productName} className="h-full w-full object-contain" />
                                                 ) : (
-                                                    <MdCheckBoxOutlineBlank size={20} className="text-slate-300" />
+                                                    <MdImage className="text-slate-300" size={32} />
                                                 )}
-                                            </button>
-                                        </td>
-                                        <td className="px-4 py-5">
-                                            <div className="flex items-center gap-4">
-                                                <div
-                                                    className="h-12 w-12 rounded-xl bg-white border border-slate-100 overflow-hidden flex-shrink-0 cursor-pointer hover:border-primary-500 transition-all"
-                                                    onClick={() => setViewImage(p.productImageUrl || getPlaceholderImage(p.productCode))}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex justify-between items-start">
+                                                    <div>
+                                                        <h3 className="font-bold text-slate-900 truncate pr-2 text-sm">{p.productName}</h3>
+                                                        <p className="text-xs text-slate-500 font-mono mt-0.5">{p.productCode}</p>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => toggleSelectOne(p._id)}
+                                                        className="p-1 -mt-1 -mr-1"
+                                                    >
+                                                        {selectedIds.includes(p._id) ? (
+                                                            <MdCheckBox size={24} className="text-primary-600" />
+                                                        ) : (
+                                                            <MdCheckBoxOutlineBlank size={24} className="text-slate-300" />
+                                                        )}
+                                                    </button>
+                                                </div>
+                                                <div className="mt-2 flex items-center justify-between">
+                                                    <span className="font-black text-slate-900">₹{p.basePrice?.toLocaleString()}</span>
+                                                    <span className={`px-2 py-0.5 text-[10px] font-black uppercase tracking-widest rounded-md border ${p.status === 'Active'
+                                                        ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                                                        : 'bg-rose-50 text-rose-600 border-rose-100'
+                                                        }`}>
+                                                        {p.status}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="bg-slate-50 px-4 py-3 flex justify-between items-center border-t border-slate-100">
+                                            <div className="text-xs text-slate-500 font-medium">
+                                                HSN: {p.hsnCode || 'N/A'}
+                                            </div>
+                                            <div className="flex gap-1">
+                                                <button
+                                                    onClick={() => handleOpenModal(p)}
+                                                    className="p-2 text-slate-400 hover:text-primary-600 hover:bg-white rounded-lg transition-all"
                                                 >
+                                                    <MdEdit size={18} />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDelete(p._id)}
+                                                    className="p-2 text-slate-400 hover:text-rose-600 hover:bg-white rounded-lg transition-all"
+                                                >
+                                                    <MdDelete size={18} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                                {filteredProducts.length === 0 && (
+                                    <div className="text-center p-8 text-slate-400 text-sm">No products found</div>
+                                )}
+                            </div>
+
+                            {/* Desktop Views */}
+                            <div className="hidden md:block">
+                                {viewMode === 'list' ? (
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-left">
+                                            <thead className="bg-slate-50 text-slate-400 text-[10px] uppercase font-black tracking-widest border-b border-slate-100">
+                                                <tr>
+                                                    <th className="px-4 py-5 w-12">
+                                                        <button
+                                                            onClick={toggleSelectAll}
+                                                            className="p-1 hover:bg-slate-200 rounded-lg transition-colors"
+                                                        >
+                                                            {selectedIds.length === filteredProducts.length && filteredProducts.length > 0 ? (
+                                                                <MdCheckBox size={20} className="text-primary-600" />
+                                                            ) : (
+                                                                <MdCheckBoxOutlineBlank size={20} />
+                                                            )}
+                                                        </button>
+                                                    </th>
+                                                    <th className="px-4 py-5">Product Info</th>
+                                                    <th className="px-8 py-5">Code & HSN</th>
+                                                    <th className="px-8 py-5 text-right">Pricing (Base / MRP)</th>
+                                                    <th className="px-8 py-5 text-center">Status</th>
+                                                    <th className="px-8 py-5 text-right">Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100">
+                                                {filteredProducts.map((p) => (
+                                                    <tr key={p._id} className={`hover:bg-slate-50 transition-colors group ${selectedIds.includes(p._id) ? 'bg-primary-50/50' : ''}`}>
+                                                        <td className="px-4 py-5">
+                                                            <button
+                                                                onClick={() => toggleSelectOne(p._id)}
+                                                                className="p-1 hover:bg-slate-200 rounded-lg transition-colors"
+                                                            >
+                                                                {selectedIds.includes(p._id) ? (
+                                                                    <MdCheckBox size={20} className="text-primary-600" />
+                                                                ) : (
+                                                                    <MdCheckBoxOutlineBlank size={20} className="text-slate-300" />
+                                                                )}
+                                                            </button>
+                                                        </td>
+                                                        <td className="px-4 py-5">
+                                                            <div className="flex items-center gap-4">
+                                                                <div
+                                                                    className="h-12 w-12 rounded-xl bg-white border border-slate-100 overflow-hidden flex-shrink-0 cursor-pointer hover:border-primary-500 transition-all"
+                                                                    onClick={() => setViewImage(p.productImageUrl || getPlaceholderImage(p.productCode))}
+                                                                >
+                                                                    <img
+                                                                        src={p.productImageUrl ? resolveImageUrl(p.productImageUrl) : getPlaceholderImage(p.productCode)}
+                                                                        alt={p.productName}
+                                                                        className="h-full w-full object-cover"
+                                                                        onError={(e) => {
+                                                                            e.target.onerror = null;
+                                                                            e.target.src = getPlaceholderImage(p.productCode);
+                                                                        }}
+                                                                    />
+                                                                </div>
+                                                                <div>
+                                                                    <div className="font-bold text-slate-900">{p.productName}</div>
+                                                                    <div className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{p.uom}</div>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-8 py-5">
+                                                            <div className="text-sm font-mono font-bold text-primary-700 tracking-tight">{p.productCode}</div>
+                                                            <div className="text-[10px] text-slate-400 uppercase font-bold mt-1">HSN: {p.hsnCode}</div>
+                                                        </td>
+                                                        <td className="px-8 py-5 text-right">
+                                                            <div className="text-sm font-black text-slate-900">₹{p.basePrice?.toLocaleString()}</div>
+                                                            <div className="text-[10px] text-slate-400 line-through">MRP: ₹{p.mrp?.toLocaleString()}</div>
+                                                        </td>
+                                                        <td className="px-8 py-5 text-center">
+                                                            <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-[0.1em] ${p.status === 'Active' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-slate-100 text-slate-400 border border-slate-200'
+                                                                }`}>
+                                                                {p.status}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-8 py-5 text-right">
+                                                            <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                {p.productImageUrl && (
+                                                                    <button
+                                                                        onClick={() => setViewImage(p.productImageUrl)}
+                                                                        className="p-2.5 text-slate-500 hover:bg-slate-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
+                                                                        title="View Image"
+                                                                    >
+                                                                        <MdVisibility size={18} />
+                                                                    </button>
+                                                                )}
+                                                                <button
+                                                                    onClick={() => handleOpenModal(p)}
+                                                                    className="p-2.5 text-primary-600 hover:bg-primary-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
+                                                                    title="Edit Product"
+                                                                >
+                                                                    <MdEdit size={18} />
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleDelete(p._id)}
+                                                                    className="p-2.5 text-rose-500 hover:bg-rose-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
+                                                                >
+                                                                    <MdDelete size={18} />
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 p-6">
+                                        {filteredProducts.map((p) => (
+                                            <div key={p._id} className={`bg-white rounded-2xl border hover:shadow-xl transition-all group flex flex-col overflow-hidden ${selectedIds.includes(p._id) ? 'border-primary-400 ring-2 ring-primary-200' : 'border-slate-100 hover:border-primary-100'}`}>
+                                                <div className="aspect-square bg-slate-50 relative overflow-hidden group-hover:bg-slate-100 transition-colors">
+                                                    {/* Checkbox */}
+                                                    <button
+                                                        onClick={() => toggleSelectOne(p._id)}
+                                                        className="absolute top-4 left-4 z-10 p-1.5 bg-white/90 backdrop-blur-sm rounded-lg shadow-sm border border-slate-200 hover:bg-white transition-all"
+                                                    >
+                                                        {selectedIds.includes(p._id) ? (
+                                                            <MdCheckBox size={20} className="text-primary-600" />
+                                                        ) : (
+                                                            <MdCheckBoxOutlineBlank size={20} className="text-slate-400" />
+                                                        )}
+                                                    </button>
                                                     <img
                                                         src={p.productImageUrl ? resolveImageUrl(p.productImageUrl) : getPlaceholderImage(p.productCode)}
                                                         alt={p.productName}
-                                                        className="h-full w-full object-cover"
+                                                        className="w-full h-full object-cover"
                                                         onError={(e) => {
                                                             e.target.onerror = null;
                                                             e.target.src = getPlaceholderImage(p.productCode);
                                                         }}
                                                     />
+                                                    <div className="absolute top-4 right-4 flex gap-2">
+                                                        <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-[0.1em] backdrop-blur-md ${p.status === 'Active' ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' : 'bg-slate-500/10 text-slate-600 border border-slate-500/20'
+                                                            }`}>
+                                                            {p.status}
+                                                        </span>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <div className="font-bold text-slate-900">{p.productName}</div>
-                                                    <div className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{p.uom}</div>
+                                                <div className="p-6 flex-1 flex flex-col">
+                                                    <div className="mb-4 flex-1">
+                                                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{p.productCode}</div>
+                                                        <h3 className="font-bold text-slate-900 leading-tight mb-2 line-clamp-2">{p.productName}</h3>
+                                                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">HSN: {p.hsnCode}</p>
+                                                    </div>
+                                                    <div className="flex items-end justify-between border-t border-slate-50 pt-4 mt-auto">
+                                                        <div>
+                                                            <div className="text-lg font-black text-slate-900">₹{p.basePrice?.toLocaleString()}</div>
+                                                            <div className="text-[10px] text-slate-400 line-through">MRP: ₹{p.mrp?.toLocaleString()}</div>
+                                                        </div>
+                                                        <div className="flex gap-2">
+                                                            <button
+                                                                onClick={() => handleOpenModal(p)}
+                                                                className="p-2 text-primary-600 hover:bg-primary-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
+                                                            >
+                                                                <MdEdit size={18} />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDelete(p._id)}
+                                                                className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
+                                                            >
+                                                                <MdDelete size={18} />
+                                                            </button>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </td>
-                                        <td className="px-8 py-5">
-                                            <div className="text-sm font-mono font-bold text-primary-700 tracking-tight">{p.productCode}</div>
-                                            <div className="text-[10px] text-slate-400 uppercase font-bold mt-1">HSN: {p.hsnCode}</div>
-                                        </td>
-                                        <td className="px-8 py-5 text-right">
-                                            <div className="text-sm font-black text-slate-900">₹{p.basePrice?.toLocaleString()}</div>
-                                            <div className="text-[10px] text-slate-400 line-through">MRP: ₹{p.mrp?.toLocaleString()}</div>
-                                        </td>
-                                        <td className="px-8 py-5 text-center">
-                                            <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-[0.1em] ${p.status === 'Active' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-slate-100 text-slate-400 border border-slate-200'
-                                                }`}>
-                                                {p.status}
-                                            </span>
-                                        </td>
-                                        <td className="px-8 py-5 text-right">
-                                            <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                {p.productImageUrl && (
-                                                    <button
-                                                        onClick={() => setViewImage(p.productImageUrl)}
-                                                        className="p-2.5 text-slate-500 hover:bg-slate-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
-                                                        title="View Image"
-                                                    >
-                                                        <MdVisibility size={18} />
-                                                    </button>
-                                                )}
-                                                <button
-                                                    onClick={() => handleOpenModal(p)}
-                                                    className="p-2.5 text-primary-600 hover:bg-primary-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
-                                                    title="Edit Product"
-                                                >
-                                                    <MdEdit size={18} />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDelete(p._id)}
-                                                    className="p-2.5 text-rose-500 hover:bg-rose-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
-                                                >
-                                                    <MdDelete size={18} />
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 p-6">
-                            {filteredProducts.map((p) => (
-                                <div key={p._id} className={`bg-white rounded-2xl border hover:shadow-xl transition-all group flex flex-col overflow-hidden ${selectedIds.includes(p._id) ? 'border-primary-400 ring-2 ring-primary-200' : 'border-slate-100 hover:border-primary-100'}`}>
-                                    <div className="aspect-square bg-slate-50 relative overflow-hidden group-hover:bg-slate-100 transition-colors">
-                                        {/* Checkbox */}
-                                        <button
-                                            onClick={() => toggleSelectOne(p._id)}
-                                            className="absolute top-4 left-4 z-10 p-1.5 bg-white/90 backdrop-blur-sm rounded-lg shadow-sm border border-slate-200 hover:bg-white transition-all"
-                                        >
-                                            {selectedIds.includes(p._id) ? (
-                                                <MdCheckBox size={20} className="text-primary-600" />
-                                            ) : (
-                                                <MdCheckBoxOutlineBlank size={20} className="text-slate-400" />
-                                            )}
-                                        </button>
-                                        <img
-                                            src={p.productImageUrl ? resolveImageUrl(p.productImageUrl) : getPlaceholderImage(p.productCode)}
-                                            alt={p.productName}
-                                            className="w-full h-full object-cover"
-                                            onError={(e) => {
-                                                e.target.onerror = null;
-                                                e.target.src = getPlaceholderImage(p.productCode);
-                                            }}
-                                        />
-                                        <div className="absolute top-4 right-4 flex gap-2">
-                                            <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-[0.1em] backdrop-blur-md ${p.status === 'Active' ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' : 'bg-slate-500/10 text-slate-600 border border-slate-500/20'
-                                                }`}>
-                                                {p.status}
-                                            </span>
-                                        </div>
+                                        ))}
                                     </div>
-                                    <div className="p-6 flex-1 flex flex-col">
-                                        <div className="mb-4 flex-1">
-                                            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{p.productCode}</div>
-                                            <h3 className="font-bold text-slate-900 leading-tight mb-2 line-clamp-2">{p.productName}</h3>
-                                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">HSN: {p.hsnCode}</p>
-                                        </div>
-                                        <div className="flex items-end justify-between border-t border-slate-50 pt-4 mt-auto">
-                                            <div>
-                                                <div className="text-lg font-black text-slate-900">₹{p.basePrice?.toLocaleString()}</div>
-                                                <div className="text-[10px] text-slate-400 line-through">MRP: ₹{p.mrp?.toLocaleString()}</div>
-                                            </div>
-                                            <div className="flex gap-2">
-                                                <button
-                                                    onClick={() => handleOpenModal(p)}
-                                                    className="p-2 text-primary-600 hover:bg-primary-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
-                                                >
-                                                    <MdEdit size={18} />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDelete(p._id)}
-                                                    className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
-                                                >
-                                                    <MdDelete size={18} />
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
+                                )}
+                            </div>
+                        </>
                     )}
                 </div>
             </div>

@@ -240,7 +240,7 @@ const Customers = () => {
             )}
 
             <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
-                <div className="p-6 border-b border-slate-50 flex flex-col md:flex-row gap-4 items-center bg-slate-50/30">
+                <div className="p-6 border-b border-slate-50 flex flex-col md:flex-row gap-4 items-center bg-slate-50/30 sticky top-0 z-10">
                     <div className="relative flex-1 w-full text-slate-400 focus-within:text-primary-600 transition-colors">
                         <MdSearch className="absolute left-4 top-1/2 -translate-y-1/2" size={20} />
                         <input
@@ -253,117 +253,199 @@ const Customers = () => {
                     </div>
                 </div>
 
-                <div className="overflow-x-auto">
-                    {loading ? (
-                        <div className="p-20 text-center">
-                            <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-primary-500 border-t-transparent mb-4"></div>
-                            <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">Syncing Customer Data...</p>
-                        </div>
-                    ) : (
-                        <table className="w-full text-left">
-                            <thead className="bg-slate-50/50 text-slate-400 text-[10px] uppercase font-black tracking-widest border-b border-slate-100">
-                                <tr>
-                                    <th className="px-4 py-5 w-12">
+                {loading ? (
+                    <div className="p-20 text-center">
+                        <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-primary-500 border-t-transparent mb-4"></div>
+                        <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">Syncing Customer Data...</p>
+                    </div>
+                ) : (
+                    <>
+                        {/* Mobile Card View */}
+                        <div className="md:hidden p-4 space-y-4 bg-slate-50/50">
+                            {filteredCustomers.map((c) => (
+                                <div key={c._id} className={`bg-white p-5 rounded-2xl border shadow-sm transition-all ${selectedIds.includes(c._id) ? 'border-primary-500 ring-1 ring-primary-500' : 'border-slate-100'}`}>
+                                    <div className="flex justify-between items-start mb-4">
+                                        <div className="flex items-center gap-3">
+                                            <div
+                                                className="h-10 w-10 rounded-xl bg-slate-50 border border-slate-100 p-1 flex-shrink-0"
+                                                onClick={() => setViewCustomer(c)}
+                                            >
+                                                {c.logoUrl ? (
+                                                    <img src={resolveImageUrl(c.logoUrl)} alt="" className="h-full w-full object-contain" />
+                                                ) : (
+                                                    <div className="h-full w-full flex items-center justify-center text-primary-600 font-black text-xs">
+                                                        {c.companyName?.substring(0, 1)}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div>
+                                                <div className="font-bold text-slate-900 text-sm">{c.companyName}</div>
+                                                <div className="text-xs text-slate-500">{c.customerName}</div>
+                                            </div>
+                                        </div>
                                         <button
-                                            onClick={toggleSelectAll}
-                                            className="p-1 hover:bg-slate-200 rounded-lg transition-colors"
+                                            onClick={() => toggleSelectOne(c._id)}
+                                            className="p-1"
                                         >
-                                            {selectedIds.length === filteredCustomers.length && filteredCustomers.length > 0 ? (
-                                                <MdCheckBox size={20} className="text-primary-600" />
+                                            {selectedIds.includes(c._id) ? (
+                                                <MdCheckBox size={24} className="text-primary-600" />
                                             ) : (
-                                                <MdCheckBoxOutlineBlank size={20} />
+                                                <MdCheckBoxOutlineBlank size={24} className="text-slate-300" />
                                             )}
                                         </button>
-                                    </th>
-                                    <th className="px-4 py-5">Company & Info</th>
-                                    <th className="px-8 py-5">Contact</th>
-                                    <th className="px-8 py-5">GSTIN</th>
-                                    <th className="px-8 py-5">Location</th>
-                                    <th className="px-8 py-5 text-right">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-50">
-                                {filteredCustomers.map((c) => (
-                                    <tr key={c._id} className={`hover:bg-slate-50/50 transition-colors group ${selectedIds.includes(c._id) ? 'bg-primary-50/50' : ''}`}>
-                                        <td className="px-4 py-5">
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-xs mb-4">
+                                        <div className="flex items-center gap-2 text-slate-600 font-medium">
+                                            <MdPhone size={14} className="text-slate-400" /> {c.mobile}
+                                        </div>
+                                        <div className="flex items-center gap-2 text-slate-600 font-medium overflow-hidden">
+                                            <MdEmail size={14} className="text-slate-400 flex-shrink-0" /> <span className="truncate">{c.email}</span>
+                                        </div>
+                                        <div className="col-span-2 flex items-center gap-2 text-slate-600 font-medium">
+                                            <MdLocationOn size={14} className="text-slate-400" /> {c.billingAddress?.city}, {c.billingAddress?.state}
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center justify-between pt-4 border-t border-slate-50">
+                                        <span className="font-mono text-[10px] bg-slate-100 px-2 py-1 rounded-md text-slate-500 font-bold uppercase tracking-wider">
+                                            {c.gstin || 'N/A'}
+                                        </span>
+                                        <div className="flex items-center gap-1">
                                             <button
-                                                onClick={() => toggleSelectOne(c._id)}
+                                                onClick={() => setViewCustomer(c)}
+                                                className="p-2 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-all"
+                                            >
+                                                <MdVisibility size={18} />
+                                            </button>
+                                            <button
+                                                onClick={() => handleOpenModal(c)}
+                                                className="p-2 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-all"
+                                            >
+                                                <MdEdit size={18} />
+                                            </button>
+                                            <button
+                                                onClick={() => handleDelete(c._id)}
+                                                className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                                            >
+                                                <MdDelete size={18} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                            {filteredCustomers.length === 0 && (
+                                <div className="text-center p-8 text-slate-400 text-sm">No customers found</div>
+                            )}
+                        </div>
+
+                        {/* Desktop Table View */}
+                        <div className="hidden md:block overflow-x-auto">
+                            <table className="w-full text-left">
+                                <thead className="bg-slate-50/50 text-slate-400 text-[10px] uppercase font-black tracking-widest border-b border-slate-100">
+                                    <tr>
+                                        <th className="px-4 py-5 w-12">
+                                            <button
+                                                onClick={toggleSelectAll}
                                                 className="p-1 hover:bg-slate-200 rounded-lg transition-colors"
                                             >
-                                                {selectedIds.includes(c._id) ? (
+                                                {selectedIds.length === filteredCustomers.length && filteredCustomers.length > 0 ? (
                                                     <MdCheckBox size={20} className="text-primary-600" />
                                                 ) : (
-                                                    <MdCheckBoxOutlineBlank size={20} className="text-slate-300" />
+                                                    <MdCheckBoxOutlineBlank size={20} />
                                                 )}
                                             </button>
-                                        </td>
-                                        <td className="px-4 py-5">
-                                            <div className="flex items-center gap-4">
-                                                <div
-                                                    className="h-10 w-10 rounded-xl bg-white border border-slate-100 p-1.5 flex-shrink-0 cursor-pointer hover:border-primary-500 transition-all"
-                                                    onClick={() => setViewCustomer(c)}
-                                                >
-                                                    {c.logoUrl ? (
-                                                        <img src={resolveImageUrl(c.logoUrl)} alt="" className="h-full w-full object-contain" />
-                                                    ) : (
-                                                        <div className="h-full w-full flex items-center justify-center text-primary-600 bg-primary-50 rounded-lg font-black text-xs">
-                                                            {c.companyName?.substring(0, 1)}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                <div>
-                                                    <div className="font-bold text-slate-900">{c.companyName}</div>
-                                                    <div className="text-xs text-slate-400 font-medium">{c.customerName}</div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-8 py-5">
-                                            <div className="text-sm text-slate-700 font-bold flex items-center gap-1.5 mb-1">
-                                                <MdPhone className="text-slate-300" size={16} /> {c.mobile}
-                                            </div>
-                                            <div className="text-xs text-slate-400 flex items-center gap-1.5">
-                                                <MdEmail className="text-slate-300" size={14} /> {c.email}
-                                            </div>
-                                        </td>
-                                        <td className="px-8 py-5">
-                                            <span className="font-mono text-[11px] bg-primary-50 px-3 py-1.5 rounded-lg text-primary-700 font-bold uppercase tracking-wider border border-primary-100">
-                                                {c.gstin}
-                                            </span>
-                                        </td>
-                                        <td className="px-8 py-5">
-                                            <div className="text-sm font-bold text-slate-700">{c.billingAddress?.city}</div>
-                                            <div className="text-[10px] text-slate-400 font-black uppercase tracking-tighter">{c.billingAddress?.state}</div>
-                                        </td>
-                                        <td className="px-8 py-5 text-right">
-                                            <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button
-                                                    onClick={() => setViewCustomer(c)}
-                                                    className="p-2.5 text-slate-500 hover:bg-slate-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
-                                                    title="View Details"
-                                                >
-                                                    <MdVisibility size={18} />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleOpenModal(c)}
-                                                    className="p-2.5 text-primary-600 hover:bg-primary-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
-                                                    title="Edit Customer"
-                                                >
-                                                    <MdEdit size={18} />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDelete(c._id)}
-                                                    className="p-2.5 text-rose-500 hover:bg-rose-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
-                                                >
-                                                    <MdDelete size={18} />
-                                                </button>
-                                            </div>
-                                        </td>
+                                        </th>
+                                        <th className="px-4 py-5">Company & Info</th>
+                                        <th className="px-8 py-5">Contact</th>
+                                        <th className="px-8 py-5">GSTIN</th>
+                                        <th className="px-8 py-5">Location</th>
+                                        <th className="px-8 py-5 text-right">Actions</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    )}
-                </div>
+                                </thead>
+                                <tbody className="divide-y divide-slate-50">
+                                    {filteredCustomers.map((c) => (
+                                        <tr key={c._id} className={`hover:bg-slate-50/50 transition-colors group ${selectedIds.includes(c._id) ? 'bg-primary-50/50' : ''}`}>
+                                            <td className="px-4 py-5">
+                                                <button
+                                                    onClick={() => toggleSelectOne(c._id)}
+                                                    className="p-1 hover:bg-slate-200 rounded-lg transition-colors"
+                                                >
+                                                    {selectedIds.includes(c._id) ? (
+                                                        <MdCheckBox size={20} className="text-primary-600" />
+                                                    ) : (
+                                                        <MdCheckBoxOutlineBlank size={20} className="text-slate-300" />
+                                                    )}
+                                                </button>
+                                            </td>
+                                            <td className="px-4 py-5">
+                                                <div className="flex items-center gap-4">
+                                                    <div
+                                                        className="h-10 w-10 rounded-xl bg-white border border-slate-100 p-1.5 flex-shrink-0 cursor-pointer hover:border-primary-500 transition-all"
+                                                        onClick={() => setViewCustomer(c)}
+                                                    >
+                                                        {c.logoUrl ? (
+                                                            <img src={resolveImageUrl(c.logoUrl)} alt="" className="h-full w-full object-contain" />
+                                                        ) : (
+                                                            <div className="h-full w-full flex items-center justify-center text-primary-600 bg-primary-50 rounded-lg font-black text-xs">
+                                                                {c.companyName?.substring(0, 1)}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <div>
+                                                        <div className="font-bold text-slate-900">{c.companyName}</div>
+                                                        <div className="text-xs text-slate-400 font-medium">{c.customerName}</div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-8 py-5">
+                                                <div className="text-sm text-slate-700 font-bold flex items-center gap-1.5 mb-1">
+                                                    <MdPhone className="text-slate-300" size={16} /> {c.mobile}
+                                                </div>
+                                                <div className="text-xs text-slate-400 flex items-center gap-1.5">
+                                                    <MdEmail className="text-slate-300" size={14} /> {c.email}
+                                                </div>
+                                            </td>
+                                            <td className="px-8 py-5">
+                                                <span className="font-mono text-[11px] bg-primary-50 px-3 py-1.5 rounded-lg text-primary-700 font-bold uppercase tracking-wider border border-primary-100">
+                                                    {c.gstin}
+                                                </span>
+                                            </td>
+                                            <td className="px-8 py-5">
+                                                <div className="text-sm font-bold text-slate-700">{c.billingAddress?.city}</div>
+                                                <div className="text-[10px] text-slate-400 font-black uppercase tracking-tighter">{c.billingAddress?.state}</div>
+                                            </td>
+                                            <td className="px-8 py-5 text-right">
+                                                <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <button
+                                                        onClick={() => setViewCustomer(c)}
+                                                        className="p-2.5 text-slate-500 hover:bg-slate-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
+                                                        title="View Details"
+                                                    >
+                                                        <MdVisibility size={18} />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleOpenModal(c)}
+                                                        className="p-2.5 text-primary-600 hover:bg-primary-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
+                                                        title="Edit Customer"
+                                                    >
+                                                        <MdEdit size={18} />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDelete(c._id)}
+                                                        className="p-2.5 text-rose-500 hover:bg-rose-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
+                                                    >
+                                                        <MdDelete size={18} />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </>
+                )}
             </div>
 
             {/* Form Modal */}

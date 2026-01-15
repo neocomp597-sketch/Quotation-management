@@ -23,70 +23,87 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
         { name: 'Terms & Conditions', icon: <MdAssignment size={22} />, path: '/terms' },
     ];
 
-    return (
-        <div
-            className={`fixed top-0 left-0 h-full bg-slate-900 text-white transition-all duration-300 z-50 ${isOpen ? 'w-64' : 'w-20'
-                } shadow-2xl`}
-        >
-            <div className="flex items-center justify-between h-20 px-4 border-b border-slate-800">
-                <div className={`flex items-center gap-3 overflow-hidden transition-all duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 w-0'}`}>
-                    <div className="p-2 bg-primary-600 rounded-lg">
-                        <MdInventory size={24} className="text-white" />
-                    </div>
-                    <span className="text-xl font-bold tracking-tight whitespace-nowrap">JAG ERP</span>
-                </div>
-                <button
-                    onClick={toggleSidebar}
-                    className="p-2 rounded-lg hover:bg-slate-800 transition-colors"
-                >
-                    <MdChevronLeft size={24} className={`transition-transform duration-300 ${!isOpen ? 'rotate-180' : ''}`} />
-                </button>
-            </div>
+    // Handle closing sidebar on mobile when a link is clicked
+    const handleNavClick = () => {
+        if (window.innerWidth < 768) {
+            toggleSidebar();
+        }
+    };
 
-            <nav className="mt-6 px-3 space-y-2">
-                {menuItems.map((item) => (
+    return (
+        <>
+            {/* Mobile Backdrop */}
+            <div
+                className={`fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 transition-opacity duration-300 md:hidden ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                onClick={toggleSidebar}
+            />
+
+            <div
+                className={`fixed top-0 left-0 h-full bg-slate-900 text-white transition-all duration-300 z-50 shadow-2xl 
+                transform ${isOpen ? 'translate-x-0 w-64' : '-translate-x-full md:translate-x-0 md:w-20 w-64'}`}
+            >
+                <div className="flex items-center justify-between h-20 px-4 border-b border-slate-800">
+                    <div className={`flex items-center gap-3 overflow-hidden transition-all duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 w-0 md:opacity-0 md:w-0'}`}>
+                        <div className="p-2 bg-primary-600 rounded-lg shrink-0">
+                            <MdInventory size={24} className="text-white" />
+                        </div>
+                        <span className="text-xl font-bold tracking-tight whitespace-nowrap">JAG ERP</span>
+                    </div>
+                    <button
+                        onClick={toggleSidebar}
+                        className="p-2 rounded-lg hover:bg-slate-800 transition-colors ml-auto md:ml-0"
+                    >
+                        <MdChevronLeft size={24} className={`transition-transform duration-300 ${!isOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                </div>
+
+                <nav className="mt-6 px-3 space-y-2">
+                    {menuItems.map((item) => (
+                        <NavLink
+                            key={item.path}
+                            to={item.path}
+                            onClick={handleNavClick}
+                            className={({ isActive }) =>
+                                `flex items-center gap-4 px-3 py-3 rounded-xl transition-all duration-200 group ${isActive
+                                    ? 'bg-primary-600 text-white shadow-lg shadow-primary-900/20'
+                                    : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                                }`
+                            }
+                        >
+                            <div className={`transition-transform duration-200 group-hover:scale-110 shrink-0`}>
+                                {item.icon}
+                            </div>
+                            <span className={`font-medium transition-all duration-300 whitespace-nowrap ${!isOpen ? 'md:opacity-0 md:w-0' : 'opacity-100'}`}>
+                                {item.name}
+                            </span>
+                            {!isOpen && (
+                                <div className="absolute left-full ml-6 px-2 py-1 bg-slate-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap hidden md:block z-50">
+                                    {item.name}
+                                </div>
+                            )}
+                        </NavLink>
+                    ))}
+                </nav>
+
+                <div className="absolute bottom-0 w-full p-4 border-t border-slate-800">
                     <NavLink
-                        key={item.path}
-                        to={item.path}
+                        to="/settings"
+                        onClick={handleNavClick}
                         className={({ isActive }) =>
-                            `flex items-center gap-4 px-3 py-3 rounded-xl transition-all duration-200 group ${isActive
-                                ? 'bg-primary-600 text-white shadow-lg shadow-primary-900/20'
+                            `flex items-center gap-4 px-3 py-3 rounded-xl transition-all duration-200 ${isActive
+                                ? 'bg-primary-600 text-white'
                                 : 'text-slate-400 hover:bg-slate-800 hover:text-white'
                             }`
                         }
                     >
-                        <div className={`transition-transform duration-200 group-hover:scale-110`}>
-                            {item.icon}
-                        </div>
-                        <span className={`font-medium transition-all duration-300 ${!isOpen ? 'opacity-0 w-0' : 'opacity-100'}`}>
-                            {item.name}
+                        <MdSettings size={22} className="shrink-0" />
+                        <span className={`font-medium transition-all duration-300 whitespace-nowrap ${!isOpen ? 'md:opacity-0 md:w-0' : 'opacity-100'}`}>
+                            Settings
                         </span>
-                        {!isOpen && (
-                            <div className="absolute left-full ml-6 px-2 py-1 bg-slate-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap">
-                                {item.name}
-                            </div>
-                        )}
                     </NavLink>
-                ))}
-            </nav>
-
-            <div className="absolute bottom-0 w-full p-4 border-t border-slate-800">
-                <NavLink
-                    to="/settings"
-                    className={({ isActive }) =>
-                        `flex items-center gap-4 px-3 py-3 rounded-xl transition-all duration-200 ${isActive
-                            ? 'bg-primary-600 text-white'
-                            : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                        }`
-                    }
-                >
-                    <MdSettings size={22} />
-                    <span className={`font-medium transition-all duration-300 ${!isOpen ? 'opacity-0 w-0' : 'opacity-100'}`}>
-                        Settings
-                    </span>
-                </NavLink>
+                </div>
             </div>
-        </div>
+        </>
     );
 };
 
