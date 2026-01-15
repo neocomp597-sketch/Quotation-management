@@ -68,3 +68,16 @@ export const resolveImageUrl = (url) => {
 
     return `${base}${cleanUrl}`;
 };
+
+/**
+ * Generate a placeholder image URL based on product/customer name
+ * Uses DiceBear API for consistent, attractive placeholders
+ */
+export const getPlaceholderImage = (seed, type = 'shapes') => {
+    const encodedSeed = encodeURIComponent(seed || 'default');
+    // Using DiceBear shapes style for products, initials for customers
+    if (type === 'initials') {
+        return `https://api.dicebear.com/7.x/initials/svg?seed=${encodedSeed}&backgroundColor=6366f1,8b5cf6,3b82f6,06b6d4,10b981&backgroundType=gradientLinear`;
+    }
+    return `https://api.dicebear.com/7.x/shapes/svg?seed=${encodedSeed}&backgroundColor=f1f5f9`;
+};

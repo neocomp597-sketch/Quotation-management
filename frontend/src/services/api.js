@@ -22,6 +22,8 @@ export const customerService = {
     create: (data) => api.post('/customers', data),
     update: (id, data) => api.put(`/customers/${id}`, data),
     delete: (id) => api.delete(`/customers/${id}`),
+    bulkDelete: (ids) => api.post('/customers/bulk-delete', { ids }),
+    bulkUpdate: (ids, updateData) => api.patch('/customers/bulk-update', { ids, updateData }),
 };
 
 export const productService = {
@@ -30,6 +32,8 @@ export const productService = {
     create: (data) => api.post('/products', data),
     update: (id, data) => api.put(`/products/${id}`, data),
     delete: (id) => api.delete(`/products/${id}`),
+    bulkDelete: (ids) => api.post('/products/bulk-delete', { ids }),
+    bulkUpdate: (ids, updateData) => api.patch('/products/bulk-update', { ids, updateData }),
 };
 
 export const quotationService = {
@@ -74,6 +78,29 @@ export const uploadService = {
             }
         });
     }
+};
+
+export const importService = {
+    importProducts: (file) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        return api.post('/import/products', formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            }
+        });
+    },
+    importCustomers: (file) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        return api.post('/import/customers', formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            }
+        });
+    },
+    getProductTemplate: () => api.get('/import/template/products', { responseType: 'blob' }),
+    getCustomerTemplate: () => api.get('/import/template/customers', { responseType: 'blob' })
 };
 
 export default api;

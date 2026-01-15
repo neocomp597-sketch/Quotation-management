@@ -75,7 +75,7 @@ const Quotations = () => {
                     <p className="text-slate-500 font-medium">Manage and track your professional trade quotations.</p>
                 </div>
                 <Link
-                    to="/quotations/create"
+                    to="/quotations/new"
                     className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
                 >
                     <MdAdd size={20} />
@@ -150,7 +150,7 @@ const Quotations = () => {
                                                 {q.status === 'draft' && (
                                                     <>
                                                         <button
-                                                            onClick={() => navigate(`/quotations/edit/${q._id}`)}
+                                                            onClick={() => navigate(`/quotations/${q._id}`)}
                                                             className="p-2.5 text-amber-600 hover:bg-amber-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
                                                             title="Edit Draft"
                                                         >

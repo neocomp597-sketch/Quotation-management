@@ -99,10 +99,61 @@ const deleteCustomer = async (req, res) => {
     }
 };
 
+// Bulk Delete Customers
+const bulkDeleteCustomers = async (req, res) => {
+    try {
+        const { ids } = req.body;
+
+        if (!ids || !Array.isArray(ids) || ids.length === 0) {
+            return res.status(400).json({ message: 'Please provide an array of customer IDs' });
+        }
+
+        const result = await Customer.deleteMany({ _id: { $in: ids } });
+
+        res.json({
+            message: `${result.deletedCount} customers deleted successfully`,
+            deletedCount: result.deletedCount
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Error deleting customers' });
+    }
+};
+
+// Bulk Update Customers
+const bulkUpdateCustomers = async (req, res) => {
+    try {
+        const { ids, updateData } = req.body;
+
+        if (!ids || !Array.isArray(ids) || ids.length === 0) {
+            return res.status(400).json({ message: 'Please provide an array of customer IDs' });
+        }
+
+        if (!updateData || Object.keys(updateData).length === 0) {
+            return res.status(400).json({ message: 'Please provide update data' });
+        }
+
+        const result = await Customer.updateMany(
+            { _id: { $in: ids } },
+            { $set: updateData }
+        );
+
+        res.json({
+            message: `${result.modifiedCount} customers updated successfully`,
+            modifiedCount: result.modifiedCount
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Error updating customers' });
+    }
+};
+
 module.exports = {
     createCustomer,
     getAllCustomers,
     getCustomerById,
     updateCustomer,
     deleteCustomer,
+    bulkDeleteCustomers,
+    bulkUpdateCustomers,
 };

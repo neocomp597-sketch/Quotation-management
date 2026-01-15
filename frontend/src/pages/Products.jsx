@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { MdAdd, MdSearch, MdEdit, MdDelete, MdInventory, MdCategory, MdQrCode, MdPayments, MdProductionQuantityLimits, MdCloudUpload, MdVisibility } from 'react-icons/md';
-import { productService, uploadService } from '../services/api';
+import { MdAdd, MdSearch, MdEdit, MdDelete, MdInventory, MdCategory, MdQrCode, MdPayments, MdProductionQuantityLimits, MdCloudUpload, MdVisibility, MdFileUpload, MdCheckBox, MdCheckBoxOutlineBlank, MdDeleteSweep, MdSync } from 'react-icons/md';
+import { productService, uploadService, importService } from '../services/api';
 import Modal from '../components/Modal';
-import { resolveImageUrl } from '../utils/helpers';
+import ImportModal from '../components/ImportModal';
+import { resolveImageUrl, getPlaceholderImage } from '../utils/helpers';
 
 const Products = () => {
     const [products, setProducts] = useState([]);
@@ -13,6 +14,11 @@ const Products = () => {
     const [isUploading, setIsUploading] = useState(false);
     const [viewImage, setViewImage] = useState(null);
     const [viewMode, setViewMode] = useState('list'); // 'list' or 'grid'
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+
+    // Bulk selection state
+    const [selectedIds, setSelectedIds] = useState([]);
+    const [isBulkActionLoading, setIsBulkActionLoading] = useState(false);
 
     const [formData, setFormData] = useState({
         productName: '',
@@ -112,6 +118,59 @@ const Products = () => {
         }
     };
 
+    // Bulk selection handlers
+    const toggleSelectAll = () => {
+        if (selectedIds.length === filteredProducts.length) {
+            setSelectedIds([]);
+        } else {
+            setSelectedIds(filteredProducts.map(p => p._id));
+        }
+    };
+
+    const toggleSelectOne = (id) => {
+        setSelectedIds(prev =>
+            prev.includes(id)
+                ? prev.filter(i => i !== id)
+                : [...prev, id]
+        );
+    };
+
+    const handleBulkDelete = async () => {
+        if (selectedIds.length === 0) return;
+
+        if (window.confirm(`Are you sure you want to delete ${selectedIds.length} products? This cannot be undone.`)) {
+            setIsBulkActionLoading(true);
+            try {
+                await productService.bulkDelete(selectedIds);
+                setSelectedIds([]);
+                fetchProducts();
+                alert(`${selectedIds.length} products deleted successfully`);
+            } catch (err) {
+                console.error("Error bulk deleting:", err);
+                alert("Failed to delete products");
+            } finally {
+                setIsBulkActionLoading(false);
+            }
+        }
+    };
+
+    const handleBulkStatusUpdate = async (status) => {
+        if (selectedIds.length === 0) return;
+
+        setIsBulkActionLoading(true);
+        try {
+            await productService.bulkUpdate(selectedIds, { status });
+            setSelectedIds([]);
+            fetchProducts();
+            alert(`${selectedIds.length} products updated to ${status}`);
+        } catch (err) {
+            console.error("Error bulk updating:", err);
+            alert("Failed to update products");
+        } finally {
+            setIsBulkActionLoading(false);
+        }
+    };
+
     const filteredProducts = products.filter(p =>
         p.productName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         p.productCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -125,14 +184,70 @@ const Products = () => {
                     <h1 className="text-3xl font-black text-slate-900 tracking-tight">Product Catalog</h1>
                     <p className="text-slate-500 font-medium">Central database for sanitaryware & CP fittings.</p>
                 </div>
-                <button
-                    onClick={() => handleOpenModal()}
-                    className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
-                >
-                    <MdAdd size={20} />
-                    <span>Add New Product</span>
-                </button>
+                <div className="flex gap-3">
+                    <button
+                        onClick={() => setIsImportModalOpen(true)}
+                        className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-emerald-600/20 uppercase text-xs tracking-widest active:scale-95"
+                    >
+                        <MdFileUpload size={20} />
+                        <span>Import</span>
+                    </button>
+                    <button
+                        onClick={() => handleOpenModal()}
+                        className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
+                    >
+                        <MdAdd size={20} />
+                        <span>Add New Product</span>
+                    </button>
+                </div>
             </div>
+
+            {/* Bulk Action Toolbar */}
+            {selectedIds.length > 0 && (
+                <div className="bg-slate-900 rounded-2xl p-4 flex items-center justify-between gap-4 shadow-xl animate-in slide-in-from-top-2">
+                    <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-xl bg-white/10 flex items-center justify-center">
+                            <MdCheckBox size={24} className="text-primary-400" />
+                        </div>
+                        <div>
+                            <div className="text-white font-black text-sm">{selectedIds.length} Selected</div>
+                            <div className="text-slate-400 text-xs">Choose an action below</div>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => handleBulkStatusUpdate('Active')}
+                            disabled={isBulkActionLoading}
+                            className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs uppercase tracking-widest transition-all disabled:opacity-50"
+                        >
+                            <MdSync size={16} />
+                            Set Active
+                        </button>
+                        <button
+                            onClick={() => handleBulkStatusUpdate('Inactive')}
+                            disabled={isBulkActionLoading}
+                            className="flex items-center gap-2 px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold text-xs uppercase tracking-widest transition-all disabled:opacity-50"
+                        >
+                            <MdSync size={16} />
+                            Set Inactive
+                        </button>
+                        <button
+                            onClick={handleBulkDelete}
+                            disabled={isBulkActionLoading}
+                            className="flex items-center gap-2 px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold text-xs uppercase tracking-widest transition-all disabled:opacity-50"
+                        >
+                            <MdDeleteSweep size={16} />
+                            Delete All
+                        </button>
+                        <button
+                            onClick={() => setSelectedIds([])}
+                            className="px-4 py-2.5 text-slate-400 hover:text-white transition-colors font-bold text-xs uppercase tracking-widest"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            )}
 
             <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
                 <div className="p-6 border-b border-slate-50 flex flex-col md:flex-row gap-4 items-center bg-slate-50/30">
@@ -178,7 +293,19 @@ const Products = () => {
                         <table className="w-full text-left">
                             <thead className="bg-slate-50 text-slate-400 text-[10px] uppercase font-black tracking-widest border-b border-slate-100">
                                 <tr>
-                                    <th className="px-8 py-5">Product Info</th>
+                                    <th className="px-4 py-5 w-12">
+                                        <button
+                                            onClick={toggleSelectAll}
+                                            className="p-1 hover:bg-slate-200 rounded-lg transition-colors"
+                                        >
+                                            {selectedIds.length === filteredProducts.length && filteredProducts.length > 0 ? (
+                                                <MdCheckBox size={20} className="text-primary-600" />
+                                            ) : (
+                                                <MdCheckBoxOutlineBlank size={20} />
+                                            )}
+                                        </button>
+                                    </th>
+                                    <th className="px-4 py-5">Product Info</th>
                                     <th className="px-8 py-5">Code & HSN</th>
                                     <th className="px-8 py-5 text-right">Pricing (Base / MRP)</th>
                                     <th className="px-8 py-5 text-center">Status</th>
@@ -187,31 +314,34 @@ const Products = () => {
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                                 {filteredProducts.map((p) => (
-                                    <tr key={p._id} className="hover:bg-slate-50 transition-colors group">
-                                        <td className="px-8 py-5">
+                                    <tr key={p._id} className={`hover:bg-slate-50 transition-colors group ${selectedIds.includes(p._id) ? 'bg-primary-50/50' : ''}`}>
+                                        <td className="px-4 py-5">
+                                            <button
+                                                onClick={() => toggleSelectOne(p._id)}
+                                                className="p-1 hover:bg-slate-200 rounded-lg transition-colors"
+                                            >
+                                                {selectedIds.includes(p._id) ? (
+                                                    <MdCheckBox size={20} className="text-primary-600" />
+                                                ) : (
+                                                    <MdCheckBoxOutlineBlank size={20} className="text-slate-300" />
+                                                )}
+                                            </button>
+                                        </td>
+                                        <td className="px-4 py-5">
                                             <div className="flex items-center gap-4">
                                                 <div
-                                                    className="h-12 w-12 rounded-xl bg-white border border-slate-100 overflow-hidden p-1.5 flex-shrink-0 cursor-pointer hover:border-primary-500 transition-all"
-                                                    onClick={() => p.productImageUrl && setViewImage(p.productImageUrl)}
+                                                    className="h-12 w-12 rounded-xl bg-white border border-slate-100 overflow-hidden flex-shrink-0 cursor-pointer hover:border-primary-500 transition-all"
+                                                    onClick={() => setViewImage(p.productImageUrl || getPlaceholderImage(p.productCode))}
                                                 >
-                                                    {p.productImageUrl ? (
-                                                        <img
-                                                            src={resolveImageUrl(p.productImageUrl)}
-                                                            alt=""
-                                                            className="h-full w-full object-contain"
-                                                            onError={(e) => {
-                                                                e.target.onerror = null;
-                                                                e.target.style.display = 'none';
-                                                                e.target.nextSibling.style.display = 'flex';
-                                                            }}
-                                                        />
-                                                    ) : null}
-                                                    <div
-                                                        className="h-full w-full flex items-center justify-center bg-slate-50 text-slate-300"
-                                                        style={{ display: p.productImageUrl ? 'none' : 'flex' }}
-                                                    >
-                                                        <MdInventory size={20} />
-                                                    </div>
+                                                    <img
+                                                        src={p.productImageUrl ? resolveImageUrl(p.productImageUrl) : getPlaceholderImage(p.productCode)}
+                                                        alt={p.productName}
+                                                        className="h-full w-full object-cover"
+                                                        onError={(e) => {
+                                                            e.target.onerror = null;
+                                                            e.target.src = getPlaceholderImage(p.productCode);
+                                                        }}
+                                                    />
                                                 </div>
                                                 <div>
                                                     <div className="font-bold text-slate-900">{p.productName}</div>
@@ -266,26 +396,28 @@ const Products = () => {
                     ) : (
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 p-6">
                             {filteredProducts.map((p) => (
-                                <div key={p._id} className="bg-white rounded-2xl border border-slate-100 hover:shadow-xl transition-all hover:border-primary-100 group flex flex-col overflow-hidden">
+                                <div key={p._id} className={`bg-white rounded-2xl border hover:shadow-xl transition-all group flex flex-col overflow-hidden ${selectedIds.includes(p._id) ? 'border-primary-400 ring-2 ring-primary-200' : 'border-slate-100 hover:border-primary-100'}`}>
                                     <div className="aspect-square bg-slate-50 relative overflow-hidden group-hover:bg-slate-100 transition-colors">
-                                        {p.productImageUrl ? (
-                                            <img
-                                                src={resolveImageUrl(p.productImageUrl)}
-                                                alt={p.productName}
-                                                className="w-full h-full object-contain p-4 mix-blend-multiply"
-                                                onError={(e) => {
-                                                    e.target.onerror = null;
-                                                    e.target.style.display = 'none';
-                                                    e.target.nextSibling.style.display = 'flex';
-                                                }}
-                                            />
-                                        ) : null}
-                                        <div
-                                            className="absolute inset-0 flex items-center justify-center text-slate-300"
-                                            style={{ display: p.productImageUrl ? 'none' : 'flex' }}
+                                        {/* Checkbox */}
+                                        <button
+                                            onClick={() => toggleSelectOne(p._id)}
+                                            className="absolute top-4 left-4 z-10 p-1.5 bg-white/90 backdrop-blur-sm rounded-lg shadow-sm border border-slate-200 hover:bg-white transition-all"
                                         >
-                                            <MdInventory size={48} />
-                                        </div>
+                                            {selectedIds.includes(p._id) ? (
+                                                <MdCheckBox size={20} className="text-primary-600" />
+                                            ) : (
+                                                <MdCheckBoxOutlineBlank size={20} className="text-slate-400" />
+                                            )}
+                                        </button>
+                                        <img
+                                            src={p.productImageUrl ? resolveImageUrl(p.productImageUrl) : getPlaceholderImage(p.productCode)}
+                                            alt={p.productName}
+                                            className="w-full h-full object-cover"
+                                            onError={(e) => {
+                                                e.target.onerror = null;
+                                                e.target.src = getPlaceholderImage(p.productCode);
+                                            }}
+                                        />
                                         <div className="absolute top-4 right-4 flex gap-2">
                                             <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-[0.1em] backdrop-blur-md ${p.status === 'Active' ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' : 'bg-slate-500/10 text-slate-600 border border-slate-500/20'
                                                 }`}>
@@ -550,6 +682,20 @@ const Products = () => {
                     <img src={resolveImageUrl(viewImage)} alt="Full view" className="max-w-full max-h-[70vh] rounded-2xl shadow-2xl border-4 border-white" />
                 </div>
             </Modal>
+
+            {/* Import Modal */}
+            <ImportModal
+                isOpen={isImportModalOpen}
+                onClose={() => setIsImportModalOpen(false)}
+                title="Import Products"
+                type="products"
+                onImport={async (file) => {
+                    const result = await importService.importProducts(file);
+                    fetchProducts(); // Refresh products after import
+                    return result;
+                }}
+                onDownloadTemplate={importService.getProductTemplate}
+            />
         </div >
     );
 };

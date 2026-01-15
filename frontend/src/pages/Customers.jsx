@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { MdAdd, MdSearch, MdEdit, MdDelete, MdPerson, MdEmail, MdPhone, MdLocationOn, MdBusiness, MdCloudUpload, MdVisibility } from 'react-icons/md';
-import { customerService, uploadService } from '../services/api';
+import { MdAdd, MdSearch, MdEdit, MdDelete, MdPerson, MdEmail, MdPhone, MdLocationOn, MdBusiness, MdCloudUpload, MdVisibility, MdFileUpload, MdCheckBox, MdCheckBoxOutlineBlank, MdDeleteSweep } from 'react-icons/md';
+import { customerService, uploadService, importService } from '../services/api';
 import Modal from '../components/Modal';
-import { resolveImageUrl } from '../utils/helpers';
+import ImportModal from '../components/ImportModal';
+import { resolveImageUrl, getPlaceholderImage } from '../utils/helpers';
 
 const Customers = () => {
     const [customers, setCustomers] = useState([]);
@@ -11,6 +12,11 @@ const Customers = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingCustomer, setEditingCustomer] = useState(null);
     const [isUploading, setIsUploading] = useState(false);
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+
+    // Bulk selection state
+    const [selectedIds, setSelectedIds] = useState([]);
+    const [isBulkActionLoading, setIsBulkActionLoading] = useState(false);
 
     // For full-screen image viewing
     const [viewCustomer, setViewCustomer] = useState(null);
@@ -135,6 +141,42 @@ const Customers = () => {
         }
     };
 
+    // Bulk selection handlers
+    const toggleSelectAll = () => {
+        if (selectedIds.length === filteredCustomers.length) {
+            setSelectedIds([]);
+        } else {
+            setSelectedIds(filteredCustomers.map(c => c._id));
+        }
+    };
+
+    const toggleSelectOne = (id) => {
+        setSelectedIds(prev =>
+            prev.includes(id)
+                ? prev.filter(i => i !== id)
+                : [...prev, id]
+        );
+    };
+
+    const handleBulkDelete = async () => {
+        if (selectedIds.length === 0) return;
+
+        if (window.confirm(`Are you sure you want to delete ${selectedIds.length} customers? This cannot be undone.`)) {
+            setIsBulkActionLoading(true);
+            try {
+                await customerService.bulkDelete(selectedIds);
+                setSelectedIds([]);
+                fetchCustomers();
+                alert(`${selectedIds.length} customers deleted successfully`);
+            } catch (err) {
+                console.error("Error bulk deleting:", err);
+                alert("Failed to delete customers");
+            } finally {
+                setIsBulkActionLoading(false);
+            }
+        }
+    };
+
     const filteredCustomers = customers.filter(c =>
         c.customerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         c.companyName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -148,14 +190,54 @@ const Customers = () => {
                     <h1 className="text-3xl font-black text-slate-900 tracking-tight">Customer Master</h1>
                     <p className="text-slate-500 font-medium">Manage your distributor and retail partners.</p>
                 </div>
-                <button
-                    onClick={() => handleOpenModal()}
-                    className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
-                >
-                    <MdAdd size={20} />
-                    <span>Add New Customer</span>
-                </button>
+                <div className="flex gap-3">
+                    <button
+                        onClick={() => setIsImportModalOpen(true)}
+                        className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-emerald-600/20 uppercase text-xs tracking-widest active:scale-95"
+                    >
+                        <MdFileUpload size={20} />
+                        <span>Import</span>
+                    </button>
+                    <button
+                        onClick={() => handleOpenModal()}
+                        className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
+                    >
+                        <MdAdd size={20} />
+                        <span>Add New Customer</span>
+                    </button>
+                </div>
             </div>
+
+            {/* Bulk Action Toolbar */}
+            {selectedIds.length > 0 && (
+                <div className="bg-slate-900 rounded-2xl p-4 flex items-center justify-between gap-4 shadow-xl">
+                    <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-xl bg-white/10 flex items-center justify-center">
+                            <MdCheckBox size={24} className="text-primary-400" />
+                        </div>
+                        <div>
+                            <div className="text-white font-black text-sm">{selectedIds.length} Selected</div>
+                            <div className="text-slate-400 text-xs">Choose an action below</div>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={handleBulkDelete}
+                            disabled={isBulkActionLoading}
+                            className="flex items-center gap-2 px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold text-xs uppercase tracking-widest transition-all disabled:opacity-50"
+                        >
+                            <MdDeleteSweep size={16} />
+                            Delete All
+                        </button>
+                        <button
+                            onClick={() => setSelectedIds([])}
+                            className="px-4 py-2.5 text-slate-400 hover:text-white transition-colors font-bold text-xs uppercase tracking-widest"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            )}
 
             <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
                 <div className="p-6 border-b border-slate-50 flex flex-col md:flex-row gap-4 items-center bg-slate-50/30">
@@ -181,7 +263,19 @@ const Customers = () => {
                         <table className="w-full text-left">
                             <thead className="bg-slate-50/50 text-slate-400 text-[10px] uppercase font-black tracking-widest border-b border-slate-100">
                                 <tr>
-                                    <th className="px-8 py-5">Company & Info</th>
+                                    <th className="px-4 py-5 w-12">
+                                        <button
+                                            onClick={toggleSelectAll}
+                                            className="p-1 hover:bg-slate-200 rounded-lg transition-colors"
+                                        >
+                                            {selectedIds.length === filteredCustomers.length && filteredCustomers.length > 0 ? (
+                                                <MdCheckBox size={20} className="text-primary-600" />
+                                            ) : (
+                                                <MdCheckBoxOutlineBlank size={20} />
+                                            )}
+                                        </button>
+                                    </th>
+                                    <th className="px-4 py-5">Company & Info</th>
                                     <th className="px-8 py-5">Contact</th>
                                     <th className="px-8 py-5">GSTIN</th>
                                     <th className="px-8 py-5">Location</th>
@@ -190,8 +284,20 @@ const Customers = () => {
                             </thead>
                             <tbody className="divide-y divide-slate-50">
                                 {filteredCustomers.map((c) => (
-                                    <tr key={c._id} className="hover:bg-slate-50/50 transition-colors group">
-                                        <td className="px-8 py-5">
+                                    <tr key={c._id} className={`hover:bg-slate-50/50 transition-colors group ${selectedIds.includes(c._id) ? 'bg-primary-50/50' : ''}`}>
+                                        <td className="px-4 py-5">
+                                            <button
+                                                onClick={() => toggleSelectOne(c._id)}
+                                                className="p-1 hover:bg-slate-200 rounded-lg transition-colors"
+                                            >
+                                                {selectedIds.includes(c._id) ? (
+                                                    <MdCheckBox size={20} className="text-primary-600" />
+                                                ) : (
+                                                    <MdCheckBoxOutlineBlank size={20} className="text-slate-300" />
+                                                )}
+                                            </button>
+                                        </td>
+                                        <td className="px-4 py-5">
                                             <div className="flex items-center gap-4">
                                                 <div
                                                     className="h-10 w-10 rounded-xl bg-white border border-slate-100 p-1.5 flex-shrink-0 cursor-pointer hover:border-primary-500 transition-all"
@@ -579,6 +685,20 @@ const Customers = () => {
                     </div>
                 )}
             </Modal>
+
+            {/* Import Modal */}
+            <ImportModal
+                isOpen={isImportModalOpen}
+                onClose={() => setIsImportModalOpen(false)}
+                title="Import Customers"
+                type="customers"
+                onImport={async (file) => {
+                    const result = await importService.importCustomers(file);
+                    fetchCustomers(); // Refresh customers after import
+                    return result;
+                }}
+                onDownloadTemplate={importService.getCustomerTemplate}
+            />
         </div>
     );
 };

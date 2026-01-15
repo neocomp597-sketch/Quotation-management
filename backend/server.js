@@ -32,6 +32,7 @@ const siteRoutes = require('./routes/siteRoutes');
 const path = require('path');
 const userRoutes = require('./routes/userRoutes');
 const authRoutes = require('./routes/authRoutes');
+const importRoutes = require('./routes/importRoutes');
 
 // API Routes
 app.use('/api/quotations', quotationRoutes);
@@ -43,6 +44,7 @@ app.use('/api/salespersons', salespersonRoutes);
 app.use('/api/sites', siteRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/import', importRoutes);
 
 // Serve Static Files
 // Serve Static Files with logging

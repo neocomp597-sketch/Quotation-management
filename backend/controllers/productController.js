@@ -3,7 +3,7 @@ const Product = require('../models/Product');
 // Create Product
 const createProduct = async (req, res) => {
     try {
-        const { productCode, productName, categoryId, hsnCode, gstPercentage, basePrice, mrp, uom } = req.body;
+        const { productCode, productName, categoryId, hsnCode, gstPercentage, basePrice, mrp, uom, productImageUrl, status } = req.body;
 
         const newProduct = new Product({
             productCode,
@@ -14,6 +14,8 @@ const createProduct = async (req, res) => {
             basePrice,
             mrp,
             uom,
+            productImageUrl,
+            status: status || 'Active',
         });
 
         await newProduct.save();
@@ -52,7 +54,7 @@ const getProductById = async (req, res) => {
 // Update Product
 const updateProduct = async (req, res) => {
     try {
-        const { productCode, productName, categoryId, hsnCode, gstPercentage, basePrice, mrp, uom } = req.body;
+        const { productCode, productName, categoryId, hsnCode, gstPercentage, basePrice, mrp, uom, productImageUrl, status } = req.body;
 
         const updatedProduct = await Product.findByIdAndUpdate(req.params.id, {
             productCode,
@@ -63,6 +65,8 @@ const updateProduct = async (req, res) => {
             basePrice,
             mrp,
             uom,
+            productImageUrl,
+            status,
         }, { new: true });
 
         if (!updatedProduct) {
@@ -92,10 +96,61 @@ const deleteProduct = async (req, res) => {
     }
 };
 
+// Bulk Delete Products
+const bulkDeleteProducts = async (req, res) => {
+    try {
+        const { ids } = req.body;
+
+        if (!ids || !Array.isArray(ids) || ids.length === 0) {
+            return res.status(400).json({ message: 'Please provide an array of product IDs' });
+        }
+
+        const result = await Product.deleteMany({ _id: { $in: ids } });
+
+        res.json({
+            message: `${result.deletedCount} products deleted successfully`,
+            deletedCount: result.deletedCount
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Error deleting products' });
+    }
+};
+
+// Bulk Update Products
+const bulkUpdateProducts = async (req, res) => {
+    try {
+        const { ids, updateData } = req.body;
+
+        if (!ids || !Array.isArray(ids) || ids.length === 0) {
+            return res.status(400).json({ message: 'Please provide an array of product IDs' });
+        }
+
+        if (!updateData || Object.keys(updateData).length === 0) {
+            return res.status(400).json({ message: 'Please provide update data' });
+        }
+
+        const result = await Product.updateMany(
+            { _id: { $in: ids } },
+            { $set: updateData }
+        );
+
+        res.json({
+            message: `${result.modifiedCount} products updated successfully`,
+            modifiedCount: result.modifiedCount
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Error updating products' });
+    }
+};
+
 module.exports = {
     createProduct,
     getAllProducts,
     getProductById,
     updateProduct,
     deleteProduct,
+    bulkDeleteProducts,
+    bulkUpdateProducts,
 };

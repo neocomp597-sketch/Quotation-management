@@ -82,7 +82,7 @@ const Dashboard = () => {
                     <p className="text-slate-500">Welcome to Jaguar ERP Quotation Management.</p>
                 </div>
                 <Link
-                    to="/quotations/create"
+                    to="/quotations/new"
                     className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-5 py-2.5 rounded-xl font-bold transition-all shadow-lg shadow-primary-600/20 uppercase text-xs"
                 >
                     <MdAdd size={20} />
