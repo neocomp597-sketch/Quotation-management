@@ -1,83 +1,88 @@
 /**
  * Calculate tax and total for a line item
  */
-export const calculateLineItem = (quantity, rate, discountPercent, gstPercentage) => {
-    const amount = quantity * rate;
-    const discountAmount = (amount * discountPercent) / 100;
-    const taxableAmount = amount - discountAmount;
-    const gstAmount = (taxableAmount * gstPercentage) / 100;
-    const lineTotal = taxableAmount + gstAmount;
+export const calculateLineItem = (
+  quantity,
+  rate,
+  discountPercent,
+  gstPercentage
+) => {
+  const amount = quantity * rate;
+  const discountAmount = (amount * discountPercent) / 100;
+  const taxableAmount = amount - discountAmount;
+  const gstAmount = (taxableAmount * gstPercentage) / 100;
+  const lineTotal = taxableAmount + gstAmount;
 
-    return {
-        discountAmount,
-        taxableAmount,
-        gstAmount,
-        lineTotal
-    };
+  return {
+    discountAmount,
+    taxableAmount,
+    gstAmount,
+    lineTotal,
+  };
 };
 
 /**
  * Format currency to INR
  */
 export const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-IN', {
-        style: 'currency',
-        currency: 'INR',
-    }).format(amount);
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+  }).format(amount);
 };
 
 /**
  * Generate Quotation Number
  */
 export const generateQuotationNo = (sequence) => {
-    const year = new Date().getFullYear();
-    const seqStr = sequence.toString().padStart(4, '0');
-    return `JAG/QTN/${year}/${seqStr}`;
+  const year = new Date().getFullYear();
+  const seqStr = sequence.toString().padStart(4, "0");
+  return `JAG/QTN/${year}/${seqStr}`;
 };
 
 /**
  * Format Date
  */
 export const formatDate = (date) => {
-    return new Date(date).toLocaleDateString('en-IN', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric'
-    });
+  return new Date(date).toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 };
 
 /**
  * Resolve Backend Image URLs
  */
 export const resolveImageUrl = (url) => {
-    if (!url) return null;
-    if (url.startsWith('http')) return url;
-    // For local development, assuming backend on 5000
-    const base = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
-    let cleanUrl = url.replace(/\\/g, '/'); // Fix windows backslashes
+  if (!url) return null;
+  if (url.startsWith("http")) return url;
+  // For local development, assuming backend on 3001
+  const base = import.meta.env.VITE_BACKEND_URL || "http://localhost:3001";
+  let cleanUrl = url.replace(/\\/g, "/"); // Fix windows backslashes
 
-    // If it's just a filename (no slashes), prepend /uploads/
-    if (!cleanUrl.includes('/')) {
-        cleanUrl = `/uploads/${cleanUrl}`;
-    }
+  // If it's just a filename (no slashes), prepend /uploads/
+  if (!cleanUrl.includes("/")) {
+    cleanUrl = `/uploads/${cleanUrl}`;
+  }
 
-    // Ensure it starts with / if not present
-    if (!cleanUrl.startsWith('/')) {
-        cleanUrl = `/${cleanUrl}`;
-    }
+  // Ensure it starts with / if not present
+  if (!cleanUrl.startsWith("/")) {
+    cleanUrl = `/${cleanUrl}`;
+  }
 
-    return `${base}${cleanUrl}`;
+  return `${base}${cleanUrl}`;
 };
 
 /**
  * Generate a placeholder image URL based on product/customer name
  * Uses DiceBear API for consistent, attractive placeholders
  */
-export const getPlaceholderImage = (seed, type = 'shapes') => {
-    const encodedSeed = encodeURIComponent(seed || 'default');
-    // Using DiceBear shapes style for products, initials for customers
-    if (type === 'initials') {
-        return `https://api.dicebear.com/7.x/initials/svg?seed=${encodedSeed}&backgroundColor=6366f1,8b5cf6,3b82f6,06b6d4,10b981&backgroundType=gradientLinear`;
-    }
-    return `https://api.dicebear.com/7.x/shapes/svg?seed=${encodedSeed}&backgroundColor=f1f5f9`;
+export const getPlaceholderImage = (seed, type = "shapes") => {
+  const encodedSeed = encodeURIComponent(seed || "default");
+  // Using DiceBear shapes style for products, initials for customers
+  if (type === "initials") {
+    return `https://api.dicebear.com/7.x/initials/svg?seed=${encodedSeed}&backgroundColor=6366f1,8b5cf6,3b82f6,06b6d4,10b981&backgroundType=gradientLinear`;
+  }
+  return `https://api.dicebear.com/7.x/shapes/svg?seed=${encodedSeed}&backgroundColor=f1f5f9`;
 };

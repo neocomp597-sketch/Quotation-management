@@ -1,0 +1,57 @@
+Repository: Quotation-management
+Date: 2026-01-15
+
+Summary of what's implemented
+- Backend (backend/): Express server with organized routes, controllers, models, and config. Features include authentication, CRUD for customers/products/quotations/salespersons/sites/terms, file uploads, Supabase integration, and a seed script.
+- Frontend (frontend/): Vite + React app with pages for Login/Register/Dashboard/Products/Customers/Quotations/Salespersons/Terms, components for layout, PDF generation, import modal, and an API service helper.
+
+High-level issues & recommendations
+1) Secrets & .env files:
+   - Ensure no secrets are committed. Check [backend/.env](backend/.env) and [frontend/.env](frontend/.env) presence and add them to .gitignore, rotate keys if already exposed.
+
+2) Input validation & sanitization:
+   - Add request validation (Joi or express-validator) for all controller inputs (auth, import, create/update endpoints).
+   - Sanitize inputs to prevent injection attacks.
+
+3) Authentication & session security:
+   - Confirm strong password hashing (bcrypt) and proper salt rounds.
+   - Verify JWT settings (short expiry, secure secret storage). Consider refresh tokens and secure cookie flags when applicable.
+
+4) Error handling consistency:
+   - Implement centralized error-handling middleware returning consistent status codes and JSON error shapes.
+
+5) Rate limiting & HTTP hardening:
+   - Add `express-rate-limit`, `helmet`, and tighten CORS origins in production.
+
+6) File uploads safety:
+   - Validate file types and sizes, scan for malware if appropriate, and avoid serving uploads directly from static paths without checks.
+
+7) Dependency & vulnerability management:
+   - Run `npm audit` and update vulnerable dependencies. Remove unused packages.
+
+8) Testing & CI:
+   - Add unit and integration tests (backend controllers, DB interactions, frontend critical flows). Add CI workflow (GitHub Actions) to run lint and tests on PRs.
+
+9) Linting & formatting:
+   - Add ESLint/Prettier to backend (frontend already uses ESLint config). Enforce via pre-commit hook.
+
+10) Database & pooling:
+   - Ensure DB client reuse and proper connection pooling. Use parameterized queries/ORM to prevent injection.
+
+11) Logging & monitoring:
+   - Add structured logs and consider an error-tracking tool (Sentry) and health/metrics endpoints.
+
+12) Documentation & developer experience:
+   - Add README setup steps for backend and frontend, list env variables and required keys, and document the seed script use.
+
+Minor/nit suggestions
+- Ensure `uploads/` is not storing long-term sensitive data; prefer cloud storage (Supabase/S3) for production.
+- Add graceful shutdown handling in `server.js` and a `/health` endpoint.
+- Consider feature-flagging or role-based access control for admin-only actions.
+
+Next steps I can take (pick any):
+- Run quick grep for `.env` or secret-like strings and produce a list.
+- Open key backend files (`controllers/*`, `middlewares/*`) and highlight missing validation lines.
+- Add CI workflow skeleton and basic tests.
+
+If you want, I can follow up with any of the next-step actions above.

@@ -1,0 +1,71 @@
+Repository: Quotation-management
+Date: 2026-01-15
+
+Base path: routes are mounted in `backend/server.js` under `/api/*`.
+
+Auth (`/api/auth`)
+- POST /api/auth/register — Register new user
+- POST /api/auth/login — Authenticate and return token
+- GET  /api/auth/me       — Get current user (protected)
+
+Customers (`/api/customers`)
+- POST   /api/customers            — Create customer (protected)
+- GET    /api/customers            — Get all customers (protected)
+- POST   /api/customers/bulk-delete — Bulk delete customers (protected)
+- PATCH  /api/customers/bulk-update — Bulk update customers (protected)
+- GET    /api/customers/:id        — Get customer by id (protected)
+- PUT    /api/customers/:id        — Update customer (protected)
+- DELETE /api/customers/:id        — Delete customer (protected)
+
+Products (`/api/products`)
+- POST   /api/products            — Create product
+- GET    /api/products            — Get all products
+- POST   /api/products/bulk-delete — Bulk delete products
+- PATCH  /api/products/bulk-update — Bulk update products
+- GET    /api/products/:id        — Get product by id
+- PUT    /api/products/:id        — Update product
+- DELETE /api/products/:id        — Delete product
+
+Quotations (`/api/quotations`)
+- POST   /api/quotations          — Create quotation (protected)
+- GET    /api/quotations          — Get all quotations (protected)
+- GET    /api/quotations/:id      — Get quotation by id (protected)
+- PUT    /api/quotations/:id      — Update quotation (protected)
+- DELETE /api/quotations/:id      — Delete quotation (protected)
+- NOTE: `finalizeQuotation` exists in controller imports but no explicit finalize route is defined in `quotationRoutes.js` (TODO).
+
+Salespersons (`/api/salespersons`)
+- GET  /api/salespersons — List salespersons
+- POST /api/salespersons — Create salesperson
+
+Sites (`/api/sites`)
+- GET  /api/sites — List sites
+- POST /api/sites — Create site
+
+Terms (`/api/terms`)
+- GET    /api/terms       — List terms/templates
+- POST   /api/terms       — Create term/template
+- PUT    /api/terms/:id   — Update term/template
+- DELETE /api/terms/:id   — Delete term/template
+
+Upload (`/api/upload`)
+- POST /api/upload/image — Upload image (then uploaded to Supabase)
+
+Users (`/api/users`)
+- PUT /api/users/profile — Update user profile (protected)
+  (Other user admin routes are scaffolded but commented/placeholder in `userRoutes.js`.)
+
+Import (`/api/import`)
+- POST /api/import/products              — Import products via Excel/CSV (file upload)
+- POST /api/import/customers             — Import customers via Excel/CSV (protected, file upload)
+- GET  /api/import/template/products     — Download product import template
+- GET  /api/import/template/customers    — Download customer import template
+
+Static files
+- GET /uploads/* — Static file serving for uploaded files (mounted at `/uploads`)
+- GET /         — Root health/info endpoint returning a simple string
+
+Remarks & suggestions
+- Many protected routes use `protect` middleware; check that `protect` returns consistent 401/403 responses.
+- Product import route does not require `protect` while customer import does — confirm intended access control.
+- Consider documenting expected request/response schema for each endpoint (example bodies, validation rules).

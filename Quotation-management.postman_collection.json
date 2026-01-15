@@ -1,0 +1,586 @@
+{
+  "info": {
+    "name": "Quotation-management API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0",
+    "_postman_id": "quotation-management-collection"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3001/api",
+      "type": "string"
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test\",\n  \"email\": \"test@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Get Me",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "me"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Customers",
+      "item": [
+        {
+          "name": "Create Customer",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Acme\",\n  \"email\": \"acme@example.com\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/customers",
+              "host": ["{{baseUrl}}"],
+              "path": ["customers"]
+            }
+          }
+        },
+        {
+          "name": "List Customers",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers",
+              "host": ["{{baseUrl}}"],
+              "path": ["customers"]
+            }
+          }
+        },
+        {
+          "name": "Bulk Delete Customers",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ids\": [\"id1\", \"id2\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/customers/bulk-delete",
+              "host": ["{{baseUrl}}"],
+              "path": ["customers", "bulk-delete"]
+            }
+          }
+        },
+        {
+          "name": "Bulk Update Customers",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"updates\": [{ \"id\": \"id1\", \"fields\": { \"status\": \"active\" } }]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/customers/bulk-update",
+              "host": ["{{baseUrl}}"],
+              "path": ["customers", "bulk-update"]
+            }
+          }
+        },
+        {
+          "name": "Get Customer",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["customers", ":id"]
+            }
+          }
+        },
+        {
+          "name": "Update Customer",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Acme Co\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/customers/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["customers", ":id"]
+            }
+          }
+        },
+        {
+          "name": "Delete Customer",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["customers", ":id"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Products",
+      "item": [
+        {
+          "name": "Create Product",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Widget\",\n  \"price\": 9.99\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/products",
+              "host": ["{{baseUrl}}"],
+              "path": ["products"]
+            }
+          }
+        },
+        {
+          "name": "List Products",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/products",
+              "host": ["{{baseUrl}}"],
+              "path": ["products"]
+            }
+          }
+        },
+        {
+          "name": "Bulk Delete Products",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"ids\": [\"pid1\"]\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/products/bulk-delete",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", "bulk-delete"]
+            }
+          }
+        },
+        {
+          "name": "Bulk Update Products",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"updates\": []\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/products/bulk-update",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", "bulk-update"]
+            }
+          }
+        },
+        {
+          "name": "Get Product",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/products/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", ":id"]
+            }
+          }
+        },
+        {
+          "name": "Update Product",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"price\": 12.5\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/products/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", ":id"]
+            }
+          }
+        },
+        {
+          "name": "Delete Product",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/products/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", ":id"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Quotations",
+      "item": [
+        {
+          "name": "Create Quotation",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": \"cid\",\n  \"items\": []\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/quotations",
+              "host": ["{{baseUrl}}"],
+              "path": ["quotations"]
+            }
+          }
+        },
+        {
+          "name": "List Quotations",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/quotations",
+              "host": ["{{baseUrl}}"],
+              "path": ["quotations"]
+            }
+          }
+        },
+        {
+          "name": "Get Quotation",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/quotations/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["quotations", ":id"]
+            }
+          }
+        },
+        {
+          "name": "Update Quotation",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"items\": []\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/quotations/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["quotations", ":id"]
+            }
+          }
+        },
+        {
+          "name": "Delete Quotation",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/quotations/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["quotations", ":id"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Salespersons",
+      "item": [
+        {
+          "name": "List Salespersons",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/salespersons",
+              "host": ["{{baseUrl}}"],
+              "path": ["salespersons"]
+            }
+          }
+        },
+        {
+          "name": "Create Salesperson",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Sales Rep\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/salespersons",
+              "host": ["{{baseUrl}}"],
+              "path": ["salespersons"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Sites",
+      "item": [
+        {
+          "name": "List Sites",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/sites",
+              "host": ["{{baseUrl}}"],
+              "path": ["sites"]
+            }
+          }
+        },
+        {
+          "name": "Create Site",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Main Site\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/sites",
+              "host": ["{{baseUrl}}"],
+              "path": ["sites"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Terms",
+      "item": [
+        {
+          "name": "List Terms",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/terms",
+              "host": ["{{baseUrl}}"],
+              "path": ["terms"]
+            }
+          }
+        },
+        {
+          "name": "Create Term",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Net 30\",\n  \"content\": \"Payment due in 30 days\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/terms",
+              "host": ["{{baseUrl}}"],
+              "path": ["terms"]
+            }
+          }
+        },
+        {
+          "name": "Update Term",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"Net 45\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/terms/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["terms", ":id"]
+            }
+          }
+        },
+        {
+          "name": "Delete Term",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/terms/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["terms", ":id"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Upload",
+      "item": [
+        {
+          "name": "Upload Image (Supabase)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [{ "key": "image", "type": "file", "src": [] }]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/upload/image",
+              "host": ["{{baseUrl}}"],
+              "path": ["upload", "image"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Update Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"New Name\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/users/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "profile"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Import",
+      "item": [
+        {
+          "name": "Import Products (file)",
+          "request": {
+            "method": "POST",
+            "body": {
+              "mode": "formdata",
+              "formdata": [{ "key": "file", "type": "file", "src": [] }]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/import/products",
+              "host": ["{{baseUrl}}"],
+              "path": ["import", "products"]
+            }
+          }
+        },
+        {
+          "name": "Import Customers (file)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [{ "key": "file", "type": "file", "src": [] }]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/import/customers",
+              "host": ["{{baseUrl}}"],
+              "path": ["import", "customers"]
+            }
+          }
+        },
+        {
+          "name": "Download Product Template",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/import/template/products",
+              "host": ["{{baseUrl}}"],
+              "path": ["import", "template", "products"]
+            }
+          }
+        },
+        {
+          "name": "Download Customer Template",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/import/template/customers",
+              "host": ["{{baseUrl}}"],
+              "path": ["import", "template", "customers"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

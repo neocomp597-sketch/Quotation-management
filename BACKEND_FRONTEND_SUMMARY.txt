@@ -1,0 +1,25 @@
+Repository: Quotation-management
+Date: 2026-01-15
+
+Backend (backend/):
+- Server: Express app in `backend/server.js` with CORS and body parsing; database connection via `config/db.js`.
+- Auth: `controllers/authController.js` with routes in `routes/authRoutes.js` (register, login, get current user).
+- Models: Mongoose-style models in `models/` for `Customer`, `Product`, `Quotation`, `Salesperson`, `Site`, `TermsTemplate`, and `User`.
+- Controllers: Organized controllers under `controllers/` for auth, customer, product, quotation, salesperson, site, terms, import, user and import handling.
+- Routes: Organized routes in `routes/` mapping to controllers (quotations, customers, products, terms, upload, salespersons, sites, auth, users, import).
+- Uploads: `uploads/` served statically; `uploadRoutes.js` supports image uploads to Supabase via `utils/uploadToSupabase.js` and `middlewares/upload.js`.
+- Import: `importController.js` supports Excel/CSV import for products & customers with Multer memory storage and template download endpoints.
+- Utilities: `config/supabase.js` integration and `utils/` helpers.
+- Scripts: `seed.js` and scripts/generate_test_products.js for seeding/testing data.
+
+Frontend (frontend/):
+- Tooling: Vite + React app (see `frontend/package.json`) with Tailwind and ESLint config.
+- Pages: React pages in `src/pages/` for authentication, dashboard, products, customers, quotations, salespersons, settings, and terms.
+- Components: Reusable UI components in `src/components/` including `Header`, `Sidebar`, `Layout`, `Modal`, `ImportModal`, and `QuotationPDF` (PDF generation).
+- Services: `src/services/api.js` and `src/utils/apiHelper.js` handle HTTP calls to backend and token management.
+- Assets & Static: `public/` and `src/assets/` used for static content.
+- Client auth flows: Login/Register pages that call backend auth endpoints; protected pages likely depend on token stored client-side.
+
+Notes:
+- Project has reasonably clear separation of concerns and a standard Express + React structure.
+- See [CODE_REVIEW_ISSUES.txt](CODE_REVIEW_ISSUES.txt) for higher-level recommendations (security, validation, CI, secrets).
