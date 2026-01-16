@@ -54,38 +54,13 @@ app.use('/uploads', (req, res, next) => {
 }, express.static(path.join(__dirname, 'uploads')));
 
 // Serve Static Files - Frontend (Production & Deployment)
-const fs = require('fs');
-const localDist = path.join(__dirname, 'dist');
-const siblingDist = path.join(__dirname, '../frontend/dist');
+const rootDir = path.resolve();
+app.use(express.static(path.join(rootDir, "dist")));
 
-let frontendPath = null;
-
-if (fs.existsSync(path.join(localDist, 'index.html'))) {
-    frontendPath = localDist;
-} else if (fs.existsSync(path.join(siblingDist, 'index.html'))) {
-    frontendPath = siblingDist;
-}
-
-if (process.env.NODE_ENV === 'production' || frontendPath) {
-    if (frontendPath) {
-        console.log(`[Frontend] Serving static files from: ${frontendPath}`);
-        app.use(express.static(frontendPath));
-
-        // 🔴 Handle SPA Routing - fallback to index.html
-        app.get('*', (req, res) => {
-            res.sendFile(path.join(frontendPath, 'index.html'));
-        });
-    } else {
-        console.warn('[Frontend] Build not found! Expecting "dist" folder in backend or ../frontend/dist');
-        app.get('/', (req, res) => {
-            res.send('ERP Quotation API is running... (Frontend build not found)');
-        });
-    }
-} else {
-    app.get('/', (req, res) => {
-        res.send('ERP Quotation API is running... (Development Mode)');
-    });
-}
+// SPA fallback — THIS FIXES YOUR ISSUE
+app.get("*", (req, res) => {
+    res.sendFile(path.join(rootDir, "dist", "index.html"));
+});
 
 const PORT = process.env.PORT || 5000;
 
