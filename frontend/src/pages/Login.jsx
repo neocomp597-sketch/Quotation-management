@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
 import './Auth.css'; // We will create this
 
 const Login = () => {
@@ -10,6 +11,8 @@ const Login = () => {
     });
     const [error, setError] = useState('');
     const navigate = useNavigate();
+
+    const { login } = useAuth(); // Use Auth Context
 
     const { email, password } = formData;
 
@@ -21,8 +24,9 @@ const Login = () => {
             // Adjust API URL as needed
             const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
             const res = await axios.post(`${baseUrl}/auth/login`, formData);
-            localStorage.setItem('token', res.data.token);
-            localStorage.setItem('user', JSON.stringify(res.data.user)); // Store user info
+
+            // Use context login method
+            login(res.data.user, res.data.token);
 
             // Redirect based on role or to dashboard
             navigate('/dashboard');

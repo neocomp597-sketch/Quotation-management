@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import Customers from './pages/Customers';
@@ -12,32 +12,39 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Salespersons from './pages/Salespersons';
 import Settings from './pages/Settings';
+import { AuthProvider } from './context/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
   return (
-    <Router>
-      <Routes>
-        {/* Public Routes */}
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
+    <AuthProvider>
+      <Router>
+        <Routes>
+          {/* Public Routes */}
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
 
-        {/* Protected Routes directly wrapped in Layout */}
-        <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
-        <Route path="/salespersons" element={<Layout><Salespersons /></Layout>} />
-        <Route path="/customers" element={<Layout><Customers /></Layout>} />
-        <Route path="/products" element={<Layout><Products /></Layout>} />
-        <Route path="/quotations" element={<Layout><Quotations /></Layout>} />
-        <Route path="/quotations/new" element={<Layout><CreateQuotation /></Layout>} />
-        <Route path="/quotations/:id" element={<Layout><CreateQuotation /></Layout>} />
-        <Route path="/terms" element={<Layout><Terms /></Layout>} />
-        <Route path="/settings" element={<Layout><Settings /></Layout>} />
+          {/* Protected Routes */}
+          <Route element={<ProtectedRoute />}>
+            <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
+            <Route path="/salespersons" element={<Layout><Salespersons /></Layout>} />
+            <Route path="/customers" element={<Layout><Customers /></Layout>} />
+            <Route path="/products" element={<Layout><Products /></Layout>} />
+            <Route path="/quotations" element={<Layout><Quotations /></Layout>} />
+            <Route path="/quotations/new" element={<Layout><CreateQuotation /></Layout>} />
+            <Route path="/quotations/:id" element={<Layout><CreateQuotation /></Layout>} />
+            <Route path="/terms" element={<Layout><Terms /></Layout>} />
+            <Route path="/settings" element={<Layout><Settings /></Layout>} />
+          </Route>
 
-        {/* Fallback route */}
-        <Route path="*" element={<LandingPage />} />
-      </Routes>
-    </Router>
+          {/* Fallback route */}
+          <Route path="*" element={<Navigate to="/dashboard" />} />
+        </Routes>
+      </Router>
+    </AuthProvider>
   );
 }
 
 export default App;
+
