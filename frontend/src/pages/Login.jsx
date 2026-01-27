@@ -26,7 +26,7 @@ const Login = () => {
             const res = await axios.post(`${baseUrl}/auth/login`, formData);
 
             // Use context login method
-            login(res.data.user, res.data.token);
+            login(res.data.token, res.data.user);
 
             // Redirect based on role or to dashboard
             navigate('/dashboard');

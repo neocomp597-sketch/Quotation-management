@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
 import './Auth.css';
 
 const Register = () => {
@@ -12,6 +13,7 @@ const Register = () => {
     });
     const [error, setError] = useState('');
     const navigate = useNavigate();
+    const { login } = useAuth(); // Use Auth Context
 
     const { name, email, password, confirmPassword } = formData;
 
@@ -26,8 +28,9 @@ const Register = () => {
         try {
             const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
             const res = await axios.post(`${baseUrl}/auth/register`, { name, email, password });
-            localStorage.setItem('token', res.data.token);
-            localStorage.setItem('user', JSON.stringify(res.data.user)); // Store user info
+
+            login(res.data.token, res.data.user);
+
             navigate('/dashboard');
         } catch (err) {
             setError(err.response?.data?.message || 'Registration failed');
