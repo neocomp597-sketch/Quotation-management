@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { MdAdd, MdSearch, MdFilterList, MdVisibility, MdDescription, MdDownload, MdPictureAsPdf, MdDelete, MdEdit, MdCheckCircle } from 'react-icons/md';
 import { Link, useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
 import { quotationService } from '../services/api';
 import { formatCurrency, formatDate, resolveImageUrl } from '../utils/helpers';
 import { PDFDownloadLink } from '@react-pdf/renderer';
@@ -37,6 +38,7 @@ const Quotations = () => {
             setIsPreviewOpen(true);
         } catch (err) {
             console.error("Error fetching detail:", err);
+            toast.error('Failed to load quotation details');
         }
     };
 
@@ -44,9 +46,11 @@ const Quotations = () => {
         if (window.confirm("Are you sure you want to delete this quotation? This cannot be undone.")) {
             try {
                 await quotationService.delete(id);
+                toast.success('Quotation deleted successfully!');
                 fetchQuotations();
             } catch (err) {
                 console.error("Error deleting:", err);
+                toast.error('Failed to delete quotation');
             }
         }
     };
@@ -55,9 +59,11 @@ const Quotations = () => {
         if (window.confirm("Finalize this quotation? It will become official.")) {
             try {
                 await quotationService.finalize(id);
+                toast.success('Quotation finalized successfully!');
                 fetchQuotations();
             } catch (err) {
                 console.error("Error finalizing:", err);
+                toast.error('Failed to finalize quotation');
             }
         }
     };

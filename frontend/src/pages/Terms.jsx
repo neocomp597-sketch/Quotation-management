@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { MdAdd, MdEdit, MdDelete, MdDescription, MdCheckCircle } from 'react-icons/md';
+import { toast } from 'react-toastify';
 import { termsService } from '../services/api';
 import Modal from '../components/Modal';
 
@@ -62,17 +63,30 @@ const Terms = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+
+        // Validate required fields
+        if (!formData.templateName?.trim()) {
+            toast.error('Template Name is required');
+            return;
+        }
+        if (!formData.content?.trim()) {
+            toast.error('Terms Content is required');
+            return;
+        }
+
         try {
             if (editingTemplate) {
                 await termsService.update(editingTemplate._id, formData);
+                toast.success('Template updated successfully!');
             } else {
                 await termsService.create(formData);
+                toast.success('Template created successfully!');
             }
             fetchTemplates();
             setIsModalOpen(false);
         } catch (err) {
             console.error("Error saving template:", err);
-            alert("Error saving template");
+            toast.error(err.response?.data?.message || 'Error saving template');
         }
     };
 
@@ -80,9 +94,11 @@ const Terms = () => {
         if (window.confirm("Are you sure you want to delete this template?")) {
             try {
                 await termsService.delete(id);
+                toast.success('Template deleted successfully!');
                 fetchTemplates();
             } catch (err) {
                 console.error("Error deleting template:", err);
+                toast.error('Failed to delete template');
             }
         }
     };
@@ -181,7 +197,7 @@ const Terms = () => {
                 <form className="space-y-6 py-2">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Template Name</label>
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Template Name <span className="text-rose-500">*</span></label>
                             <input
                                 type="text"
                                 value={formData.templateName}
@@ -208,7 +224,7 @@ const Terms = () => {
                     </div>
 
                     <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Terms Content</label>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Terms Content <span className="text-rose-500">*</span></label>
                         <textarea
                             value={formData.content}
                             onChange={(e) => setFormData({ ...formData, content: e.target.value })}

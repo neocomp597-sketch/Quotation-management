@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { MdArrowBack, MdAdd, MdDelete, MdSave, MdCheckCircle, MdPerson, MdInventory2, MdGavel, MdSearch, MdClose, MdPayments, MdEventAvailable, MdBadge, MdTrendingDown, MdEmail, MdPhone, MdLocationOn } from 'react-icons/md';
+import { toast } from 'react-toastify';
 import { customerService, productService, quotationService, termsService, salespersonService, siteService } from '../services/api';
 import { calculateLineItem, formatCurrency, resolveImageUrl } from '../utils/helpers';
 import Modal from '../components/Modal';
@@ -137,7 +138,7 @@ const CreateQuotation = () => {
 
                 } catch (err) {
                     console.error("Error fetching quotation:", err);
-                    alert("Failed to load quotation for editing");
+                    toast.error('Failed to load quotation for editing');
                     navigate('/quotations');
                 } finally {
                     setLoading(false);
@@ -247,7 +248,7 @@ const CreateQuotation = () => {
     const addProductToQuotation = (product) => {
         const existing = items.find(i => i.productId === product._id);
         if (existing) {
-            alert("Product already in list. Adjust quantity there.");
+            toast.warning('Product already in list. Adjust quantity there.');
             return;
         }
 
@@ -299,36 +300,57 @@ const CreateQuotation = () => {
 
     const handleAddSalesperson = async (e) => {
         e.preventDefault();
+
+        if (!newSalesperson.name?.trim()) {
+            toast.error('Salesperson name is required');
+            return;
+        }
+
         try {
             const res = await salespersonService.create(newSalesperson);
             setSalespersons(prev => [...prev, res.data].sort((a, b) => a.name.localeCompare(b.name)));
             setHeader(prev => ({ ...prev, salespersonName: res.data.name }));
             setIsSalespersonModalOpen(false);
             setNewSalesperson({ name: '', email: '', mobile: '' });
+            toast.success('Salesperson added successfully!');
         } catch (err) {
             console.error("Error creating salesperson:", err);
-            alert("Failed to create salesperson");
+            toast.error('Failed to create salesperson');
         }
     };
 
     const handleAddSite = async (e) => {
         e.preventDefault();
-        if (!header.customerId) return alert("Select a customer first");
+        if (!header.customerId) {
+            toast.error('Select a customer first');
+            return;
+        }
+        if (!newSite.siteName?.trim()) {
+            toast.error('Site name is required');
+            return;
+        }
         try {
             const res = await siteService.create({ ...newSite, customerId: header.customerId });
             setSites(prev => [...prev, res.data].sort((a, b) => a.siteName.localeCompare(b.siteName)));
             setHeader(prev => ({ ...prev, siteId: res.data._id }));
             setIsSiteModalOpen(false);
             setNewSite({ siteName: '', location: '', address: '', contactPerson: '', mobile: '' });
+            toast.success('Site added successfully!');
         } catch (err) {
             console.error("Error creating site:", err);
-            alert("Failed to create site");
+            toast.error('Failed to create site');
         }
     };
 
     const handleSubmit = async (status) => {
-        if (!header.customerId) return alert("Select a Customer");
-        if (items.length === 0) return alert("Add at least one product");
+        if (!header.customerId) {
+            toast.error('Please select a Customer');
+            return;
+        }
+        if (items.length === 0) {
+            toast.error('Please add at least one product');
+            return;
+        }
 
         setLoading(true);
         try {
@@ -361,15 +383,15 @@ const CreateQuotation = () => {
 
             if (isEditMode) {
                 await quotationService.update(id, quotationData);
-                alert(`Quotation updated successfully!`);
+                toast.success('Quotation updated successfully!');
             } else {
                 await quotationService.create(quotationData);
-                alert(`Quotation created successfully!`);
+                toast.success('Quotation created successfully!');
             }
             navigate('/quotations');
         } catch (err) {
             console.error(err);
-            alert("Error saving quotation");
+            toast.error(err.response?.data?.message || 'Error saving quotation');
         } finally {
             setLoading(false);
         }
@@ -419,7 +441,7 @@ const CreateQuotation = () => {
                         </div>
                         <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-8">
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Customer Selection</label>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Customer Selection <span className="text-rose-500">*</span></label>
                                 <div className="relative">
                                     <MdPerson className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
                                     <select

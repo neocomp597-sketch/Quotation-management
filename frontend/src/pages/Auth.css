@@ -59,6 +59,11 @@
     font-weight: 600;
 }
 
+.form-group label .required {
+    color: #e11d48;
+    font-weight: 700;
+}
+
 .form-group input {
     width: 100%;
     padding: 0.875rem 1rem;

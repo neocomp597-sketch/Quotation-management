@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { MdAdd, MdSearch, MdEdit, MdDelete, MdInventory, MdCategory, MdQrCode, MdPayments, MdProductionQuantityLimits, MdCloudUpload, MdVisibility, MdFileUpload, MdCheckBox, MdCheckBoxOutlineBlank, MdDeleteSweep, MdSync, MdImage } from 'react-icons/md';
+import { toast } from 'react-toastify';
 import { productService, uploadService, importService } from '../services/api';
 import Modal from '../components/Modal';
 import ImportModal from '../components/ImportModal';
@@ -83,9 +84,10 @@ const Products = () => {
         try {
             const res = await uploadService.uploadImage(file);
             setFormData(prev => ({ ...prev, productImageUrl: res.data.imageUrl }));
+            toast.success('Image uploaded successfully!');
         } catch (err) {
             console.error("Upload error:", err);
-            alert("Failed to upload image");
+            toast.error('Failed to upload image');
         } finally {
             setIsUploading(false);
         }
@@ -93,17 +95,38 @@ const Products = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+
+        // Validate required fields
+        if (!formData.productName?.trim()) {
+            toast.error('Product Name is required');
+            return;
+        }
+        if (!formData.productCode?.trim()) {
+            toast.error('Product Code is required');
+            return;
+        }
+        if (!formData.hsnCode?.trim()) {
+            toast.error('HSN Code is required');
+            return;
+        }
+        if (!formData.basePrice || formData.basePrice <= 0) {
+            toast.error('Base Price is required and must be greater than 0');
+            return;
+        }
+
         try {
             if (editingProduct) {
                 await productService.update(editingProduct._id, formData);
+                toast.success('Product updated successfully!');
             } else {
                 await productService.create(formData);
+                toast.success('Product created successfully!');
             }
             fetchProducts();
             setIsModalOpen(false);
         } catch (err) {
             console.error("Error saving product:", err);
-            alert("Error saving product data");
+            toast.error(err.response?.data?.message || 'Error saving product data');
         }
     };
 
@@ -111,9 +134,11 @@ const Products = () => {
         if (window.confirm("Are you sure you want to delete this product?")) {
             try {
                 await productService.delete(id);
+                toast.success('Product deleted successfully!');
                 fetchProducts();
             } catch (err) {
                 console.error("Error deleting product:", err);
+                toast.error('Failed to delete product');
             }
         }
     };
@@ -144,10 +169,10 @@ const Products = () => {
                 await productService.bulkDelete(selectedIds);
                 setSelectedIds([]);
                 fetchProducts();
-                alert(`${selectedIds.length} products deleted successfully`);
+                toast.success(`${selectedIds.length} products deleted successfully`);
             } catch (err) {
                 console.error("Error bulk deleting:", err);
-                alert("Failed to delete products");
+                toast.error('Failed to delete products');
             } finally {
                 setIsBulkActionLoading(false);
             }
@@ -162,10 +187,10 @@ const Products = () => {
             await productService.bulkUpdate(selectedIds, { status });
             setSelectedIds([]);
             fetchProducts();
-            alert(`${selectedIds.length} products updated to ${status}`);
+            toast.success(`${selectedIds.length} products updated to ${status}`);
         } catch (err) {
             console.error("Error bulk updating:", err);
-            alert("Failed to update products");
+            toast.error('Failed to update products');
         } finally {
             setIsBulkActionLoading(false);
         }
@@ -569,7 +594,7 @@ const Products = () => {
                             </h4>
                             <div className="space-y-6">
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Comprehensive Product Name</label>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Comprehensive Product Name <span className="text-rose-500">*</span></label>
                                     <div className="relative">
                                         <MdInventory className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
                                         <input
@@ -585,7 +610,7 @@ const Products = () => {
                                 </div>
                                 <div className="grid grid-cols-2 gap-6">
                                     <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Serial/Product Code</label>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Serial/Product Code <span className="text-rose-500">*</span></label>
                                         <div className="relative">
                                             <MdQrCode className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
                                             <input
@@ -600,7 +625,7 @@ const Products = () => {
                                         </div>
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">HSN Code (8-Digit)</label>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">HSN Code (8-Digit) <span className="text-rose-500">*</span></label>
                                         <div className="relative">
                                             <MdCategory className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
                                             <input
@@ -694,7 +719,7 @@ const Products = () => {
                                     </select>
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Excl. Tax (Base)</label>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Excl. Tax (Base) <span className="text-rose-500">*</span></label>
                                     <div className="relative">
                                         <MdPayments className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
                                         <input
@@ -709,7 +734,7 @@ const Products = () => {
                                     </div>
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Incl. Tax (MRP)</label>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Incl. Tax (MRP) <span className="text-rose-500">*</span></label>
                                     <input
                                         type="number"
                                         name="mrp"

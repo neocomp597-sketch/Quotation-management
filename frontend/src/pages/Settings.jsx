@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { toast } from 'react-toastify';
 import { userService } from '../services/api';
 
 const Settings = () => {
@@ -34,9 +35,11 @@ const Settings = () => {
             setUser(res.data);
             setPassword(''); // Clear password field
             setMessage({ type: 'success', text: 'Profile updated successfully!' });
+            toast.success('Profile updated successfully!');
         } catch (error) {
             console.error("Update failed", error);
             setMessage({ type: 'error', text: 'Failed to update profile.' });
+            toast.error('Failed to update profile');
         } finally {
             setLoading(false);
         }
@@ -61,7 +64,7 @@ const Settings = () => {
                 <form onSubmit={handleUpdate} className="space-y-6">
                     <div className="space-y-4">
                         <div>
-                            <label className="block text-sm font-bold text-slate-500 mb-1">Full Name</label>
+                            <label className="block text-sm font-bold text-slate-500 mb-1">Full Name <span className="text-rose-500">*</span></label>
                             <input
                                 type="text"
                                 name="name"
@@ -71,7 +74,7 @@ const Settings = () => {
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-bold text-slate-500 mb-1">Email Address</label>
+                            <label className="block text-sm font-bold text-slate-500 mb-1">Email Address <span className="text-rose-500">*</span></label>
                             <input
                                 type="email"
                                 name="email"

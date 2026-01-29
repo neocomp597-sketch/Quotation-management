@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
+import { toast } from 'react-toastify';
 import { useAuth } from '../context/AuthContext';
 import './Auth.css'; // We will create this
 
@@ -10,6 +11,7 @@ const Login = () => {
         password: ''
     });
     const [error, setError] = useState('');
+    const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
 
     const { login } = useAuth(); // Use Auth Context
@@ -20,6 +22,18 @@ const Login = () => {
 
     const onSubmit = async e => {
         e.preventDefault();
+
+        // Validate required fields
+        if (!email?.trim()) {
+            toast.error('Email Address is required');
+            return;
+        }
+        if (!password?.trim()) {
+            toast.error('Password is required');
+            return;
+        }
+
+        setLoading(true);
         try {
             // Adjust API URL as needed
             const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
@@ -27,11 +41,16 @@ const Login = () => {
 
             // Use context login method
             login(res.data.token, res.data.user);
+            toast.success('Login successful! Welcome back.');
 
             // Redirect based on role or to dashboard
             navigate('/dashboard');
         } catch (err) {
-            setError(err.response?.data?.message || 'Login failed');
+            const errorMessage = err.response?.data?.message || 'Login failed';
+            setError(errorMessage);
+            toast.error(errorMessage);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -42,14 +61,16 @@ const Login = () => {
                 {error && <p className="error-msg">{error}</p>}
                 <form onSubmit={onSubmit}>
                     <div className="form-group">
-                        <label>Email Address</label>
+                        <label>Email Address <span className="required">*</span></label>
                         <input type="email" name="email" value={email} onChange={onChange} required />
                     </div>
                     <div className="form-group">
-                        <label>Password</label>
+                        <label>Password <span className="required">*</span></label>
                         <input type="password" name="password" value={password} onChange={onChange} required />
                     </div>
-                    <button type="submit" className="btn-primary">Login</button>
+                    <button type="submit" className="btn-primary" disabled={loading}>
+                        {loading ? 'Signing in...' : 'Login'}
+                    </button>
                 </form>
                 <p className="auth-footer">
                     Don't have an account? <Link to="/register">Register</Link>
@@ -60,3 +81,4 @@ const Login = () => {
 };
 
 export default Login;
+

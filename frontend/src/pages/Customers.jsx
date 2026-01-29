@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { MdAdd, MdSearch, MdEdit, MdDelete, MdPerson, MdEmail, MdPhone, MdLocationOn, MdBusiness, MdCloudUpload, MdVisibility, MdFileUpload, MdCheckBox, MdCheckBoxOutlineBlank, MdDeleteSweep } from 'react-icons/md';
+import { toast } from 'react-toastify';
 import { customerService, uploadService, importService } from '../services/api';
 import Modal from '../components/Modal';
 import ImportModal from '../components/ImportModal';
@@ -106,9 +107,10 @@ const Customers = () => {
         try {
             const res = await uploadService.uploadImage(file);
             setFormData(prev => ({ ...prev, logoUrl: res.data.imageUrl }));
+            toast.success('Image uploaded successfully!');
         } catch (err) {
             console.error("Upload error:", err);
-            alert("Failed to upload image");
+            toast.error('Failed to upload image');
         } finally {
             setIsUploading(false);
         }
@@ -116,17 +118,34 @@ const Customers = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+
+        // Validate required fields
+        if (!formData.companyName?.trim()) {
+            toast.error('Company Trade Name is required');
+            return;
+        }
+        if (!formData.customerName?.trim()) {
+            toast.error('Contact Representative is required');
+            return;
+        }
+        if (!formData.gstin?.trim()) {
+            toast.error('GSTIN is required');
+            return;
+        }
+
         try {
             if (editingCustomer) {
                 await customerService.update(editingCustomer._id, formData);
+                toast.success('Customer updated successfully!');
             } else {
                 await customerService.create(formData);
+                toast.success('Customer created successfully!');
             }
             fetchCustomers();
             setIsModalOpen(false);
         } catch (err) {
             console.error("Error saving customer:", err);
-            alert("Error saving customer data");
+            toast.error(err.response?.data?.message || 'Error saving customer data');
         }
     };
 
@@ -134,9 +153,11 @@ const Customers = () => {
         if (window.confirm("Are you sure you want to delete this customer?")) {
             try {
                 await customerService.delete(id);
+                toast.success('Customer deleted successfully!');
                 fetchCustomers();
             } catch (err) {
                 console.error("Error deleting customer:", err);
+                toast.error('Failed to delete customer');
             }
         }
     };
@@ -167,10 +188,10 @@ const Customers = () => {
                 await customerService.bulkDelete(selectedIds);
                 setSelectedIds([]);
                 fetchCustomers();
-                alert(`${selectedIds.length} customers deleted successfully`);
+                toast.success(`${selectedIds.length} customers deleted successfully`);
             } catch (err) {
                 console.error("Error bulk deleting:", err);
-                alert("Failed to delete customers");
+                toast.error('Failed to delete customers');
             } finally {
                 setIsBulkActionLoading(false);
             }
@@ -481,7 +502,7 @@ const Customers = () => {
                             </h4>
                             <div className="space-y-6">
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Company Trade Name</label>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Company Trade Name <span className="text-rose-500">*</span></label>
                                     <div className="relative">
                                         <MdBusiness className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
                                         <input
@@ -496,7 +517,7 @@ const Customers = () => {
                                     </div>
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Contact Representative</label>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Contact Representative <span className="text-rose-500">*</span></label>
                                     <div className="relative">
                                         <MdPerson className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
                                         <input
@@ -599,7 +620,7 @@ const Customers = () => {
                             </h4>
                             <div className="grid grid-cols-2 gap-6">
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">GSTIN (Verified)</label>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">GSTIN (Verified) <span className="text-rose-500">*</span></label>
                                     <input
                                         type="text"
                                         name="gstin"
