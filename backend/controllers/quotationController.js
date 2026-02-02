@@ -1,5 +1,6 @@
 const Quotation = require('../models/Quotation');
 const Customer = require('../models/Customer');
+const CompanySettings = require('../models/CompanySettings');
 
 // Helper Functions for Calculations
 const calculateSubtotal = (items) => {
@@ -187,10 +188,27 @@ module.exports = {
                 .populate('siteId')
                 .populate('items.siteId')
                 .populate('items.productId')
-                .populate('termsTemplateId');
+                .populate('termsTemplateId')
+                .populate('createdBy');
             if (!quotation) return res.status(404).json({ message: 'Quotation not found' });
-            res.json(quotation);
+
+            // Fetch company settings for the user who created this quotation
+            let companySettings = null;
+            if (quotation.createdBy) {
+                companySettings = await CompanySettings.findOne({ userId: quotation.createdBy._id || quotation.createdBy });
+            }
+            // If no company settings for creator, try current user's settings
+            if (!companySettings && req.user) {
+                companySettings = await CompanySettings.findOne({ userId: req.user.id });
+            }
+
+            // Return quotation with company settings
+            const quotationObj = quotation.toObject();
+            quotationObj.companySettings = companySettings;
+
+            res.json(quotationObj);
         } catch (error) {
+            console.error("Error fetching quotation:", error);
             res.status(500).json({ message: 'Error fetching quotation' });
         }
     },

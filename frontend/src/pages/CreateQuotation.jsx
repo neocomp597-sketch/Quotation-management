@@ -1,10 +1,142 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { MdArrowBack, MdAdd, MdDelete, MdSave, MdCheckCircle, MdPerson, MdInventory2, MdGavel, MdSearch, MdClose, MdPayments, MdEventAvailable, MdBadge, MdTrendingDown, MdEmail, MdPhone, MdLocationOn } from 'react-icons/md';
+import { MdArrowBack, MdAdd, MdDelete, MdSave, MdCheckCircle, MdPerson, MdInventory2, MdGavel, MdSearch, MdClose, MdPayments, MdEventAvailable, MdBadge, MdTrendingDown, MdEmail, MdPhone, MdLocationOn, MdExpandMore } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import { customerService, productService, quotationService, termsService, salespersonService, siteService } from '../services/api';
 import { calculateLineItem, formatCurrency, resolveImageUrl } from '../utils/helpers';
 import Modal from '../components/Modal';
+
+// Searchable Customer Dropdown Component
+const CustomerSearchDropdown = ({ customers, selectedCustomerId, onSelect }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+    const dropdownRef = useRef(null);
+    const inputRef = useRef(null);
+
+    const selectedCustomer = customers.find(c => c._id === selectedCustomerId);
+
+    const filteredCustomers = useMemo(() => {
+        if (!searchTerm) return customers;
+        const query = searchTerm.toLowerCase();
+        return customers.filter(c =>
+            c.companyName?.toLowerCase().includes(query) ||
+            c.customerName?.toLowerCase().includes(query) ||
+            c.gstin?.toLowerCase().includes(query) ||
+            c.mobile?.includes(query)
+        );
+    }, [customers, searchTerm]);
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    // Focus search input when dropdown opens
+    useEffect(() => {
+        if (isOpen && inputRef.current) {
+            inputRef.current.focus();
+        }
+    }, [isOpen]);
+
+    const handleSelect = (customer) => {
+        onSelect(customer._id);
+        setIsOpen(false);
+        setSearchTerm('');
+    };
+
+    const handleClear = (e) => {
+        e.stopPropagation();
+        onSelect('');
+        setSearchTerm('');
+    };
+
+    return (
+        <div ref={dropdownRef} className="relative">
+            {/* Selected Value Display / Trigger */}
+            <div
+                onClick={() => setIsOpen(!isOpen)}
+                className={`w-full pl-12 pr-10 py-3.5 bg-slate-50 border rounded-2xl cursor-pointer transition-all flex items-center ${isOpen ? 'border-primary-500 ring-4 ring-primary-500/10' : 'border-slate-200 hover:border-slate-300'
+                    }`}
+            >
+                <MdPerson className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                <span className={`text-sm font-bold truncate flex-1 ${selectedCustomer ? 'text-slate-900' : 'text-slate-400'}`}>
+                    {selectedCustomer ? `${selectedCustomer.companyName} (${selectedCustomer.gstin})` : 'Search & Select Customer...'}
+                </span>
+                {selectedCustomer ? (
+                    <button
+                        onClick={handleClear}
+                        className="absolute right-10 text-slate-400 hover:text-rose-500 transition-colors p-1"
+                    >
+                        <MdClose size={16} />
+                    </button>
+                ) : null}
+                <MdExpandMore className={`absolute right-4 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} size={20} />
+            </div>
+
+            {/* Dropdown Panel */}
+            {isOpen && (
+                <div className="absolute z-50 w-full mt-2 bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden">
+                    {/* Search Input */}
+                    <div className="p-3 border-b border-slate-100">
+                        <div className="relative">
+                            <MdSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                            <input
+                                ref={inputRef}
+                                type="text"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                placeholder="Type to search by name, GSTIN, mobile..."
+                                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Results List */}
+                    <div className="max-h-64 overflow-y-auto">
+                        {filteredCustomers.length > 0 ? (
+                            filteredCustomers.map(customer => (
+                                <div
+                                    key={customer._id}
+                                    onClick={() => handleSelect(customer)}
+                                    className={`px-4 py-3 cursor-pointer transition-all hover:bg-primary-50 border-b border-slate-50 last:border-b-0 ${selectedCustomerId === customer._id ? 'bg-primary-50' : ''
+                                        }`}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        {customer.logoUrl ? (
+                                            <div className="h-10 w-10 rounded-lg bg-white border border-slate-100 p-1 flex-shrink-0">
+                                                <img src={resolveImageUrl(customer.logoUrl)} alt="" className="h-full w-full object-contain" />
+                                            </div>
+                                        ) : (
+                                            <div className="h-10 w-10 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
+                                                <MdPerson className="text-slate-400" size={20} />
+                                            </div>
+                                        )}
+                                        <div className="flex-1 min-w-0">
+                                            <div className="font-bold text-slate-900 text-sm truncate">{customer.companyName}</div>
+                                            <div className="text-[10px] text-slate-500 font-medium truncate">
+                                                {customer.customerName} • {customer.gstin}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))
+                        ) : (
+                            <div className="p-6 text-center text-slate-400 text-sm font-medium">
+                                No customers found matching "{searchTerm}"
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
 
 const CreateQuotation = () => {
     const navigate = useNavigate();
@@ -442,20 +574,11 @@ const CreateQuotation = () => {
                         <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-8">
                             <div className="space-y-2">
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Customer Selection <span className="text-rose-500">*</span></label>
-                                <div className="relative">
-                                    <MdPerson className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-                                    <select
-                                        name="customerId"
-                                        value={header.customerId}
-                                        onChange={handleHeaderChange}
-                                        className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-bold"
-                                    >
-                                        <option value="">Search Company Name...</option>
-                                        {customers.map(c => (
-                                            <option key={c._id} value={c._id}>{c.companyName} ({c.gstin})</option>
-                                        ))}
-                                    </select>
-                                </div>
+                                <CustomerSearchDropdown
+                                    customers={customers}
+                                    selectedCustomerId={header.customerId}
+                                    onSelect={(customerId) => setHeader(prev => ({ ...prev, customerId }))}
+                                />
                                 {selectedCustomer && (
                                     <div className="mt-4 p-4 rounded-2xl bg-primary-50/50 border border-primary-100/50">
                                         <p className="text-xs text-primary-800 font-bold mb-1">{selectedCustomer.customerName}</p>
@@ -947,7 +1070,7 @@ const CreateQuotation = () => {
                     </button>
                 </form>
             </Modal>
-        </div>
+        </div >
     );
 };
 

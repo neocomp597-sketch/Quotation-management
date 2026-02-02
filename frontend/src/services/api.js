@@ -63,6 +63,11 @@ export const userService = {
     updateProfile: (data) => api.put('/users/profile', data),
 };
 
+export const companySettingsService = {
+    get: () => api.get('/company-settings'),
+    update: (data) => api.put('/company-settings', data),
+};
+
 export const siteService = {
     getAll: (customerId) => api.get(`/sites${customerId ? `?customerId=${customerId}` : ''}`),
     create: (data) => api.post('/sites', data),

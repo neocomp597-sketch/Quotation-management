@@ -21,6 +21,10 @@ const styles = StyleSheet.create({
     qtnMetaLabel: { width: '40%', paddingLeft: 10, fontWeight: 'bold', fontSize: 8, borderRightWidth: 1, borderRightColor: '#000', height: '100%', paddingTop: 7 },
     qtnMetaValue: { width: '60%', paddingLeft: 10, fontSize: 8, height: '100%', paddingTop: 7 },
 
+    // From Company Section
+    fromCompanyBox: { borderWidth: 1, borderColor: '#000', borderTopWidth: 0, padding: 10, backgroundColor: '#f8f9fa' },
+    fromLabel: { fontSize: 8, fontWeight: 'bold', color: '#666', marginBottom: 3 },
+
     customerBox: { borderWidth: 1, borderColor: '#000', borderTopWidth: 0, padding: 15, marginBottom: 20 },
     customerLabel: { fontSize: 11, fontWeight: 'bold', marginBottom: 5 },
 
@@ -71,6 +75,7 @@ const styles = StyleSheet.create({
     signatoryLine: { borderTopWidth: 1, borderTopColor: '#000', width: 200, marginBottom: 5 },
     signatoryLabel: { fontSize: 10, fontWeight: 'bold' },
     signatoryCompany: { fontSize: 12, fontWeight: 'bold', marginTop: 5 },
+    signatoryName: { fontSize: 9, color: '#333', marginTop: 2 },
     signatoryDate: { fontSize: 9, marginTop: 2 },
 
     termsSection: { marginTop: 20, padding: 10, borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 4 },
@@ -84,6 +89,7 @@ const QuotationPDF = ({ quotation }) => {
     if (!quotation) return null;
 
     const items = quotation.items || [];
+    const companySettings = quotation.companySettings;
 
     // Group items by site
     const groupedItems = items.reduce((acc, item) => {
@@ -97,22 +103,46 @@ const QuotationPDF = ({ quotation }) => {
         return acc;
     }, {});
 
+    // Build company address string
+    const getCompanyAddressString = () => {
+        if (!companySettings?.address) return '';
+        const addr = companySettings.address;
+        const parts = [addr.line1, addr.line2, addr.city, addr.state, addr.pincode].filter(Boolean);
+        return parts.join(', ');
+    };
+
+    // Get terms content
+    const getTermsContent = () => {
+        // First check for custom terms on the quotation
+        if (quotation.customTerms) return quotation.customTerms;
+        // Then check for populated terms template
+        if (quotation.termsTemplateId?.content) return quotation.termsTemplateId.content;
+        // Finally use company default terms
+        if (companySettings?.defaultTerms) return companySettings.defaultTerms;
+        return null;
+    };
+
+    const termsContent = getTermsContent();
+
     return (
         <Document>
             <Page size="A4" style={styles.page}>
                 {/* Header */}
                 <View style={styles.mainHeader}>
                     <View style={styles.logoSection}>
-                        {quotation.customerId?.logoUrl ? (
-                            <Image src={resolveImageUrl(quotation.customerId.logoUrl)} style={{ height: 50, objectFit: 'contain' }} />
+                        {companySettings?.logoUrl ? (
+                            <Image src={resolveImageUrl(companySettings.logoUrl)} style={{ height: 50, objectFit: 'contain' }} />
                         ) : (
                             <>
-                                <Text style={styles.companyName}>VISHAL</Text>
-                                <Text style={[styles.companyName, { fontSize: 18, marginTop: -5 }]}>HARDWARES</Text>
+                                <Text style={styles.companyName}>
+                                    {companySettings?.companyName?.toUpperCase() || 'YOUR COMPANY'}
+                                </Text>
                             </>
                         )}
                         <View style={styles.logoLine} />
-                        <Text style={styles.tagline}>where quality meets value</Text>
+                        <Text style={styles.tagline}>
+                            {companySettings?.tagline || 'where quality meets value'}
+                        </Text>
                     </View>
                     <View style={styles.qtnInfoSection}>
                         <View style={styles.qtnTitleBox}>
@@ -133,14 +163,74 @@ const QuotationPDF = ({ quotation }) => {
                     </View>
                 </View>
 
+                {/* From Company Section - Company Address */}
+                {companySettings && (
+                    <View style={styles.fromCompanyBox}>
+                        <Text style={styles.fromLabel}>From:</Text>
+                        <Text style={{ fontSize: 10, fontWeight: 'bold', marginBottom: 2 }}>
+                            {companySettings.companyName}
+                        </Text>
+                        <Text style={{ fontSize: 8, color: '#444' }}>
+                            {getCompanyAddressString()}
+                        </Text>
+                        {(companySettings.phone || companySettings.email) && (
+                            <Text style={{ fontSize: 7, color: '#666', marginTop: 2 }}>
+                                {companySettings.phone && `Phone: ${companySettings.phone}`}
+                                {companySettings.phone && companySettings.email && ' | '}
+                                {companySettings.email && `Email: ${companySettings.email}`}
+                            </Text>
+                        )}
+                        {companySettings.gstin && (
+                            <Text style={{ fontSize: 7, color: '#666', marginTop: 1 }}>
+                                GSTIN: {companySettings.gstin}
+                            </Text>
+                        )}
+                    </View>
+                )}
+
                 {/* To Customer Section */}
                 <View style={styles.customerBox}>
-                    <Text style={styles.customerLabel}>To: {quotation.customerId?.companyName || quotation.customerId?.customerName}</Text>
-                    {quotation.customerId?.billingAddress && (
-                        <Text style={{ fontSize: 9 }}>
-                            {quotation.customerId.billingAddress.line1}, {quotation.customerId.billingAddress.city}, {quotation.customerId.billingAddress.state} {quotation.customerId.billingAddress.pincode}
-                        </Text>
-                    )}
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                        {/* Customer Logo */}
+                        {quotation.customerId?.logoUrl && (
+                            <View style={{ width: 50, height: 50, marginRight: 10, borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 4, padding: 2, backgroundColor: '#fff' }}>
+                                <Image
+                                    src={resolveImageUrl(quotation.customerId.logoUrl)}
+                                    style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                                />
+                            </View>
+                        )}
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.customerLabel}>To: {quotation.customerId?.companyName || quotation.customerId?.customerName}</Text>
+                            {quotation.customerId?.customerName && quotation.customerId?.companyName && (
+                                <Text style={{ fontSize: 8, color: '#0066cc', marginBottom: 3 }}>Attn: {quotation.customerId.customerName}</Text>
+                            )}
+                            {quotation.customerId?.billingAddress && (
+                                <Text style={{ fontSize: 9 }}>
+                                    {[
+                                        quotation.customerId.billingAddress.line1,
+                                        quotation.customerId.billingAddress.line2,
+                                        quotation.customerId.billingAddress.city,
+                                        quotation.customerId.billingAddress.state,
+                                        quotation.customerId.billingAddress.pincode
+                                    ].filter(Boolean).join(', ')}
+                                </Text>
+                            )}
+                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 3 }}>
+                                {quotation.customerId?.mobile && (
+                                    <Text style={{ fontSize: 7, color: '#666', marginRight: 10 }}>Ph: {quotation.customerId.mobile}</Text>
+                                )}
+                                {quotation.customerId?.email && (
+                                    <Text style={{ fontSize: 7, color: '#666', marginRight: 10 }}>Email: {quotation.customerId.email}</Text>
+                                )}
+                            </View>
+                            {quotation.customerId?.gstin && (
+                                <Text style={{ fontSize: 8, color: '#666', marginTop: 2 }}>
+                                    GSTIN: {quotation.customerId.gstin}
+                                </Text>
+                            )}
+                        </View>
+                    </View>
                     {quotation.siteId && (
                         <View style={{ marginTop: 8, borderTopWidth: 1, borderTopColor: '#eee', paddingTop: 5 }}>
                             <Text style={{ fontSize: 9, fontWeight: 'bold' }}>Site: {quotation.siteId.siteName}</Text>
@@ -170,31 +260,41 @@ const QuotationPDF = ({ quotation }) => {
                                     <Text style={styles.groupHeaderText}>{group.name.toUpperCase()}</Text>
                                 </View>
                             )}
-                            {group.items.map((item, idx) => (
-                                <View key={idx} style={styles.tableRow}>
-                                    <View style={[styles.tableCell, styles.colNo, styles.cellCenter]}><Text>{idx + 1}</Text></View>
-                                    <View style={[styles.tableCell, styles.colImg, { alignItems: 'center' }]}>
-                                        {(item.productSnapshot?.productImageUrl || item.productId?.productImageUrl || item.productImageUrl) ? (
-                                            <Image src={resolveImageUrl(item.productSnapshot?.productImageUrl || item.productId?.productImageUrl || item.productImageUrl)} style={{ width: 45, height: 45, objectFit: 'contain' }} />
-                                        ) : (
-                                            <View style={{ width: 40, height: 40, backgroundColor: '#f8fafc' }} />
-                                        )}
+                            {group.items.map((item, idx) => {
+                                // Get image URL from any available source
+                                const imageUrl = item.productSnapshot?.productImageUrl ||
+                                    item.productId?.productImageUrl ||
+                                    item.productImageUrl;
+
+                                return (
+                                    <View key={idx} style={styles.tableRow}>
+                                        <View style={[styles.tableCell, styles.colNo, styles.cellCenter]}><Text>{idx + 1}</Text></View>
+                                        <View style={[styles.tableCell, styles.colImg, { alignItems: 'center' }]}>
+                                            {imageUrl ? (
+                                                <Image
+                                                    src={resolveImageUrl(imageUrl)}
+                                                    style={{ width: 45, height: 45, objectFit: 'contain' }}
+                                                />
+                                            ) : (
+                                                <View style={{ width: 40, height: 40, backgroundColor: '#f8fafc', borderRadius: 4 }} />
+                                            )}
+                                        </View>
+                                        <View style={[styles.tableCell, styles.colProd]}>
+                                            <Text style={styles.productTitle}>{item.productSnapshot?.productName || item.productId?.productName}</Text>
+                                            <Text style={styles.productSub}>{item.productSnapshot?.productCode || item.productId?.productCode}</Text>
+                                        </View>
+                                        <View style={[styles.tableCell, styles.colHsn, styles.cellCenter]}><Text>{item.productSnapshot?.hsnCode || item.productId?.hsnCode || '-'}</Text></View>
+                                        <View style={[styles.tableCell, styles.colQty, styles.cellCenter]}>
+                                            <Text>{item.quantity} ({item.productSnapshot?.uom || item.productId?.uom || 'pcs'})</Text>
+                                        </View>
+                                        <View style={[styles.tableCell, styles.colPrice, styles.cellRight]}><Text>{item.rate.toFixed(2)}</Text></View>
+                                        <View style={[styles.tableCell, styles.colDisc, styles.cellCenter]}><Text>{item.discountPercent || 0}%</Text></View>
+                                        <View style={[styles.tableCell, styles.colFinal, styles.cellRight, { borderRightWidth: 0 }]}>
+                                            <Text style={{ fontWeight: 'bold' }}>{item.lineTotal.toFixed(0)}</Text>
+                                        </View>
                                     </View>
-                                    <View style={[styles.tableCell, styles.colProd]}>
-                                        <Text style={styles.productTitle}>{item.productSnapshot?.productName || item.productId?.productName}</Text>
-                                        <Text style={styles.productSub}>{item.productSnapshot?.productCode || item.productId?.productCode}</Text>
-                                    </View>
-                                    <View style={[styles.tableCell, styles.colHsn, styles.cellCenter]}><Text>{item.productSnapshot?.hsnCode || item.productId?.hsnCode || '-'}</Text></View>
-                                    <View style={[styles.tableCell, styles.colQty, styles.cellCenter]}>
-                                        <Text>{item.quantity} ({item.productSnapshot?.uom || item.productId?.uom || 'pcs'})</Text>
-                                    </View>
-                                    <View style={[styles.tableCell, styles.colPrice, styles.cellRight]}><Text>{item.rate.toFixed(2)}</Text></View>
-                                    <View style={[styles.tableCell, styles.colDisc, styles.cellCenter]}><Text>{item.discountPercent || 0}%</Text></View>
-                                    <View style={[styles.tableCell, styles.colFinal, styles.cellRight, { borderRightWidth: 0 }]}>
-                                        <Text style={{ fontWeight: 'bold' }}>{item.lineTotal.toFixed(0)}</Text>
-                                    </View>
-                                </View>
-                            ))}
+                                );
+                            })}
 
                             {/* Group Footer Totals */}
                             {Object.keys(groupedItems).length > 1 && (
@@ -240,20 +340,34 @@ const QuotationPDF = ({ quotation }) => {
                     </View>
                 </View>
 
+                {/* Terms & Conditions */}
+                {termsContent && (
+                    <View style={styles.termsSection}>
+                        <Text style={styles.termsTitle}>Terms & Conditions</Text>
+                        <Text style={styles.termsText}>{termsContent}</Text>
+                    </View>
+                )}
+
                 {/* Authorized Signatory */}
                 <View style={styles.signatorySection}>
                     <Text style={styles.signatoryLabel}>Authorized Signatory</Text>
-                    <Text style={styles.signatoryCompany}>Eco Pipe Company</Text>
+                    {companySettings?.authorizedSignatory?.signatureImageUrl && (
+                        <Image
+                            src={resolveImageUrl(companySettings.authorizedSignatory.signatureImageUrl)}
+                            style={{ height: 30, objectFit: 'contain', marginTop: 5 }}
+                        />
+                    )}
+                    <Text style={styles.signatoryCompany}>
+                        {companySettings?.companyName || 'Company Name'}
+                    </Text>
+                    {companySettings?.authorizedSignatory?.name && (
+                        <Text style={styles.signatoryName}>
+                            {companySettings.authorizedSignatory.name}
+                            {companySettings.authorizedSignatory.designation && ` (${companySettings.authorizedSignatory.designation})`}
+                        </Text>
+                    )}
                     <Text style={styles.signatoryDate}>Date: {new Date().toLocaleDateString('en-GB')}</Text>
                 </View>
-
-                {/* Terms */}
-                {quotation.customTerms && (
-                    <View style={styles.termsSection}>
-                        <Text style={styles.termsTitle}>Terms & Conditions</Text>
-                        <Text style={styles.termsText}>{quotation.customTerms}</Text>
-                    </View>
-                )}
 
                 <View style={styles.footer}>
                     <Text>This is a computer generated document. No signature required.</Text>

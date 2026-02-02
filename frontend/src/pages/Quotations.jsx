@@ -310,16 +310,19 @@ const Quotations = () => {
                         {/* Header Mockup */}
                         <div className="flex border-b border-slate-200">
                             <div className="w-3/5 p-8 border-r border-slate-200 flex flex-col items-center justify-center bg-slate-50/50">
-                                {selectedQuotation?.customerId?.logoUrl ? (
-                                    <img src={resolveImageUrl(selectedQuotation.customerId.logoUrl)} alt="Logo" className="h-16 object-contain mb-4" />
+                                {selectedQuotation?.companySettings?.logoUrl ? (
+                                    <img src={resolveImageUrl(selectedQuotation.companySettings.logoUrl)} alt="Logo" className="h-16 object-contain mb-4" />
                                 ) : (
                                     <div className="text-center">
-                                        <div className="text-3xl font-black tracking-tighter text-slate-900 leading-none">VISHAL</div>
-                                        <div className="text-xl font-black tracking-tighter text-slate-900 mt-1">HARDWARES</div>
+                                        <div className="text-3xl font-black tracking-tighter text-slate-900 leading-none">
+                                            {selectedQuotation?.companySettings?.companyName?.toUpperCase() || 'YOUR COMPANY'}
+                                        </div>
                                     </div>
                                 )}
                                 <div className="h-0.5 w-full bg-slate-900 mt-4"></div>
-                                <div className="text-[10px] font-bold text-slate-500 mt-2 uppercase tracking-[0.2em]">where quality meets value</div>
+                                <div className="text-[10px] font-bold text-slate-500 mt-2 uppercase tracking-[0.2em]">
+                                    {selectedQuotation?.companySettings?.tagline || 'where quality meets value'}
+                                </div>
                             </div>
                             <div className="w-2/5 flex flex-col">
                                 <div className="bg-slate-100 p-3 text-center border-b border-slate-200">
@@ -342,15 +345,67 @@ const Quotations = () => {
                             </div>
                         </div>
 
+                        {/* Company Address (From) */}
+                        {selectedQuotation?.companySettings && (
+                            <div className="px-8 py-4 bg-slate-50 border-b border-slate-200">
+                                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">From:</div>
+                                <div className="text-sm font-bold text-slate-900">{selectedQuotation.companySettings.companyName}</div>
+                                {selectedQuotation.companySettings.address && (
+                                    <div className="text-xs text-slate-500 mt-0.5">
+                                        {[
+                                            selectedQuotation.companySettings.address.line1,
+                                            selectedQuotation.companySettings.address.line2,
+                                            selectedQuotation.companySettings.address.city,
+                                            selectedQuotation.companySettings.address.state,
+                                            selectedQuotation.companySettings.address.pincode
+                                        ].filter(Boolean).join(', ')}
+                                    </div>
+                                )}
+                                <div className="flex gap-4 mt-1 text-[10px] text-slate-400">
+                                    {selectedQuotation.companySettings.phone && <span>Ph: {selectedQuotation.companySettings.phone}</span>}
+                                    {selectedQuotation.companySettings.email && <span>Email: {selectedQuotation.companySettings.email}</span>}
+                                    {selectedQuotation.companySettings.gstin && <span>GSTIN: {selectedQuotation.companySettings.gstin}</span>}
+                                </div>
+                            </div>
+                        )}
+
                         {/* Customer Info */}
                         <div className="p-8 border-b border-slate-200">
                             <div className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Issued To:</div>
-                            <div className="text-lg font-black text-slate-900">{selectedQuotation?.customerId?.companyName}</div>
-                            {selectedQuotation?.customerId?.billingAddress && (
-                                <div className="text-xs font-medium text-slate-500 mt-1 uppercase leading-relaxed">
-                                    {selectedQuotation.customerId.billingAddress.line1}, {selectedQuotation.customerId.billingAddress.city}
+                            <div className="flex items-start gap-4">
+                                {/* Customer Logo */}
+                                {selectedQuotation?.customerId?.logoUrl && (
+                                    <div className="flex-shrink-0 h-16 w-16 rounded-xl bg-white border border-slate-100 p-1 overflow-hidden shadow-sm">
+                                        <img
+                                            src={resolveImageUrl(selectedQuotation.customerId.logoUrl)}
+                                            alt={selectedQuotation.customerId.companyName}
+                                            className="h-full w-full object-contain"
+                                        />
+                                    </div>
+                                )}
+                                <div className="flex-1">
+                                    <div className="text-lg font-black text-slate-900">{selectedQuotation?.customerId?.companyName}</div>
+                                    {selectedQuotation?.customerId?.customerName && (
+                                        <div className="text-xs font-bold text-primary-600 mt-0.5">Attn: {selectedQuotation.customerId.customerName}</div>
+                                    )}
+                                    {selectedQuotation?.customerId?.billingAddress && (
+                                        <div className="text-xs font-medium text-slate-500 mt-1 uppercase leading-relaxed">
+                                            {[
+                                                selectedQuotation.customerId.billingAddress.line1,
+                                                selectedQuotation.customerId.billingAddress.line2,
+                                                selectedQuotation.customerId.billingAddress.city,
+                                                selectedQuotation.customerId.billingAddress.state,
+                                                selectedQuotation.customerId.billingAddress.pincode
+                                            ].filter(Boolean).join(', ')}
+                                        </div>
+                                    )}
+                                    <div className="flex gap-4 mt-1 text-[10px] text-slate-400">
+                                        {selectedQuotation?.customerId?.mobile && <span>Ph: {selectedQuotation.customerId.mobile}</span>}
+                                        {selectedQuotation?.customerId?.email && <span>Email: {selectedQuotation.customerId.email}</span>}
+                                        {selectedQuotation?.customerId?.gstin && <span>GSTIN: {selectedQuotation.customerId.gstin}</span>}
+                                    </div>
                                 </div>
-                            )}
+                            </div>
                             {selectedQuotation?.siteId && (
                                 <div className="mt-4 p-4 rounded-2xl bg-primary-50 border border-primary-100">
                                     <div className="text-[10px] font-black text-primary-600 uppercase tracking-widest mb-1">Project Site</div>
@@ -413,10 +468,14 @@ const Quotations = () => {
                         {/* Calculation Summary Section */}
                         <div className="flex border-t border-slate-200">
                             <div className="flex-1 bg-slate-50/30 p-8">
-                                {selectedQuotation?.customTerms && (
+                                {/* Terms & Conditions */}
+                                {(selectedQuotation?.customTerms || selectedQuotation?.termsTemplateId?.content || selectedQuotation?.companySettings?.defaultTerms) && (
                                     <div className="max-w-sm">
                                         <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Terms & Conditions</h4>
-                                        <p className="text-[10px] text-slate-500 font-medium leading-relaxed italic">{selectedQuotation.customTerms.substring(0, 150)}...</p>
+                                        <p className="text-[10px] text-slate-500 font-medium leading-relaxed whitespace-pre-line">
+                                            {(selectedQuotation.customTerms || selectedQuotation.termsTemplateId?.content || selectedQuotation.companySettings?.defaultTerms)?.substring(0, 300)}
+                                            {(selectedQuotation.customTerms || selectedQuotation.termsTemplateId?.content || selectedQuotation.companySettings?.defaultTerms)?.length > 300 ? '...' : ''}
+                                        </p>
                                     </div>
                                 )}
                             </div>
@@ -439,9 +498,24 @@ const Quotations = () => {
                         {/* Authorized Signatory Section */}
                         <div className="p-8 flex justify-end border-t border-slate-100">
                             <div className="text-right">
+                                {selectedQuotation?.companySettings?.authorizedSignatory?.signatureImageUrl && (
+                                    <img
+                                        src={resolveImageUrl(selectedQuotation.companySettings.authorizedSignatory.signatureImageUrl)}
+                                        alt="Signature"
+                                        className="h-8 object-contain ml-auto mb-2"
+                                    />
+                                )}
                                 <div className="h-0.5 w-48 bg-slate-200 mb-2 ml-auto"></div>
                                 <div className="text-xs font-black uppercase tracking-widest text-slate-400">Authorized Signatory</div>
-                                <div className="text-sm font-black text-slate-900 mt-1 uppercase tracking-tight">Eco Pipe Company</div>
+                                <div className="text-sm font-black text-slate-900 mt-1 uppercase tracking-tight">
+                                    {selectedQuotation?.companySettings?.companyName || 'Company Name'}
+                                </div>
+                                {selectedQuotation?.companySettings?.authorizedSignatory?.name && (
+                                    <div className="text-[10px] text-slate-500 mt-0.5">
+                                        {selectedQuotation.companySettings.authorizedSignatory.name}
+                                        {selectedQuotation.companySettings.authorizedSignatory.designation && ` (${selectedQuotation.companySettings.authorizedSignatory.designation})`}
+                                    </div>
+                                )}
                                 <div className="text-[10px] font-bold text-slate-500 mt-1">Date: {formatDate(new Date())}</div>
                             </div>
                         </div>
