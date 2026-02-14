@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { MdAdd, MdSearch, MdFilterList, MdVisibility, MdDescription, MdDownload, MdPictureAsPdf, MdDelete, MdEdit, MdCheckCircle } from 'react-icons/md';
+import { MdAdd, MdSearch, MdFilterList, MdVisibility, MdDescription, MdDownload, MdPictureAsPdf, MdDelete, MdEdit, MdCheckCircle, MdReceipt } from 'react-icons/md';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { quotationService } from '../services/api';
-import { formatCurrency, formatDate, resolveImageUrl } from '../utils/helpers';
+import { formatCurrency, formatDate, resolveImageUrl, fetchPdfImageBase64 } from '../utils/helpers';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import QuotationPDF from '../components/QuotationPDF';
 import Modal from '../components/Modal';
@@ -13,8 +13,46 @@ const Quotations = () => {
     const [quotations, setQuotations] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedQuotation, setSelectedQuotation] = useState(null);
+    const [pdfImages, setPdfImages] = useState({});
     const [isPreviewOpen, setIsPreviewOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    const [pdfFormat, setPdfFormat] = useState('format1');
+
+    useEffect(() => {
+        if (!selectedQuotation) return;
+
+        const loadImages = async () => {
+            const urls = new Set();
+            const q = selectedQuotation;
+
+            // Collect all image URLs
+            if (q.companySettings?.logoUrl) urls.add(q.companySettings.logoUrl);
+            if (q.customerId?.logoUrl) urls.add(q.customerId.logoUrl);
+            if (q.companySettings?.authorizedSignatory?.signatureImageUrl) {
+                urls.add(q.companySettings.authorizedSignatory.signatureImageUrl);
+            }
+            if (q.items) {
+                q.items.forEach(item => {
+                    const u = item.productSnapshot?.productImageUrl || item.productImageUrl || item.productId?.productImageUrl;
+                    if (u) urls.add(u);
+                });
+            }
+
+            const imageMap = {};
+            await Promise.all(Array.from(urls).map(async (url) => {
+                try {
+                    const base64 = await fetchPdfImageBase64(url);
+                    imageMap[url] = base64;
+                } catch (e) {
+                    console.warn("Failed to pre-fetch PDF image", url);
+                }
+            }));
+
+            setPdfImages(imageMap);
+        };
+
+        loadImages();
+    }, [selectedQuotation]);
 
     useEffect(() => {
         fetchQuotations();
@@ -262,6 +300,19 @@ const Quotations = () => {
                                                         >
                                                             <MdVisibility size={18} />
                                                         </button>
+
+                                                        {/* Tax Invoice Format */}
+                                                        <PDFDownloadLink document={<QuotationPDF quotation={q} format="format2" />} fileName={`${q.quotationNo.replace(/\//g, '-')}-invoice.pdf`}>
+                                                            {({ loading }) => (
+                                                                <button
+                                                                    disabled={loading}
+                                                                    className="p-2.5 text-slate-700 hover:bg-slate-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100 disabled:opacity-50"
+                                                                    title="Tax Invoice"
+                                                                >
+                                                                    <MdReceipt size={18} />
+                                                                </button>
+                                                            )}
+                                                        </PDFDownloadLink>
 
                                                         <PDFDownloadLink document={<QuotationPDF quotation={q} />} fileName={`${q.quotationNo.replace(/\//g, '-')}.pdf`}>
                                                             {({ loading }) => (
@@ -521,22 +572,60 @@ const Quotations = () => {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 gap-3">
+
+                    <div className="flex flex-col gap-4">
+                        <div className="flex p-1 bg-slate-100 rounded-xl relative">
+                            <div
+                                className={`absolute h-[calc(100%-8px)] w-[calc(50%-4px)] top-1 rounded-lg bg-white shadow-sm transition-all duration-300 ease-spring ${pdfFormat === 'format2' ? 'translate-x-[calc(100%+8px)]' : 'translate-x-0'
+                                    }`}
+                            ></div>
+                            <button
+                                onClick={() => setPdfFormat('format1')}
+                                className={`flex-1 relative z-10 py-3 px-4 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors duration-200 ${pdfFormat === 'format1' ? 'text-slate-900' : 'text-slate-400 hover:text-slate-600'
+                                    }`}
+                            >
+                                Standard Format
+                            </button>
+                            <button
+                                onClick={() => setPdfFormat('format2')}
+                                className={`flex-1 relative z-10 py-3 px-4 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors duration-200 ${pdfFormat === 'format2' ? 'text-slate-900' : 'text-slate-400 hover:text-slate-600'
+                                    }`}
+                            >
+                                Tax Invoice Format
+                            </button>
+                        </div>
+
                         <PDFDownloadLink
-                            document={<QuotationPDF quotation={selectedQuotation} />}
-                            fileName={`${selectedQuotation?.quotationNo.replace(/\//g, '-')}.pdf`}
+                            key={pdfFormat}
+                            document={<QuotationPDF quotation={selectedQuotation} format={pdfFormat} images={pdfImages} />}
+                            fileName={`${selectedQuotation?.quotationNo.replace(/\//g, '-')}-${pdfFormat}.pdf`}
                         >
                             {({ loading }) => (
-                                <button className="w-full flex items-center justify-center gap-3 bg-slate-900 hover:bg-black text-white py-5 rounded-3xl font-black transition-all shadow-2xl uppercase tracking-[0.2em] text-[10px]">
-                                    <MdPictureAsPdf size={20} className="text-primary-500" />
-                                    {loading ? 'Compiling Official Assets...' : 'Download Official PDF Document'}
-                                </button>
+                                <PDFDownloadButton loading={loading} />
                             )}
                         </PDFDownloadLink>
                     </div>
                 </div>
             </Modal>
         </div>
+    );
+};
+
+const PDFDownloadButton = ({ loading }) => {
+    useEffect(() => {
+        if (!loading) {
+            toast.success("PDF Ready for Download!");
+        }
+    }, [loading]);
+
+    return (
+        <button
+            disabled={loading}
+            className="w-full flex items-center justify-center gap-3 bg-slate-900 hover:bg-black text-white py-5 rounded-2xl font-black transition-all shadow-xl hover:shadow-2xl uppercase tracking-widest text-xs active:scale-[0.98]"
+        >
+            <MdPictureAsPdf size={20} className="text-primary-400" />
+            {loading ? 'Compiling Official Assets...' : 'Download Official PDF Document'}
+        </button>
     );
 };
 

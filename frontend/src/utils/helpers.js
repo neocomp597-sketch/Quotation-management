@@ -66,7 +66,45 @@ export const resolveImageUrl = (url) => {
         cleanUrl = `/${cleanUrl}`;
     }
 
+    // If it is a supabase URL, we need to ensure we don't block on CORS.
+    // However, for PDF generation, react-pdf needs to be able to fetch it.
+    // Ideally we should proxy this, but for now let's just return the URL and we will handle the proxying in the calling component or via a new helper.
     return `${base}${cleanUrl}`;
+};
+
+export const fetchPdfImageBase64 = async (url) => {
+    // Transparent 1x1 pixel to prevent crashes
+    const FALLBACK_IMAGE = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+
+    if (!url) return FALLBACK_IMAGE;
+
+    try {
+        // If it's already a data URL, return it
+        if (url.startsWith('data:')) return url;
+
+        // If it's a local path (starts with /), prepend the backend URL
+        let fetchUrl = url;
+        if (url.startsWith('/')) {
+            const base = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+            fetchUrl = `${base}${url}`;
+        }
+
+        // Ensure we handle Supabase/external URLs with CORS mode
+        const response = await fetch(fetchUrl, { mode: 'cors' });
+
+        if (!response.ok) throw new Error(`Failed to fetch image: ${response.statusText}`);
+
+        const blob = await response.blob();
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = () => resolve(FALLBACK_IMAGE); // Fallback on read error
+            reader.readAsDataURL(blob);
+        });
+    } catch (e) {
+        console.warn("Failed to load PDF image, using fallback", e);
+        return FALLBACK_IMAGE;
+    }
 };
 
 /**

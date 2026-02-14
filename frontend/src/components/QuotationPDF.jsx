@@ -1,6 +1,6 @@
 import React from 'react';
-import { Page, Text, View, Document, StyleSheet, Image } from '@react-pdf/renderer';
-import { resolveImageUrl } from '../utils/helpers';
+import { Page, Text, View, Document, StyleSheet, Image, Font } from '@react-pdf/renderer';
+import { formatCurrency, formatDate, resolveImageUrl } from '../utils/helpers';
 
 const styles = StyleSheet.create({
     page: { padding: 30, fontFamily: 'Helvetica', fontSize: 9, color: '#000', backgroundColor: '#ffffff' },
@@ -82,14 +82,62 @@ const styles = StyleSheet.create({
     termsTitle: { fontSize: 8, fontWeight: 'bold', textTransform: 'uppercase', marginBottom: 5 },
     termsText: { fontSize: 7, color: '#475569', lineHeight: 1.4 },
 
-    footer: { position: 'absolute', bottom: 30, left: 30, right: 30, textAlign: 'center', fontSize: 7, color: '#94a3b8' }
+    footer: { position: 'absolute', bottom: 30, left: 30, right: 30, textAlign: 'center', fontSize: 7, color: '#94a3b8' },
+
+    // Format 2: Tax Invoice (Visual Match)
+    f2Container: { borderWidth: 1, borderColor: '#000', marginBottom: 15 },
+    f2Header: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#000', minHeight: 95 },
+
+    // Header Sections
+    f2LogoBox: { width: '15%', padding: 5, justifyContent: 'center', alignItems: 'center' },
+    f2CenterBox: { width: '65%', paddingVertical: 10, paddingHorizontal: 5, alignItems: 'center' },
+    f2RightBox: { width: '20%', justifyContent: 'center', alignItems: 'flex-start', paddingLeft: 10 },
+    f2Divider: { width: 4, height: 40, backgroundColor: '#64748b', marginRight: 8 }, // The thick bar separator in header
+
+    // Typography
+    f2CompanyName: { fontSize: 13, fontWeight: 'bold', color: '#000', textTransform: 'uppercase', marginBottom: 2, textAlign: 'center' },
+    f2Address: { fontSize: 7, color: '#000', textAlign: 'center', lineHeight: 1.2, marginBottom: 2 },
+    f2RegDetails: { fontSize: 7, fontWeight: 'bold', color: '#000', textAlign: 'center', marginTop: 2 },
+    f2Contact: { fontSize: 7, fontWeight: 'bold', color: '#000', textAlign: 'center', marginTop: 2 },
+
+    // Right Side Title
+    f2TitleBlock: { flexDirection: 'row', alignItems: 'center' },
+    f2TitleSub: { fontSize: 9, color: '#475569', textAlign: 'right', marginBottom: 0 },
+    f2TitleMain: { fontSize: 16, fontWeight: 'bold', color: '#64748b', textTransform: 'none' }, // "Tax Invoice" specific color
+
+    // Middle Grid
+    f2Grid: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#000' },
+    f2Col: { width: '36%', padding: 8, borderRightWidth: 1, borderRightColor: '#000' },
+    f2ColLast: { width: '28%', padding: 8 },
+
+    // Section Headers (Bill To / Ship To)
+    f2SectionHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
+    f2SectionBar: { width: 4, height: 11, backgroundColor: '#475569', marginRight: 6 }, // The bar next to "Bill To"
+    f2SectionTitle: { fontSize: 9, fontWeight: 'bold', color: '#000' },
+
+    // Content Rows
+    f2Row: { flexDirection: 'row', marginBottom: 2 },
+    f2Key: { fontSize: 7, fontWeight: 'bold', color: '#000', width: 70 },
+    f2Val: { fontSize: 7, color: '#000', flex: 1, flexWrap: 'wrap' },
+    f2AddressText: { fontSize: 8, lineHeight: 1.3, marginBottom: 6, color: '#000' },
+
+    // Footer IRN
+    f2IRNBox: { padding: 6, flexDirection: 'row' },
+    qrCodeImage: { width: 60, height: 60, marginTop: 10, alignSelf: 'center' },
 });
 
-const QuotationPDF = ({ quotation }) => {
+const QuotationPDF = ({ quotation, format = 'format1', images = {} }) => {
+    console.log("PDF RENDERING: ", format); // DEBUG LOG
     if (!quotation) return null;
 
     const items = quotation.items || [];
     const companySettings = quotation.companySettings;
+
+    // Helper to get image source (prefer base64 from props, fallback to resolved URL)
+    const resolveImage = (url) => {
+        if (!url) return null;
+        return images[url] || resolveImageUrl(url);
+    };
 
     // Group items by site
     const groupedItems = items.reduce((acc, item) => {
@@ -127,117 +175,247 @@ const QuotationPDF = ({ quotation }) => {
     return (
         <Document>
             <Page size="A4" style={styles.page}>
-                {/* Header */}
-                <View style={styles.mainHeader}>
-                    <View style={styles.logoSection}>
-                        {companySettings?.logoUrl ? (
-                            <Image src={resolveImageUrl(companySettings.logoUrl)} style={{ height: 50, objectFit: 'contain' }} />
-                        ) : (
-                            <>
-                                <Text style={styles.companyName}>
-                                    {companySettings?.companyName?.toUpperCase() || 'YOUR COMPANY'}
+                {/* Header 1: Standard Quotation Header */}
+                {format === 'format1' && (
+                    <View style={{ flexDirection: 'column' }}>
+                        <View style={styles.mainHeader}>
+                            <View style={styles.logoSection}>
+                                {companySettings?.logoUrl ? (
+                                    <Image src={resolveImage(companySettings.logoUrl)} style={{ height: 50, objectFit: 'contain' }} />
+                                ) : (
+                                    <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+                                        <Text style={styles.companyName}>
+                                            {companySettings?.companyName?.toUpperCase() || 'YOUR COMPANY'}
+                                        </Text>
+                                    </View>
+                                )}
+                                <View style={styles.logoLine} />
+                                <Text style={styles.tagline}>
+                                    {companySettings?.tagline || 'where quality meets value'}
                                 </Text>
-                            </>
-                        )}
-                        <View style={styles.logoLine} />
-                        <Text style={styles.tagline}>
-                            {companySettings?.tagline || 'where quality meets value'}
-                        </Text>
-                    </View>
-                    <View style={styles.qtnInfoSection}>
-                        <View style={styles.qtnTitleBox}>
-                            <Text style={styles.qtnTitleText}>Quotation</Text>
+                            </View>
+                            <View style={styles.qtnInfoSection}>
+                                <View style={styles.qtnTitleBox}>
+                                    <Text style={styles.qtnTitleText}>Quotation</Text>
+                                </View>
+                                <View style={styles.qtnMetaRow}>
+                                    <Text style={styles.qtnMetaLabel}>Quotation No.</Text>
+                                    <Text style={styles.qtnMetaValue}>{quotation.quotationNo}</Text>
+                                </View>
+                                <View style={styles.qtnMetaRow}>
+                                    <Text style={styles.qtnMetaLabel}>Date</Text>
+                                    <Text style={styles.qtnMetaValue}>{new Date(quotation.quotationDate).toLocaleDateString('en-GB')}</Text>
+                                </View>
+                                <View style={[styles.qtnMetaRow, { borderBottomWidth: 0 }]}>
+                                    <Text style={styles.qtnMetaLabel}>Valid Till</Text>
+                                    <Text style={styles.qtnMetaValue}>{new Date(quotation.validTill).toLocaleDateString('en-GB')}</Text>
+                                </View>
+                            </View>
                         </View>
-                        <View style={styles.qtnMetaRow}>
-                            <Text style={styles.qtnMetaLabel}>Quotation No.</Text>
-                            <Text style={styles.qtnMetaValue}>{quotation.quotationNo}</Text>
-                        </View>
-                        <View style={styles.qtnMetaRow}>
-                            <Text style={styles.qtnMetaLabel}>Date</Text>
-                            <Text style={styles.qtnMetaValue}>{new Date(quotation.quotationDate).toLocaleDateString('en-GB')}</Text>
-                        </View>
-                        <View style={[styles.qtnMetaRow, { borderBottomWidth: 0 }]}>
-                            <Text style={styles.qtnMetaLabel}>Valid Till</Text>
-                            <Text style={styles.qtnMetaValue}>{new Date(quotation.validTill).toLocaleDateString('en-GB')}</Text>
-                        </View>
-                    </View>
-                </View>
 
-                {/* From Company Section - Company Address */}
-                {companySettings && (
-                    <View style={styles.fromCompanyBox}>
-                        <Text style={styles.fromLabel}>From:</Text>
-                        <Text style={{ fontSize: 10, fontWeight: 'bold', marginBottom: 2 }}>
-                            {companySettings.companyName}
-                        </Text>
-                        <Text style={{ fontSize: 8, color: '#444' }}>
-                            {getCompanyAddressString()}
-                        </Text>
-                        {(companySettings.phone || companySettings.email) && (
-                            <Text style={{ fontSize: 7, color: '#666', marginTop: 2 }}>
-                                {companySettings.phone && `Phone: ${companySettings.phone}`}
-                                {companySettings.phone && companySettings.email && ' | '}
-                                {companySettings.email && `Email: ${companySettings.email}`}
-                            </Text>
+                        {/* From Company Section - Company Address */}
+                        {companySettings && (
+                            <View style={styles.fromCompanyBox}>
+                                <Text style={styles.fromLabel}>From:</Text>
+                                <Text style={{ fontSize: 10, fontWeight: 'bold', marginBottom: 2 }}>
+                                    {companySettings.companyName}
+                                </Text>
+                                <Text style={{ fontSize: 8, color: '#444' }}>
+                                    {getCompanyAddressString()}
+                                </Text>
+                                {(companySettings.phone || companySettings.email) ? (
+                                    <Text style={{ fontSize: 7, color: '#666', marginTop: 2 }}>
+                                        {companySettings.phone && `Phone: ${companySettings.phone}`}
+                                        {companySettings.phone && companySettings.email && ' | '}
+                                        {companySettings.email && `Email: ${companySettings.email}`}
+                                    </Text>
+                                ) : null}
+                                {companySettings.gstin ? (
+                                    <Text style={{ fontSize: 7, color: '#666', marginTop: 1 }}>
+                                        GSTIN: {companySettings.gstin}
+                                    </Text>
+                                ) : null}
+                            </View>
                         )}
-                        {companySettings.gstin && (
-                            <Text style={{ fontSize: 7, color: '#666', marginTop: 1 }}>
-                                GSTIN: {companySettings.gstin}
-                            </Text>
-                        )}
+
+                        {/* To Customer Section */}
+                        <View style={styles.customerBox}>
+                            <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                                {/* Customer Logo */}
+                                {quotation.customerId?.logoUrl && (
+                                    <View style={{ width: 50, height: 50, marginRight: 10, borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 4, padding: 2, backgroundColor: '#fff' }}>
+                                        <Image
+                                            src={resolveImage(quotation.customerId.logoUrl)}
+                                            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                                        />
+                                    </View>
+                                )}
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.customerLabel}>To: {quotation.customerId?.companyName || quotation.customerId?.customerName}</Text>
+                                    {quotation.customerId?.customerName && quotation.customerId?.companyName ? (
+                                        <Text style={{ fontSize: 8, color: '#0066cc', marginBottom: 3 }}>Attn: {quotation.customerId.customerName}</Text>
+                                    ) : null}
+                                    {quotation.customerId?.billingAddress && (
+                                        <Text style={{ fontSize: 9 }}>
+                                            {[
+                                                quotation.customerId.billingAddress.line1,
+                                                quotation.customerId.billingAddress.line2,
+                                                quotation.customerId.billingAddress.city,
+                                                quotation.customerId.billingAddress.state,
+                                                quotation.customerId.billingAddress.pincode
+                                            ].filter(Boolean).join(', ')}
+                                        </Text>
+                                    )}
+                                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 3 }}>
+                                        {quotation.customerId?.mobile ? (
+                                            <Text style={{ fontSize: 7, color: '#666', marginRight: 10 }}>Ph: {quotation.customerId.mobile}</Text>
+                                        ) : null}
+                                        {quotation.customerId?.email ? (
+                                            <Text style={{ fontSize: 7, color: '#666', marginRight: 10 }}>Email: {quotation.customerId.email}</Text>
+                                        ) : null}
+                                    </View>
+                                    {quotation.customerId?.gstin ? (
+                                        <Text style={{ fontSize: 8, color: '#666', marginTop: 2 }}>
+                                            GSTIN: {quotation.customerId.gstin}
+                                        </Text>
+                                    ) : null}
+                                </View>
+                            </View>
+                            {quotation.siteId && (
+                                <View style={{ marginTop: 8, borderTopWidth: 1, borderTopColor: '#eee', paddingTop: 5 }}>
+                                    <Text style={{ fontSize: 9, fontWeight: 'bold' }}>Site: {quotation.siteId.siteName}</Text>
+                                    <Text style={{ fontSize: 8 }}>{quotation.siteId.address}</Text>
+                                </View>
+                            )}
+                        </View>
                     </View>
                 )}
 
-                {/* To Customer Section */}
-                <View style={styles.customerBox}>
-                    <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-                        {/* Customer Logo */}
-                        {quotation.customerId?.logoUrl && (
-                            <View style={{ width: 50, height: 50, marginRight: 10, borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 4, padding: 2, backgroundColor: '#fff' }}>
+                {/* Header 2: Tax Invoice (Strict Visual Match) */}
+                {format === 'format2' && (
+                    <View style={styles.f2Container}>
+                        {/* Top Header */}
+                        <View style={styles.f2Header}>
+                            {/* Logo */}
+                            <View style={styles.f2LogoBox}>
+                                {companySettings?.logoUrl ? (
+                                    <Image src={resolveImage(companySettings.logoUrl)} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                                ) : (
+                                    <View style={{ width: 60, height: 40, backgroundColor: '#eee', alignItems: 'center', justifyContent: 'center' }}><Text>LOGO</Text></View>
+                                )}
+                            </View>
+
+                            {/* Center Info */}
+                            <View style={styles.f2CenterBox}>
+                                <Text style={styles.f2CompanyName}>{companySettings?.companyName || "COMPANY NAME"}</Text>
+                                <Text style={styles.f2Address}>
+                                    {getCompanyAddressString()}
+                                </Text>
+                                <Text style={styles.f2RegDetails}>
+                                    {[
+                                        companySettings?.cin && `CIN No.: ${companySettings.cin}`,
+                                        companySettings?.pan && `PAN No.: ${companySettings.pan}`,
+                                        companySettings?.gstin && `GSTIN: ${companySettings.gstin}`
+                                    ].filter(Boolean).join('  ')}
+                                </Text>
+                                <Text style={styles.f2Contact}>
+                                    {[
+                                        companySettings?.phone && `Tel. No. ${companySettings.phone}`,
+                                        companySettings?.mobile && `Mo. No. ${companySettings.mobile}`
+                                    ].filter(Boolean).join(' & ')}
+                                </Text>
+                            </View>
+
+                            {/* Right Side Title Block */}
+                            <View style={styles.f2RightBox}>
+                                <View style={styles.f2TitleBlock}>
+                                    <View style={styles.f2Divider} />
+                                    <View>
+                                        <Text style={styles.f2TitleSub}>Original</Text>
+                                        <Text style={styles.f2TitleMain}>Tax Invoice</Text>
+                                    </View>
+                                </View>
+                            </View>
+                        </View>
+
+                        {/* Middle Grid */}
+                        <View style={styles.f2Grid}>
+                            {/* Col 1: Bill To */}
+                            <View style={styles.f2Col}>
+                                <View style={styles.f2SectionHeader}>
+                                    <View style={styles.f2SectionBar} />
+                                    <Text style={styles.f2SectionTitle}>Bill To</Text>
+                                </View>
+                                <Text style={{ fontSize: 9, fontWeight: 'bold', marginBottom: 2, color: '#000' }}>{quotation.customerId?.companyName}</Text>
+                                {quotation.customerId?.billingAddress && (
+                                    <Text style={styles.f2AddressText}>
+                                        {[
+                                            quotation.customerId.billingAddress.line1,
+                                            quotation.customerId.billingAddress.line2,
+                                            quotation.customerId.billingAddress.city,
+                                            quotation.customerId.billingAddress.state,
+                                            quotation.customerId.billingAddress.pincode
+                                        ].filter(Boolean).join(', ')}
+                                        {'\n'}
+                                        {quotation.customerId?.billingAddress?.country || 'India'}
+                                    </Text>
+                                )}
+
+                                <View style={styles.f2Row}><Text style={styles.f2Key}>State Code</Text><Text style={styles.f2Val}>: {quotation.customerId?.billingAddress?.state ? '27' : '-'}</Text></View>
+                                <View style={styles.f2Row}><Text style={styles.f2Key}>GSTIN No</Text><Text style={styles.f2Val}>: {quotation.customerId?.gstin || '-'}</Text></View>
+                                <View style={styles.f2Row}><Text style={styles.f2Key}>Contact Person</Text><Text style={styles.f2Val}>: {quotation.customerId?.customerName || '-'}</Text></View>
+                                <View style={styles.f2Row}><Text style={styles.f2Key}>Mobile No.</Text><Text style={styles.f2Val}>: {quotation.customerId?.mobile || '-'}</Text></View>
+                            </View>
+
+                            {/* Col 2: Ship To */}
+                            <View style={styles.f2Col}>
+                                <View style={styles.f2SectionHeader}>
+                                    <View style={styles.f2SectionBar} />
+                                    <Text style={styles.f2SectionTitle}>Ship To</Text>
+                                </View>
+                                <Text style={{ fontSize: 9, fontWeight: 'bold', marginBottom: 2, color: '#000' }}>
+                                    {quotation.siteId?.siteName || quotation.customerId?.companyName}
+                                </Text>
+                                <Text style={styles.f2AddressText}>
+                                    {quotation.siteId?.address || (quotation.customerId?.shippingAddress ? [
+                                        quotation.customerId.shippingAddress.line1,
+                                        quotation.customerId.shippingAddress.line2,
+                                        quotation.customerId.shippingAddress.city,
+                                        quotation.customerId.shippingAddress.state
+                                    ].filter(Boolean).join(', ') : 'Same as Billing')}
+                                    {'\n'}
+                                    {quotation.siteId?.country || 'India'}
+                                </Text>
+
+                                <View style={styles.f2Row}><Text style={styles.f2Key}>State Code</Text><Text style={styles.f2Val}>: {quotation.siteId || quotation.customerId?.shippingAddress ? '27' : '-'}</Text></View>
+                                <View style={styles.f2Row}><Text style={styles.f2Key}>GSTIN No</Text><Text style={styles.f2Val}>: {quotation.customerId?.gstin || '-'}</Text></View>
+                                <View style={styles.f2Row}><Text style={styles.f2Key}>Ack No</Text><Text style={styles.f2Val}>: {quotation.ackNo || '-'}</Text></View>
+                                <View style={styles.f2Row}><Text style={styles.f2Key}>Ack Date</Text><Text style={styles.f2Val}>: {quotation.ackDate ? new Date(quotation.ackDate).toLocaleDateString('en-GB') : '-'}</Text></View>
+                            </View>
+
+                            {/* Col 3: Invoice Info & QR */}
+                            <View style={styles.f2ColLast}>
+                                <View style={styles.f2Row}><Text style={[styles.f2Key, { width: 80 }]}>Invoice Number</Text><Text style={styles.f2Val}>: {quotation.quotationNo}</Text></View>
+                                <View style={styles.f2Row}><Text style={[styles.f2Key, { width: 80 }]}>Invoice Date</Text><Text style={styles.f2Val}>: {new Date(quotation.quotationDate).toLocaleDateString('en-GB')}</Text></View>
+                                <View style={styles.f2Row}><Text style={[styles.f2Key, { width: 80 }]}>Customer Code</Text><Text style={styles.f2Val}>: {quotation.customerId?.code || 'CUST-' + (quotation.customerId?._id?.slice(-4).toUpperCase() || '0000')}</Text></View>
+                                <View style={styles.f2Row}><Text style={[styles.f2Key, { width: 80 }]}>Ref No.</Text><Text style={styles.f2Val}>: {quotation.referenceNo || '-'}</Text></View>
+                                <View style={styles.f2Row}><Text style={[styles.f2Key, { width: 80 }]}>Payment Terms</Text><Text style={styles.f2Val}>: {quotation.paymentTerms || 'Advance'}</Text></View>
+
+                                {/* QR Code Integration */}
                                 <Image
-                                    src={resolveImageUrl(quotation.customerId.logoUrl)}
-                                    style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                                    src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(quotation.irnNo || quotation.quotationNo)}`}
+                                    style={styles.qrCodeImage}
                                 />
                             </View>
-                        )}
-                        <View style={{ flex: 1 }}>
-                            <Text style={styles.customerLabel}>To: {quotation.customerId?.companyName || quotation.customerId?.customerName}</Text>
-                            {quotation.customerId?.customerName && quotation.customerId?.companyName && (
-                                <Text style={{ fontSize: 8, color: '#0066cc', marginBottom: 3 }}>Attn: {quotation.customerId.customerName}</Text>
-                            )}
-                            {quotation.customerId?.billingAddress && (
-                                <Text style={{ fontSize: 9 }}>
-                                    {[
-                                        quotation.customerId.billingAddress.line1,
-                                        quotation.customerId.billingAddress.line2,
-                                        quotation.customerId.billingAddress.city,
-                                        quotation.customerId.billingAddress.state,
-                                        quotation.customerId.billingAddress.pincode
-                                    ].filter(Boolean).join(', ')}
-                                </Text>
-                            )}
-                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 3 }}>
-                                {quotation.customerId?.mobile && (
-                                    <Text style={{ fontSize: 7, color: '#666', marginRight: 10 }}>Ph: {quotation.customerId.mobile}</Text>
-                                )}
-                                {quotation.customerId?.email && (
-                                    <Text style={{ fontSize: 7, color: '#666', marginRight: 10 }}>Email: {quotation.customerId.email}</Text>
-                                )}
-                            </View>
-                            {quotation.customerId?.gstin && (
-                                <Text style={{ fontSize: 8, color: '#666', marginTop: 2 }}>
-                                    GSTIN: {quotation.customerId.gstin}
-                                </Text>
-                            )}
+                        </View>
+
+                        {/* IRN Bottom */}
+                        <View style={styles.f2IRNBox}>
+                            <Text style={{ fontSize: 9, fontWeight: 'bold' }}>IRN No. : </Text>
+                            <Text style={{ fontSize: 9, flex: 1 }}>{quotation.irnNo || '-'}</Text>
                         </View>
                     </View>
-                    {quotation.siteId && (
-                        <View style={{ marginTop: 8, borderTopWidth: 1, borderTopColor: '#eee', paddingTop: 5 }}>
-                            <Text style={{ fontSize: 9, fontWeight: 'bold' }}>Site: {quotation.siteId.siteName}</Text>
-                            <Text style={{ fontSize: 8 }}>{quotation.siteId.address}</Text>
-                        </View>
-                    )}
-                </View>
+                )}
 
                 {/* Table */}
                 <View style={styles.table}>
@@ -254,14 +432,13 @@ const QuotationPDF = ({ quotation }) => {
 
                     {/* Grouped Rows */}
                     {Object.values(groupedItems).map((group, gIdx) => (
-                        <React.Fragment key={gIdx}>
+                        <View key={gIdx}>
                             {Object.keys(groupedItems).length > 1 && (
                                 <View style={styles.groupHeader}>
                                     <Text style={styles.groupHeaderText}>{group.name.toUpperCase()}</Text>
                                 </View>
                             )}
                             {group.items.map((item, idx) => {
-                                // Get image URL from any available source
                                 const imageUrl = item.productSnapshot?.productImageUrl ||
                                     item.productId?.productImageUrl ||
                                     item.productImageUrl;
@@ -272,7 +449,7 @@ const QuotationPDF = ({ quotation }) => {
                                         <View style={[styles.tableCell, styles.colImg, { alignItems: 'center' }]}>
                                             {imageUrl ? (
                                                 <Image
-                                                    src={resolveImageUrl(imageUrl)}
+                                                    src={resolveImage(imageUrl)}
                                                     style={{ width: 45, height: 45, objectFit: 'contain' }}
                                                 />
                                             ) : (
@@ -313,7 +490,7 @@ const QuotationPDF = ({ quotation }) => {
                                     </View>
                                 </View>
                             )}
-                        </React.Fragment>
+                        </View>
                     ))}
                 </View>
 
@@ -353,7 +530,7 @@ const QuotationPDF = ({ quotation }) => {
                     <Text style={styles.signatoryLabel}>Authorized Signatory</Text>
                     {companySettings?.authorizedSignatory?.signatureImageUrl && (
                         <Image
-                            src={resolveImageUrl(companySettings.authorizedSignatory.signatureImageUrl)}
+                            src={resolveImage(companySettings.authorizedSignatory.signatureImageUrl)}
                             style={{ height: 30, objectFit: 'contain', marginTop: 5 }}
                         />
                     )}

@@ -167,7 +167,10 @@ const CreateQuotation = () => {
         customerId: '',
         salespersonName: '',
         siteId: '',
-        paymentTerms: '15 Days Credit'
+        paymentTerms: '15 Days Credit',
+        irnNo: '',
+        ackNo: '',
+        ackDate: ''
     });
 
     const [newSite, setNewSite] = useState({
@@ -241,7 +244,10 @@ const CreateQuotation = () => {
                         customerId: q.customerId._id || q.customerId, // Handle populated or raw ID
                         salespersonName: q.salespersonName || '',
                         siteId: q.siteId?._id || q.siteId || '',
-                        paymentTerms: q.paymentTerms || '15 Days Credit'
+                        paymentTerms: q.paymentTerms || '15 Days Credit',
+                        irnNo: q.irnNo || '',
+                        ackNo: q.ackNo || '',
+                        ackDate: q.ackDate ? new Date(q.ackDate).toISOString().split('T')[0] : ''
                     });
 
                     setItems(q.items.map(item => ({
@@ -670,6 +676,45 @@ const CreateQuotation = () => {
                                             >
                                                 <MdAdd size={20} />
                                             </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Invoice Details */}
+                                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-3">
+                                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200 pb-2 mb-2">Tax Invoice Details (Optional)</h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div className="space-y-1">
+                                            <label className="text-[9px] font-bold text-slate-400 uppercase">IRN Number</label>
+                                            <input
+                                                type="text"
+                                                name="irnNo"
+                                                value={header.irnNo}
+                                                onChange={handleHeaderChange}
+                                                placeholder="e.g. 1234567890ABC..."
+                                                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-primary-500/10"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[9px] font-bold text-slate-400 uppercase">Ack Number</label>
+                                            <input
+                                                type="text"
+                                                name="ackNo"
+                                                value={header.ackNo}
+                                                onChange={handleHeaderChange}
+                                                placeholder="e.g. 9876543210"
+                                                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-primary-500/10"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[9px] font-bold text-slate-400 uppercase">Ack Date</label>
+                                            <input
+                                                type="date"
+                                                name="ackDate"
+                                                value={header.ackDate}
+                                                onChange={handleHeaderChange}
+                                                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-primary-500/10"
+                                            />
                                         </div>
                                     </div>
                                 </div>

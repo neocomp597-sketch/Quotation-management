@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import { useAuth } from '../context/AuthContext';
+import { Eye, EyeOff, CheckCircle } from 'lucide-react';
 import './Auth.css'; // We will create this
 
 const Login = () => {
@@ -12,6 +13,7 @@ const Login = () => {
     });
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
     const navigate = useNavigate();
 
     const { login } = useAuth(); // Use Auth Context
@@ -19,6 +21,10 @@ const Login = () => {
     const { email, password } = formData;
 
     const onChange = e => setFormData({ ...formData, [e.target.name]: e.target.value });
+
+    const togglePasswordVisibility = () => {
+        setShowPassword(!showPassword);
+    };
 
     const onSubmit = async e => {
         e.preventDefault();
@@ -41,10 +47,35 @@ const Login = () => {
 
             // Use context login method
             login(res.data.token, res.data.user);
-            toast.success('Login successful! Welcome back.');
+
+            // Beautiful Toast
+            toast.success(
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ padding: '4px' }}>
+                        <span style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>Welcome Back!</span>
+                        <div style={{ fontSize: '0.9rem', opacity: 0.8 }}>Login successful</div>
+                    </div>
+                </div>,
+                {
+                    icon: <CheckCircle size={24} color="#10B981" />, // Emerald-500
+                    style: {
+                        background: '#fff',
+                        color: '#1e293b',
+                        borderRadius: '16px',
+                        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                        border: '1px solid #e2e8f0',
+                        padding: '16px',
+                    },
+                    progressStyle: {
+                        background: 'linear-gradient(to right, #3b82f6, #8b5cf6)',
+                    }
+                }
+            );
 
             // Redirect based on role or to dashboard
-            navigate('/dashboard');
+            setTimeout(() => {
+                navigate('/dashboard');
+            }, 1000); // Slight delay to show the nice toast
         } catch (err) {
             const errorMessage = err.response?.data?.message || 'Login failed';
             setError(errorMessage);
@@ -66,7 +97,23 @@ const Login = () => {
                     </div>
                     <div className="form-group">
                         <label>Password <span className="required">*</span></label>
-                        <input type="password" name="password" value={password} onChange={onChange} required />
+                        <div className="password-input-wrapper">
+                            <input
+                                type={showPassword ? "text" : "password"}
+                                name="password"
+                                value={password}
+                                onChange={onChange}
+                                required
+                            />
+                            <button
+                                type="button"
+                                className="password-toggle-btn"
+                                onClick={togglePasswordVisibility}
+                                aria-label={showPassword ? "Hide password" : "Show password"}
+                            >
+                                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                            </button>
+                        </div>
                     </div>
                     <button type="submit" className="btn-primary" disabled={loading}>
                         {loading ? 'Signing in...' : 'Login'}

@@ -128,6 +128,41 @@
     font-weight: 600;
 }
 
+
 .auth-footer a:hover {
     text-decoration: underline;
+}
+
+/* Password Input Styles */
+.password-input-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.password-input-wrapper input {
+    padding-right: 3rem;
+    /* Space for the eye icon */
+}
+
+.password-toggle-btn {
+    position: absolute;
+    right: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #94a3b8;
+    /* Slate-400 */
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s;
+    z-index: 10;
+}
+
+.password-toggle-btn:hover {
+    color: #475569;
+    /* Slate-600 */
 }
