@@ -195,11 +195,19 @@ module.exports = {
             // Fetch company settings for the user who created this quotation
             let companySettings = null;
             if (quotation.createdBy) {
-                companySettings = await CompanySettings.findOne({ userId: quotation.createdBy._id || quotation.createdBy });
+                const creatorId = quotation.createdBy._id || quotation.createdBy;
+                companySettings = await CompanySettings.findOne({ userId: creatorId });
             }
+
             // If no company settings for creator, try current user's settings
             if (!companySettings && req.user) {
                 companySettings = await CompanySettings.findOne({ userId: req.user.id });
+            }
+
+            // Fallback: If still no settings, fetch ANY company settings available in the system
+            // This ensures that organization info is shown even if the specific user hasn't set up their profile
+            if (!companySettings) {
+                companySettings = await CompanySettings.findOne().sort({ createdAt: 1 }); // Get the oldest/first one
             }
 
             // Return quotation with company settings

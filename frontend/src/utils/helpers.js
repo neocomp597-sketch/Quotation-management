@@ -51,10 +51,12 @@ export const formatDate = (date) => {
  */
 export const resolveImageUrl = (url) => {
     if (!url) return null;
-    if (url.startsWith('http')) return url;
+    const trimmedUrl = url.trim();
+    if (trimmedUrl.startsWith('http')) return trimmedUrl;
+
     // For local development, assuming backend on 5000
     const base = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
-    let cleanUrl = url.replace(/\\/g, '/'); // Fix windows backslashes
+    let cleanUrl = trimmedUrl.replace(/\\/g, '/'); // Fix windows backslashes
 
     // If it's just a filename (no slashes), prepend /uploads/
     if (!cleanUrl.includes('/')) {
@@ -66,9 +68,6 @@ export const resolveImageUrl = (url) => {
         cleanUrl = `/${cleanUrl}`;
     }
 
-    // If it is a supabase URL, we need to ensure we don't block on CORS.
-    // However, for PDF generation, react-pdf needs to be able to fetch it.
-    // Ideally we should proxy this, but for now let's just return the URL and we will handle the proxying in the calling component or via a new helper.
     return `${base}${cleanUrl}`;
 };
 
@@ -83,10 +82,10 @@ export const fetchPdfImageBase64 = async (url) => {
         if (url.startsWith('data:')) return url;
 
         // If it's a local path (starts with /), prepend the backend URL
-        let fetchUrl = url;
-        if (url.startsWith('/')) {
+        let fetchUrl = url.trim();
+        if (fetchUrl.startsWith('/')) {
             const base = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
-            fetchUrl = `${base}${url}`;
+            fetchUrl = `${base}${fetchUrl}`;
         }
 
         // Ensure we handle Supabase/external URLs with CORS mode
