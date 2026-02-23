@@ -11,7 +11,7 @@ const Layout = ({ children }) => {
             <Header sidebarOpen={sidebarOpen} toggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
 
             <main className={`pt-24 pb-12 px-4 md:px-8 transition-all duration-300 ml-0 ${sidebarOpen ? 'md:ml-64' : 'md:ml-20'}`}>
-                <div className="max-w-7xl mx-auto fade-in">
+                <div className="max-w-7xl mx-auto fade-in p-2">
                     {children}
                 </div>
             </main>

@@ -89,31 +89,31 @@ const styles = StyleSheet.create({
     f2Header: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#000', minHeight: 95 },
 
     // Header Sections
-    f2LogoBox: { width: '15%', padding: 5, justifyContent: 'center', alignItems: 'center' },
-    f2CenterBox: { width: '65%', paddingVertical: 10, paddingHorizontal: 5, alignItems: 'center' },
-    f2RightBox: { width: '20%', justifyContent: 'center', alignItems: 'flex-start', paddingLeft: 10 },
-    f2Divider: { width: 4, height: 40, backgroundColor: '#64748b', marginRight: 8 }, // The thick bar separator in header
+    f2LogoBox: { width: '20%', padding: 5, justifyContent: 'center', alignItems: 'flex-start' },
+    f2CenterBox: { width: '60%', paddingVertical: 10, paddingHorizontal: 5, alignItems: 'center', justifyContent: 'center' },
+    f2RightBox: { width: '20%', justifyContent: 'center', alignItems: 'flex-end', paddingRight: 10 },
+    f2Divider: { width: 3, height: 45, backgroundColor: '#0d9488', marginRight: 8 }, // Teal divider
 
     // Typography
     f2CompanyName: { fontSize: 13, fontWeight: 'bold', color: '#000', textTransform: 'uppercase', marginBottom: 2, textAlign: 'center' },
-    f2Address: { fontSize: 7, color: '#000', textAlign: 'center', lineHeight: 1.2, marginBottom: 2 },
-    f2RegDetails: { fontSize: 7, fontWeight: 'bold', color: '#000', textAlign: 'center', marginTop: 2 },
-    f2Contact: { fontSize: 7, fontWeight: 'bold', color: '#000', textAlign: 'center', marginTop: 2 },
+    f2Address: { fontSize: 8, color: '#333', textAlign: 'center', lineHeight: 1.2, marginBottom: 2 },
+    f2RegDetails: { fontSize: 7, fontWeight: 'bold', color: '#333', textAlign: 'center', marginTop: 2 },
+    f2Contact: { fontSize: 7, fontWeight: 'bold', color: '#333', textAlign: 'center', marginTop: 2 },
 
     // Right Side Title
-    f2TitleBlock: { flexDirection: 'row', alignItems: 'center' },
-    f2TitleSub: { fontSize: 9, color: '#475569', textAlign: 'right', marginBottom: 0 },
-    f2TitleMain: { fontSize: 16, fontWeight: 'bold', color: '#64748b', textTransform: 'none' }, // "Tax Invoice" specific color
+    f2TitleBlock: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end' },
+    f2TitleSub: { fontSize: 8, color: '#666', textAlign: 'right', marginBottom: 0 },
+    f2TitleMain: { fontSize: 15, fontWeight: 'bold', color: '#0d9488', textTransform: 'uppercase' }, // Teal Title
 
     // Middle Grid
     f2Grid: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#000' },
-    f2Col: { width: '36%', padding: 8, borderRightWidth: 1, borderRightColor: '#000' },
-    f2ColLast: { width: '28%', padding: 8 },
+    f2Col: { width: '35%', padding: 8, borderRightWidth: 1, borderRightColor: '#000' },
+    f2ColLast: { width: '30%', padding: 8 },
 
     // Section Headers (Bill To / Ship To)
-    f2SectionHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
-    f2SectionBar: { width: 4, height: 11, backgroundColor: '#475569', marginRight: 6 }, // The bar next to "Bill To"
-    f2SectionTitle: { fontSize: 9, fontWeight: 'bold', color: '#000' },
+    f2SectionHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
+    f2SectionBar: { width: 3, height: 10, backgroundColor: '#0d9488', marginRight: 5 }, // Teal Bar
+    f2SectionTitle: { fontSize: 8, fontWeight: 'bold', color: '#0d9488', textTransform: 'uppercase' },
 
     // Content Rows
     f2Row: { flexDirection: 'row', marginBottom: 2 },
@@ -299,7 +299,7 @@ const QuotationPDF = ({ quotation, format = 'format1', images = {}, companySetti
                             {/* Logo */}
                             <View style={styles.f2LogoBox}>
                                 {companySettings?.logoUrl ? (
-                                    <Image src={resolveImage(companySettings.logoUrl)} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                                    <Image src={resolveImage(companySettings.logoUrl)} style={{ width: 80, height: 80, objectFit: 'contain' }} />
                                 ) : (
                                     <View style={{ width: 60, height: 40, backgroundColor: '#eee', alignItems: 'center', justifyContent: 'center' }}><Text>LOGO</Text></View>
                                 )}
@@ -329,11 +329,11 @@ const QuotationPDF = ({ quotation, format = 'format1', images = {}, companySetti
                             {/* Right Side Title Block */}
                             <View style={styles.f2RightBox}>
                                 <View style={styles.f2TitleBlock}>
-                                    <View style={styles.f2Divider} />
                                     <View>
                                         <Text style={styles.f2TitleSub}>Original</Text>
                                         <Text style={styles.f2TitleMain}>Tax Invoice</Text>
                                     </View>
+                                    <View style={[styles.f2Divider, { marginLeft: 8, marginRight: 0 }]} />
                                 </View>
                             </View>
                         </View>
@@ -402,10 +402,12 @@ const QuotationPDF = ({ quotation, format = 'format1', images = {}, companySetti
                                 <View style={styles.f2Row}><Text style={[styles.f2Key, { width: 80 }]}>Payment Terms</Text><Text style={styles.f2Val}>: {quotation.paymentTerms || 'Advance'}</Text></View>
 
                                 {/* QR Code Integration */}
-                                <Image
-                                    src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(quotation.irnNo || quotation.quotationNo)}`}
-                                    style={styles.qrCodeImage}
-                                />
+                                <View style={{ alignItems: 'center', marginTop: 5 }}>
+                                    <Image
+                                        src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(quotation.irnNo || quotation.quotationNo)}`}
+                                        style={{ width: 50, height: 50 }}
+                                    />
+                                </View>
                             </View>
                         </View>
 

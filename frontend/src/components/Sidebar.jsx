@@ -39,10 +39,10 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             />
 
             <div
-                className={`fixed top-0 left-0 h-full bg-white text-slate-900 transition-all duration-300 z-50 shadow-xl 
-                border-r border-slate-100 transform ${isOpen ? 'translate-x-0 w-64' : '-translate-x-full md:translate-x-0 md:w-20 w-64'}`}
+                className={`fixed top-0 left-0 h-full bg-[#f0fdfa] text-slate-900 transition-all duration-300 z-50 shadow-xl 
+                border-r border-teal-100 transform ${isOpen ? 'translate-x-0 w-64' : '-translate-x-full md:translate-x-0 md:w-20 w-64'}`}
             >
-                <div className="flex items-center justify-between h-20 px-4 border-b border-slate-50">
+                <div className="flex items-center justify-between h-20 px-4 border-b border-teal-50">
                     <div className={`flex items-center gap-3 overflow-hidden transition-all duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 w-0 md:opacity-0 md:w-0'}`}>
                         <div className="p-2 bg-primary-600 rounded-lg shrink-0">
                             <MdInventory size={24} className="text-white" />
@@ -51,7 +51,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                     </div>
                     <button
                         onClick={toggleSidebar}
-                        className="p-2 rounded-lg hover:bg-slate-50 text-slate-400 transition-colors ml-auto md:ml-0"
+                        className="p-2 rounded-lg hover:bg-teal-100 text-teal-600 transition-colors ml-auto md:ml-0"
                     >
                         <MdChevronLeft size={24} className={`transition-transform duration-300 ${!isOpen ? 'rotate-180' : ''}`} />
                     </button>
@@ -65,8 +65,8 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                             onClick={handleNavClick}
                             className={({ isActive }) =>
                                 `flex items-center gap-4 px-3 py-3 rounded-xl transition-all duration-200 group ${isActive
-                                    ? 'bg-primary-50 text-primary-700 shadow-sm'
-                                    : 'text-slate-500 hover:bg-slate-50 hover:text-primary-600'
+                                    ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/30 ring-1 ring-primary-600'
+                                    : 'text-slate-600 hover:bg-teal-100/50 hover:text-primary-700 font-semibold'
                                 }`
                             }
                         >
@@ -85,14 +85,14 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                     ))}
                 </nav>
 
-                <div className="absolute bottom-0 w-full p-4 border-t border-slate-50">
+                <div className="absolute bottom-0 w-full p-4 border-t border-teal-50">
                     <NavLink
                         to="/settings"
                         onClick={handleNavClick}
                         className={({ isActive }) =>
                             `flex items-center gap-4 px-3 py-3 rounded-xl transition-all duration-200 ${isActive
-                                ? 'bg-primary-50 text-primary-700 shadow-sm'
-                                : 'text-slate-500 hover:bg-slate-50 hover:text-primary-600'
+                                ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/30'
+                                : 'text-slate-600 hover:bg-teal-100/50 hover:text-primary-700 font-semibold'
                             }`
                         }
                     >
