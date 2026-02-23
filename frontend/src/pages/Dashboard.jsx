@@ -94,8 +94,8 @@ const Dashboard = () => {
                 <StatCard
                     title="Total Quotations"
                     value={stats.totalQuotations}
-                    icon={<MdDescription size={24} className="text-blue-600" />}
-                    color="bg-blue-50"
+                    icon={<MdDescription size={24} className="text-primary-600" />}
+                    color="bg-primary-50"
                     subValue="All time generated"
                 />
                 <StatCard
@@ -116,8 +116,8 @@ const Dashboard = () => {
                 <StatCard
                     title="Registered Customers"
                     value={stats.customerCount}
-                    icon={<MdDescription size={24} className="text-indigo-600" />}
-                    color="bg-indigo-50"
+                    icon={<MdDescription size={24} className="text-primary-600" />}
+                    color="bg-primary-50"
                     subValue="Direct & Retail"
                 />
             </div>

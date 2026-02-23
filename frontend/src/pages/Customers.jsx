@@ -437,7 +437,7 @@ const Customers = () => {
                                                 <div className="text-[10px] text-slate-400 font-black uppercase tracking-tighter">{c.billingAddress?.state}</div>
                                             </td>
                                             <td className="px-8 py-5 text-right">
-                                                <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <div className="flex items-center justify-end gap-2">
                                                     <button
                                                         onClick={() => setViewCustomer(c)}
                                                         className="p-2.5 text-slate-500 hover:bg-slate-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"

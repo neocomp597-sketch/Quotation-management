@@ -30,6 +30,25 @@ const calculateGrandTotal = (items) => {
     return items.reduce((total, item) => total + (item.lineTotal || 0), 0);
 };
 
+const getAnyCompanySettings = async (creatorId) => {
+    // 1. Try creator's settings
+    if (creatorId) {
+        const settings = await CompanySettings.findOne({ userId: creatorId });
+        if (settings) return settings;
+    }
+
+    // 2. Try any settings existing in system (Global)
+    const anySettings = await CompanySettings.findOne().sort({ createdAt: 1 });
+    if (anySettings) return anySettings;
+
+    // 3. Absolute Fallback (Fake object so UI doesn't break)
+    return {
+        companyName: "Your Business Name",
+        address: { line1: "Business Address", city: "City", state: "State", pincode: "000000" },
+        authorizedSignatory: { name: "Authorized Person" }
+    };
+};
+
 // Create Quotation
 const createQuotation = async (req, res) => {
     try {
@@ -192,23 +211,9 @@ module.exports = {
                 .populate('createdBy');
             if (!quotation) return res.status(404).json({ message: 'Quotation not found' });
 
-            // Fetch company settings for the user who created this quotation
-            let companySettings = null;
-            if (quotation.createdBy) {
-                const creatorId = quotation.createdBy._id || quotation.createdBy;
-                companySettings = await CompanySettings.findOne({ userId: creatorId });
-            }
-
-            // If no company settings for creator, try current user's settings
-            if (!companySettings && req.user) {
-                companySettings = await CompanySettings.findOne({ userId: req.user.id });
-            }
-
-            // Fallback: If still no settings, fetch ANY company settings available in the system
-            // This ensures that organization info is shown even if the specific user hasn't set up their profile
-            if (!companySettings) {
-                companySettings = await CompanySettings.findOne().sort({ createdAt: 1 }); // Get the oldest/first one
-            }
+            // Fetch company settings with robust fallback
+            const creatorId = quotation.createdBy?._id || quotation.createdBy;
+            const companySettings = await getAnyCompanySettings(creatorId);
 
             // Return quotation with company settings
             const quotationObj = quotation.toObject();
@@ -229,8 +234,23 @@ module.exports = {
             const quotations = await Quotation.find(query)
                 .populate('customerId')
                 .populate('siteId')
+                .populate('createdBy')
                 .sort({ createdAt: -1 });
-            res.json(quotations);
+
+            // Fetch company settings for each creator (with caching to avoid redundant calls)
+            const settingsCache = {};
+            const quotationsWithSettings = await Promise.all(quotations.map(async (q) => {
+                const qObj = q.toObject();
+                const creatorId = q.createdBy?._id || q.createdBy;
+
+                if (creatorId && !settingsCache[creatorId]) {
+                    settingsCache[creatorId] = await getAnyCompanySettings(creatorId);
+                }
+                qObj.companySettings = settingsCache[creatorId] || await getAnyCompanySettings();
+                return qObj;
+            }));
+
+            res.json(quotationsWithSettings);
         } catch (error) {
             res.status(500).json({ message: 'Error fetching quotations' });
         }

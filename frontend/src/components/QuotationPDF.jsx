@@ -126,12 +126,12 @@ const styles = StyleSheet.create({
     qrCodeImage: { width: 60, height: 60, marginTop: 10, alignSelf: 'center' },
 });
 
-const QuotationPDF = ({ quotation, format = 'format1', images = {} }) => {
+const QuotationPDF = ({ quotation, format = 'format1', images = {}, companySettings: passedSettings }) => {
     console.log("PDF RENDERING: ", format); // DEBUG LOG
     if (!quotation) return null;
 
     const items = quotation.items || [];
-    const companySettings = quotation.companySettings;
+    const companySettings = passedSettings || quotation.companySettings;
 
     // Helper to get image source (prefer base64 from props, fallback to resolved URL)
     const resolveImage = (url) => {

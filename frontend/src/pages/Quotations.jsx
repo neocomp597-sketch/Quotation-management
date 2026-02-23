@@ -17,6 +17,7 @@ const Quotations = () => {
     const [isPreviewOpen, setIsPreviewOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [pdfFormat, setPdfFormat] = useState('format1');
+    const [companySettings, setCompanySettings] = useState(null);
 
     useEffect(() => {
         if (!selectedQuotation) return;
@@ -56,7 +57,18 @@ const Quotations = () => {
 
     useEffect(() => {
         fetchQuotations();
+        fetchCompanySettings();
     }, []);
+
+    const fetchCompanySettings = async () => {
+        try {
+            const { companySettingsService } = await import('../services/api');
+            const res = await companySettingsService.get();
+            setCompanySettings(res.data);
+        } catch (err) {
+            console.error("Error fetching settings:", err);
+        }
+    };
 
     const fetchQuotations = async () => {
         try {
@@ -274,7 +286,7 @@ const Quotations = () => {
                                                     </div>
                                                 </td>
                                                 <td className="px-8 py-5 text-right">
-                                                    <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <div className="flex items-center justify-end gap-2">
                                                         {q.status === 'draft' && (
                                                             <>
                                                                 <button
@@ -302,7 +314,7 @@ const Quotations = () => {
                                                         </button>
 
                                                         {/* Tax Invoice Format */}
-                                                        <PDFDownloadLink document={<QuotationPDF quotation={q} format="format2" />} fileName={`${q.quotationNo.replace(/\//g, '-')}-invoice.pdf`}>
+                                                        <PDFDownloadLink document={<QuotationPDF quotation={q} format="format2" companySettings={companySettings} />} fileName={`${q.quotationNo.replace(/\//g, '-')}-invoice.pdf`}>
                                                             {({ loading }) => (
                                                                 <button
                                                                     disabled={loading}
@@ -314,7 +326,7 @@ const Quotations = () => {
                                                             )}
                                                         </PDFDownloadLink>
 
-                                                        <PDFDownloadLink document={<QuotationPDF quotation={q} />} fileName={`${q.quotationNo.replace(/\//g, '-')}.pdf`}>
+                                                        <PDFDownloadLink document={<QuotationPDF quotation={q} companySettings={companySettings} />} fileName={`${q.quotationNo.replace(/\//g, '-')}.pdf`}>
                                                             {({ loading }) => (
                                                                 <button
                                                                     disabled={loading}
@@ -597,7 +609,7 @@ const Quotations = () => {
 
                         <PDFDownloadLink
                             key={pdfFormat}
-                            document={<QuotationPDF quotation={selectedQuotation} format={pdfFormat} images={pdfImages} />}
+                            document={<QuotationPDF quotation={selectedQuotation} format={pdfFormat} images={pdfImages} companySettings={companySettings} />}
                             fileName={`${selectedQuotation?.quotationNo.replace(/\//g, '-')}-${pdfFormat}.pdf`}
                         >
                             {({ loading }) => (

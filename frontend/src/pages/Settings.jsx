@@ -132,7 +132,7 @@ const Settings = () => {
             const res = await uploadService.uploadImage(file);
             setCompanySettings({
                 ...companySettings,
-                logoUrl: res.data.url
+                logoUrl: res.data.imageUrl
             });
             toast.success('Logo uploaded successfully!');
         } catch (error) {
@@ -154,7 +154,7 @@ const Settings = () => {
                 ...companySettings,
                 authorizedSignatory: {
                     ...companySettings.authorizedSignatory,
-                    signatureImageUrl: res.data.url
+                    signatureImageUrl: res.data.imageUrl
                 }
             });
             toast.success('Signature uploaded successfully!');
@@ -212,8 +212,8 @@ const Settings = () => {
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id)}
                             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm transition-all ${activeTab === tab.id
-                                    ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/20'
-                                    : 'text-slate-500 hover:bg-slate-50'
+                                ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/20'
+                                : 'text-slate-500 hover:bg-slate-50'
                                 }`}
                         >
                             <Icon size={18} />
