@@ -14,7 +14,8 @@ app.use(cors({
     origin: [
         'https://quotation-management-2znu.onrender.com',
         'http://localhost:5173',
-        'http://localhost:3000'
+        'http://localhost:3000',
+        'https://arcrm.co.in'
     ],
     credentials: true
 }));
