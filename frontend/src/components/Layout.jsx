@@ -18,7 +18,7 @@ const Layout = ({ children }) => {
 
             <footer className={`py-6 px-8 border-t border-slate-200 transition-all duration-300 ml-0 ${sidebarOpen ? 'md:ml-64' : 'md:ml-20'}`}>
                 <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between text-slate-500 text-sm gap-4 text-center md:text-left">
-                    <p>© 2025 JAG Sanitaryware & Bathroom Fittings. All rights reserved.</p>
+                    <p>&copy; {new Date().getFullYear()} JAG Sanitaryware & Bathroom Fittings. All rights reserved.</p>
                     <div className="flex flex-wrap justify-center items-center gap-4 md:gap-6">
                         <a href="#" className="hover:text-primary-600 transition-colors">Privacy Policy</a>
                         <a href="#" className="hover:text-primary-600 transition-colors">Terms of Service</a>
@@ -31,3 +31,4 @@ const Layout = ({ children }) => {
 };
 
 export default Layout;
+

@@ -6,8 +6,12 @@
 
 :root {
   --primary-color: #0d9488;
+  --primary-color-dark: #0f766e;
+  --primary-color-light: #ccfbf1;
   --secondary-color: #64748b;
   --accent-color: #14b8a6;
+  --text-color: #1e293b;
+  --surface-color: #ffffff;
   --bg-color: #ffffff;
 }
 
@@ -19,7 +23,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background-color: var(--bg-color);
-  color: #1e293b;
+  color: var(--text-color);
 }
 
 h1,
@@ -43,16 +47,16 @@ code {
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: #f0fdfa;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #99f6e4;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: #14b8a6;
 }
 
 .custom-scrollbar::-webkit-scrollbar {
@@ -124,5 +128,5 @@ code {
 }
 
 .pac-matched {
-  color: #0284c7;
+  color: var(--primary-color-dark);
 }

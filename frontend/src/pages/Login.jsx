@@ -4,7 +4,7 @@ import axios from 'axios';
 import { toast } from 'react-toastify';
 import { useAuth } from '../context/AuthContext';
 import { Eye, EyeOff, CheckCircle } from 'lucide-react';
-import './Auth.css'; // We will create this
+import './Auth.css';
 
 const Login = () => {
     const [formData, setFormData] = useState({
@@ -28,6 +28,7 @@ const Login = () => {
 
     const onSubmit = async e => {
         e.preventDefault();
+        setError('');
 
         // Validate required fields
         if (!email?.trim()) {
@@ -57,17 +58,17 @@ const Login = () => {
                     </div>
                 </div>,
                 {
-                    icon: <CheckCircle size={24} color="#10B981" />, // Emerald-500
+                    icon: <CheckCircle size={24} color="#0d9488" />,
                     style: {
                         background: '#fff',
                         color: '#1e293b',
                         borderRadius: '16px',
                         boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-                        border: '1px solid #e2e8f0',
+                        border: '1px solid #ccfbf1',
                         padding: '16px',
                     },
                     progressStyle: {
-                        background: 'linear-gradient(to right, #3b82f6, #8b5cf6)',
+                        background: 'linear-gradient(to right, #0d9488, #14b8a6)',
                     }
                 }
             );

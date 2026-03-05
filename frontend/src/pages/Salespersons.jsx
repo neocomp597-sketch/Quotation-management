@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MdDelete, MdPerson, MdEmail, MdAdminPanelSettings } from 'react-icons/md';
+import { MdEmail } from 'react-icons/md';
 import { salespersonService } from '../services/api';
 
 const Salespersons = () => {
@@ -35,7 +35,7 @@ const Salespersons = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {salespersons.map(user => (
                             <div key={user._id} className="p-6 border border-slate-100 rounded-2xl flex items-center gap-4 hover:shadow-md transition-shadow">
-                                <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-xl ${user.role === 'admin' ? 'bg-purple-600' : 'bg-primary-600'}`}>
+                                <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-xl ${user.role === 'admin' ? 'bg-primary-700' : 'bg-primary-600'}`}>
                                     {user.name.charAt(0)}
                                 </div>
                                 <div className="flex-1">
@@ -43,7 +43,7 @@ const Salespersons = () => {
                                     <div className="text-xs text-slate-500 flex items-center gap-1">
                                         <MdEmail size={12} /> {user.email}
                                     </div>
-                                    <span className={`text-[10px] font-black uppercase tracking-widest mt-2 inline-block px-2 py-0.5 rounded ${user.role === 'admin' ? 'bg-purple-50 text-purple-600' : 'bg-primary-50 text-primary-600'}`}>
+                                    <span className={`text-[10px] font-black uppercase tracking-widest mt-2 inline-block px-2 py-0.5 rounded ${user.role === 'admin' ? 'bg-primary-100 text-primary-800' : 'bg-primary-50 text-primary-600'}`}>
                                         {user.role}
                                     </span>
                                 </div>
