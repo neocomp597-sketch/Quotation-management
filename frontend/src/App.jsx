@@ -6,6 +6,7 @@ import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import Customers from './pages/Customers';
 import Products from './pages/Products';
+import MGRMaster from './pages/MGRMaster';
 import Quotations from './pages/Quotations';
 import CreateQuotation from './pages/CreateQuotation';
 import Terms from './pages/Terms';
@@ -49,6 +50,7 @@ function App() {
             <Route path="/salespersons" element={<Layout><Salespersons /></Layout>} />
             <Route path="/customers" element={<Layout><Customers /></Layout>} />
             <Route path="/products" element={<Layout><Products /></Layout>} />
+            <Route path="/mgrs" element={<Layout><MGRMaster /></Layout>} />
             <Route path="/quotations" element={<Layout><Quotations /></Layout>} />
             <Route path="/quotations/new" element={<Layout><CreateQuotation /></Layout>} />
             <Route path="/quotations/:id" element={<Layout><CreateQuotation /></Layout>} />

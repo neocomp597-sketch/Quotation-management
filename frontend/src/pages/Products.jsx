@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { MdAdd, MdSearch, MdEdit, MdDelete, MdInventory, MdCategory, MdQrCode, MdPayments, MdProductionQuantityLimits, MdCloudUpload, MdVisibility, MdFileUpload, MdCheckBox, MdCheckBoxOutlineBlank, MdDeleteSweep, MdSync, MdImage } from 'react-icons/md';
 import { toast } from 'react-toastify';
-import { productService, uploadService, importService } from '../services/api';
+import { productService, uploadService, importService, mgrService } from '../services/api';
 import Modal from '../components/Modal';
 import ImportModal from '../components/ImportModal';
 import { resolveImageUrl, getPlaceholderImage } from '../utils/helpers';
 
 const Products = () => {
     const [products, setProducts] = useState([]);
+    const [mgrsData, setMgrsData] = useState({ mgr1: [], mgr2: [], mgr3: [], mgr4: [], mgr5: [] });
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -31,12 +32,34 @@ const Products = () => {
         mrp: 0,
         uom: 'Nos',
         productImageUrl: '',
-        status: 'Active'
+        status: 'Active',
+        mgr1: '',
+        mgr2: '',
+        mgr3: '',
+        mgr4: '',
+        mgr5: ''
     });
 
     useEffect(() => {
         fetchProducts();
+        fetchMGRs();
     }, []);
+
+    const fetchMGRs = async () => {
+        try {
+            const promises = ['MGR1', 'MGR2', 'MGR3', 'MGR4', 'MGR5'].map(type => mgrService.getAll(type));
+            const [m1, m2, m3, m4, m5] = await Promise.all(promises);
+            setMgrsData({
+                mgr1: m1.data.filter(m => m.status === 'Active'),
+                mgr2: m2.data.filter(m => m.status === 'Active'),
+                mgr3: m3.data.filter(m => m.status === 'Active'),
+                mgr4: m4.data.filter(m => m.status === 'Active'),
+                mgr5: m5.data.filter(m => m.status === 'Active'),
+            });
+        } catch (err) {
+            console.error("Error fetching MGRs", err);
+        }
+    };
 
     const fetchProducts = async () => {
         try {
@@ -65,7 +88,12 @@ const Products = () => {
                 mrp: 0,
                 uom: 'Nos',
                 productImageUrl: '',
-                status: 'Active'
+                status: 'Active',
+                mgr1: '',
+                mgr2: '',
+                mgr3: '',
+                mgr4: '',
+                mgr5: ''
             });
         }
         setIsModalOpen(true);
@@ -680,6 +708,32 @@ const Products = () => {
                                 </div>
                             </div>
                         </div>
+
+                        <div>
+                            <h4 className="text-[10px] font-black text-primary-600 uppercase tracking-[0.2em] mb-6 flex items-center gap-3">
+                                <span className="h-px flex-1 bg-primary-100"></span>
+                                Product Grouping
+                                <span className="h-px flex-1 bg-primary-100"></span>
+                            </h4>
+                            <div className="grid grid-cols-2 gap-6">
+                                {[1, 2, 3, 4, 5].map(num => (
+                                    <div key={`mgr${num}`} className="space-y-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">MGR {num}</label>
+                                        <select
+                                            name={`mgr${num}`}
+                                            value={formData[`mgr${num}`] || ''}
+                                            onChange={handleFormChange}
+                                            className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold appearance-none bg-white"
+                                        >
+                                            <option value="">Select MGR {num}</option>
+                                            {mgrsData[`mgr${num}`].map(m => (
+                                                <option key={m._id} value={m._id}>{m.code} - {m.description}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
                     </div>
 
                     <div className="space-y-8">
@@ -698,6 +752,7 @@ const Products = () => {
                                         onChange={handleFormChange}
                                         className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold appearance-none bg-white"
                                     >
+                                        <option value={0}>0% Slab (Zero)</option>
                                         <option value={5}>5% Slab (Low)</option>
                                         <option value={12}>12% Slab (Mid)</option>
                                         <option value={18}>18% Slab (Std)</option>

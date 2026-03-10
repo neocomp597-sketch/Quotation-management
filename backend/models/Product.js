@@ -11,6 +11,11 @@ const ProductSchema = new mongoose.Schema({
     uom: { type: String, enum: ['Nos', 'Set', 'Box', 'Rft'], required: true },
     productImageUrl: { type: String },
     status: { type: String, enum: ['Active', 'Inactive'], default: 'Active' },
+    mgr1: { type: mongoose.Schema.Types.ObjectId, ref: 'MGR' },
+    mgr2: { type: mongoose.Schema.Types.ObjectId, ref: 'MGR' },
+    mgr3: { type: mongoose.Schema.Types.ObjectId, ref: 'MGR' },
+    mgr4: { type: mongoose.Schema.Types.ObjectId, ref: 'MGR' },
+    mgr5: { type: mongoose.Schema.Types.ObjectId, ref: 'MGR' },
     createdAt: { type: Date, default: Date.now },
 });
 

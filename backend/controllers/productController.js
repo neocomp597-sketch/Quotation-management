@@ -3,7 +3,7 @@ const Product = require('../models/Product');
 // Create Product
 const createProduct = async (req, res) => {
     try {
-        const { productCode, productName, categoryId, hsnCode, gstPercentage, basePrice, mrp, uom, productImageUrl, status } = req.body;
+        const { productCode, productName, categoryId, hsnCode, gstPercentage, basePrice, mrp, uom, productImageUrl, status, mgr1, mgr2, mgr3, mgr4, mgr5 } = req.body;
 
         const newProduct = new Product({
             productCode,
@@ -16,6 +16,11 @@ const createProduct = async (req, res) => {
             uom,
             productImageUrl,
             status: status || 'Active',
+            mgr1: mgr1 || undefined,
+            mgr2: mgr2 || undefined,
+            mgr3: mgr3 || undefined,
+            mgr4: mgr4 || undefined,
+            mgr5: mgr5 || undefined,
         });
 
         await newProduct.save();
@@ -54,7 +59,7 @@ const getProductById = async (req, res) => {
 // Update Product
 const updateProduct = async (req, res) => {
     try {
-        const { productCode, productName, categoryId, hsnCode, gstPercentage, basePrice, mrp, uom, productImageUrl, status } = req.body;
+        const { productCode, productName, categoryId, hsnCode, gstPercentage, basePrice, mrp, uom, productImageUrl, status, mgr1, mgr2, mgr3, mgr4, mgr5 } = req.body;
 
         const updatedProduct = await Product.findByIdAndUpdate(req.params.id, {
             productCode,
@@ -67,6 +72,11 @@ const updateProduct = async (req, res) => {
             uom,
             productImageUrl,
             status,
+            mgr1: mgr1 || undefined,
+            mgr2: mgr2 || undefined,
+            mgr3: mgr3 || undefined,
+            mgr4: mgr4 || undefined,
+            mgr5: mgr5 || undefined,
         }, { new: true });
 
         if (!updatedProduct) {

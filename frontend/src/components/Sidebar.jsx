@@ -7,7 +7,8 @@ import {
     MdDescription,
     MdSettings,
     MdChevronLeft,
-    MdAssignment
+    MdAssignment,
+    MdCategory
 } from 'react-icons/md';
 
 const Sidebar = ({ isOpen, toggleSidebar }) => {
@@ -19,6 +20,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
         ...(isAdmin ? [{ name: 'Salespersons', icon: <MdPeople size={22} />, path: '/salespersons' }] : []),
         { name: 'Customers', icon: <MdPeople size={22} />, path: '/customers' },
         { name: 'Products', icon: <MdInventory size={22} />, path: '/products' },
+        { name: 'MGR Master', icon: <MdCategory size={22} />, path: '/mgrs' },
         { name: 'Quotations', icon: <MdDescription size={22} />, path: '/quotations' },
         { name: 'Terms & Conditions', icon: <MdAssignment size={22} />, path: '/terms' },
     ];

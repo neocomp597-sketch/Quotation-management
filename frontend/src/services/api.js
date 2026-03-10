@@ -63,6 +63,14 @@ export const userService = {
     updateProfile: (data) => api.put('/users/profile', data),
 };
 
+export const mgrService = {
+    getAll: (type) => api.get(`/mgrs${type ? `?type=${type}` : ''}`),
+    getById: (id) => api.get(`/mgrs/${id}`),
+    create: (data) => api.post('/mgrs', data),
+    update: (id, data) => api.put(`/mgrs/${id}`, data),
+    delete: (id) => api.delete(`/mgrs/${id}`),
+};
+
 export const companySettingsService = {
     get: () => api.get('/company-settings'),
     update: (data) => api.put('/company-settings', data),
