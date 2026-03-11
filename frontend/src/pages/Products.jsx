@@ -17,6 +17,15 @@ const Products = () => {
     const [viewImage, setViewImage] = useState(null);
     const [viewMode, setViewMode] = useState('list'); // 'list' or 'grid'
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+    
+    // MGR Filters
+    const [mgrFilters, setMgrFilters] = useState({
+        mgr1: '',
+        mgr2: '',
+        mgr3: '',
+        mgr4: '',
+        mgr5: ''
+    });
 
     // Bulk selection state
     const [selectedIds, setSelectedIds] = useState([]);
@@ -143,11 +152,22 @@ const Products = () => {
         }
 
         try {
+            // Ensure MGR and Category fields are sent as IDs, not objects
+            const payload = {
+                ...formData,
+                categoryId: formData.categoryId?._id || formData.categoryId,
+                mgr1: formData.mgr1?._id || formData.mgr1,
+                mgr2: formData.mgr2?._id || formData.mgr2,
+                mgr3: formData.mgr3?._id || formData.mgr3,
+                mgr4: formData.mgr4?._id || formData.mgr4,
+                mgr5: formData.mgr5?._id || formData.mgr5,
+            };
+
             if (editingProduct) {
-                await productService.update(editingProduct._id, formData);
+                await productService.update(editingProduct._id, payload);
                 toast.success('Product updated successfully!');
             } else {
-                await productService.create(formData);
+                await productService.create(payload);
                 toast.success('Product created successfully!');
             }
             fetchProducts();
@@ -224,11 +244,47 @@ const Products = () => {
         }
     };
 
-    const filteredProducts = products.filter(p =>
-        p.productName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.productCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.hsnCode?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredProducts = products.filter(p => {
+        const matchesSearch = p.productName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            p.productCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            p.hsnCode?.toLowerCase().includes(searchTerm.toLowerCase());
+
+        const matchesMGR1 = !mgrFilters.mgr1 || p.mgr1?._id === mgrFilters.mgr1;
+        const matchesMGR2 = !mgrFilters.mgr2 || p.mgr2?._id === mgrFilters.mgr2;
+        const matchesMGR3 = !mgrFilters.mgr3 || p.mgr3?._id === mgrFilters.mgr3;
+        const matchesMGR4 = !mgrFilters.mgr4 || p.mgr4?._id === mgrFilters.mgr4;
+        const matchesMGR5 = !mgrFilters.mgr5 || p.mgr5?._id === mgrFilters.mgr5;
+
+        return matchesSearch && matchesMGR1 && matchesMGR2 && matchesMGR3 && matchesMGR4 && matchesMGR5;
+    });
+
+    // Extract unique MGRs maintained in Product Master for filters
+    const getUsedMGRs = (mgrKey) => {
+        const usedMap = new Map();
+        products.forEach(p => {
+            const mgr = p[mgrKey];
+            if (mgr && mgr._id) {
+                usedMap.set(mgr._id, mgr);
+            }
+        });
+        return Array.from(usedMap.values()).sort((a, b) => a.code?.localeCompare(b.code));
+    };
+
+    const handleMgrFilterChange = (e) => {
+        const { name, value } = e.target;
+        setMgrFilters(prev => ({ ...prev, [name]: value }));
+    };
+
+    const clearFilters = () => {
+        setMgrFilters({
+            mgr1: '',
+            mgr2: '',
+            mgr3: '',
+            mgr4: '',
+            mgr5: ''
+        });
+        setSearchTerm('');
+    };
 
     return (
         <div className="space-y-6">
@@ -303,6 +359,40 @@ const Products = () => {
             )}
 
             <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
+                {/* MGR Filters Section */}
+                <div className="px-6 py-6 border-b border-slate-50 bg-white">
+                    <div className="flex flex-wrap gap-4">
+                        {[1, 2, 3, 4, 5].map(num => {
+                            const mgrKey = `mgr${num}`;
+                            const usedOptions = getUsedMGRs(mgrKey);
+                            return (
+                                <div key={mgrKey} className="flex-1 min-w-[140px]">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">Filter MGR {num}</label>
+                                    <select
+                                        name={mgrKey}
+                                        value={mgrFilters[mgrKey]}
+                                        onChange={handleMgrFilterChange}
+                                        className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none text-[11px] font-bold appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2210%22%20height%3D%226%22%20viewBox%3D%220%200%2010%206%22%20fill%3D%22none%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Cpath%20d%3D%22M1%201L5%205L9%201%22%20stroke%3D%22%2394A3B8%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22/%3E%3C/svg%3E')] bg-[length:12px_8px] bg-[right_1rem_center] bg-no-repeat focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all cursor-pointer"
+                                    >
+                                        <option value="">All MGR {num}</option>
+                                        {usedOptions.map(m => (
+                                            <option key={m._id} value={m._id}>{m.code}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            );
+                        })}
+                        <div className="flex items-end flex-shrink-0">
+                            <button
+                                onClick={clearFilters}
+                                className="px-4 py-2 text-[10px] font-black text-rose-600 uppercase tracking-widest hover:bg-rose-50 rounded-xl transition-all"
+                            >
+                                Clear All
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 <div className="p-6 border-b border-slate-50 flex flex-col md:flex-row gap-4 items-center bg-slate-50/30">
                     <div className="relative flex-1 w-full text-slate-400 focus-within:text-primary-600 transition-colors">
                         <MdSearch className="absolute left-4 top-1/2 -translate-y-1/2" size={20} />

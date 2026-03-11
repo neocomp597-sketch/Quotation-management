@@ -34,7 +34,12 @@ const createProduct = async (req, res) => {
 // Get All Products
 const getAllProducts = async (req, res) => {
     try {
-        const products = await Product.find();
+        const products = await Product.find()
+            .populate('mgr1')
+            .populate('mgr2')
+            .populate('mgr3')
+            .populate('mgr4')
+            .populate('mgr5');
         res.json(products);
     } catch (error) {
         console.error(error);
