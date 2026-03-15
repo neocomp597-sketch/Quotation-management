@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { MdAdd, MdSearch, MdEdit, MdDelete, MdInventory, MdCategory, MdQrCode, MdPayments, MdProductionQuantityLimits, MdCloudUpload, MdVisibility, MdFileUpload, MdCheckBox, MdCheckBoxOutlineBlank, MdDeleteSweep, MdSync, MdImage } from 'react-icons/md';
 import { toast } from 'react-toastify';
-import { productService, uploadService, importService, mgrService } from '../services/api';
+import { productService, uploadService, importService, mgrService, attributeService } from '../services/api';
 import Modal from '../components/Modal';
 import ImportModal from '../components/ImportModal';
 import { resolveImageUrl, getPlaceholderImage } from '../utils/helpers';
@@ -27,6 +27,10 @@ const Products = () => {
         mgr5: ''
     });
 
+    const [availableAttributes, setAvailableAttributes] = useState([]);
+    const [allFilterAttributes, setAllFilterAttributes] = useState([]);
+    const [attributeFilters, setAttributeFilters] = useState({});
+
     // Bulk selection state
     const [selectedIds, setSelectedIds] = useState([]);
     const [isBulkActionLoading, setIsBulkActionLoading] = useState(false);
@@ -46,13 +50,23 @@ const Products = () => {
         mgr2: '',
         mgr3: '',
         mgr4: '',
-        mgr5: ''
+        mgr5: '',
+        attributes: []
     });
 
     useEffect(() => {
         fetchProducts();
         fetchMGRs();
     }, []);
+
+    useEffect(() => {
+        if (mgrFilters.mgr3) {
+            fetchFilterAttributes(mgrFilters.mgr3);
+        } else {
+            setAllFilterAttributes([]);
+            setAttributeFilters({});
+        }
+    }, [mgrFilters.mgr3]);
 
     const fetchMGRs = async () => {
         try {
@@ -70,6 +84,28 @@ const Products = () => {
         }
     };
 
+    const fetchAvailableAttributes = async (mgr3Id) => {
+        if (!mgr3Id) {
+            setAvailableAttributes([]);
+            return;
+        }
+        try {
+            const res = await attributeService.getByMGR3(mgr3Id);
+            setAvailableAttributes(res.data.filter(a => a.status === 'Active'));
+        } catch (err) {
+            console.error("Error fetching attributes:", err);
+        }
+    };
+
+    const fetchFilterAttributes = async (mgr3Id) => {
+        try {
+            const res = await attributeService.getByMGR3(mgr3Id);
+            setAllFilterAttributes(res.data.filter(a => a.status === 'Active'));
+        } catch (err) {
+            console.error("Error fetching filter attributes:", err);
+        }
+    };
+
     const fetchProducts = async () => {
         try {
             const res = await productService.getAll();
@@ -84,7 +120,13 @@ const Products = () => {
     const handleOpenModal = (product = null) => {
         if (product) {
             setEditingProduct(product);
-            setFormData({ ...product });
+            setFormData({ 
+                ...product,
+                attributes: product.attributes ? product.attributes.map(a => a._id || a) : []
+            });
+            if (product.mgr3) {
+                fetchAvailableAttributes(product.mgr3._id || product.mgr3);
+            }
         } else {
             setEditingProduct(null);
             setFormData({
@@ -102,8 +144,10 @@ const Products = () => {
                 mgr2: '',
                 mgr3: '',
                 mgr4: '',
-                mgr5: ''
+                mgr5: '',
+                attributes: []
             });
+            setAvailableAttributes([]);
         }
         setIsModalOpen(true);
     };
@@ -111,6 +155,11 @@ const Products = () => {
     const handleFormChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
+        
+        if (name === 'mgr3') {
+            fetchAvailableAttributes(value);
+            setFormData(prev => ({ ...prev, attributes: [] }));
+        }
     };
 
     const handleFileUpload = async (e) => {
@@ -161,6 +210,7 @@ const Products = () => {
                 mgr3: formData.mgr3?._id || formData.mgr3,
                 mgr4: formData.mgr4?._id || formData.mgr4,
                 mgr5: formData.mgr5?._id || formData.mgr5,
+                attributes: formData.attributes || []
             };
 
             if (editingProduct) {
@@ -255,7 +305,12 @@ const Products = () => {
         const matchesMGR4 = !mgrFilters.mgr4 || p.mgr4?._id === mgrFilters.mgr4;
         const matchesMGR5 = !mgrFilters.mgr5 || p.mgr5?._id === mgrFilters.mgr5;
 
-        return matchesSearch && matchesMGR1 && matchesMGR2 && matchesMGR3 && matchesMGR4 && matchesMGR5;
+        // Attribute filtering: if any attribute filter is selected, product MUST have all of them
+        const selectedAttrIds = Object.keys(attributeFilters);
+        const matchesAttributes = selectedAttrIds.length === 0 || 
+            selectedAttrIds.every(id => (p.attributes || []).some(attr => (attr._id || attr) === id));
+
+        return matchesSearch && matchesMGR1 && matchesMGR2 && matchesMGR3 && matchesMGR4 && matchesMGR5 && matchesAttributes;
     });
 
     // Extract unique MGRs maintained in Product Master for filters
@@ -270,9 +325,38 @@ const Products = () => {
         return Array.from(usedMap.values()).sort((a, b) => a.code?.localeCompare(b.code));
     };
 
+    const getUsedAttributes = () => {
+        const usedMap = new Map();
+        products.forEach(p => {
+            if (!mgrFilters.mgr3 || (p.mgr3?._id === mgrFilters.mgr3)) {
+                (p.attributes || []).forEach(attr => {
+                    if (attr && attr._id) {
+                        usedMap.set(attr._id, attr);
+                    }
+                });
+            }
+        });
+        return Array.from(usedMap.values()).sort((a, b) => a.description?.localeCompare(b.description));
+    };
+
+    const handleAttributeFilterChange = (attrId) => {
+        setAttributeFilters(prev => {
+            const next = { ...prev };
+            if (next[attrId]) {
+                delete next[attrId];
+            } else {
+                next[attrId] = true;
+            }
+            return next;
+        });
+    };
+
     const handleMgrFilterChange = (e) => {
         const { name, value } = e.target;
         setMgrFilters(prev => ({ ...prev, [name]: value }));
+        if (name === 'mgr3') {
+            setAttributeFilters({}); // Reset attribute filters when MGR3 changes
+        }
     };
 
     const clearFilters = () => {
@@ -283,6 +367,7 @@ const Products = () => {
             mgr4: '',
             mgr5: ''
         });
+        setAttributeFilters({});
         setSearchTerm('');
     };
 
@@ -361,35 +446,72 @@ const Products = () => {
             <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
                 {/* MGR Filters Section */}
                 <div className="px-6 py-6 border-b border-slate-50 bg-white">
-                    <div className="flex flex-wrap gap-4">
-                        {[1, 2, 3, 4, 5].map(num => {
-                            const mgrKey = `mgr${num}`;
-                            const usedOptions = getUsedMGRs(mgrKey);
-                            return (
-                                <div key={mgrKey} className="flex-1 min-w-[140px]">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">Filter MGR {num}</label>
-                                    <select
-                                        name={mgrKey}
-                                        value={mgrFilters[mgrKey]}
-                                        onChange={handleMgrFilterChange}
-                                        className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none text-[11px] font-bold appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2210%22%20height%3D%226%22%20viewBox%3D%220%200%2010%206%22%20fill%3D%22none%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Cpath%20d%3D%22M1%201L5%205L9%201%22%20stroke%3D%22%2394A3B8%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22/%3E%3C/svg%3E')] bg-[length:12px_8px] bg-[right_1rem_center] bg-no-repeat focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all cursor-pointer"
-                                    >
-                                        <option value="">All MGR {num}</option>
-                                        {usedOptions.map(m => (
-                                            <option key={m._id} value={m._id}>{m.code}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                            );
-                        })}
-                        <div className="flex items-end flex-shrink-0">
-                            <button
-                                onClick={clearFilters}
-                                className="px-4 py-2 text-[10px] font-black text-rose-600 uppercase tracking-widest hover:bg-rose-50 rounded-xl transition-all"
-                            >
-                                Clear All
-                            </button>
+                    <div className="space-y-6">
+                        <div className="flex flex-wrap gap-4">
+                            {[1, 2, 3, 4, 5].map(num => {
+                                const mgrKey = `mgr${num}`;
+                                const usedOptions = getUsedMGRs(mgrKey);
+                                return (
+                                    <div key={mgrKey} className="flex-1 min-w-[140px]">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">Filter MGR {num}</label>
+                                        <select
+                                            name={mgrKey}
+                                            value={mgrFilters[mgrKey]}
+                                            onChange={handleMgrFilterChange}
+                                            className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none text-[11px] font-bold appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2210%22%20height%3D%226%22%20viewBox%3D%220%200%2010%206%22%20fill%3D%22none%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Cpath%20d%3D%22M1%201L5%205L9%201%22%20stroke%3D%22%2394A3B8%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22/%3E%3C/svg%3E')] bg-[length:12px_8px] bg-[right_1rem_center] bg-no-repeat focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all cursor-pointer"
+                                        >
+                                            <option value="">All MGR {num}</option>
+                                            {usedOptions.map(m => (
+                                                <option key={m._id} value={m._id}>{m.code}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                );
+                            })}
+                            <div className="flex items-end flex-shrink-0">
+                                <button
+                                    onClick={clearFilters}
+                                    className="px-4 py-2 text-[10px] font-black text-rose-600 uppercase tracking-widest hover:bg-rose-50 rounded-xl transition-all"
+                                >
+                                    Clear All
+                                </button>
+                            </div>
                         </div>
+
+                        {/* Attribute Filters */}
+                        {mgrFilters.mgr3 && allFilterAttributes.length > 0 && (
+                            <div className="pt-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-4 block">Filter by Attributes</label>
+                                <div className="space-y-4">
+                                    {Object.entries(
+                                        allFilterAttributes.reduce((acc, attr) => {
+                                            if (!acc[attr.code]) acc[attr.code] = [];
+                                            acc[attr.code].push(attr);
+                                            return acc;
+                                        }, {})
+                                    ).map(([code, attrs]) => (
+                                        <div key={code} className="flex flex-col gap-2">
+                                            <span className="text-[9px] font-black text-primary-600/60 uppercase tracking-widest ml-1">{code}</span>
+                                            <div className="flex flex-wrap gap-2">
+                                                {attrs.map(attr => (
+                                                    <button
+                                                        key={attr._id}
+                                                        onClick={() => handleAttributeFilterChange(attr._id)}
+                                                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all border ${
+                                                            attributeFilters[attr._id]
+                                                                ? 'bg-primary-600 text-white border-primary-600 shadow-sm'
+                                                                : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+                                                        }`}
+                                                    >
+                                                        {attr.description}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -453,7 +575,18 @@ const Products = () => {
                                                 <div className="flex justify-between items-start">
                                                     <div>
                                                         <h3 className="font-bold text-slate-900 truncate pr-2 text-sm">{p.productName}</h3>
-                                                        <p className="text-xs text-slate-500 font-mono mt-0.5">{p.productCode}</p>
+                                                        <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                                                            <p className="text-xs text-slate-500 font-mono">{p.productCode}</p>
+                                                            {p.attributes && p.attributes.length > 0 && (
+                                                                <div className="flex flex-wrap gap-1">
+                                                                    {p.attributes.map(attr => (
+                                                                        <span key={attr._id || attr} className="px-1 py-0.5 bg-primary-50 text-primary-600 text-[8px] font-black uppercase tracking-widest rounded">
+                                                                            {attr.code || attr}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                     <button
                                                         onClick={() => toggleSelectOne(p._id)}
@@ -562,7 +695,18 @@ const Products = () => {
                                                                 </div>
                                                                 <div>
                                                                     <div className="font-bold text-slate-900">{p.productName}</div>
-                                                                    <div className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{p.uom}</div>
+                                                                    <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                                                                        <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{p.uom}</span>
+                                                                        {p.attributes && p.attributes.length > 0 && (
+                                                                            <div className="flex flex-wrap gap-1">
+                                                                                {p.attributes.map(attr => (
+                                                                                    <span key={attr._id || attr} className="px-1.5 py-0.5 bg-primary-50 text-primary-600 text-[8px] font-black uppercase tracking-widest rounded border border-primary-100">
+                                                                                        {attr.code || attr}
+                                                                                    </span>
+                                                                                ))}
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
                                                                 </div>
                                                             </div>
                                                         </td>
@@ -811,7 +955,7 @@ const Products = () => {
                                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">MGR {num}</label>
                                         <select
                                             name={`mgr${num}`}
-                                            value={formData[`mgr${num}`] || ''}
+                                            value={formData[`mgr${num}`]?._id || formData[`mgr${num}`] || ''}
                                             onChange={handleFormChange}
                                             className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold appearance-none bg-white"
                                         >
@@ -823,6 +967,38 @@ const Products = () => {
                                     </div>
                                 ))}
                             </div>
+                            
+                            {/* Attributes Selection */}
+                            {formData.mgr3 && availableAttributes.length > 0 && (
+                                <div className="mt-8">
+                                    <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-4">Attributes for MGR3</h5>
+                                    <div className="flex flex-wrap gap-2">
+                                        {availableAttributes.map(attr => (
+                                            <button
+                                                key={attr._id}
+                                                type="button"
+                                                onClick={() => {
+                                                    const current = formData.attributes || [];
+                                                    const exists = current.includes(attr._id);
+                                                    setFormData(prev => ({
+                                                        ...prev,
+                                                        attributes: exists 
+                                                            ? current.filter(id => id !== attr._id)
+                                                            : [...current, attr._id]
+                                                    }));
+                                                }}
+                                                className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${
+                                                    (formData.attributes || []).includes(attr._id)
+                                                        ? 'bg-primary-600 text-white border-primary-600 shadow-lg shadow-primary-600/20'
+                                                        : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+                                                }`}
+                                            >
+                                                {attr.description} ({attr.code})
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
 

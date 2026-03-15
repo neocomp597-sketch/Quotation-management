@@ -16,6 +16,7 @@ const ProductSchema = new mongoose.Schema({
     mgr3: { type: mongoose.Schema.Types.ObjectId, ref: 'MGR' },
     mgr4: { type: mongoose.Schema.Types.ObjectId, ref: 'MGR' },
     mgr5: { type: mongoose.Schema.Types.ObjectId, ref: 'MGR' },
+    attributes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Attribute' }],
     createdAt: { type: Date, default: Date.now },
 });
 

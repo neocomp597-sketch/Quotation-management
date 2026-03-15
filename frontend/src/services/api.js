@@ -116,4 +116,11 @@ export const importService = {
     getCustomerTemplate: () => api.get('/import/template/customers', { responseType: 'blob' })
 };
 
+export const attributeService = {
+    getByMGR3: (mgr3Id) => api.get(`/attributes/mgr3/${mgr3Id}`),
+    create: (data) => api.post('/attributes', data),
+    update: (id, data) => api.put(`/attributes/${id}`, data),
+    delete: (id) => api.delete(`/attributes/${id}`),
+};
+
 export default api;

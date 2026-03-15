@@ -3,7 +3,7 @@ const Product = require('../models/Product');
 // Create Product
 const createProduct = async (req, res) => {
     try {
-        const { productCode, productName, categoryId, hsnCode, gstPercentage, basePrice, mrp, uom, productImageUrl, status, mgr1, mgr2, mgr3, mgr4, mgr5 } = req.body;
+        const { productCode, productName, categoryId, hsnCode, gstPercentage, basePrice, mrp, uom, productImageUrl, status, mgr1, mgr2, mgr3, mgr4, mgr5, attributes } = req.body;
 
         const newProduct = new Product({
             productCode,
@@ -21,6 +21,7 @@ const createProduct = async (req, res) => {
             mgr3: mgr3 || undefined,
             mgr4: mgr4 || undefined,
             mgr5: mgr5 || undefined,
+            attributes: attributes || [],
         });
 
         await newProduct.save();
@@ -39,7 +40,8 @@ const getAllProducts = async (req, res) => {
             .populate('mgr2')
             .populate('mgr3')
             .populate('mgr4')
-            .populate('mgr5');
+            .populate('mgr5')
+            .populate('attributes');
         res.json(products);
     } catch (error) {
         console.error(error);
@@ -50,7 +52,7 @@ const getAllProducts = async (req, res) => {
 // Get Product by ID
 const getProductById = async (req, res) => {
     try {
-        const product = await Product.findById(req.params.id);
+        const product = await Product.findById(req.params.id).populate('attributes');
         if (!product) {
             return res.status(404).json({ message: 'Product not found' });
         }
@@ -64,7 +66,7 @@ const getProductById = async (req, res) => {
 // Update Product
 const updateProduct = async (req, res) => {
     try {
-        const { productCode, productName, categoryId, hsnCode, gstPercentage, basePrice, mrp, uom, productImageUrl, status, mgr1, mgr2, mgr3, mgr4, mgr5 } = req.body;
+        const { productCode, productName, categoryId, hsnCode, gstPercentage, basePrice, mrp, uom, productImageUrl, status, mgr1, mgr2, mgr3, mgr4, mgr5, attributes } = req.body;
 
         const updatedProduct = await Product.findByIdAndUpdate(req.params.id, {
             productCode,
@@ -82,6 +84,7 @@ const updateProduct = async (req, res) => {
             mgr3: mgr3 || undefined,
             mgr4: mgr4 || undefined,
             mgr5: mgr5 || undefined,
+            attributes: attributes || [],
         }, { new: true });
 
         if (!updatedProduct) {
