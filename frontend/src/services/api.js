@@ -112,8 +112,19 @@ export const importService = {
             }
         });
     },
+    importAttributes: (file) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        return api.post('/import/attributes', formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            }
+        });
+    },
     getProductTemplate: () => api.get('/import/template/products', { responseType: 'blob' }),
-    getCustomerTemplate: () => api.get('/import/template/customers', { responseType: 'blob' })
+    getCustomerTemplate: () => api.get('/import/template/customers', { responseType: 'blob' }),
+    getAttributeTemplate: () => api.get('/import/template/attributes', { responseType: 'blob' })
+
 };
 
 export const attributeService = {
@@ -122,5 +133,14 @@ export const attributeService = {
     update: (id, data) => api.put(`/attributes/${id}`, data),
     delete: (id) => api.delete(`/attributes/${id}`),
 };
+
+export const productAttributeService = {
+    getAll: () => api.get('/product-attributes'),
+    getByProductCode: (code) => api.get(`/product-attributes/${code}`),
+    save: (data) => api.post('/product-attributes', data),
+    delete: (id) => api.delete(`/product-attributes/${id}`),
+};
+
+
 
 export default api;

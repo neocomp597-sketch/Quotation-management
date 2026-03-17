@@ -37,6 +37,8 @@ const importRoutes = require('./routes/importRoutes');
 const companySettingsRoutes = require('./routes/companySettingsRoutes');
 const mgrRoutes = require('./routes/mgrRoutes');
 const attributeRoutes = require('./routes/attributeRoutes');
+const productAttributeRoutes = require('./routes/productAttributeRoutes');
+
 
 // API Routes
 app.use('/api/quotations', quotationRoutes);
@@ -52,6 +54,8 @@ app.use('/api/import', importRoutes);
 app.use('/api/company-settings', companySettingsRoutes);
 app.use('/api/mgrs', mgrRoutes);
 app.use('/api/attributes', attributeRoutes);
+app.use('/api/product-attributes', productAttributeRoutes);
+
 
 // Serve Static Files
 // Serve Static Files with logging

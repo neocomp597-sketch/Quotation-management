@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { MdAdd, MdSearch, MdEdit, MdDelete, MdInventory, MdCategory, MdQrCode, MdPayments, MdProductionQuantityLimits, MdCloudUpload, MdVisibility, MdFileUpload, MdCheckBox, MdCheckBoxOutlineBlank, MdDeleteSweep, MdSync, MdImage } from 'react-icons/md';
 import { toast } from 'react-toastify';
-import { productService, uploadService, importService, mgrService, attributeService } from '../services/api';
+import { productService, uploadService, importService, mgrService, attributeService, productAttributeService } from '../services/api';
+
 import Modal from '../components/Modal';
 import ImportModal from '../components/ImportModal';
 import { resolveImageUrl, getPlaceholderImage } from '../utils/helpers';
@@ -17,6 +18,8 @@ const Products = () => {
     const [viewImage, setViewImage] = useState(null);
     const [viewMode, setViewMode] = useState('list'); // 'list' or 'grid'
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+    const [isAttrImportModalOpen, setIsAttrImportModalOpen] = useState(false);
+
     
     // MGR Filters
     const [mgrFilters, setMgrFilters] = useState({
@@ -34,6 +37,10 @@ const Products = () => {
     // Bulk selection state
     const [selectedIds, setSelectedIds] = useState([]);
     const [isBulkActionLoading, setIsBulkActionLoading] = useState(false);
+    const [customAttributes, setCustomAttributes] = useState([]);
+    const [allProductAttributes, setAllProductAttributes] = useState({});
+
+
 
     const [formData, setFormData] = useState({
         productName: '',
@@ -57,7 +64,9 @@ const Products = () => {
     useEffect(() => {
         fetchProducts();
         fetchMGRs();
+        fetchAllAttributes();
     }, []);
+
 
     useEffect(() => {
         if (mgrFilters.mgr3) {
@@ -105,6 +114,35 @@ const Products = () => {
             console.error("Error fetching filter attributes:", err);
         }
     };
+    
+    const fetchAllAttributes = async () => {
+        try {
+            const res = await productAttributeService.getAll();
+            // Group by productCode for easy lookup
+            const grouped = res.data.reduce((acc, curr) => {
+                if (!acc[curr.productCode]) acc[curr.productCode] = [];
+                acc[curr.productCode].push(curr);
+                return acc;
+            }, {});
+            setAllProductAttributes(grouped);
+        } catch (err) {
+            console.error("Error fetching all product attributes:", err);
+        }
+    };
+
+
+    const fetchCustomAttributes = async (productCode) => {
+        if (!productCode) {
+            setCustomAttributes([]);
+            return;
+        }
+        try {
+            const res = await productAttributeService.getByProductCode(productCode);
+            setCustomAttributes(res.data);
+        } catch (err) {
+            console.error("Error fetching custom attributes:", err);
+        }
+    };
 
     const fetchProducts = async () => {
         try {
@@ -127,8 +165,13 @@ const Products = () => {
             if (product.mgr3) {
                 fetchAvailableAttributes(product.mgr3._id || product.mgr3);
             }
+            if (product.productCode) {
+                fetchCustomAttributes(product.productCode);
+            }
         } else {
             setEditingProduct(null);
+            setCustomAttributes([]);
+
             setFormData({
                 productName: '',
                 productCode: '',
@@ -387,6 +430,14 @@ const Products = () => {
                         <span>Import</span>
                     </button>
                     <button
+                        onClick={() => setIsAttrImportModalOpen(true)}
+                        className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-indigo-600/20 uppercase text-xs tracking-widest active:scale-95"
+                    >
+                        <MdFileUpload size={20} />
+                        <span>Import Attributes</span>
+                    </button>
+                    <button
+
                         onClick={() => handleOpenModal()}
                         className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
                     >
@@ -706,6 +757,15 @@ const Products = () => {
                                                                                 ))}
                                                                             </div>
                                                                         )}
+                                                                        {allProductAttributes[p.productCode] && (
+                                                                            <div className="flex flex-wrap gap-1">
+                                                                                {allProductAttributes[p.productCode].map(attr => (
+                                                                                    <span key={attr._id} className="px-1.5 py-0.5 bg-indigo-50 text-indigo-600 text-[8px] font-black uppercase tracking-widest rounded border border-indigo-100" title={`${attr.attributeCode}: ${attr.attributeValue}`}>
+                                                                                        {attr.attributeCode}
+                                                                                    </span>
+                                                                                ))}
+                                                                            </div>
+                                                                        )}
                                                                     </div>
                                                                 </div>
                                                             </div>
@@ -971,7 +1031,17 @@ const Products = () => {
                             {/* Attributes Selection */}
                             {formData.mgr3 && availableAttributes.length > 0 && (
                                 <div className="mt-8">
-                                    <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-4">Attributes for MGR3</h5>
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Attributes for MGR3</h5>
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsAttrImportModalOpen(true)}
+                                            className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border border-indigo-100"
+                                        >
+                                            <MdFileUpload size={14} />
+                                            Import Attributes
+                                        </button>
+                                    </div>
                                     <div className="flex flex-wrap gap-2">
                                         {availableAttributes.map(attr => (
                                             <button
@@ -997,8 +1067,25 @@ const Products = () => {
                                             </button>
                                         ))}
                                     </div>
+                                    
+                                    {/* Custom Imported Attributes */}
+                                    {customAttributes.length > 0 && (
+                                        <div className="mt-4 pt-4 border-t border-slate-100">
+                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3">Imported Key-Value Attributes</p>
+                                            <div className="flex flex-wrap gap-2">
+                                                {customAttributes.map(attr => (
+                                                    <div key={attr._id} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 text-slate-600 rounded-xl text-[10px] font-bold border border-slate-200">
+                                                        <span className="text-slate-400 uppercase tracking-tighter">{attr.attributeCode}:</span>
+                                                        <span>{attr.attributeValue}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
+
+
                         </div>
                     </div>
 
@@ -1120,6 +1207,29 @@ const Products = () => {
                 }}
                 onDownloadTemplate={importService.getProductTemplate}
             />
+
+            {/* Import Attributes Modal */}
+            <ImportModal
+                isOpen={isAttrImportModalOpen}
+                onClose={() => setIsAttrImportModalOpen(false)}
+                title="Import Product Attributes"
+                type="attributes"
+                onImport={async (file) => {
+                    const result = await importService.importAttributes(file);
+                    if (editingProduct && editingProduct.productCode) {
+                        fetchCustomAttributes(editingProduct.productCode);
+                    }
+                    fetchAllAttributes(); // Refresh the list view attributes too
+                    if (formData.mgr3) {
+
+                        fetchAvailableAttributes(formData.mgr3._id || formData.mgr3);
+                    }
+                    return result;
+                }}
+
+                onDownloadTemplate={importService.getAttributeTemplate}
+            />
+
         </div >
     );
 };

@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { MdAdd, MdEdit, MdDelete, MdArrowBack } from 'react-icons/md';
+import { MdAdd, MdEdit, MdDelete, MdArrowBack, MdFileUpload } from 'react-icons/md';
+
 import { toast } from 'react-toastify';
-import { mgrService, attributeService } from '../services/api';
+import { mgrService, attributeService, importService } from '../services/api';
 import Modal from '../components/Modal';
+import ImportModal from '../components/ImportModal';
+
 import { useNavigate } from 'react-router-dom';
 
 const Attributes = () => {
@@ -13,7 +16,9 @@ const Attributes = () => {
     const [loading, setLoading] = useState(false);
     const [mgr3Loading, setMgr3Loading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [editingAttribute, setEditingAttribute] = useState(null);
+
 
     const [formData, setFormData] = useState({
         code: '',
@@ -132,15 +137,25 @@ const Attributes = () => {
                         <p className="text-slate-500 font-medium">Manage attributes for MGR3 categories.</p>
                     </div>
                 </div>
-                <button
-                    onClick={() => handleOpenModal()}
-                    disabled={!selectedMgr3}
-                    className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 disabled:bg-slate-300 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
-                >
-                    <MdAdd size={20} />
-                    <span>Add Attribute</span>
-                </button>
+                <div className="flex gap-2">
+                    <button
+                        onClick={() => setIsImportModalOpen(true)}
+                        className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-indigo-600/20 uppercase text-xs tracking-widest active:scale-95"
+                    >
+                        <MdFileUpload size={20} />
+                        <span>Upload</span>
+                    </button>
+                    <button
+                        onClick={() => handleOpenModal()}
+                        disabled={!selectedMgr3}
+                        className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 disabled:bg-slate-300 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
+                    >
+                        <MdAdd size={20} />
+                        <span>Add Attribute</span>
+                    </button>
+                </div>
             </div>
+
 
             <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
                 <div className="p-6 bg-slate-50 border-b border-slate-100">
@@ -286,6 +301,22 @@ const Attributes = () => {
                     </div>
                 </form>
             </Modal>
+
+            <ImportModal
+                isOpen={isImportModalOpen}
+                onClose={() => setIsImportModalOpen(false)}
+                title="Import Product Attributes"
+                type="attributes"
+                onImport={async (file) => {
+                    const result = await importService.importAttributes(file);
+                    if (selectedMgr3) {
+                        fetchAttributes();
+                    }
+                    return result;
+                }}
+                onDownloadTemplate={importService.getAttributeTemplate}
+            />
+
         </div>
     );
 };

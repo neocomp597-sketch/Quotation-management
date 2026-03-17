@@ -1,6 +1,8 @@
 const XLSX = require('xlsx');
 const Product = require('../models/Product');
 const Customer = require('../models/Customer');
+const ProductAttribute = require('../models/ProductAttribute');
+
 
 // Import Products from Excel/CSV
 const importProducts = async (req, res) => {
@@ -233,9 +235,109 @@ const getCustomerTemplate = async (req, res) => {
     }
 };
 
+// Import Product Attributes from Excel/CSV
+const importAttributes = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ message: 'No file uploaded' });
+        }
+
+        const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const data = XLSX.utils.sheet_to_json(worksheet);
+
+        if (data.length === 0) {
+            return res.status(400).json({ message: 'No data found in file' });
+        }
+
+        const results = {
+            success: 0,
+            failed: 0,
+            errors: []
+        };
+
+        for (let i = 0; i < data.length; i++) {
+            const row = data[i];
+            try {
+                // Map columns
+                const attrData = {
+                    productCode: row['Product Code'] || row['productCode'],
+                    attributeCode: row['Attribute Code'] || row['attributeCode'],
+                    attributeValue: row['Attribute Value'] || row['attributeValue']
+                };
+
+                // Validate required fields
+                if (!attrData.productCode || !attrData.attributeCode || !attrData.attributeValue) {
+                    throw new Error('Missing required fields: Product Code, Attribute Code, or Attribute Value');
+                }
+
+                // Upsert logic: Update if (productCode + attributeCode) match, otherwise create
+                await ProductAttribute.findOneAndUpdate(
+                    { productCode: attrData.productCode, attributeCode: attrData.attributeCode },
+                    { attributeValue: attrData.attributeValue },
+                    { upsert: true, new: true }
+                );
+
+                results.success++;
+            } catch (err) {
+                results.failed++;
+                results.errors.push(`Row ${i + 2}: ${err.message}`);
+            }
+        }
+
+        res.status(200).json({
+            message: `Import completed. ${results.success} attributes imported, ${results.failed} failed.`,
+            ...results
+        });
+    } catch (error) {
+        console.error('Import error:', error);
+        res.status(500).json({ message: error.message || 'Error importing attributes' });
+    }
+};
+
+// Generate Attribute Template
+const getAttributeTemplate = async (req, res) => {
+    try {
+        const templateData = [
+            {
+                'Product Code': 'PROD001',
+                'Attribute Code': 'COLOR',
+                'Attribute Value': 'Red'
+            },
+            {
+                'Product Code': 'PROD001',
+                'Attribute Code': 'SIZE',
+                'Attribute Value': 'XL'
+            }
+        ];
+
+        const worksheet = XLSX.utils.json_to_sheet(templateData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Attributes');
+
+        // Set column widths
+        worksheet['!cols'] = [
+            { wch: 15 }, { wch: 20 }, { wch: 30 }
+        ];
+
+        const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename=attribute_import_template.xlsx');
+        res.send(buffer);
+    } catch (error) {
+        console.error('Template error:', error);
+        res.status(500).json({ message: 'Error generating template' });
+    }
+};
+
 module.exports = {
     importProducts,
     importCustomers,
+    importAttributes,
     getProductTemplate,
-    getCustomerTemplate
+    getCustomerTemplate,
+    getAttributeTemplate
 };
+
