@@ -121,9 +121,20 @@ export const importService = {
             }
         });
     },
+    importAttributeMaster: (file, mgr3Id) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        if (mgr3Id) formData.append('mgr3Id', mgr3Id);
+        return api.post('/import/attribute-master', formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            }
+        });
+    },
     getProductTemplate: () => api.get('/import/template/products', { responseType: 'blob' }),
+    getAttributeTemplate: () => api.get('/import/template/attributes', { responseType: 'blob' }),
+    getAttributeMasterTemplate: () => api.get('/import/template/attribute-master', { responseType: 'blob' }),
     getCustomerTemplate: () => api.get('/import/template/customers', { responseType: 'blob' }),
-    getAttributeTemplate: () => api.get('/import/template/attributes', { responseType: 'blob' })
 
 };
 

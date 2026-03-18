@@ -8,7 +8,9 @@ const {
     importAttributes,
     getProductTemplate,
     getCustomerTemplate,
-    getAttributeTemplate
+    getAttributeTemplate,
+    importAttributeMaster,
+    getAttributeMasterTemplate
 
 } = require('../controllers/importController');
 
@@ -37,12 +39,14 @@ const upload = multer({
 router.post('/products', upload.single('file'), importProducts);
 router.post('/customers', protect, upload.single('file'), importCustomers);
 router.post('/attributes', upload.single('file'), importAttributes);
+router.post('/attribute-master', upload.single('file'), importAttributeMaster);
 
 
 // Template download routes
 router.get('/template/products', getProductTemplate);
 router.get('/template/customers', getCustomerTemplate);
 router.get('/template/attributes', getAttributeTemplate);
+router.get('/template/attribute-master', getAttributeMasterTemplate);
 
 
 module.exports = router;

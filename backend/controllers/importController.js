@@ -2,6 +2,8 @@ const XLSX = require('xlsx');
 const Product = require('../models/Product');
 const Customer = require('../models/Customer');
 const ProductAttribute = require('../models/ProductAttribute');
+const Attribute = require('../models/Attribute');
+const MGR = require('../models/MGR');
 
 
 // Import Products from Excel/CSV
@@ -296,6 +298,83 @@ const importAttributes = async (req, res) => {
     }
 };
 
+// Import Attribute Master Definitions
+const importAttributeMaster = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ message: 'No file uploaded' });
+        }
+
+        const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const data = XLSX.utils.sheet_to_json(worksheet);
+
+        if (data.length === 0) {
+            return res.status(400).json({ message: 'No data found in file' });
+        }
+
+        const { mgr3Id } = req.body;
+        const results = {
+            success: 0,
+            failed: 0,
+            errors: []
+        };
+
+        for (let i = 0; i < data.length; i++) {
+            const row = data[i];
+            try {
+                // Map columns
+                const attrData = {
+                    mgr3Code: row['MGR3 Code'] || row['mgr3Code'],
+                    code: row['Attribute Code'] || row['attributeCode'] || row['Code'],
+                    description: row['Description'] || row['description'],
+                    status: row['Status'] || row['status'] || 'Active'
+                };
+
+                // Validate required fields
+                if (!attrData.code || !attrData.description) {
+                    throw new Error('Missing required fields: Attribute Code or Description');
+                }
+
+                let targetMgr3Id = mgr3Id;
+
+                // If MGR3 Code is provided, try to find the MGR3 record
+                if (attrData.mgr3Code) {
+                    const mgr3 = await MGR.findOne({ code: attrData.mgr3Code, type: 'MGR3' });
+                    if (mgr3) {
+                        targetMgr3Id = mgr3._id;
+                    }
+                }
+
+                if (!targetMgr3Id) {
+                    throw new Error('Missing MGR3 reference. Either provide mgr3Id in request or MGR3 Code in file.');
+                }
+
+                // Upsert logic: Update if (mgr3Id + code) match, otherwise create
+                await Attribute.findOneAndUpdate(
+                    { mgr3Id: targetMgr3Id, code: attrData.code },
+                    { description: attrData.description, status: attrData.status },
+                    { upsert: true, new: true }
+                );
+
+                results.success++;
+            } catch (err) {
+                results.failed++;
+                results.errors.push(`Row ${i + 2}: ${err.message}`);
+            }
+        }
+
+        res.status(200).json({
+            message: `Import completed. ${results.success} attributes imported, ${results.failed} failed.`,
+            ...results
+        });
+    } catch (error) {
+        console.error('Import error:', error);
+        res.status(500).json({ message: error.message || 'Error importing attribute definitions' });
+    }
+};
+
 // Generate Attribute Template
 const getAttributeTemplate = async (req, res) => {
     try {
@@ -332,12 +411,52 @@ const getAttributeTemplate = async (req, res) => {
     }
 };
 
+// Generate Attribute Master Template
+const getAttributeMasterTemplate = async (req, res) => {
+    try {
+        const templateData = [
+            {
+                'MGR3 Code': 'MGR-001',
+                'Attribute Code': 'COLOR',
+                'Description': 'Product Color',
+                'Status': 'Active'
+            },
+            {
+                'MGR3 Code': 'MGR-001',
+                'Attribute Code': 'SIZE',
+                'Description': 'Product Size',
+                'Status': 'Active'
+            }
+        ];
+
+        const worksheet = XLSX.utils.json_to_sheet(templateData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Attribute Master');
+
+        // Set column widths
+        worksheet['!cols'] = [
+            { wch: 15 }, { wch: 20 }, { wch: 30 }, { wch: 12 }
+        ];
+
+        const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename=attribute_master_template.xlsx');
+        res.send(buffer);
+    } catch (error) {
+        console.error('Template error:', error);
+        res.status(500).json({ message: 'Error generating template' });
+    }
+};
+
 module.exports = {
     importProducts,
     importCustomers,
     importAttributes,
+    importAttributeMaster,
     getProductTemplate,
     getCustomerTemplate,
-    getAttributeTemplate
+    getAttributeTemplate,
+    getAttributeMasterTemplate
 };
 

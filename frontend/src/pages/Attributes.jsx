@@ -305,16 +305,16 @@ const Attributes = () => {
             <ImportModal
                 isOpen={isImportModalOpen}
                 onClose={() => setIsImportModalOpen(false)}
-                title="Import Product Attributes"
-                type="attributes"
+                title="Import Attributes Master"
+                type="attribute-master"
                 onImport={async (file) => {
-                    const result = await importService.importAttributes(file);
+                    const result = await importService.importAttributeMaster(file, selectedMgr3);
                     if (selectedMgr3) {
                         fetchAttributes();
                     }
                     return result;
                 }}
-                onDownloadTemplate={importService.getAttributeTemplate}
+                onDownloadTemplate={importService.getAttributeMasterTemplate}
             />
 
         </div>
