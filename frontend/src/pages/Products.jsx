@@ -370,29 +370,44 @@ const Products = () => {
 
         const matchesSearch = matchesBasic || matchesMGRNames || matchesAttributeSearch || matchesCustomAttributeSearch;
 
-        const matchesMGR1 = !mgrFilters.mgr1 || p.mgr1?._id === mgrFilters.mgr1;
-        const matchesMGR2 = !mgrFilters.mgr2 || p.mgr2?._id === mgrFilters.mgr2;
-        const matchesMGR3 = !mgrFilters.mgr3 || p.mgr3?._id === mgrFilters.mgr3;
-        const matchesMGR4 = !mgrFilters.mgr4 || p.mgr4?._id === mgrFilters.mgr4;
-        const matchesMGR5 = !mgrFilters.mgr5 || p.mgr5?._id === mgrFilters.mgr5;
+        const matchesMGR1 = !mgrFilters.mgr1 || p.mgr1?._id === mgrFilters.mgr1 || p.mgr1 === mgrFilters.mgr1;
+        const matchesMGR2 = !mgrFilters.mgr2 || p.mgr2?._id === mgrFilters.mgr2 || p.mgr2 === mgrFilters.mgr2;
+        const matchesMGR3 = !mgrFilters.mgr3 || p.mgr3?._id === mgrFilters.mgr3 || p.mgr3 === mgrFilters.mgr3;
+        const matchesMGR4 = !mgrFilters.mgr4 || p.mgr4?._id === mgrFilters.mgr4 || p.mgr4 === mgrFilters.mgr4;
+        const matchesMGR5 = !mgrFilters.mgr5 || p.mgr5?._id === mgrFilters.mgr5 || p.mgr5 === mgrFilters.mgr5;
 
         // Attribute filtering: if any attribute filter is selected, product MUST have all of them
         const selectedAttrIds = Object.keys(attributeFilters);
         const matchesAttributes = selectedAttrIds.length === 0 || 
             selectedAttrIds.every(id => {
-                // Check in standard attributes
-                const hasStandard = (p.attributes || []).some(attr => (attr._id || attr) === id);
-                if (hasStandard) return true;
-                
-                // If not found in standard, check in custom attributes (by matching code/value if needed)
-                // However, since attributeFilters are based on Attribute model IDs, 
-                // we should check if any custom attribute matches the Attribute's code and description
                 const attrObj = allFilterAttributes.find(a => a._id === id);
                 if (!attrObj) return false;
+
+                const filterCode = attrObj.code?.toString().toLowerCase().trim();
+                const filterDesc = attrObj.description?.toString().toLowerCase().trim();
+
+                // Check in standard attributes (by ID OR by Code+Description case-insensitive)
+                const hasStandard = (p.attributes || []).some(attr => {
+                    if (!attr) return false;
+                    const attrId = attr._id || attr;
+                    if (attrId === id) return true;
+                    
+                    if (typeof attr === 'object') {
+                        const code = attr.code?.toString().toLowerCase().trim();
+                        const desc = attr.description?.toString().toLowerCase().trim();
+                        return code === filterCode && desc === filterDesc;
+                    }
+                    return false;
+                });
+                if (hasStandard) return true;
                 
-                return productCustomAttrs.some(ca => 
-                    ca.attributeCode === attrObj.code && ca.attributeValue === attrObj.description
-                );
+                // If not found in standard, check in custom attributes
+                const productCustomAttrs = allProductAttributes[p.productCode] || [];
+                return productCustomAttrs.some(ca => {
+                    const caCode = ca.attributeCode?.toString().toLowerCase().trim();
+                    const caValue = ca.attributeValue?.toString().toLowerCase().trim();
+                    return caCode === filterCode && caValue === filterDesc;
+                });
             });
 
         return matchesSearch && matchesMGR1 && matchesMGR2 && matchesMGR3 && matchesMGR4 && matchesMGR5 && matchesAttributes;
