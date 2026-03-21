@@ -264,6 +264,7 @@ const Products = () => {
                 toast.success('Product created successfully!');
             }
             fetchProducts();
+            fetchAllAttributes();
             setIsModalOpen(false);
         } catch (err) {
             console.error("Error saving product:", err);
@@ -338,9 +339,36 @@ const Products = () => {
     };
 
     const filteredProducts = products.filter(p => {
-        const matchesSearch = p.productName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            p.productCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            p.hsnCode?.toLowerCase().includes(searchTerm.toLowerCase());
+        const searchLower = searchTerm.toLowerCase();
+        
+        // Search in basic info
+        const matchesBasic = p.productName?.toLowerCase().includes(searchLower) ||
+            p.productCode?.toLowerCase().includes(searchLower) ||
+            p.hsnCode?.toLowerCase().includes(searchLower) ||
+            p.uom?.toLowerCase().includes(searchLower);
+
+        // Search in MGRs
+        const matchesMGRNames = 
+            p.mgr1?.code?.toLowerCase().includes(searchLower) || p.mgr1?.description?.toLowerCase().includes(searchLower) ||
+            p.mgr2?.code?.toLowerCase().includes(searchLower) || p.mgr2?.description?.toLowerCase().includes(searchLower) ||
+            p.mgr3?.code?.toLowerCase().includes(searchLower) || p.mgr3?.description?.toLowerCase().includes(searchLower) ||
+            p.mgr4?.code?.toLowerCase().includes(searchLower) || p.mgr4?.description?.toLowerCase().includes(searchLower) ||
+            p.mgr5?.code?.toLowerCase().includes(searchLower) || p.mgr5?.description?.toLowerCase().includes(searchLower);
+
+        // Search in Attributes
+        const matchesAttributeSearch = (p.attributes || []).some(attr => 
+            attr.code?.toLowerCase().includes(searchLower) || 
+            attr.description?.toLowerCase().includes(searchLower)
+        );
+
+        // Search in Custom Attributes
+        const productCustomAttrs = allProductAttributes[p.productCode] || [];
+        const matchesCustomAttributeSearch = productCustomAttrs.some(attr => 
+            attr.attributeCode?.toLowerCase().includes(searchLower) || 
+            attr.attributeValue?.toLowerCase().includes(searchLower)
+        );
+
+        const matchesSearch = matchesBasic || matchesMGRNames || matchesAttributeSearch || matchesCustomAttributeSearch;
 
         const matchesMGR1 = !mgrFilters.mgr1 || p.mgr1?._id === mgrFilters.mgr1;
         const matchesMGR2 = !mgrFilters.mgr2 || p.mgr2?._id === mgrFilters.mgr2;
@@ -351,7 +379,21 @@ const Products = () => {
         // Attribute filtering: if any attribute filter is selected, product MUST have all of them
         const selectedAttrIds = Object.keys(attributeFilters);
         const matchesAttributes = selectedAttrIds.length === 0 || 
-            selectedAttrIds.every(id => (p.attributes || []).some(attr => (attr._id || attr) === id));
+            selectedAttrIds.every(id => {
+                // Check in standard attributes
+                const hasStandard = (p.attributes || []).some(attr => (attr._id || attr) === id);
+                if (hasStandard) return true;
+                
+                // If not found in standard, check in custom attributes (by matching code/value if needed)
+                // However, since attributeFilters are based on Attribute model IDs, 
+                // we should check if any custom attribute matches the Attribute's code and description
+                const attrObj = allFilterAttributes.find(a => a._id === id);
+                if (!attrObj) return false;
+                
+                return productCustomAttrs.some(ca => 
+                    ca.attributeCode === attrObj.code && ca.attributeValue === attrObj.description
+                );
+            });
 
         return matchesSearch && matchesMGR1 && matchesMGR2 && matchesMGR3 && matchesMGR4 && matchesMGR5 && matchesAttributes;
     });

@@ -122,6 +122,13 @@ const Attributes = () => {
         }
     };
 
+    const [searchTerm, setSearchTerm] = useState('');
+
+    const filteredAttributes = attributes.filter(attr => 
+        attr.code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        attr.description?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
     return (
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -158,8 +165,8 @@ const Attributes = () => {
 
 
             <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
-                <div className="p-6 bg-slate-50 border-b border-slate-100">
-                    <div className="max-w-xs space-y-2">
+                <div className="p-6 bg-slate-50 border-b border-slate-100 flex flex-col md:flex-row gap-4 items-center">
+                    <div className="max-w-xs w-full space-y-2">
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Select MGR 3 Category</label>
                         <select
                             value={selectedMgr3}
@@ -172,6 +179,26 @@ const Attributes = () => {
                             ))}
                         </select>
                     </div>
+                    
+                    {selectedMgr3 && (
+                        <div className="flex-1 w-full space-y-2">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Search Attributes</label>
+                            <div className="relative group">
+                                <input
+                                    type="text"
+                                    placeholder="Search by Code or Description..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-medium transition-all"
+                                />
+                                <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary-500 transition-colors">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 <div className="p-6">
@@ -192,7 +219,7 @@ const Attributes = () => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {attributes.map(attr => (
+                                    {filteredAttributes.map(attr => (
                                         <tr key={attr._id} className="border-b last:border-0 border-slate-50 hover:bg-slate-50/50 transition-colors">
                                             <td className="p-4 text-sm font-bold text-slate-800">{attr.code}</td>
                                             <td className="p-4 text-sm font-medium text-slate-600">{attr.description}</td>
@@ -222,10 +249,10 @@ const Attributes = () => {
                                             </td>
                                         </tr>
                                     ))}
-                                    {attributes.length === 0 && (
+                                    {filteredAttributes.length === 0 && (
                                         <tr>
                                             <td colSpan={4} className="p-8 text-center text-slate-400 text-sm font-medium">
-                                                {selectedMgr3 ? "No attributes found for this MGR3." : "Please select an MGR3 category."}
+                                                {selectedMgr3 ? "No attributes found matching your search." : "Please select an MGR3 category."}
                                             </td>
                                         </tr>
                                     )}
