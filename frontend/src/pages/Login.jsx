@@ -30,7 +30,6 @@ const Login = () => {
         e.preventDefault();
         setError('');
 
-        // Validate required fields
         if (!email?.trim()) {
             toast.error('Email Address is required');
             return;
@@ -42,14 +41,11 @@ const Login = () => {
 
         setLoading(true);
         try {
-            // Adjust API URL as needed
             const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
             const res = await axios.post(`${baseUrl}/auth/login`, formData);
 
-            // Use context login method
             login(res.data.token, res.data.user);
 
-            // Beautiful Toast
             toast.success(
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <div style={{ padding: '4px' }}>
@@ -63,20 +59,16 @@ const Login = () => {
                         background: '#fff',
                         color: '#1e293b',
                         borderRadius: '16px',
-                        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                        boxShadow: '0 10px 30px -5px rgba(0, 0, 0, 0.1)',
                         border: '1px solid #ccfbf1',
                         padding: '16px',
-                    },
-                    progressStyle: {
-                        background: 'linear-gradient(to right, #0d9488, #14b8a6)',
                     }
                 }
             );
 
-            // Redirect based on role or to dashboard
             setTimeout(() => {
                 navigate('/dashboard');
-            }, 1000); // Slight delay to show the nice toast
+            }, 800);
         } catch (err) {
             const errorMessage = err.response?.data?.message || 'Login failed';
             setError(errorMessage);
@@ -89,39 +81,47 @@ const Login = () => {
     return (
         <div className="auth-container">
             <div className="auth-card">
-                <h2>Login</h2>
-                {error && <p className="error-msg">{error}</p>}
+                <h2>Welcome Back</h2>
+                <p className="subtitle">Sign in to manage your quotations</p>
+                {error && <div className="error-msg">{error}</div>}
                 <form onSubmit={onSubmit}>
                     <div className="form-group">
-                        <label>Email Address <span className="required">*</span></label>
-                        <input type="email" name="email" value={email} onChange={onChange} required />
+                        <label>Email Address</label>
+                        <input 
+                            type="email" 
+                            name="email" 
+                            value={email} 
+                            onChange={onChange} 
+                            placeholder="name@company.com"
+                            required 
+                        />
                     </div>
                     <div className="form-group">
-                        <label>Password <span className="required">*</span></label>
+                        <label>Password</label>
                         <div className="password-input-wrapper">
                             <input
                                 type={showPassword ? "text" : "password"}
                                 name="password"
                                 value={password}
                                 onChange={onChange}
+                                placeholder="••••••••"
                                 required
                             />
                             <button
                                 type="button"
                                 className="password-toggle-btn"
                                 onClick={togglePasswordVisibility}
-                                aria-label={showPassword ? "Hide password" : "Show password"}
                             >
                                 {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                             </button>
                         </div>
                     </div>
                     <button type="submit" className="btn-primary" disabled={loading}>
-                        {loading ? 'Signing in...' : 'Login'}
+                        {loading ? 'Please wait...' : 'Sign In'}
                     </button>
                 </form>
                 <p className="auth-footer">
-                    Don't have an account? <Link to="/register">Register</Link>
+                    New here? <Link to="/register">Create an account</Link>
                 </p>
             </div>
         </div>
@@ -129,4 +129,3 @@ const Login = () => {
 };
 
 export default Login;
-

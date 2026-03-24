@@ -5,14 +5,24 @@
 @tailwind utilities;
 
 :root {
-  --primary-color: #0d9488;
-  --primary-color-dark: #0f766e;
-  --primary-color-light: #ccfbf1;
-  --secondary-color: #64748b;
-  --accent-color: #14b8a6;
-  --text-color: #1e293b;
-  --surface-color: #ffffff;
-  --bg-color: #ffffff;
+  --primary: 171 77% 35%; /* #115e59 - Deep Teal */
+  --primary-foreground: 171 100% 95%;
+  --secondary: 215 25% 27%; /* #334155 */
+  --secondary-foreground: 210 40% 98%;
+  --accent: 171 100% 41%; /* #0d9488 */
+  --background: 210 40% 98%;
+  --surface: 0 0% 100%;
+  --text-main: 222 47% 11%;
+  --text-muted: 215 16% 47%;
+  
+  --radius-sm: 0.5rem;
+  --radius-md: 1rem;
+  --radius-lg: 1.5rem;
+  
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  --shadow-premium: 0 10px 30px -5px rgba(0, 0, 0, 0.1), 0 5px 15px -5px rgba(0, 0, 0, 0.04);
 }
 
 body {
@@ -22,45 +32,128 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: var(--bg-color);
-  color: var(--text-color);
+  background-color: hsl(var(--background));
+  color: hsl(var(--text-main));
 }
 
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
+h1, h2, h3, h4, h5, h6 {
   font-family: 'Outfit', sans-serif;
+  letter-spacing: -0.02em;
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+/* Glassmorphism */
+.glass {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.glass-dark {
+  background: rgba(15, 23, 42, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Premium Utilities */
+.shadow-premium {
+  box-shadow: var(--shadow-premium);
+}
+
+.hover-lift {
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+}
+
+.gradient-text {
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  background-image: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--accent)) 100%);
+}
+
+/* Animations */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes float {
+  0% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-10px) rotate(1deg); }
+  100% { transform: translateY(0px) rotate(0deg); }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
 }
 
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #f0fdfa;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #99f6e4;
-  border-radius: 4px;
+  background: hsl(var(--primary) / 0.2);
+  border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #14b8a6;
+  background: hsl(var(--primary) / 0.4);
 }
 
+/* Google Maps Autocomplete Fix */
+.pac-container {
+  z-index: 10000 !important;
+  border-radius: var(--radius-md);
+  margin-top: 8px;
+  border: 1px solid rgba(0,0,0,0.05);
+  box-shadow: var(--shadow-lg);
+  font-family: 'Inter', sans-serif;
+  padding: 8px 0;
+}
+
+.pac-item {
+  padding: 10px 16px;
+  cursor: pointer;
+  border-top: none;
+  transition: background-color 0.2s;
+}
+
+.pac-item:hover {
+  background-color: hsl(var(--background));
+}
+
+.pac-item-query {
+  font-size: 14px;
+  color: hsl(var(--text-main));
+  font-weight: 600;
+}
+
+
+/* Custom Scrollbar */
 .custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
+  width: 5px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
@@ -74,59 +167,4 @@ code {
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: #cbd5e1;
-}
-
-/* Animations */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.fade-in {
-  animation: fadeIn 0.4s ease-out forwards;
-}
-
-/* Google Maps Autocomplete Fix for Modals */
-.pac-container {
-  z-index: 10000 !important;
-  border-radius: 1rem;
-  margin-top: 5px;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
-  font-family: 'Inter', sans-serif;
-}
-
-.pac-item {
-  padding: 10px 15px;
-  cursor: pointer;
-  border-top: 1px solid #f1f5f9;
-}
-
-.pac-item:first-child {
-  border-top: none;
-}
-
-.pac-item:hover {
-  background-color: #f8fafc;
-}
-
-.pac-icon {
-  margin-top: 2px;
-}
-
-.pac-item-query {
-  font-size: 14px;
-  color: #0f172a;
-  font-weight: 600;
-}
-
-.pac-matched {
-  color: var(--primary-color-dark);
 }

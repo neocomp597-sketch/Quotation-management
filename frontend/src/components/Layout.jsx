@@ -1,28 +1,34 @@
 import React, { useState } from 'react';
 import Sidebar from './Sidebar';
 import Header from './Header';
+import { Link } from 'react-router-dom';
 
 const Layout = ({ children }) => {
     const [sidebarOpen, setSidebarOpen] = useState(true);
 
     return (
-        <div className="min-h-screen bg-white">
+        <div className="min-h-screen bg-slate-50/50 relative overflow-hidden">
+            {/* Elegant Background Pattern */}
+            <div className="fixed inset-0 z-0 pointer-events-none opacity-20" 
+                 style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, #cbd5e1 1px, transparent 0)', backgroundSize: '32px 32px' }}>
+            </div>
+            
             <Sidebar isOpen={sidebarOpen} toggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
             <Header sidebarOpen={sidebarOpen} toggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
 
-            <main className={`pt-24 pb-12 px-4 md:px-8 transition-all duration-300 ml-0 ${sidebarOpen ? 'md:ml-64' : 'md:ml-20'}`}>
-                <div className="max-w-7xl mx-auto fade-in p-2">
+            <main className={`relative z-10 pt-28 pb-12 transition-all duration-300 ${sidebarOpen ? 'md:ml-64' : 'md:ml-20'}`}>
+                <div className="px-6 md:px-10 max-w-7xl mx-auto">
                     {children}
                 </div>
             </main>
 
-            <footer className={`py-6 px-8 border-t border-slate-200 transition-all duration-300 ml-0 ${sidebarOpen ? 'md:ml-64' : 'md:ml-20'}`}>
-                <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between text-slate-500 text-sm gap-4 text-center md:text-left">
-                    <p>&copy; {new Date().getFullYear()} JAG Sanitaryware & Bathroom Fittings. All rights reserved.</p>
-                    <div className="flex flex-wrap justify-center items-center gap-4 md:gap-6">
-                        <a href="#" className="hover:text-primary-600 transition-colors">Privacy Policy</a>
-                        <a href="#" className="hover:text-primary-600 transition-colors">Terms of Service</a>
-                        <a href="#" className="hover:text-primary-600 transition-colors">Help Center</a>
+            <footer className={`relative z-10 py-10 transition-all duration-300 ${sidebarOpen ? 'md:ml-64' : 'md:ml-20'}`}>
+                <div className="px-6 md:px-10 max-w-7xl mx-auto border-t border-slate-100 pt-8 flex flex-col md:flex-row items-center justify-between text-slate-400 text-xs font-bold uppercase tracking-widest gap-6">
+                    <p>&copy; {new Date().getFullYear()} JAG Sanitaryware & Bathroom Fittings.</p>
+                    <div className="flex flex-wrap justify-center items-center gap-6 md:gap-10">
+                        <Link to="#" className="hover:text-primary-600 transition-colors">Privacy Policy</Link>
+                        <Link to="#" className="hover:text-primary-600 transition-colors">Terms of Service</Link>
+                        <Link to="#" className="hover:text-primary-600 transition-colors">Help Center</Link>
                     </div>
                 </div>
             </footer>
@@ -31,4 +37,3 @@ const Layout = ({ children }) => {
 };
 
 export default Layout;
-

@@ -44,6 +44,7 @@ export const quotationService = {
     delete: (id) => api.delete(`/quotations/${id}`),
     finalize: (id) => api.patch(`/quotations/${id}/finalize`),
     downloadPdf: (id) => api.get(`/quotations/${id}/pdf`, { responseType: 'blob' }),
+    getReports: () => api.get('/quotations/reports'),
 };
 
 export const termsService = {

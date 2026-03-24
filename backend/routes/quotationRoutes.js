@@ -6,13 +6,17 @@ const {
     deleteQuotation,
     getQuotationById,
     getAllQuotations,
-    finalizeQuotation
+    finalizeQuotation,
+    getReports
 } = require('../controllers/quotationController');
 
 const { protect } = require('../middlewares/authMiddleware');
 
 // POST: Create Quotation
 router.post('/', protect, createQuotation);
+
+// GET: Get reports
+router.get('/reports', protect, getReports);
 
 // GET: Get all quotations
 router.get('/', protect, getAllQuotations);

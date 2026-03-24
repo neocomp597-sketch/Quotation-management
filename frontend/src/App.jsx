@@ -16,6 +16,8 @@ import Register from './pages/Register';
 import Salespersons from './pages/Salespersons';
 import Settings from './pages/Settings';
 import Attributes from './pages/Attributes';
+import Simulations from './pages/Simulations';
+import Reports from './pages/Reports';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 
@@ -53,6 +55,8 @@ function App() {
             <Route path="/products" element={<Layout><Products /></Layout>} />
             <Route path="/mgrs" element={<Layout><MGRMaster /></Layout>} />
             <Route path="/attributes" element={<Layout><Attributes /></Layout>} />
+            <Route path="/simulations" element={<Layout><Simulations /></Layout>} />
+            <Route path="/reports" element={<Layout><Reports /></Layout>} />
             <Route path="/quotations" element={<Layout><Quotations /></Layout>} />
             <Route path="/quotations/new" element={<Layout><CreateQuotation /></Layout>} />
             <Route path="/quotations/:id" element={<Layout><CreateQuotation /></Layout>} />

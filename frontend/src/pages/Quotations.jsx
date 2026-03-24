@@ -118,6 +118,20 @@ const Quotations = () => {
         }
     };
 
+    const handleMarkAsOrdered = async (id) => {
+        if (window.confirm("Mark this quotation as ORDERED? This will reflect in your sales reports.")) {
+            try {
+                // Update status to 'ordered'
+                await quotationService.update(id, { status: 'ordered' });
+                toast.success('Quotation marked as ORDERED!');
+                fetchQuotations();
+            } catch (err) {
+                console.error("Error marking ordered:", err);
+                toast.error('Failed to update status');
+            }
+        }
+    };
+
     const filteredQuotations = quotations.filter(q =>
         q.quotationNo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         q.customerId?.companyName?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -172,9 +186,11 @@ const Quotations = () => {
                                                     <h3 className="font-bold text-slate-900 mt-2 text-sm">{q.customerId?.companyName}</h3>
                                                     <p className="text-xs text-slate-400 font-medium">{q.customerId?.customerName}</p>
                                                 </div>
-                                                <span className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border ${q.status === 'final'
-                                                    ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
-                                                    : 'bg-amber-50 text-amber-600 border-amber-100'
+                                                <span className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border ${q.status === 'ordered'
+                                                    ? 'bg-blue-50 text-blue-600 border-blue-100'
+                                                    : q.status === 'final'
+                                                        ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                                                        : 'bg-amber-50 text-amber-600 border-amber-100'
                                                     }`}>
                                                     {q.status}
                                                 </span>
@@ -210,6 +226,15 @@ const Quotations = () => {
                                                             <MdCheckCircle size={18} />
                                                         </button>
                                                     </>
+                                                )}
+                                                {q.status === 'final' && (
+                                                    <button
+                                                        onClick={() => handleMarkAsOrdered(q._id)}
+                                                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                                                        title="Convert to Order"
+                                                    >
+                                                        <MdCheckCircle size={18} />
+                                                    </button>
                                                 )}
                                                 <button
                                                     onClick={() => handleViewDetails(q._id)}
@@ -277,9 +302,11 @@ const Quotations = () => {
                                                 </td>
                                                 <td className="px-8 py-5">
                                                     <div className="flex justify-center">
-                                                        <span className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest border ${q.status === 'final'
-                                                            ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
-                                                            : 'bg-amber-50 text-amber-600 border-amber-100'
+                                                        <span className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest border ${q.status === 'ordered'
+                                                            ? 'bg-blue-50 text-blue-600 border-blue-100'
+                                                            : q.status === 'final'
+                                                                ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                                                                : 'bg-amber-50 text-amber-600 border-amber-100'
                                                             }`}>
                                                             {q.status}
                                                         </span>
@@ -304,6 +331,15 @@ const Quotations = () => {
                                                                     <MdCheckCircle size={18} />
                                                                 </button>
                                                             </>
+                                                        )}
+                                                        {q.status === 'final' && (
+                                                            <button
+                                                                onClick={() => handleMarkAsOrdered(q._id)}
+                                                                className="p-2.5 text-blue-600 hover:bg-blue-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
+                                                                title="Mark as Ordered (Invoice)"
+                                                            >
+                                                                <MdCheckCircle size={18} />
+                                                            </button>
                                                         )}
                                                         <button
                                                             onClick={() => handleViewDetails(q._id)}

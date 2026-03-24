@@ -41,7 +41,7 @@ const QuotationSchema = new mongoose.Schema({
     ackNo: { type: String },
     ackDate: { type: Date },
     irnNo: { type: String },
-    status: { type: String, enum: ['draft', 'final'], default: 'draft' },
+    status: { type: String, enum: ['draft', 'final', 'ordered'], default: 'draft' },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     createdAt: { type: Date, default: Date.now },
 });

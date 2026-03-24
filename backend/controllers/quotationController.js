@@ -255,4 +255,64 @@ module.exports = {
             res.status(500).json({ message: 'Error fetching quotations' });
         }
     },
+    getReports: async (req, res) => {
+        try {
+            let query = {};
+            if (req.user && req.user.role !== 'admin') {
+                query.createdBy = req.user.id;
+            }
+
+            const quotations = await Quotation.find(query);
+            
+            // Basic Aggregation
+            const totalQuotations = quotations.length;
+            const totalValue = quotations.reduce((sum, q) => sum + (q.grandTotal || 0), 0);
+            
+            const statusBreakdown = {
+                draft: 0,
+                final: 0,
+                ordered: 0
+            };
+
+            quotations.forEach(q => {
+                const s = q.status || 'draft';
+                if (statusBreakdown.hasOwnProperty(s)) {
+                    statusBreakdown[s]++;
+                }
+            });
+
+            // Monthly Trend (Last 6 months)
+            const monthlyTrend = [];
+            const now = new Date();
+            
+            for (let i = 5; i >= 0; i--) {
+                const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                const monthName = d.toLocaleString('default', { month: 'short' });
+                const m = d.getMonth();
+                const y = d.getFullYear();
+
+                const monthTotal = quotations.reduce((sum, q) => {
+                    const qDate = new Date(q.createdAt || q.quotationDate);
+                    if (qDate.getMonth() === m && qDate.getFullYear() === y) {
+                        return sum + (q.grandTotal || 0);
+                    }
+                    return sum;
+                }, 0);
+
+                monthlyTrend.push({ month: monthName, total: monthTotal });
+            }
+
+            res.json({
+                summary: {
+                    totalQuotations,
+                    totalValue,
+                    statusBreakdown
+                },
+                monthlyTrend
+            });
+        } catch (error) {
+            console.error("Aggregation Error:", error);
+            res.status(500).json({ message: 'Error generating reports', error: error.message });
+        }
+    }
 };
