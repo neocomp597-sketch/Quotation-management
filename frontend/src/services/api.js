@@ -29,11 +29,21 @@ export const customerService = {
 export const productService = {
     getAll: () => api.get('/products'),
     getById: (id) => api.get(`/products/${id}`),
+    getVendors: (id, availableOnly = false) => api.get(`/products/${id}/vendors${availableOnly ? '?available=true' : ''}`),
+    updateVendor: (productId, vendorId, data) => api.patch(`/products/${productId}/vendor/${vendorId}`, data),
     create: (data) => api.post('/products', data),
     update: (id, data) => api.put(`/products/${id}`, data),
     delete: (id) => api.delete(`/products/${id}`),
     bulkDelete: (ids) => api.post('/products/bulk-delete', { ids }),
     bulkUpdate: (ids, updateData) => api.patch('/products/bulk-update', { ids, updateData }),
+};
+
+export const vendorService = {
+    getAll: (activeOnly = false) => api.get(`/vendors${activeOnly ? '?active=true' : ''}`),
+    getById: (id) => api.get(`/vendors/${id}`),
+    create: (data) => api.post('/vendors', data),
+    update: (id, data) => api.patch(`/vendors/${id}`, data),
+    delete: (id) => api.delete(`/vendors/${id}`),
 };
 
 export const quotationService = {

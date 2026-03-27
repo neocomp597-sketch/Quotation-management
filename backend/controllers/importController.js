@@ -4,7 +4,16 @@ const Customer = require('../models/Customer');
 const ProductAttribute = require('../models/ProductAttribute');
 const Attribute = require('../models/Attribute');
 const MGR = require('../models/MGR');
+const Vendor = require('../models/Vendor');
+const { deriveBasePriceFromVendors } = require('../utils/vendorSelection');
 
+const escapeRegex = (value = '') => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const toBoolean = (value) => {
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'number') return value === 1;
+    if (typeof value === 'string') return ['1', 'true', 'yes', 'y'].includes(value.toLowerCase().trim());
+    return false;
+};
 
 // Import Products from Excel/CSV
 const importProducts = async (req, res) => {
@@ -44,19 +53,105 @@ const importProducts = async (req, res) => {
                     status: row['Status'] || row['status'] || 'Active'
                 };
 
+                const vendorName = row['Vendor Name'] || row['vendorName'] || row['Vendor'];
+                const vendorPriceRaw = row['Vendor Price'] || row['vendorPrice'];
+                const vendorStockRaw = row['Vendor Stock'] || row['vendorStock'];
+                const primaryRaw = row['Is Primary'] || row['isPrimary'] || row['Primary Vendor'];
+                const hasVendorData = Boolean(vendorName || vendorPriceRaw || vendorStockRaw || typeof primaryRaw !== 'undefined');
+
                 // Validate required fields
                 if (!productData.productCode || !productData.productName || !productData.hsnCode) {
                     throw new Error('Missing required fields: Product Code, Product Name, or HSN Code');
                 }
 
+                let vendorEntry = null;
+                if (hasVendorData) {
+                    if (!vendorName || !String(vendorName).trim()) {
+                        throw new Error('Vendor Name is required when vendor fields are provided');
+                    }
+
+                    const normalizedVendorName = String(vendorName).trim();
+                    let vendor = await Vendor.findOne({
+                        name: { $regex: `^${escapeRegex(normalizedVendorName)}$`, $options: 'i' }
+                    });
+
+                    if (!vendor) {
+                        const autoCreateVendor = String(req.query.autoCreateVendor || 'true').toLowerCase() !== 'false';
+                        if (!autoCreateVendor) {
+                            throw new Error(`Vendor not found: ${normalizedVendorName}`);
+                        }
+                        vendor = await Vendor.create({ name: normalizedVendorName, isActive: true });
+                    }
+
+                    if (!vendor.isActive) {
+                        throw new Error(`Vendor is inactive: ${vendor.name}`);
+                    }
+
+                    const vendorPrice = parseFloat(vendorPriceRaw || productData.basePrice || 0);
+                    const vendorStock = parseFloat(vendorStockRaw || 0);
+                    const isPrimary = toBoolean(primaryRaw);
+
+                    if (!(vendorPrice > 0)) {
+                        throw new Error('Vendor Price must be greater than zero');
+                    }
+                    if (vendorStock < 0) {
+                        throw new Error('Vendor Stock cannot be negative');
+                    }
+
+                    vendorEntry = {
+                        vendorId: vendor._id,
+                        price: vendorPrice,
+                        stock: vendorStock,
+                        isPrimary,
+                        lastUpdated: new Date()
+                    };
+                }
+
                 // Check if product already exists
                 const existing = await Product.findOne({ productCode: productData.productCode });
                 if (existing) {
-                    // Update existing product
-                    await Product.findByIdAndUpdate(existing._id, productData);
+                    const updatePayload = { ...productData };
+                    if (vendorEntry) {
+                        const mergedVendors = (existing.vendors || []).map((entry) => ({
+                            vendorId: entry.vendorId,
+                            price: Number(entry.price),
+                            stock: Number(entry.stock),
+                            isPrimary: Boolean(entry.isPrimary),
+                            lastUpdated: entry.lastUpdated || new Date()
+                        }));
+
+                        const idx = mergedVendors.findIndex(v => String(v.vendorId) === String(vendorEntry.vendorId));
+                        if (idx === -1) {
+                            mergedVendors.push(vendorEntry);
+                        } else {
+                            mergedVendors[idx] = { ...mergedVendors[idx], ...vendorEntry };
+                        }
+
+                        if (vendorEntry.isPrimary) {
+                            const effectiveIndex = idx === -1 ? mergedVendors.length - 1 : idx;
+                            mergedVendors.forEach((v) => {
+                                v.isPrimary = false;
+                            });
+                            mergedVendors[effectiveIndex].isPrimary = true;
+                        }
+                        if (!mergedVendors.some(v => v.isPrimary)) {
+                            mergedVendors[0].isPrimary = true;
+                        }
+
+                        updatePayload.vendors = mergedVendors;
+                        updatePayload.basePrice = deriveBasePriceFromVendors({
+                            vendors: mergedVendors,
+                            basePrice: productData.basePrice
+                        });
+                    }
+                    await Product.findByIdAndUpdate(existing._id, updatePayload, { runValidators: true });
                 } else {
-                    // Create new product
-                    await Product.create(productData);
+                    const createPayload = { ...productData };
+                    if (vendorEntry) {
+                        createPayload.vendors = [vendorEntry];
+                        createPayload.basePrice = deriveBasePriceFromVendors(createPayload);
+                    }
+                    await Product.create(createPayload);
                 }
                 results.success++;
             } catch (err) {
@@ -169,6 +264,10 @@ const getProductTemplate = async (req, res) => {
                 'Base Price': 1000,
                 'MRP': 1180,
                 'UOM': 'Nos',
+                'Vendor Name': 'Vendor A',
+                'Vendor Price': 1000,
+                'Vendor Stock': 25,
+                'Is Primary': true,
                 'Image URL': '',
                 'Status': 'Active'
             }
@@ -181,7 +280,8 @@ const getProductTemplate = async (req, res) => {
         // Set column widths
         worksheet['!cols'] = [
             { wch: 15 }, { wch: 30 }, { wch: 12 }, { wch: 8 },
-            { wch: 12 }, { wch: 12 }, { wch: 8 }, { wch: 40 }, { wch: 10 }
+            { wch: 12 }, { wch: 12 }, { wch: 8 }, { wch: 24 },
+            { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 40 }, { wch: 10 }
         ];
 
         const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });

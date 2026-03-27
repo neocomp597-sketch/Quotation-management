@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { MdArrowBack, MdAdd, MdDelete, MdSave, MdCheckCircle, MdPerson, MdInventory2, MdGavel, MdSearch, MdClose, MdPayments, MdEventAvailable, MdBadge, MdTrendingDown, MdEmail, MdPhone, MdLocationOn, MdExpandMore } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import { customerService, productService, quotationService, termsService, salespersonService, siteService } from '../services/api';
-import { calculateLineItem, formatCurrency, resolveImageUrl } from '../utils/helpers';
+import { calculateLineItem, resolveImageUrl } from '../utils/helpers';
 import Modal from '../components/Modal';
 
 // Searchable Customer Dropdown Component
@@ -138,6 +138,34 @@ const CustomerSearchDropdown = ({ customers, selectedCustomerId, onSelect }) => 
     );
 };
 
+const sortVendors = (vendors = []) => {
+    return [...vendors].sort((a, b) => {
+        const aStock = Number(a.stock || 0);
+        const bStock = Number(b.stock || 0);
+
+        if (aStock > 0 && bStock === 0) return -1;
+        if (aStock === 0 && bStock > 0) return 1;
+        if (a.isPrimary && !b.isPrimary) return -1;
+        if (!a.isPrimary && b.isPrimary) return 1;
+        return Number(a.price || 0) - Number(b.price || 0);
+    });
+};
+
+const getBestVendor = (vendors = []) => {
+    const activeVendors = (vendors || []).filter(v => v.vendorId?.isActive !== false);
+    if (!activeVendors.length) return null;
+
+    const primary = activeVendors.find(v => v.isPrimary && Number(v.stock) > 0);
+    if (primary) return primary;
+
+    const inStock = activeVendors
+        .filter(v => Number(v.stock) > 0)
+        .sort((a, b) => Number(a.price || 0) - Number(b.price || 0));
+    if (inStock.length) return inStock[0];
+
+    return sortVendors(activeVendors)[0] || null;
+};
+
 const CreateQuotation = () => {
     const navigate = useNavigate();
     const { id } = useParams();
@@ -151,7 +179,7 @@ const CreateQuotation = () => {
     const [sites, setSites] = useState([]);
 
     // UI State
-    const [loading, setLoading] = useState(false);
+    const [, setLoading] = useState(false);
     const [isProductModalOpen, setIsProductModalOpen] = useState(false);
     const [isSalespersonModalOpen, setIsSalespersonModalOpen] = useState(false);
     const [isSiteModalOpen, setIsSiteModalOpen] = useState(false);
@@ -250,7 +278,7 @@ const CreateQuotation = () => {
                         ackDate: q.ackDate ? new Date(q.ackDate).toISOString().split('T')[0] : ''
                     });
 
-                    setItems(q.items.map(item => ({
+                    const mappedItems = q.items.map(item => ({
                         productId: item.productId._id || item.productId,
                         productName: item.productSnapshot?.productName || '',
                         productCode: item.productSnapshot?.productCode || '',
@@ -259,14 +287,43 @@ const CreateQuotation = () => {
                         uom: item.productSnapshot?.uom || '',
                         gstPercentage: item.productSnapshot?.gstPercentage || 18,
                         quantity: item.quantity,
-                        rate: item.rate,
+                        rate: item.unitPrice || item.rate,
+                        unitPrice: item.unitPrice || item.rate,
                         discountPercent: item.discountPercent,
                         siteId: item.siteId?._id || item.siteId || '',
-                        // Recalculate derived fields to be safe
-                        ...calculateLineItem(item.quantity, item.rate, item.discountPercent, item.productSnapshot?.gstPercentage || 18)
-                    })));
+                        vendorId: item.vendorId?._id || item.vendorId || '',
+                        vendorName: item.vendorName || item.vendorId?.name || '',
+                        vendorPrice: item.vendorPrice || item.unitPrice || item.rate,
+                        vendorStockAtSelection: item.vendorStockAtSelection ?? 0,
+                        isVendorAutoSelected: item.isVendorAutoSelected !== false,
+                        vendorOptions: [],
+                        ...calculateLineItem(item.quantity, item.unitPrice || item.rate, item.discountPercent, item.productSnapshot?.gstPercentage || 18)
+                    }));
 
-                    setSelectedTermsTemplateId(q.termsTemplateId || '');
+                    const enrichedItems = await Promise.all(mappedItems.map(async (item) => {
+                        try {
+                            const productRes = await productService.getById(item.productId);
+                            const productWithVendors = productRes.data;
+                            const sortedVendorOptions = sortVendors(productWithVendors.vendors || []);
+
+                            let selectedVendor = sortedVendorOptions.find(v => String(v.vendorId?._id || v.vendorId) === String(item.vendorId));
+                            if (!selectedVendor) selectedVendor = getBestVendor(sortedVendorOptions);
+
+                            return {
+                                ...item,
+                                vendorOptions: sortedVendorOptions,
+                                vendorId: selectedVendor ? (selectedVendor.vendorId?._id || selectedVendor.vendorId) : item.vendorId,
+                                vendorName: selectedVendor?.vendorId?.name || item.vendorName,
+                                vendorStockAtSelection: item.vendorStockAtSelection ?? selectedVendor?.stock ?? 0
+                            };
+                        } catch {
+                            return item;
+                        }
+                    }));
+
+                    setItems(enrichedItems);
+
+                    setSelectedTermsTemplateId(q.termsTemplateId?._id || q.termsTemplateId || '');
                     setTermsContent(q.customTerms || '');
                     setOverallDiscount(q.totalDiscount - (q.items.reduce((sum, i) => sum + i.discountAmount, 0)) || 0); // Approximation if needed, or better logic if backend stores strictly. Ideally stores "additionalDiscount" distinct from line discounts. Check backend logic? Backend stores totalDiscount which is sum of all. So we might need to reverse engineer or just set it to 0 if simple. 
                     // Actually, the frontend calculates `totalDiscount` as `itemDiscount + overallDiscount`.
@@ -383,26 +440,54 @@ const CreateQuotation = () => {
         setHeader(prev => ({ ...prev, [name]: value }));
     };
 
-    const addProductToQuotation = (product) => {
+    const addProductToQuotation = async (product) => {
         const existing = items.find(i => i.productId === product._id);
         if (existing) {
             toast.warning('Product already in list. Adjust quantity there.');
             return;
         }
 
-        const calcs = calculateLineItem(1, product.basePrice, 0, product.gstPercentage);
+        let productWithVendors = product;
+        try {
+            const productRes = await productService.getById(product._id);
+            productWithVendors = productRes.data;
+        } catch {
+            // Fallback to list item data if detail fetch fails
+        }
+
+        const vendorOptions = sortVendors(productWithVendors.vendors || []);
+        const bestVendor = getBestVendor(vendorOptions);
+        const selectedPrice = Number(bestVendor?.price ?? productWithVendors.basePrice ?? product.basePrice ?? 0);
+
+        if (!(selectedPrice > 0)) {
+            toast.error('No valid price available for selected product');
+            return;
+        }
+
+        if (!bestVendor && vendorOptions.length) {
+            toast.warning('All active vendors are unavailable for this product');
+        }
+
+        const calcs = calculateLineItem(1, selectedPrice, 0, productWithVendors.gstPercentage || product.gstPercentage);
         const newItem = {
-            productId: product._id,
-            productName: product.productName,
-            productCode: product.productCode,
-            productImageUrl: product.productImageUrl,
-            hsnCode: product.hsnCode,
-            uom: product.uom,
-            gstPercentage: product.gstPercentage,
+            productId: productWithVendors._id || product._id,
+            productName: productWithVendors.productName || product.productName,
+            productCode: productWithVendors.productCode || product.productCode,
+            productImageUrl: productWithVendors.productImageUrl || product.productImageUrl,
+            hsnCode: productWithVendors.hsnCode || product.hsnCode,
+            uom: productWithVendors.uom || product.uom,
+            gstPercentage: productWithVendors.gstPercentage || product.gstPercentage,
             quantity: 1,
-            rate: product.basePrice,
+            unitPrice: selectedPrice,
+            rate: selectedPrice,
             discountPercent: 0,
             siteId: header.siteId || '',
+            vendorId: bestVendor ? (bestVendor.vendorId?._id || bestVendor.vendorId) : '',
+            vendorName: bestVendor?.vendorId?.name || '',
+            vendorPrice: selectedPrice,
+            vendorStockAtSelection: Number(bestVendor?.stock || 0),
+            isVendorAutoSelected: true,
+            vendorOptions,
             ...calcs
         };
 
@@ -413,6 +498,9 @@ const CreateQuotation = () => {
     const updateItem = (index, field, value) => {
         const newItems = [...items];
         const item = { ...newItems[index], [field]: value };
+        if (field === 'rate') {
+            item.unitPrice = Number(value);
+        }
 
         const calcs = calculateLineItem(
             Number(item.quantity),
@@ -423,6 +511,45 @@ const CreateQuotation = () => {
 
         newItems[index] = { ...item, ...calcs };
         setItems(newItems);
+    };
+
+    const handleVendorChange = (index, vendorId) => {
+        const nextItems = [...items];
+        const item = { ...nextItems[index] };
+        const options = item.vendorOptions || [];
+        const selectedVendor = options.find(v => String(v.vendorId?._id || v.vendorId) === String(vendorId));
+
+        if (!selectedVendor) {
+            item.vendorId = '';
+            item.vendorName = '';
+            item.vendorPrice = item.rate;
+            item.vendorStockAtSelection = 0;
+            item.isVendorAutoSelected = false;
+            nextItems[index] = item;
+            setItems(nextItems);
+            return;
+        }
+
+        const nextRate = Number(selectedVendor.price || 0);
+        const calcs = calculateLineItem(
+            Number(item.quantity),
+            nextRate,
+            Number(item.discountPercent),
+            Number(item.gstPercentage)
+        );
+
+        nextItems[index] = {
+            ...item,
+            vendorId: selectedVendor.vendorId?._id || selectedVendor.vendorId,
+            vendorName: selectedVendor.vendorId?.name || item.vendorName,
+            vendorPrice: nextRate,
+            vendorStockAtSelection: Number(selectedVendor.stock || 0),
+            isVendorAutoSelected: false,
+            unitPrice: nextRate,
+            rate: nextRate,
+            ...calcs
+        };
+        setItems(nextItems);
     };
 
     const removeItem = (index) => {
@@ -494,25 +621,39 @@ const CreateQuotation = () => {
         try {
             const quotationData = {
                 ...header,
-                items: items.map(item => ({
-                    productId: item.productId,
-                    productSnapshot: {
-                        productName: item.productName,
-                        productCode: item.productCode,
-                        hsnCode: item.hsnCode,
-                        gstPercentage: item.gstPercentage,
-                        uom: item.uom,
-                        productImageUrl: item.productImageUrl
-                    },
-                    siteId: item.siteId || header.siteId || undefined,
-                    quantity: item.quantity,
-                    rate: item.rate,
-                    discountPercent: item.discountPercent,
-                    discountAmount: item.discountAmount,
-                    taxableAmount: item.taxableAmount,
-                    gstAmount: item.gstAmount,
-                    lineTotal: item.lineTotal
-                })),
+                items: items.map(item => {
+                    const bestVendor = !item.vendorId ? getBestVendor(item.vendorOptions || []) : null;
+                    const selectedVendorId = item.vendorId || (bestVendor ? (bestVendor.vendorId?._id || bestVendor.vendorId) : undefined);
+                    const selectedVendorName = item.vendorName || bestVendor?.vendorId?.name || '';
+                    const selectedVendorPrice = item.vendorPrice || bestVendor?.price || item.rate;
+                    const selectedVendorStock = item.vendorStockAtSelection ?? bestVendor?.stock ?? 0;
+
+                    return {
+                        productId: item.productId,
+                        productSnapshot: {
+                            productName: item.productName,
+                            productCode: item.productCode,
+                            hsnCode: item.hsnCode,
+                            gstPercentage: item.gstPercentage,
+                            uom: item.uom,
+                            productImageUrl: item.productImageUrl
+                        },
+                        siteId: item.siteId || header.siteId || undefined,
+                        quantity: item.quantity,
+                        unitPrice: item.unitPrice || item.rate,
+                        rate: item.rate,
+                        discountPercent: item.discountPercent,
+                        discountAmount: item.discountAmount,
+                        taxableAmount: item.taxableAmount,
+                        gstAmount: item.gstAmount,
+                        lineTotal: item.lineTotal,
+                        vendorId: selectedVendorId,
+                        vendorName: selectedVendorName,
+                        vendorPrice: selectedVendorPrice,
+                        vendorStockAtSelection: selectedVendorStock,
+                        isVendorAutoSelected: item.vendorId ? item.isVendorAutoSelected !== false : true
+                    };
+                }),
                 termsTemplateId: selectedTermsTemplateId,
                 customTerms: termsContent,
                 totalDiscount: totals.itemDiscount + Number(overallDiscount),
@@ -740,12 +881,13 @@ const CreateQuotation = () => {
                         </div>
 
                         <div className="p-0 overflow-x-auto">
-                            <table className="w-full table-fixed min-w-[800px]">
+                            <table className="w-full table-fixed min-w-[1050px]">
                                 <thead className="bg-slate-50/50 text-slate-400 text-[9px] uppercase font-black tracking-widest border-b border-slate-100">
                                     <tr>
                                         <th className="w-12 px-6 py-4">#</th>
                                         <th className="w-20 px-4 py-4">Image</th>
                                         <th className="px-4 py-4">Description</th>
+                                        <th className="w-56 px-4 py-4">Vendor</th>
                                         <th className="w-40 px-4 py-4">Site/Group</th>
                                         <th className="w-24 px-4 py-4 text-center">Qty</th>
                                         <th className="w-32 px-4 py-4 text-right">Base Rate</th>
@@ -757,7 +899,7 @@ const CreateQuotation = () => {
                                 <tbody className="divide-y divide-slate-50">
                                     {items.length === 0 ? (
                                         <tr>
-                                            <td colSpan="8" className="py-20 text-center">
+                                            <td colSpan="10" className="py-20 text-center">
                                                 <div className="flex flex-col items-center opacity-20">
                                                     <MdInventory2 size={48} />
                                                     <p className="mt-4 font-black uppercase text-xs tracking-[0.2em]">Zero Product Lines</p>
@@ -781,6 +923,36 @@ const CreateQuotation = () => {
                                                 <td className="px-4 py-4">
                                                     <div className="font-bold text-slate-900 text-sm truncate">{item.productName}</div>
                                                     <div className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Code: {item.productCode} | HSN: {item.hsnCode}</div>
+                                                </td>
+                                                <td className="px-4 py-4">
+                                                    {item.vendorOptions?.length ? (
+                                                        <div className="space-y-1">
+                                                            <select
+                                                                value={item.vendorId || ''}
+                                                                onChange={(e) => handleVendorChange(index, e.target.value)}
+                                                                className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-lg text-[10px] font-black uppercase outline-none focus:ring-2 focus:ring-primary-500/10"
+                                                            >
+                                                                <option value="">Auto Select</option>
+                                                                {item.vendorOptions
+                                                                    .filter(v => v.vendorId?.isActive !== false)
+                                                                    .map(v => (
+                                                                        <option key={String(v.vendorId?._id || v.vendorId)} value={String(v.vendorId?._id || v.vendorId)}>
+                                                                            {v.vendorId?.name} | ₹{Number(v.price || 0).toLocaleString()} | Stk {Number(v.stock || 0)}
+                                                                        </option>
+                                                                    ))}
+                                                            </select>
+                                                            <div className="flex items-center justify-between">
+                                                                <span className="text-[9px] font-bold text-slate-500">
+                                                                    {item.vendorName || 'Auto vendor'}
+                                                                </span>
+                                                                <span className={`text-[9px] font-black uppercase ${Number(item.vendorStockAtSelection || 0) > 0 ? 'text-emerald-600' : 'text-rose-500'}`}>
+                                                                    {Number(item.vendorStockAtSelection || 0) > 0 ? `In Stock (${item.vendorStockAtSelection})` : 'Out of Stock'}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-[10px] font-bold text-slate-400">No vendor mapping</span>
+                                                    )}
                                                 </td>
                                                 <td className="px-4 py-4">
                                                     <select
@@ -961,32 +1133,48 @@ const CreateQuotation = () => {
                     </div>
 
                     <div className="max-h-[450px] overflow-y-auto custom-scrollbar space-y-2 pr-2">
-                        {filteredProducts.map(p => (
-                            <div
-                                key={p._id}
-                                onClick={() => addProductToQuotation(p)}
-                                className="flex items-center gap-4 p-4 rounded-[1.5rem] border border-slate-100 hover:border-primary-200 hover:bg-primary-50/30 cursor-pointer transition-all active:scale-[0.98] group"
-                            >
-                                <div className="h-12 w-12 rounded-2xl bg-white border border-slate-100 p-1 flex-shrink-0">
-                                    {p.productImageUrl ? (
-                                        <img src={resolveImageUrl(p.productImageUrl)} alt="" className="h-full w-full object-contain" />
-                                    ) : (
-                                        <div className="h-full w-full flex items-center justify-center text-slate-200"><MdInventory2 size={24} /></div>
-                                    )}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <h4 className="font-bold text-slate-900 group-hover:text-primary-700 transition-colors truncate">{p.productName}</h4>
-                                    <div className="flex items-center gap-3">
-                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{p.productCode}</span>
-                                        <span className="h-1 w-1 rounded-full bg-slate-300"></span>
-                                        <span className="text-[10px] font-black text-primary-600 bg-primary-50 px-2 py-0.5 rounded uppercase">INR {p.basePrice.toLocaleString()}</span>
+                        {filteredProducts.map(p => {
+                            const vendorList = sortVendors(p.vendors || []);
+                            const bestVendor = p.bestVendor || getBestVendor(vendorList);
+                            const hasStock = vendorList.some(v => Number(v.stock || 0) > 0 && v.vendorId?.isActive !== false);
+
+                            return (
+                                <div
+                                    key={p._id}
+                                    onClick={() => addProductToQuotation(p)}
+                                    className="flex items-center gap-4 p-4 rounded-[1.5rem] border border-slate-100 hover:border-primary-200 hover:bg-primary-50/30 cursor-pointer transition-all active:scale-[0.98] group"
+                                >
+                                    <div className="h-12 w-12 rounded-2xl bg-white border border-slate-100 p-1 flex-shrink-0">
+                                        {p.productImageUrl ? (
+                                            <img src={resolveImageUrl(p.productImageUrl)} alt="" className="h-full w-full object-contain" />
+                                        ) : (
+                                            <div className="h-full w-full flex items-center justify-center text-slate-200"><MdInventory2 size={24} /></div>
+                                        )}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <h4 className="font-bold text-slate-900 group-hover:text-primary-700 transition-colors truncate">{p.productName}</h4>
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{p.productCode}</span>
+                                            <span className="h-1 w-1 rounded-full bg-slate-300"></span>
+                                            <span className="text-[10px] font-black text-primary-600 bg-primary-50 px-2 py-0.5 rounded uppercase">
+                                                INR {Number(bestVendor?.price ?? p.basePrice ?? 0).toLocaleString()}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-2 mt-1">
+                                            <span className="text-[9px] text-slate-500 font-bold">
+                                                {bestVendor?.vendorId?.name ? `Best: ${bestVendor.vendorId.name}` : 'No vendor mapped'}
+                                            </span>
+                                            <span className={`text-[9px] font-black uppercase ${hasStock ? 'text-emerald-600' : 'text-rose-500'}`}>
+                                                {hasStock ? 'In Stock' : 'Out of Stock'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="h-10 w-10 rounded-xl bg-slate-50 text-slate-300 group-hover:bg-primary-600 group-hover:text-white flex items-center justify-center transition-all">
+                                        <MdAdd size={24} />
                                     </div>
                                 </div>
-                                <div className="h-10 w-10 rounded-xl bg-slate-50 text-slate-300 group-hover:bg-primary-600 group-hover:text-white flex items-center justify-center transition-all">
-                                    <MdAdd size={24} />
-                                </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                         {filteredProducts.length === 0 && (
                             <div className="py-20 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest">No matching products found</div>
                         )}

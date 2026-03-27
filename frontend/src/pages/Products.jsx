@@ -1,14 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { MdAdd, MdSearch, MdEdit, MdDelete, MdInventory, MdCategory, MdQrCode, MdPayments, MdProductionQuantityLimits, MdCloudUpload, MdVisibility, MdFileUpload, MdCheckBox, MdCheckBoxOutlineBlank, MdDeleteSweep, MdSync, MdImage } from 'react-icons/md';
 import { toast } from 'react-toastify';
-import { productService, uploadService, importService, mgrService, attributeService, productAttributeService } from '../services/api';
+import { productService, uploadService, importService, mgrService, attributeService, productAttributeService, vendorService } from '../services/api';
 
 import Modal from '../components/Modal';
 import ImportModal from '../components/ImportModal';
 import { resolveImageUrl, getPlaceholderImage } from '../utils/helpers';
 
+const emptyVendorRow = () => ({
+    vendorId: '',
+    price: '',
+    stock: 0,
+    isPrimary: false
+});
+
 const Products = () => {
     const [products, setProducts] = useState([]);
+    const [vendors, setVendors] = useState([]);
     const [mgrsData, setMgrsData] = useState({ mgr1: [], mgr2: [], mgr3: [], mgr4: [], mgr5: [] });
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -58,12 +66,14 @@ const Products = () => {
         mgr3: '',
         mgr4: '',
         mgr5: '',
-        attributes: []
+        attributes: [],
+        vendors: [emptyVendorRow()]
     });
 
     useEffect(() => {
         fetchProducts();
         fetchMGRs();
+        fetchVendors();
         fetchAllAttributes();
     }, []);
 
@@ -90,6 +100,15 @@ const Products = () => {
             });
         } catch (err) {
             console.error("Error fetching MGRs", err);
+        }
+    };
+
+    const fetchVendors = async () => {
+        try {
+            const res = await vendorService.getAll();
+            setVendors(res.data);
+        } catch (err) {
+            console.error("Error fetching vendors:", err);
         }
     };
 
@@ -160,7 +179,15 @@ const Products = () => {
             setEditingProduct(product);
             setFormData({ 
                 ...product,
-                attributes: product.attributes ? product.attributes.map(a => a._id || a) : []
+                attributes: product.attributes ? product.attributes.map(a => a._id || a) : [],
+                vendors: product.vendors && product.vendors.length
+                    ? product.vendors.map(v => ({
+                        vendorId: v.vendorId?._id || v.vendorId || '',
+                        price: v.price ?? '',
+                        stock: v.stock ?? 0,
+                        isPrimary: Boolean(v.isPrimary)
+                    }))
+                    : [emptyVendorRow()]
             });
             if (product.mgr3) {
                 fetchAvailableAttributes(product.mgr3._id || product.mgr3);
@@ -188,7 +215,8 @@ const Products = () => {
                 mgr3: '',
                 mgr4: '',
                 mgr5: '',
-                attributes: []
+                attributes: [],
+                vendors: [emptyVendorRow()]
             });
             setAvailableAttributes([]);
         }
@@ -203,6 +231,43 @@ const Products = () => {
             fetchAvailableAttributes(value);
             setFormData(prev => ({ ...prev, attributes: [] }));
         }
+    };
+
+    const addVendorRow = () => {
+        setFormData(prev => ({
+            ...prev,
+            vendors: [...(prev.vendors || []), emptyVendorRow()]
+        }));
+    };
+
+    const removeVendorRow = (index) => {
+        setFormData(prev => {
+            const nextVendors = (prev.vendors || []).filter((_, i) => i !== index);
+            if (!nextVendors.length) {
+                return { ...prev, vendors: [emptyVendorRow()] };
+            }
+            if (!nextVendors.some(v => v.isPrimary)) {
+                nextVendors[0].isPrimary = true;
+            }
+            return { ...prev, vendors: nextVendors };
+        });
+    };
+
+    const updateVendorRow = (index, field, value) => {
+        setFormData(prev => {
+            const nextVendors = [...(prev.vendors || [])];
+            const current = { ...(nextVendors[index] || emptyVendorRow()) };
+            current[field] = value;
+            nextVendors[index] = current;
+
+            if (field === 'isPrimary' && value) {
+                nextVendors.forEach((vendor, idx) => {
+                    if (idx !== index) vendor.isPrimary = false;
+                });
+            }
+
+            return { ...prev, vendors: nextVendors };
+        });
     };
 
     const handleFileUpload = async (e) => {
@@ -238,8 +303,64 @@ const Products = () => {
             toast.error('HSN Code is required');
             return;
         }
-        if (!formData.basePrice || formData.basePrice <= 0) {
-            toast.error('Base Price is required and must be greater than 0');
+
+        const normalizedVendors = (formData.vendors || [])
+            .filter(v => v.vendorId)
+            .map(v => ({
+                vendorId: v.vendorId?._id || v.vendorId,
+                price: Number(v.price),
+                stock: Number(v.stock),
+                isPrimary: Boolean(v.isPrimary)
+            }));
+
+        if (!normalizedVendors.length && !editingProduct) {
+            toast.error('At least one vendor is required');
+            return;
+        }
+
+        const vendorIdSet = new Set(normalizedVendors.map(v => String(v.vendorId)));
+        if (vendorIdSet.size !== normalizedVendors.length) {
+            toast.error('Same vendor cannot be added twice');
+            return;
+        }
+
+        if (normalizedVendors.some(v => !(v.price > 0))) {
+            toast.error('Vendor price must be greater than 0');
+            return;
+        }
+
+        if (normalizedVendors.some(v => v.stock < 0)) {
+            toast.error('Vendor stock cannot be negative');
+            return;
+        }
+
+        let primaryCount = normalizedVendors.filter(v => v.isPrimary).length;
+        if (primaryCount > 1) {
+            toast.error('Only one primary vendor is allowed');
+            return;
+        }
+        if (normalizedVendors.length && primaryCount === 0) {
+            normalizedVendors[0].isPrimary = true;
+        }
+
+        if (normalizedVendors.length && normalizedVendors.every(v => v.stock <= 0)) {
+            toast.warning('All mapped vendors are out of stock');
+        }
+
+        const sortedVendors = [...normalizedVendors].sort((a, b) => {
+            if (a.stock > 0 && b.stock === 0) return -1;
+            if (a.stock === 0 && b.stock > 0) return 1;
+            if (a.isPrimary && !b.isPrimary) return -1;
+            if (!a.isPrimary && b.isPrimary) return 1;
+            return a.price - b.price;
+        });
+
+        const derivedBasePrice = sortedVendors.length
+            ? Number(sortedVendors[0].price || 0)
+            : Number(formData.basePrice || 0);
+
+        if (!(derivedBasePrice > 0)) {
+            toast.error('Base price must be greater than 0');
             return;
         }
 
@@ -253,7 +374,9 @@ const Products = () => {
                 mgr3: formData.mgr3?._id || formData.mgr3,
                 mgr4: formData.mgr4?._id || formData.mgr4,
                 mgr5: formData.mgr5?._id || formData.mgr5,
-                attributes: formData.attributes || []
+                attributes: formData.attributes || [],
+                vendors: normalizedVendors,
+                basePrice: derivedBasePrice
             };
 
             if (editingProduct) {
@@ -423,20 +546,6 @@ const Products = () => {
             }
         });
         return Array.from(usedMap.values()).sort((a, b) => a.code?.localeCompare(b.code));
-    };
-
-    const getUsedAttributes = () => {
-        const usedMap = new Map();
-        products.forEach(p => {
-            if (!mgrFilters.mgr3 || (p.mgr3?._id === mgrFilters.mgr3)) {
-                (p.attributes || []).forEach(attr => {
-                    if (attr && attr._id) {
-                        usedMap.set(attr._id, attr);
-                    }
-                });
-            }
-        });
-        return Array.from(usedMap.values()).sort((a, b) => a.description?.localeCompare(b.description));
     };
 
     const handleAttributeFilterChange = (attrId) => {
@@ -708,7 +817,10 @@ const Products = () => {
                                                     </button>
                                                 </div>
                                                 <div className="mt-2 flex items-center justify-between">
-                                                    <span className="font-black text-slate-900">₹{p.basePrice?.toLocaleString()}</span>
+                                                    <div>
+                                                        <span className="font-black text-slate-900">₹{p.basePrice?.toLocaleString()}</span>
+                                                        <p className="text-[10px] font-bold text-slate-400">{p.vendors?.length || 0} vendors</p>
+                                                    </div>
                                                     <span className={`px-2 py-0.5 text-[10px] font-black uppercase tracking-widest rounded-md border ${p.status === 'Active'
                                                         ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
                                                         : 'bg-rose-50 text-rose-600 border-rose-100'
@@ -833,6 +945,7 @@ const Products = () => {
                                                         </td>
                                                         <td className="px-8 py-5 text-right">
                                                             <div className="text-sm font-black text-slate-900">₹{p.basePrice?.toLocaleString()}</div>
+                                                            <div className="text-[10px] text-slate-400">{p.vendors?.length || 0} vendors mapped</div>
                                                             <div className="text-[10px] text-slate-400 line-through">MRP: ₹{p.mrp?.toLocaleString()}</div>
                                                         </td>
                                                         <td className="px-8 py-5 text-center">
@@ -913,6 +1026,7 @@ const Products = () => {
                                                     <div className="flex items-end justify-between border-t border-slate-50 pt-4 mt-auto">
                                                         <div>
                                                             <div className="text-lg font-black text-slate-900">₹{p.basePrice?.toLocaleString()}</div>
+                                                            <div className="text-[10px] text-slate-400">{p.vendors?.length || 0} vendors</div>
                                                             <div className="text-[10px] text-slate-400 line-through">MRP: ₹{p.mrp?.toLocaleString()}</div>
                                                         </div>
                                                         <div className="flex gap-2">
@@ -1209,6 +1323,95 @@ const Products = () => {
                                         placeholder="0"
                                         required
                                     />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h4 className="text-[10px] font-black text-primary-600 uppercase tracking-[0.2em] mb-6 flex items-center gap-3">
+                                <span className="h-px flex-1 bg-primary-100"></span>
+                                Vendor Mapping
+                                <span className="h-px flex-1 bg-primary-100"></span>
+                            </h4>
+                            <div className="space-y-3">
+                                {(formData.vendors || []).map((vendorRow, index) => (
+                                    <div key={`vendor-row-${index}`} className="grid grid-cols-12 gap-3 items-end p-3 rounded-2xl border border-slate-200 bg-slate-50/60">
+                                        <div className="col-span-12 md:col-span-5 space-y-1">
+                                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Vendor</label>
+                                            <select
+                                                value={vendorRow.vendorId || ''}
+                                                onChange={(e) => updateVendorRow(index, 'vendorId', e.target.value)}
+                                                className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl outline-none text-xs font-bold"
+                                            >
+                                                <option value="">Select Vendor</option>
+                                                {vendors
+                                                    .filter(v => v.isActive || String(v._id) === String(vendorRow.vendorId))
+                                                    .map(v => (
+                                                        <option key={v._id} value={v._id}>{v.name}{!v.isActive ? ' (Inactive)' : ''}</option>
+                                                    ))}
+                                            </select>
+                                        </div>
+                                        <div className="col-span-6 md:col-span-2 space-y-1">
+                                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Price</label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                step="0.01"
+                                                value={vendorRow.price}
+                                                onChange={(e) => updateVendorRow(index, 'price', e.target.value)}
+                                                className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold"
+                                                placeholder="0"
+                                            />
+                                        </div>
+                                        <div className="col-span-6 md:col-span-2 space-y-1">
+                                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Stock</label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                value={vendorRow.stock}
+                                                onChange={(e) => updateVendorRow(index, 'stock', e.target.value)}
+                                                className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold"
+                                                placeholder="0"
+                                            />
+                                        </div>
+                                        <div className="col-span-6 md:col-span-2 flex flex-col gap-2">
+                                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Primary</label>
+                                            <button
+                                                type="button"
+                                                onClick={() => updateVendorRow(index, 'isPrimary', !vendorRow.isPrimary)}
+                                                className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${vendorRow.isPrimary ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-100'}`}
+                                            >
+                                                {vendorRow.isPrimary ? 'Primary' : 'Set Primary'}
+                                            </button>
+                                        </div>
+                                        <div className="col-span-6 md:col-span-1 flex justify-end">
+                                            <button
+                                                type="button"
+                                                onClick={() => removeVendorRow(index)}
+                                                className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl border border-rose-100"
+                                                title="Remove Vendor Row"
+                                            >
+                                                <MdDelete size={16} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+
+                                <div className="flex items-center justify-between">
+                                    <button
+                                        type="button"
+                                        onClick={addVendorRow}
+                                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary-50 text-primary-700 border border-primary-100 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-primary-100"
+                                    >
+                                        <MdAdd size={16} />
+                                        Add Vendor
+                                    </button>
+                                    {(formData.vendors || []).filter(v => v.vendorId).length > 0 &&
+                                        (formData.vendors || []).filter(v => v.vendorId).every(v => Number(v.stock) <= 0) && (
+                                            <span className="text-[10px] font-black uppercase tracking-widest text-amber-600">
+                                                All mapped vendors are out of stock
+                                            </span>
+                                        )}
                                 </div>
                             </div>
                         </div>

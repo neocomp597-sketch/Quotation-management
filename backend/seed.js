@@ -3,6 +3,7 @@ const Customer = require('./models/Customer');
 const Product = require('./models/Product');
 const TermsTemplate = require('./models/TermsTemplate');
 const User = require('./models/User');
+const Vendor = require('./models/Vendor');
 const bcrypt = require('bcryptjs');
 require('dotenv').config();
 
@@ -15,6 +16,7 @@ const seedData = async () => {
         await User.deleteMany({});
         await Customer.deleteMany({});
         await Product.deleteMany({});
+        await Vendor.deleteMany({});
         await TermsTemplate.deleteMany({});
 
         // 1. Create Users
@@ -65,6 +67,33 @@ const seedData = async () => {
             }
         ]);
 
+        const seededVendors = await Vendor.insertMany([
+            {
+                name: 'Western Trade Supplies',
+                contactPerson: 'Rohit Mehta',
+                phone: '9876543211',
+                email: 'rohit@westerntrade.in',
+                address: 'Mumbai',
+                isActive: true
+            },
+            {
+                name: 'Prime Build Distributors',
+                contactPerson: 'Aditi Shah',
+                phone: '9876543212',
+                email: 'aditi@primebuild.in',
+                address: 'Pune',
+                isActive: true
+            },
+            {
+                name: 'Metro Source Hub',
+                contactPerson: 'Karan Patil',
+                phone: '9876543213',
+                email: 'karan@metrosource.in',
+                address: 'Nashik',
+                isActive: true
+            }
+        ]);
+
         // 3. Seed Products
         await Product.insertMany([
             {
@@ -72,18 +101,27 @@ const seedData = async () => {
                 productName: 'Rimless Wall Hung WC with Soft Close Seat',
                 hsnCode: '69101000',
                 gstPercentage: 18,
-                basePrice: 12500,
+                basePrice: 12200,
                 mrp: 18500,
-                uom: 'Nos'
+                uom: 'Nos',
+                vendors: [
+                    { vendorId: seededVendors[0]._id, price: 12500, stock: 0, isPrimary: true },
+                    { vendorId: seededVendors[1]._id, price: 12200, stock: 8, isPrimary: false },
+                    { vendorId: seededVendors[2]._id, price: 12800, stock: 12, isPrimary: false }
+                ]
             },
             {
                 productCode: 'JAG-CP-502',
                 productName: 'Single Lever Basin Mixer - Alive Series',
                 hsnCode: '84818020',
                 gstPercentage: 18,
-                basePrice: 4200,
+                basePrice: 4100,
                 mrp: 6500,
-                uom: 'Nos'
+                uom: 'Nos',
+                vendors: [
+                    { vendorId: seededVendors[0]._id, price: 4200, stock: 6, isPrimary: true },
+                    { vendorId: seededVendors[1]._id, price: 4100, stock: 10, isPrimary: false }
+                ]
             }
         ]);
 

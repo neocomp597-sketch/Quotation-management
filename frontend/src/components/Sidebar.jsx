@@ -10,7 +10,8 @@ import {
     MdAssignment,
     MdCategory,
     MdAutoGraph,
-    MdAnalytics
+    MdAnalytics,
+    MdStorefront
 } from 'react-icons/md';
 
 const Sidebar = ({ isOpen, toggleSidebar }) => {
@@ -21,6 +22,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
         { name: 'Dashboard', icon: <MdDashboard size={22} />, path: '/dashboard' },
         ...(isAdmin ? [{ name: 'Salespersons', icon: <MdPeople size={22} />, path: '/salespersons' }] : []),
         { name: 'Customers', icon: <MdPeople size={22} />, path: '/customers' },
+        { name: 'Vendors', icon: <MdStorefront size={22} />, path: '/vendors' },
         { name: 'Products', icon: <MdInventory size={22} />, path: '/products' },
         { name: 'MGR Master', icon: <MdCategory size={22} />, path: '/mgrs' },
         { name: 'Simulations', icon: <MdAutoGraph size={22} />, path: '/simulations' },

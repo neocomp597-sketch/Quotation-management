@@ -34,6 +34,10 @@ const worksheetData = products.map(p => ({
     'Base Price': p.basePrice,
     'MRP': p.mrp,
     'UOM': p.uom,
+    'Vendor Name': 'Sample Vendor',
+    'Vendor Price': p.basePrice,
+    'Vendor Stock': 10,
+    'Is Primary': true,
     'Image URL': '',
     'Status': p.status
 }));
@@ -52,6 +56,10 @@ worksheet['!cols'] = [
     { wch: 12 },  // Base Price
     { wch: 12 },  // MRP
     { wch: 8 },   // UOM
+    { wch: 20 },  // Vendor Name
+    { wch: 12 },  // Vendor Price
+    { wch: 12 },  // Vendor Stock
+    { wch: 10 },  // Is Primary
     { wch: 30 },  // Image URL
     { wch: 10 },  // Status
 ];

@@ -1,6 +1,14 @@
 const Quotation = require('../models/Quotation');
 const Customer = require('../models/Customer');
 const CompanySettings = require('../models/CompanySettings');
+const Product = require('../models/Product');
+const { getBestVendorForProduct, sortVendorsByPriority, isVendorActive } = require('../utils/vendorSelection');
+
+const asBadRequest = (message) => {
+    const error = new Error(message);
+    error.statusCode = 400;
+    return error;
+};
 
 // Helper Functions for Calculations
 const calculateSubtotal = (items) => {
@@ -30,6 +38,21 @@ const calculateGrandTotal = (items) => {
     return items.reduce((total, item) => total + (item.lineTotal || 0), 0);
 };
 
+const calculateLineItem = (quantity, rate, discountPercent, gstPercentage) => {
+    const amount = Number(quantity || 0) * Number(rate || 0);
+    const discountAmount = (amount * Number(discountPercent || 0)) / 100;
+    const taxableAmount = amount - discountAmount;
+    const gstAmount = (taxableAmount * Number(gstPercentage || 0)) / 100;
+    const lineTotal = taxableAmount + gstAmount;
+
+    return {
+        discountAmount,
+        taxableAmount,
+        gstAmount,
+        lineTotal
+    };
+};
+
 const getAnyCompanySettings = async (creatorId) => {
     // 1. Try creator's settings
     if (creatorId) {
@@ -49,6 +72,101 @@ const getAnyCompanySettings = async (creatorId) => {
     };
 };
 
+const resolveVendorForItem = (product, requestedVendorId) => {
+    const productVendors = sortVendorsByPriority(product.vendors || []);
+
+    if (!productVendors.length) {
+        return { selectedVendor: null, isAutoSelected: true };
+    }
+
+    if (requestedVendorId) {
+        const match = productVendors.find((entry) => String(entry.vendorId?._id || entry.vendorId) === String(requestedVendorId));
+        if (!match) {
+            throw asBadRequest('Selected vendor does not belong to this product');
+        }
+        if (!isVendorActive(match)) {
+            throw asBadRequest('Selected vendor is inactive');
+        }
+        return { selectedVendor: match, isAutoSelected: false };
+    }
+
+    const bestVendor = getBestVendorForProduct({ ...product.toObject(), vendors: productVendors });
+    return { selectedVendor: bestVendor, isAutoSelected: true };
+};
+
+const normalizeQuotationItems = async (items, fallbackSiteId) => {
+    if (!Array.isArray(items) || items.length === 0) {
+        throw asBadRequest('At least one quotation item is required');
+    }
+
+    return Promise.all(
+        items.map(async (item) => {
+            if (!item.productId) {
+                throw asBadRequest('Each quotation item must include productId');
+            }
+
+            const product = await Product.findById(item.productId).populate('vendors.vendorId');
+            if (!product) {
+                throw asBadRequest(`Product not found for item: ${item.productId}`);
+            }
+
+            const { selectedVendor, isAutoSelected } = resolveVendorForItem(product, item.vendorId);
+            const quantity = Number(item.quantity || 0);
+            const discountPercent = Number(item.discountPercent || 0);
+
+            if (!(quantity > 0)) {
+                throw asBadRequest(`Quantity must be greater than 0 for product ${product.productCode}`);
+            }
+
+            const unitPrice = Number(
+                item.unitPrice ??
+                item.rate ??
+                selectedVendor?.price ??
+                product.basePrice
+            );
+
+            if (!(unitPrice > 0)) {
+                throw asBadRequest(`Unit price must be greater than 0 for product ${product.productCode}`);
+            }
+
+            const gstPercentage = Number(
+                item.productSnapshot?.gstPercentage ??
+                item.gstPercentage ??
+                product.gstPercentage ??
+                0
+            );
+
+            const calculations = calculateLineItem(quantity, unitPrice, discountPercent, gstPercentage);
+
+            return {
+                productId: product._id,
+                vendorId: selectedVendor ? (selectedVendor.vendorId?._id || selectedVendor.vendorId) : undefined,
+                vendorName: selectedVendor?.vendorId?.name || item.vendorName || '',
+                vendorPrice: selectedVendor ? Number(selectedVendor.price || 0) : unitPrice,
+                vendorStockAtSelection: selectedVendor ? Number(selectedVendor.stock || 0) : Number(item.vendorStockAtSelection || 0),
+                isVendorAutoSelected: selectedVendor ? isAutoSelected : true,
+                siteId: item.siteId || fallbackSiteId || undefined,
+                productSnapshot: {
+                    productName: item.productSnapshot?.productName || product.productName,
+                    productCode: item.productSnapshot?.productCode || product.productCode,
+                    hsnCode: item.productSnapshot?.hsnCode || product.hsnCode,
+                    gstPercentage,
+                    uom: item.productSnapshot?.uom || product.uom,
+                    productImageUrl: item.productSnapshot?.productImageUrl || product.productImageUrl
+                },
+                quantity,
+                unitPrice,
+                rate: unitPrice,
+                discountPercent,
+                discountAmount: calculations.discountAmount,
+                taxableAmount: calculations.taxableAmount,
+                gstAmount: calculations.gstAmount,
+                lineTotal: calculations.lineTotal,
+            };
+        })
+    );
+};
+
 // Create Quotation
 const createQuotation = async (req, res) => {
     try {
@@ -61,13 +179,14 @@ const createQuotation = async (req, res) => {
             paymentTerms,
             termsTemplateId,
             customTerms,
-            status
+            status,
+            totalDiscount: requestedTotalDiscount
         } = req.body;
-
-        // console.log("Received Quotation Request:", JSON.stringify(req.body, null, 2));
 
         const customer = await Customer.findById(customerId);
         if (!customer) return res.status(404).json({ message: 'Customer not found' });
+
+        const normalizedItems = await normalizeQuotationItems(items, siteId);
 
         // Auto-increment logic for JAG/QTN/YYYY/0001
         const year = new Date().getFullYear();
@@ -82,14 +201,18 @@ const createQuotation = async (req, res) => {
         const seqStr = sequence.toString().padStart(4, '0');
         const quotationNo = `JAG/QTN/${year}/${seqStr}`;
 
-        const customerState = customer.billingAddress?.state || ''; // Safe access
+        const customerState = customer.billingAddress?.state || '';
+        const itemDiscountTotal = calculateTotalDiscount(normalizedItems);
+        const totalDiscount = typeof requestedTotalDiscount !== 'undefined'
+            ? Number(requestedTotalDiscount)
+            : itemDiscountTotal;
+        const additionalDiscount = Math.max(0, totalDiscount - itemDiscountTotal);
 
-        const subtotal = calculateSubtotal(items || []); // Safe array access
-        const totalDiscount = calculateTotalDiscount(items || []);
-        const gstBreakup = calculateGST(items || [], customerState);
-        const tempGrandTotal = calculateGrandTotal(items || []);
+        const subtotal = calculateSubtotal(normalizedItems);
+        const gstBreakup = calculateGST(normalizedItems, customerState);
+        const tempGrandTotal = Math.max(0, calculateGrandTotal(normalizedItems) - additionalDiscount);
         const roundedGrandTotal = Math.round(tempGrandTotal);
-        const roundOff = (roundedGrandTotal - tempGrandTotal).toFixed(2);
+        const roundOff = Number((roundedGrandTotal - tempGrandTotal).toFixed(2));
 
         const newQuotation = new Quotation({
             quotationNo,
@@ -97,12 +220,9 @@ const createQuotation = async (req, res) => {
             quotationDate: new Date(),
             validTill,
             salespersonName,
-            siteId: siteId || undefined, // Ensure empty string becomes undefined
+            siteId: siteId || undefined,
             paymentTerms,
-            items: items.map(item => ({
-                ...item,
-                siteId: item.siteId || undefined
-            })),
+            items: normalizedItems,
             subtotal,
             totalDiscount,
             gstBreakup,
@@ -111,14 +231,14 @@ const createQuotation = async (req, res) => {
             termsTemplateId: termsTemplateId || undefined,
             customTerms,
             status: status || 'draft',
-            createdBy: req.user ? req.user.id : undefined, // Safely handle createdBy
+            createdBy: req.user ? req.user.id : undefined,
         });
 
         await newQuotation.save();
         res.status(201).json(newQuotation);
     } catch (error) {
-        console.error("Create Quotation Error Stack:", error); // Log full stack
-        res.status(500).json({ message: 'Error creating quotation', error: error.message, stack: error.stack });
+        console.error("Create Quotation Error Stack:", error);
+        res.status(error.statusCode || 500).json({ message: error.message || 'Error creating quotation' });
     }
 };
 
@@ -135,30 +255,34 @@ const updateQuotation = async (req, res) => {
             paymentTerms,
             termsTemplateId,
             customTerms,
-            status
+            status,
+            totalDiscount: requestedTotalDiscount
         } = req.body;
 
         const customer = await Customer.findById(customerId);
         if (!customer) return res.status(404).json({ message: 'Customer not found' });
 
+        const normalizedItems = await normalizeQuotationItems(items, siteId);
         const customerState = customer.billingAddress?.state || '';
 
-        const subtotal = calculateSubtotal(items || []);
-        const totalDiscount = calculateTotalDiscount(items || []);
-        const gstBreakup = calculateGST(items || [], customerState);
-        const tempGrandTotal = calculateGrandTotal(items || []);
+        const itemDiscountTotal = calculateTotalDiscount(normalizedItems);
+        const totalDiscount = typeof requestedTotalDiscount !== 'undefined'
+            ? Number(requestedTotalDiscount)
+            : itemDiscountTotal;
+        const additionalDiscount = Math.max(0, totalDiscount - itemDiscountTotal);
+
+        const subtotal = calculateSubtotal(normalizedItems);
+        const gstBreakup = calculateGST(normalizedItems, customerState);
+        const tempGrandTotal = Math.max(0, calculateGrandTotal(normalizedItems) - additionalDiscount);
         const roundedGrandTotal = Math.round(tempGrandTotal);
-        const roundOff = (roundedGrandTotal - tempGrandTotal).toFixed(2);
+        const roundOff = Number((roundedGrandTotal - tempGrandTotal).toFixed(2));
 
         const updatedQuotation = await Quotation.findByIdAndUpdate(id, {
             customerId,
-            items: items.map(item => ({
-                ...item,
-                siteId: item.siteId || undefined
-            })),
+            items: normalizedItems,
             validTill,
             salespersonName,
-            siteId,
+            siteId: siteId || undefined,
             paymentTerms,
             subtotal,
             totalDiscount,
@@ -168,12 +292,12 @@ const updateQuotation = async (req, res) => {
             termsTemplateId: termsTemplateId || undefined,
             customTerms,
             status: status || 'draft',
-        }, { new: true });
+        }, { new: true, runValidators: true });
 
         res.json(updatedQuotation);
     } catch (error) {
         console.error("Update Quotation Error:", error);
-        res.status(500).json({ message: 'Error updating quotation' });
+        res.status(error.statusCode || 500).json({ message: error.message || 'Error updating quotation' });
     }
 };
 
@@ -188,7 +312,11 @@ const deleteQuotation = async (req, res) => {
 
 const finalizeQuotation = async (req, res) => {
     try {
-        const quotation = await Quotation.findByIdAndUpdate(req.params.id, { status: 'final' }, { new: true });
+        const quotation = await Quotation.findByIdAndUpdate(
+            req.params.id,
+            { status: 'final' },
+            { new: true }
+        );
         res.json(quotation);
     } catch (error) {
         res.status(500).json({ message: 'Error finalizing quotation' });
@@ -207,6 +335,7 @@ module.exports = {
                 .populate('siteId')
                 .populate('items.siteId')
                 .populate('items.productId')
+                .populate('items.vendorId')
                 .populate('termsTemplateId')
                 .populate('createdBy');
             if (!quotation) return res.status(404).json({ message: 'Quotation not found' });
@@ -263,11 +392,11 @@ module.exports = {
             }
 
             const quotations = await Quotation.find(query);
-            
+
             // Basic Aggregation
             const totalQuotations = quotations.length;
             const totalValue = quotations.reduce((sum, q) => sum + (q.grandTotal || 0), 0);
-            
+
             const statusBreakdown = {
                 draft: 0,
                 final: 0,
@@ -284,7 +413,7 @@ module.exports = {
             // Monthly Trend (Last 6 months)
             const monthlyTrend = [];
             const now = new Date();
-            
+
             for (let i = 5; i >= 0; i--) {
                 const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
                 const monthName = d.toLocaleString('default', { month: 'short' });

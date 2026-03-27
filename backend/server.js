@@ -38,6 +38,7 @@ const companySettingsRoutes = require('./routes/companySettingsRoutes');
 const mgrRoutes = require('./routes/mgrRoutes');
 const attributeRoutes = require('./routes/attributeRoutes');
 const productAttributeRoutes = require('./routes/productAttributeRoutes');
+const vendorRoutes = require('./routes/vendorRoutes');
 
 
 // API Routes
@@ -55,6 +56,7 @@ app.use('/api/company-settings', companySettingsRoutes);
 app.use('/api/mgrs', mgrRoutes);
 app.use('/api/attributes', attributeRoutes);
 app.use('/api/product-attributes', productAttributeRoutes);
+app.use('/api/vendors', vendorRoutes);
 
 
 // Serve Static Files

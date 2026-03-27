@@ -18,6 +18,7 @@ import Settings from './pages/Settings';
 import Attributes from './pages/Attributes';
 import Simulations from './pages/Simulations';
 import Reports from './pages/Reports';
+import Vendors from './pages/Vendors';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 
@@ -52,6 +53,7 @@ function App() {
             <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
             <Route path="/salespersons" element={<Layout><Salespersons /></Layout>} />
             <Route path="/customers" element={<Layout><Customers /></Layout>} />
+            <Route path="/vendors" element={<Layout><Vendors /></Layout>} />
             <Route path="/products" element={<Layout><Products /></Layout>} />
             <Route path="/mgrs" element={<Layout><MGRMaster /></Layout>} />
             <Route path="/attributes" element={<Layout><Attributes /></Layout>} />
@@ -73,4 +75,3 @@ function App() {
 }
 
 export default App;
-

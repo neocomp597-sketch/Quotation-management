@@ -10,6 +10,11 @@ const QuotationSchema = new mongoose.Schema({
     paymentTerms: { type: String },
     items: [{
         productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
+        vendorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Vendor' },
+        vendorName: { type: String },
+        vendorPrice: { type: Number, default: 0 },
+        vendorStockAtSelection: { type: Number, default: 0 },
+        isVendorAutoSelected: { type: Boolean, default: true },
         siteId: { type: mongoose.Schema.Types.ObjectId, ref: 'Site' },
         productSnapshot: {
             productName: String,
@@ -20,6 +25,7 @@ const QuotationSchema = new mongoose.Schema({
             productImageUrl: String
         },
         quantity: { type: Number, required: true },
+        unitPrice: { type: Number },
         rate: { type: Number, required: true },
         discountPercent: { type: Number, default: 0 },
         discountAmount: { type: Number, default: 0 },

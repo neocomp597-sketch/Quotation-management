@@ -3,7 +3,7 @@ import { MdAdd, MdSearch, MdFilterList, MdVisibility, MdDescription, MdDownload,
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { quotationService } from '../services/api';
-import { formatCurrency, formatDate, resolveImageUrl, fetchPdfImageBase64 } from '../utils/helpers';
+import { formatDate, resolveImageUrl, fetchPdfImageBase64 } from '../utils/helpers';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import QuotationPDF from '../components/QuotationPDF';
 import Modal from '../components/Modal';
@@ -44,7 +44,7 @@ const Quotations = () => {
                 try {
                     const base64 = await fetchPdfImageBase64(url);
                     imageMap[url] = base64;
-                } catch (e) {
+                } catch {
                     console.warn("Failed to pre-fetch PDF image", url);
                 }
             }));
@@ -549,6 +549,11 @@ const Quotations = () => {
                                             <td className="px-4 py-4 border-r border-slate-100">
                                                 <div className="font-bold text-slate-900 uppercase text-[10px]">{item.productSnapshot?.productName || item.productId?.productName}</div>
                                                 <div className="text-[9px] font-black text-slate-400 mt-0.5 tracking-tighter">{item.productSnapshot?.productCode || item.productId?.productCode} | RATE: ₹{item.rate.toLocaleString()} | DISC: {item.discountPercent}%</div>
+                                                {(item.vendorName || item.vendorId?.name) && (
+                                                    <div className="text-[9px] font-bold text-primary-600 mt-1">
+                                                        Vendor: {item.vendorName || item.vendorId?.name}
+                                                    </div>
+                                                )}
                                             </td>
                                             <td className="px-4 py-4 text-center text-slate-600 font-medium border-r border-slate-100">{item.productSnapshot?.hsnCode || '-'}</td>
                                             <td className="px-4 py-4 text-center border-r border-slate-100">

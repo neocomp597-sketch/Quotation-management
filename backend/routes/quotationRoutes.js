@@ -31,5 +31,6 @@ router.put('/:id', protect, updateQuotation);
 router.delete('/:id', protect, deleteQuotation);
 
 // PATCH: Finalize Quotation
+router.patch('/:id/finalize', protect, finalizeQuotation);
 
 module.exports = router;

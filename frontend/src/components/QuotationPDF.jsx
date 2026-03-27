@@ -1,6 +1,6 @@
 import React from 'react';
 import { Page, Text, View, Document, StyleSheet, Image, Font } from '@react-pdf/renderer';
-import { formatCurrency, formatDate, resolveImageUrl } from '../utils/helpers';
+import { resolveImageUrl } from '../utils/helpers';
 
 const styles = StyleSheet.create({
     page: { padding: 30, fontFamily: 'Helvetica', fontSize: 9, color: '#000', backgroundColor: '#ffffff' },
@@ -461,6 +461,9 @@ const QuotationPDF = ({ quotation, format = 'format1', images = {}, companySetti
                                         <View style={[styles.tableCell, styles.colProd]}>
                                             <Text style={styles.productTitle}>{item.productSnapshot?.productName || item.productId?.productName}</Text>
                                             <Text style={styles.productSub}>{item.productSnapshot?.productCode || item.productId?.productCode}</Text>
+                                            {(item.vendorName || item.vendorId?.name) ? (
+                                                <Text style={styles.productSub}>Vendor: {item.vendorName || item.vendorId?.name}</Text>
+                                            ) : null}
                                         </View>
                                         <View style={[styles.tableCell, styles.colHsn, styles.cellCenter]}><Text>{item.productSnapshot?.hsnCode || item.productId?.hsnCode || '-'}</Text></View>
                                         <View style={[styles.tableCell, styles.colQty, styles.cellCenter]}>
