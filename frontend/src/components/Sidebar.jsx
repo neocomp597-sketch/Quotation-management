@@ -11,7 +11,8 @@ import {
     MdCategory,
     MdAutoGraph,
     MdAnalytics,
-    MdStorefront
+    MdStorefront,
+    MdReceipt
 } from 'react-icons/md';
 
 const Sidebar = ({ isOpen, toggleSidebar }) => {
@@ -24,6 +25,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
         { name: 'Customers', icon: <MdPeople size={22} />, path: '/customers' },
         { name: 'Vendors', icon: <MdStorefront size={22} />, path: '/vendors' },
         { name: 'Products', icon: <MdInventory size={22} />, path: '/products' },
+        { name: 'Vouchers', icon: <MdReceipt size={22} />, path: '/vouchers' },
         { name: 'MGR Master', icon: <MdCategory size={22} />, path: '/mgrs' },
         { name: 'Simulations', icon: <MdAutoGraph size={22} />, path: '/simulations' },
         { name: 'Reports', icon: <MdAnalytics size={22} />, path: '/reports' },

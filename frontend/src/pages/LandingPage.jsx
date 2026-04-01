@@ -101,9 +101,24 @@ const LandingPage = () => {
                                     <div className="space-y-4">
                                         <div className="h-32 w-full bg-slate-700/20 rounded-xl border border-white/5"></div>
                                         <div className="grid grid-cols-3 gap-4">
-                                            <div className="h-20 bg-emerald-500/10 rounded-xl border border-emerald-500/10"></div>
-                                            <div className="h-20 bg-blue-500/10 rounded-xl border border-blue-500/10"></div>
-                                            <div className="h-20 bg-amber-500/10 rounded-xl border border-amber-500/10"></div>
+                                            <div className="h-20 flip-card-container">
+                                                <div className="flip-card-inner">
+                                                    <div className="flip-card-front bg-emerald-500/10 border border-emerald-500/10 mix-blend-overlay"></div>
+                                                    <div className="flip-card-back bg-emerald-500/30 border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.3)]"></div>
+                                                </div>
+                                            </div>
+                                            <div className="h-20 flip-card-container">
+                                                <div className="flip-card-inner delay-1">
+                                                    <div className="flip-card-front bg-blue-500/10 border border-blue-500/10 mix-blend-overlay"></div>
+                                                    <div className="flip-card-back bg-blue-500/30 border border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.3)]"></div>
+                                                </div>
+                                            </div>
+                                            <div className="h-20 flip-card-container">
+                                                <div className="flip-card-inner delay-2">
+                                                    <div className="flip-card-front bg-amber-500/10 border border-amber-500/10 mix-blend-overlay"></div>
+                                                    <div className="flip-card-back bg-amber-500/30 border border-amber-500/30 shadow-[0_0_15px_rgba(245,158,11,0.3)]"></div>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>

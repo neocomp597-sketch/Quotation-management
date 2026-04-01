@@ -19,6 +19,8 @@ import Attributes from './pages/Attributes';
 import Simulations from './pages/Simulations';
 import Reports from './pages/Reports';
 import Vendors from './pages/Vendors';
+import Vouchers from './pages/Vouchers';
+import CreateVoucher from './pages/CreateVoucher';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 
@@ -55,6 +57,9 @@ function App() {
             <Route path="/customers" element={<Layout><Customers /></Layout>} />
             <Route path="/vendors" element={<Layout><Vendors /></Layout>} />
             <Route path="/products" element={<Layout><Products /></Layout>} />
+            <Route path="/vouchers" element={<Layout><Vouchers /></Layout>} />
+            <Route path="/vouchers/new" element={<Layout><CreateVoucher /></Layout>} />
+            <Route path="/vouchers/:id" element={<Layout><CreateVoucher /></Layout>} />
             <Route path="/mgrs" element={<Layout><MGRMaster /></Layout>} />
             <Route path="/attributes" element={<Layout><Attributes /></Layout>} />
             <Route path="/simulations" element={<Layout><Simulations /></Layout>} />

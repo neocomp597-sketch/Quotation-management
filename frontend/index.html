@@ -6,12 +6,66 @@
   <link rel="icon" type="image/svg+xml" href="/vite.svg" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Quotations</title>
-  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDJeMis1L5Dlg1c22uhKBZqYq2W5MJ2ezU&libraries=places"
+  <style>
+    #initial-loader {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      background-color: #f8fafc;
+      z-index: 9999;
+      font-family: system-ui, -apple-system, sans-serif;
+    }
+    .spinner {
+      width: 48px;
+      height: 48px;
+      border: 4px solid #ccfbf1;
+      border-top: 4px solid #0d9488;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 24px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .loading-text {
+      color: #475569;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+  </style>
+  <script>
+    if (typeof global === 'undefined') {
+      window.global = window;
+    }
+    if (typeof process === 'undefined') {
+      window.process = { env: {} };
+    }
+  </script>
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDJeMis1L5Dlg1c22uhKBZqYq2W5MJ2ezU&libraries=places&loading=async"
     async defer></script>
 </head>
 
 <body>
-  <div id="root"></div>
+  <div id="root">
+    <div id="initial-loader">
+      <div class="spinner"></div>
+      <div class="loading-text">Loading Workspace...</div>
+    </div>
+  </div>
   <script type="module" src="/src/main.jsx"></script>
 </body>
 

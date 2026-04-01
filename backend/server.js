@@ -39,7 +39,7 @@ const mgrRoutes = require('./routes/mgrRoutes');
 const attributeRoutes = require('./routes/attributeRoutes');
 const productAttributeRoutes = require('./routes/productAttributeRoutes');
 const vendorRoutes = require('./routes/vendorRoutes');
-
+const voucherRoutes = require('./routes/voucherRoutes');
 
 // API Routes
 app.use('/api/quotations', quotationRoutes);
@@ -57,7 +57,7 @@ app.use('/api/mgrs', mgrRoutes);
 app.use('/api/attributes', attributeRoutes);
 app.use('/api/product-attributes', productAttributeRoutes);
 app.use('/api/vendors', vendorRoutes);
-
+app.use('/api/vouchers', voucherRoutes);
 
 // Serve Static Files
 // Serve Static Files with logging
