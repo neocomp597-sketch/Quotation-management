@@ -171,4 +171,12 @@ export const voucherService = {
     delete: (id) => api.delete(`/vouchers/${id}`),
 };
 
+export const enquiryService = {
+    getAll: () => api.get('/enquiries'),
+    getById: (id) => api.get(`/enquiries/${id}`),
+    create: (data) => api.post('/enquiries', data),
+    update: (id, data) => api.put(`/enquiries/${id}`, data),
+    delete: (id) => api.delete(`/enquiries/${id}`),
+};
+
 export default api;

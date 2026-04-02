@@ -23,6 +23,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
         { name: 'Dashboard', icon: <MdDashboard size={22} />, path: '/dashboard' },
         ...(isAdmin ? [{ name: 'Salespersons', icon: <MdPeople size={22} />, path: '/salespersons' }] : []),
         { name: 'Customers', icon: <MdPeople size={22} />, path: '/customers' },
+        { name: 'Leads & Enquiries', icon: <MdAssignment size={22} />, path: '/enquiries' },
         { name: 'Vendors', icon: <MdStorefront size={22} />, path: '/vendors' },
         { name: 'Products', icon: <MdInventory size={22} />, path: '/products' },
         { name: 'Vouchers', icon: <MdReceipt size={22} />, path: '/vouchers' },

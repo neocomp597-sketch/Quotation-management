@@ -10,6 +10,7 @@ const defaultForm = {
     phone: '',
     email: '',
     address: '',
+    gstin: '',
     isActive: true
 };
 
@@ -55,6 +56,7 @@ const Vendors = () => {
             phone: vendor.phone || '',
             email: vendor.email || '',
             address: vendor.address || '',
+            gstin: vendor.gstin || '',
             isActive: vendor.isActive !== false
         } : defaultForm);
         setIsModalOpen(true);
@@ -145,7 +147,7 @@ const Vendors = () => {
                                 <tr>
                                     <th className="px-8 py-5">Vendor</th>
                                     <th className="px-8 py-5">Contact</th>
-                                    <th className="px-8 py-5">Address</th>
+                                    <th className="px-8 py-5">GSTIN</th>
                                     <th className="px-8 py-5 text-center">Status</th>
                                     <th className="px-8 py-5 text-right">Actions</th>
                                 </tr>
@@ -169,7 +171,8 @@ const Vendors = () => {
                                             <div className="text-[11px] text-slate-500">{vendor.email || '-'}</div>
                                         </td>
                                         <td className="px-8 py-5">
-                                            <div className="text-sm text-slate-600 font-medium max-w-md truncate">{vendor.address || '-'}</div>
+                                            <div className="text-sm text-slate-900 font-black">{vendor.gstin || '-'}</div>
+                                            <div className="text-[10px] text-slate-400 font-medium truncate max-w-[200px]">{vendor.address || 'No address'}</div>
                                         </td>
                                         <td className="px-8 py-5 text-center">
                                             <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-[0.1em] ${vendor.isActive ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-slate-100 text-slate-400 border border-slate-200'}`}>
@@ -268,16 +271,29 @@ const Vendors = () => {
                             />
                         </div>
                     </div>
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Email</label>
-                        <input
-                            type="email"
-                            name="email"
-                            value={formData.email}
-                            onChange={onChange}
-                            className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none"
-                            placeholder="vendor@company.com"
-                        />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Email</label>
+                            <input
+                                type="email"
+                                name="email"
+                                value={formData.email}
+                                onChange={onChange}
+                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none"
+                                placeholder="vendor@company.com"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">GSTIN</label>
+                            <input
+                                type="text"
+                                name="gstin"
+                                value={formData.gstin}
+                                onChange={onChange}
+                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none"
+                                placeholder="GST Number"
+                            />
+                        </div>
                     </div>
                     <div className="space-y-2">
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Address</label>

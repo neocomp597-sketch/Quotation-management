@@ -13,6 +13,8 @@ import Terms from './pages/Terms';
 import LandingPage from './pages/LandingPage';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import Enquiries from './pages/Enquiries';
+import CreateEnquiry from './pages/CreateEnquiry';
 import Salespersons from './pages/Salespersons';
 import Settings from './pages/Settings';
 import Attributes from './pages/Attributes';
@@ -56,6 +58,9 @@ function App() {
             <Route path="/salespersons" element={<Layout><Salespersons /></Layout>} />
             <Route path="/customers" element={<Layout><Customers /></Layout>} />
             <Route path="/vendors" element={<Layout><Vendors /></Layout>} />
+            <Route path="/enquiries" element={<Layout><Enquiries /></Layout>} />
+            <Route path="/enquiries/create" element={<Layout><CreateEnquiry /></Layout>} />
+            <Route path="/enquiries/edit/:id" element={<Layout><CreateEnquiry /></Layout>} />
             <Route path="/products" element={<Layout><Products /></Layout>} />
             <Route path="/vouchers" element={<Layout><Vouchers /></Layout>} />
             <Route path="/vouchers/new" element={<Layout><CreateVoucher /></Layout>} />

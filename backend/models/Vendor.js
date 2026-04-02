@@ -32,6 +32,7 @@ const VendorSchema = new mongoose.Schema(
             }
         },
         address: { type: String, trim: true, default: '' },
+        gstin: { type: String, trim: true, default: '' },
         isActive: { type: Boolean, default: true }
     },
     { timestamps: true }
