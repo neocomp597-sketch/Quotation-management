@@ -15,6 +15,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Enquiries from './pages/Enquiries';
 import CreateEnquiry from './pages/CreateEnquiry';
+import EnquiryAnalytics from './pages/EnquiryAnalytics';
 import Salespersons from './pages/Salespersons';
 import Settings from './pages/Settings';
 import Attributes from './pages/Attributes';
@@ -59,6 +60,7 @@ function App() {
             <Route path="/customers" element={<Layout><Customers /></Layout>} />
             <Route path="/vendors" element={<Layout><Vendors /></Layout>} />
             <Route path="/enquiries" element={<Layout><Enquiries /></Layout>} />
+            <Route path="/enquiries/analytics" element={<Layout><EnquiryAnalytics /></Layout>} />
             <Route path="/enquiries/create" element={<Layout><CreateEnquiry /></Layout>} />
             <Route path="/enquiries/edit/:id" element={<Layout><CreateEnquiry /></Layout>} />
             <Route path="/products" element={<Layout><Products /></Layout>} />

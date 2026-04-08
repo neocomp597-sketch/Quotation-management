@@ -1,4 +1,5 @@
 const Enquiry = require('../models/Enquiry');
+const { updateActivityDate, logStatusChange } = require('../utils/activityHelper');
 
 exports.createEnquiry = async (req, res) => {
     try {
@@ -10,7 +11,8 @@ exports.createEnquiry = async (req, res) => {
 
         const newEnquiry = new Enquiry({
             ...req.body,
-            createdBy: req.user?._id
+            createdBy: req.user?._id,
+            lastActivityDate: new Date() // Set initial activity date
         });
 
         await newEnquiry.save();
@@ -25,6 +27,9 @@ exports.getAllEnquiries = async (req, res) => {
         const enquiries = await Enquiry.find()
             .populate('customerId')
             .populate('createdBy', 'name email')
+            .populate('items.vendors', 'name')
+            .populate('items.vendorQuotes.vendorId', 'name')
+            .populate('items.finalVendor', 'name')
             .sort({ createdAt: -1 });
         res.json(enquiries);
     } catch (err) {
@@ -35,7 +40,11 @@ exports.getAllEnquiries = async (req, res) => {
 exports.getEnquiryById = async (req, res) => {
     try {
         const { id } = req.params;
-        const enquiry = await Enquiry.findById(id).populate('customerId');
+        const enquiry = await Enquiry.findById(id)
+            .populate('customerId')
+            .populate('items.vendors', 'name')
+            .populate('items.vendorQuotes.vendorId', 'name')
+            .populate('items.finalVendor', 'name');
         if (!enquiry) return res.status(404).json({ message: 'Enquiry not found' });
         res.json(enquiry);
     } catch (err) {
@@ -46,12 +55,38 @@ exports.getEnquiryById = async (req, res) => {
 exports.updateEnquiry = async (req, res) => {
     try {
         const { id } = req.params;
+        const { status, lossReason } = req.body;
+
+        // Get current enquiry to track status change
+        const currentEnquiry = await Enquiry.findById(id);
+        if (!currentEnquiry) {
+            return res.status(404).json({ message: 'Enquiry not found' });
+        }
+
+        // Enforce: If changing to Lost, lossReason MUST be provided
+        if (status === 'Lost' && !lossReason) {
+            return res.status(400).json({
+                message: 'lossReason is required when marking enquiry as Lost',
+                requiredField: 'lossReason',
+                validValues: ['High Price', 'Slow Delivery', 'No Stock', 'Delayed Follow-up', 'Customer Dropped', 'Other']
+            });
+        }
+
+        // Log status change if happening
+        if (status && status !== currentEnquiry.status) {
+            await logStatusChange(id, currentEnquiry.status, status, req.user?._id);
+        }
+
+        // Update enquiry (lastActivityDate will be auto-updated by Mongoose hook)
         const updatedEnquiry = await Enquiry.findByIdAndUpdate(
             id,
             { ...req.body },
             { new: true, runValidators: true }
         );
-        if (!updatedEnquiry) return res.status(404).json({ message: 'Enquiry not found' });
+
+        // Ensure activity date is updated
+        await updateActivityDate(id, 'status_update');
+
         res.json(updatedEnquiry);
     } catch (err) {
         res.status(400).json({ message: err.message });

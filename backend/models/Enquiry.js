@@ -11,7 +11,7 @@ const EnquirySchema = new mongoose.Schema({
     items: [{
         productName: { type: String, required: true },
         quantity: { type: Number, required: true },
-        uom: { type: String, enum: ['Pcs', 'Set', 'Ltr', 'Pack', 'Doz'], default: 'Pcs' },
+        uom: { type: String, enum: ['Pcs', 'Set', 'Ltr', 'Pack', 'Doz', 'Kg', 'Mtr'], default: 'Pcs' },
         actionStatus: { 
             type: String, 
             enum: [
@@ -27,11 +27,63 @@ const EnquirySchema = new mongoose.Schema({
         },
         salespersonName: { type: String }, // Who handles customer
         agentName: { type: String },      // any agent or middle man
+        
+        // Vendor info per product
+        vendors: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Vendor' }],
+        vendorQuotes: [{
+            vendorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Vendor' },
+            price: { type: Number },
+            deliveryTime: { type: String },
+            availability: { type: String },
+            remarks: { type: String },
+            probability: { type: Number, min: 0, max: 100 }
+        }],
+        finalVendor: { type: mongoose.Schema.Types.ObjectId, ref: 'Vendor' }
     }],
 
-    status: { type: String, enum: ['Open', 'Won', 'Lost'], default: 'Open' },
+    status: { 
+        type: String, 
+        enum: ['New', 'Contacted', 'Quotation Pending', 'Quotation Received', 'Negotiation', 'Finalized', 'PO Received', 'Lost'], 
+        default: 'New' 
+    },
+    closureReason: { type: String }, // captured when status changes to Lost or Finalized
+    probability: { type: Number, min: 0, max: 100, default: 0 },
+    remarks: { type: String },
+    
+    followUpHistory: [{
+        date: { type: Date, default: Date.now },
+        note: { type: String },
+        actionType: { type: String, enum: ['Call', 'Email', 'Visit', 'Meeting', 'Other'], default: 'Call' },
+        performedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+    }],
+
+    assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    lastActivityDate: { type: Date, default: Date.now },
+    lossReason: {
+        type: String,
+        enum: ['High Price', 'Slow Delivery', 'No Stock', 'Delayed Follow-up', 'Customer Dropped', 'Other']
+    },
+
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     createdAt: { type: Date, default: Date.now }
+});
+
+// Auto-update lastActivityDate on any save/update
+EnquirySchema.pre('save', function(next) {
+    this.lastActivityDate = new Date();
+    next();
+});
+
+// Auto-update lastActivityDate on findByIdAndUpdate
+EnquirySchema.pre('findByIdAndUpdate', function(next) {
+    this.set({ lastActivityDate: new Date() });
+    next();
+});
+
+// Auto-update lastActivityDate on updateOne/updateMany
+EnquirySchema.pre(['updateOne', 'updateMany'], function(next) {
+    this.set({ lastActivityDate: new Date() });
+    next();
 });
 
 module.exports = mongoose.model('Enquiry', EnquirySchema);

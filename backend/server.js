@@ -41,6 +41,9 @@ const productAttributeRoutes = require('./routes/productAttributeRoutes');
 const vendorRoutes = require('./routes/vendorRoutes');
 const voucherRoutes = require('./routes/voucherRoutes');
 const enquiryRoutes = require('./routes/enquiryRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
+const analyticsRoutes = require('./routes/analyticsRoutes');
+const scheduler = require('./utils/scheduler');
 
 // API Routes
 app.use('/api/quotations', quotationRoutes);
@@ -60,6 +63,11 @@ app.use('/api/product-attributes', productAttributeRoutes);
 app.use('/api/vendors', vendorRoutes);
 app.use('/api/vouchers', voucherRoutes);
 app.use('/api/enquiries', enquiryRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/analytics', analyticsRoutes);
+
+// Start Scheduler
+scheduler.startScheduler();
 
 // Serve Static Files
 // Serve Static Files with logging

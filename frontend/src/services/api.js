@@ -179,4 +179,24 @@ export const enquiryService = {
     delete: (id) => api.delete(`/enquiries/${id}`),
 };
 
+export const analyticsService = {
+    getSummary: (params) => api.get('/analytics/summary', { params }),
+    getStages: (params) => api.get('/analytics/stages', { params }),
+    getTrends: (period, params) => api.get('/analytics/trends', { params: { period, ...params } }),
+    getFollowUps: (params) => api.get('/analytics/followups', { params }),
+    getVendors: (params) => api.get('/analytics/vendors', { params }),
+    getProducts: (params) => api.get('/analytics/products', { params }),
+    getUsers: (params) => api.get('/analytics/users', { params }),
+    getProbability: (params) => api.get('/analytics/probability', { params }),
+    getHealth: (params) => api.get('/analytics/health', { params }),
+    exportReport: (type, params) => api.get('/analytics/export', { params: { type, ...params } }),
+};
+
+export const notificationService = {
+    getUnread: () => api.get('/notifications/unread'),
+    getAll: () => api.get('/notifications'),
+    markAsRead: (id) => api.patch(`/notifications/${id}/read`),
+    dismiss: (id) => api.patch(`/notifications/${id}/dismiss`),
+};
+
 export default api;
