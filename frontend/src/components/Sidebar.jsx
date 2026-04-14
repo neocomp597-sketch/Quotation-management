@@ -37,9 +37,14 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
         setExpanded(prev => ({ ...prev, [key]: !prev[key] }));
     };
 
-    // Check if any child is active
+    // Check if any child is active (supports nested routes like /enquiries/create)
     const isChildActive = (children) => {
-        return children.some(child => location.pathname === child.path);
+        return children.some(child => {
+            if (location.pathname === child.path) return true;
+            // Match nested routes: /enquiries/create matches /enquiries
+            if (child.path !== '/dashboard' && location.pathname.startsWith(child.path + '/')) return true;
+            return false;
+        });
     };
 
     const menuStructure = [
