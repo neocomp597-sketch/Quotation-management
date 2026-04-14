@@ -192,6 +192,14 @@ export const analyticsService = {
     exportReport: (type, params) => api.get('/analytics/export', { params: { type, ...params } }),
 };
 
+export const planningService = {
+    getAll: (financialYear) => api.get(`/planning${financialYear ? `?financialYear=${financialYear}` : ''}`),
+    create: (data) => api.post('/planning', data),
+    update: (id, data) => api.put(`/planning/${id}`, data),
+    delete: (id) => api.delete(`/planning/${id}`),
+    getMGRReport: (financialYear) => api.get(`/planning/mgr-report?financialYear=${financialYear}`),
+};
+
 export const notificationService = {
     getUnread: () => api.get('/notifications/unread'),
     getAll: () => api.get('/notifications'),

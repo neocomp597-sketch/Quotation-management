@@ -20,6 +20,7 @@ import Salespersons from './pages/Salespersons';
 import Settings from './pages/Settings';
 import Attributes from './pages/Attributes';
 import Simulations from './pages/Simulations';
+import PlanningScreen from './pages/PlanningScreen';
 import Reports from './pages/Reports';
 import Vendors from './pages/Vendors';
 import Vouchers from './pages/Vouchers';
@@ -69,6 +70,7 @@ function App() {
             <Route path="/vouchers/:id" element={<Layout><CreateVoucher /></Layout>} />
             <Route path="/mgrs" element={<Layout><MGRMaster /></Layout>} />
             <Route path="/attributes" element={<Layout><Attributes /></Layout>} />
+            <Route path="/planning" element={<Layout><PlanningScreen /></Layout>} />
             <Route path="/simulations" element={<Layout><Simulations /></Layout>} />
             <Route path="/reports" element={<Layout><Reports /></Layout>} />
             <Route path="/quotations" element={<Layout><Quotations /></Layout>} />
