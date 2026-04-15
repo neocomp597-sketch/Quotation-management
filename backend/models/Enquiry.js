@@ -69,21 +69,18 @@ const EnquirySchema = new mongoose.Schema({
 });
 
 // Auto-update lastActivityDate on any save/update
-EnquirySchema.pre('save', function(next) {
+EnquirySchema.pre('save', function() {
     this.lastActivityDate = new Date();
-    next();
 });
 
 // Auto-update lastActivityDate on findByIdAndUpdate
-EnquirySchema.pre('findByIdAndUpdate', function(next) {
+EnquirySchema.pre('findByIdAndUpdate', function() {
     this.set({ lastActivityDate: new Date() });
-    next();
 });
 
 // Auto-update lastActivityDate on updateOne/updateMany
-EnquirySchema.pre(['updateOne', 'updateMany'], function(next) {
+EnquirySchema.pre(['updateOne', 'updateMany'], function() {
     this.set({ lastActivityDate: new Date() });
-    next();
 });
 
 module.exports = mongoose.model('Enquiry', EnquirySchema);

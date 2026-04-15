@@ -50,9 +50,8 @@ ProductSchema.path('vendors').validate(function (vendors) {
     return true;
 }, 'Vendors must be unique and only one vendor can be primary');
 
-ProductSchema.pre('save', function (next) {
+ProductSchema.pre('save', function () {
     this.updatedAt = new Date();
-    next();
 });
 
 module.exports = mongoose.model('Product', ProductSchema);

@@ -122,7 +122,8 @@ const PlanningScreen = () => {
     const filteredProducts = useMemo(() => {
         if (!productSearch) return products.slice(0, 10);
         return products.filter(p =>
-            (p.name || '').toLowerCase().includes(productSearch.toLowerCase())
+            (p.productName || '').toLowerCase().includes(productSearch.toLowerCase()) ||
+            (p.productCode || '').toLowerCase().includes(productSearch.toLowerCase())
         ).slice(0, 10);
     }, [products, productSearch]);
 
@@ -144,15 +145,15 @@ const PlanningScreen = () => {
         setNewRow(prev => ({
             ...prev,
             productId: product._id,
-            productName: product.name
+            productName: product.productName
         }));
-        setProductSearch(product.name);
+        setProductSearch(product.productName);
         setShowProductDropdown(false);
     };
 
     const handleAddEntry = async () => {
         // Validate
-        if (!newRow.monthYear || !newRow.customerId || !newRow.productId || !newRow.qty || !newRow.value || !newRow.mgrCode || !newRow.status) {
+        if (!newRow.monthYear || !newRow.customerId || !newRow.productId || newRow.qty === '' || newRow.value === '' || !newRow.mgrCode || !newRow.status) {
             toast.error('Please fill all fields');
             return;
         }
@@ -180,7 +181,7 @@ const PlanningScreen = () => {
             await planningService.delete(id);
             toast.success('Entry removed');
             fetchData();
-        } catch (err) {
+        } catch {
             toast.error('Failed to delete entry');
         }
     };
@@ -338,7 +339,7 @@ const PlanningScreen = () => {
                                                     onClick={() => selectProduct(p)}
                                                     className="w-full text-left px-3 py-2 text-xs font-bold hover:bg-primary-50 transition-colors border-b border-slate-50"
                                                 >
-                                                    {p.name}
+                                                    {p.productName}
                                                 </button>
                                             ))}
                                         </div>
@@ -396,10 +397,11 @@ const PlanningScreen = () => {
                                 <td className="py-2 px-3 text-center">
                                     <button
                                         onClick={handleAddEntry}
-                                        className="p-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all"
-                                        title="Add Entry"
+                                        className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all font-bold text-xs uppercase tracking-widest mx-auto"
+                                        title="Save Entry"
                                     >
-                                        <MdAdd size={18} />
+                                        <MdSave size={16} />
+                                        Save
                                     </button>
                                 </td>
                             </tr>

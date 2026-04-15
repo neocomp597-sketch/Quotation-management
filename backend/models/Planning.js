@@ -22,17 +22,15 @@ const PlanningSchema = new mongoose.Schema({
 });
 
 // Auto-calculate totalValue before save
-PlanningSchema.pre('save', function(next) {
+PlanningSchema.pre('save', function() {
     this.totalValue = this.qty * this.value;
-    next();
 });
 
-PlanningSchema.pre('findByIdAndUpdate', function(next) {
+PlanningSchema.pre('findByIdAndUpdate', function() {
     const update = this.getUpdate();
     if (update.qty !== undefined && update.value !== undefined) {
         this.set({ totalValue: update.qty * update.value });
     }
-    next();
 });
 
 module.exports = mongoose.model('Planning', PlanningSchema);
