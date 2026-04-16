@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-    MdAdd, MdDelete, MdCalendarMonth, MdSave, MdDownload, MdRefresh, MdEdit, MdClose
+    MdAdd, MdDelete, MdCalendarMonth, MdSave, MdDownload, MdRefresh, MdEdit, MdClose, MdKeyboardArrowDown, MdKeyboardArrowRight
 } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import { planningService, customerService, productService, mgrService } from '../services/api';
@@ -44,6 +44,16 @@ const PlanningScreen = () => {
     const [entries, setEntries] = useState([]);
     const [reportData, setReportData] = useState(null);
     const [loading, setLoading] = useState(false);
+
+    // Expand/Collapse state
+    const [isGridExpanded, setIsGridExpanded] = useState(true);
+    const [isReportExpanded, setIsReportExpanded] = useState(true);
+    const [expandedQuarters, setExpandedQuarters] = useState({
+        'Q1': true,
+        'Q2': true,
+        'Q3': true,
+        'Q4': true
+    });
 
     // Master data for dropdowns
     const [customers, setCustomers] = useState([]);
@@ -203,6 +213,7 @@ const PlanningScreen = () => {
         setCustomerSearch(entry.customerName || entry.customerId?.companyName || entry.customerId?.customerName || '');
         setProductSearch(entry.productName || entry.productId?.name || '');
         window.scrollTo({ top: 300, behavior: 'smooth' });
+        setIsGridExpanded(true); // Ensure grid is expanded when editing
     };
 
     const handleCancelEdit = () => {
@@ -255,6 +266,13 @@ const PlanningScreen = () => {
         toast.success('Excel downloaded');
     };
 
+    const toggleQuarter = (quarterPrefix) => {
+        setExpandedQuarters(prev => ({
+            ...prev,
+            [quarterPrefix]: !prev[quarterPrefix]
+        }));
+    };
+
     const monthLabels = getMonthLabels(financialYear);
 
     const calculatedTotal = (newRow.qty && newRow.value) ? Number(newRow.qty) * Number(newRow.value) : 0;
@@ -293,12 +311,19 @@ const PlanningScreen = () => {
                 </div>
             </div>
 
-            {/* Data Entry Grid */}
+            {/* Data Entry Grid border */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-                <div className="p-6 border-b border-slate-100 bg-slate-50/50">
-                    <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest">Planning Grid</h2>
+                <div 
+                    className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center cursor-pointer hover:bg-slate-100/50 transition-colors"
+                    onClick={() => setIsGridExpanded(!isGridExpanded)}
+                >
+                    <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
+                        <MdKeyboardArrowDown className={`text-slate-500 transition-transform duration-300 ${!isGridExpanded ? '-rotate-90' : ''}`} size={20}/>
+                        Planning Grid
+                    </h2>
                 </div>
 
+                {isGridExpanded && (
                 <div className="overflow-x-auto">
                     <table className="w-full text-left text-sm">
                         <thead>
@@ -342,7 +367,7 @@ const PlanningScreen = () => {
                                         className="w-full px-2 py-2 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-primary-500"
                                     />
                                     {showCustomerDropdown && filteredCustomers.length > 0 && (
-                                        <div className="absolute z-50 left-3 right-3 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-40 overflow-y-auto">
+                                        <div className="absolute z-50 left-3 right-3 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-40 overflow-y-auto custom-scrollbar">
                                             {filteredCustomers.map(c => (
                                                 <button
                                                     key={c._id}
@@ -368,7 +393,7 @@ const PlanningScreen = () => {
                                         className="w-full px-2 py-2 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-primary-500"
                                     />
                                     {showProductDropdown && filteredProducts.length > 0 && (
-                                        <div className="absolute z-50 left-3 right-3 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-40 overflow-y-auto">
+                                        <div className="absolute z-50 left-3 right-3 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-40 overflow-y-auto custom-scrollbar">
                                             {filteredProducts.map(p => (
                                                 <button
                                                     key={p._id}
@@ -514,70 +539,111 @@ const PlanningScreen = () => {
                         </tbody>
                     </table>
                 </div>
+                )}
             </div>
 
             {/* Dynamic MGR Report */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-                <div className="p-6 border-b border-slate-100 bg-slate-50/50">
-                    <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest">
+                <div 
+                    className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center cursor-pointer hover:bg-slate-100/50 transition-colors"
+                    onClick={() => setIsReportExpanded(!isReportExpanded)}
+                >
+                    <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
+                        <MdKeyboardArrowDown className={`text-slate-500 transition-transform duration-300 ${!isReportExpanded ? '-rotate-90' : ''}`} size={20} />
                         Dynamic MGR Report — FY {financialYear}
                     </h2>
                 </div>
 
-                {reportData && reportData.mgrCodes.length > 0 ? (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left text-xs">
-                            <thead>
-                                <tr className="bg-amber-50 border-b border-amber-100">
-                                    <th className="py-3 px-4 font-black text-slate-700 min-w-[100px]"></th>
-                                    {reportData.mgrCodes.map(mgr => (
-                                        <th key={mgr} className="py-3 px-4 font-black text-slate-700 text-right min-w-[100px]">{mgr}</th>
-                                    ))}
-                                    <th className="py-3 px-4 font-black text-slate-900 text-right bg-amber-100 min-w-[100px]">Total</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {reportData.rows.map((row, idx) => {
-                                    const isQuarter = row.isQuarter;
-                                    const isTotal = row.isTotal;
-                                    const isPercentage = row.isPercentage;
-                                    const isHighlight = isQuarter || isTotal || isPercentage;
+                {isReportExpanded && (
+                    reportData && reportData.mgrCodes.length > 0 ? (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-xs">
+                                <thead>
+                                    <tr className="bg-amber-50 border-b border-amber-100">
+                                        <th className="py-3 px-4 font-black text-slate-700 min-w-[100px]"></th>
+                                        {reportData.mgrCodes.map(mgr => (
+                                            <th key={mgr} className="py-3 px-4 font-black text-slate-700 text-right min-w-[100px]">{mgr}</th>
+                                        ))}
+                                        <th className="py-3 px-4 font-black text-slate-900 text-right bg-amber-100 min-w-[100px]">Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {(() => {
+                                        let currentQuarter = null;
+                                        return reportData.rows.map((row, idx) => {
+                                            const isQuarter = row.isQuarter;
+                                            const isTotal = row.isTotal;
+                                            const isPercentage = row.isPercentage;
+                                            const isHighlight = isQuarter || isTotal || isPercentage;
 
-                                    return (
-                                        <tr
-                                            key={idx}
-                                            className={`border-b transition-colors ${
-                                                isTotal ? 'bg-amber-50 border-amber-200 font-black' :
-                                                isPercentage ? 'bg-slate-50 border-slate-200' :
-                                                isQuarter ? 'bg-blue-50/50 border-blue-100 font-bold' :
-                                                'border-slate-50 hover:bg-slate-50'
-                                            }`}
-                                        >
-                                            <td className={`py-3 px-4 ${isHighlight ? 'font-black text-slate-900' : 'font-semibold text-slate-600'} ${isQuarter ? 'pl-4' : 'pl-8'}`}>
-                                                {row.month}
-                                            </td>
-                                            {reportData.mgrCodes.map(mgr => (
-                                                <td key={mgr} className={`py-3 px-4 text-right ${isHighlight ? 'font-bold text-slate-900' : 'text-slate-700'}`}>
-                                                    {isPercentage ? `${row[mgr] || 0}%` : (row[mgr] || 0).toLocaleString()}
-                                                </td>
-                                            ))}
-                                            <td className={`py-3 px-4 text-right ${isTotal ? 'bg-amber-100 font-black' : isPercentage ? 'bg-slate-100 font-bold' : 'bg-amber-50/50 font-bold'} text-slate-900`}>
-                                                {isPercentage ? `${row.total}%` : (row.total || 0).toLocaleString()}
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
-                ) : (
-                    <div className="p-10 text-center text-slate-400 font-bold">
-                        {loading ? (
-                            <div className="animate-spin border-4 border-slate-200 border-t-primary-600 rounded-full h-8 w-8 mx-auto"></div>
-                        ) : (
-                            'No data available. Add planning entries above to generate the MGR report.'
-                        )}
-                    </div>
+                                            // Determine current quarter from the quarter row text "Q1 2026-27"
+                                            let rowQuarterPrefix = null;
+                                            if (isQuarter) {
+                                                rowQuarterPrefix = row.month.substring(0, 2); // "Q1", "Q2" etc.
+                                            } else if (!isTotal && !isPercentage) {
+                                                // It's a month row. Find which quarter it belongs to based on the next quarter row
+                                                const nextQuarterRow = reportData.rows.slice(idx).find(r => r.isQuarter);
+                                                if (nextQuarterRow) {
+                                                    rowQuarterPrefix = nextQuarterRow.month.substring(0, 2);
+                                                }
+                                            }
+
+                                            // If it's a month row and the corresponding quarter is collapsed, don't render it
+                                            if (!isHighlight && rowQuarterPrefix && !expandedQuarters[rowQuarterPrefix]) {
+                                                return null;
+                                            }
+
+                                            return (
+                                                <tr
+                                                    key={idx}
+                                                    className={`border-b transition-colors ${
+                                                        isTotal ? 'bg-amber-50 border-amber-200 font-black' :
+                                                        isPercentage ? 'bg-slate-50 border-slate-200' :
+                                                        isQuarter ? 'bg-blue-50/50 border-blue-100 font-bold cursor-pointer hover:bg-blue-100/50' :
+                                                        'border-slate-50 hover:bg-slate-50'
+                                                    }`}
+                                                    onClick={() => {
+                                                        if (isQuarter) {
+                                                            const prefix = row.month.substring(0, 2);
+                                                            toggleQuarter(prefix);
+                                                        }
+                                                    }}
+                                                >
+                                                    <td className={`py-3 px-4 ${isHighlight ? 'font-black text-slate-900' : 'font-semibold text-slate-600'} ${isQuarter ? 'pl-2' : 'pl-8'}`}>
+                                                        <div className="flex items-center gap-1">
+                                                            {isQuarter && (
+                                                                <MdKeyboardArrowDown 
+                                                                    className={`text-blue-500 transition-transform duration-300 ${!expandedQuarters[row.month.substring(0, 2)] ? '-rotate-90' : ''}`} 
+                                                                    size={18} 
+                                                                />
+                                                            )}
+                                                            {row.month}
+                                                        </div>
+                                                    </td>
+                                                    {reportData.mgrCodes.map(mgr => (
+                                                        <td key={mgr} className={`py-3 px-4 text-right ${isHighlight ? 'font-bold text-slate-900' : 'text-slate-700'}`}>
+                                                            {isPercentage ? `${row[mgr] || 0}%` : (row[mgr] || 0).toLocaleString()}
+                                                        </td>
+                                                    ))}
+                                                    <td className={`py-3 px-4 text-right ${isTotal ? 'bg-amber-100 font-black' : isPercentage ? 'bg-slate-100 font-bold' : 'bg-amber-50/50 font-bold'} text-slate-900`}>
+                                                        {isPercentage ? `${row.total}%` : (row.total || 0).toLocaleString()}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        });
+                                    })()}
+                                </tbody>
+                            </table>
+                        </div>
+                    ) : (
+                        <div className="p-10 text-center text-slate-400 font-bold">
+                            {loading ? (
+                                <div className="animate-spin border-4 border-slate-200 border-t-primary-600 rounded-full h-8 w-8 mx-auto"></div>
+                            ) : (
+                                'No data available. Add planning entries above to generate the MGR report.'
+                            )}
+                        </div>
+                    )
                 )}
             </div>
         </div>
