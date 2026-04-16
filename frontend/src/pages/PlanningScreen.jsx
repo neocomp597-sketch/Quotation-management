@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-    MdAdd, MdDelete, MdCalendarMonth, MdSave, MdDownload, MdRefresh
+    MdAdd, MdDelete, MdCalendarMonth, MdSave, MdDownload, MdRefresh, MdEdit, MdClose
 } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import { planningService, customerService, productService, mgrService } from '../services/api';
@@ -49,6 +49,8 @@ const PlanningScreen = () => {
     const [customers, setCustomers] = useState([]);
     const [products, setProducts] = useState([]);
     const [mgrList, setMgrList] = useState([]);
+
+    const [editingId, setEditingId] = useState(null);
 
     // New row form
     const emptyRow = {
@@ -151,7 +153,7 @@ const PlanningScreen = () => {
         setShowProductDropdown(false);
     };
 
-    const handleAddEntry = async () => {
+    const handleSaveEntry = async () => {
         // Validate
         if (!newRow.monthYear || !newRow.customerId || !newRow.productId || newRow.qty === '' || newRow.value === '' || !newRow.mgrCode || !newRow.status) {
             toast.error('Please fill all fields');
@@ -159,21 +161,55 @@ const PlanningScreen = () => {
         }
 
         try {
-            await planningService.create({
+            const dataToSave = {
                 ...newRow,
                 financialYear,
                 qty: Number(newRow.qty),
                 value: Number(newRow.value),
                 month: FY_MONTHS.indexOf(newRow.monthYear.split('-')[0]) + 1
-            });
-            toast.success('Entry added');
+            };
+
+            if (editingId) {
+                await planningService.update(editingId, dataToSave);
+                toast.success('Entry updated');
+                setEditingId(null);
+            } else {
+                await planningService.create(dataToSave);
+                toast.success('Entry added');
+            }
+
             setNewRow({ ...emptyRow });
             setCustomerSearch('');
             setProductSearch('');
             fetchData();
         } catch (err) {
-            toast.error(err.response?.data?.message || 'Failed to add entry');
+            toast.error(err.response?.data?.message || (editingId ? 'Failed to update entry' : 'Failed to add entry'));
         }
+    };
+
+    const handleEditEntry = (entry) => {
+        setEditingId(entry._id);
+        setNewRow({
+            monthYear: entry.monthYear,
+            customerId: entry.customerId?._id || entry.customerId || '',
+            customerName: entry.customerName || entry.customerId?.companyName || entry.customerId?.customerName || '',
+            productId: entry.productId?._id || entry.productId || '',
+            productName: entry.productName || entry.productId?.name || '',
+            qty: entry.qty,
+            value: entry.value,
+            mgrCode: entry.mgrCode,
+            status: entry.status
+        });
+        setCustomerSearch(entry.customerName || entry.customerId?.companyName || entry.customerId?.customerName || '');
+        setProductSearch(entry.productName || entry.productId?.name || '');
+        window.scrollTo({ top: 300, behavior: 'smooth' });
+    };
+
+    const handleCancelEdit = () => {
+        setEditingId(null);
+        setNewRow({ ...emptyRow });
+        setCustomerSearch('');
+        setProductSearch('');
     };
 
     const handleDeleteEntry = async (id) => {
@@ -395,14 +431,25 @@ const PlanningScreen = () => {
                                     </select>
                                 </td>
                                 <td className="py-2 px-3 text-center">
-                                    <button
-                                        onClick={handleAddEntry}
-                                        className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all font-bold text-xs uppercase tracking-widest mx-auto"
-                                        title="Save Entry"
-                                    >
-                                        <MdSave size={16} />
-                                        Save
-                                    </button>
+                                    <div className="flex items-center justify-center gap-2">
+                                        <button
+                                            onClick={handleSaveEntry}
+                                            className={`flex items-center justify-center gap-1.5 px-3 py-1.5 text-white rounded-lg transition-all font-bold text-xs uppercase tracking-widest ${editingId ? 'bg-blue-600 hover:bg-blue-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}
+                                            title={editingId ? "Update Entry" : "Save Entry"}
+                                        >
+                                            <MdSave size={16} />
+                                            {editingId ? 'Update' : 'Save'}
+                                        </button>
+                                        {editingId && (
+                                            <button
+                                                onClick={handleCancelEdit}
+                                                className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition-all font-bold text-xs uppercase tracking-widest"
+                                                title="Cancel Edit"
+                                            >
+                                                <MdClose size={16} />
+                                            </button>
+                                        )}
+                                    </div>
                                 </td>
                             </tr>
 
@@ -438,12 +485,22 @@ const PlanningScreen = () => {
                                             </span>
                                         </td>
                                         <td className="py-3 px-3 text-center">
-                                            <button
-                                                onClick={() => handleDeleteEntry(entry._id)}
-                                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
-                                            >
-                                                <MdDelete size={16} />
-                                            </button>
+                                            <div className="flex items-center justify-center gap-2">
+                                                <button
+                                                    onClick={() => handleEditEntry(entry)}
+                                                    className={`p-1.5 rounded-lg transition-all ${editingId === entry._id ? 'text-primary-600 bg-primary-50' : 'text-slate-400 hover:text-primary-600 hover:bg-primary-50'}`}
+                                                    title="Edit Entry"
+                                                >
+                                                    <MdEdit size={16} />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDeleteEntry(entry._id)}
+                                                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                                                    title="Delete Entry"
+                                                >
+                                                    <MdDelete size={16} />
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))
