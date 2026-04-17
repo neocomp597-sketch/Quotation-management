@@ -43,22 +43,25 @@ const PlanningScreen = () => {
     const [financialYear, setFinancialYear] = useState(getFinancialYears()[1]); // default current FY
     const [entries, setEntries] = useState([]);
     const [reportData, setReportData] = useState(null);
+    const [reportData2, setReportData2] = useState(null);
     const [loading, setLoading] = useState(false);
 
     // Expand/Collapse state
     const [isGridExpanded, setIsGridExpanded] = useState(true);
-    const [isReportExpanded, setIsReportExpanded] = useState(true);
+    const [isReportExpanded, setIsReportExpanded] = useState(false);
+    const [isReportExpanded2, setIsReportExpanded2] = useState(false);
     const [expandedQuarters, setExpandedQuarters] = useState({
-        'Q1': true,
-        'Q2': true,
-        'Q3': true,
-        'Q4': true
+        'Q1': false,
+        'Q2': false,
+        'Q3': false,
+        'Q4': false
     });
 
     // Master data for dropdowns
     const [customers, setCustomers] = useState([]);
     const [products, setProducts] = useState([]);
     const [mgrList, setMgrList] = useState([]);
+    const [mgrList2, setMgrList2] = useState([]);
 
     const [editingId, setEditingId] = useState(null);
 
@@ -72,6 +75,7 @@ const PlanningScreen = () => {
         qty: '',
         value: '',
         mgrCode: '',
+        mgrCode2: '',
         status: ''
     };
     const [newRow, setNewRow] = useState({ ...emptyRow });
@@ -86,14 +90,16 @@ const PlanningScreen = () => {
     useEffect(() => {
         const fetchMasters = async () => {
             try {
-                const [custRes, prodRes, mgrRes] = await Promise.all([
+                const [custRes, prodRes, mgrRes, mgr2Res] = await Promise.all([
                     customerService.getAll(),
                     productService.getAll(),
-                    mgrService.getAll('MGR1')
+                    mgrService.getAll('MGR1'),
+                    mgrService.getAll('MGR2')
                 ]);
                 setCustomers(custRes.data);
                 setProducts(prodRes.data);
                 setMgrList(mgrRes.data.filter(m => m.status === 'Active'));
+                setMgrList2(mgr2Res.data.filter(m => m.status === 'Active'));
             } catch (err) {
                 console.error('Failed to load master data:', err);
             }
@@ -109,12 +115,14 @@ const PlanningScreen = () => {
     const fetchData = async () => {
         setLoading(true);
         try {
-            const [entriesRes, reportRes] = await Promise.all([
+            const [entriesRes, reportRes, report2Res] = await Promise.all([
                 planningService.getAll(financialYear),
-                planningService.getMGRReport(financialYear)
+                planningService.getMGRReport(financialYear, 'MGR1'),
+                planningService.getMGRReport(financialYear, 'MGR2')
             ]);
             setEntries(entriesRes.data);
             setReportData(reportRes.data);
+            setReportData2(report2Res.data);
         } catch (err) {
             console.error('Failed to load planning data:', err);
         } finally {
@@ -166,7 +174,7 @@ const PlanningScreen = () => {
     const handleSaveEntry = async () => {
         // Validate
         if (!newRow.monthYear || !newRow.customerId || !newRow.productId || newRow.qty === '' || newRow.value === '' || !newRow.mgrCode || !newRow.status) {
-            toast.error('Please fill all fields');
+            toast.error('Please fill all mandatory fields (MGR 2 is optional)');
             return;
         }
 
@@ -208,6 +216,7 @@ const PlanningScreen = () => {
             qty: entry.qty,
             value: entry.value,
             mgrCode: entry.mgrCode,
+            mgrCode2: entry.mgrCode2 || '',
             status: entry.status
         });
         setCustomerSearch(entry.customerName || entry.customerId?.companyName || entry.customerId?.customerName || '');
@@ -335,6 +344,7 @@ const PlanningScreen = () => {
                                 <th className="py-3 px-3 font-black text-slate-700 text-xs text-right">Value</th>
                                 <th className="py-3 px-3 font-black text-slate-700 text-xs text-right bg-amber-100">Qty * Value</th>
                                 <th className="py-3 px-3 font-black text-slate-700 text-xs">MGR 1</th>
+                                <th className="py-3 px-3 font-black text-slate-700 text-xs text-center">MGR 2</th>
                                 <th className="py-3 px-3 font-black text-slate-700 text-xs">Status</th>
                                 <th className="py-3 px-3 font-black text-slate-700 text-xs text-center">Action</th>
                             </tr>
@@ -445,6 +455,18 @@ const PlanningScreen = () => {
                                 </td>
                                 <td className="py-2 px-3">
                                     <select
+                                        value={newRow.mgrCode2}
+                                        onChange={(e) => handleNewRowChange('mgrCode2', e.target.value)}
+                                        className="w-full px-2 py-2 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-primary-500 bg-white"
+                                    >
+                                        <option value="">Select</option>
+                                        {mgrList2.map(m => (
+                                            <option key={m._id} value={m.code}>{m.code} - {m.description}</option>
+                                        ))}
+                                    </select>
+                                </td>
+                                <td className="py-2 px-3">
+                                    <select
                                         value={newRow.status}
                                         onChange={(e) => handleNewRowChange('status', e.target.value)}
                                         className="w-full px-2 py-2 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-primary-500 bg-white"
@@ -499,6 +521,9 @@ const PlanningScreen = () => {
                                         <td className="py-3 px-3 text-xs">
                                             <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded font-bold">{entry.mgrCode}</span>
                                         </td>
+                                        <td className="py-3 px-3 text-xs text-center">
+                                            <span className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded font-bold">{entry.mgrCode2 || '-'}</span>
+                                        </td>
                                         <td className="py-3 px-3 text-xs">
                                             <span className={`px-2 py-1 rounded font-bold ${
                                                 entry.status === 'Firm' ? 'bg-emerald-50 text-emerald-700' :
@@ -550,10 +575,11 @@ const PlanningScreen = () => {
                 >
                     <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
                         <MdKeyboardArrowDown className={`text-slate-500 transition-transform duration-300 ${!isReportExpanded ? '-rotate-90' : ''}`} size={20} />
-                        Dynamic MGR Report — FY {financialYear}
+                        Dynamic MGR 1 Report — FY {financialYear}
                     </h2>
                 </div>
 
+                {/* Report Table 1 Contents ... */}
                 {isReportExpanded && (
                     reportData && reportData.mgrCodes.length > 0 ? (
                         <div className="overflow-x-auto">
@@ -569,26 +595,22 @@ const PlanningScreen = () => {
                                 </thead>
                                 <tbody>
                                     {(() => {
-                                        let currentQuarter = null;
                                         return reportData.rows.map((row, idx) => {
                                             const isQuarter = row.isQuarter;
                                             const isTotal = row.isTotal;
                                             const isPercentage = row.isPercentage;
                                             const isHighlight = isQuarter || isTotal || isPercentage;
 
-                                            // Determine current quarter from the quarter row text "Q1 2026-27"
                                             let rowQuarterPrefix = null;
                                             if (isQuarter) {
-                                                rowQuarterPrefix = row.month.substring(0, 2); // "Q1", "Q2" etc.
+                                                rowQuarterPrefix = row.month.substring(0, 2);
                                             } else if (!isTotal && !isPercentage) {
-                                                // It's a month row. Find which quarter it belongs to based on the next quarter row
                                                 const nextQuarterRow = reportData.rows.slice(idx).find(r => r.isQuarter);
                                                 if (nextQuarterRow) {
                                                     rowQuarterPrefix = nextQuarterRow.month.substring(0, 2);
                                                 }
                                             }
 
-                                            // If it's a month row and the corresponding quarter is collapsed, don't render it
                                             if (!isHighlight && rowQuarterPrefix && !expandedQuarters[rowQuarterPrefix]) {
                                                 return null;
                                             }
@@ -641,6 +663,105 @@ const PlanningScreen = () => {
                                 <div className="animate-spin border-4 border-slate-200 border-t-primary-600 rounded-full h-8 w-8 mx-auto"></div>
                             ) : (
                                 'No data available. Add planning entries above to generate the MGR report.'
+                            )}
+                        </div>
+                    )
+                )}
+            </div>
+
+            {/* Dynamic MGR 2 Report */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                <div 
+                    className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center cursor-pointer hover:bg-slate-100/50 transition-colors"
+                    onClick={() => setIsReportExpanded2(!isReportExpanded2)}
+                >
+                    <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
+                        <MdKeyboardArrowDown className={`text-slate-500 transition-transform duration-300 ${!isReportExpanded2 ? '-rotate-90' : ''}`} size={20} />
+                        Dynamic MGR 2 Report — FY {financialYear}
+                    </h2>
+                </div>
+
+                {isReportExpanded2 && (
+                    reportData2 && reportData2.mgrCodes.length > 0 ? (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-xs">
+                                <thead>
+                                    <tr className="bg-amber-50 border-b border-amber-100">
+                                        <th className="py-3 px-4 font-black text-slate-700 min-w-[100px]"></th>
+                                        {reportData2.mgrCodes.map(mgr => (
+                                            <th key={mgr} className="py-3 px-4 font-black text-slate-700 text-right min-w-[100px]">{mgr}</th>
+                                        ))}
+                                        <th className="py-3 px-4 font-black text-slate-900 text-right bg-amber-100 min-w-[100px]">Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {reportData2.rows.map((row, idx) => {
+                                        const isQuarter = row.isQuarter;
+                                        const isTotal = row.isTotal;
+                                        const isPercentage = row.isPercentage;
+                                        const isHighlight = isQuarter || isTotal || isPercentage;
+
+                                        let rowQuarterPrefix = null;
+                                        if (isQuarter) {
+                                            rowQuarterPrefix = row.month.substring(0, 2);
+                                        } else if (!isTotal && !isPercentage) {
+                                            const nextQuarterRow = reportData2.rows.slice(idx).find(r => r.isQuarter);
+                                            if (nextQuarterRow) {
+                                                rowQuarterPrefix = nextQuarterRow.month.substring(0, 2);
+                                            }
+                                        }
+
+                                        if (!isHighlight && rowQuarterPrefix && !expandedQuarters[rowQuarterPrefix]) {
+                                            return null;
+                                        }
+
+                                        return (
+                                            <tr
+                                                key={idx}
+                                                className={`border-b transition-colors ${
+                                                    isTotal ? 'bg-amber-50 border-amber-200 font-black' :
+                                                    isPercentage ? 'bg-slate-50 border-slate-200' :
+                                                    isQuarter ? 'bg-blue-50/50 border-blue-100 font-bold cursor-pointer hover:bg-blue-100/50' :
+                                                    'border-slate-50 hover:bg-slate-50'
+                                                }`}
+                                                onClick={() => {
+                                                    if (isQuarter) {
+                                                        const prefix = row.month.substring(0, 2);
+                                                        toggleQuarter(prefix);
+                                                    }
+                                                }}
+                                            >
+                                                <td className={`py-3 px-4 ${isHighlight ? 'font-black text-slate-900' : 'font-semibold text-slate-600'} ${isQuarter ? 'pl-2' : 'pl-8'}`}>
+                                                    <div className="flex items-center gap-1">
+                                                        {isQuarter && (
+                                                            <MdKeyboardArrowDown 
+                                                                className={`text-blue-500 transition-transform duration-300 ${!expandedQuarters[row.month.substring(0, 2)] ? '-rotate-90' : ''}`} 
+                                                                size={18} 
+                                                            />
+                                                        )}
+                                                        {row.month}
+                                                    </div>
+                                                </td>
+                                                {reportData2.mgrCodes.map(mgr => (
+                                                    <td key={mgr} className={`py-3 px-4 text-right ${isHighlight ? 'font-bold text-slate-900' : 'text-slate-700'}`}>
+                                                        {isPercentage ? `${row[mgr] || 0}%` : (row[mgr] || 0).toLocaleString()}
+                                                    </td>
+                                                ))}
+                                                <td className={`py-3 px-4 text-right ${isTotal ? 'bg-amber-100 font-black' : isPercentage ? 'bg-slate-100 font-bold' : 'bg-amber-50/50 font-bold'} text-slate-900`}>
+                                                    {isPercentage ? `${row.total}%` : (row.total || 0).toLocaleString()}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    ) : (
+                        <div className="p-10 text-center text-slate-400 font-bold">
+                            {loading ? (
+                                <div className="animate-spin border-4 border-slate-200 border-t-primary-600 rounded-full h-8 w-8 mx-auto"></div>
+                            ) : (
+                                'No data available for MGR 2. Add entries with MGR 2 codes to generate this report.'
                             )}
                         </div>
                     )

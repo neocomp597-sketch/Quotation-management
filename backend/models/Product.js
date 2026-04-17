@@ -19,7 +19,7 @@ const ProductSchema = new mongoose.Schema({
     gstPercentage: { type: Number, required: true },
     basePrice: { type: Number, required: true },
     mrp: { type: Number, required: true },
-    uom: { type: String, enum: ['Nos', 'Set', 'Box', 'Rft'], required: true },
+    uom: { type: String, required: true },
     productImageUrl: { type: String },
     status: { type: String, enum: ['Active', 'Inactive'], default: 'Active' },
     mgr1: { type: mongoose.Schema.Types.ObjectId, ref: 'MGR' },

@@ -41,6 +41,16 @@ const importProducts = async (req, res) => {
             const row = data[i];
             try {
                 // Map columns (case-insensitive)
+                const uomMap = {
+                    1: 'PCS',
+                    2: 'KG',
+                    3: 'LTR',
+                    4: 'BOX',
+                    5: 'MTR'
+                };
+                let rawUom = row['UOM'] || row['uom'] || row['Unit'];
+                let parsedUom = uomMap[rawUom] || rawUom || 'Nos';
+
                 const productData = {
                     productCode: row['Product Code'] || row['productCode'] || row['Code'],
                     productName: row['Product Name'] || row['productName'] || row['Name'],
@@ -48,7 +58,7 @@ const importProducts = async (req, res) => {
                     gstPercentage: parseFloat(row['GST %'] || row['gstPercentage'] || row['GST'] || 18),
                     basePrice: parseFloat(row['Base Price'] || row['basePrice'] || row['Price'] || 0),
                     mrp: parseFloat(row['MRP'] || row['mrp'] || 0),
-                    uom: row['UOM'] || row['uom'] || row['Unit'] || 'Nos',
+                    uom: String(parsedUom).trim(),
                     productImageUrl: row['Image URL'] || row['productImageUrl'] || '',
                     status: row['Status'] || row['status'] || 'Active'
                 };

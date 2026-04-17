@@ -63,23 +63,26 @@ exports.deleteEntry = async (req, res) => {
 // Dynamic MGR Report — month-wise breakdown grouped by MGR codes
 exports.getMGRReport = async (req, res) => {
     try {
-        const { financialYear } = req.query;
+        const { financialYear, type } = req.query;
         if (!financialYear) {
             return res.status(400).json({ message: 'financialYear is required (e.g. 2026-27)' });
         }
 
+        const mgrType = type || 'MGR1';
+        const mgrField = mgrType === 'MGR2' ? 'mgrCode2' : 'mgrCode';
+
         // Get all entries for the financial year
         const entries = await Planning.find({ financialYear });
 
-        // Get unique MGR codes
-        const mgrCodes = [...new Set(entries.map(e => e.mgrCode))].sort();
+        // Get unique MGR codes for the selected field
+        const mgrCodes = [...new Set(entries.map(e => e[mgrField]).filter(Boolean))].sort();
 
         // Define months in financial year order (Apr to Mar)
         const monthNames = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
         const startYear = parseInt(financialYear.split('-')[0]);
 
         const monthRows = monthNames.map((name, idx) => {
-            const year = idx < 9 ? startYear : startYear + 1; // Apr-Dec = startYear, Jan-Mar = startYear+1
+            const year = idx < 9 ? startYear : startYear + 1;
             const yearShort = year.toString().slice(-2);
             const monthKey = `${name}-${yearShort}`;
 
@@ -88,7 +91,7 @@ exports.getMGRReport = async (req, res) => {
 
             mgrCodes.forEach(mgr => {
                 const sum = entries
-                    .filter(e => e.monthYear === monthKey && e.mgrCode === mgr)
+                    .filter(e => e.monthYear === monthKey && e[mgrField] === mgr)
                     .reduce((acc, e) => acc + (e.totalValue || 0), 0);
                 row[mgr] = sum;
                 total += sum;
@@ -98,12 +101,11 @@ exports.getMGRReport = async (req, res) => {
             return row;
         });
 
-        // Quarter grouping
         const quarters = [
-            { name: 'Q1', months: [0, 1, 2] },   // Apr, May, Jun
-            { name: 'Q2', months: [3, 4, 5] },   // Jul, Aug, Sep
-            { name: 'Q3', months: [6, 7, 8] },   // Oct, Nov, Dec
-            { name: 'Q4', months: [9, 10, 11] }  // Jan, Feb, Mar
+            { name: 'Q1', months: [0, 1, 2] },
+            { name: 'Q2', months: [3, 4, 5] },
+            { name: 'Q3', months: [6, 7, 8] },
+            { name: 'Q4', months: [9, 10, 11] }
         ];
 
         const quarterTotals = quarters.map(q => {
@@ -120,7 +122,6 @@ exports.getMGRReport = async (req, res) => {
             return row;
         });
 
-        // Grand total
         const grandTotal = { month: 'Total', isTotal: true };
         let gt = 0;
         mgrCodes.forEach(mgr => {
@@ -130,14 +131,29 @@ exports.getMGRReport = async (req, res) => {
         });
         grandTotal.total = gt;
 
-        // Percentage row
         const percentageRow = { month: 'Percentage %', isPercentage: true };
         mgrCodes.forEach(mgr => {
             percentageRow[mgr] = gt > 0 ? parseFloat(((grandTotal[mgr] / gt) * 100).toFixed(1)) : 0;
         });
         percentageRow.total = 100;
 
-        // Build report rows: interleave months and quarter totals
+        // Add Previous Year Percentage logic
+        const prevYearStart = startYear - 1;
+        const prevYearEnd = startYear.toString().slice(-2);
+        const prevFinancialYear = `${prevYearStart}-${prevYearEnd}`;
+        
+        const prevEntries = await Planning.find({ financialYear: prevFinancialYear });
+        const prevGT = prevEntries.reduce((acc, e) => acc + (e.totalValue || 0), 0);
+        
+        const prevPercentageRow = { month: 'Percentage % (Previous Year)', isPercentage: true };
+        mgrCodes.forEach(mgr => {
+            const prevMgrTotal = prevEntries
+                .filter(e => e[mgrField] === mgr)
+                .reduce((acc, e) => acc + (e.totalValue || 0), 0);
+            prevPercentageRow[mgr] = prevGT > 0 ? parseFloat(((prevMgrTotal / prevGT) * 100).toFixed(1)) : 0;
+        });
+        prevPercentageRow.total = 100;
+
         const reportRows = [];
         quarters.forEach((q, qi) => {
             q.months.forEach(mi => {
@@ -147,6 +163,7 @@ exports.getMGRReport = async (req, res) => {
         });
         reportRows.push(grandTotal);
         reportRows.push(percentageRow);
+        reportRows.push(prevPercentageRow);
 
         res.json({
             financialYear,
