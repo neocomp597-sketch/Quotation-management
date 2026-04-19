@@ -706,7 +706,7 @@ const PlanningScreen = () => {
                 )}
             </div>
 
-            {/* Dynamic MGR Report */}
+            {/* MGR Report */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
                 <div 
                     className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center cursor-pointer hover:bg-slate-100/50 transition-colors"
@@ -714,7 +714,7 @@ const PlanningScreen = () => {
                 >
                     <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
                         <MdKeyboardArrowDown className={`text-slate-500 transition-transform duration-300 ${!isReportExpanded ? '-rotate-90' : ''}`} size={20} />
-                        Dynamic MGR 1 Report — FY {financialYear}
+                        MGR 1 Report — FY {financialYear}
                     </h2>
                 </div>
 
@@ -808,7 +808,7 @@ const PlanningScreen = () => {
                 )}
             </div>
 
-            {/* Dynamic MGR 2 Report */}
+            {/* MGR 2 Report */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
                 <div 
                     className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center cursor-pointer hover:bg-slate-100/50 transition-colors"
@@ -816,7 +816,7 @@ const PlanningScreen = () => {
                 >
                     <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
                         <MdKeyboardArrowDown className={`text-slate-500 transition-transform duration-300 ${!isReportExpanded2 ? '-rotate-90' : ''}`} size={20} />
-                        Dynamic MGR 2 Report — FY {financialYear}
+                        MGR 2 Report — FY {financialYear}
                     </h2>
                 </div>
 
