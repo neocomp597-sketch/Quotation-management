@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
-    MdAdd, MdDelete, MdCalendarMonth, MdSave, MdDownload, MdRefresh, MdEdit, MdClose, MdKeyboardArrowDown, MdKeyboardArrowRight
+    MdDelete, MdCalendarMonth, MdSave, MdDownload, MdRefresh, MdEdit, MdClose, MdKeyboardArrowDown
 } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import { planningService, customerService, productService, mgrService } from '../services/api';
@@ -12,7 +12,7 @@ const FY_MONTHS = [
     'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'
 ];
 
-const STATUS_OPTIONS = ['Firm', 'MFC', 'B & B', 'Others'];
+const STATUS_OPTIONS = ['Firm', 'MFC', 'B & B', 'Others', 'Order Received', 'Lost', 'Parked'];
 
 // Generate financial year options (current + next 2)
 const getFinancialYears = () => {
@@ -85,6 +85,30 @@ const PlanningScreen = () => {
     const [productSearch, setProductSearch] = useState('');
     const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
     const [showProductDropdown, setShowProductDropdown] = useState(false);
+    const [filters, setFilters] = useState({
+        mgrCode: '',
+        mgrCode2: '',
+        status: ''
+    });
+
+    // Define fetchData function
+    const fetchData = useCallback(async () => {
+        setLoading(true);
+        try {
+            const [entriesRes, reportRes, report2Res] = await Promise.all([
+                planningService.getAll(financialYear),
+                planningService.getMGRReport(financialYear, 'MGR1'),
+                planningService.getMGRReport(financialYear, 'MGR2')
+            ]);
+            setEntries(entriesRes.data);
+            setReportData(reportRes.data);
+            setReportData2(report2Res.data);
+        } catch (err) {
+            console.error('Failed to load planning data:', err);
+        } finally {
+            setLoading(false);
+        }
+    }, [financialYear]);
 
     // Fetch master data on mount
     useEffect(() => {
@@ -110,25 +134,7 @@ const PlanningScreen = () => {
     // Fetch entries and report when FY changes
     useEffect(() => {
         fetchData();
-    }, [financialYear]);
-
-    const fetchData = async () => {
-        setLoading(true);
-        try {
-            const [entriesRes, reportRes, report2Res] = await Promise.all([
-                planningService.getAll(financialYear),
-                planningService.getMGRReport(financialYear, 'MGR1'),
-                planningService.getMGRReport(financialYear, 'MGR2')
-            ]);
-            setEntries(entriesRes.data);
-            setReportData(reportRes.data);
-            setReportData2(report2Res.data);
-        } catch (err) {
-            console.error('Failed to load planning data:', err);
-        } finally {
-            setLoading(false);
-        }
-    };
+    }, [fetchData]);
 
     // Filtered customer/product lists for search
     const filteredCustomers = useMemo(() => {
@@ -147,8 +153,51 @@ const PlanningScreen = () => {
         ).slice(0, 10);
     }, [products, productSearch]);
 
+    const filteredEntries = useMemo(() => {
+        return entries.filter((entry) => {
+            const matchesMgr1 = !filters.mgrCode || entry.mgrCode === filters.mgrCode;
+            const matchesMgr2 = !filters.mgrCode2 || entry.mgrCode2 === filters.mgrCode2;
+            const matchesStatus = !filters.status || entry.status === filters.status;
+
+            return matchesMgr1 && matchesMgr2 && matchesStatus;
+        });
+    }, [entries, filters]);
+
+    const hasActiveFilters = Boolean(filters.mgrCode || filters.mgrCode2 || filters.status);
+
     const handleNewRowChange = (field, value) => {
         setNewRow(prev => ({ ...prev, [field]: value }));
+    };
+
+    const handleFilterChange = (field, value) => {
+        setFilters(prev => ({ ...prev, [field]: value }));
+    };
+
+    const clearFilters = () => {
+        setFilters({
+            mgrCode: '',
+            mgrCode2: '',
+            status: ''
+        });
+    };
+
+    const getStatusClasses = (status) => {
+        switch (status) {
+            case 'Firm':
+                return 'bg-emerald-50 text-emerald-700';
+            case 'MFC':
+                return 'bg-amber-50 text-amber-700';
+            case 'B & B':
+                return 'bg-purple-50 text-purple-700';
+            case 'Order Received':
+                return 'bg-sky-50 text-sky-700';
+            case 'Lost':
+                return 'bg-rose-50 text-rose-700';
+            case 'Parked':
+                return 'bg-slate-200 text-slate-700';
+            default:
+                return 'bg-slate-100 text-slate-600';
+        }
     };
 
     const selectCustomer = (customer) => {
@@ -212,7 +261,7 @@ const PlanningScreen = () => {
             customerId: entry.customerId?._id || entry.customerId || '',
             customerName: entry.customerName || entry.customerId?.companyName || entry.customerId?.customerName || '',
             productId: entry.productId?._id || entry.productId || '',
-            productName: entry.productName || entry.productId?.name || '',
+            productName: entry.productName || entry.productId?.productName || '',
             qty: entry.qty,
             value: entry.value,
             mgrCode: entry.mgrCode,
@@ -220,8 +269,8 @@ const PlanningScreen = () => {
             status: entry.status
         });
         setCustomerSearch(entry.customerName || entry.customerId?.companyName || entry.customerId?.customerName || '');
-        setProductSearch(entry.productName || entry.productId?.name || '');
-        window.scrollTo({ top: 300, behavior: 'smooth' });
+        setProductSearch(entry.productName || entry.productId?.productName || '');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
         setIsGridExpanded(true); // Ensure grid is expanded when editing
     };
 
@@ -248,14 +297,15 @@ const PlanningScreen = () => {
         const wb = XLSX.utils.book_new();
 
         // Entries sheet
-        const entriesData = entries.map(e => ({
+        const entriesData = filteredEntries.map(e => ({
             'Month': e.monthYear,
             'Customer': e.customerName,
             'Product': e.productName,
             'Qty': e.qty,
             'Value': e.value,
             'Total': e.totalValue,
-            'MGR': e.mgrCode,
+            'MGR 1': e.mgrCode,
+            'MGR 2': e.mgrCode2 || '',
             'Status': e.status
         }));
         const ws1 = XLSX.utils.json_to_sheet(entriesData);
@@ -320,51 +370,60 @@ const PlanningScreen = () => {
                 </div>
             </div>
 
-            {/* Data Entry Grid border */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-                <div 
+                <div
                     className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center cursor-pointer hover:bg-slate-100/50 transition-colors"
                     onClick={() => setIsGridExpanded(!isGridExpanded)}
                 >
                     <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
-                        <MdKeyboardArrowDown className={`text-slate-500 transition-transform duration-300 ${!isGridExpanded ? '-rotate-90' : ''}`} size={20}/>
+                        <MdKeyboardArrowDown className={`text-slate-500 transition-transform duration-300 ${!isGridExpanded ? '-rotate-90' : ''}`} size={20} />
                         Planning Grid
                     </h2>
                 </div>
 
                 {isGridExpanded && (
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm">
-                        <thead>
-                            <tr className="bg-amber-50 border-b border-amber-100">
-                                <th className="py-3 px-3 font-black text-slate-700 text-xs">Month & Year</th>
-                                <th className="py-3 px-3 font-black text-slate-700 text-xs">Customer Name</th>
-                                <th className="py-3 px-3 font-black text-slate-700 text-xs">Product</th>
-                                <th className="py-3 px-3 font-black text-slate-700 text-xs text-right">Qty</th>
-                                <th className="py-3 px-3 font-black text-slate-700 text-xs text-right">Value</th>
-                                <th className="py-3 px-3 font-black text-slate-700 text-xs text-right bg-amber-100">Qty * Value</th>
-                                <th className="py-3 px-3 font-black text-slate-700 text-xs">MGR 1</th>
-                                <th className="py-3 px-3 font-black text-slate-700 text-xs text-center">MGR 2</th>
-                                <th className="py-3 px-3 font-black text-slate-700 text-xs">Status</th>
-                                <th className="py-3 px-3 font-black text-slate-700 text-xs text-center">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-50">
-                            {/* New Entry Row */}
-                            <tr className="bg-green-50/50 border-b-2 border-green-100">
-                                <td className="py-2 px-3">
+                    <>
+                        <div className="p-4 md:p-5 border-b border-slate-100 bg-slate-50/60 space-y-4">
+                            <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+                                <div>
+                                    <p className="text-xs font-black uppercase tracking-[0.25em] text-primary-600">
+                                        {editingId ? 'Edit Entry' : 'New Entry'}
+                                    </p>
+                                    <h3 className="text-xl font-black text-slate-900 mt-1">
+                                        {editingId ? 'Update Planning Entry' : 'Add Planning Entry'}
+                                    </h3>
+                                    <p className="text-sm text-slate-500 font-medium mt-1">
+                                        Entry controls are now above the grid so the table has more working space.
+                                    </p>
+                                </div>
+                                {editingId && (
+                                    <button
+                                        onClick={handleCancelEdit}
+                                        className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 transition-colors"
+                                    >
+                                        <MdClose size={18} />
+                                        Cancel Edit
+                                    </button>
+                                )}
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
+                                <div>
+                                    <label className="block text-[11px] font-black uppercase tracking-widest text-slate-500 mb-2">Month & Year</label>
                                     <select
                                         value={newRow.monthYear}
                                         onChange={(e) => handleNewRowChange('monthYear', e.target.value)}
-                                        className="w-full px-2 py-2 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-primary-500 bg-white"
+                                        className="w-full px-3 py-3 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-primary-500 bg-white"
                                     >
-                                        <option value="">Select</option>
-                                        {monthLabels.map(m => (
-                                            <option key={m} value={m}>{m}</option>
+                                        <option value="">Select month</option>
+                                        {monthLabels.map((month) => (
+                                            <option key={month} value={month}>{month}</option>
                                         ))}
                                     </select>
-                                </td>
-                                <td className="py-2 px-3 relative">
+                                </div>
+
+                                <div className="relative">
+                                    <label className="block text-[11px] font-black uppercase tracking-widest text-slate-500 mb-2">Customer Name</label>
                                     <input
                                         type="text"
                                         value={customerSearch}
@@ -373,24 +432,26 @@ const PlanningScreen = () => {
                                             setShowCustomerDropdown(true);
                                         }}
                                         onFocus={() => setShowCustomerDropdown(true)}
-                                        placeholder="Type to search..."
-                                        className="w-full px-2 py-2 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-primary-500"
+                                        placeholder="Type customer name"
+                                        className="w-full px-3 py-3 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-primary-500 bg-white"
                                     />
                                     {showCustomerDropdown && filteredCustomers.length > 0 && (
-                                        <div className="absolute z-50 left-3 right-3 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-40 overflow-y-auto custom-scrollbar">
-                                            {filteredCustomers.map(c => (
+                                        <div className="absolute z-50 left-0 right-0 top-full mt-2 bg-white border border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto custom-scrollbar">
+                                            {filteredCustomers.map((customer) => (
                                                 <button
-                                                    key={c._id}
-                                                    onClick={() => selectCustomer(c)}
-                                                    className="w-full text-left px-3 py-2 text-xs font-bold hover:bg-primary-50 transition-colors border-b border-slate-50"
+                                                    key={customer._id}
+                                                    onClick={() => selectCustomer(customer)}
+                                                    className="w-full text-left px-3 py-2.5 text-sm font-bold hover:bg-primary-50 transition-colors border-b border-slate-50"
                                                 >
-                                                    {c.companyName || c.customerName}
+                                                    {customer.companyName || customer.customerName}
                                                 </button>
                                             ))}
                                         </div>
                                     )}
-                                </td>
-                                <td className="py-2 px-3 relative">
+                                </div>
+
+                                <div className="relative">
+                                    <label className="block text-[11px] font-black uppercase tracking-widest text-slate-500 mb-2">Product</label>
                                     <input
                                         type="text"
                                         value={productSearch}
@@ -399,171 +460,249 @@ const PlanningScreen = () => {
                                             setShowProductDropdown(true);
                                         }}
                                         onFocus={() => setShowProductDropdown(true)}
-                                        placeholder="Type to search..."
-                                        className="w-full px-2 py-2 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-primary-500"
+                                        placeholder="Type product name"
+                                        className="w-full px-3 py-3 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-primary-500 bg-white"
                                     />
                                     {showProductDropdown && filteredProducts.length > 0 && (
-                                        <div className="absolute z-50 left-3 right-3 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-40 overflow-y-auto custom-scrollbar">
-                                            {filteredProducts.map(p => (
+                                        <div className="absolute z-50 left-0 right-0 top-full mt-2 bg-white border border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto custom-scrollbar">
+                                            {filteredProducts.map((product) => (
                                                 <button
-                                                    key={p._id}
-                                                    onClick={() => selectProduct(p)}
-                                                    className="w-full text-left px-3 py-2 text-xs font-bold hover:bg-primary-50 transition-colors border-b border-slate-50"
+                                                    key={product._id}
+                                                    onClick={() => selectProduct(product)}
+                                                    className="w-full text-left px-3 py-2.5 text-sm font-bold hover:bg-primary-50 transition-colors border-b border-slate-50"
                                                 >
-                                                    {p.productName}
+                                                    {product.productName}
                                                 </button>
                                             ))}
                                         </div>
                                     )}
-                                </td>
-                                <td className="py-2 px-3">
+                                </div>
+
+                                <div>
+                                    <label className="block text-[11px] font-black uppercase tracking-widest text-slate-500 mb-2">Qty</label>
                                     <input
                                         type="number"
-                                        min="0"
                                         value={newRow.qty}
                                         onChange={(e) => handleNewRowChange('qty', e.target.value)}
                                         placeholder="0"
-                                        className="w-20 px-2 py-2 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-primary-500 text-right"
+                                        className="w-full px-3 py-3 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-primary-500 text-right bg-white"
                                     />
-                                </td>
-                                <td className="py-2 px-3">
+                                </div>
+
+                                <div>
+                                    <label className="block text-[11px] font-black uppercase tracking-widest text-slate-500 mb-2">Value</label>
                                     <input
                                         type="number"
                                         min="0"
                                         value={newRow.value}
                                         onChange={(e) => handleNewRowChange('value', e.target.value)}
                                         placeholder="0"
-                                        className="w-24 px-2 py-2 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-primary-500 text-right"
+                                        className="w-full px-3 py-3 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-primary-500 text-right bg-white"
                                     />
-                                </td>
-                                <td className="py-2 px-3 bg-amber-50">
-                                    <span className="text-sm font-black text-slate-900">
+                                </div>
+
+                                <div>
+                                    <label className="block text-[11px] font-black uppercase tracking-widest text-slate-500 mb-2">Qty * Value</label>
+                                    <div className="px-3 py-3 rounded-xl bg-amber-50 border border-amber-100 text-lg font-black text-slate-900">
                                         {calculatedTotal.toLocaleString()}
-                                    </span>
-                                </td>
-                                <td className="py-2 px-3">
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-[11px] font-black uppercase tracking-widest text-slate-500 mb-2">MGR 1</label>
                                     <select
                                         value={newRow.mgrCode}
                                         onChange={(e) => handleNewRowChange('mgrCode', e.target.value)}
-                                        className="w-full px-2 py-2 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-primary-500 bg-white"
+                                        className="w-full px-3 py-3 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-primary-500 bg-white"
                                     >
-                                        <option value="">Select</option>
-                                        {mgrList.map(m => (
-                                            <option key={m._id} value={m.code}>{m.code} - {m.description}</option>
+                                        <option value="">Select MGR 1</option>
+                                        {mgrList.map((mgr) => (
+                                            <option key={mgr._id} value={mgr.code}>{mgr.code} - {mgr.description}</option>
                                         ))}
                                     </select>
-                                </td>
-                                <td className="py-2 px-3">
+                                </div>
+
+                                <div>
+                                    <label className="block text-[11px] font-black uppercase tracking-widest text-slate-500 mb-2">MGR 2</label>
                                     <select
                                         value={newRow.mgrCode2}
                                         onChange={(e) => handleNewRowChange('mgrCode2', e.target.value)}
-                                        className="w-full px-2 py-2 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-primary-500 bg-white"
+                                        className="w-full px-3 py-3 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-primary-500 bg-white"
                                     >
-                                        <option value="">Select</option>
-                                        {mgrList2.map(m => (
-                                            <option key={m._id} value={m.code}>{m.code} - {m.description}</option>
+                                        <option value="">Select MGR 2</option>
+                                        {mgrList2.map((mgr) => (
+                                            <option key={mgr._id} value={mgr.code}>{mgr.code} - {mgr.description}</option>
                                         ))}
                                     </select>
-                                </td>
-                                <td className="py-2 px-3">
+                                </div>
+
+                                <div>
+                                    <label className="block text-[11px] font-black uppercase tracking-widest text-slate-500 mb-2">Status</label>
                                     <select
                                         value={newRow.status}
                                         onChange={(e) => handleNewRowChange('status', e.target.value)}
-                                        className="w-full px-2 py-2 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-primary-500 bg-white"
+                                        className="w-full px-3 py-3 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-primary-500 bg-white"
                                     >
-                                        <option value="">Select</option>
-                                        {STATUS_OPTIONS.map(s => (
-                                            <option key={s} value={s}>{s}</option>
+                                        <option value="">Select status</option>
+                                        {STATUS_OPTIONS.map((status) => (
+                                            <option key={status} value={status}>{status}</option>
                                         ))}
                                     </select>
-                                </td>
-                                <td className="py-2 px-3 text-center">
-                                    <div className="flex items-center justify-center gap-2">
-                                        <button
-                                            onClick={handleSaveEntry}
-                                            className={`flex items-center justify-center gap-1.5 px-3 py-1.5 text-white rounded-lg transition-all font-bold text-xs uppercase tracking-widest ${editingId ? 'bg-blue-600 hover:bg-blue-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}
-                                            title={editingId ? "Update Entry" : "Save Entry"}
-                                        >
-                                            <MdSave size={16} />
-                                            {editingId ? 'Update' : 'Save'}
-                                        </button>
-                                        {editingId && (
-                                            <button
-                                                onClick={handleCancelEdit}
-                                                className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition-all font-bold text-xs uppercase tracking-widest"
-                                                title="Cancel Edit"
-                                            >
-                                                <MdClose size={16} />
-                                            </button>
-                                        )}
-                                    </div>
-                                </td>
-                            </tr>
+                                </div>
 
-                            {/* Existing Entries */}
-                            {loading ? (
-                                <tr>
-                                    <td colSpan="9" className="py-10 text-center">
-                                        <div className="animate-spin border-4 border-slate-200 border-t-primary-600 rounded-full h-8 w-8 mx-auto"></div>
-                                    </td>
-                                </tr>
-                            ) : entries.length > 0 ? (
-                                entries.map((entry) => (
-                                    <tr key={entry._id} className="hover:bg-slate-50 transition-colors">
-                                        <td className="py-3 px-3 font-bold text-slate-700 text-xs">{entry.monthYear}</td>
-                                        <td className="py-3 px-3 font-bold text-slate-900 text-xs">{entry.customerName}</td>
-                                        <td className="py-3 px-3 text-slate-700 text-xs">{entry.productName}</td>
-                                        <td className="py-3 px-3 text-right font-bold text-slate-700 text-xs">{entry.qty}</td>
-                                        <td className="py-3 px-3 text-right font-bold text-slate-700 text-xs">{entry.value?.toLocaleString()}</td>
-                                        <td className="py-3 px-3 text-right font-black text-slate-900 text-xs bg-amber-50/50">
-                                            {entry.totalValue?.toLocaleString()}
-                                        </td>
-                                        <td className="py-3 px-3 text-xs">
-                                            <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded font-bold">{entry.mgrCode}</span>
-                                        </td>
-                                        <td className="py-3 px-3 text-xs text-center">
-                                            <span className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded font-bold">{entry.mgrCode2 || '-'}</span>
-                                        </td>
-                                        <td className="py-3 px-3 text-xs">
-                                            <span className={`px-2 py-1 rounded font-bold ${
-                                                entry.status === 'Firm' ? 'bg-emerald-50 text-emerald-700' :
-                                                entry.status === 'MFC' ? 'bg-amber-50 text-amber-700' :
-                                                entry.status === 'B & B' ? 'bg-purple-50 text-purple-700' :
-                                                'bg-slate-100 text-slate-600'
-                                            }`}>
-                                                {entry.status}
-                                            </span>
-                                        </td>
-                                        <td className="py-3 px-3 text-center">
-                                            <div className="flex items-center justify-center gap-2">
-                                                <button
-                                                    onClick={() => handleEditEntry(entry)}
-                                                    className={`p-1.5 rounded-lg transition-all ${editingId === entry._id ? 'text-primary-600 bg-primary-50' : 'text-slate-400 hover:text-primary-600 hover:bg-primary-50'}`}
-                                                    title="Edit Entry"
-                                                >
-                                                    <MdEdit size={16} />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDeleteEntry(entry._id)}
-                                                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
-                                                    title="Delete Entry"
-                                                >
-                                                    <MdDelete size={16} />
-                                                </button>
-                                            </div>
-                                        </td>
+                                <div className="xl:col-span-2">
+                                    <label className="block text-[11px] font-black uppercase tracking-widest text-slate-500 mb-2">Action</label>
+                                    <button
+                                        onClick={handleSaveEntry}
+                                        className={`w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-white font-bold transition-colors ${editingId ? 'bg-blue-600 hover:bg-blue-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}
+                                    >
+                                        <MdSave size={18} />
+                                        {editingId ? 'Update Entry' : 'Save Entry'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="px-4 md:px-5 py-4 border-b border-slate-100 bg-white">
+                            <div className="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 xl:flex-1">
+                                    <div>
+                                        <label className="block text-[11px] font-black uppercase tracking-widest text-slate-500 mb-2">Filter MGR 1</label>
+                                        <select
+                                            value={filters.mgrCode}
+                                            onChange={(e) => handleFilterChange('mgrCode', e.target.value)}
+                                            className="w-full px-3 py-3 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-primary-500 bg-white"
+                                        >
+                                            <option value="">All MGR 1</option>
+                                            {mgrList.map((mgr) => (
+                                                <option key={mgr._id} value={mgr.code}>{mgr.code}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-[11px] font-black uppercase tracking-widest text-slate-500 mb-2">Filter MGR 2</label>
+                                        <select
+                                            value={filters.mgrCode2}
+                                            onChange={(e) => handleFilterChange('mgrCode2', e.target.value)}
+                                            className="w-full px-3 py-3 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-primary-500 bg-white"
+                                        >
+                                            <option value="">All MGR 2</option>
+                                            {mgrList2.map((mgr) => (
+                                                <option key={mgr._id} value={mgr.code}>{mgr.code}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-[11px] font-black uppercase tracking-widest text-slate-500 mb-2">Filter Status</label>
+                                        <select
+                                            value={filters.status}
+                                            onChange={(e) => handleFilterChange('status', e.target.value)}
+                                            className="w-full px-3 py-3 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-primary-500 bg-white"
+                                        >
+                                            <option value="">All Statuses</option>
+                                            {STATUS_OPTIONS.map((status) => (
+                                                <option key={status} value={status}>{status}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center gap-3">
+                                    <span className="px-3 py-2 rounded-xl bg-slate-100 text-slate-600 text-sm font-bold">
+                                        {filteredEntries.length} {filteredEntries.length === 1 ? 'entry' : 'entries'}
+                                    </span>
+                                    <button
+                                        onClick={clearFilters}
+                                        disabled={!hasActiveFilters}
+                                        className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-600 font-bold hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <MdRefresh size={18} />
+                                        Clear Filters
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-sm">
+                                <thead>
+                                    <tr className="bg-amber-50 border-b border-amber-100">
+                                        <th className="py-3 px-4 font-black text-slate-700 text-xs min-w-[110px]">Month & Year</th>
+                                        <th className="py-3 px-4 font-black text-slate-700 text-xs min-w-[180px]">Customer Name</th>
+                                        <th className="py-3 px-4 font-black text-slate-700 text-xs min-w-[260px]">Product</th>
+                                        <th className="py-3 px-4 font-black text-slate-700 text-xs text-right min-w-[90px]">Qty</th>
+                                        <th className="py-3 px-4 font-black text-slate-700 text-xs text-right min-w-[110px]">Value</th>
+                                        <th className="py-3 px-4 font-black text-slate-700 text-xs text-right bg-amber-100 min-w-[120px]">Qty * Value</th>
+                                        <th className="py-3 px-4 font-black text-slate-700 text-xs min-w-[110px]">MGR 1</th>
+                                        <th className="py-3 px-4 font-black text-slate-700 text-xs text-center min-w-[110px]">MGR 2</th>
+                                        <th className="py-3 px-4 font-black text-slate-700 text-xs min-w-[150px]">Status</th>
+                                        <th className="py-3 px-4 font-black text-slate-700 text-xs text-center min-w-[100px]">Action</th>
                                     </tr>
-                                ))
-                            ) : (
-                                <tr>
-                                    <td colSpan="9" className="py-10 text-center text-slate-400 font-bold text-sm">
-                                        No planning entries for FY {financialYear}. Add your first entry above.
-                                    </td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
+                                </thead>
+                                <tbody className="divide-y divide-slate-50">
+                                    {loading ? (
+                                        <tr>
+                                            <td colSpan="10" className="py-10 text-center">
+                                                <div className="animate-spin border-4 border-slate-200 border-t-primary-600 rounded-full h-8 w-8 mx-auto"></div>
+                                            </td>
+                                        </tr>
+                                    ) : filteredEntries.length > 0 ? (
+                                        filteredEntries.map((entry) => (
+                                            <tr key={entry._id} className="hover:bg-slate-50 transition-colors">
+                                                <td className="py-3 px-4 font-bold text-slate-700 text-xs">{entry.monthYear}</td>
+                                                <td className="py-3 px-4 font-bold text-slate-900 text-xs">{entry.customerName}</td>
+                                                <td className="py-3 px-4 text-slate-700 text-xs">{entry.productName}</td>
+                                                <td className="py-3 px-4 text-right font-bold text-slate-700 text-xs">{entry.qty}</td>
+                                                <td className="py-3 px-4 text-right font-bold text-slate-700 text-xs">{entry.value?.toLocaleString()}</td>
+                                                <td className="py-3 px-4 text-right font-black text-slate-900 text-xs bg-amber-50/50">
+                                                    {entry.totalValue?.toLocaleString()}
+                                                </td>
+                                                <td className="py-3 px-4 text-xs">
+                                                    <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded font-bold">{entry.mgrCode}</span>
+                                                </td>
+                                                <td className="py-3 px-4 text-xs text-center">
+                                                    <span className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded font-bold">{entry.mgrCode2 || '-'}</span>
+                                                </td>
+                                                <td className="py-3 px-4 text-xs">
+                                                    <span className={`px-2 py-1 rounded font-bold ${getStatusClasses(entry.status)}`}>
+                                                        {entry.status}
+                                                    </span>
+                                                </td>
+                                                <td className="py-3 px-4 text-center">
+                                                    <div className="flex items-center justify-center gap-2">
+                                                        <button
+                                                            onClick={() => handleEditEntry(entry)}
+                                                            className={`p-1.5 rounded-lg transition-all ${editingId === entry._id ? 'text-primary-600 bg-primary-50' : 'text-slate-400 hover:text-primary-600 hover:bg-primary-50'}`}
+                                                            title="Edit Entry"
+                                                        >
+                                                            <MdEdit size={16} />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDeleteEntry(entry._id)}
+                                                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                                                            title="Delete Entry"
+                                                        >
+                                                            <MdDelete size={16} />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    ) : (
+                                        <tr>
+                                            <td colSpan="10" className="py-10 text-center text-slate-400 font-bold text-sm">
+                                                {hasActiveFilters
+                                                    ? 'No planning entries match the selected filters.'
+                                                    : `No planning entries for FY ${financialYear}. Add your first entry above.`}
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </>
                 )}
             </div>
 

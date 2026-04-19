@@ -38,7 +38,7 @@ const Register = () => {
             const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
             const res = await axios.post(`${baseUrl}/auth/register`, { name, email, password });
 
-            login(res.data.token, res.data.user);
+            await login(res.data.token, res.data.user);
             
             toast.success(
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -110,6 +110,7 @@ const Register = () => {
                             onChange={onChange} 
                             placeholder="••••••••"
                             required 
+                            autoComplete="new-password"
                         />
                     </div>
                     <div className="form-group">
@@ -121,6 +122,7 @@ const Register = () => {
                             onChange={onChange} 
                             placeholder="••••••••"
                             required 
+                            autoComplete="new-password"
                         />
                     </div>
                     <button type="submit" className="btn-primary" disabled={loading}>

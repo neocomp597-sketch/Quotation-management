@@ -1,10 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { toast } from 'react-toastify';
 import { MdBusiness, MdPerson, MdLocationOn, MdAccountBalance, MdDescription, MdCloudUpload, MdSave, MdEdit } from 'react-icons/md';
 import { userService, companySettingsService, uploadService } from '../services/api';
 import { resolveImageUrl } from '../utils/helpers';
+import { useAuth } from '../context/AuthContext';
+import { ROLE_LABELS } from '../constants/menuPermissions';
 
 const Settings = () => {
+    const { user: authUser, refreshSession } = useAuth();
     const [activeTab, setActiveTab] = useState('profile');
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState(null);
@@ -48,31 +51,39 @@ const Settings = () => {
         quotationPrefix: 'JAG/QTN'
     });
 
-    const [logoUploading, setLogoUploading] = useState(false);
+const [logoUploading, setLogoUploading] = useState(false);
     const [signatureUploading, setSignatureUploading] = useState(false);
 
-    useEffect(() => {
-        const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
-        setUser(storedUser);
-        fetchCompanySettings();
-    }, []);
-
-    const fetchCompanySettings = async () => {
+    const fetchCompanySettings = useCallback(async () => {
         try {
             const res = await companySettingsService.get();
             if (res.data) {
-                setCompanySettings({
-                    ...companySettings,
+                setCompanySettings((prev) => ({
+                    ...prev,
                     ...res.data,
-                    address: { ...companySettings.address, ...res.data.address },
-                    bankDetails: { ...companySettings.bankDetails, ...res.data.bankDetails },
-                    authorizedSignatory: { ...companySettings.authorizedSignatory, ...res.data.authorizedSignatory }
-                });
+                    address: { ...prev.address, ...res.data.address },
+                    bankDetails: { ...prev.bankDetails, ...res.data.bankDetails },
+                    authorizedSignatory: { ...prev.authorizedSignatory, ...res.data.authorizedSignatory }
+                }));
             }
         } catch (error) {
             console.error('Error fetching company settings:', error);
         }
-    };
+    }, []);
+
+    useEffect(() => {
+        fetchCompanySettings();
+    }, [fetchCompanySettings]);
+
+    useEffect(() => {
+        if (authUser) {
+            setUser({
+                name: authUser.name || '',
+                email: authUser.email || '',
+                role: authUser.role || ''
+            });
+        }
+    }, [authUser]);
 
     const handleProfileChange = (e) => {
         setUser({ ...user, [e.target.name]: e.target.value });
@@ -90,8 +101,12 @@ const Settings = () => {
             };
 
             const res = await userService.updateProfile(updateData);
-            localStorage.setItem('user', JSON.stringify(res.data));
-            setUser(res.data);
+            setUser({
+                name: res.data.name,
+                email: res.data.email,
+                role: res.data.role
+            });
+            await refreshSession();
             setPassword('');
             setMessage({ type: 'success', text: 'Profile updated successfully!' });
             toast.success('Profile updated successfully!');
@@ -261,7 +276,7 @@ const Settings = () => {
                         <div>
                             <label className={labelClass}>Role</label>
                             <div className="inline-block px-3 py-1.5 bg-slate-100 text-slate-500 rounded-lg text-sm font-black uppercase tracking-wide cursor-not-allowed">
-                                {user.role || 'Sales'}
+                                {ROLE_LABELS[authUser?.role || user.role] || authUser?.role || user.role || 'User'}
                             </div>
                         </div>
                         <div>
@@ -272,6 +287,7 @@ const Settings = () => {
                                 onChange={(e) => setPassword(e.target.value)}
                                 placeholder="Leave blank to keep current"
                                 className={inputClass}
+                                autoComplete="new-password"
                             />
                         </div>
 

@@ -4,7 +4,7 @@ import { toast } from 'react-toastify';
 import { customerService, uploadService, importService } from '../services/api';
 import Modal from '../components/Modal';
 import ImportModal from '../components/ImportModal';
-import { resolveImageUrl, getPlaceholderImage } from '../utils/helpers';
+import { resolveImageUrl } from '../utils/helpers';
 
 const Customers = () => {
     const [customers, setCustomers] = useState([]);
@@ -125,11 +125,7 @@ const Customers = () => {
             return;
         }
         if (!formData.customerName?.trim()) {
-            toast.error('Contact Representative is required');
-            return;
-        }
-        if (!formData.gstin?.trim()) {
-            toast.error('GSTIN is required');
+            toast.error('Customer Code is required');
             return;
         }
 
@@ -378,7 +374,7 @@ const Customers = () => {
                                             </button>
                                         </th>
                                         <th className="px-4 py-5">Company & Info</th>
-                                        <th className="px-8 py-5">Contact</th>
+                                        <th className="px-8 py-5">Customer Code</th>
                                         <th className="px-8 py-5">GSTIN</th>
                                         <th className="px-8 py-5">Location</th>
                                         <th className="px-8 py-5 text-right">Actions</th>
@@ -517,7 +513,7 @@ const Customers = () => {
                                     </div>
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Contact Representative <span className="text-rose-500">*</span></label>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Customer Code <span className="text-rose-500">*</span></label>
                                     <div className="relative">
                                         <MdPerson className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
                                         <input
@@ -526,7 +522,7 @@ const Customers = () => {
                                             value={formData.customerName}
                                             onChange={handleFormChange}
                                             className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all outline-none text-sm font-bold placeholder:font-normal placeholder:text-slate-300"
-                                            placeholder="Full name of person"
+                                            placeholder="Enter customer code"
                                             required
                                         />
                                     </div>
@@ -620,7 +616,7 @@ const Customers = () => {
                             </h4>
                             <div className="grid grid-cols-2 gap-6">
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">GSTIN (Verified) <span className="text-rose-500">*</span></label>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">GSTIN (Optional)</label>
                                     <input
                                         type="text"
                                         name="gstin"
@@ -628,7 +624,6 @@ const Customers = () => {
                                         onChange={handleFormChange}
                                         className="w-full px-4 py-3.5 bg-primary-50/50 border border-primary-100 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-mono font-black text-primary-700 uppercase"
                                         placeholder="15-Digit Code"
-                                        required
                                     />
                                 </div>
                                 <div className="space-y-2">

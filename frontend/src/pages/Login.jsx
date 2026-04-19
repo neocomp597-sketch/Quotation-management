@@ -44,7 +44,7 @@ const Login = () => {
             const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
             const res = await axios.post(`${baseUrl}/auth/login`, formData);
 
-            login(res.data.token, res.data.user);
+            await login(res.data.token, res.data.user);
 
             toast.success(
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -106,6 +106,7 @@ const Login = () => {
                                 onChange={onChange}
                                 placeholder="••••••••"
                                 required
+                                autoComplete="current-password"
                             />
                             <button
                                 type="button"

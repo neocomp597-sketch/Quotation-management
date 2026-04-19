@@ -3,10 +3,11 @@ import { MdSearch, MdNotifications, MdLogout, MdMenu, MdSettings, MdCheck } from
 import { useNavigate, Link } from 'react-router-dom';
 import { notificationService } from '../services/api';
 import { toast } from 'react-toastify';
+import { useAuth } from '../context/AuthContext';
 
 const Header = ({ sidebarOpen, toggleSidebar }) => {
     const navigate = useNavigate();
-    const user = JSON.parse(localStorage.getItem('user') || '{"name": "User", "email": "user@example.com"}');
+    const { user, logout } = useAuth();
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [isNotifOpen, setIsNotifOpen] = useState(false);
     const [notifications, setNotifications] = useState([]);
@@ -14,8 +15,7 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
     const notifRef = useRef(null);
 
     const handleLogout = () => {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+        logout();
         navigate('/');
     };
 
@@ -41,9 +41,16 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
 
     // Auto-fetch on mount and then every few minutes
     useEffect(() => {
-        fetchNotifications();
-        const interval = setInterval(fetchNotifications, 5 * 60 * 1000); // 5 mins
-        return () => clearInterval(interval);
+        const initialFetchTimer = setTimeout(() => {
+            void fetchNotifications();
+        }, 0);
+        const interval = setInterval(() => {
+            void fetchNotifications();
+        }, 5 * 60 * 1000); // 5 mins
+        return () => {
+            clearTimeout(initialFetchTimer);
+            clearInterval(interval);
+        };
     }, []);
 
     useEffect(() => {
@@ -64,7 +71,9 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
         try {
             await notificationService.dismiss(id);
             setNotifications(prev => prev.filter(n => n._id !== id));
-        } catch (err) { }
+        } catch (error) {
+            console.error('Failed to dismiss notification', error);
+        }
     };
 
     const handleNotifClick = async (n) => {
@@ -72,7 +81,9 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
             await notificationService.markAsRead(n._id);
             if (n.relatedId) navigate(`/enquiries/edit/${n.relatedId}`);
             setIsNotifOpen(false);
-        } catch (err) { }
+        } catch (error) {
+            console.error('Failed to mark notification as read', error);
+        }
     };
 
     return (
@@ -137,7 +148,7 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
                         <button onClick={() => setIsProfileOpen(!isProfileOpen)} className="flex items-center gap-3 pl-2 pr-1 py-1 rounded-2xl hover:bg-slate-50 transition-all border border-transparent hover:border-slate-100 outline-none">
                             <div className="text-right hidden md:block">
                                 <p className="text-sm font-black text-slate-900 leading-none">{user?.name || 'User'}</p>
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Specialist</p>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">{user?.role || 'User'}</p>
                             </div>
                             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center shadow-sm overflow-hidden ring-1 ring-slate-200 ring-offset-2 hover:ring-primary-600 transition-all">
                                 {user?.avatar ? (

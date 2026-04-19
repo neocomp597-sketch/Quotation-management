@@ -5,7 +5,7 @@ exports.createEntry = async (req, res) => {
         const entry = new Planning({
             ...req.body,
             totalValue: (req.body.qty || 0) * (req.body.value || 0),
-            createdBy: req.user?._id
+            createdBy: req.user?.id
         });
         await entry.save();
         res.status(201).json(entry);
@@ -22,7 +22,7 @@ exports.getAllEntries = async (req, res) => {
 
         const entries = await Planning.find(filter)
             .populate('customerId', 'companyName customerName')
-            .populate('productId', 'name')
+            .populate('productId', 'productName')
             .sort({ createdAt: -1 });
         res.json(entries);
     } catch (err) {

@@ -7,7 +7,12 @@ import {
     MdDescription,
     MdSettings,
     MdChevronLeft,
-    MdChevronRight,
+    MdExpandMore,
+    MdExpandLess,
+    MdFolderOpen,
+    MdPointOfSale,
+    MdRequestQuote,
+    MdBarChart,
     MdAssignment,
     MdCategory,
     MdAutoGraph,
@@ -17,31 +22,23 @@ import {
     MdShoppingCart,
     MdLocalShipping,
     MdCalendarMonth,
-    MdExpandMore,
-    MdExpandLess,
-    MdFolderOpen,
-    MdPointOfSale,
-    MdRequestQuote,
-    MdBarChart
+    MdLock
 } from 'react-icons/md';
+import { useAuth } from '../context/AuthContext';
 
 const Sidebar = ({ isOpen, toggleSidebar }) => {
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
-    const isAdmin = user.role === 'admin';
     const location = useLocation();
+    const { isAdmin, hasAccess } = useAuth();
 
-    // Track which menus are expanded
     const [expanded, setExpanded] = useState({});
 
     const toggleMenu = (key) => {
-        setExpanded(prev => ({ ...prev, [key]: !prev[key] }));
+        setExpanded((prev) => ({ ...prev, [key]: !prev[key] }));
     };
 
-    // Check if any child is active (supports nested routes like /enquiries/create)
     const isChildActive = (children) => {
-        return children.some(child => {
+        return children.some((child) => {
             if (location.pathname === child.path) return true;
-            // Match nested routes: /enquiries/create matches /enquiries
             if (child.path !== '/dashboard' && location.pathname.startsWith(child.path + '/')) return true;
             return false;
         });
@@ -50,6 +47,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
     const menuStructure = [
         {
             type: 'link',
+            key: 'dashboard',
             name: 'Dashboard',
             icon: <MdDashboard size={22} />,
             path: '/dashboard'
@@ -125,9 +123,17 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                 { name: 'Reports', icon: <MdBarChart size={18} />, path: '/reports' },
             ]
         },
-    ];
+        {
+            type: 'group',
+            name: 'Admin',
+            key: 'admin',
+            icon: <MdLock size={22} />,
+            children: [
+                { name: 'Authorization', icon: <MdLock size={18} />, path: '/admin/authorization' },
+            ]
+        },
+    ].filter((item) => hasAccess(item.key));
 
-    // Auto-expand the group that contains the active route
     const getAutoExpanded = (key, children) => {
         if (expanded[key] !== undefined) return expanded[key];
         return isChildActive(children);
@@ -141,17 +147,14 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
 
     return (
         <>
-            {/* Mobile Backdrop */}
             <div
                 className={`fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 transition-opacity duration-300 md:hidden ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
                 onClick={toggleSidebar}
             />
 
             <div
-                className={`fixed top-0 left-0 h-full bg-white transition-all duration-300 z-50 shadow-2xl
-                border-r border-slate-100 transform flex flex-col ${isOpen ? 'translate-x-0 w-64' : '-translate-x-full md:translate-x-0 md:w-20 w-64'}`}
+                className={`fixed top-0 left-0 h-full bg-white transition-all duration-300 z-50 shadow-2xl border-r border-slate-100 transform flex flex-col ${isOpen ? 'translate-x-0 w-64' : '-translate-x-full md:translate-x-0 md:w-20 w-64'}`}
             >
-                {/* Logo Header */}
                 <div className="flex items-center justify-between h-20 px-6 border-b border-slate-50 shrink-0">
                     <div className={`flex items-center gap-3 overflow-hidden transition-all duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 w-0 md:opacity-0 md:w-0'}`}>
                         <div className="w-10 h-10 bg-gradient-to-br from-primary-600 to-accent rounded-xl flex items-center justify-center shadow-lg shadow-primary-600/30 shrink-0">
@@ -167,10 +170,8 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                     </button>
                 </div>
 
-                {/* Navigation */}
                 <nav className="flex-1 overflow-y-auto overflow-x-hidden py-4 px-3 space-y-1 custom-scrollbar">
                     {menuStructure.map((item) => {
-                        // Single link item (Dashboard)
                         if (item.type === 'link') {
                             return (
                                 <NavLink
@@ -199,13 +200,11 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                             );
                         }
 
-                        // Group with submenu
                         const isExpanded = getAutoExpanded(item.key, item.children);
                         const hasActiveChild = isChildActive(item.children);
 
                         return (
                             <div key={item.key}>
-                                {/* Group header */}
                                 <button
                                     onClick={() => {
                                         if (isOpen) {
@@ -236,7 +235,6 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                                     )}
                                 </button>
 
-                                {/* Submenu children */}
                                 {isOpen && isExpanded && (
                                     <div className="ml-4 mt-1 space-y-0.5 border-l-2 border-slate-100 pl-3">
                                         {item.children.map((child) => (
@@ -262,24 +260,25 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                     })}
                 </nav>
 
-                {/* Settings - pinned at bottom */}
-                <div className="p-3 border-t border-slate-50 shrink-0 bg-white">
-                    <NavLink
-                        to="/settings"
-                        onClick={handleNavClick}
-                        className={({ isActive }) =>
-                            `flex items-center gap-4 px-4 py-3 rounded-2xl transition-all duration-200 ${isActive
-                                ? 'bg-slate-900 text-white shadow-xl shadow-slate-900/20'
-                                : 'text-slate-500 hover:bg-slate-50 hover:text-primary-600 font-semibold'
-                            }`
-                        }
-                    >
-                        <MdSettings size={22} className="shrink-0" />
-                        <span className={`font-bold transition-all duration-300 whitespace-nowrap ${!isOpen ? 'md:opacity-0 md:w-0' : 'opacity-100'}`}>
-                            Settings
-                        </span>
-                    </NavLink>
-                </div>
+                {hasAccess('settings') && (
+                    <div className="p-3 border-t border-slate-50 shrink-0 bg-white">
+                        <NavLink
+                            to="/settings"
+                            onClick={handleNavClick}
+                            className={({ isActive }) =>
+                                `flex items-center gap-4 px-4 py-3 rounded-2xl transition-all duration-200 ${isActive
+                                    ? 'bg-slate-900 text-white shadow-xl shadow-slate-900/20'
+                                    : 'text-slate-500 hover:bg-slate-50 hover:text-primary-600 font-semibold'
+                                }`
+                            }
+                        >
+                            <MdSettings size={22} className="shrink-0" />
+                            <span className={`font-bold transition-all duration-300 whitespace-nowrap ${!isOpen ? 'md:opacity-0 md:w-0' : 'opacity-100'}`}>
+                                Settings
+                            </span>
+                        </NavLink>
+                    </div>
+                )}
             </div>
         </>
     );

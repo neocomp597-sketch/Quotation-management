@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import Layout from './components/Layout';
+import PermissionRoute from './components/PermissionRoute';
 import Dashboard from './pages/Dashboard';
 import Customers from './pages/Customers';
 import Products from './pages/Products';
@@ -25,6 +26,7 @@ import Reports from './pages/Reports';
 import Vendors from './pages/Vendors';
 import Vouchers from './pages/Vouchers';
 import CreateVoucher from './pages/CreateVoucher';
+import Authorization from './pages/Authorization';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 
@@ -56,28 +58,29 @@ function App() {
 
           {/* Protected Routes */}
           <Route element={<ProtectedRoute />}>
-            <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
-            <Route path="/salespersons" element={<Layout><Salespersons /></Layout>} />
-            <Route path="/customers" element={<Layout><Customers /></Layout>} />
-            <Route path="/vendors" element={<Layout><Vendors /></Layout>} />
-            <Route path="/enquiries" element={<Layout><Enquiries /></Layout>} />
-            <Route path="/enquiries/analytics" element={<Layout><EnquiryAnalytics /></Layout>} />
-            <Route path="/enquiries/create" element={<Layout><CreateEnquiry /></Layout>} />
-            <Route path="/enquiries/edit/:id" element={<Layout><CreateEnquiry /></Layout>} />
-            <Route path="/products" element={<Layout><Products /></Layout>} />
-            <Route path="/vouchers" element={<Layout><Vouchers /></Layout>} />
-            <Route path="/vouchers/new" element={<Layout><CreateVoucher /></Layout>} />
-            <Route path="/vouchers/:id" element={<Layout><CreateVoucher /></Layout>} />
-            <Route path="/mgrs" element={<Layout><MGRMaster /></Layout>} />
-            <Route path="/attributes" element={<Layout><Attributes /></Layout>} />
-            <Route path="/planning" element={<Layout><PlanningScreen /></Layout>} />
-            <Route path="/simulations" element={<Layout><Simulations /></Layout>} />
-            <Route path="/reports" element={<Layout><Reports /></Layout>} />
-            <Route path="/quotations" element={<Layout><Quotations /></Layout>} />
-            <Route path="/quotations/new" element={<Layout><CreateQuotation /></Layout>} />
-            <Route path="/quotations/:id" element={<Layout><CreateQuotation /></Layout>} />
-            <Route path="/terms" element={<Layout><Terms /></Layout>} />
-            <Route path="/settings" element={<Layout><Settings /></Layout>} />
+            <Route path="/dashboard" element={<PermissionRoute permissionKey="dashboard"><Layout><Dashboard /></Layout></PermissionRoute>} />
+            <Route path="/salespersons" element={<PermissionRoute permissionKey="admin"><Layout><Salespersons /></Layout></PermissionRoute>} />
+            <Route path="/customers" element={<PermissionRoute permissionKey="master"><Layout><Customers /></Layout></PermissionRoute>} />
+            <Route path="/vendors" element={<PermissionRoute permissionKey="master"><Layout><Vendors /></Layout></PermissionRoute>} />
+            <Route path="/enquiries" element={<PermissionRoute permissionKey="enquiry"><Layout><Enquiries /></Layout></PermissionRoute>} />
+            <Route path="/enquiries/analytics" element={<PermissionRoute permissionKey="enquiry"><Layout><EnquiryAnalytics /></Layout></PermissionRoute>} />
+            <Route path="/enquiries/create" element={<PermissionRoute permissionKey="enquiry"><Layout><CreateEnquiry /></Layout></PermissionRoute>} />
+            <Route path="/enquiries/edit/:id" element={<PermissionRoute permissionKey="enquiry"><Layout><CreateEnquiry /></Layout></PermissionRoute>} />
+            <Route path="/products" element={<PermissionRoute permissionKey="master"><Layout><Products /></Layout></PermissionRoute>} />
+            <Route path="/vouchers" element={<PermissionRoute permissionKey="sale"><Layout><Vouchers /></Layout></PermissionRoute>} />
+            <Route path="/vouchers/new" element={<PermissionRoute permissionKey="sale"><Layout><CreateVoucher /></Layout></PermissionRoute>} />
+            <Route path="/vouchers/:id" element={<PermissionRoute permissionKey="sale"><Layout><CreateVoucher /></Layout></PermissionRoute>} />
+            <Route path="/mgrs" element={<PermissionRoute permissionKey="master"><Layout><MGRMaster /></Layout></PermissionRoute>} />
+            <Route path="/attributes" element={<PermissionRoute permissionKey="master"><Layout><Attributes /></Layout></PermissionRoute>} />
+            <Route path="/planning" element={<PermissionRoute permissionKey="planning"><Layout><PlanningScreen /></Layout></PermissionRoute>} />
+            <Route path="/simulations" element={<PermissionRoute permissionKey="planning"><Layout><Simulations /></Layout></PermissionRoute>} />
+            <Route path="/reports" element={<PermissionRoute permissionKey="reports"><Layout><Reports /></Layout></PermissionRoute>} />
+            <Route path="/quotations" element={<PermissionRoute permissionKey="quotation"><Layout><Quotations /></Layout></PermissionRoute>} />
+            <Route path="/quotations/new" element={<PermissionRoute permissionKey="quotation"><Layout><CreateQuotation /></Layout></PermissionRoute>} />
+            <Route path="/quotations/:id" element={<PermissionRoute permissionKey="quotation"><Layout><CreateQuotation /></Layout></PermissionRoute>} />
+            <Route path="/terms" element={<PermissionRoute permissionKey="master"><Layout><Terms /></Layout></PermissionRoute>} />
+            <Route path="/settings" element={<PermissionRoute permissionKey="settings"><Layout><Settings /></Layout></PermissionRoute>} />
+            <Route path="/admin/authorization" element={<PermissionRoute permissionKey="admin"><Layout><Authorization /></Layout></PermissionRoute>} />
           </Route>
 
           {/* Fallback route */}

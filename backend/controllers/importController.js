@@ -232,12 +232,17 @@ const importCustomers = async (req, res) => {
                 };
 
                 // Validate required fields
-                if (!customerData.customerName || !customerData.companyName || !customerData.gstin) {
-                    throw new Error('Missing required fields: Customer Name, Company Name, or GSTIN');
+                if (!customerData.customerName || !customerData.companyName) {
+                    throw new Error('Missing required fields: Customer Name or Company Name');
                 }
 
-                // Check if customer already exists by GSTIN
-                const existing = await Customer.findOne({ gstin: customerData.gstin });
+                const existing = customerData.gstin
+                    ? await Customer.findOne({ gstin: customerData.gstin })
+                    : await Customer.findOne({
+                        companyName: customerData.companyName,
+                        customerName: customerData.customerName
+                    });
+
                 if (existing) {
                     // Update existing customer
                     await Customer.findByIdAndUpdate(existing._id, customerData);

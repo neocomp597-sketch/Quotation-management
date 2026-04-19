@@ -70,8 +70,20 @@ export const salespersonService = {
     delete: (id) => api.delete(`/salespersons/${id}`),
 };
 
+export const authService = {
+    getMe: () => api.get('/auth/me'),
+};
+
 export const userService = {
+    getAll: () => api.get('/users'),
     updateProfile: (data) => api.put('/users/profile', data),
+    updateRole: (id, role) => api.patch(`/users/${id}/role`, { role }),
+};
+
+export const authorizationService = {
+    getAll: () => api.get('/authorization'),
+    getMy: () => api.get('/authorization/me'),
+    update: (role, permissions) => api.put(`/authorization/${role}`, { permissions }),
 };
 
 export const mgrService = {

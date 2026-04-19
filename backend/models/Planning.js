@@ -8,14 +8,14 @@ const PlanningSchema = new mongoose.Schema({
     productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
     productName: { type: String, required: true },
     customerName: { type: String, required: true },
-    qty: { type: Number, required: true, min: 0 },
+    qty: { type: Number, required: true },
     value: { type: Number, required: true, min: 0 },
     totalValue: { type: Number, default: 0 }, // qty * value (auto-calculated)
     mgrCode: { type: String, required: true }, // MGR1 code from MGR master
     mgrCode2: { type: String }, // MGR2 code from MGR master
     status: {
         type: String,
-        enum: ['Firm', 'MFC', 'B & B', 'Others'],
+        enum: ['Firm', 'MFC', 'B & B', 'Others', 'Order Received', 'Lost', 'Parked'],
         required: true
     },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },

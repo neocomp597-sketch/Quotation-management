@@ -44,6 +44,7 @@ const enquiryRoutes = require('./routes/enquiryRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
 const planningRoutes = require('./routes/planningRoutes');
+const authorizationRoutes = require('./routes/authorizationRoutes');
 const scheduler = require('./utils/scheduler');
 
 // API Routes
@@ -67,6 +68,7 @@ app.use('/api/enquiries', enquiryRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/planning', planningRoutes);
+app.use('/api/authorization', authorizationRoutes);
 
 // Start Scheduler
 scheduler.startScheduler();
