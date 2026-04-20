@@ -5,6 +5,7 @@ const ProductAttribute = require('../models/ProductAttribute');
 const Attribute = require('../models/Attribute');
 const MGR = require('../models/MGR');
 const Vendor = require('../models/Vendor');
+const Planning = require('../models/Planning');
 const { deriveBasePriceFromVendors } = require('../utils/vendorSelection');
 
 const escapeRegex = (value = '') => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -13,6 +14,48 @@ const toBoolean = (value) => {
     if (typeof value === 'number') return value === 1;
     if (typeof value === 'string') return ['1', 'true', 'yes', 'y'].includes(value.toLowerCase().trim());
     return false;
+};
+const FY_MONTHS = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
+const PLANNING_STATUS_OPTIONS = ['Firm', 'MFC', 'B & B', 'Others', 'Order Received', 'Lost', 'Parked'];
+const cleanCellValue = (value = '') => String(value ?? '').trim().replace(/\s+/g, ' ');
+const normalizeKey = (value = '') => cleanCellValue(value).toUpperCase();
+const buildExactRegex = (value = '') => new RegExp(`^${escapeRegex(cleanCellValue(value))}$`, 'i');
+
+const getPlanningMonthLabels = (financialYear) => {
+    if (!/^\d{4}-\d{2}$/.test(financialYear)) {
+        throw new Error('Financial Year must be in the format 2025-26');
+    }
+
+    const startYear = parseInt(financialYear.split('-')[0], 10);
+    return FY_MONTHS.map((month, idx) => {
+        const year = idx < 9 ? startYear : startYear + 1;
+        return `${month}-${year.toString().slice(-2)}`;
+    });
+};
+
+const resolvePlanningMonth = (financialYear, monthYear) => {
+    const cleanedMonthYear = cleanCellValue(monthYear);
+    const validMonthLabels = getPlanningMonthLabels(financialYear);
+    const monthIndex = validMonthLabels.findIndex((label) => normalizeKey(label) === normalizeKey(cleanedMonthYear));
+
+    if (monthIndex === -1) {
+        throw new Error(`Month & Year must match FY ${financialYear} (example: ${validMonthLabels[0]})`);
+    }
+
+    return monthIndex + 1;
+};
+
+const resolvePlanningStatus = (value = '') => {
+    const cleaned = cleanCellValue(value);
+    return PLANNING_STATUS_OPTIONS.find((status) => normalizeKey(status) === normalizeKey(cleaned)) || '';
+};
+
+const getCurrentFinancialYear = () => {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    const startYear = currentMonth >= 3 ? currentYear : currentYear - 1;
+    return `${startYear}-${String(startYear + 1).slice(-2)}`;
 };
 
 // Import Products from Excel/CSV
@@ -264,6 +307,215 @@ const importCustomers = async (req, res) => {
     } catch (error) {
         console.error('Import error:', error);
         res.status(500).json({ message: error.message || 'Error importing customers' });
+    }
+};
+
+// Import Planning entries from Excel/CSV
+const importPlanning = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ message: 'No file uploaded' });
+        }
+
+        const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const data = XLSX.utils.sheet_to_json(worksheet);
+
+        if (data.length === 0) {
+            return res.status(400).json({ message: 'No data found in file' });
+        }
+
+        const selectedFinancialYear = cleanCellValue(req.body.financialYear || req.query.financialYear);
+        const results = {
+            success: 0,
+            failed: 0,
+            errors: []
+        };
+
+        for (let i = 0; i < data.length; i++) {
+            const row = data[i];
+
+            try {
+                const financialYear = cleanCellValue(
+                    row['Financial Year'] || row.financialYear || row.FY || selectedFinancialYear
+                );
+                const monthYear = cleanCellValue(
+                    row['Month & Year'] || row.monthYear || row.Month || row.month
+                );
+                const customerLookup = cleanCellValue(
+                    row['Customer Name'] || row.customerName || row['Company Name'] || row.companyName
+                );
+                const productLookup = cleanCellValue(
+                    row['Product Name'] || row.productName || row['Product Code'] || row.productCode
+                );
+                const qty = Number(row.Qty ?? row.qty);
+                const value = Number(row.Value ?? row.value);
+                const mgrCodeInput = cleanCellValue(
+                    row['MGR 1'] || row.MGR1 || row.mgrCode || row.mgrCode1
+                );
+                const mgrCode2Input = cleanCellValue(
+                    row['MGR 2'] || row.MGR2 || row.mgrCode2
+                );
+                const status = resolvePlanningStatus(row.Status || row.status);
+
+                if (!financialYear || !monthYear || !customerLookup || !productLookup || !mgrCodeInput || !status) {
+                    throw new Error('Missing required fields: Financial Year, Month & Year, Customer Name, Product Name, MGR 1, or Status');
+                }
+
+                if (!Number.isFinite(qty) || qty < 0) {
+                    throw new Error('Qty must be a number greater than or equal to zero');
+                }
+
+                if (!Number.isFinite(value) || value < 0) {
+                    throw new Error('Value must be a number greater than or equal to zero');
+                }
+
+                const month = resolvePlanningMonth(financialYear, monthYear);
+
+                let customer = await Customer.findOne({
+                    companyName: { $regex: buildExactRegex(customerLookup) }
+                });
+                if (!customer) {
+                    customer = await Customer.findOne({
+                        customerName: { $regex: buildExactRegex(customerLookup) }
+                    });
+                }
+                if (!customer) {
+                    throw new Error(`Customer not found: ${customerLookup}`);
+                }
+
+                let product = await Product.findOne({
+                    productCode: { $regex: buildExactRegex(productLookup) }
+                });
+                if (!product) {
+                    product = await Product.findOne({
+                        productName: { $regex: buildExactRegex(productLookup) }
+                    });
+                }
+                if (!product) {
+                    throw new Error(`Product not found: ${productLookup}`);
+                }
+
+                const mgr1 = await MGR.findOne({
+                    mgrType: 'MGR1',
+                    code: { $regex: buildExactRegex(mgrCodeInput) }
+                });
+                if (!mgr1) {
+                    throw new Error(`MGR 1 not found: ${mgrCodeInput}`);
+                }
+
+                let mgr2 = null;
+                if (mgrCode2Input) {
+                    mgr2 = await MGR.findOne({
+                        mgrType: 'MGR2',
+                        code: { $regex: buildExactRegex(mgrCode2Input) }
+                    });
+                    if (!mgr2) {
+                        throw new Error(`MGR 2 not found: ${mgrCode2Input}`);
+                    }
+                }
+
+                const planningData = {
+                    financialYear,
+                    monthYear,
+                    month,
+                    customerId: customer._id,
+                    customerName: customer.companyName || customer.customerName,
+                    productId: product._id,
+                    productName: product.productName,
+                    qty,
+                    value,
+                    totalValue: qty * value,
+                    mgrCode: mgr1.code,
+                    mgrCode2: mgr2?.code || '',
+                    status,
+                    createdBy: req.user?.id || null
+                };
+
+                const existing = await Planning.findOne({
+                    financialYear,
+                    monthYear,
+                    customerId: customer._id,
+                    productId: product._id,
+                    mgrCode: mgr1.code,
+                    mgrCode2: mgr2?.code || '',
+                    status
+                });
+
+                if (existing) {
+                    await Planning.findByIdAndUpdate(existing._id, planningData, { runValidators: true });
+                } else {
+                    await Planning.create(planningData);
+                }
+
+                results.success++;
+            } catch (err) {
+                results.failed++;
+                results.errors.push(`Row ${i + 2}: ${err.message}`);
+            }
+        }
+
+        res.status(200).json({
+            message: `Import completed. ${results.success} planning entries imported, ${results.failed} failed.`,
+            ...results
+        });
+    } catch (error) {
+        console.error('Import error:', error);
+        res.status(500).json({ message: error.message || 'Error importing planning entries' });
+    }
+};
+
+// Generate Planning Template
+const getPlanningTemplate = async (req, res) => {
+    try {
+        const financialYear = cleanCellValue(req.query.financialYear) || getCurrentFinancialYear();
+        const monthLabels = getPlanningMonthLabels(financialYear);
+        const [customer, product, mgr1, mgr2] = await Promise.all([
+            Customer.findOne().sort({ createdAt: 1 }),
+            Product.findOne().sort({ createdAt: 1 }),
+            MGR.findOne({ mgrType: 'MGR1', status: 'Active' }).sort({ code: 1 }),
+            MGR.findOne({ mgrType: 'MGR2', status: 'Active' }).sort({ code: 1 })
+        ]);
+
+        const templateData = [
+            {
+                'Financial Year': financialYear,
+                'Month & Year': monthLabels[0],
+                'Customer Name': customer?.companyName || customer?.customerName || 'ABC Enterprises',
+                'Product Name': product?.productName || 'Sample Product Name',
+                Qty: 10,
+                Value: 2500,
+                'MGR 1': mgr1?.code || 'SBU 3',
+                'MGR 2': mgr2?.code || '',
+                Status: 'Firm'
+            }
+        ];
+
+        const worksheet = XLSX.utils.json_to_sheet(templateData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Planning');
+
+        worksheet['!cols'] = [
+            { wch: 16 },
+            { wch: 14 },
+            { wch: 28 },
+            { wch: 36 },
+            { wch: 10 },
+            { wch: 12 },
+            { wch: 14 },
+            { wch: 14 },
+            { wch: 18 }
+        ];
+
+        const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename=planning_import_template.xlsx');
+        res.send(buffer);
+    } catch (error) {
+        console.error('Template error:', error);
+        res.status(500).json({ message: 'Error generating template' });
     }
 };
 
@@ -567,10 +819,12 @@ const getAttributeMasterTemplate = async (req, res) => {
 module.exports = {
     importProducts,
     importCustomers,
+    importPlanning,
     importAttributes,
     importAttributeMaster,
     getProductTemplate,
     getCustomerTemplate,
+    getPlanningTemplate,
     getAttributeTemplate,
     getAttributeMasterTemplate
 };

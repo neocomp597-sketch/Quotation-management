@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 
 const CustomerSchema = new mongoose.Schema({
+    externalCode: { type: String, default: '', index: true },
     customerName: { type: String, required: true },
     companyName: { type: String, required: true },
     gstin: { type: String, default: '' },

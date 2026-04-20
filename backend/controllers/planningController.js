@@ -1,10 +1,55 @@
 const Planning = require('../models/Planning');
+const MGR = require('../models/MGR');
+
+const escapeRegex = (value = '') => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const cleanValue = (value = '') => String(value ?? '').trim().replace(/\s+/g, ' ');
+const normalizeCodeKey = (value = '') => cleanValue(value).toUpperCase();
+
+const resolveMgrCode = async (value, mgrType) => {
+    const cleaned = cleanValue(value);
+    if (!cleaned) {
+        return '';
+    }
+
+    const match = await MGR.findOne({
+        mgrType,
+        code: { $regex: new RegExp(`^${escapeRegex(cleaned)}$`, 'i') }
+    });
+
+    return match?.code || cleaned;
+};
+
+const normalizePlanningPayload = async (payload = {}) => {
+    const normalized = { ...payload };
+
+    if (Object.prototype.hasOwnProperty.call(normalized, 'monthYear')) {
+        normalized.monthYear = cleanValue(normalized.monthYear);
+    }
+    if (Object.prototype.hasOwnProperty.call(normalized, 'financialYear')) {
+        normalized.financialYear = cleanValue(normalized.financialYear);
+    }
+    if (Object.prototype.hasOwnProperty.call(normalized, 'customerName')) {
+        normalized.customerName = cleanValue(normalized.customerName);
+    }
+    if (Object.prototype.hasOwnProperty.call(normalized, 'productName')) {
+        normalized.productName = cleanValue(normalized.productName);
+    }
+    if (Object.prototype.hasOwnProperty.call(normalized, 'mgrCode')) {
+        normalized.mgrCode = await resolveMgrCode(normalized.mgrCode, 'MGR1');
+    }
+    if (Object.prototype.hasOwnProperty.call(normalized, 'mgrCode2')) {
+        normalized.mgrCode2 = await resolveMgrCode(normalized.mgrCode2, 'MGR2');
+    }
+
+    return normalized;
+};
 
 exports.createEntry = async (req, res) => {
     try {
+        const normalizedBody = await normalizePlanningPayload(req.body);
         const entry = new Planning({
-            ...req.body,
-            totalValue: (req.body.qty || 0) * (req.body.value || 0),
+            ...normalizedBody,
+            totalValue: (normalizedBody.qty || 0) * (normalizedBody.value || 0),
             createdBy: req.user?.id
         });
         await entry.save();
@@ -33,7 +78,7 @@ exports.getAllEntries = async (req, res) => {
 exports.updateEntry = async (req, res) => {
     try {
         const { id } = req.params;
-        const updateData = { ...req.body };
+        const updateData = await normalizePlanningPayload(req.body);
         if (updateData.qty !== undefined && updateData.value !== undefined) {
             updateData.totalValue = updateData.qty * updateData.value;
         }
@@ -70,12 +115,28 @@ exports.getMGRReport = async (req, res) => {
 
         const mgrType = type || 'MGR1';
         const mgrField = mgrType === 'MGR2' ? 'mgrCode2' : 'mgrCode';
+        const masterCodes = await MGR.find({ mgrType }).select('code').lean();
+        const masterCodeMap = new Map(masterCodes.map((mgr) => [normalizeCodeKey(mgr.code), mgr.code]));
 
         // Get all entries for the financial year
         const entries = await Planning.find({ financialYear });
 
-        // Get unique MGR codes for the selected field
-        const mgrCodes = [...new Set(entries.map(e => e[mgrField]).filter(Boolean))].sort();
+        const mgrCodeGroups = [];
+        const seenCodeGroups = new Set();
+        entries.forEach((entry) => {
+            const codeKey = normalizeCodeKey(entry[mgrField]);
+            if (!codeKey || seenCodeGroups.has(codeKey)) {
+                return;
+            }
+
+            seenCodeGroups.add(codeKey);
+            mgrCodeGroups.push({
+                key: codeKey,
+                label: masterCodeMap.get(codeKey) || cleanValue(entry[mgrField])
+            });
+        });
+        mgrCodeGroups.sort((left, right) => left.label.localeCompare(right.label));
+        const mgrCodes = mgrCodeGroups.map((group) => group.label);
 
         // Define months in financial year order (Apr to Mar)
         const monthNames = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
@@ -89,11 +150,11 @@ exports.getMGRReport = async (req, res) => {
             const row = { month: monthKey };
             let total = 0;
 
-            mgrCodes.forEach(mgr => {
+            mgrCodeGroups.forEach((mgr) => {
                 const sum = entries
-                    .filter(e => e.monthYear === monthKey && e[mgrField] === mgr)
+                    .filter((entry) => entry.monthYear === monthKey && normalizeCodeKey(entry[mgrField]) === mgr.key)
                     .reduce((acc, e) => acc + (e.totalValue || 0), 0);
-                row[mgr] = sum;
+                row[mgr.label] = sum;
                 total += sum;
             });
 
@@ -112,9 +173,9 @@ exports.getMGRReport = async (req, res) => {
             const row = { month: `${q.name} ${financialYear}`, isQuarter: true };
             let total = 0;
 
-            mgrCodes.forEach(mgr => {
-                const sum = q.months.reduce((acc, i) => acc + (monthRows[i][mgr] || 0), 0);
-                row[mgr] = sum;
+            mgrCodeGroups.forEach((mgr) => {
+                const sum = q.months.reduce((acc, i) => acc + (monthRows[i][mgr.label] || 0), 0);
+                row[mgr.label] = sum;
                 total += sum;
             });
 
@@ -124,16 +185,16 @@ exports.getMGRReport = async (req, res) => {
 
         const grandTotal = { month: 'Total', isTotal: true };
         let gt = 0;
-        mgrCodes.forEach(mgr => {
-            const sum = monthRows.reduce((acc, r) => acc + (r[mgr] || 0), 0);
-            grandTotal[mgr] = sum;
+        mgrCodeGroups.forEach((mgr) => {
+            const sum = monthRows.reduce((acc, row) => acc + (row[mgr.label] || 0), 0);
+            grandTotal[mgr.label] = sum;
             gt += sum;
         });
         grandTotal.total = gt;
 
         const percentageRow = { month: 'Percentage %', isPercentage: true };
-        mgrCodes.forEach(mgr => {
-            percentageRow[mgr] = gt > 0 ? parseFloat(((grandTotal[mgr] / gt) * 100).toFixed(1)) : 0;
+        mgrCodeGroups.forEach((mgr) => {
+            percentageRow[mgr.label] = gt > 0 ? parseFloat(((grandTotal[mgr.label] / gt) * 100).toFixed(1)) : 0;
         });
         percentageRow.total = 100;
 
@@ -146,11 +207,11 @@ exports.getMGRReport = async (req, res) => {
         const prevGT = prevEntries.reduce((acc, e) => acc + (e.totalValue || 0), 0);
         
         const prevPercentageRow = { month: 'Percentage % (Previous Year)', isPercentage: true };
-        mgrCodes.forEach(mgr => {
+        mgrCodeGroups.forEach((mgr) => {
             const prevMgrTotal = prevEntries
-                .filter(e => e[mgrField] === mgr)
+                .filter((entry) => normalizeCodeKey(entry[mgrField]) === mgr.key)
                 .reduce((acc, e) => acc + (e.totalValue || 0), 0);
-            prevPercentageRow[mgr] = prevGT > 0 ? parseFloat(((prevMgrTotal / prevGT) * 100).toFixed(1)) : 0;
+            prevPercentageRow[mgr.label] = prevGT > 0 ? parseFloat(((prevMgrTotal / prevGT) * 100).toFixed(1)) : 0;
         });
         prevPercentageRow.total = 100;
 
