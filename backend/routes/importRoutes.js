@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const { protect } = require('../middlewares/authMiddleware');
 const {
     importProducts,
@@ -52,5 +54,23 @@ router.get('/template/attributes', getAttributeTemplate);
 router.get('/template/attribute-master', getAttributeMasterTemplate);
 router.get('/template/planning', protect, getPlanningTemplate);
 
+router.get('/missing-codes/:filename', (req, res) => {
+    const { filename } = req.params;
+    const validFilenames = ['missing_customer_codes.txt', 'missing_product_codes.txt'];
+    
+    if (!validFilenames.includes(filename)) {
+        return res.status(400).json({ message: 'Invalid filename' });
+    }
+    
+    const filePath = path.join(__dirname, '..', 'uploads', filename);
+    
+    if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ message: 'File not found' });
+    }
+    
+    res.setHeader('Content-Type', 'text/plain');
+    res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+    res.sendFile(filePath);
+});
 
 module.exports = router;

@@ -70,7 +70,7 @@ const LandingPage = () => {
                             <span className="bg-gradient-to-r from-teal-200 to-emerald-200 bg-clip-text text-transparent">Better Quotes.</span>
                         </h1>
                         <p className="text-xl text-teal-100/90 mb-10 max-w-xl">
-                            The ultimate quotation tool for JAG ERP. Create, manage, and track professional proposals that turn prospects into loyal customers.
+                            The ultimate quotation tool for AR CRM. Create, manage, and track professional proposals that turn prospects into loyal customers.
                         </p>
                         <div className="cta-buttons !justify-start">
                             <Link to="/register" className="btn-landing-premium primary">

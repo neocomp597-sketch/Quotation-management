@@ -160,7 +160,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                         <div className="w-10 h-10 bg-gradient-to-br from-primary-600 to-accent rounded-xl flex items-center justify-center shadow-lg shadow-primary-600/30 shrink-0">
                             <span className="text-white font-black text-xl">Q</span>
                         </div>
-                        <span className="text-xl font-black tracking-tighter whitespace-nowrap text-slate-900 font-outfit uppercase">JAG ERP</span>
+                        <span className="text-xl font-black tracking-tighter whitespace-nowrap text-slate-900 font-outfit uppercase">AR CRM</span>
                     </div>
                     <button
                         onClick={toggleSidebar}

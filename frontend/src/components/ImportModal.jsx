@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { MdCloudUpload, MdDownload, MdDescription, MdClose, MdCheckCircle, MdError } from 'react-icons/md';
 import Modal from './Modal';
+import api from '../services/api';
 
 const ImportModal = ({ isOpen, onClose, title, onImport, onDownloadTemplate, type = 'products' }) => {
     const [file, setFile] = useState(null);
@@ -72,13 +73,38 @@ const ImportModal = ({ isOpen, onClose, title, onImport, onDownloadTemplate, typ
             });
             setFile(null);
         } catch (err) {
+            const errorData = err.response?.data || {};
             setResult({
                 success: false,
-                message: err.response?.data?.message || 'Import failed',
-                errors: err.response?.data?.errors || []
+                message: errorData.message || 'Import failed',
+                errors: errorData.errors || [],
+                missingCustomerCodes: errorData.missingCustomerCodes || [],
+                missingProductCodes: errorData.missingProductCodes || [],
+                missingCustomerCodesFile: errorData.missingCustomerCodesFile || null,
+                missingProductCodesFile: errorData.missingProductCodesFile || null
             });
         } finally {
             setIsImporting(false);
+        }
+    };
+
+    const handleDownloadMissingCodes = async (filename) => {
+        try {
+            const response = await api.get(`/import/missing-codes/${filename}`, {
+                responseType: 'blob'
+            });
+            const blob = new Blob([response.data], { type: 'text/plain' });
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error('Download error:', err);
+            alert('Failed to download file');
         }
     };
 
@@ -220,8 +246,52 @@ const ImportModal = ({ isOpen, onClose, title, onImport, onDownloadTemplate, typ
                                         {result.successCount} imported successfully, {result.failedCount} failed
                                     </p>
                                 )}
+                                {(result.missingCustomerCodes && result.missingCustomerCodes.length > 0) && (
+                                    <div className="mt-3">
+                                        <p className="text-xs text-rose-600 font-bold uppercase tracking-widest mb-1">
+                                            Missing Customer Codes ({result.missingCustomerCodes.length}):
+                                        </p>
+                                        <div className="max-h-24 overflow-y-auto bg-white rounded-lg p-2 border border-rose-200">
+                                            <p className="text-xs font-mono text-rose-700">{result.missingCustomerCodes.slice(0, 10).join(', ')}</p>
+                                            {result.missingCustomerCodes.length > 10 && (
+                                                <p className="text-xs text-rose-500">...and {result.missingCustomerCodes.length - 10} more</p>
+                                            )}
+                                        </div>
+                                        {result.missingCustomerCodesFile && (
+                                            <button
+                                                onClick={() => handleDownloadMissingCodes(result.missingCustomerCodesFile)}
+                                                className="mt-2 flex items-center gap-1 px-3 py-1.5 bg-rose-100 hover:bg-rose-200 rounded-lg text-rose-700 text-xs font-bold transition-all"
+                                            >
+                                                <MdDescription size={14} />
+                                                Download List
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+                                {(result.missingProductCodes && result.missingProductCodes.length > 0) && (
+                                    <div className="mt-3">
+                                        <p className="text-xs text-rose-600 font-bold uppercase tracking-widest mb-1">
+                                            Missing Product Codes ({result.missingProductCodes.length}):
+                                        </p>
+                                        <div className="max-h-24 overflow-y-auto bg-white rounded-lg p-2 border border-rose-200">
+                                            <p className="text-xs font-mono text-rose-700">{result.missingProductCodes.slice(0, 10).join(', ')}</p>
+                                            {result.missingProductCodes.length > 10 && (
+                                                <p className="text-xs text-rose-500">...and {result.missingProductCodes.length - 10} more</p>
+                                            )}
+                                        </div>
+                                        {result.missingProductCodesFile && (
+                                            <button
+                                                onClick={() => handleDownloadMissingCodes(result.missingProductCodesFile)}
+                                                className="mt-2 flex items-center gap-1 px-3 py-1.5 bg-rose-100 hover:bg-rose-200 rounded-lg text-rose-700 text-xs font-bold transition-all"
+                                            >
+                                                <MdDescription size={14} />
+                                                Download List
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
                                 {result.errors && result.errors.length > 0 && (
-                                    <div className="mt-2 max-h-32 overflow-y-auto">
+                                    <div className="mt-3 max-h-32 overflow-y-auto">
                                         <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mb-1">Errors:</p>
                                         {result.errors.map((err, idx) => (
                                             <p key={idx} className="text-xs text-rose-600">{err}</p>

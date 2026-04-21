@@ -312,6 +312,8 @@ const importCustomers = async (req, res) => {
 
 // Import Planning entries from Excel/CSV
 const importPlanning = async (req, res) => {
+    const fs = require('fs');
+    const path = require('path');
     try {
         if (!req.file) {
             return res.status(400).json({ message: 'No file uploaded' });
@@ -327,6 +329,68 @@ const importPlanning = async (req, res) => {
         }
 
         const selectedFinancialYear = cleanCellValue(req.body.financialYear || req.query.financialYear);
+
+        const uniqueCustomerCodes = new Set();
+        const uniqueProductCodes = new Set();
+
+        for (let i = 0; i < data.length; i++) {
+            const row = data[i];
+            const customerLookup = cleanCellValue(
+                row['Customer Code'] || row['customerCode'] || row['Customer Name'] || row.customerName || row['Company Name'] || row.companyName
+            );
+            const productLookup = cleanCellValue(
+                row['Product Code'] || row['productCode'] || row['Product Name'] || row.productName
+            );
+            if (customerLookup) uniqueCustomerCodes.add(customerLookup);
+            if (productLookup) uniqueProductCodes.add(productLookup);
+        }
+
+        const missingCustomerCodes = [];
+        const missingProductCodes = [];
+
+        for (const custCode of uniqueCustomerCodes) {
+            const existing = await Customer.findOne({
+                customerName: { $regex: buildExactRegex(custCode) }
+            });
+            if (!existing) {
+                missingCustomerCodes.push(custCode);
+            }
+        }
+
+        for (const prodCode of uniqueProductCodes) {
+            const existing = await Product.findOne({
+                productCode: { $regex: buildExactRegex(prodCode) }
+            });
+            if (!existing) {
+                missingProductCodes.push(prodCode);
+            }
+        }
+
+        if (missingCustomerCodes.length > 0 || missingProductCodes.length > 0) {
+            const uploadDir = path.join(__dirname, '..', 'uploads');
+            if (!fs.existsSync(uploadDir)) {
+                fs.mkdirSync(uploadDir, { recursive: true });
+            }
+
+            if (missingCustomerCodes.length > 0) {
+                const custFilePath = path.join(uploadDir, 'missing_customer_codes.txt');
+                fs.writeFileSync(custFilePath, missingCustomerCodes.join('\n'), 'utf8');
+            }
+
+            if (missingProductCodes.length > 0) {
+                const prodFilePath = path.join(uploadDir, 'missing_product_codes.txt');
+                fs.writeFileSync(prodFilePath, missingProductCodes.join('\n'), 'utf8');
+            }
+
+            return res.status(400).json({
+                message: 'Validation failed. Missing customer and/or product codes found.',
+                missingCustomerCodes,
+                missingProductCodes,
+                missingCustomerCodesFile: missingCustomerCodes.length > 0 ? 'missing_customer_codes.txt' : null,
+                missingProductCodesFile: missingProductCodes.length > 0 ? 'missing_product_codes.txt' : null
+            });
+        }
+
         const results = {
             success: 0,
             failed: 0,
@@ -344,10 +408,10 @@ const importPlanning = async (req, res) => {
                     row['Month & Year'] || row.monthYear || row.Month || row.month
                 );
                 const customerLookup = cleanCellValue(
-                    row['Customer Name'] || row.customerName || row['Company Name'] || row.companyName
+                    row['Customer Code'] || row['customerCode'] || row['Customer Name'] || row.customerName || row['Company Name'] || row.companyName
                 );
                 const productLookup = cleanCellValue(
-                    row['Product Name'] || row.productName || row['Product Code'] || row.productCode
+                    row['Product Code'] || row['productCode'] || row['Product Name'] || row.productName
                 );
                 const qty = Number(row.Qty ?? row.qty);
                 const value = Number(row.Value ?? row.value);
@@ -360,7 +424,7 @@ const importPlanning = async (req, res) => {
                 const status = resolvePlanningStatus(row.Status || row.status);
 
                 if (!financialYear || !monthYear || !customerLookup || !productLookup || !mgrCodeInput || !status) {
-                    throw new Error('Missing required fields: Financial Year, Month & Year, Customer Name, Product Name, MGR 1, or Status');
+                    throw new Error('Missing required fields: Financial Year, Month & Year, Customer Code, Product Code, MGR 1, or Status');
                 }
 
                 if (!Number.isFinite(qty) || qty < 0) {
@@ -374,27 +438,17 @@ const importPlanning = async (req, res) => {
                 const month = resolvePlanningMonth(financialYear, monthYear);
 
                 let customer = await Customer.findOne({
-                    companyName: { $regex: buildExactRegex(customerLookup) }
+                    customerName: { $regex: buildExactRegex(customerLookup) }
                 });
                 if (!customer) {
-                    customer = await Customer.findOne({
-                        customerName: { $regex: buildExactRegex(customerLookup) }
-                    });
-                }
-                if (!customer) {
-                    throw new Error(`Customer not found: ${customerLookup}`);
+                    throw new Error(`Customer code not found: ${customerLookup}`);
                 }
 
                 let product = await Product.findOne({
                     productCode: { $regex: buildExactRegex(productLookup) }
                 });
                 if (!product) {
-                    product = await Product.findOne({
-                        productName: { $regex: buildExactRegex(productLookup) }
-                    });
-                }
-                if (!product) {
-                    throw new Error(`Product not found: ${productLookup}`);
+                    throw new Error(`Product code not found: ${productLookup}`);
                 }
 
                 const mgr1 = await MGR.findOne({
@@ -478,12 +532,12 @@ const getPlanningTemplate = async (req, res) => {
             MGR.findOne({ mgrType: 'MGR2', status: 'Active' }).sort({ code: 1 })
         ]);
 
-        const templateData = [
+const templateData = [
             {
                 'Financial Year': financialYear,
                 'Month & Year': monthLabels[0],
-                'Customer Name': customer?.companyName || customer?.customerName || 'ABC Enterprises',
-                'Product Name': product?.productName || 'Sample Product Name',
+                'Customer Code': customer?.customerName || 'CUST001',
+                'Product Code': product?.productCode || 'PROD001',
                 Qty: 10,
                 Value: 2500,
                 'MGR 1': mgr1?.code || 'SBU 3',
@@ -496,11 +550,11 @@ const getPlanningTemplate = async (req, res) => {
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, 'Planning');
 
-        worksheet['!cols'] = [
+worksheet['!cols'] = [
             { wch: 16 },
             { wch: 14 },
-            { wch: 28 },
-            { wch: 36 },
+            { wch: 16 },
+            { wch: 16 },
             { wch: 10 },
             { wch: 12 },
             { wch: 14 },
