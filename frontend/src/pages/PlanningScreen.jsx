@@ -484,6 +484,14 @@ const PlanningScreen = () => {
         }
 
         const workbook = XLSX.utils.book_new();
+        const buildReportRows = (data) => data.rows.map((row) => {
+            const exportRow = { Month: row.month };
+            data.mgrCodes.forEach((mgr) => {
+                exportRow[mgr] = row[mgr] || 0;
+            });
+            exportRow.Total = row.total || 0;
+            return exportRow;
+        });
 
         const entriesData = sortedEntries.map((entry) => ({
                 Month: entry.monthYear,
@@ -506,7 +514,30 @@ const PlanningScreen = () => {
         ];
         XLSX.utils.book_append_sheet(workbook, entriesSheet, 'Planning Entries');
 
-        const buildReportRows = (data) => data.rows.map((row) => {
+        if (reportData) {
+            const reportSheet = XLSX.utils.json_to_sheet(buildReportRows(reportData));
+            reportSheet['!cols'] = [{ wch: 26 }, ...reportData.mgrCodes.map(() => ({ wch: 16 })), { wch: 16 }];
+            XLSX.utils.book_append_sheet(workbook, reportSheet, 'MGR 1 Report');
+        }
+
+        if (reportData2) {
+            const reportSheet2 = XLSX.utils.json_to_sheet(buildReportRows(reportData2));
+            reportSheet2['!cols'] = [{ wch: 26 }, ...reportData2.mgrCodes.map(() => ({ wch: 16 })), { wch: 16 }];
+            XLSX.utils.book_append_sheet(workbook, reportSheet2, 'MGR 2 Report');
+        }
+
+        XLSX.writeFile(workbook, `Planning-${financialYear}.xlsx`);
+        toast.success('Excel downloaded with customer and product code details');
+    };
+
+    const exportReportToExcel = (data, reportLabel) => {
+        if (!data || !data.mgrCodes?.length) {
+            toast.error(`No data available for ${reportLabel}`);
+            return;
+        }
+
+        const workbook = XLSX.utils.book_new();
+        const reportRows = data.rows.map((row) => {
             const exportRow = { Month: row.month };
             data.mgrCodes.forEach((mgr) => {
                 exportRow[mgr] = row[mgr] || 0;
@@ -514,19 +545,13 @@ const PlanningScreen = () => {
             exportRow.Total = row.total || 0;
             return exportRow;
         });
+        const reportSheet = XLSX.utils.json_to_sheet(reportRows);
+        reportSheet['!cols'] = [{ wch: 26 }, ...data.mgrCodes.map(() => ({ wch: 16 })), { wch: 16 }];
+        XLSX.utils.book_append_sheet(workbook, reportSheet, reportLabel);
 
-        if (reportData) {
-            const reportSheet = XLSX.utils.json_to_sheet(buildReportRows(reportData));
-            XLSX.utils.book_append_sheet(workbook, reportSheet, 'MGR 1 Report');
-        }
-
-        if (reportData2) {
-            const reportSheet2 = XLSX.utils.json_to_sheet(buildReportRows(reportData2));
-            XLSX.utils.book_append_sheet(workbook, reportSheet2, 'MGR 2 Report');
-        }
-
-        XLSX.writeFile(workbook, `Planning-${financialYear}.xlsx`);
-        toast.success('Excel downloaded with customer and product code details');
+        const safeReportLabel = reportLabel.replace(/\s+/g, '-');
+        XLSX.writeFile(workbook, `${safeReportLabel}-${financialYear}.xlsx`);
+        toast.success(`${reportLabel} exported`);
     };
 
     const requestSort = (key) => {
@@ -979,6 +1004,18 @@ const PlanningScreen = () => {
                         <MdKeyboardArrowDown className={`text-slate-500 transition-transform duration-300 ${!isReportExpanded ? '-rotate-90' : ''}`} size={20} />
                         MGR 1 Report - FY {financialYear}
                     </h2>
+                    <button
+                        type="button"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            exportReportToExcel(reportData, 'MGR 1 Report');
+                        }}
+                        disabled={!reportData || !reportData.mgrCodes?.length}
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 font-bold text-xs uppercase tracking-widest hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <MdDownload size={16} />
+                        Export
+                    </button>
                 </div>
 
                 {isReportExpanded && (
@@ -1076,6 +1113,18 @@ const PlanningScreen = () => {
                         <MdKeyboardArrowDown className={`text-slate-500 transition-transform duration-300 ${!isReportExpanded2 ? '-rotate-90' : ''}`} size={20} />
                         MGR 2 Report - FY {financialYear}
                     </h2>
+                    <button
+                        type="button"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            exportReportToExcel(reportData2, 'MGR 2 Report');
+                        }}
+                        disabled={!reportData2 || !reportData2.mgrCodes?.length}
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 font-bold text-xs uppercase tracking-widest hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <MdDownload size={16} />
+                        Export
+                    </button>
                 </div>
 
                 {isReportExpanded2 && (
