@@ -374,7 +374,6 @@ const Customers = () => {
                                             </button>
                                         </th>
                                         <th className="px-4 py-5">Company & Info</th>
-                                        <th className="px-8 py-5">Customer Code</th>
                                         <th className="px-8 py-5">GSTIN</th>
                                         <th className="px-8 py-5">Location</th>
                                         <th className="px-8 py-5 text-right">Actions</th>
@@ -413,14 +412,6 @@ const Customers = () => {
                                                         <div className="font-bold text-slate-900">{c.companyName}</div>
                                                         <div className="text-xs text-slate-400 font-medium">{c.customerName}</div>
                                                     </div>
-                                                </div>
-                                            </td>
-                                            <td className="px-8 py-5">
-                                                <div className="text-sm text-slate-700 font-bold flex items-center gap-1.5 mb-1">
-                                                    <MdPhone className="text-slate-300" size={16} /> {c.mobile}
-                                                </div>
-                                                <div className="text-xs text-slate-400 flex items-center gap-1.5">
-                                                    <MdEmail className="text-slate-300" size={14} /> {c.email}
                                                 </div>
                                             </td>
                                             <td className="px-8 py-5">

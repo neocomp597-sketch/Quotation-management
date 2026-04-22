@@ -16,10 +16,24 @@ const toBoolean = (value) => {
     return false;
 };
 const FY_MONTHS = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
-const PLANNING_STATUS_OPTIONS = ['Firm', 'MFC', 'B & B', 'Others', 'Order Received', 'Lost', 'Parked'];
+const PLANNING_STATUS_OPTIONS = ['Firm', 'MFC', 'B & B', 'Others', 'Order Received', 'Invoice', 'Lost', 'Parked'];
 const cleanCellValue = (value = '') => String(value ?? '').trim().replace(/\s+/g, ' ');
 const normalizeKey = (value = '') => cleanCellValue(value).toUpperCase();
 const buildExactRegex = (value = '') => new RegExp(`^${escapeRegex(cleanCellValue(value))}$`, 'i');
+const pickFirstNonEmpty = (...values) => {
+    for (const value of values) {
+        const cleaned = cleanCellValue(value);
+        if (cleaned) {
+            return cleaned;
+        }
+    }
+
+    return '';
+};
+const toSafeNumber = (value, fallback = 0) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+};
 
 const getPlanningMonthLabels = (financialYear) => {
     if (!/^\d{4}-\d{2}$/.test(financialYear)) {
@@ -48,6 +62,22 @@ const resolvePlanningMonth = (financialYear, monthYear) => {
 const resolvePlanningStatus = (value = '') => {
     const cleaned = cleanCellValue(value);
     return PLANNING_STATUS_OPTIONS.find((status) => normalizeKey(status) === normalizeKey(cleaned)) || '';
+};
+
+const findCustomerByLookup = async (value = '') => {
+    const cleaned = cleanCellValue(value);
+    if (!cleaned) {
+        return null;
+    }
+
+    const exactMatch = buildExactRegex(cleaned);
+    return Customer.findOne({
+        $or: [
+            { externalCode: exactMatch },
+            { customerName: exactMatch },
+            { companyName: exactMatch }
+        ]
+    });
 };
 
 const getCurrentFinancialYear = () => {
@@ -250,26 +280,44 @@ const importCustomers = async (req, res) => {
             try {
                 // Map columns (case-insensitive)
                 const customerData = {
-                    customerName: row['Customer Name'] || row['customerName'] || row['Name'],
-                    companyName: row['Company Name'] || row['companyName'] || row['Company'],
-                    gstin: row['GSTIN'] || row['gstin'] || row['GST No'],
-                    mobile: row['Mobile'] || row['mobile'] || row['Phone'] || '',
-                    email: row['Email'] || row['email'] || '',
-                    logoUrl: row['Logo URL'] || row['logoUrl'] || '',
-                    defaultDiscount: parseFloat(row['Default Discount'] || row['defaultDiscount'] || row['Discount'] || 0),
+                    externalCode: pickFirstNonEmpty(row['Customer Code'], row.customerCode, row['Code'], row['BP Code']),
+                    customerName: pickFirstNonEmpty(
+                        row['Customer Name'],
+                        row.customerName,
+                        row['Name'],
+                        row['Contact Person'],
+                        row['BP Name'],
+                        row['Company Name'],
+                        row.companyName,
+                        row['Company']
+                    ),
+                    companyName: pickFirstNonEmpty(
+                        row['Company Name'],
+                        row.companyName,
+                        row['Company'],
+                        row['BP Name'],
+                        row['Customer Name'],
+                        row.customerName,
+                        row['Name']
+                    ),
+                    gstin: pickFirstNonEmpty(row['GSTIN'], row.gstin, row['GST No'], row['Federal Tax ID'], row['Unified Federal Tax ID'], row['VAT Reg. Number'], row['Registration No.']),
+                    mobile: pickFirstNonEmpty(row['Mobile'], row.mobile, row['Phone'], row['Mobile Phone'], row['Telephone 1'], row['Telephone 2']),
+                    email: pickFirstNonEmpty(row['Email'], row.email, row['E-Mail'], row.EmailCC),
+                    logoUrl: pickFirstNonEmpty(row['Logo URL'], row.logoUrl, row.Picture),
+                    defaultDiscount: toSafeNumber(row['Default Discount'] ?? row.defaultDiscount ?? row['Discount'] ?? row['Discount %'], 0),
                     billingAddress: {
-                        line1: row['Billing Address Line 1'] || row['Address Line 1'] || '',
-                        line2: row['Billing Address Line 2'] || row['Address Line 2'] || '',
-                        city: row['City'] || row['Billing City'] || '',
-                        state: row['State'] || row['Billing State'] || '',
-                        pincode: row['Pincode'] || row['Billing Pincode'] || ''
+                        line1: pickFirstNonEmpty(row['Billing Address Line 1'], row['Address Line 1'], row['Bill-to Street']),
+                        line2: pickFirstNonEmpty(row['Billing Address Line 2'], row['Address Line 2'], row['Bill-to County'], row['Bill-to Country']),
+                        city: pickFirstNonEmpty(row['City'], row['Billing City'], row['Bill-to City'], row['City/Town/Village']),
+                        state: pickFirstNonEmpty(row['State'], row['Billing State'], row['Bill-to State'], row['BP State']),
+                        pincode: pickFirstNonEmpty(row['Pincode'], row['Billing Pincode'], row['Bill-to Zip Code'], row['Zip Code'])
                     },
                     shippingAddress: {
-                        line1: row['Shipping Address Line 1'] || row['Billing Address Line 1'] || row['Address Line 1'] || '',
-                        line2: row['Shipping Address Line 2'] || row['Billing Address Line 2'] || row['Address Line 2'] || '',
-                        city: row['Shipping City'] || row['City'] || '',
-                        state: row['Shipping State'] || row['State'] || '',
-                        pincode: row['Shipping Pincode'] || row['Pincode'] || ''
+                        line1: pickFirstNonEmpty(row['Shipping Address Line 1'], row['Billing Address Line 1'], row['Address Line 1'], row['Ship-to Street']),
+                        line2: pickFirstNonEmpty(row['Shipping Address Line 2'], row['Billing Address Line 2'], row['Address Line 2'], row['Ship-to County'], row['Ship-to Country']),
+                        city: pickFirstNonEmpty(row['Shipping City'], row['City'], row['Ship-to City'], row['City/Town/Village']),
+                        state: pickFirstNonEmpty(row['Shipping State'], row['State'], row['Ship-to State'], row['BP State']),
+                        pincode: pickFirstNonEmpty(row['Shipping Pincode'], row['Pincode'], row['Ship-to Zip Code'], row['Zip Code'])
                     },
                     createdBy: req.user ? req.user.id : null
                 };
@@ -279,16 +327,30 @@ const importCustomers = async (req, res) => {
                     throw new Error('Missing required fields: Customer Name or Company Name');
                 }
 
-                const existing = customerData.gstin
-                    ? await Customer.findOne({ gstin: customerData.gstin })
-                    : await Customer.findOne({
+                let existing = null;
+                if (customerData.externalCode) {
+                    existing = await Customer.findOne({
+                        externalCode: buildExactRegex(customerData.externalCode)
+                    });
+                }
+
+                if (!existing && customerData.gstin) {
+                    existing = await Customer.findOne({ gstin: customerData.gstin });
+                }
+
+                if (!existing) {
+                    existing = await Customer.findOne({
                         companyName: customerData.companyName,
                         customerName: customerData.customerName
                     });
+                }
 
                 if (existing) {
                     // Update existing customer
-                    await Customer.findByIdAndUpdate(existing._id, customerData);
+                    await Customer.findByIdAndUpdate(existing._id, {
+                        ...customerData,
+                        createdBy: req.user?.id || existing.createdBy || null
+                    });
                 } else {
                     // Create new customer
                     await Customer.create(customerData);
@@ -349,9 +411,7 @@ const importPlanning = async (req, res) => {
         const missingProductCodes = [];
 
         for (const custCode of uniqueCustomerCodes) {
-            const existing = await Customer.findOne({
-                customerName: { $regex: buildExactRegex(custCode) }
-            });
+            const existing = await findCustomerByLookup(custCode);
             if (!existing) {
                 missingCustomerCodes.push(custCode);
             }
@@ -437,9 +497,7 @@ const importPlanning = async (req, res) => {
 
                 const month = resolvePlanningMonth(financialYear, monthYear);
 
-                let customer = await Customer.findOne({
-                    customerName: { $regex: buildExactRegex(customerLookup) }
-                });
+                const customer = await findCustomerByLookup(customerLookup);
                 if (!customer) {
                     throw new Error(`Customer code not found: ${customerLookup}`);
                 }
@@ -536,7 +594,7 @@ const templateData = [
             {
                 'Financial Year': financialYear,
                 'Month & Year': monthLabels[0],
-                'Customer Code': customer?.customerName || 'CUST001',
+                'Customer Code': customer?.externalCode || customer?.customerName || 'CUST001',
                 'Product Code': product?.productCode || 'PROD001',
                 Qty: 10,
                 Value: 2500,
@@ -621,8 +679,9 @@ const getCustomerTemplate = async (req, res) => {
     try {
         const templateData = [
             {
+                'Customer Code': 'CUST-001',
                 'Customer Name': 'John Doe',
-                'Company Name': 'ABC Enterprises',
+                'Company Name': 'ABC Enterprises Pvt Ltd',
                 'GSTIN': '27AABCU9603R1ZM',
                 'Mobile': '9876543210',
                 'Email': 'john@abc.com',
@@ -631,6 +690,11 @@ const getCustomerTemplate = async (req, res) => {
                 'City': 'Mumbai',
                 'State': 'Maharashtra',
                 'Pincode': '400001',
+                'Shipping Address Line 1': 'Warehouse 12, Industrial Estate',
+                'Shipping Address Line 2': 'Phase 2',
+                'Shipping City': 'Mumbai',
+                'Shipping State': 'Maharashtra',
+                'Shipping Pincode': '400001',
                 'Default Discount': 5,
                 'Logo URL': ''
             }
@@ -640,12 +704,23 @@ const getCustomerTemplate = async (req, res) => {
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, 'Customers');
 
+        const notesSheet = XLSX.utils.aoa_to_sheet([
+            ['Customer Import Notes'],
+            ['Required columns', 'Customer Code, Customer Name, Company Name'],
+            ['Meaning', 'Customer Code = external customer code, Customer Name = contact/person, Company Name = trade name/company'],
+            ['Optional columns', 'GSTIN, Mobile, Email, Billing/Shipping address columns, Default Discount, Logo URL'],
+            ['Accepted source formats', 'This importer also accepts BP Code, BP Name, Contact Person and related SAP-style columns']
+        ]);
+        XLSX.utils.book_append_sheet(workbook, notesSheet, 'Instructions');
+
         // Set column widths
         worksheet['!cols'] = [
-            { wch: 20 }, { wch: 25 }, { wch: 20 }, { wch: 15 }, { wch: 25 },
+            { wch: 15 }, { wch: 20 }, { wch: 28 }, { wch: 20 }, { wch: 15 }, { wch: 25 },
             { wch: 25 }, { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 10 },
+            { wch: 28 }, { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 10 },
             { wch: 15 }, { wch: 40 }
         ];
+        notesSheet['!cols'] = [{ wch: 24 }, { wch: 120 }];
 
         const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
 

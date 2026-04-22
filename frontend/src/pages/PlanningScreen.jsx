@@ -22,7 +22,7 @@ const FY_MONTHS = [
     'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'
 ];
 
-const STATUS_OPTIONS = ['Firm', 'MFC', 'B & B', 'Others', 'Order Received', 'Lost', 'Parked'];
+const STATUS_OPTIONS = ['Firm', 'MFC', 'B & B', 'Others', 'Order Received', 'Invoice', 'Lost', 'Parked'];
 
 // Generate financial year options (current + next 2)
 const getFinancialYears = () => {
@@ -76,6 +76,34 @@ const getCanonicalMgrCode = (value, mgrItems = []) => {
     return match?.code || String(value || '').trim().replace(/\s+/g, ' ');
 };
 
+const getEntityId = (value) => {
+    if (!value) {
+        return '';
+    }
+
+    if (typeof value === 'object') {
+        return String(value._id || '');
+    }
+
+    return String(value);
+};
+
+const getFallbackCode = (prefix, value) => {
+    const entityId = getEntityId(value);
+    return entityId ? `${prefix}-${entityId.slice(-8).toUpperCase()}` : '';
+};
+
+const compareSortValues = (left, right) => {
+    if (typeof left === 'number' && typeof right === 'number') {
+        return left - right;
+    }
+
+    return String(left || '').localeCompare(String(right || ''), undefined, {
+        numeric: true,
+        sensitivity: 'base'
+    });
+};
+
 const PlanningScreen = () => {
     const [financialYear, setFinancialYear] = useState(getFinancialYears()[1]);
     const [entries, setEntries] = useState([]);
@@ -125,6 +153,10 @@ const PlanningScreen = () => {
         mgrCode: '',
         mgrCode2: '',
         status: ''
+    });
+    const [sortConfig, setSortConfig] = useState({
+        key: 'monthYear',
+        direction: 'asc'
     });
 
     const fetchData = useCallback(async () => {
@@ -178,6 +210,7 @@ const PlanningScreen = () => {
         }
 
         return customers.filter((customer) =>
+            (customer.externalCode || '').toLowerCase().includes(customerSearch.toLowerCase()) ||
             (customer.companyName || '').toLowerCase().includes(customerSearch.toLowerCase()) ||
             (customer.customerName || '').toLowerCase().includes(customerSearch.toLowerCase())
         ).slice(0, 10);
@@ -205,6 +238,108 @@ const PlanningScreen = () => {
     }, [entries, filters]);
 
     const hasActiveFilters = Boolean(filters.mgrCode || filters.mgrCode2 || filters.status);
+    const monthLabels = getMonthLabels(financialYear);
+    const monthOrder = useMemo(
+        () => new Map(monthLabels.map((label, index) => [label, index])),
+        [monthLabels]
+    );
+    const customerMap = useMemo(
+        () => new Map(customers.map((customer) => [String(customer._id), customer])),
+        [customers]
+    );
+    const productMap = useMemo(
+        () => new Map(products.map((product) => [String(product._id), product])),
+        [products]
+    );
+
+    const getCustomerById = useCallback(
+        (customerId) => customerMap.get(getEntityId(customerId)) || null,
+        [customerMap]
+    );
+    const getProductById = useCallback(
+        (productId) => productMap.get(getEntityId(productId)) || null,
+        [productMap]
+    );
+    const getCustomerForEntry = useCallback(
+        (entry) => getCustomerById(entry.customerId) || (typeof entry.customerId === 'object' ? entry.customerId : null),
+        [getCustomerById]
+    );
+    const getProductForEntry = useCallback(
+        (entry) => getProductById(entry.productId) || (typeof entry.productId === 'object' ? entry.productId : null),
+        [getProductById]
+    );
+    const getCustomerCode = useCallback(
+        (customerId) => getCustomerById(customerId)?.externalCode || getFallbackCode('CUST', customerId) || '-',
+        [getCustomerById]
+    );
+    const getProductCode = useCallback(
+        (productId) => getProductById(productId)?.productCode || '-',
+        [getProductById]
+    );
+
+    const sortedEntries = useMemo(() => {
+        const rows = [...filteredEntries];
+
+        rows.sort((left, right) => {
+            let leftValue;
+            let rightValue;
+
+            switch (sortConfig.key) {
+                case 'monthYear':
+                    leftValue = monthOrder.get(left.monthYear) ?? Number.MAX_SAFE_INTEGER;
+                    rightValue = monthOrder.get(right.monthYear) ?? Number.MAX_SAFE_INTEGER;
+                    break;
+                case 'customerCode':
+                    leftValue = getCustomerCode(left.customerId);
+                    rightValue = getCustomerCode(right.customerId);
+                    break;
+                case 'customerName':
+                    leftValue = left.customerName;
+                    rightValue = right.customerName;
+                    break;
+                case 'productCode':
+                    leftValue = getProductCode(left.productId);
+                    rightValue = getProductCode(right.productId);
+                    break;
+                case 'productName':
+                    leftValue = left.productName;
+                    rightValue = right.productName;
+                    break;
+                case 'qty':
+                    leftValue = Number(left.qty || 0);
+                    rightValue = Number(right.qty || 0);
+                    break;
+                case 'value':
+                    leftValue = Number(left.value || 0);
+                    rightValue = Number(right.value || 0);
+                    break;
+                case 'totalValue':
+                    leftValue = Number(left.totalValue || 0);
+                    rightValue = Number(right.totalValue || 0);
+                    break;
+                case 'mgrCode':
+                    leftValue = getCanonicalMgrCode(left.mgrCode, mgrList);
+                    rightValue = getCanonicalMgrCode(right.mgrCode, mgrList);
+                    break;
+                case 'mgrCode2':
+                    leftValue = getCanonicalMgrCode(left.mgrCode2 || '', mgrList2);
+                    rightValue = getCanonicalMgrCode(right.mgrCode2 || '', mgrList2);
+                    break;
+                case 'status':
+                    leftValue = left.status;
+                    rightValue = right.status;
+                    break;
+                default:
+                    leftValue = left[sortConfig.key];
+                    rightValue = right[sortConfig.key];
+            }
+
+            const comparison = compareSortValues(leftValue, rightValue);
+            return sortConfig.direction === 'asc' ? comparison : -comparison;
+        });
+
+        return rows;
+    }, [filteredEntries, sortConfig, monthOrder, mgrList, mgrList2, getCustomerCode, getProductCode]);
 
     const handleNewRowChange = (field, value) => {
         setNewRow((prev) => ({ ...prev, [field]: value }));
@@ -230,6 +365,8 @@ const PlanningScreen = () => {
                 return 'bg-amber-50 text-amber-700';
             case 'B & B':
                 return 'bg-purple-50 text-purple-700';
+            case 'Invoice':
+                return 'bg-orange-50 text-orange-700';
             case 'Order Received':
                 return 'bg-sky-50 text-sky-700';
             case 'Lost':
@@ -341,39 +478,83 @@ const PlanningScreen = () => {
     };
 
     const exportToExcel = () => {
-        if (!reportData) {
+        if (!sortedEntries.length && !reportData && !reportData2) {
+            toast.error('No planning data available to export');
             return;
         }
 
         const workbook = XLSX.utils.book_new();
 
-        const entriesData = filteredEntries.map((entry) => ({
-            Month: entry.monthYear,
-            Customer: entry.customerName,
-            Product: entry.productName,
-            Qty: entry.qty,
-            Value: entry.value,
-            Total: entry.totalValue,
-            'MGR 1': getCanonicalMgrCode(entry.mgrCode, mgrList),
-            'MGR 2': getCanonicalMgrCode(entry.mgrCode2 || '', mgrList2),
-            Status: entry.status
-        }));
+        const entriesData = sortedEntries.map((entry) => ({
+                Month: entry.monthYear,
+                'Customer Code': getCustomerCode(entry.customerId),
+                'Customer Name': entry.customerName,
+                'Product Code': getProductCode(entry.productId),
+                'Product Name': entry.productName,
+                Qty: entry.qty,
+                Value: entry.value,
+                Total: entry.totalValue,
+                'MGR 1': getCanonicalMgrCode(entry.mgrCode, mgrList),
+                'MGR 2': getCanonicalMgrCode(entry.mgrCode2 || '', mgrList2),
+                Status: entry.status
+            }));
         const entriesSheet = XLSX.utils.json_to_sheet(entriesData);
+        entriesSheet['!cols'] = [
+            { wch: 12 }, { wch: 15 }, { wch: 20 }, { wch: 15 }, 
+            { wch: 25 }, { wch: 10 }, { wch: 12 }, { wch: 12 },
+            { wch: 12 }, { wch: 12 }, { wch: 15 }
+        ];
         XLSX.utils.book_append_sheet(workbook, entriesSheet, 'Planning Entries');
 
-        const reportRows = reportData.rows.map((row) => {
+        const buildReportRows = (data) => data.rows.map((row) => {
             const exportRow = { Month: row.month };
-            reportData.mgrCodes.forEach((mgr) => {
+            data.mgrCodes.forEach((mgr) => {
                 exportRow[mgr] = row[mgr] || 0;
             });
             exportRow.Total = row.total || 0;
             return exportRow;
         });
-        const reportSheet = XLSX.utils.json_to_sheet(reportRows);
-        XLSX.utils.book_append_sheet(workbook, reportSheet, 'MGR Report');
+
+        if (reportData) {
+            const reportSheet = XLSX.utils.json_to_sheet(buildReportRows(reportData));
+            XLSX.utils.book_append_sheet(workbook, reportSheet, 'MGR 1 Report');
+        }
+
+        if (reportData2) {
+            const reportSheet2 = XLSX.utils.json_to_sheet(buildReportRows(reportData2));
+            XLSX.utils.book_append_sheet(workbook, reportSheet2, 'MGR 2 Report');
+        }
 
         XLSX.writeFile(workbook, `Planning-${financialYear}.xlsx`);
-        toast.success('Excel downloaded');
+        toast.success('Excel downloaded with customer and product code details');
+    };
+
+    const requestSort = (key) => {
+        setSortConfig((prev) => ({
+            key,
+            direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+        }));
+    };
+
+    const renderSortableHeader = (label, key, className = '') => {
+        const isActive = sortConfig.key === key;
+        const isRightAligned = className.includes('text-right');
+
+        return (
+            <th className={`py-3 px-3 ${className}`}>
+                <button
+                    type="button"
+                    onClick={() => requestSort(key)}
+                    className={`group inline-flex items-center gap-1.5 font-black text-slate-700 text-xs ${isRightAligned ? 'w-full justify-end' : ''}`}
+                >
+                    <span>{label}</span>
+                    <MdKeyboardArrowDown
+                        className={`transition-all duration-200 ${isActive ? 'text-primary-600 opacity-100' : 'text-slate-300 opacity-70 group-hover:text-slate-500'} ${isActive && sortConfig.direction === 'asc' ? 'rotate-180' : ''}`}
+                        size={16}
+                    />
+                </button>
+            </th>
+        );
     };
 
     const toggleQuarter = (quarterPrefix) => {
@@ -382,8 +563,6 @@ const PlanningScreen = () => {
             [quarterPrefix]: !prev[quarterPrefix]
         }));
     };
-
-    const monthLabels = getMonthLabels(financialYear);
     const calculatedTotal = (newRow.qty && newRow.value) ? Number(newRow.qty) * Number(newRow.value) : 0;
     const compactFieldClass = 'w-full px-2.5 py-2.5 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-primary-500 bg-white';
     const compactNumericFieldClass = `${compactFieldClass} text-right`;
@@ -532,15 +711,17 @@ const PlanningScreen = () => {
                             <table className="w-full text-left text-sm">
                                 <thead>
                                     <tr className="bg-amber-50 border-b border-amber-100">
-                                        <th className="py-3 px-3 font-black text-slate-700 text-xs min-w-[110px]">Month & Year</th>
-                                        <th className="py-3 px-3 font-black text-slate-700 text-xs min-w-[200px]">Customer Name</th>
-                                        <th className="py-3 px-3 font-black text-slate-700 text-xs min-w-[260px]">Product</th>
-                                        <th className="py-3 px-3 font-black text-slate-700 text-xs text-right min-w-[90px]">Qty</th>
-                                        <th className="py-3 px-3 font-black text-slate-700 text-xs text-right min-w-[110px]">Value</th>
-                                        <th className="py-3 px-3 font-black text-slate-700 text-xs text-right bg-amber-100 min-w-[130px]">Qty * Value</th>
-                                        <th className="py-3 px-3 font-black text-slate-700 text-xs min-w-[140px]">MGR 1</th>
-                                        <th className="py-3 px-3 font-black text-slate-700 text-xs min-w-[140px]">MGR 2</th>
-                                        <th className="py-3 px-3 font-black text-slate-700 text-xs min-w-[220px]">Status</th>
+                                        {renderSortableHeader('Month & Year', 'monthYear', 'min-w-[110px]')}
+                                        {renderSortableHeader('Customer Code', 'customerCode', 'min-w-[120px]')}
+                                        {renderSortableHeader('Customer Name', 'customerName', 'min-w-[200px]')}
+                                        {renderSortableHeader('Product Code', 'productCode', 'min-w-[120px]')}
+                                        {renderSortableHeader('Product Name', 'productName', 'min-w-[260px]')}
+                                        {renderSortableHeader('Qty', 'qty', 'text-right min-w-[90px]')}
+                                        {renderSortableHeader('Value', 'value', 'text-right min-w-[110px]')}
+                                        {renderSortableHeader('Qty * Value', 'totalValue', 'text-right bg-amber-100 min-w-[130px]')}
+                                        {renderSortableHeader('MGR 1', 'mgrCode', 'min-w-[140px]')}
+                                        {renderSortableHeader('MGR 2', 'mgrCode2', 'min-w-[140px]')}
+                                        {renderSortableHeader('Status', 'status', 'min-w-[220px]')}
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-50">
@@ -556,6 +737,11 @@ const PlanningScreen = () => {
                                                     <option key={month} value={month}>{month}</option>
                                                 ))}
                                             </select>
+                                        </td>
+                                        <td className="py-2 px-3">
+                                            <div className="text-xs font-bold text-primary-700 bg-primary-100 px-2 py-2 rounded-lg">
+                                                {newRow.customerId ? getCustomerCode(newRow.customerId) : '-'}
+                                            </div>
                                         </td>
                                         <td ref={customerAnchorRef} className="py-2 px-3">
                                             <input
@@ -579,11 +765,19 @@ const PlanningScreen = () => {
                                                             onClick={() => selectCustomer(customer)}
                                                             className="w-full text-left px-3 py-2.5 text-sm font-bold hover:bg-primary-50 transition-colors border-b border-slate-50"
                                                         >
-                                                            {customer.companyName || customer.customerName}
+                                                            <div>{customer.companyName || customer.customerName}</div>
+                                                            <div className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                                                                {customer.externalCode || getFallbackCode('CUST', customer._id)}
+                                                            </div>
                                                         </button>
                                                     ))}
                                                 </div>
                                             </PortalDropdown>
+                                        </td>
+                                        <td className="py-2 px-3">
+                                            <div className="text-xs font-bold text-primary-700 bg-primary-100 px-2 py-2 rounded-lg">
+                                                {newRow.productId ? getProductCode(newRow.productId) : '-'}
+                                            </div>
                                         </td>
                                         <td ref={productAnchorRef} className="py-2 px-3">
                                             <input
@@ -697,17 +891,25 @@ const PlanningScreen = () => {
 
                                     {loading ? (
                                         <tr>
-                                            <td colSpan="9" className="py-10 text-center">
+                                            <td colSpan="11" className="py-10 text-center">
                                                 <div className="animate-spin border-4 border-slate-200 border-t-primary-600 rounded-full h-8 w-8 mx-auto"></div>
                                             </td>
                                         </tr>
-                                    ) : filteredEntries.length > 0 ? (
-                                        filteredEntries.map((entry) => (
+                                    ) : sortedEntries.length > 0 ? (
+                                        sortedEntries.map((entry) => {
+                                            const customer = getCustomerForEntry(entry);
+                                            const product = getProductForEntry(entry);
+                                            const customerCode = customer?.externalCode || getFallbackCode('CUST', entry.customerId) || '-';
+                                            const productCode = product?.productCode || '-';
+                                            
+                                            return (
                                             <tr key={entry._id} className={`hover:bg-slate-50 transition-colors ${editingId === entry._id ? 'bg-primary-50/60' : ''}`}>
                                                 <td className="py-3 px-3 font-bold text-slate-700 text-xs whitespace-nowrap">{entry.monthYear}</td>
+                                                <td className="py-3 px-3 font-bold text-blue-700 text-xs bg-blue-50 rounded whitespace-nowrap">{customerCode}</td>
                                                 <td className="py-3 px-3 font-bold text-slate-900 text-xs max-w-[220px]">
                                                     <p className="truncate" title={entry.customerName}>{entry.customerName}</p>
                                                 </td>
+                                                <td className="py-3 px-3 font-bold text-emerald-700 text-xs bg-emerald-50 rounded whitespace-nowrap">{productCode}</td>
                                                 <td className="py-3 px-3 text-slate-700 text-xs max-w-[320px]">
                                                     <p className="truncate" title={entry.productName}>{entry.productName}</p>
                                                 </td>
@@ -750,10 +952,11 @@ const PlanningScreen = () => {
                                                     </div>
                                                 </td>
                                             </tr>
-                                        ))
+                                            );
+                                        })
                                     ) : (
                                         <tr>
-                                            <td colSpan="9" className="py-10 text-center text-slate-400 font-bold text-sm">
+                                            <td colSpan="11" className="py-10 text-center text-slate-400 font-bold text-sm">
                                                 {hasActiveFilters
                                                     ? 'No planning entries match the selected filters.'
                                                     : `No planning entries for FY ${financialYear}. Add your first entry above.`}
