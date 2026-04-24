@@ -107,6 +107,7 @@ const compareSortValues = (left, right) => {
 const PlanningScreen = () => {
     const [financialYear, setFinancialYear] = useState(getFinancialYears()[1]);
     const [entries, setEntries] = useState([]);
+    const [combinedReportData, setCombinedReportData] = useState(null);
     const [reportData, setReportData] = useState(null);
     const [reportData2, setReportData2] = useState(null);
     const [loading, setLoading] = useState(false);
@@ -162,13 +163,15 @@ const PlanningScreen = () => {
     const fetchData = useCallback(async () => {
         setLoading(true);
         try {
-            const [entriesRes, reportRes, report2Res] = await Promise.all([
+            const [entriesRes, combinedReportRes, reportRes, report2Res] = await Promise.all([
                 planningService.getAll(financialYear),
+                planningService.getMGRReport(financialYear),
                 planningService.getMGRReport(financialYear, 'MGR1'),
                 planningService.getMGRReport(financialYear, 'MGR2')
             ]);
 
             setEntries(entriesRes.data);
+            setCombinedReportData(combinedReportRes.data);
             setReportData(reportRes.data);
             setReportData2(report2Res.data);
         } catch (err) {
@@ -259,14 +262,6 @@ const PlanningScreen = () => {
     const getProductById = useCallback(
         (productId) => productMap.get(getEntityId(productId)) || null,
         [productMap]
-    );
-    const getCustomerForEntry = useCallback(
-        (entry) => getCustomerById(entry.customerId) || (typeof entry.customerId === 'object' ? entry.customerId : null),
-        [getCustomerById]
-    );
-    const getProductForEntry = useCallback(
-        (entry) => getProductById(entry.productId) || (typeof entry.productId === 'object' ? entry.productId : null),
-        [getProductById]
     );
     const getCustomerCode = useCallback(
         (customerId) => getCustomerById(customerId)?.externalCode || getFallbackCode('CUST', customerId) || '-',
@@ -539,6 +534,9 @@ const PlanningScreen = () => {
         const workbook = XLSX.utils.book_new();
         const reportRows = data.rows.map((row) => {
             const exportRow = { Month: row.month };
+            if (row.mgrType) {
+                exportRow['MGR Type'] = row.mgrType;
+            }
             data.mgrCodes.forEach((mgr) => {
                 exportRow[mgr] = row[mgr] || 0;
             });
@@ -732,26 +730,35 @@ const PlanningScreen = () => {
                             </div>
                         </div>
 
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left text-sm">
+                        <div className="overflow-hidden">
+                            <table className="w-full table-fixed text-left text-sm">
+                                <colgroup>
+                                    <col className="w-[8%]" />
+                                    <col className="w-[17%]" />
+                                    <col className="w-[21%]" />
+                                    <col className="w-[6%]" />
+                                    <col className="w-[8%]" />
+                                    <col className="w-[9%]" />
+                                    <col className="w-[9%]" />
+                                    <col className="w-[9%]" />
+                                    <col className="w-[13%]" />
+                                </colgroup>
                                 <thead>
                                     <tr className="bg-amber-50 border-b border-amber-100">
-                                        {renderSortableHeader('Month & Year', 'monthYear', 'min-w-[110px]')}
-                                        {renderSortableHeader('Customer Code', 'customerCode', 'min-w-[120px]')}
-                                        {renderSortableHeader('Customer Name', 'customerName', 'min-w-[200px]')}
-                                        {renderSortableHeader('Product Code', 'productCode', 'min-w-[120px]')}
-                                        {renderSortableHeader('Product Name', 'productName', 'min-w-[260px]')}
-                                        {renderSortableHeader('Qty', 'qty', 'text-right min-w-[90px]')}
-                                        {renderSortableHeader('Value', 'value', 'text-right min-w-[110px]')}
-                                        {renderSortableHeader('Qty * Value', 'totalValue', 'text-right bg-amber-100 min-w-[130px]')}
-                                        {renderSortableHeader('MGR 1', 'mgrCode', 'min-w-[140px]')}
-                                        {renderSortableHeader('MGR 2', 'mgrCode2', 'min-w-[140px]')}
-                                        {renderSortableHeader('Status', 'status', 'min-w-[220px]')}
+                                        {renderSortableHeader('Month', 'monthYear', 'px-2 py-3')}
+                                        {renderSortableHeader('Customer', 'customerName', 'px-2 py-3')}
+                                        {renderSortableHeader('Product Name', 'productName', 'px-2 py-3')}
+                                        {renderSortableHeader('Qty', 'qty', 'px-2 py-3 text-right')}
+                                        {renderSortableHeader('Value', 'value', 'px-2 py-3 text-right')}
+                                        {renderSortableHeader('Total', 'totalValue', 'px-2 py-3 text-right bg-amber-100')}
+                                        {renderSortableHeader('MGR 1', 'mgrCode', 'px-2 py-3')}
+                                        {renderSortableHeader('MGR 2', 'mgrCode2', 'px-2 py-3')}
+                                        {renderSortableHeader('Status', 'status', 'px-2 py-3')}
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-50">
                                     <tr className="bg-primary-50/40 border-b border-primary-100 align-top">
-                                        <td className="py-2 px-3">
+                                        <td className="py-2 px-2">
                                             <select
                                                 value={newRow.monthYear}
                                                 onChange={(e) => handleNewRowChange('monthYear', e.target.value)}
@@ -763,12 +770,7 @@ const PlanningScreen = () => {
                                                 ))}
                                             </select>
                                         </td>
-                                        <td className="py-2 px-3">
-                                            <div className="text-xs font-bold text-primary-700 bg-primary-100 px-2 py-2 rounded-lg">
-                                                {newRow.customerId ? getCustomerCode(newRow.customerId) : '-'}
-                                            </div>
-                                        </td>
-                                        <td ref={customerAnchorRef} className="py-2 px-3">
+                                        <td ref={customerAnchorRef} className="py-2 px-2">
                                             <input
                                                 type="text"
                                                 value={customerSearch}
@@ -799,12 +801,7 @@ const PlanningScreen = () => {
                                                 </div>
                                             </PortalDropdown>
                                         </td>
-                                        <td className="py-2 px-3">
-                                            <div className="text-xs font-bold text-primary-700 bg-primary-100 px-2 py-2 rounded-lg">
-                                                {newRow.productId ? getProductCode(newRow.productId) : '-'}
-                                            </div>
-                                        </td>
-                                        <td ref={productAnchorRef} className="py-2 px-3">
+                                        <td ref={productAnchorRef} className="py-2 px-2">
                                             <input
                                                 type="text"
                                                 value={productSearch}
@@ -832,7 +829,7 @@ const PlanningScreen = () => {
                                                 </div>
                                             </PortalDropdown>
                                         </td>
-                                        <td className="py-2 px-3">
+                                        <td className="py-2 px-2">
                                             <input
                                                 type="number"
                                                 value={newRow.qty}
@@ -841,7 +838,7 @@ const PlanningScreen = () => {
                                                 className={compactNumericFieldClass}
                                             />
                                         </td>
-                                        <td className="py-2 px-3">
+                                        <td className="py-2 px-2">
                                             <input
                                                 type="number"
                                                 min="0"
@@ -851,12 +848,12 @@ const PlanningScreen = () => {
                                                 className={compactNumericFieldClass}
                                             />
                                         </td>
-                                        <td className="py-2 px-3 bg-amber-50/80">
+                                        <td className="py-2 px-2 bg-amber-50/80">
                                             <div className="px-2.5 py-2.5 rounded-lg bg-amber-50 border border-amber-100 text-sm font-black text-slate-900 text-right">
                                                 {calculatedTotal.toLocaleString()}
                                             </div>
                                         </td>
-                                        <td className="py-2 px-3">
+                                        <td className="py-2 px-2">
                                             <select
                                                 value={newRow.mgrCode}
                                                 onChange={(e) => handleNewRowChange('mgrCode', e.target.value)}
@@ -868,7 +865,7 @@ const PlanningScreen = () => {
                                                 ))}
                                             </select>
                                         </td>
-                                        <td className="py-2 px-3">
+                                        <td className="py-2 px-2">
                                             <select
                                                 value={newRow.mgrCode2}
                                                 onChange={(e) => handleNewRowChange('mgrCode2', e.target.value)}
@@ -880,7 +877,7 @@ const PlanningScreen = () => {
                                                 ))}
                                             </select>
                                         </td>
-                                        <td className="py-2 px-3">
+                                        <td className="py-2 px-2">
                                             <div className="space-y-2">
                                                 <select
                                                     value={newRow.status}
@@ -916,46 +913,38 @@ const PlanningScreen = () => {
 
                                     {loading ? (
                                         <tr>
-                                            <td colSpan="11" className="py-10 text-center">
+                                            <td colSpan="9" className="py-10 text-center">
                                                 <div className="animate-spin border-4 border-slate-200 border-t-primary-600 rounded-full h-8 w-8 mx-auto"></div>
                                             </td>
                                         </tr>
                                     ) : sortedEntries.length > 0 ? (
-                                        sortedEntries.map((entry) => {
-                                            const customer = getCustomerForEntry(entry);
-                                            const product = getProductForEntry(entry);
-                                            const customerCode = customer?.externalCode || getFallbackCode('CUST', entry.customerId) || '-';
-                                            const productCode = product?.productCode || '-';
-                                            
-                                            return (
+                                        sortedEntries.map((entry) => (
                                             <tr key={entry._id} className={`hover:bg-slate-50 transition-colors ${editingId === entry._id ? 'bg-primary-50/60' : ''}`}>
-                                                <td className="py-3 px-3 font-bold text-slate-700 text-xs whitespace-nowrap">{entry.monthYear}</td>
-                                                <td className="py-3 px-3 font-bold text-blue-700 text-xs bg-blue-50 rounded whitespace-nowrap">{customerCode}</td>
-                                                <td className="py-3 px-3 font-bold text-slate-900 text-xs max-w-[220px]">
+                                                <td className="py-3 px-2 font-bold text-slate-700 text-xs whitespace-nowrap">{entry.monthYear}</td>
+                                                <td className="py-3 px-2 font-bold text-slate-900 text-xs">
                                                     <p className="truncate" title={entry.customerName}>{entry.customerName}</p>
                                                 </td>
-                                                <td className="py-3 px-3 font-bold text-emerald-700 text-xs bg-emerald-50 rounded whitespace-nowrap">{productCode}</td>
-                                                <td className="py-3 px-3 text-slate-700 text-xs max-w-[320px]">
+                                                <td className="py-3 px-2 text-slate-700 text-xs">
                                                     <p className="truncate" title={entry.productName}>{entry.productName}</p>
                                                 </td>
-                                                <td className="py-3 px-3 text-right font-bold text-slate-700 text-xs whitespace-nowrap">{entry.qty}</td>
-                                                <td className="py-3 px-3 text-right font-bold text-slate-700 text-xs whitespace-nowrap">{entry.value?.toLocaleString()}</td>
-                                                <td className="py-3 px-3 text-right font-black text-slate-900 text-xs bg-amber-50/50 whitespace-nowrap">
+                                                <td className="py-3 px-2 text-right font-bold text-slate-700 text-xs whitespace-nowrap">{entry.qty}</td>
+                                                <td className="py-3 px-2 text-right font-bold text-slate-700 text-xs whitespace-nowrap">{entry.value?.toLocaleString()}</td>
+                                                <td className="py-3 px-2 text-right font-black text-slate-900 text-xs bg-amber-50/50 whitespace-nowrap">
                                                     {entry.totalValue?.toLocaleString()}
                                                 </td>
-                                                <td className="py-3 px-3 text-xs whitespace-nowrap">
-                                                    <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded font-bold">
+                                                <td className="py-3 px-2 text-xs whitespace-nowrap">
+                                                    <span className="block truncate px-2 py-1 bg-blue-50 text-blue-700 rounded font-bold" title={getCanonicalMgrCode(entry.mgrCode, mgrList)}>
                                                         {getCanonicalMgrCode(entry.mgrCode, mgrList)}
                                                     </span>
                                                 </td>
-                                                <td className="py-3 px-3 text-xs whitespace-nowrap">
-                                                    <span className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded font-bold">
+                                                <td className="py-3 px-2 text-xs whitespace-nowrap">
+                                                    <span className="block truncate px-2 py-1 bg-indigo-50 text-indigo-700 rounded font-bold" title={getCanonicalMgrCode(entry.mgrCode2 || '', mgrList2) || '-'}>
                                                         {getCanonicalMgrCode(entry.mgrCode2 || '', mgrList2) || '-'}
                                                     </span>
                                                 </td>
-                                                <td className="py-3 px-3 text-xs">
-                                                    <div className="flex items-center justify-between gap-3">
-                                                        <span className={`px-2 py-1 rounded font-bold whitespace-nowrap ${getStatusClasses(entry.status)}`}>
+                                                <td className="py-3 px-2 text-xs">
+                                                    <div className="flex items-center justify-between gap-1">
+                                                        <span className={`truncate px-2 py-1 rounded font-bold whitespace-nowrap ${getStatusClasses(entry.status)}`} title={entry.status}>
                                                             {entry.status}
                                                         </span>
                                                         <div className="flex items-center gap-1">
@@ -977,11 +966,10 @@ const PlanningScreen = () => {
                                                     </div>
                                                 </td>
                                             </tr>
-                                            );
-                                        })
+                                        ))
                                     ) : (
                                         <tr>
-                                            <td colSpan="11" className="py-10 text-center text-slate-400 font-bold text-sm">
+                                            <td colSpan="9" className="py-10 text-center text-slate-400 font-bold text-sm">
                                                 {hasActiveFilters
                                                     ? 'No planning entries match the selected filters.'
                                                     : `No planning entries for FY ${financialYear}. Add your first entry above.`}
@@ -1002,15 +990,15 @@ const PlanningScreen = () => {
                 >
                     <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
                         <MdKeyboardArrowDown className={`text-slate-500 transition-transform duration-300 ${!isReportExpanded ? '-rotate-90' : ''}`} size={20} />
-                        MGR 1 Report - FY {financialYear}
+                        MGR Report - FY {financialYear}
                     </h2>
                     <button
                         type="button"
                         onClick={(e) => {
                             e.stopPropagation();
-                            exportReportToExcel(reportData, 'MGR 1 Report');
+                            exportReportToExcel(combinedReportData, 'MGR Report');
                         }}
-                        disabled={!reportData || !reportData.mgrCodes?.length}
+                        disabled={!combinedReportData || !combinedReportData.mgrCodes?.length}
                         className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 font-bold text-xs uppercase tracking-widest hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         <MdDownload size={16} />
@@ -1019,20 +1007,21 @@ const PlanningScreen = () => {
                 </div>
 
                 {isReportExpanded && (
-                    reportData && reportData.mgrCodes.length > 0 ? (
-                        <div className="overflow-x-auto">
+                    combinedReportData && combinedReportData.mgrCodes.length > 0 ? (
+                        <div className="overflow-hidden">
                             <table className="w-full text-left text-xs">
                                 <thead>
                                     <tr className="bg-amber-50 border-b border-amber-100">
                                         <th className="py-3 px-4 font-black text-slate-700 min-w-[100px]"></th>
-                                        {reportData.mgrCodes.map((mgr) => (
+                                        <th className="py-3 px-4 font-black text-slate-700 min-w-[80px]">Type</th>
+                                        {combinedReportData.mgrCodes.map((mgr) => (
                                             <th key={mgr} className="py-3 px-4 font-black text-slate-700 text-right min-w-[100px]">{mgr}</th>
                                         ))}
                                         <th className="py-3 px-4 font-black text-slate-900 text-right bg-amber-100 min-w-[100px]">Total</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {reportData.rows.map((row, idx) => {
+                                    {combinedReportData.rows.map((row, idx) => {
                                         const isQuarter = row.isQuarter;
                                         const isTotal = row.isTotal;
                                         const isPercentage = row.isPercentage;
@@ -1042,7 +1031,7 @@ const PlanningScreen = () => {
                                         if (isQuarter) {
                                             rowQuarterPrefix = row.month.substring(0, 2);
                                         } else if (!isTotal && !isPercentage) {
-                                            const nextQuarterRow = reportData.rows.slice(idx).find((reportRow) => reportRow.isQuarter);
+                                            const nextQuarterRow = combinedReportData.rows.slice(idx).find((reportRow) => reportRow.isQuarter);
                                             if (nextQuarterRow) {
                                                 rowQuarterPrefix = nextQuarterRow.month.substring(0, 2);
                                             }
@@ -1078,7 +1067,10 @@ const PlanningScreen = () => {
                                                         {row.month}
                                                     </div>
                                                 </td>
-                                                {reportData.mgrCodes.map((mgr) => (
+                                                <td className={`py-3 px-4 text-xs font-black uppercase tracking-widest ${row.mgrType === 'MGR 2' ? 'text-indigo-700' : 'text-blue-700'}`}>
+                                                    {row.mgrType || '-'}
+                                                </td>
+                                                {combinedReportData.mgrCodes.map((mgr) => (
                                                     <td key={mgr} className={`py-3 px-4 text-right ${isHighlight ? 'font-bold text-slate-900' : 'text-slate-700'}`}>
                                                         {isPercentage ? `${row[mgr] || 0}%` : (row[mgr] || 0).toLocaleString()}
                                                     </td>

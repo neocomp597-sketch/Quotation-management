@@ -72,7 +72,7 @@ const Reports = () => {
     const [activeTab, setActiveTab] = useState('quotations');
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
-    const [dateFilter, setDateFilter] = useState({ start: '', end: '' });
+    const [dateFilter] = useState({ start: '', end: '' });
 
     // Quotation data
     const [reportData, setReportData] = useState(null);
@@ -224,6 +224,9 @@ const Reports = () => {
                 if (planningReport?.rows) {
                     const data = planningReport.rows.map(r => {
                         const row = { Month: r.month };
+                        if (r.mgrType) {
+                            row['MGR Type'] = r.mgrType;
+                        }
                         (planningReport.mgrColumns || []).forEach(col => {
                             row[col] = r[col] || 0;
                         });
@@ -668,17 +671,18 @@ const Reports = () => {
                     <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden">
                         <div className="p-6 border-b border-slate-50 bg-slate-50/30">
                             <h2 className="text-lg font-black text-slate-900">MGR Planning Report — FY {planningFY}</h2>
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Month-wise breakdown by MGR code</p>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Date-first breakdown, paired MGR 1 then MGR 2</p>
                         </div>
-                        <div className="overflow-x-auto">
+                        <div className="overflow-hidden">
                             <table className="w-full text-left">
                                 <thead>
                                     <tr className="bg-white">
-                                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest sticky left-0 bg-white">Month</th>
+                                        <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest bg-white">Month</th>
+                                        <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest bg-white">Type</th>
                                         {(planningReport.mgrColumns || []).map(col => (
-                                            <th key={col} className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">{col}</th>
+                                            <th key={col} className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">{col}</th>
                                         ))}
-                                        <th className="px-6 py-4 text-[10px] font-black text-slate-900 uppercase tracking-widest text-right">Total</th>
+                                        <th className="px-4 py-4 text-[10px] font-black text-slate-900 uppercase tracking-widest text-right">Total</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-50">
@@ -687,13 +691,14 @@ const Reports = () => {
                                         const isGrand = row.month === 'Grand Total' || row.month === 'Percentage';
                                         return (
                                             <tr key={i} className={`${isQuarter ? 'bg-primary-50/50 font-black' : isGrand ? 'bg-slate-100 font-black' : 'hover:bg-slate-50'}`}>
-                                                <td className={`px-6 py-3 text-sm font-bold sticky left-0 ${isQuarter ? 'text-primary-700 bg-primary-50/50' : isGrand ? 'text-slate-900 bg-slate-100' : 'text-slate-700 bg-white'}`}>{row.month}</td>
+                                                <td className={`px-4 py-3 text-sm font-bold ${isQuarter ? 'text-primary-700 bg-primary-50/50' : isGrand ? 'text-slate-900 bg-slate-100' : 'text-slate-700 bg-white'}`}>{row.month}</td>
+                                                <td className={`px-4 py-3 text-xs font-black uppercase tracking-widest ${row.mgrType === 'MGR 2' ? 'text-indigo-700' : 'text-blue-700'}`}>{row.mgrType || '-'}</td>
                                                 {(planningReport.mgrColumns || []).map(col => (
-                                                    <td key={col} className="px-6 py-3 text-sm font-semibold text-slate-600 text-right">
+                                                    <td key={col} className="px-4 py-3 text-sm font-semibold text-slate-600 text-right">
                                                         {row.month === 'Percentage' ? `${row[col] || 0}%` : (row[col] || 0).toLocaleString()}
                                                     </td>
                                                 ))}
-                                                <td className="px-6 py-3 text-sm font-black text-slate-900 text-right">
+                                                <td className="px-4 py-3 text-sm font-black text-slate-900 text-right">
                                                     {row.month === 'Percentage' ? `${row.total || 0}%` : (row.total || 0).toLocaleString()}
                                                 </td>
                                             </tr>
