@@ -115,11 +115,6 @@ exports.getMGRReport = async (req, res) => {
 
         if (!type) {
             const entries = await Planning.find({ financialYear });
-            const mgrTypes = [
-                { key: 'MGR1', label: 'MGR 1', field: 'mgrCode' },
-                { key: 'MGR2', label: 'MGR 2', field: 'mgrCode2' }
-            ];
-
             const monthNames = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
             const startYear = parseInt(financialYear.split('-')[0], 10);
             const monthKeys = monthNames.map((name, idx) => {
@@ -127,62 +122,50 @@ exports.getMGRReport = async (req, res) => {
                 return `${name}-${year.toString().slice(-2)}`;
             });
 
-            const mastersByType = await Promise.all(
-                mgrTypes.map((mgr) => MGR.find({ mgrType: mgr.key }).select('code').lean())
-            );
-            const masterLabelMaps = new Map(
-                mgrTypes.map((mgr, idx) => [
-                    mgr.key,
-                    new Map(mastersByType[idx].map((item) => [normalizeCodeKey(item.code), item.code]))
-                ])
-            );
+            const [mgr1Masters, mgr2Masters] = await Promise.all([
+                MGR.find({ mgrType: 'MGR1' }).select('code').lean(),
+                MGR.find({ mgrType: 'MGR2' }).select('code').lean()
+            ]);
+            const mgr1MasterMap = new Map(mgr1Masters.map((item) => [normalizeCodeKey(item.code), item.code]));
+            const mgr2MasterMap = new Map(mgr2Masters.map((item) => [normalizeCodeKey(item.code), item.code]));
 
-            const groupsByType = new Map();
-            mgrTypes.forEach((mgr) => {
-                const masterMap = masterLabelMaps.get(mgr.key);
+            const collectGroups = (field, masterMap, fallbackLabel) => {
                 const seen = new Set();
                 const groups = [];
 
                 entries.forEach((entry) => {
-                    const codeKey = normalizeCodeKey(entry[mgr.field]);
-                    if (!codeKey || seen.has(codeKey)) {
+                    const rawValue = cleanValue(entry[field]) || fallbackLabel;
+                    const key = normalizeCodeKey(rawValue);
+                    if (!key || seen.has(key)) {
                         return;
                     }
 
-                    seen.add(codeKey);
+                    seen.add(key);
                     groups.push({
-                        key: codeKey,
-                        label: masterMap.get(codeKey) || cleanValue(entry[mgr.field])
+                        key,
+                        label: masterMap.get(key) || rawValue
                     });
                 });
 
                 groups.sort((left, right) => left.label.localeCompare(right.label));
-                groupsByType.set(mgr.key, groups);
-            });
+                return groups;
+            };
 
-            const mgrColumns = [];
-            const seenColumns = new Set();
-            mgrTypes.forEach((mgr) => {
-                groupsByType.get(mgr.key).forEach((group) => {
-                    if (!seenColumns.has(group.label)) {
-                        seenColumns.add(group.label);
-                        mgrColumns.push(group.label);
-                    }
-                });
-            });
+            const mgr1Groups = collectGroups('mgrCode', mgr1MasterMap, '');
+            const mgr2Groups = collectGroups('mgrCode2', mgr2MasterMap, 'Unassigned');
+            const mgrColumns = mgr1Groups.map((group) => group.label);
 
-            const buildTypedRow = (periodLabel, mgr, rowEntries, flags = {}) => {
-                const row = { month: periodLabel, mgrType: mgr.label, ...flags };
+            const sumEntries = (rowEntries, mgr1Key, mgr2Key = null) => rowEntries
+                .filter((entry) => normalizeCodeKey(entry.mgrCode) === mgr1Key)
+                .filter((entry) => mgr2Key === null || normalizeCodeKey(cleanValue(entry.mgrCode2) || 'Unassigned') === mgr2Key)
+                .reduce((acc, entry) => acc + (entry.totalValue || 0), 0);
+
+            const buildMatrixRow = (periodLabel, rowEntries, flags = {}) => {
+                const row = { month: periodLabel, ...flags };
                 let total = 0;
 
-                mgrColumns.forEach((column) => {
-                    row[column] = 0;
-                });
-
-                groupsByType.get(mgr.key).forEach((group) => {
-                    const sum = rowEntries
-                        .filter((entry) => normalizeCodeKey(entry[mgr.field]) === group.key)
-                        .reduce((acc, entry) => acc + (entry.totalValue || 0), 0);
+                mgr1Groups.forEach((group) => {
+                    const sum = flags.categoryKey ? sumEntries(rowEntries, group.key, flags.categoryKey) : sumEntries(rowEntries, group.key);
                     row[group.label] = sum;
                     total += sum;
                 });
@@ -191,41 +174,22 @@ exports.getMGRReport = async (req, res) => {
                 return row;
             };
 
-            const quarters = [
-                { name: 'Q1', months: monthKeys.slice(0, 3) },
-                { name: 'Q2', months: monthKeys.slice(3, 6) },
-                { name: 'Q3', months: monthKeys.slice(6, 9) },
-                { name: 'Q4', months: monthKeys.slice(9, 12) }
-            ];
-
             const rows = [];
-            quarters.forEach((quarter) => {
-                quarter.months.forEach((monthKey) => {
-                    const monthEntries = entries.filter((entry) => entry.monthYear === monthKey);
-                    mgrTypes.forEach((mgr) => {
-                        rows.push(buildTypedRow(monthKey, mgr, monthEntries));
-                    });
-                });
+            monthKeys.forEach((monthKey) => {
+                const monthEntries = entries.filter((entry) => entry.monthYear === monthKey);
+                rows.push(buildMatrixRow(monthKey, monthEntries, { isMonth: true }));
 
-                const quarterEntries = entries.filter((entry) => quarter.months.includes(entry.monthYear));
-                mgrTypes.forEach((mgr) => {
-                    rows.push(buildTypedRow(`${quarter.name} ${financialYear}`, mgr, quarterEntries, { isQuarter: true }));
+                mgr2Groups.forEach((category) => {
+                    rows.push(buildMatrixRow(category.label, monthEntries, {
+                        parentMonth: monthKey,
+                        categoryKey: category.key
+                    }));
                 });
             });
 
-            const grandTotalRows = mgrTypes.map((mgr) => buildTypedRow('Grand Total', mgr, entries, { isTotal: true }));
-            rows.push(...grandTotalRows);
-
-            const grandTotal = grandTotalRows.reduce((acc, row) => acc + (row.total || 0), 0);
-            mgrTypes.forEach((mgr, index) => {
-                const row = { month: 'Percentage', mgrType: mgr.label, isPercentage: true };
-                mgrColumns.forEach((column) => {
-                    const value = grandTotal > 0 ? ((grandTotalRows[index][column] || 0) / grandTotal) * 100 : 0;
-                    row[column] = parseFloat(value.toFixed(1));
-                });
-                row.total = grandTotal > 0 ? parseFloat(((grandTotalRows[index].total / grandTotal) * 100).toFixed(1)) : 0;
-                rows.push(row);
-            });
+            if (entries.length > 0) {
+                rows.push(buildMatrixRow('Total', entries, { isTotal: true }));
+            }
 
             return res.json({
                 financialYear,

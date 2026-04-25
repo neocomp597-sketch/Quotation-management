@@ -47,16 +47,51 @@ const getPlanningMonthLabels = (financialYear) => {
     });
 };
 
-const resolvePlanningMonth = (financialYear, monthYear) => {
-    const cleanedMonthYear = cleanCellValue(monthYear);
+const excelSerialDateToDate = (serial) => {
+    const utcDays = Math.floor(serial - 25569);
+    const utcValue = utcDays * 86400;
+    return new Date(utcValue * 1000);
+};
+
+const resolvePlanningMonthInfo = (financialYear, monthYear) => {
+    const rawMonthYear = monthYear;
+    const cleanedMonthYear = cleanCellValue(rawMonthYear);
     const validMonthLabels = getPlanningMonthLabels(financialYear);
-    const monthIndex = validMonthLabels.findIndex((label) => normalizeKey(label) === normalizeKey(cleanedMonthYear));
+    const normalizedInput = normalizeKey(cleanedMonthYear).replace(/\s+/g, '-');
+    let monthIndex = validMonthLabels.findIndex((label) => normalizeKey(label) === normalizedInput);
+
+    if (monthIndex === -1 && typeof rawMonthYear === 'number' && Number.isFinite(rawMonthYear)) {
+        const date = excelSerialDateToDate(rawMonthYear);
+        if (!Number.isNaN(date.getTime())) {
+            const month = FY_MONTHS[date.getUTCMonth()];
+            const label = `${month}-${String(date.getUTCFullYear()).slice(-2)}`;
+            monthIndex = validMonthLabels.findIndex((validLabel) => normalizeKey(validLabel) === normalizeKey(label));
+        }
+    }
+
+    if (monthIndex === -1 && rawMonthYear instanceof Date && !Number.isNaN(rawMonthYear.getTime())) {
+        const month = FY_MONTHS[rawMonthYear.getMonth()];
+        const label = `${month}-${String(rawMonthYear.getFullYear()).slice(-2)}`;
+        monthIndex = validMonthLabels.findIndex((validLabel) => normalizeKey(validLabel) === normalizeKey(label));
+    }
+
+    if (monthIndex === -1 && cleanedMonthYear) {
+        const parsedDate = new Date(cleanedMonthYear);
+        if (!Number.isNaN(parsedDate.getTime())) {
+            const month = FY_MONTHS[parsedDate.getMonth()];
+            const label = `${month}-${String(parsedDate.getFullYear()).slice(-2)}`;
+            monthIndex = validMonthLabels.findIndex((validLabel) => normalizeKey(validLabel) === normalizeKey(label));
+        }
+    }
 
     if (monthIndex === -1) {
         throw new Error(`Month & Year must match FY ${financialYear} (example: ${validMonthLabels[0]})`);
     }
 
-    return monthIndex + 1;
+    return {
+        month: monthIndex + 1,
+        monthYear: validMonthLabels[monthIndex]
+    };
 };
 
 const resolvePlanningStatus = (value = '') => {
@@ -464,9 +499,8 @@ const importPlanning = async (req, res) => {
                 const financialYear = cleanCellValue(
                     row['Financial Year'] || row.financialYear || row.FY || selectedFinancialYear
                 );
-                const monthYear = cleanCellValue(
-                    row['Month & Year'] || row.monthYear || row.Month || row.month
-                );
+                const rawMonthYear = row['Month & Year'] ?? row.monthYear ?? row.Month ?? row.month;
+                const monthYear = cleanCellValue(rawMonthYear);
                 const customerLookup = cleanCellValue(
                     row['Customer Code'] || row['customerCode'] || row['Customer Name'] || row.customerName || row['Company Name'] || row.companyName
                 );
@@ -495,7 +529,7 @@ const importPlanning = async (req, res) => {
                     throw new Error('Value must be a number greater than or equal to zero');
                 }
 
-                const month = resolvePlanningMonth(financialYear, monthYear);
+                const monthInfo = resolvePlanningMonthInfo(financialYear, rawMonthYear);
 
                 const customer = await findCustomerByLookup(customerLookup);
                 if (!customer) {
@@ -530,8 +564,8 @@ const importPlanning = async (req, res) => {
 
                 const planningData = {
                     financialYear,
-                    monthYear,
-                    month,
+                    monthYear: monthInfo.monthYear,
+                    month: monthInfo.month,
                     customerId: customer._id,
                     customerName: customer.companyName || customer.customerName,
                     productId: product._id,
@@ -547,7 +581,7 @@ const importPlanning = async (req, res) => {
 
                 const existing = await Planning.findOne({
                     financialYear,
-                    monthYear,
+                    monthYear: monthInfo.monthYear,
                     customerId: customer._id,
                     productId: product._id,
                     mgrCode: mgr1.code,

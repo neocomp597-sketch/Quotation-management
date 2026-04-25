@@ -121,6 +121,7 @@ const PlanningScreen = () => {
         Q3: false,
         Q4: false
     });
+    const [expandedReportMonths, setExpandedReportMonths] = useState({});
 
     const [customers, setCustomers] = useState([]);
     const [products, setProducts] = useState([]);
@@ -241,11 +242,22 @@ const PlanningScreen = () => {
     }, [entries, filters]);
 
     const hasActiveFilters = Boolean(filters.mgrCode || filters.mgrCode2 || filters.status);
-    const monthLabels = getMonthLabels(financialYear);
+    const monthLabels = useMemo(() => getMonthLabels(financialYear), [financialYear]);
     const monthOrder = useMemo(
         () => new Map(monthLabels.map((label, index) => [label, index])),
         [monthLabels]
     );
+    useEffect(() => {
+        setExpandedReportMonths((prev) => {
+            const next = { ...prev };
+            monthLabels.forEach((month) => {
+                if (typeof next[month] === 'undefined') {
+                    next[month] = true;
+                }
+            });
+            return next;
+        });
+    }, [monthLabels]);
     const customerMap = useMemo(
         () => new Map(customers.map((customer) => [String(customer._id), customer])),
         [customers]
@@ -479,14 +491,28 @@ const PlanningScreen = () => {
         }
 
         const workbook = XLSX.utils.book_new();
-        const buildReportRows = (data) => data.rows.map((row) => {
-            const exportRow = { Month: row.month };
-            data.mgrCodes.forEach((mgr) => {
-                exportRow[mgr] = row[mgr] || 0;
-            });
-            exportRow.Total = row.total || 0;
-            return exportRow;
-        });
+        const buildReportSheet = (data) => {
+            const reportRows = [
+                ['', ...data.mgrCodes, 'Total'],
+                ...data.rows.map((row) => {
+                    const firstCell = row.parentMonth
+                        ? `   ${row.month}`
+                        : row.isMonth
+                            ? `▼ ${row.month}`
+                            : row.month;
+
+                    return [
+                        firstCell,
+                        ...data.mgrCodes.map((mgr) => row[mgr] || 0),
+                        row.total || 0
+                    ];
+                })
+            ];
+
+            const sheet = XLSX.utils.aoa_to_sheet(reportRows);
+            sheet['!cols'] = [{ wch: 26 }, ...data.mgrCodes.map(() => ({ wch: 16 })), { wch: 16 }];
+            return sheet;
+        };
 
         const entriesData = sortedEntries.map((entry) => ({
                 Month: entry.monthYear,
@@ -510,14 +536,12 @@ const PlanningScreen = () => {
         XLSX.utils.book_append_sheet(workbook, entriesSheet, 'Planning Entries');
 
         if (reportData) {
-            const reportSheet = XLSX.utils.json_to_sheet(buildReportRows(reportData));
-            reportSheet['!cols'] = [{ wch: 26 }, ...reportData.mgrCodes.map(() => ({ wch: 16 })), { wch: 16 }];
+            const reportSheet = buildReportSheet(reportData);
             XLSX.utils.book_append_sheet(workbook, reportSheet, 'MGR 1 Report');
         }
 
         if (reportData2) {
-            const reportSheet2 = XLSX.utils.json_to_sheet(buildReportRows(reportData2));
-            reportSheet2['!cols'] = [{ wch: 26 }, ...reportData2.mgrCodes.map(() => ({ wch: 16 })), { wch: 16 }];
+            const reportSheet2 = buildReportSheet(reportData2);
             XLSX.utils.book_append_sheet(workbook, reportSheet2, 'MGR 2 Report');
         }
 
@@ -532,18 +556,23 @@ const PlanningScreen = () => {
         }
 
         const workbook = XLSX.utils.book_new();
-        const reportRows = data.rows.map((row) => {
-            const exportRow = { Month: row.month };
-            if (row.mgrType) {
-                exportRow['MGR Type'] = row.mgrType;
-            }
-            data.mgrCodes.forEach((mgr) => {
-                exportRow[mgr] = row[mgr] || 0;
-            });
-            exportRow.Total = row.total || 0;
-            return exportRow;
-        });
-        const reportSheet = XLSX.utils.json_to_sheet(reportRows);
+        const reportRows = [
+            ['', ...data.mgrCodes, 'Total'],
+            ...data.rows.map((row) => {
+                const firstCell = row.parentMonth
+                    ? `   ${row.month}`
+                    : row.isMonth
+                        ? `▼ ${row.month}`
+                        : row.month;
+
+                return [
+                    firstCell,
+                    ...data.mgrCodes.map((mgr) => row[mgr] || 0),
+                    row.total || 0
+                ];
+            })
+        ];
+        const reportSheet = XLSX.utils.aoa_to_sheet(reportRows);
         reportSheet['!cols'] = [{ wch: 26 }, ...data.mgrCodes.map(() => ({ wch: 16 })), { wch: 16 }];
         XLSX.utils.book_append_sheet(workbook, reportSheet, reportLabel);
 
@@ -584,6 +613,13 @@ const PlanningScreen = () => {
         setExpandedQuarters((prev) => ({
             ...prev,
             [quarterPrefix]: !prev[quarterPrefix]
+        }));
+    };
+
+    const toggleReportMonth = (month) => {
+        setExpandedReportMonths((prev) => ({
+            ...prev,
+            [month]: !prev[month]
         }));
     };
     const calculatedTotal = (newRow.qty && newRow.value) ? Number(newRow.qty) * Number(newRow.value) : 0;
@@ -1008,75 +1044,59 @@ const PlanningScreen = () => {
 
                 {isReportExpanded && (
                     combinedReportData && combinedReportData.mgrCodes.length > 0 ? (
-                        <div className="overflow-hidden">
-                            <table className="w-full text-left text-xs">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-sm font-mono">
                                 <thead>
-                                    <tr className="bg-amber-50 border-b border-amber-100">
-                                        <th className="py-3 px-4 font-black text-slate-700 min-w-[100px]"></th>
-                                        <th className="py-3 px-4 font-black text-slate-700 min-w-[80px]">Type</th>
+                                    <tr className="bg-slate-50 border-b border-slate-200">
+                                        <th className="py-3 px-6 font-bold text-slate-700 min-w-[170px]"></th>
                                         {combinedReportData.mgrCodes.map((mgr) => (
-                                            <th key={mgr} className="py-3 px-4 font-black text-slate-700 text-right min-w-[100px]">{mgr}</th>
+                                            <th key={mgr} className="py-3 px-4 font-bold text-slate-700 text-right min-w-[120px] border-l border-slate-300">{mgr}</th>
                                         ))}
-                                        <th className="py-3 px-4 font-black text-slate-900 text-right bg-amber-100 min-w-[100px]">Total</th>
+                                        <th className="py-3 px-4 font-bold text-slate-900 text-right bg-slate-100 min-w-[120px] border-l border-slate-300">Total</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {combinedReportData.rows.map((row, idx) => {
-                                        const isQuarter = row.isQuarter;
+                                        const isMonth = row.isMonth;
                                         const isTotal = row.isTotal;
-                                        const isPercentage = row.isPercentage;
-                                        const isHighlight = isQuarter || isTotal || isPercentage;
+                                        const isChild = Boolean(row.parentMonth);
 
-                                        let rowQuarterPrefix = null;
-                                        if (isQuarter) {
-                                            rowQuarterPrefix = row.month.substring(0, 2);
-                                        } else if (!isTotal && !isPercentage) {
-                                            const nextQuarterRow = combinedReportData.rows.slice(idx).find((reportRow) => reportRow.isQuarter);
-                                            if (nextQuarterRow) {
-                                                rowQuarterPrefix = nextQuarterRow.month.substring(0, 2);
-                                            }
-                                        }
-
-                                        if (!isHighlight && rowQuarterPrefix && !expandedQuarters[rowQuarterPrefix]) {
+                                        if (isChild && !expandedReportMonths[row.parentMonth]) {
                                             return null;
                                         }
 
                                         return (
                                             <tr
                                                 key={idx}
-                                                className={`border-b transition-colors ${
-                                                    isTotal ? 'bg-amber-50 border-amber-200 font-black' :
-                                                    isPercentage ? 'bg-slate-50 border-slate-200' :
-                                                    isQuarter ? 'bg-blue-50/50 border-blue-100 font-bold cursor-pointer hover:bg-blue-100/50' :
-                                                    'border-slate-50 hover:bg-slate-50'
+                                                className={`border-b border-slate-100 transition-colors ${
+                                                    isTotal ? 'bg-amber-50 font-black' :
+                                                    isMonth ? 'bg-white font-bold cursor-pointer hover:bg-slate-50' :
+                                                    'bg-white hover:bg-slate-50 text-slate-700'
                                                 }`}
                                                 onClick={() => {
-                                                    if (isQuarter) {
-                                                        toggleQuarter(row.month.substring(0, 2));
+                                                    if (isMonth) {
+                                                        toggleReportMonth(row.month);
                                                     }
                                                 }}
                                             >
-                                                <td className={`py-3 px-4 ${isHighlight ? 'font-black text-slate-900' : 'font-semibold text-slate-600'} ${isQuarter ? 'pl-2' : 'pl-8'}`}>
-                                                    <div className="flex items-center gap-1">
-                                                        {isQuarter && (
+                                                <td className={`py-3 px-6 ${isMonth || isTotal ? 'font-bold text-slate-900' : 'text-slate-700 pl-14'}`}>
+                                                    <div className="flex items-center gap-2">
+                                                        {isMonth && (
                                                             <MdKeyboardArrowDown
-                                                                className={`text-blue-500 transition-transform duration-300 ${!expandedQuarters[row.month.substring(0, 2)] ? '-rotate-90' : ''}`}
+                                                                className={`text-slate-700 transition-transform duration-300 ${!expandedReportMonths[row.month] ? '-rotate-90' : ''}`}
                                                                 size={18}
                                                             />
                                                         )}
                                                         {row.month}
                                                     </div>
                                                 </td>
-                                                <td className={`py-3 px-4 text-xs font-black uppercase tracking-widest ${row.mgrType === 'MGR 2' ? 'text-indigo-700' : 'text-blue-700'}`}>
-                                                    {row.mgrType || '-'}
-                                                </td>
                                                 {combinedReportData.mgrCodes.map((mgr) => (
-                                                    <td key={mgr} className={`py-3 px-4 text-right ${isHighlight ? 'font-bold text-slate-900' : 'text-slate-700'}`}>
-                                                        {isPercentage ? `${row[mgr] || 0}%` : (row[mgr] || 0).toLocaleString()}
+                                                    <td key={mgr} className={`py-3 px-4 text-right border-l border-slate-200 ${isMonth || isTotal ? 'font-bold text-slate-900' : 'text-slate-700'}`}>
+                                                        {(row[mgr] || 0).toLocaleString()}
                                                     </td>
                                                 ))}
-                                                <td className={`py-3 px-4 text-right ${isTotal ? 'bg-amber-100 font-black' : isPercentage ? 'bg-slate-100 font-bold' : 'bg-amber-50/50 font-bold'} text-slate-900`}>
-                                                    {isPercentage ? `${row.total}%` : (row.total || 0).toLocaleString()}
+                                                <td className={`py-3 px-4 text-right border-l border-slate-300 ${isTotal ? 'bg-amber-100 font-black' : isMonth ? 'bg-slate-50 font-bold' : 'bg-slate-50/60'} text-slate-900`}>
+                                                    {(row.total || 0).toLocaleString()}
                                                 </td>
                                             </tr>
                                         );
