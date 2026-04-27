@@ -158,9 +158,12 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                 <div className="flex items-center justify-between h-20 px-6 border-b border-slate-50 shrink-0">
                     <div className={`flex items-center gap-3 overflow-hidden transition-all duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 w-0 md:opacity-0 md:w-0'}`}>
                         <div className="w-10 h-10 bg-gradient-to-br from-primary-600 to-accent rounded-xl flex items-center justify-center shadow-lg shadow-primary-600/30 shrink-0">
-                            <span className="text-white font-black text-xl">Q</span>
+                            <span className="text-white font-black text-xl">A</span>
                         </div>
-                        <span className="text-xl font-black tracking-tighter whitespace-nowrap text-slate-900 font-outfit uppercase">AR CRM</span>
+                        <div className="whitespace-nowrap text-slate-900 font-outfit uppercase">
+                            <p className="text-lg font-black tracking-tighter">ARCRM</p>
+                            <p className="text-[10px] font-bold text-slate-500 -mt-1">Always Ready CRM</p>
+                        </div>
                     </div>
                     <button
                         onClick={toggleSidebar}

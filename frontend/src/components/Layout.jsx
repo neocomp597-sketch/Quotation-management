@@ -24,7 +24,7 @@ const Layout = ({ children }) => {
 
             <footer className={`relative z-10 py-10 transition-all duration-300 ${sidebarOpen ? 'md:ml-64' : 'md:ml-20'}`}>
                 <div className="px-6 md:px-10 max-w-7xl mx-auto border-t border-slate-100 pt-8 flex flex-col md:flex-row items-center justify-between text-slate-400 text-xs font-bold uppercase tracking-widest gap-6">
-                    <p>&copy; {new Date().getFullYear()} JAG Sanitaryware & Bathroom Fittings.</p>
+                    <p>&copy; {new Date().getFullYear()} ARCRM. Always Ready CRM.</p>
                     <div className="flex flex-wrap justify-center items-center gap-6 md:gap-10">
                         <Link to="#" className="hover:text-primary-600 transition-colors">Privacy Policy</Link>
                         <Link to="#" className="hover:text-primary-600 transition-colors">Terms of Service</Link>

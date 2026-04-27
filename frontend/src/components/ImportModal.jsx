@@ -9,6 +9,8 @@ const ImportModal = ({ isOpen, onClose, title, onImport, onDownloadTemplate, typ
     const [isDownloading, setIsDownloading] = useState(false);
     const [result, setResult] = useState(null);
     const [dragActive, setDragActive] = useState(false);
+    const [importProgress, setImportProgress] = useState({ processed: 0, total: 0 });
+    const [importStage, setImportStage] = useState('idle');
     const fileInputRef = useRef(null);
 
     const handleDrag = (e) => {
@@ -61,9 +63,27 @@ const ImportModal = ({ isOpen, onClose, title, onImport, onDownloadTemplate, typ
 
         setIsImporting(true);
         setResult(null);
+        setImportProgress({ processed: 0, total: 0 });
+        setImportStage('uploading');
 
         try {
-            const response = await onImport(file);
+            const response = await onImport(file, (event) => {
+                const total = event.total || file.size || 0;
+                const loaded = Math.min(event.loaded || 0, total || event.loaded || 0);
+                if (total > 0 && loaded >= total) {
+                    setImportStage('processing');
+                }
+                setImportProgress({
+                    processed: loaded,
+                    total
+                });
+            });
+
+            setImportProgress({
+                processed: response.data.total || response.data.success + response.data.failed,
+                total: response.data.total || response.data.success + response.data.failed
+            });
+
             setResult({
                 success: true,
                 message: response.data.message,
@@ -80,11 +100,12 @@ const ImportModal = ({ isOpen, onClose, title, onImport, onDownloadTemplate, typ
                 errors: errorData.errors || [],
                 missingCustomerCodes: errorData.missingCustomerCodes || [],
                 missingProductCodes: errorData.missingProductCodes || [],
-                missingCustomerCodesFile: errorData.missingCustomerCodesFile || null,
-                missingProductCodesFile: errorData.missingProductCodesFile || null
+                missingMgr1Codes: errorData.missingMgr1Codes || [],
+                missingMgr2Codes: errorData.missingMgr2Codes || []
             });
         } finally {
             setIsImporting(false);
+            setImportStage('idle');
         }
     };
 
@@ -134,6 +155,8 @@ const ImportModal = ({ isOpen, onClose, title, onImport, onDownloadTemplate, typ
     const handleClose = () => {
         setFile(null);
         setResult(null);
+        setImportProgress({ processed: 0, total: 0 });
+        setImportStage('idle');
         onClose();
     };
 
@@ -228,6 +251,39 @@ const ImportModal = ({ isOpen, onClose, title, onImport, onDownloadTemplate, typ
                     )}
                 </div>
 
+                {/* Progress Bar */}
+                {isImporting && (
+                    <div className="rounded-2xl p-4 bg-blue-50 border border-blue-100">
+                        <div className="flex items-center justify-between mb-3">
+                            <p className="text-sm font-bold text-blue-900">
+                                {importStage === 'uploading' ? 'Uploading file...' : 'Processing entries...'}
+                            </p>
+                            <p className="text-xs font-bold text-blue-600">
+                                {importProgress.total > 0
+                                    ? Math.round((importProgress.processed / importProgress.total) * 100)
+                                    : 'Processing'}%
+                            </p>
+                        </div>
+                        <div className="w-full bg-blue-200 rounded-full h-2 overflow-hidden">
+                            <div 
+                                className="bg-gradient-to-r from-blue-500 to-blue-600 h-full transition-all duration-300 ease-out"
+                                style={{
+                                    width: importProgress.total > 0
+                                        ? `${Math.min((importProgress.processed / importProgress.total) * 100, 100)}%`
+                                        : importStage === 'processing' ? '100%' : '20%'
+                                }}
+                            />
+                        </div>
+                        {importProgress.total > 0 && (
+                            <p className="text-xs text-blue-600 mt-2 font-medium">
+                                {importStage === 'uploading'
+                                    ? `${Math.round(importProgress.processed / 1024)} KB / ${Math.round(importProgress.total / 1024)} KB uploaded`
+                                    : `${Math.round(importProgress.processed)} / ${importProgress.total} entries processed`}
+                            </p>
+                        )}
+                    </div>
+                )}
+
                 {/* Result Section */}
                 {result && (
                     <div className={`rounded-2xl p-4 ${result.success ? 'bg-emerald-50 border border-emerald-100' : 'bg-rose-50 border border-rose-100'}`}>
@@ -288,6 +344,32 @@ const ImportModal = ({ isOpen, onClose, title, onImport, onDownloadTemplate, typ
                                                 Download List
                                             </button>
                                         )}
+                                    </div>
+                                )}
+                                {(result.missingMgr1Codes && result.missingMgr1Codes.length > 0) && (
+                                    <div className="mt-3">
+                                        <p className="text-xs text-rose-600 font-bold uppercase tracking-widest mb-1">
+                                            Missing MGR 1 Codes ({result.missingMgr1Codes.length}):
+                                        </p>
+                                        <div className="max-h-24 overflow-y-auto bg-white rounded-lg p-2 border border-rose-200">
+                                            <p className="text-xs font-mono text-rose-700">{result.missingMgr1Codes.slice(0, 10).join(', ')}</p>
+                                            {result.missingMgr1Codes.length > 10 && (
+                                                <p className="text-xs text-rose-500">...and {result.missingMgr1Codes.length - 10} more</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                                {(result.missingMgr2Codes && result.missingMgr2Codes.length > 0) && (
+                                    <div className="mt-3">
+                                        <p className="text-xs text-rose-600 font-bold uppercase tracking-widest mb-1">
+                                            Missing MGR 2 Codes ({result.missingMgr2Codes.length}):
+                                        </p>
+                                        <div className="max-h-24 overflow-y-auto bg-white rounded-lg p-2 border border-rose-200">
+                                            <p className="text-xs font-mono text-rose-700">{result.missingMgr2Codes.slice(0, 10).join(', ')}</p>
+                                            {result.missingMgr2Codes.length > 10 && (
+                                                <p className="text-xs text-rose-500">...and {result.missingMgr2Codes.length - 10} more</p>
+                                            )}
+                                        </div>
                                     </div>
                                 )}
                                 {result.errors && result.errors.length > 0 && (

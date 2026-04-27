@@ -15,6 +15,7 @@ import { planningService, customerService, productService, mgrService, importSer
 import * as XLSX from 'xlsx';
 import ImportModal from '../components/ImportModal';
 import PortalDropdown from '../components/PortalDropdown';
+import { formatToLakhs, formatToIndian } from '../utils/formatters';
 
 // Financial year months (Apr-Mar)
 const FY_MONTHS = [
@@ -51,6 +52,18 @@ const getMonthLabels = (fy) => {
 };
 
 const normalizeMgrCode = (value = '') => String(value || '').trim().replace(/\s+/g, ' ').toUpperCase();
+
+const formatReportValue = (value, decimals = 3) => formatToLakhs(value || 0, decimals);
+
+const formatReportPercentage = (value, decimals = 2) => `${Number(value || 0).toLocaleString('en-IN', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals
+})}%`;
+
+const formatReportPercentageTotal = (value) => `${Number(value || 0).toLocaleString('en-IN', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+})}%`;
 
 const dedupeMgrOptions = (items = []) => {
     const seen = new Set();
@@ -130,6 +143,8 @@ const PlanningScreen = () => {
 
     const [editingId, setEditingId] = useState(null);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+    const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
+    const autoRefreshIntervalRef = useRef(null);
 
     const emptyRow = {
         monthYear: '',
@@ -207,6 +222,47 @@ const PlanningScreen = () => {
     useEffect(() => {
         fetchData();
     }, [fetchData]);
+
+    // Auto-refresh polling
+    useEffect(() => {
+        if (autoRefreshEnabled) {
+            const interval = setInterval(() => {
+                fetchData();
+            }, 10000);
+            autoRefreshIntervalRef.current = interval;
+
+            return () => {
+                if (autoRefreshIntervalRef.current) {
+                    clearInterval(autoRefreshIntervalRef.current);
+                    autoRefreshIntervalRef.current = null;
+                }
+            };
+        }
+    }, [autoRefreshEnabled, fetchData]);
+
+    useEffect(() => {
+        if (!autoRefreshEnabled) {
+            return undefined;
+        }
+
+        const handleFocusRefresh = () => {
+            fetchData();
+        };
+
+        const handleVisibilityRefresh = () => {
+            if (!document.hidden) {
+                fetchData();
+            }
+        };
+
+        window.addEventListener('focus', handleFocusRefresh);
+        document.addEventListener('visibilitychange', handleVisibilityRefresh);
+
+        return () => {
+            window.removeEventListener('focus', handleFocusRefresh);
+            document.removeEventListener('visibilitychange', handleVisibilityRefresh);
+        };
+    }, [autoRefreshEnabled, fetchData]);
 
     const filteredCustomers = useMemo(() => {
         if (!customerSearch) {
@@ -491,6 +547,14 @@ const PlanningScreen = () => {
         }
 
         const workbook = XLSX.utils.book_new();
+        const getExportCellValue = (row, value, isTotalColumn = false) => {
+            if (row.isPercentage) {
+                return isTotalColumn ? formatReportPercentageTotal(value) : formatReportPercentage(value);
+            }
+
+            return formatReportValue(value, 3);
+        };
+
         const buildReportSheet = (data) => {
             const reportRows = [
                 ['', ...data.mgrCodes, 'Total'],
@@ -503,8 +567,8 @@ const PlanningScreen = () => {
 
                     return [
                         firstCell,
-                        ...data.mgrCodes.map((mgr) => row[mgr] || 0),
-                        row.total || 0
+                        ...data.mgrCodes.map((mgr) => getExportCellValue(row, row[mgr] || 0)),
+                        getExportCellValue(row, row.total || 0, true)
                     ];
                 })
             ];
@@ -556,6 +620,14 @@ const PlanningScreen = () => {
         }
 
         const workbook = XLSX.utils.book_new();
+        const getExportCellValue = (row, value, isTotalColumn = false) => {
+            if (row.isPercentage) {
+                return isTotalColumn ? formatReportPercentageTotal(value) : formatReportPercentage(value);
+            }
+
+            return formatReportValue(value, 3);
+        };
+
         const reportRows = [
             ['', ...data.mgrCodes, 'Total'],
             ...data.rows.map((row) => {
@@ -567,8 +639,8 @@ const PlanningScreen = () => {
 
                 return [
                     firstCell,
-                    ...data.mgrCodes.map((mgr) => row[mgr] || 0),
-                    row.total || 0
+                    ...data.mgrCodes.map((mgr) => getExportCellValue(row, row[mgr] || 0)),
+                    getExportCellValue(row, row.total || 0, true)
                 ];
             })
         ];
@@ -646,7 +718,14 @@ const PlanningScreen = () => {
                             <option key={fy} value={fy}>FY {fy}</option>
                         ))}
                     </select>
-                    <button onClick={fetchData} className="p-3 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition-all">
+                    <button
+                        onClick={() => setAutoRefreshEnabled(!autoRefreshEnabled)}
+                        className={`p-3 rounded-xl transition-all ${autoRefreshEnabled ? 'bg-emerald-100 text-emerald-600 border border-emerald-300' : 'bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200'}`}
+                        title={autoRefreshEnabled ? 'Auto-refresh enabled (10s interval)' : 'Click to enable auto-refresh'}
+                    >
+                        <MdRefresh size={20} className={autoRefreshEnabled ? 'animate-spin' : ''} />
+                    </button>
+                    <button onClick={fetchData} className="p-3 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition-all" title="Refresh now">
                         <MdRefresh size={20} />
                     </button>
                     <button
@@ -886,7 +965,7 @@ const PlanningScreen = () => {
                                         </td>
                                         <td className="py-2 px-2 bg-amber-50/80">
                                             <div className="px-2.5 py-2.5 rounded-lg bg-amber-50 border border-amber-100 text-sm font-black text-slate-900 text-right">
-                                                {calculatedTotal.toLocaleString()}
+                                                {formatToIndian(calculatedTotal, 2)}
                                             </div>
                                         </td>
                                         <td className="py-2 px-2">
@@ -1026,13 +1105,13 @@ const PlanningScreen = () => {
                 >
                     <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
                         <MdKeyboardArrowDown className={`text-slate-500 transition-transform duration-300 ${!isReportExpanded ? '-rotate-90' : ''}`} size={20} />
-                        MGR Report - FY {financialYear}
+                        MGR 1 Report - FY {financialYear}
                     </h2>
                     <button
                         type="button"
                         onClick={(e) => {
                             e.stopPropagation();
-                            exportReportToExcel(combinedReportData, 'MGR Report');
+                            exportReportToExcel(combinedReportData, 'MGR 1 Report');
                         }}
                         disabled={!combinedReportData || !combinedReportData.mgrCodes?.length}
                         className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 font-bold text-xs uppercase tracking-widest hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1092,11 +1171,11 @@ const PlanningScreen = () => {
                                                 </td>
                                                 {combinedReportData.mgrCodes.map((mgr) => (
                                                     <td key={mgr} className={`py-3 px-4 text-right border-l border-slate-200 ${isMonth || isTotal ? 'font-bold text-slate-900' : 'text-slate-700'}`}>
-                                                        {(row[mgr] || 0).toLocaleString()}
+                                                        {formatReportValue(row[mgr] || 0, 3)}
                                                     </td>
                                                 ))}
                                                 <td className={`py-3 px-4 text-right border-l border-slate-300 ${isTotal ? 'bg-amber-100 font-black' : isMonth ? 'bg-slate-50 font-bold' : 'bg-slate-50/60'} text-slate-900`}>
-                                                    {(row.total || 0).toLocaleString()}
+                                                    {formatReportValue(row.total || 0, 3)}
                                                 </td>
                                             </tr>
                                         );
@@ -1157,7 +1236,8 @@ const PlanningScreen = () => {
                                         const isQuarter = row.isQuarter;
                                         const isTotal = row.isTotal;
                                         const isPercentage = row.isPercentage;
-                                        const isHighlight = isQuarter || isTotal || isPercentage;
+                                        const isPreviousYearValue = row.isPreviousYearValue;
+                                        const isHighlight = isQuarter || isTotal || isPercentage || isPreviousYearValue;
 
                                         let rowQuarterPrefix = null;
                                         if (isQuarter) {
@@ -1178,6 +1258,7 @@ const PlanningScreen = () => {
                                                 key={idx}
                                                 className={`border-b transition-colors ${
                                                     isTotal ? 'bg-amber-50 border-amber-200 font-black' :
+                                                    isPreviousYearValue ? 'bg-amber-100/70 border-amber-200 font-bold' :
                                                     isPercentage ? 'bg-slate-50 border-slate-200' :
                                                     isQuarter ? 'bg-blue-50/50 border-blue-100 font-bold cursor-pointer hover:bg-blue-100/50' :
                                                     'border-slate-50 hover:bg-slate-50'
@@ -1201,11 +1282,20 @@ const PlanningScreen = () => {
                                                 </td>
                                                 {reportData2.mgrCodes.map((mgr) => (
                                                     <td key={mgr} className={`py-3 px-4 text-right ${isHighlight ? 'font-bold text-slate-900' : 'text-slate-700'}`}>
-                                                        {isPercentage ? `${row[mgr] || 0}%` : (row[mgr] || 0).toLocaleString()}
+                                                        {isPercentage
+                                                            ? formatReportPercentage(row[mgr] || 0)
+                                                            : formatReportValue(row[mgr] || 0, 3)}
                                                     </td>
                                                 ))}
-                                                <td className={`py-3 px-4 text-right ${isTotal ? 'bg-amber-100 font-black' : isPercentage ? 'bg-slate-100 font-bold' : 'bg-amber-50/50 font-bold'} text-slate-900`}>
-                                                    {isPercentage ? `${row.total}%` : (row.total || 0).toLocaleString()}
+                                                <td className={`py-3 px-4 text-right ${
+                                                    isTotal ? 'bg-amber-100 font-black' :
+                                                    isPreviousYearValue ? 'bg-amber-200/80 font-bold' :
+                                                    isPercentage ? 'bg-slate-100 font-bold' :
+                                                    'bg-amber-50/50 font-bold'
+                                                } text-slate-900`}>
+                                                    {isPercentage
+                                                        ? formatReportPercentageTotal(row.total)
+                                                        : formatReportValue(row.total || 0, 3)}
                                                 </td>
                                             </tr>
                                         );
@@ -1230,8 +1320,8 @@ const PlanningScreen = () => {
                 onClose={() => setIsImportModalOpen(false)}
                 title={`Import Planning - FY ${financialYear}`}
                 type="planning"
-                onImport={async (file) => {
-                    const result = await importService.importPlanning(file, financialYear);
+                onImport={async (file, onUploadProgress) => {
+                    const result = await importService.importPlanning(file, financialYear, onUploadProgress);
                     await fetchData();
                     return result;
                 }}

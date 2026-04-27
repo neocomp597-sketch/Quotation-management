@@ -34,6 +34,72 @@ const toSafeNumber = (value, fallback = 0) => {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : fallback;
 };
+const buildNormalizedLookupMap = (docs, fields, requestedValues) => {
+    const requestedSet = new Set(requestedValues.map(normalizeKey));
+    const map = new Map();
+
+    docs.forEach((doc) => {
+        fields.forEach((field) => {
+            const rawValue = doc[field];
+            const key = normalizeKey(rawValue);
+            if (key && requestedSet.has(key) && !map.has(key)) {
+                map.set(key, doc);
+            }
+        });
+    });
+
+    return map;
+};
+
+const loadPlanningCustomers = async (lookupValues) => {
+    if (!lookupValues.length) {
+        return new Map();
+    }
+
+    const docs = await Customer.find({
+        $or: [
+            { externalCode: { $in: lookupValues } },
+            { customerName: { $in: lookupValues } },
+            { companyName: { $in: lookupValues } }
+        ]
+    })
+        .collation({ locale: 'en', strength: 2 })
+        .lean();
+
+    return buildNormalizedLookupMap(docs, ['externalCode', 'customerName', 'companyName'], lookupValues);
+};
+
+const loadPlanningProducts = async (lookupValues) => {
+    if (!lookupValues.length) {
+        return new Map();
+    }
+
+    const docs = await Product.find({
+        $or: [
+            { productCode: { $in: lookupValues } },
+            { productName: { $in: lookupValues } }
+        ]
+    })
+        .collation({ locale: 'en', strength: 2 })
+        .lean();
+
+    return buildNormalizedLookupMap(docs, ['productCode', 'productName'], lookupValues);
+};
+
+const loadPlanningMgrs = async (lookupValues, mgrType) => {
+    if (!lookupValues.length) {
+        return new Map();
+    }
+
+    const docs = await MGR.find({
+        mgrType,
+        code: { $in: lookupValues }
+    })
+        .collation({ locale: 'en', strength: 2 })
+        .lean();
+
+    return buildNormalizedLookupMap(docs, ['code'], lookupValues);
+};
 
 const getPlanningMonthLabels = (financialYear) => {
     if (!/^\d{4}-\d{2}$/.test(financialYear)) {
@@ -407,7 +473,7 @@ const importCustomers = async (req, res) => {
     }
 };
 
-// Import Planning entries from Excel/CSV
+// Import Planning entries from Excel/CSV - OPTIMIZED with batch lookups and bulkWrite
 const importPlanning = async (req, res) => {
     const fs = require('fs');
     const path = require('path');
@@ -427,8 +493,11 @@ const importPlanning = async (req, res) => {
 
         const selectedFinancialYear = cleanCellValue(req.body.financialYear || req.query.financialYear);
 
+        // PHASE 1: Collect all unique lookups
         const uniqueCustomerCodes = new Set();
         const uniqueProductCodes = new Set();
+        const uniqueMgr1Codes = new Set();
+        const uniqueMgr2Codes = new Set();
 
         for (let i = 0; i < data.length; i++) {
             const row = data[i];
@@ -438,30 +507,39 @@ const importPlanning = async (req, res) => {
             const productLookup = cleanCellValue(
                 row['Product Code'] || row['productCode'] || row['Product Name'] || row.productName
             );
+            const mgrCodeInput = cleanCellValue(
+                row['MGR 1'] || row.MGR1 || row.mgrCode || row.mgrCode1
+            );
+            const mgrCode2Input = cleanCellValue(
+                row['MGR 2'] || row.MGR2 || row.mgrCode2
+            );
+            
             if (customerLookup) uniqueCustomerCodes.add(customerLookup);
             if (productLookup) uniqueProductCodes.add(productLookup);
+            if (mgrCodeInput) uniqueMgr1Codes.add(mgrCodeInput);
+            if (mgrCode2Input) uniqueMgr2Codes.add(mgrCode2Input);
         }
 
-        const missingCustomerCodes = [];
-        const missingProductCodes = [];
+        // PHASE 2: Batch load all entities
+        const customerLookups = Array.from(uniqueCustomerCodes);
+        const productLookups = Array.from(uniqueProductCodes);
+        const mgr1Lookups = Array.from(uniqueMgr1Codes);
+        const mgr2Lookups = Array.from(uniqueMgr2Codes);
 
-        for (const custCode of uniqueCustomerCodes) {
-            const existing = await findCustomerByLookup(custCode);
-            if (!existing) {
-                missingCustomerCodes.push(custCode);
-            }
-        }
+        const [customerMap, productMap, mgr1Map, mgr2Map] = await Promise.all([
+            loadPlanningCustomers(customerLookups),
+            loadPlanningProducts(productLookups),
+            loadPlanningMgrs(mgr1Lookups, 'MGR1'),
+            loadPlanningMgrs(mgr2Lookups, 'MGR2')
+        ]);
 
-        for (const prodCode of uniqueProductCodes) {
-            const existing = await Product.findOne({
-                productCode: { $regex: buildExactRegex(prodCode) }
-            });
-            if (!existing) {
-                missingProductCodes.push(prodCode);
-            }
-        }
+        // Check for missing codes
+        const missingCustomerCodes = customerLookups.filter(code => !customerMap.has(normalizeKey(code)));
+        const missingProductCodes = productLookups.filter(code => !productMap.has(normalizeKey(code)));
+        const missingMgr1Codes = mgr1Lookups.filter(code => !mgr1Map.has(normalizeKey(code)));
+        const missingMgr2Codes = mgr2Lookups.filter(code => !mgr2Map.has(normalizeKey(code)));
 
-        if (missingCustomerCodes.length > 0 || missingProductCodes.length > 0) {
+        if (missingCustomerCodes.length > 0 || missingProductCodes.length > 0 || missingMgr1Codes.length > 0 || missingMgr2Codes.length > 0) {
             const uploadDir = path.join(__dirname, '..', 'uploads');
             if (!fs.existsSync(uploadDir)) {
                 fs.mkdirSync(uploadDir, { recursive: true });
@@ -477,23 +555,40 @@ const importPlanning = async (req, res) => {
                 fs.writeFileSync(prodFilePath, missingProductCodes.join('\n'), 'utf8');
             }
 
+            if (missingMgr1Codes.length > 0) {
+                const mgr1FilePath = path.join(uploadDir, 'missing_mgr1_codes.txt');
+                fs.writeFileSync(mgr1FilePath, missingMgr1Codes.join('\n'), 'utf8');
+            }
+
+            if (missingMgr2Codes.length > 0) {
+                const mgr2FilePath = path.join(uploadDir, 'missing_mgr2_codes.txt');
+                fs.writeFileSync(mgr2FilePath, missingMgr2Codes.join('\n'), 'utf8');
+            }
+
             return res.status(400).json({
-                message: 'Validation failed. Missing customer and/or product codes found.',
+                message: 'Validation failed. Missing codes found.',
                 missingCustomerCodes,
                 missingProductCodes,
-                missingCustomerCodesFile: missingCustomerCodes.length > 0 ? 'missing_customer_codes.txt' : null,
-                missingProductCodesFile: missingProductCodes.length > 0 ? 'missing_product_codes.txt' : null
+                missingMgr1Codes,
+                missingMgr2Codes
             });
         }
 
+        // PHASE 3: Parse and prepare bulk operations
         const results = {
             success: 0,
             failed: 0,
-            errors: []
+            errors: [],
+            processed: 0,
+            total: data.length
         };
+
+        const bulkOps = [];
+        const BATCH_SIZE = 1000;
 
         for (let i = 0; i < data.length; i++) {
             const row = data[i];
+            results.processed = i + 1;
 
             try {
                 const financialYear = cleanCellValue(
@@ -531,35 +626,25 @@ const importPlanning = async (req, res) => {
 
                 const monthInfo = resolvePlanningMonthInfo(financialYear, rawMonthYear);
 
-                const customer = await findCustomerByLookup(customerLookup);
+                // Use cached lookups
+                const customer = customerMap.get(normalizeKey(customerLookup));
                 if (!customer) {
                     throw new Error(`Customer code not found: ${customerLookup}`);
                 }
 
-                let product = await Product.findOne({
-                    productCode: { $regex: buildExactRegex(productLookup) }
-                });
+                const product = productMap.get(normalizeKey(productLookup));
                 if (!product) {
                     throw new Error(`Product code not found: ${productLookup}`);
                 }
 
-                const mgr1 = await MGR.findOne({
-                    mgrType: 'MGR1',
-                    code: { $regex: buildExactRegex(mgrCodeInput) }
-                });
+                const mgr1 = mgr1Map.get(normalizeKey(mgrCodeInput));
                 if (!mgr1) {
                     throw new Error(`MGR 1 not found: ${mgrCodeInput}`);
                 }
 
-                let mgr2 = null;
-                if (mgrCode2Input) {
-                    mgr2 = await MGR.findOne({
-                        mgrType: 'MGR2',
-                        code: { $regex: buildExactRegex(mgrCode2Input) }
-                    });
-                    if (!mgr2) {
-                        throw new Error(`MGR 2 not found: ${mgrCode2Input}`);
-                    }
+                const mgr2 = mgrCode2Input ? mgr2Map.get(normalizeKey(mgrCode2Input)) : null;
+                if (mgrCode2Input && !mgr2) {
+                    throw new Error(`MGR 2 not found: ${mgrCode2Input}`);
                 }
 
                 const planningData = {
@@ -579,26 +664,45 @@ const importPlanning = async (req, res) => {
                     createdBy: req.user?.id || null
                 };
 
-                const existing = await Planning.findOne({
-                    financialYear,
-                    monthYear: monthInfo.monthYear,
-                    customerId: customer._id,
-                    productId: product._id,
-                    mgrCode: mgr1.code,
-                    mgrCode2: mgr2?.code || '',
-                    status
+                // Use updateOne with upsert for bulk operation
+                bulkOps.push({
+                    updateOne: {
+                        filter: {
+                            financialYear,
+                            monthYear: monthInfo.monthYear,
+                            customerId: customer._id,
+                            productId: product._id,
+                            mgrCode: mgr1.code,
+                            mgrCode2: mgr2?.code || '',
+                            status
+                        },
+                        update: {
+                            $set: planningData
+                        },
+                        upsert: true
+                    }
                 });
 
-                if (existing) {
-                    await Planning.findByIdAndUpdate(existing._id, planningData, { runValidators: true });
-                } else {
-                    await Planning.create(planningData);
-                }
-
                 results.success++;
+
+                // Execute bulk operations in batches
+                if (bulkOps.length >= BATCH_SIZE || i === data.length - 1) {
+                    if (bulkOps.length > 0) {
+                        await Planning.bulkWrite(bulkOps, { ordered: false });
+                        bulkOps.length = 0;
+                    }
+                }
             } catch (err) {
                 results.failed++;
                 results.errors.push(`Row ${i + 2}: ${err.message}`);
+                
+                // Still track in bulk to maintain consistency
+                if (bulkOps.length >= BATCH_SIZE) {
+                    if (bulkOps.length > 0) {
+                        await Planning.bulkWrite(bulkOps, { ordered: false });
+                        bulkOps.length = 0;
+                    }
+                }
             }
         }
 

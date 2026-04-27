@@ -153,10 +153,10 @@ exports.getMGRReport = async (req, res) => {
 
             const mgr1Groups = collectGroups('mgrCode', mgr1MasterMap, '');
             const mgr2Groups = collectGroups('mgrCode2', mgr2MasterMap, 'Unassigned');
-            const mgrColumns = mgr1Groups.map((group) => group.label);
+            const mgrColumns = mgr2Groups.map((group) => group.label);
 
-            const sumEntries = (rowEntries, mgr1Key, mgr2Key = null) => rowEntries
-                .filter((entry) => normalizeCodeKey(entry.mgrCode) === mgr1Key)
+            const sumEntries = (rowEntries, mgr1Key = null, mgr2Key = null) => rowEntries
+                .filter((entry) => mgr1Key === null || normalizeCodeKey(entry.mgrCode) === mgr1Key)
                 .filter((entry) => mgr2Key === null || normalizeCodeKey(cleanValue(entry.mgrCode2) || 'Unassigned') === mgr2Key)
                 .reduce((acc, entry) => acc + (entry.totalValue || 0), 0);
 
@@ -164,8 +164,8 @@ exports.getMGRReport = async (req, res) => {
                 const row = { month: periodLabel, ...flags };
                 let total = 0;
 
-                mgr1Groups.forEach((group) => {
-                    const sum = flags.categoryKey ? sumEntries(rowEntries, group.key, flags.categoryKey) : sumEntries(rowEntries, group.key);
+                mgr2Groups.forEach((group) => {
+                    const sum = flags.categoryKey ? sumEntries(rowEntries, flags.categoryKey, group.key) : sumEntries(rowEntries, null, group.key);
                     row[group.label] = sum;
                     total += sum;
                 });
@@ -179,7 +179,7 @@ exports.getMGRReport = async (req, res) => {
                 const monthEntries = entries.filter((entry) => entry.monthYear === monthKey);
                 rows.push(buildMatrixRow(monthKey, monthEntries, { isMonth: true }));
 
-                mgr2Groups.forEach((category) => {
+                mgr1Groups.forEach((category) => {
                     rows.push(buildMatrixRow(category.label, monthEntries, {
                         parentMonth: monthKey,
                         categoryKey: category.key
@@ -284,22 +284,22 @@ exports.getMGRReport = async (req, res) => {
         });
         percentageRow.total = 100;
 
-        // Add Previous Year Percentage logic
+        // Add Previous Year value row
         const prevYearStart = startYear - 1;
         const prevYearEnd = startYear.toString().slice(-2);
         const prevFinancialYear = `${prevYearStart}-${prevYearEnd}`;
-        
+
         const prevEntries = await Planning.find({ financialYear: prevFinancialYear });
         const prevGT = prevEntries.reduce((acc, e) => acc + (e.totalValue || 0), 0);
-        
-        const prevPercentageRow = { month: 'Percentage % (Previous Year)', isPercentage: true };
+
+        const prevValueRow = { month: 'Value (Previous Year)', isPreviousYearValue: true };
         mgrCodeGroups.forEach((mgr) => {
             const prevMgrTotal = prevEntries
                 .filter((entry) => normalizeCodeKey(entry[mgrField]) === mgr.key)
                 .reduce((acc, e) => acc + (e.totalValue || 0), 0);
-            prevPercentageRow[mgr.label] = prevGT > 0 ? parseFloat(((prevMgrTotal / prevGT) * 100).toFixed(1)) : 0;
+            prevValueRow[mgr.label] = prevMgrTotal;
         });
-        prevPercentageRow.total = 100;
+        prevValueRow.total = prevGT;
 
         const reportRows = [];
         quarters.forEach((q, qi) => {
@@ -310,7 +310,7 @@ exports.getMGRReport = async (req, res) => {
         });
         reportRows.push(grandTotal);
         reportRows.push(percentageRow);
-        reportRows.push(prevPercentageRow);
+        reportRows.push(prevValueRow);
 
         res.json({
             financialYear,

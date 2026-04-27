@@ -154,14 +154,15 @@ export const importService = {
             }
         });
     },
-    importPlanning: (file, financialYear) => {
+    importPlanning: (file, financialYear, onUploadProgress) => {
         const formData = new FormData();
         formData.append('file', file);
         if (financialYear) formData.append('financialYear', financialYear);
         return api.post('/import/planning', formData, {
             headers: {
                 'Content-Type': 'multipart/form-data'
-            }
+            },
+            onUploadProgress
         });
     },
     getProductTemplate: () => api.get('/import/template/products', { responseType: 'blob' }),

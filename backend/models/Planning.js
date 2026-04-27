@@ -22,6 +22,11 @@ const PlanningSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now }
 });
 
+PlanningSchema.index({ financialYear: 1, monthYear: 1 });
+PlanningSchema.index({ financialYear: 1, mgrCode: 1, monthYear: 1 });
+PlanningSchema.index({ financialYear: 1, mgrCode2: 1, monthYear: 1 });
+PlanningSchema.index({ financialYear: 1, customerId: 1, productId: 1, mgrCode: 1, mgrCode2: 1, status: 1, monthYear: 1 });
+
 // Auto-calculate totalValue before save
 PlanningSchema.pre('save', function() {
     this.totalValue = this.qty * this.value;
