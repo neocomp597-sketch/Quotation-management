@@ -24,7 +24,7 @@ const FY_MONTHS = [
 ];
 
 const STATUS_OPTIONS = ['Firm', 'MFC', 'B & B', 'Others', 'Order Received', 'Invoice', 'Lost', 'Parked'];
-
+const STATUS_REPORT_COLUMNS = ['Firm', 'MFC', 'B&B', 'Other', 'Invoice', 'Lost', 'Parked', 'Order Received'];
 // Generate financial year options (current + next 2)
 const getFinancialYears = () => {
     const now = new Date();
@@ -64,6 +64,9 @@ const formatReportPercentageTotal = (value) => `${Number(value || 0).toLocaleStr
     minimumFractionDigits: 0,
     maximumFractionDigits: 0
 })}%`;
+
+const formatStatusMetric = (value) => formatReportValue(value, 3);
+const STATUS_BREAKDOWN_ROWS = ['Utility', 'UC', 'Industry', 'Total'];
 
 const dedupeMgrOptions = (items = []) => {
     const seen = new Set();
@@ -117,11 +120,15 @@ const compareSortValues = (left, right) => {
     });
 };
 
+const getReportYearOptions = (financialYear) => {
+    const startYear = parseInt(financialYear.split('-')[0], 10);
+    return [String(startYear), String(startYear + 1)];
+};
+
 const PlanningScreen = () => {
     const [financialYear, setFinancialYear] = useState(getFinancialYears()[1]);
     const [entries, setEntries] = useState([]);
     const [combinedReportData, setCombinedReportData] = useState(null);
-    const [reportData, setReportData] = useState(null);
     const [reportData2, setReportData2] = useState(null);
     const [loading, setLoading] = useState(false);
 
@@ -143,8 +150,6 @@ const PlanningScreen = () => {
 
     const [editingId, setEditingId] = useState(null);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-    const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
-    const autoRefreshIntervalRef = useRef(null);
 
     const emptyRow = {
         monthYear: '',
@@ -171,6 +176,10 @@ const PlanningScreen = () => {
         mgrCode2: '',
         status: ''
     });
+    const [reportFilters, setReportFilters] = useState({
+        month: '',
+        year: ''
+    });
     const [sortConfig, setSortConfig] = useState({
         key: 'monthYear',
         direction: 'asc'
@@ -179,23 +188,25 @@ const PlanningScreen = () => {
     const fetchData = useCallback(async () => {
         setLoading(true);
         try {
-            const [entriesRes, combinedReportRes, reportRes, report2Res] = await Promise.all([
+            const reportQuery = {
+                month: reportFilters.month,
+                year: reportFilters.year
+            };
+            const [entriesRes, sbuReportRes, segmentReportRes] = await Promise.all([
                 planningService.getAll(financialYear),
-                planningService.getMGRReport(financialYear),
-                planningService.getMGRReport(financialYear, 'MGR1'),
-                planningService.getMGRReport(financialYear, 'MGR2')
+                planningService.getMGRReport(financialYear, 'SBU', reportQuery),
+                planningService.getMGRReport(financialYear, 'SEGMENT', reportQuery)
             ]);
 
             setEntries(entriesRes.data);
-            setCombinedReportData(combinedReportRes.data);
-            setReportData(reportRes.data);
-            setReportData2(report2Res.data);
+            setCombinedReportData(sbuReportRes.data);
+            setReportData2(segmentReportRes.data);
         } catch (err) {
             console.error('Failed to load planning data:', err);
         } finally {
             setLoading(false);
         }
-    }, [financialYear]);
+    }, [financialYear, reportFilters.month, reportFilters.year]);
 
     useEffect(() => {
         const fetchMasters = async () => {
@@ -222,47 +233,14 @@ const PlanningScreen = () => {
     useEffect(() => {
         fetchData();
     }, [fetchData]);
-
-    // Auto-refresh polling
     useEffect(() => {
-        if (autoRefreshEnabled) {
-            const interval = setInterval(() => {
-                fetchData();
-            }, 10000);
-            autoRefreshIntervalRef.current = interval;
-
-            return () => {
-                if (autoRefreshIntervalRef.current) {
-                    clearInterval(autoRefreshIntervalRef.current);
-                    autoRefreshIntervalRef.current = null;
-                }
-            };
-        }
-    }, [autoRefreshEnabled, fetchData]);
-
-    useEffect(() => {
-        if (!autoRefreshEnabled) {
-            return undefined;
-        }
-
-        const handleFocusRefresh = () => {
-            fetchData();
-        };
-
-        const handleVisibilityRefresh = () => {
-            if (!document.hidden) {
-                fetchData();
-            }
-        };
-
-        window.addEventListener('focus', handleFocusRefresh);
-        document.addEventListener('visibilitychange', handleVisibilityRefresh);
-
-        return () => {
-            window.removeEventListener('focus', handleFocusRefresh);
-            document.removeEventListener('visibilitychange', handleVisibilityRefresh);
-        };
-    }, [autoRefreshEnabled, fetchData]);
+        const nextYears = getReportYearOptions(financialYear);
+        setReportFilters((prev) => (
+            nextYears.includes(prev.year)
+                ? prev
+                : { ...prev, year: '' }
+        ));
+    }, [financialYear]);
 
     const filteredCustomers = useMemo(() => {
         if (!customerSearch) {
@@ -420,6 +398,29 @@ const PlanningScreen = () => {
         });
     };
 
+    const handleReportFilterChange = (field, value) => {
+        setReportFilters((prev) => {
+            const next = { ...prev, [field]: value };
+            if (field === 'month') {
+                if (!value) {
+                    next.year = '';
+                } else {
+                    const startYear = parseInt(financialYear.split('-')[0], 10);
+                    const monthIndex = FY_MONTHS.indexOf(value);
+                    next.year = String(monthIndex <= 8 ? startYear : startYear + 1);
+                }
+            }
+            return next;
+        });
+    };
+
+    const clearReportFilters = () => {
+        setReportFilters({
+            month: '',
+            year: ''
+        });
+    };
+
     const getStatusClasses = (status) => {
         switch (status) {
             case 'Firm':
@@ -540,15 +541,57 @@ const PlanningScreen = () => {
         }
     };
 
+    const buildReportExportRows = (data, getExportCellValue) => {
+        const reportRows = [['', ...data.mgrCodes, 'Total']];
+
+        data.rows.forEach((row) => {
+            const firstCell = row.parentMonth
+                ? `   ${row.month}`
+                : row.isMonth
+                    ? `▼ ${row.month}`
+                    : row.month;
+
+            reportRows.push([
+                firstCell,
+                ...data.mgrCodes.map((mgr) => getExportCellValue(row, row[mgr] || 0)),
+                getExportCellValue(row, row.total || 0, true)
+            ]);
+
+            if (data.reportType === 'SBU' && row.isChild && row.statusBreakdown) {
+                reportRows.push(['      Status Breakdown', ...(data.statusColumns || []).map(() => ''), '']);
+                reportRows.push(['      Segment', ...(data.statusColumns || []).map((column) => column), 'Total']);
+
+                STATUS_BREAKDOWN_ROWS.forEach((segment) => {
+                    const statusRow = row.statusBreakdown?.[segment] || {};
+                    reportRows.push([
+                        `         ${segment}`,
+                        ...(data.statusColumns || []).map((column) => formatStatusMetric(statusRow[column] || 0)),
+                        formatStatusMetric(statusRow.total || 0)
+                    ]);
+                });
+            }
+        });
+
+        return reportRows;
+    };
+
+    const getReportSheetColumns = (data) => {
+        const columns = data.reportType === 'SBU' && data.statusColumns?.length
+            ? data.statusColumns
+            : data.mgrCodes;
+
+        return [{ wch: 26 }, ...columns.map(() => ({ wch: 16 })), { wch: 16 }];
+    };
+
     const exportToExcel = () => {
-        if (!sortedEntries.length && !reportData && !reportData2) {
+        if (!sortedEntries.length && !combinedReportData && !reportData2) {
             toast.error('No planning data available to export');
             return;
         }
 
         const workbook = XLSX.utils.book_new();
         const getExportCellValue = (row, value, isTotalColumn = false) => {
-            if (row.isPercentage) {
+            if (row.isPercentage || row.isTotalPercentage) {
                 return isTotalColumn ? formatReportPercentageTotal(value) : formatReportPercentage(value);
             }
 
@@ -556,57 +599,40 @@ const PlanningScreen = () => {
         };
 
         const buildReportSheet = (data) => {
-            const reportRows = [
-                ['', ...data.mgrCodes, 'Total'],
-                ...data.rows.map((row) => {
-                    const firstCell = row.parentMonth
-                        ? `   ${row.month}`
-                        : row.isMonth
-                            ? `▼ ${row.month}`
-                            : row.month;
-
-                    return [
-                        firstCell,
-                        ...data.mgrCodes.map((mgr) => getExportCellValue(row, row[mgr] || 0)),
-                        getExportCellValue(row, row.total || 0, true)
-                    ];
-                })
-            ];
-
-            const sheet = XLSX.utils.aoa_to_sheet(reportRows);
-            sheet['!cols'] = [{ wch: 26 }, ...data.mgrCodes.map(() => ({ wch: 16 })), { wch: 16 }];
+            const sheet = XLSX.utils.aoa_to_sheet(buildReportExportRows(data, getExportCellValue));
+            sheet['!cols'] = getReportSheetColumns(data);
             return sheet;
         };
 
         const entriesData = sortedEntries.map((entry) => ({
-                Month: entry.monthYear,
-                'Customer Code': getCustomerCode(entry.customerId),
-                'Customer Name': entry.customerName,
-                'Product Code': getProductCode(entry.productId),
-                'Product Name': entry.productName,
-                Qty: entry.qty,
-                Value: entry.value,
-                Total: entry.totalValue,
-                'MGR 1': getCanonicalMgrCode(entry.mgrCode, mgrList),
-                'MGR 2': getCanonicalMgrCode(entry.mgrCode2 || '', mgrList2),
-                Status: entry.status
-            }));
+            Month: entry.monthYear,
+            'Customer Code': getCustomerCode(entry.customerId),
+            'Customer Name': entry.customerName,
+            'Product Code': getProductCode(entry.productId),
+            'Product Name': entry.productName,
+            Qty: entry.qty,
+            Value: entry.value,
+            Total: entry.totalValue,
+            'MGR 1': getCanonicalMgrCode(entry.mgrCode, mgrList),
+            'MGR 2': getCanonicalMgrCode(entry.mgrCode2 || '', mgrList2),
+            Status: entry.status
+        }));
         const entriesSheet = XLSX.utils.json_to_sheet(entriesData);
         entriesSheet['!cols'] = [
-            { wch: 12 }, { wch: 15 }, { wch: 20 }, { wch: 15 }, 
+            { wch: 12 }, { wch: 15 }, { wch: 20 }, { wch: 15 },
             { wch: 25 }, { wch: 10 }, { wch: 12 }, { wch: 12 },
             { wch: 12 }, { wch: 12 }, { wch: 15 }
         ];
         XLSX.utils.book_append_sheet(workbook, entriesSheet, 'Planning Entries');
 
-        if (reportData) {
-            const reportSheet = buildReportSheet(reportData);
-            XLSX.utils.book_append_sheet(workbook, reportSheet, 'MGR 1 Report');
+        if (combinedReportData) {
+            const reportSheet = buildReportSheet(combinedReportData);
+            XLSX.utils.book_append_sheet(workbook, reportSheet, 'SBU Wise Report');
         }
 
         if (reportData2) {
             const reportSheet2 = buildReportSheet(reportData2);
-            XLSX.utils.book_append_sheet(workbook, reportSheet2, 'MGR 2 Report');
+            XLSX.utils.book_append_sheet(workbook, reportSheet2, 'Segment Wise Report');
         }
 
         XLSX.writeFile(workbook, `Planning-${financialYear}.xlsx`);
@@ -621,31 +647,15 @@ const PlanningScreen = () => {
 
         const workbook = XLSX.utils.book_new();
         const getExportCellValue = (row, value, isTotalColumn = false) => {
-            if (row.isPercentage) {
+            if (row.isPercentage || row.isTotalPercentage) {
                 return isTotalColumn ? formatReportPercentageTotal(value) : formatReportPercentage(value);
             }
 
             return formatReportValue(value, 3);
         };
 
-        const reportRows = [
-            ['', ...data.mgrCodes, 'Total'],
-            ...data.rows.map((row) => {
-                const firstCell = row.parentMonth
-                    ? `   ${row.month}`
-                    : row.isMonth
-                        ? `▼ ${row.month}`
-                        : row.month;
-
-                return [
-                    firstCell,
-                    ...data.mgrCodes.map((mgr) => getExportCellValue(row, row[mgr] || 0)),
-                    getExportCellValue(row, row.total || 0, true)
-                ];
-            })
-        ];
-        const reportSheet = XLSX.utils.aoa_to_sheet(reportRows);
-        reportSheet['!cols'] = [{ wch: 26 }, ...data.mgrCodes.map(() => ({ wch: 16 })), { wch: 16 }];
+        const reportSheet = XLSX.utils.aoa_to_sheet(buildReportExportRows(data, getExportCellValue));
+        reportSheet['!cols'] = getReportSheetColumns(data);
         XLSX.utils.book_append_sheet(workbook, reportSheet, reportLabel);
 
         const safeReportLabel = reportLabel.replace(/\s+/g, '-');
@@ -694,9 +704,79 @@ const PlanningScreen = () => {
             [month]: !prev[month]
         }));
     };
+
+    const renderSbuStatusBreakdown = (row) => {
+        if (!row.isChild) {
+            return null;
+        }
+
+        const statusColumns = combinedReportData?.statusColumns?.length
+            ? combinedReportData.statusColumns
+            : STATUS_REPORT_COLUMNS;
+        const getStatusRow = (segment) => {
+            const source = row.statusBreakdown?.[segment] || {};
+            const normalized = { ...source };
+            statusColumns.forEach((column) => {
+                if (typeof normalized[column] === 'undefined') {
+                    normalized[column] = 0;
+                }
+            });
+            normalized.total = Number(normalized.total || 0);
+            return normalized;
+        };
+
+        return (
+            <tr key={`${row.parentMonth}-${row.month}-status-breakdown`} className="bg-slate-50/50">
+                <td colSpan={combinedReportData.mgrCodes.length + 2} className="px-8 py-4">
+                    <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                        <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
+                            <p className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-500">Status Breakdown</p>
+                            <p className="text-sm font-bold text-slate-900 mt-1">{row.month}</p>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-xs">
+                                <thead>
+                                    <tr className="bg-slate-50 border-b border-slate-200">
+                                        <th className="py-3 px-4 text-left font-black text-slate-700 min-w-[120px]">Segment</th>
+                                        {statusColumns.map((column) => (
+                                            <th key={column} className="py-3 px-4 text-right font-black text-slate-700 min-w-[90px]">{column}</th>
+                                        ))}
+                                        <th className="py-3 px-4 text-right font-black text-slate-900 bg-slate-100 min-w-[90px]">Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {STATUS_BREAKDOWN_ROWS.map((segment) => {
+                                        const statusRow = getStatusRow(segment);
+                                        const isTotalRow = segment === 'Total';
+
+                                        return (
+                                            <tr key={segment} className={`border-b border-slate-100 ${isTotalRow ? 'bg-amber-50 font-black' : 'hover:bg-slate-50'}`}>
+                                                <td className={`py-3 px-4 text-slate-900 ${isTotalRow ? 'font-black' : 'font-bold'}`}>{segment}</td>
+                                                {statusColumns.map((column) => (
+                                                    <td key={column} className={`py-3 px-4 text-right text-slate-700 ${isTotalRow ? 'font-black' : 'font-medium'}`}>
+                                                        {formatStatusMetric(statusRow[column] || 0)}
+                                                    </td>
+                                                ))}
+                                                <td className={`py-3 px-4 text-right text-slate-900 ${isTotalRow ? 'bg-amber-100 font-black' : 'bg-slate-50 font-bold'}`}>
+                                                    {formatStatusMetric(statusRow.total || 0)}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </td>
+            </tr>
+        );
+    };
+
     const calculatedTotal = (newRow.qty && newRow.value) ? Number(newRow.qty) * Number(newRow.value) : 0;
     const compactFieldClass = 'w-full px-2.5 py-2.5 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-primary-500 bg-white';
     const compactNumericFieldClass = `${compactFieldClass} text-right`;
+    const reportYearOptions = useMemo(() => getReportYearOptions(financialYear), [financialYear]);
+    const hasActiveReportFilters = Boolean(reportFilters.month || reportFilters.year);
 
     return (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-24">
@@ -718,13 +798,6 @@ const PlanningScreen = () => {
                             <option key={fy} value={fy}>FY {fy}</option>
                         ))}
                     </select>
-                    <button
-                        onClick={() => setAutoRefreshEnabled(!autoRefreshEnabled)}
-                        className={`p-3 rounded-xl transition-all ${autoRefreshEnabled ? 'bg-emerald-100 text-emerald-600 border border-emerald-300' : 'bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200'}`}
-                        title={autoRefreshEnabled ? 'Auto-refresh enabled (10s interval)' : 'Click to enable auto-refresh'}
-                    >
-                        <MdRefresh size={20} className={autoRefreshEnabled ? 'animate-spin' : ''} />
-                    </button>
                     <button onClick={fetchData} className="p-3 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition-all" title="Refresh now">
                         <MdRefresh size={20} />
                     </button>
@@ -742,6 +815,59 @@ const PlanningScreen = () => {
                         <MdDownload size={18} />
                         Export
                     </button>
+                </div>
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                <div className="p-4 md:p-5 border-b border-slate-100 bg-slate-50/60">
+                    <p className="text-xs font-black uppercase tracking-[0.25em] text-primary-600">Report Filters</p>
+                    <h2 className="text-xl font-black text-slate-900 mt-1">Month + Year Control</h2>
+                    <p className="text-sm text-slate-500 font-medium mt-1">
+                        These filters apply to the SBU Wise and Segment Wise reports together.
+                    </p>
+                </div>
+                <div className="p-4 md:p-5">
+                    <div className="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 xl:flex-1">
+                            <div>
+                                <label className="block text-[11px] font-black uppercase tracking-widest text-slate-500 mb-2">Month</label>
+                                <select
+                                    value={reportFilters.month}
+                                    onChange={(e) => handleReportFilterChange('month', e.target.value)}
+                                    className="w-full px-3 py-3 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-primary-500 bg-white"
+                                >
+                                    <option value="">All Months</option>
+                                    {FY_MONTHS.map((month) => (
+                                        <option key={month} value={month}>{month}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-[11px] font-black uppercase tracking-widest text-slate-500 mb-2">Year</label>
+                                <select
+                                    value={reportFilters.year}
+                                    onChange={(e) => handleReportFilterChange('year', e.target.value)}
+                                    disabled={!reportFilters.month}
+                                    className="w-full px-3 py-3 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-primary-500 bg-white disabled:bg-slate-100 disabled:text-slate-400"
+                                >
+                                    <option value="">All Years</option>
+                                    {reportYearOptions.map((year) => (
+                                        <option key={year} value={year}>{year}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={clearReportFilters}
+                                disabled={!hasActiveReportFilters}
+                                className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-600 font-bold hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <MdRefresh size={18} />
+                                Clear Report Filters
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -1105,13 +1231,13 @@ const PlanningScreen = () => {
                 >
                     <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
                         <MdKeyboardArrowDown className={`text-slate-500 transition-transform duration-300 ${!isReportExpanded ? '-rotate-90' : ''}`} size={20} />
-                        MGR 1 Report - FY {financialYear}
+                        SBU Wise - FY {financialYear}
                     </h2>
                     <button
                         type="button"
                         onClick={(e) => {
                             e.stopPropagation();
-                            exportReportToExcel(combinedReportData, 'MGR 1 Report');
+                            exportReportToExcel(combinedReportData, 'SBU Wise Report');
                         }}
                         disabled={!combinedReportData || !combinedReportData.mgrCodes?.length}
                         className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 font-bold text-xs uppercase tracking-widest hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1137,47 +1263,67 @@ const PlanningScreen = () => {
                                 <tbody>
                                     {combinedReportData.rows.map((row, idx) => {
                                         const isMonth = row.isMonth;
+                                        const isQuarter = row.isQuarter;
                                         const isTotal = row.isTotal;
+                                        const isPercentage = row.isPercentage;
+                                        const isPreviousYearValue = row.isPreviousYearValue;
+                                        const isTotalPercentage = row.isTotalPercentage;
                                         const isChild = Boolean(row.parentMonth);
+                                        const isHighlight = isQuarter || isTotal || isPercentage || isPreviousYearValue || isTotalPercentage;
 
                                         if (isChild && !expandedReportMonths[row.parentMonth]) {
                                             return null;
                                         }
 
                                         return (
-                                            <tr
-                                                key={idx}
-                                                className={`border-b border-slate-100 transition-colors ${
-                                                    isTotal ? 'bg-amber-50 font-black' :
-                                                    isMonth ? 'bg-white font-bold cursor-pointer hover:bg-slate-50' :
-                                                    'bg-white hover:bg-slate-50 text-slate-700'
-                                                }`}
-                                                onClick={() => {
-                                                    if (isMonth) {
-                                                        toggleReportMonth(row.month);
-                                                    }
-                                                }}
-                                            >
-                                                <td className={`py-3 px-6 ${isMonth || isTotal ? 'font-bold text-slate-900' : 'text-slate-700 pl-14'}`}>
-                                                    <div className="flex items-center gap-2">
-                                                        {isMonth && (
-                                                            <MdKeyboardArrowDown
-                                                                className={`text-slate-700 transition-transform duration-300 ${!expandedReportMonths[row.month] ? '-rotate-90' : ''}`}
-                                                                size={18}
-                                                            />
-                                                        )}
-                                                        {row.month}
-                                                    </div>
-                                                </td>
-                                                {combinedReportData.mgrCodes.map((mgr) => (
-                                                    <td key={mgr} className={`py-3 px-4 text-right border-l border-slate-200 ${isMonth || isTotal ? 'font-bold text-slate-900' : 'text-slate-700'}`}>
-                                                        {formatReportValue(row[mgr] || 0, 3)}
+                                            <React.Fragment key={`${row.parentMonth || 'root'}-${row.month}-${idx}`}>
+                                                <tr
+                                                    className={`border-b border-slate-100 transition-colors ${
+                                                        isTotal ? 'bg-amber-50 font-black' :
+                                                        isPreviousYearValue ? 'bg-amber-100/70 font-bold' :
+                                                        isPercentage || isTotalPercentage ? 'bg-slate-50 font-bold' :
+                                                        isQuarter ? 'bg-blue-50/50 font-bold' :
+                                                        isMonth ? 'bg-white font-bold cursor-pointer hover:bg-slate-50' :
+                                                        'bg-white hover:bg-slate-50 text-slate-700'
+                                                    }`}
+                                                    onClick={() => {
+                                                        if (isMonth) {
+                                                            toggleReportMonth(row.month);
+                                                        }
+                                                    }}
+                                                >
+                                                    <td className={`py-3 px-6 ${isHighlight || isMonth ? 'font-bold text-slate-900' : 'text-slate-700 pl-14'}`}>
+                                                        <div className="flex items-center gap-2">
+                                                            {isMonth && (
+                                                                <MdKeyboardArrowDown
+                                                                    className={`text-slate-700 transition-transform duration-300 ${!expandedReportMonths[row.month] ? '-rotate-90' : ''}`}
+                                                                    size={18}
+                                                                />
+                                                            )}
+                                                            {row.month}
+                                                        </div>
                                                     </td>
-                                                ))}
-                                                <td className={`py-3 px-4 text-right border-l border-slate-300 ${isTotal ? 'bg-amber-100 font-black' : isMonth ? 'bg-slate-50 font-bold' : 'bg-slate-50/60'} text-slate-900`}>
-                                                    {formatReportValue(row.total || 0, 3)}
-                                                </td>
-                                            </tr>
+                                                    {combinedReportData.mgrCodes.map((mgr) => (
+                                                        <td key={mgr} className={`py-3 px-4 text-right border-l border-slate-200 ${isHighlight || isMonth ? 'font-bold text-slate-900' : 'text-slate-700'}`}>
+                                                            {isPercentage || isTotalPercentage
+                                                                ? formatReportPercentage(row[mgr] || 0)
+                                                                : formatReportValue(row[mgr] || 0, 3)}
+                                                        </td>
+                                                    ))}
+                                                    <td className={`py-3 px-4 text-right border-l border-slate-300 ${
+                                                        isTotal ? 'bg-amber-100 font-black' :
+                                                        isPreviousYearValue ? 'bg-amber-200/80 font-bold' :
+                                                        isPercentage || isTotalPercentage ? 'bg-slate-100 font-bold' :
+                                                        isMonth || isQuarter ? 'bg-slate-50 font-bold' :
+                                                        'bg-slate-50/60'
+                                                    } text-slate-900`}>
+                                                        {isPercentage || isTotalPercentage
+                                                            ? formatReportPercentageTotal(row.total)
+                                                            : formatReportValue(row.total || 0, 3)}
+                                                    </td>
+                                                </tr>
+                                                {renderSbuStatusBreakdown(row)}
+                                            </React.Fragment>
                                         );
                                     })}
                                 </tbody>
@@ -1188,7 +1334,7 @@ const PlanningScreen = () => {
                             {loading ? (
                                 <div className="animate-spin border-4 border-slate-200 border-t-primary-600 rounded-full h-8 w-8 mx-auto"></div>
                             ) : (
-                                'No data available. Add planning entries above to generate the MGR report.'
+                                'No data available. Add planning entries above to generate the SBU Wise report.'
                             )}
                         </div>
                     )
@@ -1202,13 +1348,13 @@ const PlanningScreen = () => {
                 >
                     <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
                         <MdKeyboardArrowDown className={`text-slate-500 transition-transform duration-300 ${!isReportExpanded2 ? '-rotate-90' : ''}`} size={20} />
-                        MGR 2 Report - FY {financialYear}
+                        Segment Wise - FY {financialYear}
                     </h2>
                     <button
                         type="button"
                         onClick={(e) => {
                             e.stopPropagation();
-                            exportReportToExcel(reportData2, 'MGR 2 Report');
+                            exportReportToExcel(reportData2, 'Segment Wise Report');
                         }}
                         disabled={!reportData2 || !reportData2.mgrCodes?.length}
                         className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 font-bold text-xs uppercase tracking-widest hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1237,7 +1383,8 @@ const PlanningScreen = () => {
                                         const isTotal = row.isTotal;
                                         const isPercentage = row.isPercentage;
                                         const isPreviousYearValue = row.isPreviousYearValue;
-                                        const isHighlight = isQuarter || isTotal || isPercentage || isPreviousYearValue;
+                                        const isTotalPercentage = row.isTotalPercentage;
+                                        const isHighlight = isQuarter || isTotal || isPercentage || isPreviousYearValue || isTotalPercentage;
 
                                         let rowQuarterPrefix = null;
                                         if (isQuarter) {
@@ -1259,7 +1406,7 @@ const PlanningScreen = () => {
                                                 className={`border-b transition-colors ${
                                                     isTotal ? 'bg-amber-50 border-amber-200 font-black' :
                                                     isPreviousYearValue ? 'bg-amber-100/70 border-amber-200 font-bold' :
-                                                    isPercentage ? 'bg-slate-50 border-slate-200' :
+                                                    isPercentage || isTotalPercentage ? 'bg-slate-50 border-slate-200' :
                                                     isQuarter ? 'bg-blue-50/50 border-blue-100 font-bold cursor-pointer hover:bg-blue-100/50' :
                                                     'border-slate-50 hover:bg-slate-50'
                                                 }`}
@@ -1282,7 +1429,7 @@ const PlanningScreen = () => {
                                                 </td>
                                                 {reportData2.mgrCodes.map((mgr) => (
                                                     <td key={mgr} className={`py-3 px-4 text-right ${isHighlight ? 'font-bold text-slate-900' : 'text-slate-700'}`}>
-                                                        {isPercentage
+                                                        {isPercentage || isTotalPercentage
                                                             ? formatReportPercentage(row[mgr] || 0)
                                                             : formatReportValue(row[mgr] || 0, 3)}
                                                     </td>
@@ -1290,10 +1437,10 @@ const PlanningScreen = () => {
                                                 <td className={`py-3 px-4 text-right ${
                                                     isTotal ? 'bg-amber-100 font-black' :
                                                     isPreviousYearValue ? 'bg-amber-200/80 font-bold' :
-                                                    isPercentage ? 'bg-slate-100 font-bold' :
+                                                    isPercentage || isTotalPercentage ? 'bg-slate-100 font-bold' :
                                                     'bg-amber-50/50 font-bold'
                                                 } text-slate-900`}>
-                                                    {isPercentage
+                                                    {isPercentage || isTotalPercentage
                                                         ? formatReportPercentageTotal(row.total)
                                                         : formatReportValue(row.total || 0, 3)}
                                                 </td>
@@ -1308,7 +1455,7 @@ const PlanningScreen = () => {
                             {loading ? (
                                 <div className="animate-spin border-4 border-slate-200 border-t-primary-600 rounded-full h-8 w-8 mx-auto"></div>
                             ) : (
-                                'No data available for MGR 2. Add entries with MGR 2 codes to generate this report.'
+                                'No data available for Segment Wise. Add entries with MGR 2 codes to generate this report.'
                             )}
                         </div>
                     )

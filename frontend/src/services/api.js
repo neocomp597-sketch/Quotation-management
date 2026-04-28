@@ -224,7 +224,13 @@ export const planningService = {
     create: (data) => api.post('/planning', data),
     update: (id, data) => api.put(`/planning/${id}`, data),
     delete: (id) => api.delete(`/planning/${id}`),
-    getMGRReport: (financialYear, type) => api.get(`/planning/mgr-report?financialYear=${financialYear}${type ? `&type=${type}` : ''}`),
+    getMGRReport: (financialYear, type, filters = {}) => api.get('/planning/mgr-report', {
+        params: {
+            financialYear,
+            type,
+            ...filters
+        }
+    }),
 };
 
 export const notificationService = {
