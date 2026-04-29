@@ -25,6 +25,16 @@ const FY_MONTHS = [
 
 const STATUS_OPTIONS = ['Firm', 'MFC', 'B & B', 'Others', 'Order Received', 'Invoice', 'Lost', 'Parked'];
 const STATUS_REPORT_COLUMNS = ['Firm', 'MFC', 'B&B', 'Other', 'Invoice', 'Lost', 'Parked', 'Order Received'];
+const STATUS_REPORT_ROWS = [
+    { key: 'Firm', label: 'Firm', aliases: ['Firm'] },
+    { key: 'Invoice', label: 'Invoice', aliases: ['Invoice'] },
+    { key: 'B&B', label: 'Book & Bill', aliases: ['B&B', 'B & B', 'Book & Bill'] },
+    { key: 'MFC', label: 'MFC', aliases: ['MFC'] },
+    { key: 'Other', label: 'Others', aliases: ['Other', 'Others'] },
+    { key: 'Lost', label: 'Lost', aliases: ['Lost'] },
+    { key: 'Parked', label: 'Parked', aliases: ['Parked'] },
+    { key: 'Order Received', label: 'Order Received', aliases: ['Order Received'] }
+];
 // Generate financial year options (current + next 2)
 const getFinancialYears = () => {
     const now = new Date();
@@ -130,11 +140,13 @@ const PlanningScreen = () => {
     const [entries, setEntries] = useState([]);
     const [combinedReportData, setCombinedReportData] = useState(null);
     const [reportData2, setReportData2] = useState(null);
+    const [statusBreakdownData, setStatusBreakdownData] = useState([]);
     const [loading, setLoading] = useState(false);
 
     const [isGridExpanded, setIsGridExpanded] = useState(true);
     const [isReportExpanded, setIsReportExpanded] = useState(false);
     const [isReportExpanded2, setIsReportExpanded2] = useState(false);
+    const [isStatusBreakdownExpanded, setIsStatusBreakdownExpanded] = useState(false);
     const [expandedQuarters, setExpandedQuarters] = useState({
         Q1: false,
         Q2: false,
@@ -381,6 +393,61 @@ const PlanningScreen = () => {
 
         return rows;
     }, [filteredEntries, sortConfig, monthOrder, mgrList, mgrList2, getCustomerCode, getProductCode]);
+
+    const computedStatusBreakdownData = useMemo(() => {
+        const breakdown = {};
+        
+        STATUS_BREAKDOWN_ROWS.forEach((segment) => {
+            breakdown[segment] = { segment, total: 0 };
+            STATUS_REPORT_COLUMNS.forEach((col) => {
+                breakdown[segment][col] = 0;
+            });
+        });
+
+        entries.forEach((entry) => {
+            const status = entry.status;
+            const value = Number(entry.value || 0);
+            
+            // For each entry, aggregate to the Total row
+            if (breakdown['Total']) {
+                if (breakdown['Total'][status] !== undefined) {
+                    breakdown['Total'][status] += value;
+                }
+                breakdown['Total'].total += value;
+            }
+        });
+
+        // Compute Utility, UC, Industry from combinedReportData if available
+        if (combinedReportData && combinedReportData.rows) {
+            combinedReportData.rows.forEach((row) => {
+                if (row.statusBreakdown) {
+                    STATUS_BREAKDOWN_ROWS.forEach((segment) => {
+                        const segData = row.statusBreakdown[segment];
+                        if (segData) {
+                            if (!breakdown[segment]) {
+                                breakdown[segment] = { segment, total: 0 };
+                                STATUS_REPORT_COLUMNS.forEach((col) => {
+                                    breakdown[segment][col] = 0;
+                                });
+                            }
+                            STATUS_REPORT_COLUMNS.forEach((col) => {
+                                breakdown[segment][col] += Number(segData[col] || 0);
+                            });
+                            breakdown[segment].total += Number(segData.total || 0);
+                        }
+                    });
+                }
+            });
+        }
+
+        return STATUS_BREAKDOWN_ROWS
+            .filter((segment) => breakdown[segment] && breakdown[segment].total > 0)
+            .map((segment) => breakdown[segment]);
+    }, [entries, combinedReportData]);
+
+    useEffect(() => {
+        setStatusBreakdownData(computedStatusBreakdownData);
+    }, [computedStatusBreakdownData]);
 
     const handleNewRowChange = (field, value) => {
         setNewRow((prev) => ({ ...prev, [field]: value }));
@@ -663,6 +730,31 @@ const PlanningScreen = () => {
         toast.success(`${reportLabel} exported`);
     };
 
+    const exportStatusBreakdownToExcel = () => {
+        if (!statusBreakdownData || statusBreakdownData.length === 0) {
+            toast.error('No status breakdown data available to export');
+            return;
+        }
+
+        const workbook = XLSX.utils.book_new();
+        
+        const rows = [
+            ['Segment', ...STATUS_REPORT_COLUMNS, 'Total'],
+            ...statusBreakdownData.map((row) => [
+                row.segment,
+                ...STATUS_REPORT_COLUMNS.map((col) => formatStatusMetric(row[col] || 0)),
+                formatStatusMetric(row.total || 0)
+            ])
+        ];
+
+        const sheet = XLSX.utils.aoa_to_sheet(rows);
+        sheet['!cols'] = [{ wch: 20 }, ...STATUS_REPORT_COLUMNS.map(() => ({ wch: 16 })), { wch: 16 }];
+        XLSX.utils.book_append_sheet(workbook, sheet, 'Status Breakdown Summary');
+
+        XLSX.writeFile(workbook, `Status-Breakdown-Summary-${financialYear}.xlsx`);
+        toast.success('Status Breakdown Summary exported');
+    };
+
     const requestSort = (key) => {
         setSortConfig((prev) => ({
             key,
@@ -703,73 +795,6 @@ const PlanningScreen = () => {
             ...prev,
             [month]: !prev[month]
         }));
-    };
-
-    const renderSbuStatusBreakdown = (row) => {
-        if (!row.isChild) {
-            return null;
-        }
-
-        const statusColumns = combinedReportData?.statusColumns?.length
-            ? combinedReportData.statusColumns
-            : STATUS_REPORT_COLUMNS;
-        const getStatusRow = (segment) => {
-            const source = row.statusBreakdown?.[segment] || {};
-            const normalized = { ...source };
-            statusColumns.forEach((column) => {
-                if (typeof normalized[column] === 'undefined') {
-                    normalized[column] = 0;
-                }
-            });
-            normalized.total = Number(normalized.total || 0);
-            return normalized;
-        };
-
-        return (
-            <tr key={`${row.parentMonth}-${row.month}-status-breakdown`} className="bg-slate-50/50">
-                <td colSpan={combinedReportData.mgrCodes.length + 2} className="px-8 py-4">
-                    <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                        <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
-                            <p className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-500">Status Breakdown</p>
-                            <p className="text-sm font-bold text-slate-900 mt-1">{row.month}</p>
-                        </div>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-xs">
-                                <thead>
-                                    <tr className="bg-slate-50 border-b border-slate-200">
-                                        <th className="py-3 px-4 text-left font-black text-slate-700 min-w-[120px]">Segment</th>
-                                        {statusColumns.map((column) => (
-                                            <th key={column} className="py-3 px-4 text-right font-black text-slate-700 min-w-[90px]">{column}</th>
-                                        ))}
-                                        <th className="py-3 px-4 text-right font-black text-slate-900 bg-slate-100 min-w-[90px]">Total</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {STATUS_BREAKDOWN_ROWS.map((segment) => {
-                                        const statusRow = getStatusRow(segment);
-                                        const isTotalRow = segment === 'Total';
-
-                                        return (
-                                            <tr key={segment} className={`border-b border-slate-100 ${isTotalRow ? 'bg-amber-50 font-black' : 'hover:bg-slate-50'}`}>
-                                                <td className={`py-3 px-4 text-slate-900 ${isTotalRow ? 'font-black' : 'font-bold'}`}>{segment}</td>
-                                                {statusColumns.map((column) => (
-                                                    <td key={column} className={`py-3 px-4 text-right text-slate-700 ${isTotalRow ? 'font-black' : 'font-medium'}`}>
-                                                        {formatStatusMetric(statusRow[column] || 0)}
-                                                    </td>
-                                                ))}
-                                                <td className={`py-3 px-4 text-right text-slate-900 ${isTotalRow ? 'bg-amber-100 font-black' : 'bg-slate-50 font-bold'}`}>
-                                                    {formatStatusMetric(statusRow.total || 0)}
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </td>
-            </tr>
-        );
     };
 
     const calculatedTotal = (newRow.qty && newRow.value) ? Number(newRow.qty) * Number(newRow.value) : 0;
@@ -1322,7 +1347,6 @@ const PlanningScreen = () => {
                                                             : formatReportValue(row.total || 0, 3)}
                                                     </td>
                                                 </tr>
-                                                {renderSbuStatusBreakdown(row)}
                                             </React.Fragment>
                                         );
                                     })}
@@ -1456,6 +1480,77 @@ const PlanningScreen = () => {
                                 <div className="animate-spin border-4 border-slate-200 border-t-primary-600 rounded-full h-8 w-8 mx-auto"></div>
                             ) : (
                                 'No data available for Segment Wise. Add entries with MGR 2 codes to generate this report.'
+                            )}
+                        </div>
+                    )
+                )}
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                <div
+                    className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center cursor-pointer hover:bg-slate-100/50 transition-colors"
+                    onClick={() => setIsStatusBreakdownExpanded(!isStatusBreakdownExpanded)}
+                >
+                    <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
+                        <MdKeyboardArrowDown
+                            className={`text-slate-500 transition-transform duration-300 ${!isStatusBreakdownExpanded ? '-rotate-90' : ''}`}
+                            size={20}
+                        />
+                        Status Breakdown Summary - FY {financialYear}
+                    </h2>
+                    <button
+                        type="button"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            exportStatusBreakdownToExcel();
+                        }}
+                        disabled={!statusBreakdownData || !statusBreakdownData.length}
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 font-bold text-xs uppercase tracking-widest hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <MdDownload size={16} />
+                        Export
+                    </button>
+                </div>
+
+                {isStatusBreakdownExpanded && (
+                    statusBreakdownData && statusBreakdownData.length > 0 ? (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="bg-amber-50 border-b border-amber-100">
+                                        <th className="py-3 px-4 text-left font-black text-slate-900 min-w-[120px]">Segment</th>
+                                        {STATUS_REPORT_COLUMNS.map((column) => (
+                                            <th key={column} className="py-3 px-4 text-right font-black text-slate-900 min-w-[100px]">{column}</th>
+                                        ))}
+                                        <th className="py-3 px-4 text-right font-black text-slate-900 bg-amber-100 min-w-[100px]">Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {statusBreakdownData.map((row, idx) => {
+                                        const isTotalRow = row.segment === 'Total';
+                                        return (
+                                            <tr key={idx} className={`border-b border-slate-100 ${isTotalRow ? 'bg-amber-50 font-black' : 'hover:bg-slate-50'}`}>
+                                                <td className={`py-3 px-4 text-slate-900 ${isTotalRow ? 'font-black' : 'font-bold'}`}>{row.segment}</td>
+                                                {STATUS_REPORT_COLUMNS.map((column) => (
+                                                    <td key={column} className={`py-3 px-4 text-right text-slate-700 ${isTotalRow ? 'font-black' : ''}`}>
+                                                        {formatStatusMetric(row[column] || 0)}
+                                                    </td>
+                                                ))}
+                                                <td className={`py-3 px-4 text-right text-slate-900 ${isTotalRow ? 'bg-amber-100 font-black' : 'bg-slate-50 font-bold'}`}>
+                                                    {formatStatusMetric(row.total || 0)}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    ) : (
+                        <div className="p-10 text-center text-slate-400 font-bold">
+                            {loading ? (
+                                <div className="animate-spin border-4 border-slate-200 border-t-primary-600 rounded-full h-8 w-8 mx-auto"></div>
+                            ) : (
+                                'No data available. Add planning entries to generate the status breakdown.'
                             )}
                         </div>
                     )
