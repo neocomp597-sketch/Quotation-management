@@ -140,7 +140,6 @@ const PlanningScreen = () => {
     const [entries, setEntries] = useState([]);
     const [combinedReportData, setCombinedReportData] = useState(null);
     const [reportData2, setReportData2] = useState(null);
-    const [statusBreakdownData, setStatusBreakdownData] = useState([]);
     const [loading, setLoading] = useState(false);
 
     const [isGridExpanded, setIsGridExpanded] = useState(true);
@@ -154,6 +153,7 @@ const PlanningScreen = () => {
         Q4: false
     });
     const [expandedReportMonths, setExpandedReportMonths] = useState({});
+    const [expandedStatusBreakdownMonths, setExpandedStatusBreakdownMonths] = useState({});
 
     const [customers, setCustomers] = useState([]);
     const [products, setProducts] = useState([]);
@@ -304,6 +304,17 @@ const PlanningScreen = () => {
             return next;
         });
     }, [monthLabels]);
+    useEffect(() => {
+        setExpandedStatusBreakdownMonths((prev) => {
+            const next = { ...prev };
+            monthLabels.forEach((month) => {
+                if (typeof next[month] === 'undefined') {
+                    next[month] = true;
+                }
+            });
+            return next;
+        });
+    }, [monthLabels]);
     const customerMap = useMemo(
         () => new Map(customers.map((customer) => [String(customer._id), customer])),
         [customers]
@@ -395,59 +406,68 @@ const PlanningScreen = () => {
     }, [filteredEntries, sortConfig, monthOrder, mgrList, mgrList2, getCustomerCode, getProductCode]);
 
     const computedStatusBreakdownData = useMemo(() => {
-        const breakdown = {};
-        
-        STATUS_BREAKDOWN_ROWS.forEach((segment) => {
-            breakdown[segment] = { segment, total: 0 };
+        const createSegmentRow = (segment) => {
+            const row = { segment, total: 0 };
             STATUS_REPORT_COLUMNS.forEach((col) => {
-                breakdown[segment][col] = 0;
+                row[col] = 0;
+            });
+            return row;
+        };
+
+        const monthMap = new Map();
+
+        monthLabels.forEach((monthLabel) => {
+            const segmentRows = {};
+            STATUS_BREAKDOWN_ROWS.forEach((segment) => {
+                segmentRows[segment] = createSegmentRow(segment);
+            });
+            monthMap.set(monthLabel, {
+                month: monthLabel,
+                rows: segmentRows
             });
         });
 
-        entries.forEach((entry) => {
-            const status = entry.status;
-            const value = Number(entry.value || 0);
-            
-            // For each entry, aggregate to the Total row
-            if (breakdown['Total']) {
-                if (breakdown['Total'][status] !== undefined) {
-                    breakdown['Total'][status] += value;
-                }
-                breakdown['Total'].total += value;
-            }
-        });
-
-        // Compute Utility, UC, Industry from combinedReportData if available
-        if (combinedReportData && combinedReportData.rows) {
+        if (combinedReportData?.rows) {
             combinedReportData.rows.forEach((row) => {
-                if (row.statusBreakdown) {
-                    STATUS_BREAKDOWN_ROWS.forEach((segment) => {
-                        const segData = row.statusBreakdown[segment];
-                        if (segData) {
-                            if (!breakdown[segment]) {
-                                breakdown[segment] = { segment, total: 0 };
-                                STATUS_REPORT_COLUMNS.forEach((col) => {
-                                    breakdown[segment][col] = 0;
-                                });
-                            }
-                            STATUS_REPORT_COLUMNS.forEach((col) => {
-                                breakdown[segment][col] += Number(segData[col] || 0);
-                            });
-                            breakdown[segment].total += Number(segData.total || 0);
-                        }
-                    });
+                if (!row.parentMonth || !row.statusBreakdown) {
+                    return;
                 }
+
+                const monthEntry = monthMap.get(row.parentMonth);
+                if (!monthEntry) {
+                    return;
+                }
+
+                STATUS_BREAKDOWN_ROWS.forEach((segment) => {
+                    const segmentRow = monthEntry.rows[segment];
+                    const segData = row.statusBreakdown[segment];
+                    if (!segmentRow || !segData) {
+                        return;
+                    }
+
+                    STATUS_REPORT_COLUMNS.forEach((col) => {
+                        segmentRow[col] += Number(segData[col] || 0);
+                    });
+                    segmentRow.total += Number(segData.total || 0);
+                });
             });
         }
 
-        return STATUS_BREAKDOWN_ROWS
-            .filter((segment) => breakdown[segment] && breakdown[segment].total > 0)
-            .map((segment) => breakdown[segment]);
-    }, [entries, combinedReportData]);
+        const months = monthLabels
+            .map((monthLabel) => {
+                const monthEntry = monthMap.get(monthLabel);
+                const monthRows = STATUS_BREAKDOWN_ROWS
+                    .map((segment) => monthEntry.rows[segment]);
 
-    useEffect(() => {
-        setStatusBreakdownData(computedStatusBreakdownData);
-    }, [computedStatusBreakdownData]);
+                return {
+                    month: monthLabel,
+                    rows: monthRows,
+                    total: Number(monthEntry.rows.Total?.total || 0)
+                };
+            });
+
+        return months;
+    }, [combinedReportData, monthLabels]);
 
     const handleNewRowChange = (field, value) => {
         setNewRow((prev) => ({ ...prev, [field]: value }));
@@ -731,24 +751,37 @@ const PlanningScreen = () => {
     };
 
     const exportStatusBreakdownToExcel = () => {
-        if (!statusBreakdownData || statusBreakdownData.length === 0) {
+        if (!computedStatusBreakdownData || computedStatusBreakdownData.length === 0) {
             toast.error('No status breakdown data available to export');
             return;
         }
 
         const workbook = XLSX.utils.book_new();
-        
-        const rows = [
-            ['Segment', ...STATUS_REPORT_COLUMNS, 'Total'],
-            ...statusBreakdownData.map((row) => [
-                row.segment,
-                ...STATUS_REPORT_COLUMNS.map((col) => formatStatusMetric(row[col] || 0)),
-                formatStatusMetric(row.total || 0)
-            ])
-        ];
+
+        const rows = [['Month', 'Segment', ...STATUS_REPORT_COLUMNS, 'Total']];
+
+        computedStatusBreakdownData.forEach((monthEntry) => {
+            const totalRow = monthEntry.rows.find((row) => row.segment === 'Total');
+
+            monthEntry.rows.forEach((row, index) => {
+                rows.push([
+                    index === 0 ? monthEntry.month : '',
+                    row.segment,
+                    ...STATUS_REPORT_COLUMNS.map((col) => formatStatusMetric(row[col] || 0)),
+                    formatStatusMetric(row.total || 0)
+                ]);
+            });
+
+            rows.push([
+                '',
+                'Total',
+                ...STATUS_REPORT_COLUMNS.map((col) => formatStatusMetric(totalRow?.[col] || 0)),
+                formatStatusMetric(totalRow?.total || monthEntry.total || 0)
+            ]);
+        });
 
         const sheet = XLSX.utils.aoa_to_sheet(rows);
-        sheet['!cols'] = [{ wch: 20 }, ...STATUS_REPORT_COLUMNS.map(() => ({ wch: 16 })), { wch: 16 }];
+        sheet['!cols'] = [{ wch: 16 }, { wch: 20 }, ...STATUS_REPORT_COLUMNS.map(() => ({ wch: 16 })), { wch: 16 }];
         XLSX.utils.book_append_sheet(workbook, sheet, 'Status Breakdown Summary');
 
         XLSX.writeFile(workbook, `Status-Breakdown-Summary-${financialYear}.xlsx`);
@@ -792,6 +825,12 @@ const PlanningScreen = () => {
 
     const toggleReportMonth = (month) => {
         setExpandedReportMonths((prev) => ({
+            ...prev,
+            [month]: !prev[month]
+        }));
+    };
+    const toggleStatusBreakdownMonth = (month) => {
+        setExpandedStatusBreakdownMonths((prev) => ({
             ...prev,
             [month]: !prev[month]
         }));
@@ -1504,7 +1543,7 @@ const PlanningScreen = () => {
                             e.stopPropagation();
                             exportStatusBreakdownToExcel();
                         }}
-                        disabled={!statusBreakdownData || !statusBreakdownData.length}
+                        disabled={!computedStatusBreakdownData || !computedStatusBreakdownData.length}
                         className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 font-bold text-xs uppercase tracking-widest hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         <MdDownload size={16} />
@@ -1513,12 +1552,12 @@ const PlanningScreen = () => {
                 </div>
 
                 {isStatusBreakdownExpanded && (
-                    statusBreakdownData && statusBreakdownData.length > 0 ? (
+                    computedStatusBreakdownData && computedStatusBreakdownData.length > 0 ? (
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead>
                                     <tr className="bg-amber-50 border-b border-amber-100">
-                                        <th className="py-3 px-4 text-left font-black text-slate-900 min-w-[120px]">Segment</th>
+                                        <th className="py-3 px-4 text-left font-black text-slate-900 min-w-[160px]">Month / Segment</th>
                                         {STATUS_REPORT_COLUMNS.map((column) => (
                                             <th key={column} className="py-3 px-4 text-right font-black text-slate-900 min-w-[100px]">{column}</th>
                                         ))}
@@ -1526,20 +1565,54 @@ const PlanningScreen = () => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {statusBreakdownData.map((row, idx) => {
-                                        const isTotalRow = row.segment === 'Total';
+                                    {computedStatusBreakdownData.map((monthEntry) => {
+                                        const totalRow = monthEntry.rows.find((row) => row.segment === 'Total');
+
                                         return (
-                                            <tr key={idx} className={`border-b border-slate-100 ${isTotalRow ? 'bg-amber-50 font-black' : 'hover:bg-slate-50'}`}>
-                                                <td className={`py-3 px-4 text-slate-900 ${isTotalRow ? 'font-black' : 'font-bold'}`}>{row.segment}</td>
-                                                {STATUS_REPORT_COLUMNS.map((column) => (
-                                                    <td key={column} className={`py-3 px-4 text-right text-slate-700 ${isTotalRow ? 'font-black' : ''}`}>
-                                                        {formatStatusMetric(row[column] || 0)}
+                                            <React.Fragment key={monthEntry.month}>
+                                                <tr
+                                                    className="border-b-2 border-slate-200 bg-blue-50 font-bold cursor-pointer hover:bg-blue-100/60 transition-colors"
+                                                    onClick={() => toggleStatusBreakdownMonth(monthEntry.month)}
+                                                >
+                                                    <td className="py-3 px-4 text-slate-900">
+                                                        <div className="flex items-center gap-2">
+                                                            <MdKeyboardArrowDown
+                                                                className={`text-slate-700 transition-transform duration-300 ${!expandedStatusBreakdownMonths[monthEntry.month] ? '-rotate-90' : ''}`}
+                                                                size={18}
+                                                            />
+                                                            {monthEntry.month}
+                                                        </div>
                                                     </td>
-                                                ))}
-                                                <td className={`py-3 px-4 text-right text-slate-900 ${isTotalRow ? 'bg-amber-100 font-black' : 'bg-slate-50 font-bold'}`}>
-                                                    {formatStatusMetric(row.total || 0)}
-                                                </td>
-                                            </tr>
+                                                    {STATUS_REPORT_COLUMNS.map((column) => (
+                                                        <td key={column} className="py-3 px-4 text-right text-slate-900 font-bold">
+                                                            {formatStatusMetric(totalRow?.[column] || 0)}
+                                                        </td>
+                                                    ))}
+                                                    <td className="py-3 px-4 text-right text-slate-900 bg-slate-50 font-black">
+                                                        {formatStatusMetric(totalRow?.total || monthEntry.total || 0)}
+                                                    </td>
+                                                </tr>
+                                                {expandedStatusBreakdownMonths[monthEntry.month] && monthEntry.rows.map((row) => {
+                                                    const isTotalRow = row.segment === 'Total';
+
+                                                    return (
+                                                        <tr
+                                                            key={`${monthEntry.month}-${row.segment}`}
+                                                            className={`border-b border-slate-100 ${isTotalRow ? 'bg-amber-50 font-black' : 'hover:bg-slate-50'}`}
+                                                        >
+                                                            <td className={`py-3 px-4 text-slate-900 ${isTotalRow ? 'font-black' : 'font-bold pl-12'}`}>{row.segment}</td>
+                                                            {STATUS_REPORT_COLUMNS.map((column) => (
+                                                                <td key={column} className={`py-3 px-4 text-right ${isTotalRow ? 'text-slate-900 font-black' : 'text-slate-700'}`}>
+                                                                    {formatStatusMetric(row[column] || 0)}
+                                                                </td>
+                                                            ))}
+                                                            <td className={`py-3 px-4 text-right text-slate-900 ${isTotalRow ? 'bg-amber-100 font-black' : 'bg-slate-50 font-bold'}`}>
+                                                                {formatStatusMetric(row.total || 0)}
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </React.Fragment>
                                         );
                                     })}
                                 </tbody>
