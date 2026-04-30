@@ -146,12 +146,8 @@ const PlanningScreen = () => {
     const [isReportExpanded, setIsReportExpanded] = useState(false);
     const [isReportExpanded2, setIsReportExpanded2] = useState(false);
     const [isStatusBreakdownExpanded, setIsStatusBreakdownExpanded] = useState(false);
-    const [expandedSbuQuarters, setExpandedSbuQuarters] = useState({
-        Q1: false,
-        Q2: false,
-        Q3: false,
-        Q4: false
-    });
+    const [expandedSbuMonths, setExpandedSbuMonths] = useState({});
+    const [activeSbuSegments, setActiveSbuSegments] = useState({});
     const [expandedQuarters, setExpandedQuarters] = useState({
         Q1: false,
         Q2: false,
@@ -623,7 +619,7 @@ const PlanningScreen = () => {
             const firstCell = data.reportType === 'SBU'
                 ? row.isSegment
                     ? `   ${row.month}`
-                    : row.isQuarter
+                    : row.isMonth
                         ? `v ${row.month}`
                         : row.month
                 : row.parentMonth
@@ -791,10 +787,17 @@ const PlanningScreen = () => {
         );
     };
 
-    const toggleSbuQuarter = (quarterPrefix) => {
-        setExpandedSbuQuarters((prev) => ({
+    const toggleSbuMonth = (monthLabel) => {
+        setExpandedSbuMonths((prev) => ({
             ...prev,
-            [quarterPrefix]: !prev[quarterPrefix]
+            [monthLabel]: !prev[monthLabel]
+        }));
+    };
+
+    const handleSbuSegmentSelect = (monthLabel, segmentKey) => {
+        setActiveSbuSegments((prev) => ({
+            ...prev,
+            [monthLabel]: prev[monthLabel] === segmentKey ? null : segmentKey
         }));
     };
 
@@ -1300,82 +1303,111 @@ const PlanningScreen = () => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {combinedReportData.rows.map((row, idx) => {
-                                        const isQuarter = row.isQuarter;
-                                        const isSegment = row.isSegment;
-                                        const isTotal = row.isTotal;
-                                        const isStatus = row.isStatus;
-                                        const isPercentage = row.isPercentage;
-                                        const isPreviousYearValue = row.isPreviousYearValue;
-                                        const isTotalPercentage = row.isTotalPercentage;
-                                        const rowQuarterKey = row.quarterKey || row.parentQuarter || null;
-                                        const isSummary = isTotal || isPercentage || isPreviousYearValue || isTotalPercentage;
-                                        const isHighlight = isQuarter || isSummary;
-
-                                        if (isStatus) {
-                                            return null;
-                                        }
-
-                                        if (isSegment && rowQuarterKey && !expandedSbuQuarters[rowQuarterKey]) {
-                                            return null;
-                                        }
+                                    {(combinedReportData.monthLabels || []).map((monthLabel) => {
+                                        const monthName = monthLabel.split('-')[0];
+                                        const monthData = combinedReportData.monthSegmentBreakdown?.[monthName] || {};
+                                        const monthRow = combinedReportData.rows.find((row) => row.isMonth && row.month === monthLabel) || {};
+                                        const activeSegmentKey = activeSbuSegments[monthLabel];
+                                        const segmentOptions = [
+                                            { key: 'export', label: 'Export' },
+                                            { key: 'industry', label: 'Industry' },
+                                            { key: 'uc', label: 'UC' },
+                                            { key: 'utility', label: 'Utility' }
+                                        ];
 
                                         return (
-                                            <React.Fragment key={`${row.parentQuarter || 'root'}-${row.parentSegment || 'row'}-${row.month}-${idx}`}>
+                                            <React.Fragment key={monthLabel}>
                                                 <tr
+                                                    className="border-b border-slate-100 transition-colors bg-blue-50/50 font-bold cursor-pointer hover:bg-blue-100/60"
+                                                    onClick={() => toggleSbuMonth(monthLabel)}
+                                                >
+                                                    <td className="py-3 px-6 font-bold text-slate-900">
+                                                        <div className="flex items-center gap-2">
+                                                            <MdKeyboardArrowDown
+                                                                className={`text-slate-700 transition-transform duration-300 ${!expandedSbuMonths[monthLabel] ? '-rotate-90' : ''}`}
+                                                                size={18}
+                                                            />
+                                                            {monthName}
+                                                        </div>
+                                                    </td>
+                                                    {combinedReportData.mgrCodes.map((mgr) => (
+                                                        <td key={mgr} className="py-3 px-4 text-right border-l border-slate-200 font-bold text-slate-900">
+                                                            {formatReportValue(monthRow[mgr] || 0, 3)}
+                                                        </td>
+                                                    ))}
+                                                    <td className="py-3 px-4 text-right border-l border-slate-300 bg-slate-50 font-bold text-slate-900">
+                                                        {formatReportValue(monthRow.total || 0, 3)}
+                                                    </td>
+                                                </tr>
+
+                                                {expandedSbuMonths[monthLabel] && segmentOptions.map((segment) => {
+                                                    const row = monthData[segment.key] || {};
+                                                    const isActive = activeSegmentKey === segment.key;
+
+                                                    return (
+                                                        <tr
+                                                            key={`${monthLabel}-${segment.key}`}
+                                                            className={`border-b border-slate-100 transition-colors cursor-pointer ${
+                                                                isActive ? 'bg-emerald-50 text-slate-900' : 'bg-slate-50 text-slate-700 hover:bg-slate-100/70'
+                                                            }`}
+                                                            onClick={() => handleSbuSegmentSelect(monthLabel, segment.key)}
+                                                        >
+                                                            <td className={`py-3 px-6 pl-10 font-bold ${isActive ? 'text-emerald-800' : 'text-slate-700'}`}>
+                                                                {segment.label}
+                                                            </td>
+                                                            {combinedReportData.mgrCodes.map((mgr) => (
+                                                                <td key={mgr} className="py-3 px-4 text-right border-l border-slate-200 font-bold">
+                                                                    {isActive ? formatReportValue(row[mgr] || 0, 3) : '—'}
+                                                                </td>
+                                                            ))}
+                                                            <td className={`py-3 px-4 text-right border-l border-slate-300 font-bold ${isActive ? 'bg-emerald-100/60 text-slate-900' : 'bg-slate-100/60 text-slate-500'}`}>
+                                                                {isActive ? formatReportValue(row.total || 0, 3) : '—'}
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </React.Fragment>
+                                        );
+                                    })}
+
+                                    {combinedReportData.rows
+                                        .filter((row) => row.isTotal || row.isPercentage || row.isPreviousYearValue || row.isTotalPercentage)
+                                        .map((row) => {
+                                            const isTotal = row.isTotal;
+                                            const isPercentage = row.isPercentage;
+                                            const isPreviousYearValue = row.isPreviousYearValue;
+                                            const isTotalPercentage = row.isTotalPercentage;
+
+                                            return (
+                                                <tr
+                                                    key={row.month}
                                                     className={`border-b border-slate-100 transition-colors ${
                                                         isTotal ? 'bg-amber-50 font-black' :
                                                         isPreviousYearValue ? 'bg-amber-100/70 font-bold' :
                                                         isPercentage || isTotalPercentage ? 'bg-slate-50 font-bold' :
-                                                        isQuarter ? 'bg-blue-50/50 font-bold cursor-pointer hover:bg-blue-100/60' :
-                                                        isSegment ? 'bg-slate-50 font-bold text-slate-800' :
-                                                        'bg-white hover:bg-slate-50 text-slate-700'
+                                                        'bg-white text-slate-700'
                                                     }`}
-                                                    onClick={() => {
-                                                        if (isQuarter && row.quarterKey) {
-                                                            toggleSbuQuarter(row.quarterKey);
-                                                        }
-                                                    }}
                                                 >
-                                                    <td className={`py-3 px-6 ${
-                                                        isQuarter || isSummary
-                                                            ? 'font-bold text-slate-900'
-                                                            : isSegment
-                                                                ? 'font-bold text-slate-800 pl-10'
-                                                                    : 'text-slate-700'
-                                                    }`}>
-                                                        <div className="flex items-center gap-2">
-                                                            {isQuarter && (
-                                                                <MdKeyboardArrowDown
-                                                                    className={`text-slate-700 transition-transform duration-300 ${!expandedSbuQuarters[row.quarterKey] ? '-rotate-90' : ''}`}
-                                                                    size={18}
-                                                                />
-                                                            )}
-                                                            {row.month}
-                                                        </div>
-                                                    </td>
+                                                    <td className="py-3 px-6 font-bold text-slate-900">{row.month}</td>
                                                     {combinedReportData.mgrCodes.map((mgr) => (
-                                                        <td key={mgr} className={`py-3 px-4 text-right border-l border-slate-200 ${isHighlight || isSegment ? 'font-bold text-slate-900' : 'text-slate-700'}`}>
+                                                        <td key={mgr} className="py-3 px-4 text-right border-l border-slate-200 font-bold text-slate-900">
                                                             {isPercentage || isTotalPercentage
                                                                 ? formatReportPercentage(row[mgr] || 0)
                                                                 : formatReportValue(row[mgr] || 0, 3)}
                                                         </td>
                                                     ))}
-                                                    <td className={`py-3 px-4 text-right border-l border-slate-300 ${
+                                                    <td className={`py-3 px-4 text-right border-l border-slate-300 text-slate-900 ${
                                                         isTotal ? 'bg-amber-100 font-black' :
                                                         isPreviousYearValue ? 'bg-amber-200/80 font-bold' :
-                                                        isPercentage || isTotalPercentage ? 'bg-slate-100 font-bold' :
-                                                        isQuarter || isSegment ? 'bg-slate-50 font-bold' :
-                                                        'bg-slate-50/60'
-                                                    } text-slate-900`}>
+                                                        'bg-slate-100 font-bold'
+                                                    }`}>
                                                         {isPercentage || isTotalPercentage
                                                             ? formatReportPercentageTotal(row.total)
                                                             : formatReportValue(row.total || 0, 3)}
                                                     </td>
                                                 </tr>
-                                            </React.Fragment>
-                                        );
-                                    })}
+                                            );
+                                        })}
                                 </tbody>
                             </table>
                         </div>

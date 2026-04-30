@@ -377,9 +377,12 @@ exports.getMGRReport = async (req, res) => {
         if (reportType === 'SEGMENT' || reportType === 'MGR2') {
             const columnGroups = buildColumnGroups(entries, 'mgrCode2', 'Unassigned', mgr2MasterMap);
             const columns = columnGroups.map((group) => group.label);
+            const visibleMonthLabels = monthYearFilter
+                ? [monthYearFilter]
+                : monthLabels.filter((_, index) => index < 9);
 
-            const buildMonthRows = (sourceEntries) => monthLabels.map((monthLabel) => {
-                const row = { month: monthLabel };
+            const buildMonthRows = (sourceEntries, labels = visibleMonthLabels) => labels.map((monthLabel) => {
+                const row = { month: monthLabel, monthLabel, monthName: monthLabel.split('-')[0], isMonth: true };
                 let total = 0;
 
                 columnGroups.forEach((column) => {
@@ -394,33 +397,38 @@ exports.getMGRReport = async (req, res) => {
                 return row;
             });
 
-            const monthRows = buildMonthRows(entries);
-            const prevMonthRows = buildMonthRows(prevEntries);
-            const quarterRows = monthYearFilter
-                ? []
-                : QUARTERS.map((quarter) => {
-                    const row = { month: `${quarter.name} ${financialYear}`, isQuarter: true };
-                    let total = 0;
-                    columnGroups.forEach((column) => {
-                        const sum = quarter.months.reduce((acc, monthIndex) => acc + Number(monthRows[monthIndex]?.[column.label] || 0), 0);
-                        row[column.label] = sum;
-                        total += sum;
-                    });
-                    row.total = total;
-                    return row;
-                });
+            const monthRows = buildMonthRows(entries, visibleMonthLabels);
+            const prevMonthRows = buildMonthRows(prevEntries, visibleMonthLabels.map((monthLabel) => {
+                const [monthName, yearSuffix] = monthLabel.split('-');
+                return `${monthName}-${String(Number(`20${yearSuffix}`) - 1).slice(-2)}`;
+            }));
 
+            const monthSegmentBreakdown = {};
             const reportRows = [];
-            if (monthYearFilter) {
-                reportRows.push(...monthRows);
-            } else {
-                QUARTERS.forEach((quarter, index) => {
-                    quarter.months.forEach((monthIndex) => {
-                        reportRows.push(monthRows[monthIndex]);
-                    });
-                    reportRows.push(quarterRows[index]);
+
+            visibleMonthLabels.forEach((monthLabel) => {
+                const monthName = monthLabel.split('-')[0];
+                const monthEntries = entries.filter((entry) => entry.monthYear === monthLabel);
+                const monthRow = buildMonthRows(monthEntries, [monthLabel])[0];
+                monthSegmentBreakdown[monthName] = {};
+                reportRows.push(monthRow);
+
+                columnGroups.forEach((segment) => {
+                    const segmentEntries = monthEntries.filter((entry) => normalizeCodeKey(entry.mgrCode2) === segment.key);
+                    const segmentRow = {
+                        ...buildMonthRows(segmentEntries, [monthLabel])[0],
+                        month: segment.label,
+                        monthLabel,
+                        monthName,
+                        isSegment: true,
+                        parentMonth: monthLabel
+                    };
+
+                    monthSegmentBreakdown[monthName][normalizeCodeKey(segment.label).toLowerCase()] = segmentRow;
+                    reportRows.push(segmentRow);
                 });
-            }
+            });
+
             const summaryRows = buildSummaryRows(monthRows, columns, prevMonthRows);
             reportRows.push(...summaryRows);
 
@@ -432,6 +440,8 @@ exports.getMGRReport = async (req, res) => {
                 reportType: 'SEGMENT',
                 mgrCodes: columns,
                 mgrColumns: columns,
+                monthLabels: visibleMonthLabels,
+                monthSegmentBreakdown,
                 reconciliation: {
                     sourceTotal: entries.reduce((acc, entry) => acc + getMeasureForEntry(entry, 'value'), 0),
                     reportTotal: Number(summaryRows.find((row) => row.isTotal)?.total || 0),
@@ -443,9 +453,9 @@ exports.getMGRReport = async (req, res) => {
 
         const sbuGroups = buildColumnGroups(entries, 'mgrCode', 'Unassigned', mgr1MasterMap);
         const columns = sbuGroups.map((group) => group.label);
-        const quarterScope = monthYearFilter
-            ? QUARTERS.filter((quarter) => quarter.months.includes(monthLabels.indexOf(monthYearFilter)))
-            : QUARTERS;
+        const visibleMonthLabels = monthYearFilter
+            ? [monthYearFilter]
+            : monthLabels.filter((_, index) => index < 9);
 
         const buildSbuValueRow = (label, sourceEntries, flags = {}) => {
             const row = { month: label, ...flags };
@@ -463,50 +473,53 @@ exports.getMGRReport = async (req, res) => {
             return row;
         };
 
-        const buildPeriodRows = (sourceEntries, labelResolver = (monthLabel) => monthLabel) => monthLabels.map((monthLabel) => {
+        const buildPeriodRows = (sourceEntries, labels = visibleMonthLabels, labelResolver = (monthLabel) => monthLabel) => labels.map((monthLabel) => {
             const sourceMonthLabel = labelResolver(monthLabel);
             const monthEntries = sourceEntries.filter((entry) => entry.monthYear === sourceMonthLabel);
-            return buildSbuValueRow(monthLabel, monthEntries, { isMonth: true });
+            return buildSbuValueRow(monthLabel, monthEntries, {
+                isMonth: true,
+                monthLabel,
+                monthName: monthLabel.split('-')[0]
+            });
         });
 
-        const currentPeriodRows = buildPeriodRows(entries);
-        const prevPeriodRows = buildPeriodRows(prevEntries, (monthLabel) => {
+        const currentPeriodRows = buildPeriodRows(entries, visibleMonthLabels);
+        const prevPeriodRows = buildPeriodRows(prevEntries, visibleMonthLabels, (monthLabel) => {
             const [monthName, yearSuffix] = monthLabel.split('-');
             return `${monthName}-${String(Number(`20${yearSuffix}`) - 1).slice(-2)}`;
         });
         const reportRows = [];
+        const monthSegmentBreakdown = {};
 
-        quarterScope.forEach((quarter) => {
-            const quarterMonthLabels = quarter.months
-                .map((monthIndex) => monthLabels[monthIndex])
-                .filter(Boolean);
-            const quarterEntries = entries.filter((entry) => quarterMonthLabels.includes(entry.monthYear));
-            const quarterLabel = `${quarter.name} (${quarterMonthLabels.map((label) => label.split('-')[0]).join('-')})`;
+        visibleMonthLabels.forEach((monthLabel) => {
+            const monthName = monthLabel.split('-')[0];
+            const monthEntries = entries.filter((entry) => entry.monthYear === monthLabel);
 
-            reportRows.push(buildSbuValueRow(quarterLabel, quarterEntries, {
-                isQuarter: true,
-                quarterKey: quarter.name,
-                quarterMonths: quarterMonthLabels
+            reportRows.push(buildSbuValueRow(monthLabel, monthEntries, {
+                isMonth: true,
+                monthLabel,
+                monthName
             }));
 
+            monthSegmentBreakdown[monthName] = {};
+
             STATUS_SEGMENTS.forEach((segment) => {
-                const segmentEntries = quarterEntries.filter((entry) => normalizeCodeKey(entry.mgrCode2) === normalizeCodeKey(segment));
+                const segmentEntries = monthEntries.filter((entry) => normalizeCodeKey(entry.mgrCode2) === normalizeCodeKey(segment));
                 const segmentRow = buildSbuValueRow(segment, segmentEntries, {
                     isSegment: true,
-                    parentQuarter: quarter.name
+                    parentMonth: monthLabel,
+                    monthLabel,
+                    monthName
                 });
+                monthSegmentBreakdown[monthName][normalizeCodeKey(segment).toLowerCase()] = segmentRow;
                 reportRows.push(segmentRow);
             });
         });
 
         const summaryRows = buildSummaryRows(
-            monthYearFilter
-                ? currentPeriodRows.filter((row) => row.month === monthYearFilter)
-                : currentPeriodRows,
+            currentPeriodRows,
             columns,
-            monthYearFilter
-                ? prevPeriodRows.filter((row) => row.month === monthYearFilter)
-                : prevPeriodRows
+            prevPeriodRows
         );
         reportRows.push(...summaryRows);
 
@@ -526,6 +539,8 @@ exports.getMGRReport = async (req, res) => {
             reportType: 'SBU',
             mgrCodes: columns,
             mgrColumns: columns,
+            monthLabels: visibleMonthLabels,
+            monthSegmentBreakdown,
             statusColumns: STATUS_COLUMNS.map(getLabelForColumn),
             statusSegments: [...STATUS_SEGMENTS, 'Total'],
             reconciliation: {
