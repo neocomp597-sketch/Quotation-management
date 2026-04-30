@@ -43,7 +43,7 @@ const LandingPage = () => {
             <header className="landing-header glass">
                 <div className="logo-container">
                     <div className="landing-logo animate-float">Q</div>
-                    <span className="logo-text font-outfit">Quotations</span>
+                    <span className="logo-text font-outfit">ARCRM</span>
                 </div>
                 <nav className="landing-nav">
                     <Link to="/login" className="nav-link">Features</Link>

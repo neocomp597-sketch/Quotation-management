@@ -126,7 +126,10 @@ const SegmentWise = ({ data, financialYear }) => {
                     <tbody className="divide-y divide-slate-100">
                         {/* Month Row */}
                         <tr className="bg-blue-50 hover:bg-blue-100/50 transition-colors border-b-2 border-slate-200">
-                            <td className="px-6 py-4 font-bold text-slate-900 flex items-center gap-2">
+                            <td
+                                onClick={() => toggleMonth(monthYear)}
+                                className="px-6 py-4 font-bold text-slate-900 flex items-center gap-2 cursor-pointer"
+                            >
                                 <MdKeyboardArrowDown
                                     size={20}
                                     className={`text-blue-600 transition-transform duration-300 ${!expandedMonths[monthYear] ? '-rotate-90' : ''}`}

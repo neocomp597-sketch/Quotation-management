@@ -82,7 +82,7 @@ const Login = () => {
         <div className="auth-container">
             <div className="auth-card">
                 <h2>Welcome Back</h2>
-                <p className="subtitle">Sign in to manage your quotations</p>
+                 <p className="subtitle">Sign in to manage your sales pipeline</p>
                 {error && <div className="error-msg">{error}</div>}
                 <form onSubmit={onSubmit}>
                     <div className="form-group">

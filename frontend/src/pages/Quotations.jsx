@@ -141,7 +141,7 @@ const Quotations = () => {
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-black text-slate-900 tracking-tight">Sales Quotes</h1>
+                    <h1 className="text-3xl font-black text-slate-900 tracking-tight">ARCRM Sales</h1>
                     <p className="text-slate-500 font-medium">Manage and track your professional trade quotations.</p>
                 </div>
                 <Link

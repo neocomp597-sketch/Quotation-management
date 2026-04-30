@@ -551,10 +551,10 @@ const QuotationPDF = ({ quotation, format = 'format1', images = {}, companySetti
                     <Text style={styles.signatoryDate}>Date: {new Date().toLocaleDateString('en-GB')}</Text>
                 </View>
 
-                <View style={styles.footer}>
+                <Text style={styles.footer}>
                     <Text>This is a computer generated document. No signature required.</Text>
-                    <Text>JAGUAR ERP - Empowering Your Business</Text>
-                </View>
+                    <Text>ARCRM - Empowering Your Business</Text>
+                </Text>
             </Page>
         </Document>
     );

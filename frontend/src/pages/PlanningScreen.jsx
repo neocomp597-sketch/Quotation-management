@@ -147,7 +147,6 @@ const PlanningScreen = () => {
     const [isReportExpanded2, setIsReportExpanded2] = useState(false);
     const [isStatusBreakdownExpanded, setIsStatusBreakdownExpanded] = useState(false);
     const [expandedSbuMonths, setExpandedSbuMonths] = useState({});
-    const [activeSbuSegments, setActiveSbuSegments] = useState({});
     const [expandedQuarters, setExpandedQuarters] = useState({
         Q1: false,
         Q2: false,
@@ -794,13 +793,6 @@ const PlanningScreen = () => {
         }));
     };
 
-    const handleSbuSegmentSelect = (monthLabel, segmentKey) => {
-        setActiveSbuSegments((prev) => ({
-            ...prev,
-            [monthLabel]: prev[monthLabel] === segmentKey ? null : segmentKey
-        }));
-    };
-
     const toggleQuarter = (quarterPrefix) => {
         setExpandedQuarters((prev) => ({
             ...prev,
@@ -1307,7 +1299,6 @@ const PlanningScreen = () => {
                                         const monthName = monthLabel.split('-')[0];
                                         const monthData = combinedReportData.monthSegmentBreakdown?.[monthName] || {};
                                         const monthRow = combinedReportData.rows.find((row) => row.isMonth && row.month === monthLabel) || {};
-                                        const activeSegmentKey = activeSbuSegments[monthLabel];
                                         const segmentOptions = [
                                             { key: 'export', label: 'Export' },
                                             { key: 'industry', label: 'Industry' },
@@ -1342,17 +1333,13 @@ const PlanningScreen = () => {
 
                                                 {expandedSbuMonths[monthLabel] && segmentOptions.map((segment) => {
                                                     const row = monthData[segment.key] || {};
-                                                    const isActive = activeSegmentKey === segment.key;
-
+                                                    const isActive = true;
                                                     return (
                                                         <tr
                                                             key={`${monthLabel}-${segment.key}`}
-                                                            className={`border-b border-slate-100 transition-colors cursor-pointer ${
-                                                                isActive ? 'bg-emerald-50 text-slate-900' : 'bg-slate-50 text-slate-700 hover:bg-slate-100/70'
-                                                            }`}
-                                                            onClick={() => handleSbuSegmentSelect(monthLabel, segment.key)}
+                                                            className="border-b border-slate-100 bg-slate-50 text-slate-700"
                                                         >
-                                                            <td className={`py-3 px-6 pl-10 font-bold ${isActive ? 'text-emerald-800' : 'text-slate-700'}`}>
+                                                            <td className="py-3 px-6 pl-10 font-bold text-slate-700">
                                                                 {segment.label}
                                                             </td>
                                                             {combinedReportData.mgrCodes.map((mgr) => (

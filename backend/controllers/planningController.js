@@ -379,7 +379,7 @@ exports.getMGRReport = async (req, res) => {
             const columns = columnGroups.map((group) => group.label);
             const visibleMonthLabels = monthYearFilter
                 ? [monthYearFilter]
-                : monthLabels.filter((_, index) => index < 9);
+                : monthLabels;
 
             const buildMonthRows = (sourceEntries, labels = visibleMonthLabels) => labels.map((monthLabel) => {
                 const row = { month: monthLabel, monthLabel, monthName: monthLabel.split('-')[0], isMonth: true };
@@ -455,7 +455,7 @@ exports.getMGRReport = async (req, res) => {
         const columns = sbuGroups.map((group) => group.label);
         const visibleMonthLabels = monthYearFilter
             ? [monthYearFilter]
-            : monthLabels.filter((_, index) => index < 9);
+            : monthLabels;
 
         const buildSbuValueRow = (label, sourceEntries, flags = {}) => {
             const row = { month: label, ...flags };

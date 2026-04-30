@@ -76,7 +76,7 @@ const Register = () => {
         <div className="auth-container">
             <div className="auth-card">
                 <h2>Create Account</h2>
-                <p className="subtitle">Start generating professional quotes today</p>
+                 <p className="subtitle">Join ARCRM to start creating professional quotes</p>
                 {error && <div className="error-msg">{error}</div>}
                 <form onSubmit={onSubmit}>
                     <div className="form-group">

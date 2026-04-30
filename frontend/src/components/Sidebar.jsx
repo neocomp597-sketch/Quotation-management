@@ -79,7 +79,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
         },
         {
             type: 'group',
-            name: 'Quotation',
+            name: 'Sales',
             key: 'quotation',
             icon: <MdRequestQuote size={22} />,
             children: [
