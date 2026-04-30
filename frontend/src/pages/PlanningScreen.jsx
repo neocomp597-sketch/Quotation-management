@@ -71,12 +71,12 @@ const formatReportPercentage = (value, decimals = 2) => `${Number(value || 0).to
 })}%`;
 
 const formatReportPercentageTotal = (value) => `${Number(value || 0).toLocaleString('en-IN', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
 })}%`;
 
 const formatStatusMetric = (value) => formatReportValue(value, 3);
-const STATUS_BREAKDOWN_ROWS = ['Utility', 'UC', 'Industry', 'Total'];
+const STATUS_BREAKDOWN_ROWS = ['Export', 'Industry', 'UC', 'Utility', 'Total'];
 
 const dedupeMgrOptions = (items = []) => {
     const seen = new Set();
@@ -146,13 +146,18 @@ const PlanningScreen = () => {
     const [isReportExpanded, setIsReportExpanded] = useState(false);
     const [isReportExpanded2, setIsReportExpanded2] = useState(false);
     const [isStatusBreakdownExpanded, setIsStatusBreakdownExpanded] = useState(false);
+    const [expandedSbuQuarters, setExpandedSbuQuarters] = useState({
+        Q1: false,
+        Q2: false,
+        Q3: false,
+        Q4: false
+    });
     const [expandedQuarters, setExpandedQuarters] = useState({
         Q1: false,
         Q2: false,
         Q3: false,
         Q4: false
     });
-    const [expandedReportMonths, setExpandedReportMonths] = useState({});
     const [expandedStatusBreakdownMonths, setExpandedStatusBreakdownMonths] = useState({});
 
     const [customers, setCustomers] = useState([]);
@@ -294,17 +299,6 @@ const PlanningScreen = () => {
         [monthLabels]
     );
     useEffect(() => {
-        setExpandedReportMonths((prev) => {
-            const next = { ...prev };
-            monthLabels.forEach((month) => {
-                if (typeof next[month] === 'undefined') {
-                    next[month] = true;
-                }
-            });
-            return next;
-        });
-    }, [monthLabels]);
-    useEffect(() => {
         setExpandedStatusBreakdownMonths((prev) => {
             const next = { ...prev };
             monthLabels.forEach((month) => {
@@ -406,6 +400,7 @@ const PlanningScreen = () => {
     }, [filteredEntries, sortConfig, monthOrder, mgrList, mgrList2, getCustomerCode, getProductCode]);
 
     const computedStatusBreakdownData = useMemo(() => {
+        const visibleMonthLabels = combinedReportData?.monthYear ? [combinedReportData.monthYear] : monthLabels;
         const createSegmentRow = (segment) => {
             const row = { segment, total: 0 };
             STATUS_REPORT_COLUMNS.forEach((col) => {
@@ -416,7 +411,7 @@ const PlanningScreen = () => {
 
         const monthMap = new Map();
 
-        monthLabels.forEach((monthLabel) => {
+        visibleMonthLabels.forEach((monthLabel) => {
             const segmentRows = {};
             STATUS_BREAKDOWN_ROWS.forEach((segment) => {
                 segmentRows[segment] = createSegmentRow(segment);
@@ -427,33 +422,26 @@ const PlanningScreen = () => {
             });
         });
 
-        if (combinedReportData?.rows) {
-            combinedReportData.rows.forEach((row) => {
-                if (!row.parentMonth || !row.statusBreakdown) {
+        if (combinedReportData?.sbuWise) {
+            combinedReportData.sbuWise.forEach((row) => {
+                const monthEntry = monthMap.get(row.month);
+                const segmentRow = monthEntry?.rows?.[row.segment];
+                const totalRow = monthEntry?.rows?.Total;
+                const normalizedStatus = STATUS_REPORT_ROWS.find((statusRow) => statusRow.aliases.includes(row.status))?.key;
+
+                if (!segmentRow || !totalRow || !normalizedStatus) {
                     return;
                 }
 
-                const monthEntry = monthMap.get(row.parentMonth);
-                if (!monthEntry) {
-                    return;
-                }
-
-                STATUS_BREAKDOWN_ROWS.forEach((segment) => {
-                    const segmentRow = monthEntry.rows[segment];
-                    const segData = row.statusBreakdown[segment];
-                    if (!segmentRow || !segData) {
-                        return;
-                    }
-
-                    STATUS_REPORT_COLUMNS.forEach((col) => {
-                        segmentRow[col] += Number(segData[col] || 0);
-                    });
-                    segmentRow.total += Number(segData.total || 0);
-                });
+                const value = Number(row.value || 0);
+                segmentRow[normalizedStatus] += value;
+                segmentRow.total += value;
+                totalRow[normalizedStatus] += value;
+                totalRow.total += value;
             });
         }
 
-        const months = monthLabels
+        const months = visibleMonthLabels
             .map((monthLabel) => {
                 const monthEntry = monthMap.get(monthLabel);
                 const monthRows = STATUS_BREAKDOWN_ROWS
@@ -632,7 +620,15 @@ const PlanningScreen = () => {
         const reportRows = [['', ...data.mgrCodes, 'Total']];
 
         data.rows.forEach((row) => {
-            const firstCell = row.parentMonth
+            const firstCell = data.reportType === 'SBU'
+                ? row.isStatus
+                    ? `      ${row.month}`
+                    : row.isSegment
+                        ? `   ${row.month}`
+                        : row.isQuarter
+                            ? `v ${row.month}`
+                            : row.month
+                : row.parentMonth
                 ? `   ${row.month}`
                 : row.isMonth
                     ? `▼ ${row.month}`
@@ -644,31 +640,12 @@ const PlanningScreen = () => {
                 getExportCellValue(row, row.total || 0, true)
             ]);
 
-            if (data.reportType === 'SBU' && row.isChild && row.statusBreakdown) {
-                reportRows.push(['      Status Breakdown', ...(data.statusColumns || []).map(() => ''), '']);
-                reportRows.push(['      Segment', ...(data.statusColumns || []).map((column) => column), 'Total']);
-
-                STATUS_BREAKDOWN_ROWS.forEach((segment) => {
-                    const statusRow = row.statusBreakdown?.[segment] || {};
-                    reportRows.push([
-                        `         ${segment}`,
-                        ...(data.statusColumns || []).map((column) => formatStatusMetric(statusRow[column] || 0)),
-                        formatStatusMetric(statusRow.total || 0)
-                    ]);
-                });
-            }
         });
 
         return reportRows;
     };
 
-    const getReportSheetColumns = (data) => {
-        const columns = data.reportType === 'SBU' && data.statusColumns?.length
-            ? data.statusColumns
-            : data.mgrCodes;
-
-        return [{ wch: 26 }, ...columns.map(() => ({ wch: 16 })), { wch: 16 }];
-    };
+    const getReportSheetColumns = (data) => [{ wch: 26 }, ...data.mgrCodes.map(() => ({ wch: 16 })), { wch: 16 }];
 
     const exportToExcel = () => {
         if (!sortedEntries.length && !combinedReportData && !reportData2) {
@@ -816,17 +793,17 @@ const PlanningScreen = () => {
         );
     };
 
-    const toggleQuarter = (quarterPrefix) => {
-        setExpandedQuarters((prev) => ({
+    const toggleSbuQuarter = (quarterPrefix) => {
+        setExpandedSbuQuarters((prev) => ({
             ...prev,
             [quarterPrefix]: !prev[quarterPrefix]
         }));
     };
 
-    const toggleReportMonth = (month) => {
-        setExpandedReportMonths((prev) => ({
+    const toggleQuarter = (quarterPrefix) => {
+        setExpandedQuarters((prev) => ({
             ...prev,
-            [month]: !prev[month]
+            [quarterPrefix]: !prev[quarterPrefix]
         }));
     };
     const toggleStatusBreakdownMonth = (month) => {
@@ -1317,7 +1294,7 @@ const PlanningScreen = () => {
                             <table className="w-full text-left text-sm font-mono">
                                 <thead>
                                     <tr className="bg-slate-50 border-b border-slate-200">
-                                        <th className="py-3 px-6 font-bold text-slate-700 min-w-[170px]"></th>
+                                        <th className="py-3 px-6 font-bold text-slate-700 min-w-[220px]">Segment / Status</th>
                                         {combinedReportData.mgrCodes.map((mgr) => (
                                             <th key={mgr} className="py-3 px-4 font-bold text-slate-700 text-right min-w-[120px] border-l border-slate-300">{mgr}</th>
                                         ))}
@@ -1326,49 +1303,60 @@ const PlanningScreen = () => {
                                 </thead>
                                 <tbody>
                                     {combinedReportData.rows.map((row, idx) => {
-                                        const isMonth = row.isMonth;
                                         const isQuarter = row.isQuarter;
+                                        const isSegment = row.isSegment;
+                                        const isStatus = row.isStatus;
                                         const isTotal = row.isTotal;
                                         const isPercentage = row.isPercentage;
                                         const isPreviousYearValue = row.isPreviousYearValue;
                                         const isTotalPercentage = row.isTotalPercentage;
-                                        const isChild = Boolean(row.parentMonth);
-                                        const isHighlight = isQuarter || isTotal || isPercentage || isPreviousYearValue || isTotalPercentage;
+                                        const rowQuarterKey = row.quarterKey || row.parentQuarter || null;
+                                        const isSummary = isTotal || isPercentage || isPreviousYearValue || isTotalPercentage;
+                                        const isHighlight = isQuarter || isSummary;
 
-                                        if (isChild && !expandedReportMonths[row.parentMonth]) {
+                                        if ((isSegment || isStatus) && rowQuarterKey && !expandedSbuQuarters[rowQuarterKey]) {
                                             return null;
                                         }
 
                                         return (
-                                            <React.Fragment key={`${row.parentMonth || 'root'}-${row.month}-${idx}`}>
+                                            <React.Fragment key={`${row.parentQuarter || 'root'}-${row.parentSegment || 'row'}-${row.month}-${idx}`}>
                                                 <tr
                                                     className={`border-b border-slate-100 transition-colors ${
                                                         isTotal ? 'bg-amber-50 font-black' :
                                                         isPreviousYearValue ? 'bg-amber-100/70 font-bold' :
                                                         isPercentage || isTotalPercentage ? 'bg-slate-50 font-bold' :
-                                                        isQuarter ? 'bg-blue-50/50 font-bold' :
-                                                        isMonth ? 'bg-white font-bold cursor-pointer hover:bg-slate-50' :
+                                                        isQuarter ? 'bg-blue-50/50 font-bold cursor-pointer hover:bg-blue-100/60' :
+                                                        isSegment ? 'bg-slate-50 font-bold text-slate-800' :
+                                                        isStatus ? 'bg-white text-slate-700' :
                                                         'bg-white hover:bg-slate-50 text-slate-700'
                                                     }`}
                                                     onClick={() => {
-                                                        if (isMonth) {
-                                                            toggleReportMonth(row.month);
+                                                        if (isQuarter && row.quarterKey) {
+                                                            toggleSbuQuarter(row.quarterKey);
                                                         }
                                                     }}
                                                 >
-                                                    <td className={`py-3 px-6 ${isHighlight || isMonth ? 'font-bold text-slate-900' : 'text-slate-700 pl-14'}`}>
+                                                    <td className={`py-3 px-6 ${
+                                                        isQuarter || isSummary
+                                                            ? 'font-bold text-slate-900'
+                                                            : isSegment
+                                                                ? 'font-bold text-slate-800 pl-10'
+                                                                : isStatus
+                                                                    ? 'text-slate-700 pl-16'
+                                                                    : 'text-slate-700'
+                                                    }`}>
                                                         <div className="flex items-center gap-2">
-                                                            {isMonth && (
+                                                            {isQuarter && (
                                                                 <MdKeyboardArrowDown
-                                                                    className={`text-slate-700 transition-transform duration-300 ${!expandedReportMonths[row.month] ? '-rotate-90' : ''}`}
+                                                                    className={`text-slate-700 transition-transform duration-300 ${!expandedSbuQuarters[row.quarterKey] ? '-rotate-90' : ''}`}
                                                                     size={18}
                                                                 />
                                                             )}
-                                                            {row.month}
+                                                            {isStatus ? `→ ${row.month}` : row.month}
                                                         </div>
                                                     </td>
                                                     {combinedReportData.mgrCodes.map((mgr) => (
-                                                        <td key={mgr} className={`py-3 px-4 text-right border-l border-slate-200 ${isHighlight || isMonth ? 'font-bold text-slate-900' : 'text-slate-700'}`}>
+                                                        <td key={mgr} className={`py-3 px-4 text-right border-l border-slate-200 ${isHighlight || isSegment ? 'font-bold text-slate-900' : 'text-slate-700'}`}>
                                                             {isPercentage || isTotalPercentage
                                                                 ? formatReportPercentage(row[mgr] || 0)
                                                                 : formatReportValue(row[mgr] || 0, 3)}
@@ -1378,7 +1366,7 @@ const PlanningScreen = () => {
                                                         isTotal ? 'bg-amber-100 font-black' :
                                                         isPreviousYearValue ? 'bg-amber-200/80 font-bold' :
                                                         isPercentage || isTotalPercentage ? 'bg-slate-100 font-bold' :
-                                                        isMonth || isQuarter ? 'bg-slate-50 font-bold' :
+                                                        isQuarter || isSegment ? 'bg-slate-50 font-bold' :
                                                         'bg-slate-50/60'
                                                     } text-slate-900`}>
                                                         {isPercentage || isTotalPercentage

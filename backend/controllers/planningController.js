@@ -11,7 +11,8 @@ const STATUS_ALIASES = {
     Others: 'Other'
 };
 const STATUS_FALLBACK = 'Others';
-const STATUS_SEGMENTS = ['Utility', 'UC', 'Industry'];
+const STATUS_SEGMENTS = ['Export', 'Industry', 'UC', 'Utility'];
+const STATUS_DISPLAY_PRIORITY = ['Firm', 'B & B', 'Invoice'];
 const FY_MONTH_NAMES = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
 const QUARTERS = [
     { name: 'Q1', months: [0, 1, 2] },
@@ -184,14 +185,14 @@ const buildSummaryRows = (rows, columns, prevRows, flags = {}) => {
     });
     prevValueRow.total = prevTotal;
 
-    const totalPercentageRow = { month: 'Total Percentage', isTotalPercentage: true };
+    const totalPercentageRow = { month: 'Percentage PY', isTotalPercentage: true };
     columns.forEach((column) => {
         const current = Number(grandTotal[column] || 0);
         const previous = Number(prevValueRow[column] || 0);
-        totalPercentageRow[column] = previous > 0 ? Number((((current - previous) / previous) * 100).toFixed(2)) : 0;
+        totalPercentageRow[column] = previous > 0 ? Number(((current / previous) * 100).toFixed(2)) : 0;
     });
     totalPercentageRow.total = prevTotal > 0
-        ? Number((((totalValue - prevTotal) / prevTotal) * 100).toFixed(2))
+        ? Number(((totalValue / prevTotal) * 100).toFixed(2))
         : 0;
 
     const summaryRows = [grandTotal, percentageRow, prevValueRow, totalPercentageRow];
@@ -441,97 +442,96 @@ exports.getMGRReport = async (req, res) => {
             });
         }
 
-        const columnGroups = buildColumnGroups(entries, 'mgrCode2', 'Unassigned', mgr2MasterMap);
-        const columns = columnGroups.map((group) => group.label);
         const sbuGroups = buildColumnGroups(entries, 'mgrCode', 'Unassigned', mgr1MasterMap);
+        const columns = sbuGroups.map((group) => group.label);
+        const quarterScope = monthYearFilter
+            ? QUARTERS.filter((quarter) => quarter.months.includes(monthLabels.indexOf(monthYearFilter)))
+            : QUARTERS;
 
-        const buildSbuMonthRow = (monthLabel, sourceEntries, flags = {}) => {
-            const row = { month: monthLabel, ...flags };
+        const buildSbuValueRow = (label, sourceEntries, flags = {}) => {
+            const row = { month: label, ...flags };
             let total = 0;
 
-            columnGroups.forEach((column) => {
+            sbuGroups.forEach((sbu) => {
                 const sum = sourceEntries
-                    .filter((entry) => !flags.sbuKey || normalizeCodeKey(entry.mgrCode) === flags.sbuKey)
-                    .filter((entry) => normalizeCodeKey(entry.mgrCode2) === column.key)
+                    .filter((entry) => normalizeCodeKey(entry.mgrCode) === sbu.key)
                     .reduce((acc, entry) => acc + getMeasureForEntry(entry, 'value'), 0);
-                row[column.label] = sum;
+                row[sbu.label] = sum;
                 total += sum;
             });
 
             row.total = total;
-
-            if (flags.includeStatusBreakdown) {
-                row.statusBreakdown = buildStatusBreakdown(sourceEntries);
-            }
-
             return row;
         };
 
-        const monthRows = [];
-        const prevMonthRows = [];
-
-        monthLabels.forEach((monthLabel) => {
-            const monthEntries = entries.filter((entry) => entry.monthYear === monthLabel);
-            monthRows.push(buildSbuMonthRow(monthLabel, monthEntries, { isMonth: true }));
-            sbuGroups.forEach((sbu) => {
-                monthRows.push(buildSbuMonthRow(sbu.label, monthEntries, {
-                    parentMonth: monthLabel,
-                    sbuKey: sbu.key,
-                    isChild: true,
-                    includeStatusBreakdown: true
-                }));
-            });
+        const buildPeriodRows = (sourceEntries, labelResolver = (monthLabel) => monthLabel) => monthLabels.map((monthLabel) => {
+            const sourceMonthLabel = labelResolver(monthLabel);
+            const monthEntries = sourceEntries.filter((entry) => entry.monthYear === sourceMonthLabel);
+            return buildSbuValueRow(monthLabel, monthEntries, { isMonth: true });
         });
 
-        monthLabels.forEach((monthLabel) => {
-            const prevMonthLabel = monthYearFilter
-                ? prevQuery.monthYear
-                : `${monthLabel.split('-')[0]}-${String(Number(`20${monthLabel.split('-')[1]}`) - 1).slice(-2)}`;
-            const sourceEntries = prevEntries.filter((entry) => entry.monthYear === prevMonthLabel);
-            prevMonthRows.push(buildSbuMonthRow(monthLabel, sourceEntries, { isMonth: true }));
+        const currentPeriodRows = buildPeriodRows(entries);
+        const prevPeriodRows = buildPeriodRows(prevEntries, (monthLabel) => {
+            const [monthName, yearSuffix] = monthLabel.split('-');
+            return `${monthName}-${String(Number(`20${yearSuffix}`) - 1).slice(-2)}`;
         });
-
-        const quarterRows = monthYearFilter
-            ? []
-            : QUARTERS.map((quarter) => {
-                const row = { month: `${quarter.name} ${financialYear}`, isQuarter: true };
-                let total = 0;
-                columns.forEach((column) => {
-                    const sum = quarter.months.reduce((acc, monthIndex) => acc + Number(monthRows.find((item) => item.isMonth && item.month === monthLabels[monthIndex])?.[column] || 0), 0);
-                    row[column] = sum;
-                    total += sum;
-                });
-                row.total = total;
-                return row;
-            });
-
         const reportRows = [];
-        if (monthYearFilter) {
-            reportRows.push(...monthRows);
-        } else {
-            QUARTERS.forEach((quarter, index) => {
-                quarter.months.forEach((monthIndex) => {
-                    const monthLabel = monthLabels[monthIndex];
-                    reportRows.push(...monthRows.filter((row) => row.month === monthLabel || row.parentMonth === monthLabel));
+
+        quarterScope.forEach((quarter) => {
+            const quarterMonthLabels = quarter.months
+                .map((monthIndex) => monthLabels[monthIndex])
+                .filter(Boolean);
+            const quarterEntries = entries.filter((entry) => quarterMonthLabels.includes(entry.monthYear));
+            const quarterLabel = `${quarter.name} (${quarterMonthLabels.map((label) => label.split('-')[0]).join('-')})`;
+
+            reportRows.push(buildSbuValueRow(quarterLabel, quarterEntries, {
+                isQuarter: true,
+                quarterKey: quarter.name,
+                quarterMonths: quarterMonthLabels
+            }));
+
+            STATUS_SEGMENTS.forEach((segment) => {
+                const segmentEntries = quarterEntries.filter((entry) => normalizeCodeKey(entry.mgrCode2) === normalizeCodeKey(segment));
+                const segmentRow = buildSbuValueRow(segment, segmentEntries, {
+                    isSegment: true,
+                    parentQuarter: quarter.name
                 });
-                reportRows.push(quarterRows[index]);
+                reportRows.push(segmentRow);
+
+                const statusOrder = STATUS_COLUMNS
+                    .filter((status) => STATUS_DISPLAY_PRIORITY.includes(status))
+                    .concat(STATUS_COLUMNS.filter((status) => !STATUS_DISPLAY_PRIORITY.includes(status)));
+
+                statusOrder.forEach((status) => {
+                    const statusEntries = segmentEntries.filter((entry) => normalizeStatusValue(entry.status) === status);
+                    const statusRow = buildSbuValueRow(getLabelForColumn(status), statusEntries, {
+                        isStatus: true,
+                        parentQuarter: quarter.name,
+                        parentSegment: segment
+                    });
+                    reportRows.push(statusRow);
+                });
             });
-        }
+        });
+
         const summaryRows = buildSummaryRows(
-            monthRows.filter((row) => row.isMonth),
+            monthYearFilter
+                ? currentPeriodRows.filter((row) => row.month === monthYearFilter)
+                : currentPeriodRows,
             columns,
-            prevMonthRows
+            monthYearFilter
+                ? prevPeriodRows.filter((row) => row.month === monthYearFilter)
+                : prevPeriodRows
         );
         reportRows.push(...summaryRows);
-        const sbuWise = monthRows
-            .filter((row) => row.isChild)
-            .map((row) => ({
-                month: row.parentMonth,
-                sbu: row.month,
-                segments: Object.fromEntries(columns.map((column) => [column, Number(row[column] || 0)])),
-                total: Number(row.total || 0),
-                statusBreakdown: row.statusBreakdown || {}
-            }));
+
+        const sbuWise = entries.map((entry) => ({
+            month: entry.monthYear,
+            sbu: cleanValue(entry.mgrCode) || 'Unassigned',
+            segment: cleanValue(entry.mgrCode2) || 'Unassigned',
+            status: getLabelForColumn(normalizeStatusValue(entry.status)),
+            value: getMeasureForEntry(entry, 'value')
+        }));
 
         return res.json({
             financialYear,
