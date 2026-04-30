@@ -621,13 +621,11 @@ const PlanningScreen = () => {
 
         data.rows.forEach((row) => {
             const firstCell = data.reportType === 'SBU'
-                ? row.isStatus
-                    ? `      ${row.month}`
-                    : row.isSegment
-                        ? `   ${row.month}`
-                        : row.isQuarter
-                            ? `v ${row.month}`
-                            : row.month
+                ? row.isSegment
+                    ? `   ${row.month}`
+                    : row.isQuarter
+                        ? `v ${row.month}`
+                        : row.month
                 : row.parentMonth
                 ? `   ${row.month}`
                 : row.isMonth
@@ -1294,7 +1292,7 @@ const PlanningScreen = () => {
                             <table className="w-full text-left text-sm font-mono">
                                 <thead>
                                     <tr className="bg-slate-50 border-b border-slate-200">
-                                        <th className="py-3 px-6 font-bold text-slate-700 min-w-[220px]">Segment / Status</th>
+                                        <th className="py-3 px-6 font-bold text-slate-700 min-w-[220px]">Segment</th>
                                         {combinedReportData.mgrCodes.map((mgr) => (
                                             <th key={mgr} className="py-3 px-4 font-bold text-slate-700 text-right min-w-[120px] border-l border-slate-300">{mgr}</th>
                                         ))}
@@ -1305,8 +1303,8 @@ const PlanningScreen = () => {
                                     {combinedReportData.rows.map((row, idx) => {
                                         const isQuarter = row.isQuarter;
                                         const isSegment = row.isSegment;
-                                        const isStatus = row.isStatus;
                                         const isTotal = row.isTotal;
+                                        const isStatus = row.isStatus;
                                         const isPercentage = row.isPercentage;
                                         const isPreviousYearValue = row.isPreviousYearValue;
                                         const isTotalPercentage = row.isTotalPercentage;
@@ -1314,7 +1312,11 @@ const PlanningScreen = () => {
                                         const isSummary = isTotal || isPercentage || isPreviousYearValue || isTotalPercentage;
                                         const isHighlight = isQuarter || isSummary;
 
-                                        if ((isSegment || isStatus) && rowQuarterKey && !expandedSbuQuarters[rowQuarterKey]) {
+                                        if (isStatus) {
+                                            return null;
+                                        }
+
+                                        if (isSegment && rowQuarterKey && !expandedSbuQuarters[rowQuarterKey]) {
                                             return null;
                                         }
 
@@ -1327,7 +1329,6 @@ const PlanningScreen = () => {
                                                         isPercentage || isTotalPercentage ? 'bg-slate-50 font-bold' :
                                                         isQuarter ? 'bg-blue-50/50 font-bold cursor-pointer hover:bg-blue-100/60' :
                                                         isSegment ? 'bg-slate-50 font-bold text-slate-800' :
-                                                        isStatus ? 'bg-white text-slate-700' :
                                                         'bg-white hover:bg-slate-50 text-slate-700'
                                                     }`}
                                                     onClick={() => {
@@ -1341,8 +1342,6 @@ const PlanningScreen = () => {
                                                             ? 'font-bold text-slate-900'
                                                             : isSegment
                                                                 ? 'font-bold text-slate-800 pl-10'
-                                                                : isStatus
-                                                                    ? 'text-slate-700 pl-16'
                                                                     : 'text-slate-700'
                                                     }`}>
                                                         <div className="flex items-center gap-2">
@@ -1352,7 +1351,7 @@ const PlanningScreen = () => {
                                                                     size={18}
                                                                 />
                                                             )}
-                                                            {isStatus ? `→ ${row.month}` : row.month}
+                                                            {row.month}
                                                         </div>
                                                     </td>
                                                     {combinedReportData.mgrCodes.map((mgr) => (

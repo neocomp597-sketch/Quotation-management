@@ -12,7 +12,6 @@ const STATUS_ALIASES = {
 };
 const STATUS_FALLBACK = 'Others';
 const STATUS_SEGMENTS = ['Export', 'Industry', 'UC', 'Utility'];
-const STATUS_DISPLAY_PRIORITY = ['Firm', 'B & B', 'Invoice'];
 const FY_MONTH_NAMES = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
 const QUARTERS = [
     { name: 'Q1', months: [0, 1, 2] },
@@ -497,20 +496,6 @@ exports.getMGRReport = async (req, res) => {
                     parentQuarter: quarter.name
                 });
                 reportRows.push(segmentRow);
-
-                const statusOrder = STATUS_COLUMNS
-                    .filter((status) => STATUS_DISPLAY_PRIORITY.includes(status))
-                    .concat(STATUS_COLUMNS.filter((status) => !STATUS_DISPLAY_PRIORITY.includes(status)));
-
-                statusOrder.forEach((status) => {
-                    const statusEntries = segmentEntries.filter((entry) => normalizeStatusValue(entry.status) === status);
-                    const statusRow = buildSbuValueRow(getLabelForColumn(status), statusEntries, {
-                        isStatus: true,
-                        parentQuarter: quarter.name,
-                        parentSegment: segment
-                    });
-                    reportRows.push(statusRow);
-                });
             });
         });
 
