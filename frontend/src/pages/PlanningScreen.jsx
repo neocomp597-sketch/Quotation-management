@@ -63,6 +63,8 @@ const getMonthLabels = (fy) => {
 
 const normalizeMgrCode = (value = '') => String(value || '').trim().replace(/\s+/g, ' ').toUpperCase();
 
+const normalizeCodeKey = (value = '') => normalizeMgrCode(value);
+
 const formatReportValue = (value, decimals = 3) => formatToLakhs(value || 0, decimals);
 
 const formatReportPercentage = (value, decimals = 2) => `${Number(value || 0).toLocaleString('en-IN', {
@@ -703,17 +705,55 @@ const PlanningScreen = () => {
         }
 
         const workbook = XLSX.utils.book_new();
-        const getExportCellValue = (row, value, isTotalColumn = false) => {
-            if (row.isPercentage || row.isTotalPercentage) {
-                return isTotalColumn ? formatReportPercentageTotal(value) : formatReportPercentage(value);
-            }
+        let reportRows = [];
 
-            return formatReportValue(value, 3);
-        };
+        // Handle SBU Wise Report (Status x SBU matrix)
+        if (reportLabel.includes('SBU')) {
+            reportRows = [['Status', ...data.mgrCodes, 'Total']];
+            
+            (data.statusColumns || []).forEach((status) => {
+                let rowTotal = 0;
+                const rowData = [status];
 
-        const reportSheet = XLSX.utils.aoa_to_sheet(buildReportExportRows(data, getExportCellValue));
-        reportSheet['!cols'] = getReportSheetColumns(data);
-        XLSX.utils.book_append_sheet(workbook, reportSheet, reportLabel);
+                data.mgrCodes.forEach((sbu) => {
+                    const value = (data.sbuWise || [])
+                        .filter((entry) => normalizeCodeKey(entry.sbu) === normalizeCodeKey(sbu) && entry.status === status)
+                        .reduce((sum, entry) => sum + Number(entry.value || 0), 0);
+                    rowData.push(formatReportValue(value, 0));
+                    rowTotal += value;
+                });
+
+                rowData.push(formatReportValue(rowTotal, 0));
+                reportRows.push(rowData);
+            });
+
+            // Add total row
+            const totalRow = ['Total'];
+            let grandTotal = 0;
+            data.mgrCodes.forEach((sbu) => {
+                const total = (data.sbuWise || [])
+                    .filter((entry) => normalizeCodeKey(entry.sbu) === normalizeCodeKey(sbu))
+                    .reduce((sum, entry) => sum + Number(entry.value || 0), 0);
+                totalRow.push(formatReportValue(total, 0));
+                grandTotal += total;
+            });
+            totalRow.push(formatReportValue(grandTotal, 0));
+            reportRows.push(totalRow);
+        } else {
+            // Handle other report types (original logic)
+            const getExportCellValue = (row, value, isTotalColumn = false) => {
+                if (row.isPercentage || row.isTotalPercentage) {
+                    return isTotalColumn ? formatReportPercentageTotal(value) : formatReportPercentage(value);
+                }
+                return formatReportValue(value, 3);
+            };
+
+            reportRows = buildReportExportRows(data, getExportCellValue);
+        }
+
+        const sheet = XLSX.utils.aoa_to_sheet(reportRows);
+        sheet['!cols'] = [{ wch: 16 }, ...data.mgrCodes.map(() => ({ wch: 14 })), { wch: 14 }];
+        XLSX.utils.book_append_sheet(workbook, sheet, reportLabel);
 
         const safeReportLabel = reportLabel.replace(/\s+/g, '-');
         XLSX.writeFile(workbook, `${safeReportLabel}-${financialYear}.xlsx`);
@@ -1282,119 +1322,65 @@ const PlanningScreen = () => {
                 </div>
 
                 {isReportExpanded && (
-                    combinedReportData && combinedReportData.mgrCodes.length > 0 ? (
+                    combinedReportData && combinedReportData.mgrCodes?.length > 0 ? (
                         <div className="overflow-x-auto">
-                            <table className="w-full text-left text-sm font-mono">
+                            <table className="w-full text-left text-sm">
                                 <thead>
                                     <tr className="bg-slate-50 border-b border-slate-200">
-                                        <th className="py-3 px-6 font-bold text-slate-700 min-w-[220px]">Segment</th>
-                                        {combinedReportData.mgrCodes.map((mgr) => (
-                                            <th key={mgr} className="py-3 px-4 font-bold text-slate-700 text-right min-w-[120px] border-l border-slate-300">{mgr}</th>
+                                        <th className="py-3 px-4 font-bold text-slate-700 text-left min-w-[140px]">Status</th>
+                                        {combinedReportData.mgrCodes.map((sbu) => (
+                                            <th key={sbu} className="py-3 px-4 font-bold text-slate-700 text-right min-w-[100px] border-l border-slate-300">{sbu}</th>
                                         ))}
-                                        <th className="py-3 px-4 font-bold text-slate-900 text-right bg-slate-100 min-w-[120px] border-l border-slate-300">Total</th>
+                                        <th className="py-3 px-4 font-bold text-slate-900 text-right bg-slate-100 min-w-[100px] border-l border-slate-300">Total</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {(combinedReportData.monthLabels || []).map((monthLabel) => {
-                                        const monthName = monthLabel.split('-')[0];
-                                        const monthData = combinedReportData.monthSegmentBreakdown?.[monthName] || {};
-                                        const monthRow = combinedReportData.rows.find((row) => row.isMonth && row.month === monthLabel) || {};
-                                        const segmentOptions = [
-                                            { key: 'export', label: 'Export' },
-                                            { key: 'industry', label: 'Industry' },
-                                            { key: 'uc', label: 'UC' },
-                                            { key: 'utility', label: 'Utility' }
-                                        ];
+                                    {(combinedReportData.statusColumns || []).map((status) => {
+                                        let rowTotal = 0;
+                                        const statusValues = {};
+
+                                        // Calculate values for each SBU + status combination
+                                        combinedReportData.mgrCodes.forEach((sbu) => {
+                                            const value = (combinedReportData.sbuWise || [])
+                                                .filter((entry) => normalizeCodeKey(entry.sbu) === normalizeCodeKey(sbu) && entry.status === status)
+                                                .reduce((sum, entry) => sum + Number(entry.value || 0), 0);
+                                            statusValues[sbu] = value;
+                                            rowTotal += value;
+                                        });
 
                                         return (
-                                            <React.Fragment key={monthLabel}>
-                                                <tr
-                                                    className="border-b border-slate-100 transition-colors bg-blue-50/50 font-bold cursor-pointer hover:bg-blue-100/60"
-                                                    onClick={() => toggleSbuMonth(monthLabel)}
-                                                >
-                                                    <td className="py-3 px-6 font-bold text-slate-900">
-                                                        <div className="flex items-center gap-2">
-                                                            <MdKeyboardArrowDown
-                                                                className={`text-slate-700 transition-transform duration-300 ${!expandedSbuMonths[monthLabel] ? '-rotate-90' : ''}`}
-                                                                size={18}
-                                                            />
-                                                            {monthName}
-                                                        </div>
+                                            <tr key={status} className="border-b border-slate-100 hover:bg-slate-50">
+                                                <td className="py-3 px-4 font-bold text-slate-900">{status}</td>
+                                                {combinedReportData.mgrCodes.map((sbu) => (
+                                                    <td key={`${status}-${sbu}`} className="py-3 px-4 text-right border-l border-slate-200 font-semibold text-slate-700">
+                                                        {formatReportValue(statusValues[sbu] || 0, 0)}
                                                     </td>
-                                                    {combinedReportData.mgrCodes.map((mgr) => (
-                                                        <td key={mgr} className="py-3 px-4 text-right border-l border-slate-200 font-bold text-slate-900">
-                                                            {formatReportValue(monthRow[mgr] || 0, 3)}
-                                                        </td>
-                                                    ))}
-                                                    <td className="py-3 px-4 text-right border-l border-slate-300 bg-slate-50 font-bold text-slate-900">
-                                                        {formatReportValue(monthRow.total || 0, 3)}
-                                                    </td>
-                                                </tr>
-
-                                                {expandedSbuMonths[monthLabel] && segmentOptions.map((segment) => {
-                                                    const row = monthData[segment.key] || {};
-                                                    const isActive = true;
-                                                    return (
-                                                        <tr
-                                                            key={`${monthLabel}-${segment.key}`}
-                                                            className="border-b border-slate-100 bg-slate-50 text-slate-700"
-                                                        >
-                                                            <td className="py-3 px-6 pl-10 font-bold text-slate-700">
-                                                                {segment.label}
-                                                            </td>
-                                                            {combinedReportData.mgrCodes.map((mgr) => (
-                                                                <td key={mgr} className="py-3 px-4 text-right border-l border-slate-200 font-bold">
-                                                                    {isActive ? formatReportValue(row[mgr] || 0, 3) : '—'}
-                                                                </td>
-                                                            ))}
-                                                            <td className={`py-3 px-4 text-right border-l border-slate-300 font-bold ${isActive ? 'bg-emerald-100/60 text-slate-900' : 'bg-slate-100/60 text-slate-500'}`}>
-                                                                {isActive ? formatReportValue(row.total || 0, 3) : '—'}
-                                                            </td>
-                                                        </tr>
-                                                    );
-                                                })}
-                                            </React.Fragment>
+                                                ))}
+                                                <td className="py-3 px-4 text-right border-l border-slate-300 bg-slate-50 font-bold text-slate-900">
+                                                    {formatReportValue(rowTotal, 0)}
+                                                </td>
+                                            </tr>
                                         );
                                     })}
-
-                                    {combinedReportData.rows
-                                        .filter((row) => row.isTotal || row.isPercentage || row.isPreviousYearValue || row.isTotalPercentage)
-                                        .map((row) => {
-                                            const isTotal = row.isTotal;
-                                            const isPercentage = row.isPercentage;
-                                            const isPreviousYearValue = row.isPreviousYearValue;
-                                            const isTotalPercentage = row.isTotalPercentage;
-
+                                    <tr className="border-b border-slate-200 bg-amber-50 font-black">
+                                        <td className="py-3 px-4 font-bold text-slate-900">Total</td>
+                                        {combinedReportData.mgrCodes.map((sbu) => {
+                                            const total = (combinedReportData.sbuWise || [])
+                                                .filter((entry) => normalizeCodeKey(entry.sbu) === normalizeCodeKey(sbu))
+                                                .reduce((sum, entry) => sum + Number(entry.value || 0), 0);
                                             return (
-                                                <tr
-                                                    key={row.month}
-                                                    className={`border-b border-slate-100 transition-colors ${
-                                                        isTotal ? 'bg-amber-50 font-black' :
-                                                        isPreviousYearValue ? 'bg-amber-100/70 font-bold' :
-                                                        isPercentage || isTotalPercentage ? 'bg-slate-50 font-bold' :
-                                                        'bg-white text-slate-700'
-                                                    }`}
-                                                >
-                                                    <td className="py-3 px-6 font-bold text-slate-900">{row.month}</td>
-                                                    {combinedReportData.mgrCodes.map((mgr) => (
-                                                        <td key={mgr} className="py-3 px-4 text-right border-l border-slate-200 font-bold text-slate-900">
-                                                            {isPercentage || isTotalPercentage
-                                                                ? formatReportPercentage(row[mgr] || 0)
-                                                                : formatReportValue(row[mgr] || 0, 3)}
-                                                        </td>
-                                                    ))}
-                                                    <td className={`py-3 px-4 text-right border-l border-slate-300 text-slate-900 ${
-                                                        isTotal ? 'bg-amber-100 font-black' :
-                                                        isPreviousYearValue ? 'bg-amber-200/80 font-bold' :
-                                                        'bg-slate-100 font-bold'
-                                                    }`}>
-                                                        {isPercentage || isTotalPercentage
-                                                            ? formatReportPercentageTotal(row.total)
-                                                            : formatReportValue(row.total || 0, 3)}
-                                                    </td>
-                                                </tr>
+                                                <td key={`total-${sbu}`} className="py-3 px-4 text-right border-l border-slate-300 font-black text-slate-900">
+                                                    {formatReportValue(total, 0)}
+                                                </td>
                                             );
                                         })}
+                                        <td className="py-3 px-4 text-right border-l border-slate-300 bg-amber-100 font-black text-slate-900">
+                                            {formatReportValue(
+                                                (combinedReportData.sbuWise || []).reduce((sum, entry) => sum + Number(entry.value || 0), 0),
+                                                0
+                                            )}
+                                        </td>
+                                    </tr>
                                 </tbody>
                             </table>
                         </div>
