@@ -180,6 +180,7 @@ const PlanningScreen = () => {
     const [expandedSegmentMonths, setExpandedSegmentMonths] = useState({});
     const [expandedStatusBreakdownMonths, setExpandedStatusBreakdownMonths] = useState({});
     const [expandedSbuWiseMonths, setExpandedSbuWiseMonths] = useState({});
+    const [isExportExpanded, setIsExportExpanded] = useState(true);
 
     const [customers, setCustomers] = useState([]);
     const [products, setProducts] = useState([]);
@@ -1472,9 +1473,78 @@ const PlanningScreen = () => {
                 </div>
 
                 {isReportExpanded && (
-                    computedSbuWiseData && computedSbuWiseData.length > 0 ? (
+                    combinedReportData && combinedReportData.mgrCodes?.length > 0 ? (
                         <div className="overflow-x-auto">
-                            {computedSbuWiseData.map((monthEntry) => (
+                            <div
+                                className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center cursor-pointer hover:bg-slate-100/50 transition-colors"
+                                onClick={() => setIsExportExpanded(!isExportExpanded)}
+                            >
+                                <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
+                                    <MdKeyboardArrowDown className={`text-slate-500 transition-transform duration-300 ${!isExportExpanded ? '-rotate-90' : ''}`} size={20} />
+                                    Export
+                                </h3>
+                            </div>
+                            {isExportExpanded ? (
+                                <table className="w-full text-left text-sm">
+                                    <thead>
+                                        <tr className="bg-slate-50 border-b border-slate-200">
+                                            <th className="py-3 px-4 font-bold text-slate-700 text-left min-w-[140px]">Status</th>
+                                            {combinedReportData.mgrCodes.map((sbu) => (
+                                                <th key={sbu} className="py-3 px-4 font-bold text-slate-700 text-right min-w-[100px] border-l border-slate-300">{sbu}</th>
+                                            ))}
+                                            <th className="py-3 px-4 font-bold text-slate-900 text-right bg-slate-100 min-w-[100px] border-l border-slate-300">Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {STATUS_REPORT_ROWS.map((statusRow) => {
+                                            let rowTotal = 0;
+                                            const statusValues = {};
+
+                                            combinedReportData.mgrCodes.forEach((sbu) => {
+                                                const value = (combinedReportData.sbuWise || [])
+                                                    .filter((entry) => normalizeCodeKey(entry.sbu) === normalizeCodeKey(sbu) && entry.status === statusRow.label)
+                                                    .reduce((sum, entry) => sum + Number(entry.value || 0), 0);
+                                                statusValues[sbu] = value;
+                                                rowTotal += value;
+                                            });
+
+                                            return (
+                                                <tr key={statusRow.key} className="border-b border-slate-100 hover:bg-slate-50">
+                                                    <td className="py-3 px-4 font-bold text-slate-900">{statusRow.label}</td>
+                                                    {combinedReportData.mgrCodes.map((sbu) => (
+                                                        <td key={`${statusRow.key}-${sbu}`} className="py-3 px-4 text-right border-l border-slate-200 font-semibold text-slate-700">
+                                                            {formatReportValue(statusValues[sbu] || 0, 0)}
+                                                        </td>
+                                                    ))}
+                                                    <td className="py-3 px-4 text-right border-l border-slate-300 bg-slate-50 font-bold text-slate-900">
+                                                        {formatReportValue(rowTotal, 0)}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                        <tr className="border-b border-slate-200 bg-amber-50 font-black">
+                                            <td className="py-3 px-4 font-bold text-slate-900">All</td>
+                                            {combinedReportData.mgrCodes.map((sbu) => {
+                                                const total = (combinedReportData.sbuWise || [])
+                                                    .filter((entry) => normalizeCodeKey(entry.sbu) === normalizeCodeKey(sbu))
+                                                    .reduce((sum, entry) => sum + Number(entry.value || 0), 0);
+                                                return (
+                                                    <td key={`total-${sbu}`} className="py-3 px-4 text-right border-l border-slate-300 font-black text-slate-900">
+                                                        {formatReportValue(total, 0)}
+                                                    </td>
+                                                );
+                                            })}
+                                            <td className="py-3 px-4 text-right border-l border-slate-300 bg-amber-100 font-black text-slate-900">
+                                                {formatReportValue(
+                                                    (combinedReportData.sbuWise || []).reduce((sum, entry) => sum + Number(entry.value || 0), 0),
+                                                    0
+                                                )}
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            ) : (
+                                computedSbuWiseData && computedSbuWiseData.length > 0 && computedSbuWiseData.map((monthEntry) => (
                                 <div key={monthEntry.month} className="border-b border-slate-200 last:border-b-0">
                                     <div
                                         className="bg-blue-50 font-bold cursor-pointer hover:bg-blue-100/60 transition-colors border-b border-blue-200"
@@ -1522,7 +1592,8 @@ const PlanningScreen = () => {
                                         </table>
                                     )}
                                 </div>
-                            ))}
+                            ))
+                            )}
                         </div>
                     ) : (
                         <div className="p-10 text-center text-slate-400 font-bold">
