@@ -2183,15 +2183,20 @@ const PlanningScreen = () => {
                                 {monthRow.month}
                               </div>
                             </td>
-                            {reportData2.mgrCodes.map((mgr) => (
-                              <td
-                                key={mgr}
-                                className="py-3 px-4 text-right text-slate-900 font-bold"
-                              >
-                                {formatReportValue(monthRow[mgr] || 0, 3)}
-                              </td>
-                            ))}
-                            <td className="py-3 px-4 text-right text-slate-900 bg-slate-50 font-black">
+                            {reportData2.mgrCodes.map((mgr) => {
+                              const cellValue = Number(monthRow[mgr] || 0);
+                              return (
+                                <td
+                                  key={mgr}
+                                  className={`py-3 px-4 text-right text-slate-900 font-bold ${cellValue > 0 ? "bg-blue-100/60" : ""}`}
+                                >
+                                  {formatReportValue(cellValue, 3)}
+                                </td>
+                              );
+                            })}
+                            <td
+                              className={`py-3 px-4 text-right text-slate-900 font-black ${Number(monthRow.total || 0) > 0 ? "bg-blue-100/60" : "bg-slate-50"}`}
+                            >
                               {formatReportValue(monthRow.total || 0, 3)}
                             </td>
                           </tr>
@@ -2242,17 +2247,19 @@ const PlanningScreen = () => {
                                     <span>{row.sbu}</span>
                                   </td>
                                   {reportData2.mgrCodes.map((mgr) => {
-                                    const val = row.values[mgr] || 0;
+                                    const val = Number(row.values[mgr] || 0);
                                     return (
                                       <td
                                         key={mgr}
-                                        className="py-3 px-4 text-right text-slate-700"
+                                        className={`py-3 px-4 text-right text-slate-700 ${val > 0 ? "bg-blue-100/60" : ""}`}
                                       >
                                         {formatReportValue(val, 3)}
                                       </td>
                                     );
                                   })}
-                                  <td className="py-3 px-4 text-right text-slate-900 bg-amber-50/50 font-bold">
+                                  <td
+                                    className={`py-3 px-4 text-right text-slate-900 font-bold ${Number(row.total || 0) > 0 ? "bg-blue-100/60" : "bg-amber-50/50"}`}
+                                  >
                                     {formatReportValue(row.total, 3)}
                                   </td>
                                 </tr>
@@ -2298,26 +2305,31 @@ const PlanningScreen = () => {
                           >
                             {row.month}
                           </td>
-                          {reportData2.mgrCodes.map((mgr) => (
-                            <td
-                              key={mgr}
-                              className={`py-3 px-4 text-right ${isTotal || isPercentage || isPreviousYearValue || isTotalPercentage ? "font-bold text-slate-900" : "text-slate-700"}`}
-                            >
-                              {isPercentage || isTotalPercentage
-                                ? formatReportPercentage(row[mgr] || 0)
-                                : formatReportValue(row[mgr] || 0, 3)}
-                            </td>
-                          ))}
+                          {reportData2.mgrCodes.map((mgr) => {
+                            const cellValue = Number(row[mgr] || 0);
+                            return (
+                              <td
+                                key={mgr}
+                                className={`py-3 px-4 text-right ${isTotal || isPercentage || isPreviousYearValue || isTotalPercentage ? "font-bold text-slate-900" : "text-slate-700"} ${cellValue > 0 ? "bg-blue-100/60" : ""}`}
+                              >
+                                {isPercentage || isTotalPercentage
+                                  ? formatReportPercentage(cellValue)
+                                  : formatReportValue(cellValue, 3)}
+                              </td>
+                            );
+                          })}
                           <td
                             className={`py-3 px-4 text-right ${
-                              isTotal
-                                ? "bg-amber-100 font-black"
-                                : isPreviousYearValue
-                                  ? "bg-amber-200/80 font-bold"
-                                  : isPercentage || isTotalPercentage
-                                    ? "bg-slate-100 font-bold"
-                                    : "bg-amber-50/50 font-bold"
-                            } text-slate-900`}
+                              Number(row.total || 0) > 0
+                                ? "bg-blue-100/60"
+                                : isTotal
+                                  ? "bg-amber-100"
+                                  : isPreviousYearValue
+                                    ? "bg-amber-200/80"
+                                    : isPercentage || isTotalPercentage
+                                      ? "bg-slate-100"
+                                      : "bg-amber-50/50"
+                            } ${isTotal ? "font-black" : "font-bold"} text-slate-900`}
                           >
                             {isPercentage || isTotalPercentage
                               ? formatReportPercentageTotal(row.total)
