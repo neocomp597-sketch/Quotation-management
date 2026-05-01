@@ -218,6 +218,7 @@ const PlanningScreen = () => {
   const [entries, setEntries] = useState([]);
   const [combinedReportData, setCombinedReportData] = useState(null);
   const [reportData2, setReportData2] = useState(null);
+  console.log({ reportData2 });
   const [loading, setLoading] = useState(false);
 
   const [isGridExpanded, setIsGridExpanded] = useState(true);
@@ -606,18 +607,9 @@ const PlanningScreen = () => {
     });
 
     if (combinedReportData?.sbuWise) {
-      console.log("[Processing] Raw sbuWise rows:", combinedReportData.sbuWise);
       combinedReportData.sbuWise.forEach((row) => {
         const { month, segment, status, sbu, value } = row;
         const normalizedSbu = normalizeSbuValue(sbu);
-        console.log("[Row Data]", {
-          month,
-          segment,
-          status,
-          sbu,
-          normalizedSbu,
-          value,
-        });
 
         if (!grouped[month]) grouped[month] = {};
         if (!grouped[month][segment]) grouped[month][segment] = {};
@@ -2143,7 +2135,7 @@ const PlanningScreen = () => {
                 <thead>
                   <tr className="bg-amber-50 border-b border-amber-100">
                     <th className="py-3 px-4 font-black text-slate-700 min-w-[160px]">
-                      Month / Segment
+                      Month
                     </th>
                     {reportData2.mgrCodes.map((mgr) => (
                       <th
@@ -2159,13 +2151,22 @@ const PlanningScreen = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {(reportData2.rows || [])
-                    .filter((row) => row.isMonth)
-                    .map((monthRow) => {
-                      const monthLabel = monthRow.monthLabel || monthRow.month;
-                      const childRows = (reportData2.rows || []).filter(
-                        (row) => row.parentMonth === monthLabel,
-                      );
+                  {(() => {
+                    const monthRowsByLabel = new Map(
+                      (reportData2.rows || [])
+                        .filter((row) => row.isMonth && !row.isSegment)
+                        .map((row) => [row.monthLabel || row.month, row]),
+                    );
+                    const segmentMonthLabels =
+                      reportData2.monthLabels?.length > 0
+                        ? reportData2.monthLabels
+                        : Array.from(monthRowsByLabel.keys());
+
+                    return segmentMonthLabels.map((monthLabel) => {
+                      const monthRow = monthRowsByLabel.get(monthLabel) || {
+                        month: monthLabel,
+                        total: 0,
+                      };
 
                       return (
                         <React.Fragment key={monthLabel}>
@@ -2195,33 +2196,85 @@ const PlanningScreen = () => {
                             </td>
                           </tr>
                           {expandedSegmentMonths[monthLabel] &&
-                            childRows.map((row) => (
-                              <tr
-                                key={`${monthLabel}-${row.month}`}
-                                className="border-b border-slate-100 hover:bg-slate-50"
-                              >
-                                <td className="py-3 px-4 text-slate-900 font-bold pl-12">
-                                  {row.month}
-                                </td>
-                                {reportData2.mgrCodes.map((mgr) => (
-                                  <td
-                                    key={mgr}
-                                    className="py-3 px-4 text-right text-slate-700"
-                                  >
-                                    {formatReportValue(row[mgr] || 0, 3)}
+                            (() => {
+                              // Build SBU-level rows from sbuWise for this month
+                              const sbuMap = new Map();
+                              const resolveSbuLabel = (value) => {
+                                const normalized = normalizeSbuValue(value);
+                                const match = (
+                                  combinedReportData?.mgrCodes || []
+                                ).find(
+                                  (code) =>
+                                    normalizeSbuValue(code) === normalized,
+                                );
+                                return match || value || "Unassigned";
+                              };
+
+                              (combinedReportData?.sbuWise || [])
+                                .filter((r) => r.month === monthLabel)
+                                .forEach((r) => {
+                                  const canonicalSbu = resolveSbuLabel(r.sbu);
+                                  const normalizedSbu =
+                                    normalizeSbuValue(canonicalSbu);
+                                  const key = normalizedSbu || canonicalSbu;
+                                  if (!sbuMap.has(key)) {
+                                    sbuMap.set(key, {
+                                      normalizedSbu,
+                                      sbu: canonicalSbu,
+                                      values: {},
+                                      total: 0,
+                                    });
+                                  }
+                                  const entry = sbuMap.get(key);
+                                  const segKey = r.segment || "Unassigned";
+                                  entry.values[segKey] =
+                                    (entry.values[segKey] || 0) +
+                                    Number(r.value || 0);
+                                  entry.total += Number(r.value || 0);
+                                });
+                              const sbuRows = Array.from(sbuMap.values());
+                              return sbuRows.map((row) => (
+                                <tr
+                                  key={`${monthLabel}-${row.normalizedSbu}`}
+                                  className="border-b border-slate-100 hover:bg-slate-50"
+                                >
+                                  <td className="py-3 px-4 text-slate-900 font-bold pl-12">
+                                    <span>{row.sbu}</span>
                                   </td>
-                                ))}
-                                <td className="py-3 px-4 text-right text-slate-900 bg-amber-50/50 font-bold">
-                                  {formatReportValue(row.total || 0, 3)}
-                                </td>
-                              </tr>
-                            ))}
+                                  {reportData2.mgrCodes.map((mgr) => {
+                                    const val = row.values[mgr] || 0;
+                                    return (
+                                      <td
+                                        key={mgr}
+                                        className="py-3 px-4 text-right text-slate-700"
+                                      >
+                                        {formatReportValue(val, 3)}
+                                      </td>
+                                    );
+                                  })}
+                                  <td className="py-3 px-4 text-right text-slate-900 bg-amber-50/50 font-bold">
+                                    {formatReportValue(row.total, 3)}
+                                  </td>
+                                </tr>
+                              ));
+                            })()}
                         </React.Fragment>
                       );
-                    })}
-                  {(reportData2.rows || [])
-                    .filter((row) => !row.isMonth && !row.parentMonth)
-                    .map((row) => {
+                    });
+                  })()}
+                  {(() => {
+                    const summaryRowsInOrder = [
+                      (reportData2.rows || []).find((row) => row.isTotal),
+                      (reportData2.rows || []).find((row) => row.isPercentage),
+                      (reportData2.rows || []).find(
+                        (row) => row.isPreviousYearValue,
+                      ),
+                      (reportData2.rows || []).find(
+                        (row) => row.isTotalPercentage,
+                      ),
+                    ].filter(Boolean);
+
+                    return summaryRowsInOrder.map((row) => {
                       const isTotal = row.isTotal;
                       const isPercentage = row.isPercentage;
                       const isPreviousYearValue = row.isPreviousYearValue;
@@ -2272,7 +2325,8 @@ const PlanningScreen = () => {
                           </td>
                         </tr>
                       );
-                    })}
+                    });
+                  })()}
                 </tbody>
               </table>
             </div>
