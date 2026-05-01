@@ -368,22 +368,6 @@ const PlanningScreen = () => {
         });
     }, [monthLabels]);
 
-    useEffect(() => {
-        if (computedStatusBreakdownData) {
-            setExpandedStatusBreakdownSegments((prev) => {
-                const next = { ...prev };
-                computedStatusBreakdownData.forEach((monthEntry) => {
-                    monthEntry.segments.forEach((segmentEntry) => {
-                        const key = `${monthEntry.month}-${segmentEntry.segment}`;
-                        if (typeof next[key] === 'undefined') {
-                            next[key] = true;
-                        }
-                    });
-                });
-                return next;
-            });
-        }
-    }, [computedStatusBreakdownData]);
     const customerMap = useMemo(
         () => new Map(customers.map((customer) => [String(customer._id), customer])),
         [customers]
@@ -519,6 +503,23 @@ const PlanningScreen = () => {
 
         return months;
     }, [combinedReportData, monthLabels]);
+
+    useEffect(() => {
+        if (computedStatusBreakdownData) {
+            setExpandedStatusBreakdownSegments((prev) => {
+                const next = { ...prev };
+                computedStatusBreakdownData.forEach((monthEntry) => {
+                    monthEntry.segments.forEach((segmentEntry) => {
+                        const key = `${monthEntry.month}-${segmentEntry.segment}`;
+                        if (typeof next[key] === 'undefined') {
+                            next[key] = true;
+                        }
+                    });
+                });
+                return next;
+            });
+        }
+    }, [computedStatusBreakdownData]);
 
     const computedSbuWiseData = useMemo(() => {
         const visibleMonthLabels = combinedReportData?.monthYear ? [combinedReportData.monthYear] : monthLabels;

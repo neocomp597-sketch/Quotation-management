@@ -27,6 +27,7 @@ import Vendors from './pages/Vendors';
 import Vouchers from './pages/Vouchers';
 import CreateVoucher from './pages/CreateVoucher';
 import Authorization from './pages/Authorization';
+import ErrorBoundary from './components/ErrorBoundary';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 
@@ -72,7 +73,7 @@ function App() {
             <Route path="/vouchers/:id" element={<PermissionRoute permissionKey="sale"><Layout><CreateVoucher /></Layout></PermissionRoute>} />
             <Route path="/mgrs" element={<PermissionRoute permissionKey="master"><Layout><MGRMaster /></Layout></PermissionRoute>} />
             <Route path="/attributes" element={<PermissionRoute permissionKey="master"><Layout><Attributes /></Layout></PermissionRoute>} />
-            <Route path="/planning" element={<PermissionRoute permissionKey="planning"><Layout><PlanningScreen /></Layout></PermissionRoute>} />
+            <Route path="/planning" element={<PermissionRoute permissionKey="planning"><Layout><ErrorBoundary><PlanningScreen /></ErrorBoundary></Layout></PermissionRoute>} />
             <Route path="/simulations" element={<PermissionRoute permissionKey="planning"><Layout><Simulations /></Layout></PermissionRoute>} />
             <Route path="/reports" element={<PermissionRoute permissionKey="reports"><Layout><Reports /></Layout></PermissionRoute>} />
             <Route path="/quotations" element={<PermissionRoute permissionKey="quotation"><Layout><Quotations /></Layout></PermissionRoute>} />
