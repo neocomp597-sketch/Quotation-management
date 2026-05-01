@@ -179,6 +179,7 @@ const PlanningScreen = () => {
     const [isStatusBreakdownExpanded, setIsStatusBreakdownExpanded] = useState(false);
     const [expandedSegmentMonths, setExpandedSegmentMonths] = useState({});
     const [expandedStatusBreakdownMonths, setExpandedStatusBreakdownMonths] = useState({});
+    const [expandedSbuWiseMonths, setExpandedSbuWiseMonths] = useState({});
 
     const [customers, setCustomers] = useState([]);
     const [products, setProducts] = useState([]);
@@ -356,6 +357,15 @@ const PlanningScreen = () => {
             });
             return next;
         });
+        setExpandedSbuWiseMonths((prev) => {
+            const next = { ...prev };
+            monthLabels.forEach((month) => {
+                if (typeof next[month] === 'undefined') {
+                    next[month] = true;
+                }
+            });
+            return next;
+        });
     }, [monthLabels]);
     const customerMap = useMemo(
         () => new Map(customers.map((customer) => [String(customer._id), customer])),
@@ -499,6 +509,65 @@ const PlanningScreen = () => {
                     month: monthLabel,
                     rows: monthRows,
                     total: Number(monthEntry.rows.Total?.total || 0)
+                };
+            });
+
+        return months;
+    }, [combinedReportData, monthLabels]);
+
+    const computedSbuWiseData = useMemo(() => {
+        const visibleMonthLabels = combinedReportData?.monthYear ? [combinedReportData.monthYear] : monthLabels;
+
+        const monthMap = new Map();
+
+        visibleMonthLabels.forEach((monthLabel) => {
+            const statusRows = {};
+            STATUS_REPORT_ROWS.forEach((statusRow) => {
+                statusRows[statusRow.key] = { status: statusRow.label, ...Object.fromEntries(combinedReportData?.mgrCodes?.map(sbu => [sbu, 0]) || []), total: 0 };
+            });
+            // Add All row
+            statusRows['All'] = { status: 'All', ...Object.fromEntries(combinedReportData?.mgrCodes?.map(sbu => [sbu, 0]) || []), total: 0 };
+            monthMap.set(monthLabel, {
+                month: monthLabel,
+                rows: statusRows
+            });
+        });
+
+        if (combinedReportData?.sbuWise) {
+            combinedReportData.sbuWise.forEach((row) => {
+                const monthEntry = monthMap.get(row.month);
+                const normalizedStatus = STATUS_REPORT_ROWS.find((statusRow) => statusRow.aliases.includes(row.status))?.key;
+                const allRow = monthEntry?.rows?.All;
+
+                if (!monthEntry || !normalizedStatus) {
+                    return;
+                }
+
+                const statusRow = monthEntry.rows[normalizedStatus];
+                const value = Number(row.value || 0);
+
+                if (statusRow && row.sbu) {
+                    statusRow[row.sbu] = (statusRow[row.sbu] || 0) + value;
+                    statusRow.total += value;
+                    if (allRow) {
+                        allRow[row.sbu] = (allRow[row.sbu] || 0) + value;
+                        allRow.total += value;
+                    }
+                }
+            });
+        }
+
+        const months = visibleMonthLabels
+            .map((monthLabel) => {
+                const monthEntry = monthMap.get(monthLabel);
+                const monthRows = STATUS_REPORT_ROWS
+                    .map((statusRow) => monthEntry.rows[statusRow.key])
+                    .concat(monthEntry.rows.All);
+
+                return {
+                    month: monthLabel,
+                    rows: monthRows,
+                    total: Number(monthEntry.rows.All?.total || 0)
                 };
             });
 
@@ -908,6 +977,13 @@ const PlanningScreen = () => {
 
     const toggleStatusBreakdownMonth = (month) => {
         setExpandedStatusBreakdownMonths((prev) => ({
+            ...prev,
+            [month]: !prev[month]
+        }));
+    };
+
+    const toggleSbuWiseMonth = (month) => {
+        setExpandedSbuWiseMonths((prev) => ({
             ...prev,
             [month]: !prev[month]
         }));
@@ -1396,67 +1472,57 @@ const PlanningScreen = () => {
                 </div>
 
                 {isReportExpanded && (
-                    combinedReportData && combinedReportData.mgrCodes?.length > 0 ? (
+                    computedSbuWiseData && computedSbuWiseData.length > 0 ? (
                         <div className="overflow-x-auto">
-                            <table className="w-full text-left text-sm">
-                                <thead>
-                                    <tr className="bg-slate-50 border-b border-slate-200">
-                                        <th className="py-3 px-4 font-bold text-slate-700 text-left min-w-[140px]">Status</th>
-                                        {combinedReportData.mgrCodes.map((sbu) => (
-                                            <th key={sbu} className="py-3 px-4 font-bold text-slate-700 text-right min-w-[100px] border-l border-slate-300">{sbu}</th>
-                                        ))}
-                                        <th className="py-3 px-4 font-bold text-slate-900 text-right bg-slate-100 min-w-[100px] border-l border-slate-300">Total</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {(combinedReportData.statusColumns || []).map((status) => {
-                                        let rowTotal = 0;
-                                        const statusValues = {};
+                            {computedSbuWiseData.map((monthEntry) => (
+                                <div key={monthEntry.month} className="border-b border-slate-200 last:border-b-0">
+                                    <div
+                                        className="bg-blue-50 font-bold cursor-pointer hover:bg-blue-100/60 transition-colors border-b border-blue-200"
+                                        onClick={() => toggleSbuWiseMonth(monthEntry.month)}
+                                    >
+                                        <div className="flex items-center gap-2 py-3 px-4">
+                                            <MdKeyboardArrowDown
+                                                className={`text-slate-700 transition-transform duration-300 ${!expandedSbuWiseMonths[monthEntry.month] ? '-rotate-90' : ''}`}
+                                                size={18}
+                                            />
+                                            <span className="text-slate-900 font-black">{monthEntry.month}</span>
+                                            <span className="ml-auto text-slate-700 font-bold">{formatReportValue(monthEntry.total, 0)}</span>
+                                        </div>
+                                    </div>
+                                    {expandedSbuWiseMonths[monthEntry.month] && (
+                                        <table className="w-full text-left text-sm">
+                                            <thead>
+                                                <tr className="bg-slate-50 border-b border-slate-200">
+                                                    <th className="py-3 px-4 font-bold text-slate-700 text-left min-w-[140px]">Status</th>
+                                                    {combinedReportData.mgrCodes.map((sbu) => (
+                                                        <th key={sbu} className="py-3 px-4 font-bold text-slate-700 text-right min-w-[100px] border-l border-slate-300">{sbu}</th>
+                                                    ))}
+                                                    <th className="py-3 px-4 font-bold text-slate-900 text-right bg-slate-100 min-w-[100px] border-l border-slate-300">Total</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {monthEntry.rows.map((row) => {
+                                                    const isAllRow = row.status === 'All';
 
-                                        // Calculate values for each SBU + status combination
-                                        combinedReportData.mgrCodes.forEach((sbu) => {
-                                            const value = (combinedReportData.sbuWise || [])
-                                                .filter((entry) => normalizeCodeKey(entry.sbu) === normalizeCodeKey(sbu) && entry.status === status)
-                                                .reduce((sum, entry) => sum + Number(entry.value || 0), 0);
-                                            statusValues[sbu] = value;
-                                            rowTotal += value;
-                                        });
-
-                                        return (
-                                            <tr key={status} className="border-b border-slate-100 hover:bg-slate-50">
-                                                <td className="py-3 px-4 font-bold text-slate-900">{status}</td>
-                                                {combinedReportData.mgrCodes.map((sbu) => (
-                                                    <td key={`${status}-${sbu}`} className="py-3 px-4 text-right border-l border-slate-200 font-semibold text-slate-700">
-                                                        {formatReportValue(statusValues[sbu] || 0, 0)}
-                                                    </td>
-                                                ))}
-                                                <td className="py-3 px-4 text-right border-l border-slate-300 bg-slate-50 font-bold text-slate-900">
-                                                    {formatReportValue(rowTotal, 0)}
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                    <tr className="border-b border-slate-200 bg-amber-50 font-black">
-                                        <td className="py-3 px-4 font-bold text-slate-900">Total</td>
-                                        {combinedReportData.mgrCodes.map((sbu) => {
-                                            const total = (combinedReportData.sbuWise || [])
-                                                .filter((entry) => normalizeCodeKey(entry.sbu) === normalizeCodeKey(sbu))
-                                                .reduce((sum, entry) => sum + Number(entry.value || 0), 0);
-                                            return (
-                                                <td key={`total-${sbu}`} className="py-3 px-4 text-right border-l border-slate-300 font-black text-slate-900">
-                                                    {formatReportValue(total, 0)}
-                                                </td>
-                                            );
-                                        })}
-                                        <td className="py-3 px-4 text-right border-l border-slate-300 bg-amber-100 font-black text-slate-900">
-                                            {formatReportValue(
-                                                (combinedReportData.sbuWise || []).reduce((sum, entry) => sum + Number(entry.value || 0), 0),
-                                                0
-                                            )}
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                                                    return (
+                                                        <tr key={`${monthEntry.month}-${row.status}`} className={`border-b border-slate-100 ${isAllRow ? 'bg-amber-50 font-black' : 'hover:bg-slate-50'}`}>
+                                                            <td className={`py-3 px-4 ${isAllRow ? 'font-black text-slate-900' : 'font-bold text-slate-900'}`}>{row.status}</td>
+                                                            {combinedReportData.mgrCodes.map((sbu) => (
+                                                                <td key={`${monthEntry.month}-${row.status}-${sbu}`} className={`py-3 px-4 text-right border-l border-slate-200 ${isAllRow ? 'font-black text-slate-900' : 'font-semibold text-slate-700'}`}>
+                                                                    {formatReportValue(row[sbu] || 0, 0)}
+                                                                </td>
+                                                            ))}
+                                                            <td className={`py-3 px-4 text-right border-l border-slate-300 ${isAllRow ? 'bg-amber-100 font-black text-slate-900' : 'bg-slate-50 font-bold text-slate-900'}`}>
+                                                                {formatReportValue(row.total || 0, 0)}
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    )}
+                                </div>
+                            ))}
                         </div>
                     ) : (
                         <div className="p-10 text-center text-slate-400 font-bold">
