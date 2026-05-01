@@ -61,6 +61,35 @@ const getMonthLabels = (fy) => {
     });
 };
 
+// Get current month label for default selection
+const getCurrentMonthLabel = (fy) => {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    const startYear = parseInt(fy.split('-')[0], 10);
+    
+    // Map JS month (0-11) to FY_MONTHS index
+    // April=3 -> index 0, May=4 -> index 1, ..., Mar=2 -> index 11
+    let monthIndex;
+    if (currentMonth >= 3) {
+        // Apr-Dec: index = currentMonth - 3
+        monthIndex = currentMonth - 3;
+    } else {
+        // Jan-Mar: index = currentMonth + 9
+        monthIndex = currentMonth + 9;
+    }
+    
+    // Only return if it's within the FY range
+    if (monthIndex >= 0 && monthIndex < 12) {
+        const fyMonth = FY_MONTHS[monthIndex];
+        const year = monthIndex < 9 ? startYear : startYear + 1;
+        return `${fyMonth}-${year.toString().slice(-2)}`;
+    }
+    
+    // Fallback: return first month if calculation is off
+    return getMonthLabels(fy)[0];
+};
+
 const normalizeMgrCode = (value = '') => String(value || '').trim().replace(/\s+/g, ' ').toUpperCase();
 
 const normalizeCodeKey = (value = '') => normalizeMgrCode(value);
@@ -148,13 +177,7 @@ const PlanningScreen = () => {
     const [isReportExpanded, setIsReportExpanded] = useState(false);
     const [isReportExpanded2, setIsReportExpanded2] = useState(false);
     const [isStatusBreakdownExpanded, setIsStatusBreakdownExpanded] = useState(false);
-    const [expandedSbuMonths, setExpandedSbuMonths] = useState({});
-    const [expandedQuarters, setExpandedQuarters] = useState({
-        Q1: false,
-        Q2: false,
-        Q3: false,
-        Q4: false
-    });
+    const [expandedSegmentMonths, setExpandedSegmentMonths] = useState({});
     const [expandedStatusBreakdownMonths, setExpandedStatusBreakdownMonths] = useState({});
 
     const [customers, setCustomers] = useState([]);
@@ -185,11 +208,20 @@ const PlanningScreen = () => {
     const [showProductDropdown, setShowProductDropdown] = useState(false);
     const customerAnchorRef = useRef(null);
     const productAnchorRef = useRef(null);
-    const [filters, setFilters] = useState({
-        mgrCode: '',
-        mgrCode2: '',
-        status: ''
-    });
+    
+    // Initialize filters with month as primary filter
+    const initializeFilters = () => {
+        const monthLabels = getMonthLabels(getFinancialYears()[1]);
+        const defaultMonth = getCurrentMonthLabel(getFinancialYears()[1]);
+        return {
+            month: monthLabels.includes(defaultMonth) ? defaultMonth : monthLabels[0],
+            mgrCode: '',
+            mgrCode2: '',
+            status: ''
+        };
+    };
+    
+    const [filters, setFilters] = useState(initializeFilters());
     const [reportFilters, setReportFilters] = useState({
         month: '',
         year: ''
@@ -256,6 +288,18 @@ const PlanningScreen = () => {
         ));
     }, [financialYear]);
 
+    // Update month filter when financial year changes
+    useEffect(() => {
+        const monthLabels = getMonthLabels(financialYear);
+        const defaultMonth = getCurrentMonthLabel(financialYear);
+        const newMonth = monthLabels.includes(defaultMonth) ? defaultMonth : monthLabels[0];
+        
+        setFilters((prev) => ({
+            ...prev,
+            month: newMonth
+        }));
+    }, [financialYear]);
+
     const filteredCustomers = useMemo(() => {
         if (!customerSearch) {
             return customers.slice(0, 10);
@@ -281,11 +325,18 @@ const PlanningScreen = () => {
 
     const filteredEntries = useMemo(() => {
         return entries.filter((entry) => {
+            // STEP 1: Filter by month (PRIMARY FILTER)
+            const matchesMonth = !filters.month || entry.monthYear === filters.month;
+            
+            // STEP 2: Filter by status
+            const matchesStatus = !filters.status || entry.status === filters.status;
+            
+            // STEP 3: Filter by MGR codes
             const matchesMgr1 = !filters.mgrCode || normalizeMgrCode(entry.mgrCode) === normalizeMgrCode(filters.mgrCode);
             const matchesMgr2 = !filters.mgrCode2 || normalizeMgrCode(entry.mgrCode2) === normalizeMgrCode(filters.mgrCode2);
-            const matchesStatus = !filters.status || entry.status === filters.status;
 
-            return matchesMgr1 && matchesMgr2 && matchesStatus;
+            // All conditions must match
+            return matchesMonth && matchesStatus && matchesMgr1 && matchesMgr2;
         });
     }, [entries, filters]);
 
@@ -463,7 +514,10 @@ const PlanningScreen = () => {
     };
 
     const clearFilters = () => {
+        const monthLabels = getMonthLabels(financialYear);
+        const defaultMonth = getCurrentMonthLabel(financialYear);
         setFilters({
+            month: monthLabels.includes(defaultMonth) ? defaultMonth : monthLabels[0],
             mgrCode: '',
             mgrCode2: '',
             status: ''
@@ -536,20 +590,34 @@ const PlanningScreen = () => {
     };
 
     const handleSaveEntry = async () => {
-        if (!newRow.monthYear || !newRow.customerId || !newRow.productId || newRow.qty === '' || newRow.value === '' || !newRow.mgrCode || !newRow.status) {
-            toast.error('Please fill all mandatory fields (MGR 2 is optional)');
+        // CRITICAL: Enforce month selection first
+        if (!filters.month) {
+            toast.error('⚠️ Please select a Month first in the filters above');
+            return;
+        }
+        
+        if (!newRow.customerId || !newRow.productId || newRow.qty === '' || newRow.value === '' || !newRow.mgrCode || !newRow.status) {
+            toast.error('Please fill all mandatory fields (MGR 2 is optional, Month auto-set)');
+            return;
+        }
+        
+        // Auto-set inline entry month to selected filter month
+        const monthToUse = newRow.monthYear || filters.month;
+        if (!monthToUse) {
+            toast.error('Please select a Month');
             return;
         }
 
         try {
             const dataToSave = {
                 ...newRow,
+                monthYear: monthToUse,
                 financialYear,
                 qty: Number(newRow.qty),
                 value: Number(newRow.value),
                 mgrCode: getCanonicalMgrCode(newRow.mgrCode, mgrList),
                 mgrCode2: getCanonicalMgrCode(newRow.mgrCode2, mgrList2),
-                month: FY_MONTHS.indexOf(newRow.monthYear.split('-')[0]) + 1
+                month: FY_MONTHS.indexOf(monthToUse.split('-')[0]) + 1
             };
 
             if (editingId) {
@@ -574,6 +642,11 @@ const PlanningScreen = () => {
 
     const handleEditEntry = (entry) => {
         setEditingId(entry._id);
+        // Set filter month to the entry's month when editing
+        setFilters((prev) => ({
+            ...prev,
+            month: entry.monthYear
+        }));
         setNewRow({
             monthYear: entry.monthYear,
             customerId: entry.customerId?._id || entry.customerId || '',
@@ -826,19 +899,13 @@ const PlanningScreen = () => {
         );
     };
 
-    const toggleSbuMonth = (monthLabel) => {
-        setExpandedSbuMonths((prev) => ({
+    const toggleSegmentMonth = (monthLabel) => {
+        setExpandedSegmentMonths((prev) => ({
             ...prev,
             [monthLabel]: !prev[monthLabel]
         }));
     };
 
-    const toggleQuarter = (quarterPrefix) => {
-        setExpandedQuarters((prev) => ({
-            ...prev,
-            [quarterPrefix]: !prev[quarterPrefix]
-        }));
-    };
     const toggleStatusBreakdownMonth = (month) => {
         setExpandedStatusBreakdownMonths((prev) => ({
             ...prev,
@@ -985,7 +1052,21 @@ const PlanningScreen = () => {
 
                         <div className="px-4 md:px-5 py-4 border-b border-slate-100 bg-white">
                             <div className="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-4">
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 xl:flex-1">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 xl:flex-1">
+                                    <div>
+                                        <label className="block text-[11px] font-black uppercase tracking-widest text-slate-500 mb-2">📅 Filter Month (Primary)</label>
+                                        <select
+                                            value={filters.month}
+                                            onChange={(e) => handleFilterChange('month', e.target.value)}
+                                            className="w-full px-3 py-3 border border-primary-300 rounded-xl text-sm font-bold outline-none focus:border-primary-500 bg-primary-50"
+                                        >
+                                            <option value="">Select month...</option>
+                                            {monthLabels.map((month) => (
+                                                <option key={month} value={month}>{month}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
                                     <div>
                                         <label className="block text-[11px] font-black uppercase tracking-widest text-slate-500 mb-2">Filter MGR 1</label>
                                         <select
@@ -1074,16 +1155,9 @@ const PlanningScreen = () => {
                                 <tbody className="divide-y divide-slate-50">
                                     <tr className="bg-primary-50/40 border-b border-primary-100 align-top">
                                         <td className="py-2 px-2">
-                                            <select
-                                                value={newRow.monthYear}
-                                                onChange={(e) => handleNewRowChange('monthYear', e.target.value)}
-                                                className={compactFieldClass}
-                                            >
-                                                <option value="">Select month</option>
-                                                {monthLabels.map((month) => (
-                                                    <option key={month} value={month}>{month}</option>
-                                                ))}
-                                            </select>
+                                            <div className="w-full px-2.5 py-2.5 border border-primary-400 rounded-lg text-xs font-black outline-none bg-primary-100 text-primary-700">
+                                                {filters.month || '⚠️ Select month'}
+                                            </div>
                                         </td>
                                         <td ref={customerAnchorRef} className="py-2 px-2">
                                             <input
@@ -1422,10 +1496,10 @@ const PlanningScreen = () => {
                 {isReportExpanded2 && (
                     reportData2 && reportData2.mgrCodes.length > 0 ? (
                         <div className="overflow-x-auto">
-                            <table className="w-full text-left text-xs">
+                            <table className="w-full text-left text-sm">
                                 <thead>
                                     <tr className="bg-amber-50 border-b border-amber-100">
-                                        <th className="py-3 px-4 font-black text-slate-700 min-w-[100px]"></th>
+                                        <th className="py-3 px-4 font-black text-slate-700 min-w-[160px]">Month / Segment</th>
                                         {reportData2.mgrCodes.map((mgr) => (
                                             <th key={mgr} className="py-3 px-4 font-black text-slate-700 text-right min-w-[100px]">{mgr}</th>
                                         ))}
@@ -1433,75 +1507,96 @@ const PlanningScreen = () => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {reportData2.rows.map((row, idx) => {
-                                        const isQuarter = row.isQuarter;
-                                        const isTotal = row.isTotal;
-                                        const isPercentage = row.isPercentage;
-                                        const isPreviousYearValue = row.isPreviousYearValue;
-                                        const isTotalPercentage = row.isTotalPercentage;
-                                        const isHighlight = isQuarter || isTotal || isPercentage || isPreviousYearValue || isTotalPercentage;
+                                    {(reportData2.rows || [])
+                                        .filter((row) => row.isMonth)
+                                        .map((monthRow) => {
+                                            const monthLabel = monthRow.monthLabel || monthRow.month;
+                                            const childRows = (reportData2.rows || []).filter((row) => row.parentMonth === monthLabel);
 
-                                        let rowQuarterPrefix = null;
-                                        if (isQuarter) {
-                                            rowQuarterPrefix = row.month.substring(0, 2);
-                                        } else if (!isTotal && !isPercentage) {
-                                            const nextQuarterRow = reportData2.rows.slice(idx).find((reportRow) => reportRow.isQuarter);
-                                            if (nextQuarterRow) {
-                                                rowQuarterPrefix = nextQuarterRow.month.substring(0, 2);
-                                            }
-                                        }
+                                            return (
+                                                <React.Fragment key={monthLabel}>
+                                                    <tr
+                                                        className="border-b-2 border-slate-200 bg-blue-50 font-bold cursor-pointer hover:bg-blue-100/60 transition-colors"
+                                                        onClick={() => toggleSegmentMonth(monthLabel)}
+                                                    >
+                                                        <td className="py-3 px-4 text-slate-900">
+                                                            <div className="flex items-center gap-2">
+                                                                <MdKeyboardArrowDown
+                                                                    className={`text-slate-700 transition-transform duration-300 ${!expandedSegmentMonths[monthLabel] ? '-rotate-90' : ''}`}
+                                                                    size={18}
+                                                                />
+                                                                {monthRow.month}
+                                                            </div>
+                                                        </td>
+                                                        {reportData2.mgrCodes.map((mgr) => (
+                                                            <td key={mgr} className="py-3 px-4 text-right text-slate-900 font-bold">
+                                                                {formatReportValue(monthRow[mgr] || 0, 3)}
+                                                            </td>
+                                                        ))}
+                                                        <td className="py-3 px-4 text-right text-slate-900 bg-slate-50 font-black">
+                                                            {formatReportValue(monthRow.total || 0, 3)}
+                                                        </td>
+                                                    </tr>
+                                                    {expandedSegmentMonths[monthLabel] && childRows.map((row) => (
+                                                        <tr
+                                                            key={`${monthLabel}-${row.month}`}
+                                                            className="border-b border-slate-100 hover:bg-slate-50"
+                                                        >
+                                                            <td className="py-3 px-4 text-slate-900 font-bold pl-12">{row.month}</td>
+                                                            {reportData2.mgrCodes.map((mgr) => (
+                                                                <td key={mgr} className="py-3 px-4 text-right text-slate-700">
+                                                                    {formatReportValue(row[mgr] || 0, 3)}
+                                                                </td>
+                                                            ))}
+                                                            <td className="py-3 px-4 text-right text-slate-900 bg-amber-50/50 font-bold">
+                                                                {formatReportValue(row.total || 0, 3)}
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </React.Fragment>
+                                            );
+                                        })}
+                                    {(reportData2.rows || [])
+                                        .filter((row) => !row.isMonth && !row.parentMonth)
+                                        .map((row) => {
+                                            const isTotal = row.isTotal;
+                                            const isPercentage = row.isPercentage;
+                                            const isPreviousYearValue = row.isPreviousYearValue;
+                                            const isTotalPercentage = row.isTotalPercentage;
 
-                                        if (!isHighlight && rowQuarterPrefix && !expandedQuarters[rowQuarterPrefix]) {
-                                            return null;
-                                        }
-
-                                        return (
-                                            <tr
-                                                key={idx}
-                                                className={`border-b transition-colors ${
-                                                    isTotal ? 'bg-amber-50 border-amber-200 font-black' :
-                                                    isPreviousYearValue ? 'bg-amber-100/70 border-amber-200 font-bold' :
-                                                    isPercentage || isTotalPercentage ? 'bg-slate-50 border-slate-200' :
-                                                    isQuarter ? 'bg-blue-50/50 border-blue-100 font-bold cursor-pointer hover:bg-blue-100/50' :
-                                                    'border-slate-50 hover:bg-slate-50'
-                                                }`}
-                                                onClick={() => {
-                                                    if (isQuarter) {
-                                                        toggleQuarter(row.month.substring(0, 2));
-                                                    }
-                                                }}
-                                            >
-                                                <td className={`py-3 px-4 ${isHighlight ? 'font-black text-slate-900' : 'font-semibold text-slate-600'} ${isQuarter ? 'pl-2' : 'pl-8'}`}>
-                                                    <div className="flex items-center gap-1">
-                                                        {isQuarter && (
-                                                            <MdKeyboardArrowDown
-                                                                className={`text-blue-500 transition-transform duration-300 ${!expandedQuarters[row.month.substring(0, 2)] ? '-rotate-90' : ''}`}
-                                                                size={18}
-                                                            />
-                                                        )}
+                                            return (
+                                                <tr
+                                                    key={row.month}
+                                                    className={`border-b transition-colors ${
+                                                        isTotal ? 'bg-amber-50 border-amber-200 font-black' :
+                                                        isPreviousYearValue ? 'bg-amber-100/70 border-amber-200 font-bold' :
+                                                        isPercentage || isTotalPercentage ? 'bg-slate-50 border-slate-200' :
+                                                        'border-slate-50 hover:bg-slate-50'
+                                                    }`}
+                                                >
+                                                    <td className={`py-3 px-4 ${isTotal || isPercentage || isPreviousYearValue || isTotalPercentage ? 'font-black text-slate-900' : 'font-semibold text-slate-600'}`}>
                                                         {row.month}
-                                                    </div>
-                                                </td>
-                                                {reportData2.mgrCodes.map((mgr) => (
-                                                    <td key={mgr} className={`py-3 px-4 text-right ${isHighlight ? 'font-bold text-slate-900' : 'text-slate-700'}`}>
-                                                        {isPercentage || isTotalPercentage
-                                                            ? formatReportPercentage(row[mgr] || 0)
-                                                            : formatReportValue(row[mgr] || 0, 3)}
                                                     </td>
-                                                ))}
-                                                <td className={`py-3 px-4 text-right ${
-                                                    isTotal ? 'bg-amber-100 font-black' :
-                                                    isPreviousYearValue ? 'bg-amber-200/80 font-bold' :
-                                                    isPercentage || isTotalPercentage ? 'bg-slate-100 font-bold' :
-                                                    'bg-amber-50/50 font-bold'
-                                                } text-slate-900`}>
-                                                    {isPercentage || isTotalPercentage
-                                                        ? formatReportPercentageTotal(row.total)
-                                                        : formatReportValue(row.total || 0, 3)}
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
+                                                    {reportData2.mgrCodes.map((mgr) => (
+                                                        <td key={mgr} className={`py-3 px-4 text-right ${(isTotal || isPercentage || isPreviousYearValue || isTotalPercentage) ? 'font-bold text-slate-900' : 'text-slate-700'}`}>
+                                                            {isPercentage || isTotalPercentage
+                                                                ? formatReportPercentage(row[mgr] || 0)
+                                                                : formatReportValue(row[mgr] || 0, 3)}
+                                                        </td>
+                                                    ))}
+                                                    <td className={`py-3 px-4 text-right ${
+                                                        isTotal ? 'bg-amber-100 font-black' :
+                                                        isPreviousYearValue ? 'bg-amber-200/80 font-bold' :
+                                                        isPercentage || isTotalPercentage ? 'bg-slate-100 font-bold' :
+                                                        'bg-amber-50/50 font-bold'
+                                                    } text-slate-900`}>
+                                                        {isPercentage || isTotalPercentage
+                                                            ? formatReportPercentageTotal(row.total)
+                                                            : formatReportValue(row.total || 0, 3)}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
                                 </tbody>
                             </table>
                         </div>
