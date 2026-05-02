@@ -274,10 +274,6 @@ const PlanningScreen = () => {
   };
 
   const [filters, setFilters] = useState(initializeFilters());
-  const [reportFilters, setReportFilters] = useState({
-    month: "",
-    year: "",
-  });
   const [sortConfig, setSortConfig] = useState({
     key: "monthYear",
     direction: "asc",
@@ -286,10 +282,15 @@ const PlanningScreen = () => {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const reportQuery = {
-        month: reportFilters.month,
-        year: reportFilters.year,
-      };
+      const reportQuery = {};
+      if (filters.month) {
+        const [mName] = filters.month.split("-");
+        const startYear = parseInt(financialYear.split("-")[0], 10);
+        const mIdx = FY_MONTHS.indexOf(mName);
+        reportQuery.month = mName;
+        reportQuery.year = String(mIdx <= 8 ? startYear : startYear + 1);
+      }
+
       const [entriesRes, sbuReportRes, segmentReportRes] = await Promise.all([
         planningService.getAll(financialYear),
         planningService.getMGRReport(financialYear, "SBU", reportQuery),
@@ -308,7 +309,7 @@ const PlanningScreen = () => {
     } finally {
       setLoading(false);
     }
-  }, [financialYear, reportFilters.month, reportFilters.year]);
+  }, [financialYear, filters.month]);
 
   useEffect(() => {
     const fetchMasters = async () => {
@@ -343,12 +344,6 @@ const PlanningScreen = () => {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
-  useEffect(() => {
-    const nextYears = getReportYearOptions(financialYear);
-    setReportFilters((prev) =>
-      nextYears.includes(prev.year) ? prev : { ...prev, year: "" },
-    );
-  }, [financialYear]);
 
   // Keep month filter empty when financial year changes
   useEffect(() => {
@@ -751,29 +746,6 @@ const PlanningScreen = () => {
       mgrCode: "",
       mgrCode2: "",
       status: "",
-    });
-  };
-
-  const handleReportFilterChange = (field, value) => {
-    setReportFilters((prev) => {
-      const next = { ...prev, [field]: value };
-      if (field === "month") {
-        if (!value) {
-          next.year = "";
-        } else {
-          const startYear = parseInt(financialYear.split("-")[0], 10);
-          const monthIndex = FY_MONTHS.indexOf(value);
-          next.year = String(monthIndex <= 8 ? startYear : startYear + 1);
-        }
-      }
-      return next;
-    });
-  };
-
-  const clearReportFilters = () => {
-    setReportFilters({
-      month: "",
-      year: "",
     });
   };
 
@@ -1274,13 +1246,6 @@ const PlanningScreen = () => {
   const compactFieldClass =
     "w-full px-2.5 py-2.5 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-primary-500 bg-white";
   const compactNumericFieldClass = `${compactFieldClass} text-right`;
-  const reportYearOptions = useMemo(
-    () => getReportYearOptions(financialYear),
-    [financialYear],
-  );
-  const hasActiveReportFilters = Boolean(
-    reportFilters.month || reportFilters.year,
-  );
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-24">
@@ -1330,75 +1295,7 @@ const PlanningScreen = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-        <div className="p-4 md:p-5 border-b border-slate-100 bg-slate-50/60">
-          <p className="text-xs font-black uppercase tracking-[0.25em] text-primary-600">
-            Report Filters
-          </p>
-          <h2 className="text-xl font-black text-slate-900 mt-1">
-            Month + Year Control
-          </h2>
-          <p className="text-sm text-slate-500 font-medium mt-1">
-            These filters apply to the SBU Wise and Segment Wise reports
-            together.
-          </p>
-        </div>
-        <div className="p-4 md:p-5">
-          <div className="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 xl:flex-1">
-              <div>
-                <label className="block text-[11px] font-black uppercase tracking-widest text-slate-500 mb-2">
-                  Month
-                </label>
-                <select
-                  value={reportFilters.month}
-                  onChange={(e) =>
-                    handleReportFilterChange("month", e.target.value)
-                  }
-                  className="w-full px-3 py-3 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-primary-500 bg-white"
-                >
-                  <option value="">All Months</option>
-                  {FY_MONTHS.map((month) => (
-                    <option key={month} value={month}>
-                      {month}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-[11px] font-black uppercase tracking-widest text-slate-500 mb-2">
-                  Year
-                </label>
-                <select
-                  value={reportFilters.year}
-                  onChange={(e) =>
-                    handleReportFilterChange("year", e.target.value)
-                  }
-                  disabled={!reportFilters.month}
-                  className="w-full px-3 py-3 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-primary-500 bg-white disabled:bg-slate-100 disabled:text-slate-400"
-                >
-                  <option value="">All Years</option>
-                  {reportYearOptions.map((year) => (
-                    <option key={year} value={year}>
-                      {year}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div className="flex items-center">
-              <button
-                onClick={clearReportFilters}
-                disabled={!hasActiveReportFilters}
-                className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-600 font-bold hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <MdRefresh size={18} />
-                Clear Report Filters
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
         <div
