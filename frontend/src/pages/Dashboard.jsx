@@ -61,18 +61,18 @@ const Dashboard = () => {
         const fetchDashboardData = async () => {
             try {
                 const response = await quotationService.getReports();
-                const { stats, recentQuotations } = response.data;
+                const { summary, recentQuotations } = response.data;
 
                 setStats({
-                    totalQuotations: stats.totalQuotations || 0,
-                    pendingDrafts: stats.draftQuotes || 0,
-                    totalValue: stats.businessPipeline || 0,
-                    customerCount: stats.registeredCustomers || 0,
-                    productCount: stats.totalProducts || 0,
-                    vendorCount: stats.totalVendors || 0
+                    totalQuotations: summary?.totalQuotations || 0,
+                    pendingDrafts: summary?.statusBreakdown?.draft || 0,
+                    totalValue: summary?.totalValue || 0,
+                    customerCount: summary?.customerCount || 0,
+                    productCount: summary?.productCount || 0,
+                    vendorCount: summary?.vendorCount || 0
                 });
 
-                setRecentQuotations(recentQuotations);
+                setRecentQuotations(recentQuotations || []);
             } catch (err) {
                 console.error("Error fetching dashboard data:", err);
             } finally {

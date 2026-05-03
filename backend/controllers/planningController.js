@@ -199,13 +199,10 @@ const buildSummaryRows = (rows, columns, prevRows, flags = {}) => {
 
     const totalPercentageRow = { month: 'Percentage PY', isTotalPercentage: true };
     columns.forEach((column) => {
-        const current = Number(grandTotal[column] || 0);
         const previous = Number(prevValueRow[column] || 0);
-        totalPercentageRow[column] = previous > 0 ? Number(((current / previous) * 100).toFixed(2)) : 0;
+        totalPercentageRow[column] = prevTotal > 0 ? Number(((previous / prevTotal) * 100).toFixed(2)) : 0;
     });
-    totalPercentageRow.total = prevTotal > 0
-        ? Number(((totalValue / prevTotal) * 100).toFixed(2))
-        : 0;
+    totalPercentageRow.total = prevTotal > 0 ? 100 : 0;
 
     const summaryRows = [grandTotal, percentageRow, prevValueRow, totalPercentageRow];
 
