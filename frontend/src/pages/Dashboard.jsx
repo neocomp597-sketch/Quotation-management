@@ -11,7 +11,9 @@ import {
     MdPeople,
     MdSchedule,
     MdTrendingDown,
-    MdAutoGraph
+    MdAutoGraph,
+    MdInventory2,
+    MdStorefront
 } from 'react-icons/md';
 import { Link } from 'react-router-dom';
 import { quotationService, customerService } from '../services/api';
@@ -48,7 +50,9 @@ const Dashboard = () => {
         totalQuotations: 0,
         pendingDrafts: 0,
         totalValue: 0,
-        customerCount: 0
+        customerCount: 0,
+        productCount: 0,
+        vendorCount: 0
     });
     const [recentQuotations, setRecentQuotations] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -56,23 +60,19 @@ const Dashboard = () => {
     useEffect(() => {
         const fetchDashboardData = async () => {
             try {
-                const [qtnRes, custRes] = await Promise.all([
-                    quotationService.getAll(),
-                    customerService.getAll()
-                ]);
-
-                const qtns = qtnRes.data;
-                const totalValue = qtns.reduce((sum, q) => sum + (q.grandTotal || 0), 0);
-                const drafts = qtns.filter(q => q.status === 'draft').length;
+                const response = await quotationService.getReports();
+                const { stats, recentQuotations } = response.data;
 
                 setStats({
-                    totalQuotations: qtns.length,
-                    pendingDrafts: drafts,
-                    totalValue: totalValue,
-                    customerCount: custRes.data.length
+                    totalQuotations: stats.totalQuotations || 0,
+                    pendingDrafts: stats.draftQuotes || 0,
+                    totalValue: stats.businessPipeline || 0,
+                    customerCount: stats.registeredCustomers || 0,
+                    productCount: stats.totalProducts || 0,
+                    vendorCount: stats.totalVendors || 0
                 });
 
-                setRecentQuotations(qtns.slice(0, 5));
+                setRecentQuotations(recentQuotations);
             } catch (err) {
                 console.error("Error fetching dashboard data:", err);
             } finally {
@@ -117,6 +117,22 @@ const Dashboard = () => {
             icon: <MdPeople size={26} />,
             color: "bg-gradient-to-br from-blue-500 to-indigo-600",
             subValue: "Direct & Retail"
+        },
+        {
+            title: "Total Products",
+            value: stats.productCount,
+            desc: "Active Inventory",
+            icon: <MdInventory2 size={26} />,
+            color: "bg-gradient-to-br from-purple-500 to-fuchsia-600",
+            subValue: "Active Inventory"
+        },
+        {
+            title: "Total Vendors",
+            value: stats.vendorCount,
+            desc: "Onboarded Suppliers",
+            icon: <MdStorefront size={26} />,
+            color: "bg-gradient-to-br from-rose-500 to-pink-600",
+            subValue: "Onboarded Suppliers"
         }
     ];
 
@@ -143,7 +159,7 @@ const Dashboard = () => {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
                 {statItems.map((stat, i) => (
                     <StatCard
                         key={i}

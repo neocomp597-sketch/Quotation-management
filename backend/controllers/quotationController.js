@@ -2,6 +2,7 @@ const Quotation = require('../models/Quotation');
 const Customer = require('../models/Customer');
 const CompanySettings = require('../models/CompanySettings');
 const Product = require('../models/Product');
+const Vendor = require('../models/Vendor');
 const { getBestVendorForProduct, sortVendorsByPriority, isVendorActive } = require('../utils/vendorSelection');
 
 const asBadRequest = (message) => {
@@ -391,7 +392,19 @@ module.exports = {
                 query.createdBy = req.user.id;
             }
 
-            const quotations = await Quotation.find(query);
+            const [
+                quotations,
+                productCount,
+                vendorCount,
+                customerCount,
+                recentQuotations
+            ] = await Promise.all([
+                Quotation.find(query),
+                Product.countDocuments(),
+                Vendor.countDocuments(),
+                Customer.countDocuments(),
+                Quotation.find(query).populate('customerId').sort({ createdAt: -1 }).limit(5)
+            ]);
 
             // Basic Aggregation
             const totalQuotations = quotations.length;
@@ -435,9 +448,13 @@ module.exports = {
                 summary: {
                     totalQuotations,
                     totalValue,
-                    statusBreakdown
+                    statusBreakdown,
+                    productCount,
+                    vendorCount,
+                    customerCount
                 },
-                monthlyTrend
+                monthlyTrend,
+                recentQuotations
             });
         } catch (error) {
             console.error("Aggregation Error:", error);
