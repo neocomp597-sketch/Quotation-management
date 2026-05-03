@@ -234,10 +234,7 @@ export const analyticsService = {
 };
 
 export const planningService = {
-  getAll: (financialYear) =>
-    api.get(
-      `/planning${financialYear ? `?financialYear=${financialYear}` : ""}`,
-    ),
+  getAll: (params = {}) => api.get("/planning", { params }),
   create: (data) => api.post("/planning", data),
   update: (id, data) => api.put(`/planning/${id}`, data),
   delete: (id) => api.delete(`/planning/${id}`),

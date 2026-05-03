@@ -224,6 +224,10 @@ const PlanningScreen = () => {
   const [reportData2, setReportData2] = useState(null);
   console.log({ reportData2 });
   const [loading, setLoading] = useState(false);
+  const [totalEntries, setTotalEntries] = useState(0);
+  const [offset, setOffset] = useState(0);
+  const [limit] = useState(5);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
 
 
   const [isReportExpanded, setIsReportExpanded] = useState(false);
@@ -284,7 +288,13 @@ const PlanningScreen = () => {
   });
 
   const fetchData = useCallback(async () => {
-    setLoading(true);
+    const isLoadMore = offset > 0;
+    if (isLoadMore) {
+      setIsLoadingMore(true);
+    } else {
+      setLoading(true);
+    }
+
     try {
       const reportQuery = {};
       if (filters.month) {
@@ -295,25 +305,39 @@ const PlanningScreen = () => {
         reportQuery.year = String(mIdx <= 8 ? startYear : startYear + 1);
       }
 
-      const [entriesRes, sbuReportRes, segmentReportRes] = await Promise.all([
-        planningService.getAll(financialYear),
-        planningService.getMGRReport(financialYear, "SBU", reportQuery),
-        planningService.getMGRReport(financialYear, "SEGMENT", reportQuery),
-      ]);
+      const params = {
+        financialYear,
+        month: filters.month,
+        mgr1: filters.mgrCode,
+        mgr2: filters.mgrCode2,
+        status: filters.status,
+        limit,
+        offset,
+      };
 
-      setEntries(entriesRes.data);
-      console.log(
-        "[API Response] Status Breakdown Summary Data (sbuWise):",
-        sbuReportRes.data,
-      );
-      setCombinedReportData(sbuReportRes.data);
-      setReportData2(segmentReportRes.data);
+      if (isLoadMore) {
+        const entriesRes = await planningService.getAll(params);
+        setEntries((prev) => [...prev, ...entriesRes.data.data]);
+        setTotalEntries(entriesRes.data.total);
+       } else {
+         const [entriesRes, sbuReportRes, segmentReportRes] = await Promise.all([
+           planningService.getAll(params),
+           planningService.getMGRReport(financialYear, "SBU", reportQuery),
+           planningService.getMGRReport(financialYear, "SEGMENT", reportQuery),
+         ]);
+
+         setEntries(entriesRes.data.data || []);
+         setTotalEntries(entriesRes.data.total || 0);
+         setCombinedReportData(sbuReportRes.data);
+         setReportData2(segmentReportRes.data);
+       }
     } catch (err) {
       console.error("Failed to load planning data:", err);
     } finally {
       setLoading(false);
+      setIsLoadingMore(false);
     }
-  }, [financialYear, filters.month]);
+  }, [financialYear, filters, offset, limit]);
 
   useEffect(() => {
     const fetchMasters = async () => {
@@ -344,6 +368,11 @@ const PlanningScreen = () => {
 
     fetchMasters();
   }, []);
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setOffset(0);
+  }, [filters, financialYear]);
 
   useEffect(() => {
     fetchData();
@@ -397,25 +426,9 @@ const PlanningScreen = () => {
   }, [products, productSearch]);
 
   const filteredEntries = useMemo(() => {
-    return entries.filter((entry) => {
-      // STEP 1: Filter by month (PRIMARY FILTER)
-      const matchesMonth = !filters.month || entry.monthYear === filters.month;
-
-      // STEP 2: Filter by status
-      const matchesStatus = !filters.status || entry.status === filters.status;
-
-      // STEP 3: Filter by MGR codes
-      const matchesMgr1 =
-        !filters.mgrCode ||
-        normalizeMgrCode(entry.mgrCode) === normalizeMgrCode(filters.mgrCode);
-      const matchesMgr2 =
-        !filters.mgrCode2 ||
-        normalizeMgrCode(entry.mgrCode2) === normalizeMgrCode(filters.mgrCode2);
-
-      // All conditions must match
-      return matchesMonth && matchesStatus && matchesMgr1 && matchesMgr2;
-    });
-  }, [entries, filters]);
+    // The entries are already filtered by the backend
+    return entries;
+  }, [entries]);
 
   const hasActiveFilters = Boolean(
     filters.mgrCode || filters.mgrCode2 || filters.status,
@@ -1462,6 +1475,10 @@ const PlanningScreen = () => {
                         onChange={(e) =>
                           handleNewRowChange("monthYear", e.target.value)
                         }
+                        onFocus={() => {
+                          setShowCustomerDropdown(false);
+                          setShowProductDropdown(false);
+                        }}
                         className="w-full px-2.5 py-2.5 border border-primary-400 rounded-lg text-xs font-black outline-none focus:border-primary-500 bg-primary-50"
                       >
                         <option value="">Select month</option>
@@ -1482,7 +1499,10 @@ const PlanningScreen = () => {
                           handleNewRowChange("customerName", "");
                           setShowCustomerDropdown(true);
                         }}
-                        onFocus={() => setShowCustomerDropdown(true)}
+                        onFocus={() => {
+                          setShowCustomerDropdown(true);
+                          setShowProductDropdown(false);
+                        }}
                         placeholder="Type customer name"
                         className={compactFieldClass}
                       />
@@ -1521,7 +1541,10 @@ const PlanningScreen = () => {
                           handleNewRowChange("productName", "");
                           setShowProductDropdown(true);
                         }}
-                        onFocus={() => setShowProductDropdown(true)}
+                        onFocus={() => {
+                          setShowProductDropdown(true);
+                          setShowCustomerDropdown(false);
+                        }}
                         placeholder="Type product name"
                         className={compactFieldClass}
                       />
@@ -1551,6 +1574,10 @@ const PlanningScreen = () => {
                         onChange={(e) =>
                           handleNewRowChange("qty", e.target.value)
                         }
+                        onFocus={() => {
+                          setShowCustomerDropdown(false);
+                          setShowProductDropdown(false);
+                        }}
                         placeholder="0"
                         className={compactNumericFieldClass}
                       />
@@ -1563,6 +1590,10 @@ const PlanningScreen = () => {
                         onChange={(e) =>
                           handleNewRowChange("value", e.target.value)
                         }
+                        onFocus={() => {
+                          setShowCustomerDropdown(false);
+                          setShowProductDropdown(false);
+                        }}
                         placeholder="0"
                         className={compactNumericFieldClass}
                       />
@@ -1578,6 +1609,10 @@ const PlanningScreen = () => {
                         onChange={(e) =>
                           handleNewRowChange("mgrCode", e.target.value)
                         }
+                        onFocus={() => {
+                          setShowCustomerDropdown(false);
+                          setShowProductDropdown(false);
+                        }}
                         className={compactFieldClass}
                       >
                         <option value="">Select MGR 1</option>
@@ -1594,6 +1629,10 @@ const PlanningScreen = () => {
                         onChange={(e) =>
                           handleNewRowChange("mgrCode2", e.target.value)
                         }
+                        onFocus={() => {
+                          setShowCustomerDropdown(false);
+                          setShowProductDropdown(false);
+                        }}
                         className={compactFieldClass}
                       >
                         <option value="">Select MGR 2</option>
@@ -1611,6 +1650,10 @@ const PlanningScreen = () => {
                           onChange={(e) =>
                             handleNewRowChange("status", e.target.value)
                           }
+                          onFocus={() => {
+                            setShowCustomerDropdown(false);
+                            setShowProductDropdown(false);
+                          }}
                           className={compactFieldClass}
                         >
                           <option value="">Select status</option>
@@ -1742,6 +1785,27 @@ const PlanningScreen = () => {
                   )}
                 </tbody>
               </table>
+            </div>
+
+            {/* Pagination Footer */}
+            <div className="px-4 py-4 border-t border-slate-100 bg-slate-50/30 flex flex-col items-center gap-3">
+              <div className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+                Showing <span className="text-primary-600">{entries.length}</span> of <span className="text-slate-900">{totalEntries}</span> entries
+              </div>
+              
+              {entries.length < totalEntries && (
+                <button
+                  onClick={() => setOffset(prev => prev + limit)}
+                  disabled={isLoadingMore}
+                  className="px-6 py-2.5 bg-white border border-primary-200 text-primary-600 rounded-xl font-black text-[11px] uppercase tracking-widest hover:bg-primary-50 transition-all flex items-center gap-2 shadow-sm disabled:opacity-50"
+                >
+                  {isLoadingMore ? (
+                    <div className="h-4 w-4 border-2 border-primary-600 border-t-transparent rounded-full animate-spin"></div>
+                  ) : (
+                    "Load More Entries"
+                  )}
+                </button>
+              )}
             </div>
           </>
 
@@ -1884,6 +1948,79 @@ const PlanningScreen = () => {
                       );
                     });
                   })()}
+
+                  {/* SUMMARY ROWS */}
+                  {combinedReportData && combinedReportData.mgrCodes?.length > 0 &&
+                    (() => {
+                      const summaryRowsInOrder = [
+                        (combinedReportData.rows || []).find((row) => row.isTotal),
+                        (combinedReportData.rows || []).find((row) => row.isPercentage),
+                        (combinedReportData.rows || []).find(
+                          (row) => row.isPreviousYearValue,
+                        ),
+                        (combinedReportData.rows || []).find(
+                          (row) => row.isTotalPercentage,
+                        ),
+                      ].filter(Boolean);
+
+                      return summaryRowsInOrder.map((row) => {
+                        const isTotal = row.isTotal;
+                        const isPercentage = row.isPercentage;
+                        const isPreviousYearValue = row.isPreviousYearValue;
+                        const isTotalPercentage = row.isTotalPercentage;
+
+                        return (
+                          <tr
+                            key={`sbu-summary-${row.month}`}
+                            className={`border-b transition-colors ${
+                              isTotal
+                                ? "bg-amber-50 border-amber-200 font-black"
+                                : isPreviousYearValue
+                                  ? "bg-amber-100/70 border-amber-200 font-bold"
+                                  : isPercentage || isTotalPercentage
+                                    ? "bg-slate-50 border-slate-200"
+                                    : "border-slate-50 hover:bg-slate-50"
+                            }`}
+                          >
+                            <td
+                              className={`py-3 px-4 ${isTotal || isPercentage || isPreviousYearValue || isTotalPercentage ? "font-black text-slate-900" : "font-semibold text-slate-600"}`}
+                            >
+                              {isPercentage ? "Percentage CY" : row.month}
+                            </td>
+                            {combinedReportData.mgrCodes.map((sbu) => {
+                              const cellValue = Number(row[sbu] || 0);
+                              return (
+                                <td
+                                  key={`sbu-summary-${row.month}-${sbu}`}
+                                  className={`py-3 px-4 text-right border-l border-slate-200 ${isTotal || isPercentage || isPreviousYearValue || isTotalPercentage ? "font-bold text-slate-900" : "text-slate-700"} ${cellValue > 0 ? "bg-blue-100/60" : ""}`}
+                                >
+                                  {isPercentage || isTotalPercentage
+                                    ? formatReportPercentage(cellValue)
+                                    : formatReportValue(cellValue, 0)}
+                                </td>
+                              );
+                            })}
+                            <td
+                              className={`py-3 px-4 text-right border-l border-slate-300 ${
+                                Number(row.total || 0) > 0
+                                  ? "bg-blue-100/60"
+                                  : isTotal
+                                    ? "bg-amber-100"
+                                    : isPreviousYearValue
+                                      ? "bg-amber-200/80"
+                                      : isPercentage || isTotalPercentage
+                                        ? "bg-slate-100"
+                                        : "bg-amber-50/50"
+                              } ${isTotal ? "font-black" : "font-bold"} text-slate-900`}
+                            >
+                              {isPercentage || isTotalPercentage
+                                ? formatReportPercentageTotal(row.total)
+                                : formatReportValue(row.total || 0, 0)}
+                            </td>
+                          </tr>
+                        );
+                      });
+                    })()}
 
 
                 </tbody>

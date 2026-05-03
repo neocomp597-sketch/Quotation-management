@@ -10,6 +10,19 @@ const STATUS_ALIASES = {
     'B & B': 'B&B',
     Others: 'Other'
 };
+const normalizeSbuValue = (sbuName = '') => {
+    const cleaned = String(sbuName || '')
+        .trim()
+        .toUpperCase()
+        .replace(/\s+/g, '');
+
+    if (cleaned === 'SBU1') return 'SBU1';
+    if (cleaned === 'SBU2') return 'SBU2';
+    if (cleaned === 'SBU3') return 'SBU3';
+    if (cleaned === 'EPC') return 'EPC';
+
+    return cleaned;
+};
 const STATUS_FALLBACK = 'Others';
 const STATUS_SEGMENTS = ['Export', 'Industry', 'UC', 'Utility'];
 const FY_MONTH_NAMES = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
@@ -220,15 +233,26 @@ exports.createEntry = async (req, res) => {
 
 exports.getAllEntries = async (req, res) => {
     try {
-        const { financialYear } = req.query;
+        const { financialYear, month, mgr1, mgr2, status, limit = 5, offset = 0 } = req.query;
         const filter = {};
         if (financialYear) filter.financialYear = financialYear;
+        if (month) filter.monthYear = month;
+        if (mgr1) filter.mgrCode = mgr1;
+        if (mgr2) filter.mgrCode2 = mgr2;
+        if (status) filter.status = status;
 
+        const total = await Planning.countDocuments(filter);
         const entries = await Planning.find(filter)
             .populate('customerId', 'companyName customerName')
             .populate('productId', 'productName')
-            .sort({ createdAt: -1 });
-        res.json(entries);
+            .sort({ createdAt: -1 })
+            .skip(Number(offset))
+            .limit(Number(limit));
+
+        res.json({
+            total,
+            data: entries
+        });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
@@ -452,7 +476,7 @@ exports.getMGRReport = async (req, res) => {
         }
 
         const sbuGroups = buildColumnGroups(entries, 'mgrCode', 'Unassigned', mgr1MasterMap);
-        const columns = sbuGroups.map((group) => group.label);
+        const columns = sbuGroups.map((group) => normalizeSbuValue(group.label));
         const visibleMonthLabels = monthYearFilter
             ? [monthYearFilter]
             : monthLabels;
@@ -465,7 +489,7 @@ exports.getMGRReport = async (req, res) => {
                 const sum = sourceEntries
                     .filter((entry) => normalizeCodeKey(entry.mgrCode) === sbu.key)
                     .reduce((acc, entry) => acc + getMeasureForEntry(entry, 'value'), 0);
-                row[sbu.label] = sum;
+                row[normalizeSbuValue(sbu.label)] = sum;
                 total += sum;
             });
 
