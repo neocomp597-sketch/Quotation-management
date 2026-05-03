@@ -221,7 +221,7 @@ const PlanningScreen = () => {
   console.log({ reportData2 });
   const [loading, setLoading] = useState(false);
 
-  const [isGridExpanded, setIsGridExpanded] = useState(true);
+
   const [isReportExpanded, setIsReportExpanded] = useState(false);
   const [isReportExpanded2, setIsReportExpanded2] = useState(false);
   const [isStatusBreakdownExpanded, setIsStatusBreakdownExpanded] =
@@ -792,9 +792,9 @@ const PlanningScreen = () => {
   };
 
   const handleSaveEntry = async () => {
-    // CRITICAL: Enforce month selection first
-    if (!filters.month) {
-      toast.error("⚠️ Please select a Month first in the filters above");
+    // Validate entry month selection
+    if (!newRow.monthYear) {
+      toast.error("⚠️ Please select a Month for the entry");
       return;
     }
 
@@ -807,13 +807,12 @@ const PlanningScreen = () => {
       !newRow.status
     ) {
       toast.error(
-        "Please fill all mandatory fields (MGR 2 is optional, Month auto-set)",
+        "Please fill all mandatory fields (MGR 2 is optional)",
       );
       return;
     }
 
-    // Auto-set inline entry month to selected filter month
-    const monthToUse = newRow.monthYear || filters.month;
+    const monthToUse = newRow.monthYear;
     if (!monthToUse) {
       toast.error("Please select a Month");
       return;
@@ -1251,13 +1250,10 @@ const PlanningScreen = () => {
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-24">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-4xl font-black text-slate-900 tracking-tight flex items-center gap-3">
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
             <MdCalendarMonth className="text-primary-600" />
             Planning Screen
           </h1>
-          <p className="text-slate-500 font-medium mt-1">
-            Plan monthly targets by customer, product, and MGR
-          </p>
         </div>
         <div className="flex flex-wrap gap-3 items-center">
           <select
@@ -1298,46 +1294,18 @@ const PlanningScreen = () => {
 
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-        <div
-          className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center cursor-pointer hover:bg-slate-100/50 transition-colors"
-          onClick={() => setIsGridExpanded(!isGridExpanded)}
-        >
-          <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
-            <MdKeyboardArrowDown
-              className={`text-slate-500 transition-transform duration-300 ${!isGridExpanded ? "-rotate-90" : ""}`}
-              size={20}
-            />
-            Planning Grid
-          </h2>
-        </div>
-
-        {isGridExpanded && (
           <>
-            <div className="p-4 md:p-5 border-b border-slate-100 bg-slate-50/60 space-y-4">
-              <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
-                <div>
-                  <p className="text-xs font-black uppercase tracking-[0.25em] text-primary-600">
-                    {editingId ? "Edit Entry" : "Inline Entry"}
-                  </p>
-                  <h3 className="text-xl font-black text-slate-900 mt-1">
-                    {editingId ? "Update Planning Entry" : "Add Planning Entry"}
-                  </h3>
-                  <p className="text-sm text-slate-500 font-medium mt-1">
-                    The data-entry row is back inside the grid for faster
-                    single-line entry.
-                  </p>
-                </div>
-                {editingId && (
-                  <button
-                    onClick={handleCancelEdit}
-                    className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 transition-colors"
-                  >
-                    <MdClose size={18} />
-                    Cancel Edit
-                  </button>
-                )}
+            {editingId && (
+              <div className="p-4 md:p-5 border-b border-slate-100 bg-slate-50/60 flex justify-end">
+                <button
+                  onClick={handleCancelEdit}
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 transition-colors"
+                >
+                  <MdClose size={18} />
+                  Cancel Edit
+                </button>
               </div>
-            </div>
+            )}
 
             <div className="px-4 md:px-5 py-4 border-b border-slate-100 bg-white">
               <div className="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-4">
@@ -1485,9 +1453,20 @@ const PlanningScreen = () => {
                 <tbody className="divide-y divide-slate-50">
                   <tr className="bg-primary-50/40 border-b border-primary-100 align-top">
                     <td className="py-2 px-2">
-                      <div className="w-full px-2.5 py-2.5 border border-primary-400 rounded-lg text-xs font-black outline-none bg-primary-100 text-primary-700">
-                        {filters.month || "⚠️ Select month"}
-                      </div>
+                      <select
+                        value={newRow.monthYear}
+                        onChange={(e) =>
+                          handleNewRowChange("monthYear", e.target.value)
+                        }
+                        className="w-full px-2.5 py-2.5 border border-primary-400 rounded-lg text-xs font-black outline-none focus:border-primary-500 bg-primary-50"
+                      >
+                        <option value="">Select month</option>
+                        {monthLabels.map((month) => (
+                          <option key={month} value={month}>
+                            {month}
+                          </option>
+                        ))}
+                      </select>
                     </td>
                     <td ref={customerAnchorRef} className="py-2 px-2">
                       <input
@@ -1761,7 +1740,7 @@ const PlanningScreen = () => {
               </table>
             </div>
           </>
-        )}
+
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
