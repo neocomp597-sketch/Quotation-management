@@ -169,7 +169,7 @@ const buildSummaryRows = (rows, columns, prevRows, flags = {}) => {
     });
     grandTotal.total = totalValue;
 
-    const percentageRow = { month: 'Percentage %', isPercentage: true };
+    const percentageRow = { month: 'Percentage CY', isPercentage: true };
     columns.forEach((column) => {
         percentageRow[column] = totalValue > 0 ? Number(((grandTotal[column] / totalValue) * 100).toFixed(2)) : 0;
     });
