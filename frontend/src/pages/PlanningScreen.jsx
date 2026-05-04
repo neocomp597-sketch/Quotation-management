@@ -2466,28 +2466,28 @@ const PlanningScreen = () => {
                   })}
                   {statusBreakdownSummaryRows.map((summaryRow) => {
                     const isYellowLabel = summaryRow.isTotal || summaryRow.isPreviousYearValue;
-                    const isBlueCells = summaryRow.isTotal || summaryRow.isTotalPercentage;
                     
                     return (
                       <tr
                         key={`status-breakdown-${summaryRow.key}`}
-                        className="border-b-2 border-slate-200"
+                        className={`border-b-2 border-slate-200 ${isYellowLabel ? "bg-amber-50" : "bg-slate-50"}`}
                       >
                         <td
                           colSpan={3}
                           className={`py-3 px-3 font-black text-slate-900 uppercase tracking-wider text-[11px] border-r border-slate-200 ${
-                            isYellowLabel ? "bg-amber-50" : "bg-slate-50"
+                            isYellowLabel ? "bg-amber-100/40" : "bg-slate-100/40"
                           }`}
                         >
                           {summaryRow.label}
                         </td>
                         {STATUS_REPORT_COLUMNS.map((column) => {
                           const cellValue = Number(summaryRow.values[column] || 0);
+                          const hasValue = cellValue > 0;
                           return (
                             <td
                               key={`${summaryRow.key}-${column}`}
                               className={`py-3 px-3 text-right font-black text-slate-900 border-r border-slate-200 ${
-                                isBlueCells ? "bg-blue-50/50" : "bg-slate-50/50"
+                                hasValue ? "bg-blue-100/60" : ""
                               }`}
                             >
                               {summaryRow.isPercentage || summaryRow.isTotalPercentage
@@ -2498,7 +2498,7 @@ const PlanningScreen = () => {
                         })}
                         <td
                           className={`py-3 px-3 text-right font-black text-slate-900 ${
-                            isBlueCells ? "bg-blue-100/40" : "bg-slate-100/40"
+                            Number(summaryRow.rowTotal || 0) > 0 ? "bg-blue-100/60" : (isYellowLabel ? "bg-amber-100/50" : "bg-slate-100/50")
                           }`}
                         >
                           {summaryRow.isPercentage || summaryRow.isTotalPercentage
