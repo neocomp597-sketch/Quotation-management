@@ -231,6 +231,7 @@ const PlanningScreen = () => {
   const [entries, setEntries] = useState([]);
   const [combinedReportData, setCombinedReportData] = useState(null);
   const [reportData2, setReportData2] = useState(null);
+  const [statusReportData, setStatusReportData] = useState(null);
   console.log({ reportData2 });
   const [loading, setLoading] = useState(false);
   const [totalEntries, setTotalEntries] = useState(0);
@@ -329,16 +330,18 @@ const PlanningScreen = () => {
         setEntries((prev) => [...prev, ...entriesRes.data.data]);
         setTotalEntries(entriesRes.data.total);
        } else {
-         const [entriesRes, sbuReportRes, segmentReportRes] = await Promise.all([
+         const [entriesRes, sbuReportRes, segmentReportRes, statusReportRes] = await Promise.all([
            planningService.getAll(params),
            planningService.getMGRReport(financialYear, "SBU", reportQuery),
            planningService.getMGRReport(financialYear, "SEGMENT", reportQuery),
+           planningService.getMGRReport(financialYear, "STATUS", reportQuery),
          ]);
 
          setEntries(entriesRes.data.data || []);
          setTotalEntries(entriesRes.data.total || 0);
          setCombinedReportData(sbuReportRes.data);
          setReportData2(segmentReportRes.data);
+         setStatusReportData(statusReportRes.data);
        }
     } catch (err) {
       console.error("Failed to load planning data:", err);
@@ -574,7 +577,8 @@ const PlanningScreen = () => {
     getProductCode,
   ]);
 
-  const statusBreakdownColumns = useMemo(() => {
+  const statusBreakdownColumns = STATUS_REPORT_COLUMNS;
+  const _unused_statusBreakdownColumns = useMemo(() => {
     const reportColumnSource =
       combinedReportData?.mgrColumns?.length > 0
         ? combinedReportData.mgrColumns
@@ -1977,7 +1981,7 @@ const PlanningScreen = () => {
                                 >
                                   {isPercentage || isTotalPercentage
                                     ? formatReportPercentage(cellValue)
-                                    : formatReportValue(cellValue, 0)}
+                                    : formatReportValue(cellValue, 3)}
                                 </td>
                               );
                             })}
@@ -1996,7 +2000,7 @@ const PlanningScreen = () => {
                             >
                               {isPercentage || isTotalPercentage
                                 ? formatReportPercentageTotal(row.total)
-                                : formatReportValue(row.total || 0, 0)}
+                                : formatReportValue(row.total || 0, 3)}
                             </td>
                           </tr>
                         );
@@ -2306,10 +2310,11 @@ const PlanningScreen = () => {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-amber-50 border-b border-amber-100">
-                    <th className="py-3 px-4 text-left font-black text-slate-900 min-w-[200px]">
-                      Month / Segment / Status
-                    </th>
+                  <tr className="bg-slate-100 border-b border-slate-200">
+                    <th className="py-3 px-4 text-left font-black text-slate-900 min-w-[120px]">Month</th>
+                    <th className="py-3 px-4 text-left font-black text-slate-900 min-w-[100px]">SBU/EPC</th>
+                    <th className="py-3 px-4 text-left font-black text-slate-900 min-w-[120px]">Segment</th>
+                    {/* Status/SBU/Segment columns */}
                     {statusBreakdownColumns.map((column) => (
                       <th
                         key={`status-breakdown-header-${column}`}
@@ -2352,12 +2357,12 @@ const PlanningScreen = () => {
                                 key={`${monthEntry.month}-col-${column}`}
                                 className={`py-3 px-4 text-right text-slate-900 ${totalValue > 0 ? "bg-blue-100" : ""}`}
                               >
-                                {formatReportValue(totalValue, 0)}
+                                {formatReportValue(totalValue, 3)}
                               </td>
                             );
                           })}
                           <td className="py-3 px-4 text-right text-slate-900 font-black bg-amber-100 border-l-2 border-amber-200">
-                            {formatReportValue(monthGrandTotal, 0)}
+                            {formatReportValue(monthGrandTotal, 3)}
                           </td>
                         </tr>
 
@@ -2383,12 +2388,12 @@ const PlanningScreen = () => {
                                       key={`${monthEntry.month}-${key}-${column}`}
                                       className={`py-3 px-4 text-right text-slate-700 ${cellValue > 0 ? "bg-blue-100" : ""}`}
                                     >
-                                      {formatReportValue(cellValue, 0)}
+                                      {formatReportValue(cellValue, 3)}
                                     </td>
                                   );
                                 })}
                                 <td className="py-3 px-4 text-right text-slate-700 font-bold bg-amber-50 border-l-2 border-amber-200">
-                                  {formatReportValue(rowTotal, 0)}
+                                  {formatReportValue(rowTotal, 3)}
                                 </td>
                               </tr>
                             );

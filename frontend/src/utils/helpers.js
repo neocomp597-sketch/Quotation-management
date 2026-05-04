@@ -24,10 +24,12 @@ export const calculateLineItem = (
 /**
  * Format currency to INR
  */
-export const formatCurrency = (amount) => {
+export const formatCurrency = (amount, decimals = 2) => {
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency: "INR",
+    maximumFractionDigits: decimals,
+    minimumFractionDigits: decimals,
   }).format(amount);
 };
 

@@ -39,7 +39,7 @@ const StatCard = ({ title, value, icon, trend, color, subValue, isTrendUp }) => 
 
         <div className="relative">
             <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest leading-none mb-3">{title}</h3>
-            <p className="text-3xl font-black text-slate-900 leading-none">{value}</p>
+            <p className="text-2xl font-black text-slate-900 leading-none">{value}</p>
             <p className="text-xs font-bold text-slate-400 mt-3">{subValue}</p>
         </div>
     </div>
@@ -102,7 +102,7 @@ const Dashboard = () => {
         },
         {
             title: "Business Pipeline",
-            value: formatCurrency(stats.totalValue),
+            value: formatCurrency(stats.totalValue, 0),
             desc: "Total quoted value",
             icon: <MdAttachMoney size={26} />,
             color: "bg-gradient-to-br from-primary-600 to-accent",
@@ -159,7 +159,7 @@ const Dashboard = () => {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-6 gap-6">
                 {statItems.map((stat, i) => (
                     <StatCard
                         key={i}
