@@ -17,7 +17,11 @@ const Layout = ({ children }) => {
             <Header sidebarOpen={sidebarOpen} toggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
 
             <main className={`relative z-10 pt-28 pb-12 transition-all duration-300 ${sidebarOpen ? 'md:ml-64' : 'md:ml-20'}`}>
+<<<<<<< HEAD
                 <div className="px-6 md:px-10 max-w-full mx-auto">
+=======
+                <div className="px-4 md:px-6 lg:px-8 max-w-[1600px] mx-auto">
+>>>>>>> babc1b5dca85e501b0e668d71fb9690cae2a04f5
                     {children}
                 </div>
             </main>
