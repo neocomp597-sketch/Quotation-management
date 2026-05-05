@@ -643,7 +643,6 @@ const PlanningScreen = () => {
 
     return visibleMonths.map(month => {
       const monthRows = sbuWise.filter(r => r.month === month);
-
       const sbus = Array.from(new Set(monthRows.map(r => normalizeSbuValue(r.sbu)))).filter(Boolean);
 
       const sbuGroups = sbus.map(sbu => {
@@ -660,7 +659,7 @@ const PlanningScreen = () => {
           });
           const total = Object.values(statuses).reduce((sum, v) => sum + v, 0);
           return { segment: seg, statuses, total };
-        });
+        }).filter(seg => seg.total > 0);
 
         const sbuTotalStatuses = {};
         STATUS_REPORT_COLUMNS.forEach(col => {
@@ -669,10 +668,16 @@ const PlanningScreen = () => {
         const sbuGrandTotal = Object.values(sbuTotalStatuses).reduce((sum, v) => sum + v, 0);
 
         return { sbu: sbuLabel, segmentGroups, sbuTotalStatuses, sbuGrandTotal };
-      });
+      }).filter(sbu => sbu.sbuGrandTotal > 0);
 
-      return { month, sbuGroups };
-    });
+      const monthTotalStatuses = {};
+      STATUS_REPORT_COLUMNS.forEach(col => {
+        monthTotalStatuses[col] = sbuGroups.reduce((sum, sbu) => sum + sbu.sbuTotalStatuses[col], 0);
+      });
+      const monthGrandTotal = Object.values(monthTotalStatuses).reduce((sum, v) => sum + v, 0);
+
+      return { month, sbuGroups, monthTotalStatuses, monthGrandTotal };
+    }).filter(month => month.sbuGroups.length > 0);
   }, [combinedReportData, monthLabels]);
 
   const statusBreakdownSummaryRows = useMemo(() => {
@@ -738,6 +743,23 @@ const PlanningScreen = () => {
       ] : [])
     ];
   }, [computedStatusBreakdownData, combinedReportData]);
+
+  const visibleStatusColumns = useMemo(() => {
+    if (!computedStatusBreakdownData) return [];
+    return STATUS_REPORT_COLUMNS.filter(col => {
+      // Check if any month/SBU/segment has data for this column
+      const hasDataInMain = computedStatusBreakdownData.some(month =>
+        month.sbuGroups.some(sbu => sbu.sbuTotalStatuses[col] > 0)
+      );
+      if (hasDataInMain) return true;
+
+      // Check summary rows
+      const hasDataInSummary = (statusBreakdownSummaryRows || []).some(row =>
+        Number(row.values[col] || 0) > 0
+      );
+      return hasDataInSummary;
+    });
+  }, [computedStatusBreakdownData, statusBreakdownSummaryRows]);
 
   useEffect(() => {
     if (computedStatusBreakdownData) {
@@ -1195,49 +1217,70 @@ const PlanningScreen = () => {
     }
 
     const workbook = XLSX.utils.book_new();
+    const columns = visibleStatusColumns;
 
-    const rows = [["Month", "Status", ...statusBreakdownColumns]];
+    const rows = [
+      ["Month", "SBU/EPC", "Segment", ...columns, "Total"]
+    ];
 
-    computedStatusBreakdownData.forEach((monthEntry) => {
-      STATUS_BREAKDOWN_ORDERED_ROWS.forEach(({ key, label }) => {
-        const row = monthEntry.statuses[key] || {};
+    computedStatusBreakdownData.forEach((monthData) => {
+      // Month Total row
+      rows.push([
+        monthData.month,
+        "",
+        "MONTH TOTAL",
+        ...columns.map((col) => monthData.monthTotalStatuses[col] || 0),
+        monthData.monthGrandTotal,
+      ]);
+
+      monthData.sbuGroups.forEach((sbuGroup) => {
+        sbuGroup.segmentGroups.forEach((seg, segIdx) => {
+          rows.push([
+            "",
+            segIdx === 0 ? sbuGroup.sbu : "",
+            seg.segment,
+            ...columns.map((col) => seg.statuses[col] || 0),
+            seg.total,
+          ]);
+        });
+
+        // Add SBU Total row
         rows.push([
-          monthEntry.month,
-          label,
-          ...statusBreakdownColumns.map((column) =>
-            formatReportValue(row[column] || 0, 0),
-          ),
+          "",
+          "",
+          `${sbuGroup.sbu} TOTAL`,
+          ...columns.map((col) => sbuGroup.sbuTotalStatuses[col] || 0),
+          sbuGroup.sbuGrandTotal,
         ]);
       });
-
-      // Add totals row for this month
-      const monthTotals = calculateMonthTotals(monthEntry);
-      rows.push([
-        monthEntry.month,
-        "TOTAL",
-        ...statusBreakdownColumns.map((column) =>
-          formatReportValue(monthTotals[column] || 0, 0),
-        ),
-      ]);
-      rows.push([]); // blank row for spacing
+      rows.push([]); // Empty row for spacing
     });
 
-    // Add grand total row
-    rows.push([]); // blank row before grand total
-    const grandTotals = calculateGrandTotals(computedStatusBreakdownData);
-    rows.push([
-      "",
-      "GRAND TOTAL",
-      ...statusBreakdownColumns.map((column) =>
-        formatReportValue(grandTotals[column] || 0, 0),
-      ),
-    ]);
+    // Add summary rows
+    statusBreakdownSummaryRows.forEach((summaryRow) => {
+      rows.push([
+        summaryRow.label,
+        "",
+        "",
+        ...columns.map((col) => {
+          const val = summaryRow.values[col] || 0;
+          return summaryRow.isPercentage || summaryRow.isTotalPercentage
+            ? `${val}%`
+            : val;
+        }),
+        summaryRow.isPercentage || summaryRow.isTotalPercentage
+          ? `${summaryRow.rowTotal}%`
+          : summaryRow.rowTotal,
+      ]);
+    });
 
     const sheet = XLSX.utils.aoa_to_sheet(rows);
     sheet["!cols"] = [
-      { wch: 16 },
+      { wch: 15 },
+      { wch: 15 },
       { wch: 20 },
-      ...statusBreakdownColumns.map(() => ({ wch: 16 })),
+      ...columns.map(() => ({ wch: 12 })),
+      { wch: 12 },
     ];
     XLSX.utils.book_append_sheet(workbook, sheet, "Status Breakdown Summary");
 
@@ -2356,7 +2399,7 @@ const PlanningScreen = () => {
                     <th className="py-2.5 px-3 text-left font-black text-slate-900 text-[11px] min-w-[90px] border-r border-slate-200">Month</th>
                     <th className="py-2.5 px-3 text-left font-black text-slate-900 text-[11px] min-w-[110px] border-r border-slate-200">SBU/EPC</th>
                     <th className="py-2.5 px-3 text-left font-black text-slate-900 text-[11px] min-w-[110px] border-r border-slate-200">Segment</th>
-                    {STATUS_REPORT_COLUMNS.map((column) => (
+                    {visibleStatusColumns.map((column) => (
                       <th
                         key={`status-breakdown-header-${column}`}
                         className="py-2.5 px-3 text-right font-black text-slate-900 text-[11px] min-w-[80px] border-r border-slate-200"
@@ -2376,23 +2419,31 @@ const PlanningScreen = () => {
                       <React.Fragment key={monthData.month}>
                         {/* Month Header Row */}
                         <tr
-                          className="bg-slate-50 border-b border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors"
+                          className="bg-blue-50 border-b border-blue-200 cursor-pointer hover:bg-blue-100/60 transition-colors font-bold"
                           onClick={() => toggleStatusBreakdownMonth(monthData.month)}
                         >
-                          <td className="py-2.5 px-3 text-slate-900 font-black uppercase tracking-wider text-[11px] flex items-center gap-2 border-r border-slate-200">
+                          <td className="py-2.5 px-3 text-slate-900 font-black uppercase tracking-wider text-[11px] flex items-center gap-2 border-r border-blue-200">
                             <MdKeyboardArrowDown
-                              className={`text-slate-500 transition-transform duration-200 ${!isMonthExpanded ? "-rotate-90" : ""}`}
+                              className={`text-slate-700 transition-transform duration-200 ${!isMonthExpanded ? "-rotate-90" : ""}`}
                               size={18}
                             />
                             {monthData.month}
                           </td>
-                          <td colSpan={STATUS_REPORT_COLUMNS.length + 3} className="bg-white/50"></td>
+                          <td className="py-2.5 px-3 border-r border-blue-200"></td>
+                          <td className="py-2.5 px-3 border-r border-blue-200 uppercase text-[10px] font-black text-blue-800">Month Total</td>
+                          {visibleStatusColumns.map(col => (
+                            <td key={col} className="py-2.5 px-3 text-right text-blue-900 border-r border-blue-200 font-black">
+                              {formatReportValue(monthData.monthTotalStatuses[col], 3)}
+                            </td>
+                          ))}
+                          <td className="py-2.5 px-3 text-right font-black text-blue-900 bg-blue-100/40">
+                            {formatReportValue(monthData.monthGrandTotal, 3)}
+                          </td>
                         </tr>
 
                         {isMonthExpanded && monthData.sbuGroups.map((sbuGroup, sIdx) => {
                           const sbuKey = `${monthData.month}-${sbuGroup.sbu}`;
                           const isSbuExpanded = expandedStatusBreakdownSbus[sbuKey];
-                          const fixedSegments = ["Export", "Industry", "UC", "Utility"];
 
                           return (
                             <React.Fragment key={sbuGroup.sbu}>
@@ -2409,25 +2460,20 @@ const PlanningScreen = () => {
                                   />
                                   {sbuGroup.sbu}
                                 </td>
-                                <td colSpan={STATUS_REPORT_COLUMNS.length + 2} className="bg-white/50"></td>
+                                <td colSpan={visibleStatusColumns.length + 2} className="bg-white/50"></td>
                               </tr>
 
                               {isSbuExpanded && (
                                 <>
-                                  {fixedSegments.map((segmentName) => {
-                                    const seg = sbuGroup.segmentGroups.find(g => g.segment === segmentName) || {
-                                      segment: segmentName,
-                                      statuses: {},
-                                      total: 0
-                                    };
+                                  {sbuGroup.segmentGroups.map((seg) => {
                                     return (
-                                      <tr key={`${monthData.month}-${sbuGroup.sbu}-${segmentName}`} className="border-b border-slate-200 hover:bg-slate-50/50 transition-colors">
+                                      <tr key={`${monthData.month}-${sbuGroup.sbu}-${seg.segment}`} className="border-b border-slate-200 hover:bg-slate-50/50 transition-colors">
                                         <td className="py-1.5 px-3 border-r border-slate-200"></td>
                                         <td className="py-1.5 px-3 border-r border-slate-200"></td>
                                         <td className="py-1.5 px-6 text-slate-800 font-black border-r border-slate-200 bg-white">
-                                          {segmentName}
+                                          {seg.segment}
                                         </td>
-                                        {STATUS_REPORT_COLUMNS.map(col => (
+                                        {visibleStatusColumns.map(col => (
                                           <td key={col} className="py-1.5 px-3 text-right text-slate-600 border-r border-slate-200 text-[13px]">
                                             {formatReportValue(seg.statuses[col], 3)}
                                           </td>
@@ -2443,7 +2489,7 @@ const PlanningScreen = () => {
                                     <td className="py-2 px-3 border-r border-slate-200"></td>
                                     <td className="py-2 px-3 border-r border-slate-200"></td>
                                     <td className="py-2 px-6 text-slate-900 border-r border-slate-200 uppercase tracking-tight text-[12px] font-black">SBU TOTAL</td>
-                                    {STATUS_REPORT_COLUMNS.map(col => (
+                                    {visibleStatusColumns.map(col => (
                                       <td key={col} className="py-2 px-3 text-right text-slate-900 border-r border-slate-200 font-black">
                                         {formatReportValue(sbuGroup.sbuTotalStatuses[col], 3)}
                                       </td>
@@ -2475,7 +2521,7 @@ const PlanningScreen = () => {
                         >
                           {summaryRow.label}
                         </td>
-                        {STATUS_REPORT_COLUMNS.map((column) => {
+                        {visibleStatusColumns.map((column) => {
                           const cellValue = Number(summaryRow.values[column] || 0);
                           const hasValue = cellValue > 0;
                           return (
