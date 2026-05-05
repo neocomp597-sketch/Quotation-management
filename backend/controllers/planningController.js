@@ -3,7 +3,7 @@ const MGR = require('../models/MGR');
 
 const escapeRegex = (value = '') => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const cleanValue = (value = '') => String(value ?? '').trim().replace(/\s+/g, ' ');
-const normalizeCodeKey = (value = '') => cleanValue(value).toUpperCase();
+const normalizeCodeKey = (value = '') => String(value ?? '').trim().replace(/\s+/g, '').toUpperCase();
 
 const STATUS_COLUMNS = ['Firm', 'MFC', 'B & B', 'Others', 'Invoice', 'Lost', 'Parked', 'Order Received'];
 const STATUS_ALIASES = {
@@ -112,8 +112,21 @@ const buildEmptyStatusTotals = () => {
     return row;
 };
 const buildStatusBreakdown = (sourceEntries = []) => {
-    const breakdown = {};
+    const totalRow = buildEmptyStatusTotals();
 
+    // First calculate status-wise totals for all entries (The Grand Total)
+    STATUS_COLUMNS.forEach((status) => {
+        const label = getLabelForColumn(status);
+        const value = sourceEntries
+            .filter((entry) => normalizeStatusValue(entry.status) === status)
+            .reduce((acc, entry) => acc + getMeasureForEntry(entry, 'value'), 0);
+        totalRow[label] = value;
+        totalRow.total += value;
+    });
+
+    const breakdown = { Total: totalRow };
+
+    // Then calculate for individual segments
     STATUS_SEGMENTS.forEach((segment) => {
         const segmentEntries = sourceEntries.filter((entry) => normalizeCodeKey(entry.mgrCode2) === normalizeCodeKey(segment));
         const segmentRow = buildEmptyStatusTotals();
@@ -130,14 +143,6 @@ const buildStatusBreakdown = (sourceEntries = []) => {
         breakdown[segment] = segmentRow;
     });
 
-    const totalRow = buildEmptyStatusTotals();
-    STATUS_COLUMNS.forEach((status) => {
-        const label = getLabelForColumn(status);
-        totalRow[label] = STATUS_SEGMENTS.reduce((acc, segment) => acc + Number(breakdown[segment][label] || 0), 0);
-        totalRow.total += totalRow[label];
-    });
-    breakdown.Total = totalRow;
-
     return breakdown;
 };
 
@@ -146,7 +151,7 @@ const getMeasureForEntry = (entry, metric) => {
         return 1;
     }
 
-    return Number(entry.totalValue || 0);
+    return Number(entry.totalValue || (Number(entry.qty || 0) * Number(entry.value || 0)));
 };
 
 const buildColumnGroups = (entries, field, fallbackLabel, masterMap) => {
@@ -570,6 +575,7 @@ exports.getMGRReport = async (req, res) => {
                 matchesSource: entries.reduce((acc, entry) => acc + getMeasureForEntry(entry, 'value'), 0) === Number(summaryRows.find((row) => row.isTotal)?.total || 0)
             },
             sbuWise,
+            prevYearStatusTotals: buildStatusBreakdown(prevEntries).Total,
             rows: reportRows
         });
     } catch (err) {

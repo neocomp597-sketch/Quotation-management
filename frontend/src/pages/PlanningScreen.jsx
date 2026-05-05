@@ -642,7 +642,7 @@ const PlanningScreen = () => {
     const sbuWise = combinedReportData?.sbuWise || [];
 
     return visibleMonths.map(month => {
-      const monthRows = sbuWise.filter(r => r.month === month);
+      const monthRows = sbuWise.filter(r => r.month?.toUpperCase() === month?.toUpperCase());
       const sbus = Array.from(new Set(monthRows.map(r => normalizeSbuValue(r.sbu)))).filter(Boolean);
 
       const sbuGroups = sbus.map(sbu => {
@@ -677,7 +677,7 @@ const PlanningScreen = () => {
       const monthGrandTotal = Object.values(monthTotalStatuses).reduce((sum, v) => sum + v, 0);
 
       return { month, sbuGroups, monthTotalStatuses, monthGrandTotal };
-    }).filter(month => month.sbuGroups.length > 0);
+    });
   }, [combinedReportData, monthLabels]);
 
   const statusBreakdownSummaryRows = useMemo(() => {
@@ -699,12 +699,20 @@ const PlanningScreen = () => {
     });
     percentageRow.total = grandTotalValue > 0 ? 100 : 0;
 
-    const prevYearRow = (combinedReportData?.rows || []).find(r => r.isPreviousYearValue);
+    const prevYearStatusTotals = combinedReportData?.prevYearStatusTotals || {};
+    const prevYearTotal = Number(prevYearStatusTotals.total || 0);
+
+    const percentagePYRow = {};
+    STATUS_REPORT_COLUMNS.forEach(col => {
+      percentagePYRow[col] = prevYearTotal > 0
+        ? Number(((Number(prevYearStatusTotals[col] || 0) / prevYearTotal) * 100).toFixed(2))
+        : 0;
+    });
 
     return [
       {
         key: "total",
-        label: "Total",
+        label: "TOTAL",
         isTotal: true,
         values: grandTotals,
         rowTotal: grandTotalValue,
@@ -716,31 +724,20 @@ const PlanningScreen = () => {
         values: percentageRow,
         rowTotal: percentageRow.total,
       },
-      ...(prevYearRow ? [
-        {
-          key: "prev-year",
-          label: "Value (Previous Year)",
-          isPreviousYearValue: true,
-          values: prevYearRow,
-          rowTotal: prevYearRow.total || 0,
-        },
-        {
-          key: "prev-percentage",
-          label: "Percentage PY",
-          isTotalPercentage: true,
-          values: (() => {
-            const pValues = {};
-            const pTotal = Number(prevYearRow?.total || 0);
-            STATUS_REPORT_COLUMNS.forEach(col => {
-              pValues[col] = pTotal > 0
-                ? Number(((Number(prevYearRow[col] || 0) / pTotal) * 100).toFixed(2))
-                : 0;
-            });
-            return pValues;
-          })(),
-          rowTotal: Number(prevYearRow?.total || 0) > 0 ? 100 : 0,
-        }
-      ] : [])
+      {
+        key: "prev-year",
+        label: "Value (Previous Year)",
+        isPreviousYearValue: true,
+        values: prevYearStatusTotals,
+        rowTotal: prevYearTotal,
+      },
+      {
+        key: "prev-percentage",
+        label: "Percentage PY",
+        isTotalPercentage: true,
+        values: percentagePYRow,
+        rowTotal: prevYearTotal > 0 ? 100 : 0,
+      }
     ];
   }, [computedStatusBreakdownData, combinedReportData]);
 
@@ -1228,7 +1225,7 @@ const PlanningScreen = () => {
       rows.push([
         monthData.month,
         "",
-        "MONTH TOTAL",
+        "",
         ...columns.map((col) => monthData.monthTotalStatuses[col] || 0),
         monthData.monthGrandTotal,
       ]);
@@ -2419,24 +2416,24 @@ const PlanningScreen = () => {
                       <React.Fragment key={monthData.month}>
                         {/* Month Header Row */}
                         <tr
-                          className="bg-blue-50 border-b border-blue-200 cursor-pointer hover:bg-blue-100/60 transition-colors font-bold"
+                          className="bg-slate-100/50 border-b border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors font-bold"
                           onClick={() => toggleStatusBreakdownMonth(monthData.month)}
                         >
-                          <td className="py-2.5 px-3 text-slate-900 font-black uppercase tracking-wider text-[11px] flex items-center gap-2 border-r border-blue-200">
+                          <td className="py-2.5 px-3 text-slate-900 font-black uppercase tracking-wider text-[11px] flex items-center gap-2 border-r border-slate-200">
                             <MdKeyboardArrowDown
-                              className={`text-slate-700 transition-transform duration-200 ${!isMonthExpanded ? "-rotate-90" : ""}`}
+                              className={`text-slate-500 transition-transform duration-200 ${!isMonthExpanded ? "-rotate-90" : ""}`}
                               size={18}
                             />
                             {monthData.month}
                           </td>
-                          <td className="py-2.5 px-3 border-r border-blue-200"></td>
-                          <td className="py-2.5 px-3 border-r border-blue-200 uppercase text-[10px] font-black text-blue-800">Month Total</td>
+                          <td className="py-2.5 px-3 border-r border-slate-200"></td>
+                          <td className="py-2.5 px-3 border-r border-slate-200"></td>
                           {visibleStatusColumns.map(col => (
-                            <td key={col} className="py-2.5 px-3 text-right text-blue-900 border-r border-blue-200 font-black">
+                            <td key={col} className="py-2.5 px-3 text-right text-slate-900 border-r border-slate-200 font-black">
                               {formatReportValue(monthData.monthTotalStatuses[col], 3)}
                             </td>
                           ))}
-                          <td className="py-2.5 px-3 text-right font-black text-blue-900 bg-blue-100/40">
+                          <td className="py-2.5 px-3 text-right font-black text-slate-900 bg-slate-200/50">
                             {formatReportValue(monthData.monthGrandTotal, 3)}
                           </td>
                         </tr>
