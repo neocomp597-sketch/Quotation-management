@@ -2393,18 +2393,18 @@ const PlanningScreen = () => {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-slate-100 border-b border-slate-300">
-                    <th className="py-2.5 px-3 text-left font-black text-slate-900 text-[11px] min-w-[90px] border-r border-slate-200">Month</th>
-                    <th className="py-2.5 px-3 text-left font-black text-slate-900 text-[11px] min-w-[110px] border-r border-slate-200">SBU/EPC</th>
-                    <th className="py-2.5 px-3 text-left font-black text-slate-900 text-[11px] min-w-[110px] border-r border-slate-200">Segment</th>
+                    <th className="py-3 px-3 text-left font-black text-slate-900 text-[11px] min-w-[90px] border-r border-slate-200">Month</th>
+                    <th className="py-3 px-3 text-left font-black text-slate-900 text-[11px] min-w-[110px] border-r border-slate-200">SBU/EPC</th>
+                    <th className="py-3 px-3 text-left font-black text-slate-900 text-[11px] min-w-[110px] border-r border-slate-200">Segment</th>
                     {visibleStatusColumns.map((column) => (
                       <th
                         key={`status-breakdown-header-${column}`}
-                        className="py-2.5 px-3 text-right font-black text-slate-900 text-[11px] min-w-[80px] border-r border-slate-200"
+                        className="py-3 px-3 text-right font-black text-slate-900 text-[11px] min-w-[80px] border-r border-slate-200"
                       >
                         {column}
                       </th>
                     ))}
-                    <th className="py-2.5 px-3 text-right font-black text-slate-900 text-[11px] min-w-[90px] bg-slate-200/50 border-r border-slate-200">
+                    <th className="py-3 px-3 text-right font-black text-slate-900 text-[11px] min-w-[90px] bg-slate-200/50 border-r border-slate-200">
                       Total
                     </th>
                   </tr>

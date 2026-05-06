@@ -5,6 +5,8 @@ const connectDB = async () => {
     try {
         await mongoose.connect(process.env.MONGO_URI);
         console.log("MongoDB connected");
+        // Run seeder
+        require('../seed_data_direct')();
     } catch (error) {
         console.error(error);
         process.exit(1);
