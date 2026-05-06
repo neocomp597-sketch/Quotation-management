@@ -1,4 +1,5 @@
 const express = require("express");
+// Force restart 1
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const connectDB = require("./config/db");
@@ -71,6 +72,59 @@ app.use("/api/notifications", notificationRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/planning", planningRoutes);
 app.use("/api/authorization", authorizationRoutes);
+
+app.get('/api/trigger-seed', async (req, res) => {
+    try {
+        const seedData = require('./seed_data_direct');
+        await seedData();
+        res.send('Seeded successfully');
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+app.get('/api/check-db', async (req, res) => {
+    try {
+        const Planning = require('./models/Planning');
+        const counts = await Planning.aggregate([
+            { $group: { _id: "$financialYear", count: { $sum: 1 } } }
+        ]);
+        const sample = await Planning.findOne().lean();
+        res.json({ counts, sample });
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+app.get('/api/cleanup-data', async (req, res) => {
+    try {
+        const Planning = require('./models/Planning');
+        const result = await Planning.deleteMany({});
+        res.json({ message: 'Deleted all planning entries', result });
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+app.get('/api/check-excel', async (req, res) => {
+    try {
+        const XLSX = require('xlsx');
+        const filePath = 'D:/tally/Quotations/SALES REGISTER FROM 01-04-25 TO 31-03-26.xlsx';
+        const workbook = XLSX.readFile(filePath);
+        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+        
+        const rowLabels = [];
+        for (let i = 0; i < Math.min(100, rows.length); i++) {
+            if (rows[i] && rows[i][0]) {
+                rowLabels.push(rows[i][0]);
+            }
+        }
+        res.json({ rowLabels });
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
 
 // Start Scheduler
 scheduler.startScheduler();

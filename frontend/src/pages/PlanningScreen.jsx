@@ -1910,8 +1910,7 @@ const PlanningScreen = () => {
           </button>
         </div>
 
-        {isReportExpanded &&
-          (combinedReportData && combinedReportData.mgrCodes?.length > 0 ? (
+        {isReportExpanded && (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead>
@@ -1919,7 +1918,7 @@ const PlanningScreen = () => {
                     <th className="py-3 px-4 font-bold text-slate-700 text-left min-w-[200px]">
                       Month / Segment
                     </th>
-                    {combinedReportData.mgrCodes.map((sbu) => (
+                    {(combinedReportData?.mgrCodes?.length > 0 ? combinedReportData.mgrCodes : ['EPC', 'SBU1', 'SBU2', 'SBU3']).map((sbu) => (
                       <th
                         key={sbu}
                         className="py-3 px-4 font-bold text-slate-700 text-right min-w-[100px] border-l border-slate-300"
@@ -1934,16 +1933,17 @@ const PlanningScreen = () => {
                 </thead>
                 <tbody>
                   {(() => {
-                    const monthRows = (combinedReportData.rows || []).filter(
+                    const mgrCodes = combinedReportData?.mgrCodes?.length > 0 ? combinedReportData.mgrCodes : ['EPC', 'SBU1', 'SBU2', 'SBU3'];
+                    const monthRows = (combinedReportData?.rows || []).filter(
                       (row) => row.isMonth && !row.isSegment
                     );
-                    const segmentRows = (combinedReportData.rows || []).filter(
+                    const segmentRows = (combinedReportData?.rows || []).filter(
                       (row) => row.isSegment
                     );
                     const visibleMonths =
-                      combinedReportData.monthLabels?.length > 0
+                      combinedReportData?.monthLabels?.length > 0
                         ? combinedReportData.monthLabels
-                        : monthRows.map((r) => r.monthLabel || r.month);
+                        : (monthRows.length > 0 ? monthRows.map((r) => r.monthLabel || r.month) : monthLabels);
 
                     return visibleMonths.map((monthLabel) => {
                       const monthRow = monthRows.find(
@@ -1971,7 +1971,7 @@ const PlanningScreen = () => {
                                 </span>
                               </div>
                             </td>
-                            {combinedReportData.mgrCodes.map((sbu) => {
+                            {mgrCodes.map((sbu) => {
                               const cellValue = Number(monthRow[sbu] || 0);
                               return (
                                 <td
@@ -1990,7 +1990,7 @@ const PlanningScreen = () => {
                           </tr>
 
                           {/* SEGMENT ROWS (shown when month is expanded) */}
-                          {expandedSbuWiseMonths[monthLabel] &&
+                          {expandedSbuWiseMonths[monthLabel] && (monthSegments.length > 0 ?
                             monthSegments.map((segRow) => (
                               <tr
                                 key={`${monthLabel}-${segRow.month}`}
@@ -1999,7 +1999,7 @@ const PlanningScreen = () => {
                                 <td className="py-3 px-4 text-slate-900 font-bold pl-12">
                                   {segRow.month}
                                 </td>
-                                {combinedReportData.mgrCodes.map((sbu) => {
+                                {mgrCodes.map((sbu) => {
                                   const val = Number(segRow[sbu] || 0);
                                   return (
                                     <td
@@ -2014,96 +2014,114 @@ const PlanningScreen = () => {
                                   {formatReportValue(segRow.total || 0, 0)}
                                 </td>
                               </tr>
-                            ))}
+                            )) : (
+                              ['Export', 'Industry', 'UC', 'Utility'].map(seg => (
+                                <tr
+                                  key={`${monthLabel}-${seg}`}
+                                  className="border-b border-slate-100 hover:bg-slate-50"
+                                >
+                                  <td className="py-3 px-4 text-slate-900 font-bold pl-12">
+                                    {seg}
+                                  </td>
+                                  {mgrCodes.map((sbu) => (
+                                    <td
+                                      key={`${monthLabel}-${seg}-${sbu}`}
+                                      className="py-3 px-4 text-right border-l border-slate-200 font-semibold text-slate-700"
+                                    >
+                                      -
+                                    </td>
+                                  ))}
+                                  <td className="py-3 px-4 text-right border-l border-slate-300 bg-slate-50 font-bold text-slate-900">
+                                    -
+                                  </td>
+                                </tr>
+                              ))
+                            )
+                          )}
                         </React.Fragment>
                       );
                     });
                   })()}
 
                   {/* SUMMARY ROWS */}
-                  {combinedReportData && combinedReportData.mgrCodes?.length > 0 &&
-                    (() => {
-                      const summaryRowsInOrder = [
-                        (combinedReportData.rows || []).find((row) => row.isTotal),
-                        (combinedReportData.rows || []).find((row) => row.isPercentage),
-                        (combinedReportData.rows || []).find(
-                          (row) => row.isPreviousYearValue,
-                        ),
-                        (combinedReportData.rows || []).find(
-                          (row) => row.isTotalPercentage,
-                        ),
-                      ].filter(Boolean);
+                  {(() => {
+                    const mgrCodes = combinedReportData?.mgrCodes?.length > 0 ? combinedReportData.mgrCodes : ['EPC', 'SBU1', 'SBU2', 'SBU3'];
+                    const summaryRowsInOrder = combinedReportData ? [
+                      (combinedReportData.rows || []).find((row) => row.isTotal),
+                      (combinedReportData.rows || []).find((row) => row.isPercentage),
+                      (combinedReportData.rows || []).find(
+                        (row) => row.isPreviousYearValue,
+                      ),
+                      (combinedReportData.rows || []).find(
+                        (row) => row.isTotalPercentage,
+                      ),
+                    ].filter(Boolean) : [
+                      { month: 'Total', isTotal: true, total: 0 },
+                      { month: 'Percentage CY', isPercentage: true, total: 0 },
+                      { month: 'Value (Previous Year)', isPreviousYearValue: true, total: 0 },
+                      { month: 'Percentage PY', isTotalPercentage: true, total: 0 },
+                    ];
 
-                      return summaryRowsInOrder.map((row) => {
-                        const isTotal = row.isTotal;
-                        const isPercentage = row.isPercentage;
-                        const isPreviousYearValue = row.isPreviousYearValue;
-                        const isTotalPercentage = row.isTotalPercentage;
+                    return summaryRowsInOrder.map((row) => {
+                      const isTotal = row.isTotal;
+                      const isPercentage = row.isPercentage;
+                      const isPreviousYearValue = row.isPreviousYearValue;
+                      const isTotalPercentage = row.isTotalPercentage;
 
-                        return (
-                          <tr
-                            key={`sbu-summary-${row.month}`}
-                            className={`border-b transition-colors ${isTotal
-                                ? "bg-amber-50 border-amber-200 font-black"
-                                : isPreviousYearValue
-                                  ? "bg-amber-100/70 border-amber-200 font-bold"
-                                  : isPercentage || isTotalPercentage
-                                    ? "bg-slate-50 border-slate-200"
-                                    : "border-slate-50 hover:bg-slate-50"
-                              }`}
+                      return (
+                        <tr
+                          key={`sbu-summary-${row.month}`}
+                          className={`border-b transition-colors ${isTotal
+                            ? "bg-amber-50 border-amber-200 font-black"
+                            : isPreviousYearValue
+                              ? "bg-amber-100/70 border-amber-200 font-bold"
+                              : isPercentage || isTotalPercentage
+                                ? "bg-slate-50 border-slate-200"
+                                : "border-slate-50 hover:bg-slate-50"
+                            }`}
+                        >
+                          <td
+                            className={`py-3 px-4 ${isTotal || isPercentage || isPreviousYearValue || isTotalPercentage ? "font-black text-slate-900" : "font-semibold text-slate-600"}`}
                           >
-                            <td
-                              className={`py-3 px-4 ${isTotal || isPercentage || isPreviousYearValue || isTotalPercentage ? "font-black text-slate-900" : "font-semibold text-slate-600"}`}
-                            >
-                              {isPercentage ? "Percentage CY" : row.month}
-                            </td>
-                            {combinedReportData.mgrCodes.map((sbu) => {
-                              const cellValue = Number(row[sbu] || 0);
-                              return (
-                                <td
-                                  key={`sbu-summary-${row.month}-${sbu}`}
-                                  className={`py-3 px-4 text-right border-l border-slate-200 ${isTotal || isPercentage || isPreviousYearValue || isTotalPercentage ? "font-bold text-slate-900" : "text-slate-700"} ${cellValue > 0 ? "bg-blue-100/60" : ""}`}
-                                >
-                                  {isPercentage || isTotalPercentage
-                                    ? formatReportPercentage(cellValue)
-                                    : formatReportValue(cellValue, 3)}
-                                </td>
-                              );
-                            })}
-                            <td
-                              className={`py-3 px-4 text-right border-l border-slate-300 ${Number(row.total || 0) > 0
-                                  ? "bg-blue-100/60"
-                                  : isTotal
-                                    ? "bg-amber-100"
-                                    : isPreviousYearValue
-                                      ? "bg-amber-200/80"
-                                      : isPercentage || isTotalPercentage
-                                        ? "bg-slate-100"
-                                        : "bg-amber-50/50"
-                                } ${isTotal ? "font-black" : "font-bold"} text-slate-900`}
-                            >
-                              {isPercentage || isTotalPercentage
-                                ? formatReportPercentageTotal(row.total)
-                                : formatReportValue(row.total || 0, 3)}
-                            </td>
-                          </tr>
-                        );
-                      });
-                    })()}
-
-
+                            {isPercentage ? "Percentage CY" : row.month}
+                          </td>
+                          {mgrCodes.map((sbu) => {
+                            const cellValue = Number(row[sbu] || 0);
+                            return (
+                              <td
+                                key={`sbu-summary-${row.month}-${sbu}`}
+                                className={`py-3 px-4 text-right border-l border-slate-200 ${isTotal || isPercentage || isPreviousYearValue || isTotalPercentage ? "font-bold text-slate-900" : "text-slate-700"} ${cellValue > 0 ? "bg-blue-100/60" : ""}`}
+                              >
+                                {isPercentage || isTotalPercentage
+                                  ? formatReportPercentage(cellValue)
+                                  : formatReportValue(cellValue, 3)}
+                              </td>
+                            );
+                          })}
+                          <td
+                            className={`py-3 px-4 text-right border-l border-slate-300 ${Number(row.total || 0) > 0
+                              ? "bg-blue-100/60"
+                              : isTotal
+                                ? "bg-amber-100"
+                                : isPreviousYearValue
+                                  ? "bg-amber-200/80"
+                                  : isPercentage || isTotalPercentage
+                                    ? "bg-slate-100"
+                                    : "bg-amber-50/50"
+                            } ${isTotal ? "font-black" : "font-bold"} text-slate-900`}
+                          >
+                            {isPercentage || isTotalPercentage
+                              ? formatReportPercentageTotal(row.total)
+                              : formatReportValue(row.total || 0, 3)}
+                          </td>
+                        </tr>
+                      );
+                    });
+                  })()}
                 </tbody>
               </table>
             </div>
-          ) : (
-            <div className="p-10 text-center text-slate-400 font-bold">
-              {loading ? (
-                <div className="animate-spin border-4 border-slate-200 border-t-primary-600 rounded-full h-8 w-8 mx-auto"></div>
-              ) : (
-                "No data available. Add planning entries above to generate the SBU Wise report."
-              )}
-            </div>
-          ))}
+          )}
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
@@ -2132,8 +2150,7 @@ const PlanningScreen = () => {
           </button>
         </div>
 
-        {isReportExpanded2 &&
-          (reportData2 && reportData2.mgrCodes.length > 0 ? (
+        {isReportExpanded2 && (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead>
@@ -2141,7 +2158,7 @@ const PlanningScreen = () => {
                     <th className="py-3 px-4 font-black text-slate-700 min-w-[160px]">
                       Month
                     </th>
-                    {reportData2.mgrCodes.map((mgr) => (
+                    {(reportData2?.mgrCodes?.length > 0 ? reportData2.mgrCodes : ['Export', 'Industry', 'UC', 'Utility']).map((mgr) => (
                       <th
                         key={mgr}
                         className="py-3 px-4 font-black text-slate-700 text-right min-w-[100px]"
@@ -2156,15 +2173,16 @@ const PlanningScreen = () => {
                 </thead>
                 <tbody>
                   {(() => {
+                    const mgrCodes = reportData2?.mgrCodes?.length > 0 ? reportData2.mgrCodes : ['Export', 'Industry', 'UC', 'Utility'];
                     const monthRowsByLabel = new Map(
-                      (reportData2.rows || [])
+                      (reportData2?.rows || [])
                         .filter((row) => row.isMonth && !row.isSegment)
                         .map((row) => [row.monthLabel || row.month, row]),
                     );
                     const segmentMonthLabels =
-                      reportData2.monthLabels?.length > 0
+                      reportData2?.monthLabels?.length > 0
                         ? reportData2.monthLabels
-                        : Array.from(monthRowsByLabel.keys());
+                        : (monthRowsByLabel.size > 0 ? Array.from(monthRowsByLabel.keys()) : monthLabels);
 
                     return segmentMonthLabels.map((monthLabel) => {
                       const monthRow = monthRowsByLabel.get(monthLabel) || {
@@ -2187,7 +2205,7 @@ const PlanningScreen = () => {
                                 {monthRow.month}
                               </div>
                             </td>
-                            {reportData2.mgrCodes.map((mgr) => {
+                            {mgrCodes.map((mgr) => {
                               const cellValue = Number(monthRow[mgr] || 0);
                               return (
                                 <td
@@ -2206,7 +2224,6 @@ const PlanningScreen = () => {
                           </tr>
                           {expandedSegmentMonths[monthLabel] &&
                             (() => {
-                              // Build SBU-level rows from sbuWise for this month
                               const sbuMap = new Map();
                               const resolveSbuLabel = (value) => {
                                 const normalized = normalizeSbuValue(value);
@@ -2242,6 +2259,31 @@ const PlanningScreen = () => {
                                   entry.total += Number(r.value || 0);
                                 });
                               const sbuRows = Array.from(sbuMap.values());
+                              
+                              if (sbuRows.length === 0) {
+                                return ['EPC', 'SBU1', 'SBU2', 'SBU3'].map(sbu => (
+                                  <tr
+                                    key={`${monthLabel}-${sbu}`}
+                                    className="border-b border-slate-100 hover:bg-slate-50"
+                                  >
+                                    <td className="py-3 px-4 text-slate-900 font-bold pl-12">
+                                      <span>{sbu}</span>
+                                    </td>
+                                    {mgrCodes.map((mgr) => (
+                                      <td
+                                        key={mgr}
+                                        className="py-3 px-4 text-right text-slate-700"
+                                      >
+                                        -
+                                      </td>
+                                    ))}
+                                    <td className="py-3 px-4 text-right text-slate-900 font-bold bg-amber-50/50">
+                                      -
+                                    </td>
+                                  </tr>
+                                ));
+                              }
+
                               return sbuRows.map((row) => (
                                 <tr
                                   key={`${monthLabel}-${row.normalizedSbu}`}
@@ -2250,7 +2292,7 @@ const PlanningScreen = () => {
                                   <td className="py-3 px-4 text-slate-900 font-bold pl-12">
                                     <span>{row.sbu}</span>
                                   </td>
-                                  {reportData2.mgrCodes.map((mgr) => {
+                                  {mgrCodes.map((mgr) => {
                                     const val = Number(row.values[mgr] || 0);
                                     return (
                                       <td
@@ -2274,7 +2316,8 @@ const PlanningScreen = () => {
                     });
                   })()}
                   {(() => {
-                    const summaryRowsInOrder = [
+                    const mgrCodes = reportData2?.mgrCodes?.length > 0 ? reportData2.mgrCodes : ['Export', 'Industry', 'UC', 'Utility'];
+                    const summaryRowsInOrder = reportData2 ? [
                       (reportData2.rows || []).find((row) => row.isTotal),
                       (reportData2.rows || []).find((row) => row.isPercentage),
                       (reportData2.rows || []).find(
@@ -2283,7 +2326,12 @@ const PlanningScreen = () => {
                       (reportData2.rows || []).find(
                         (row) => row.isTotalPercentage,
                       ),
-                    ].filter(Boolean);
+                    ].filter(Boolean) : [
+                      { month: 'Total', isTotal: true, total: 0 },
+                      { month: 'Percentage CY', isPercentage: true, total: 0 },
+                      { month: 'Value (Previous Year)', isPreviousYearValue: true, total: 0 },
+                      { month: 'Percentage PY', isTotalPercentage: true, total: 0 },
+                    ];
 
                     return summaryRowsInOrder.map((row) => {
                       const isTotal = row.isTotal;
@@ -2308,7 +2356,7 @@ const PlanningScreen = () => {
                           >
                             {isPercentage ? "Percentage CY" : row.month}
                           </td>
-                          {reportData2.mgrCodes.map((mgr) => {
+                          {mgrCodes.map((mgr) => {
                             const cellValue = Number(row[mgr] || 0);
                             return (
                               <td
@@ -2344,15 +2392,7 @@ const PlanningScreen = () => {
                 </tbody>
               </table>
             </div>
-          ) : (
-            <div className="p-10 text-center text-slate-400 font-bold">
-              {loading ? (
-                <div className="animate-spin border-4 border-slate-200 border-t-primary-600 rounded-full h-8 w-8 mx-auto"></div>
-              ) : (
-                "No data available for Segment Wise. Add entries with MGR 2 codes to generate this report."
-              )}
-            </div>
-          ))}
+          )}
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
@@ -2386,9 +2426,7 @@ const PlanningScreen = () => {
           </button>
         </div>
 
-        {isStatusBreakdownExpanded &&
-          (computedStatusBreakdownData &&
-            computedStatusBreakdownData.length > 0 ? (
+        {isStatusBreakdownExpanded && (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -2396,7 +2434,7 @@ const PlanningScreen = () => {
                     <th className="py-3 px-3 text-left font-black text-slate-900 text-[11px] min-w-[90px] border-r border-slate-200">Month</th>
                     <th className="py-3 px-3 text-left font-black text-slate-900 text-[11px] min-w-[110px] border-r border-slate-200">SBU/EPC</th>
                     <th className="py-3 px-3 text-left font-black text-slate-900 text-[11px] min-w-[110px] border-r border-slate-200">Segment</th>
-                    {visibleStatusColumns.map((column) => (
+                    {(visibleStatusColumns.length > 0 ? visibleStatusColumns : STATUS_REPORT_COLUMNS).map((column) => (
                       <th
                         key={`status-breakdown-header-${column}`}
                         className="py-3 px-3 text-right font-black text-slate-900 text-[11px] min-w-[80px] border-r border-slate-200"
@@ -2410,8 +2448,10 @@ const PlanningScreen = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {computedStatusBreakdownData.map((monthData, mIdx) => {
+                  {(computedStatusBreakdownData?.length > 0 ? computedStatusBreakdownData : []).map((monthData, mIdx) => {
                     const isMonthExpanded = expandedStatusBreakdownMonths[monthData.month];
+                    const statusCols = visibleStatusColumns.length > 0 ? visibleStatusColumns : STATUS_REPORT_COLUMNS;
+                    
                     return (
                       <React.Fragment key={monthData.month}>
                         {/* Month Header Row */}
@@ -2428,17 +2468,22 @@ const PlanningScreen = () => {
                           </td>
                           <td className="py-2.5 px-3 border-r border-slate-200"></td>
                           <td className="py-2.5 px-3 border-r border-slate-200"></td>
-                          {visibleStatusColumns.map(col => (
+                          {statusCols.map(col => (
                             <td key={col} className="py-2.5 px-3 text-right text-slate-900 border-r border-slate-200 font-black">
-                              {formatReportValue(monthData.monthTotalStatuses[col], 3)}
+                              {formatReportValue(monthData.monthTotalStatuses?.[col] || 0, 3)}
                             </td>
                           ))}
                           <td className="py-2.5 px-3 text-right font-black text-slate-900 bg-slate-200/50">
-                            {formatReportValue(monthData.monthGrandTotal, 3)}
+                            {formatReportValue(monthData.monthGrandTotal || 0, 3)}
                           </td>
                         </tr>
 
-                        {isMonthExpanded && monthData.sbuGroups.map((sbuGroup, sIdx) => {
+                        {isMonthExpanded && (monthData.sbuGroups?.length > 0 ? monthData.sbuGroups : [
+                          { sbu: 'EPC', segmentGroups: [], sbuTotalStatuses: {}, sbuGrandTotal: 0 },
+                          { sbu: 'SBU1', segmentGroups: [], sbuTotalStatuses: {}, sbuGrandTotal: 0 },
+                          { sbu: 'SBU2', segmentGroups: [], sbuTotalStatuses: {}, sbuGrandTotal: 0 },
+                          { sbu: 'SBU3', segmentGroups: [], sbuTotalStatuses: {}, sbuGrandTotal: 0 }
+                        ]).map((sbuGroup, sIdx) => {
                           const sbuKey = `${monthData.month}-${sbuGroup.sbu}`;
                           const isSbuExpanded = expandedStatusBreakdownSbus[sbuKey];
 
@@ -2457,12 +2502,17 @@ const PlanningScreen = () => {
                                   />
                                   {sbuGroup.sbu}
                                 </td>
-                                <td colSpan={visibleStatusColumns.length + 2} className="bg-white/50"></td>
+                                <td colSpan={statusCols.length + 2} className="bg-white/50"></td>
                               </tr>
 
                               {isSbuExpanded && (
                                 <>
-                                  {sbuGroup.segmentGroups.map((seg) => {
+                                  {(sbuGroup.segmentGroups?.length > 0 ? sbuGroup.segmentGroups : [
+                                    { segment: 'Export', statuses: {}, total: 0 },
+                                    { segment: 'Industry', statuses: {}, total: 0 },
+                                    { segment: 'UC', statuses: {}, total: 0 },
+                                    { segment: 'Utility', statuses: {}, total: 0 }
+                                  ]).map((seg) => {
                                     return (
                                       <tr key={`${monthData.month}-${sbuGroup.sbu}-${seg.segment}`} className="border-b border-slate-200 hover:bg-slate-50/50 transition-colors">
                                         <td className="py-1.5 px-3 border-r border-slate-200"></td>
@@ -2470,13 +2520,13 @@ const PlanningScreen = () => {
                                         <td className="py-1.5 px-6 text-slate-800 font-black border-r border-slate-200 bg-white">
                                           {seg.segment}
                                         </td>
-                                        {visibleStatusColumns.map(col => (
+                                        {statusCols.map(col => (
                                           <td key={col} className="py-1.5 px-3 text-right text-slate-600 border-r border-slate-200 text-[13px]">
-                                            {formatReportValue(seg.statuses[col], 3)}
+                                            {formatReportValue(seg.statuses?.[col] || 0, 3)}
                                           </td>
                                         ))}
                                         <td className="py-1.5 px-3 text-right font-black text-slate-900 bg-slate-50/30">
-                                          {formatReportValue(seg.total, 3)}
+                                          {formatReportValue(seg.total || 0, 3)}
                                         </td>
                                       </tr>
                                     );
@@ -2486,13 +2536,13 @@ const PlanningScreen = () => {
                                     <td className="py-2 px-3 border-r border-slate-200"></td>
                                     <td className="py-2 px-3 border-r border-slate-200"></td>
                                     <td className="py-2 px-6 text-slate-900 border-r border-slate-200 uppercase tracking-tight text-[12px] font-black">SBU TOTAL</td>
-                                    {visibleStatusColumns.map(col => (
+                                    {statusCols.map(col => (
                                       <td key={col} className="py-2 px-3 text-right text-slate-900 border-r border-slate-200 font-black">
-                                        {formatReportValue(sbuGroup.sbuTotalStatuses[col], 3)}
+                                        {formatReportValue(sbuGroup.sbuTotalStatuses?.[col] || 0, 3)}
                                       </td>
                                     ))}
                                     <td className="py-2 px-3 text-right font-black text-slate-900 bg-yellow-100/20">
-                                      {formatReportValue(sbuGroup.sbuGrandTotal, 3)}
+                                      {formatReportValue(sbuGroup.sbuGrandTotal || 0, 3)}
                                     </td>
                                   </tr>
                                 </>
@@ -2503,8 +2553,14 @@ const PlanningScreen = () => {
                       </React.Fragment>
                     );
                   })}
-                  {statusBreakdownSummaryRows.map((summaryRow) => {
+                  {(statusBreakdownSummaryRows?.length > 0 ? statusBreakdownSummaryRows : [
+                    { key: 'total', label: 'TOTAL', isTotal: true, values: {}, rowTotal: 0 },
+                    { key: 'percentage', label: 'Percentage CY', isPercentage: true, values: {}, rowTotal: 0 },
+                    { key: 'prev-year', label: 'Value (Previous Year)', isPreviousYearValue: true, values: {}, rowTotal: 0 },
+                    { key: 'prev-percentage', label: 'Percentage PY', isTotalPercentage: true, values: {}, rowTotal: 0 }
+                  ]).map((summaryRow) => {
                     const isYellowLabel = summaryRow.isTotal || summaryRow.isPreviousYearValue;
+                    const statusCols = visibleStatusColumns.length > 0 ? visibleStatusColumns : STATUS_REPORT_COLUMNS;
 
                     return (
                       <tr
@@ -2518,8 +2574,8 @@ const PlanningScreen = () => {
                         >
                           {summaryRow.label}
                         </td>
-                        {visibleStatusColumns.map((column) => {
-                          const cellValue = Number(summaryRow.values[column] || 0);
+                        {statusCols.map((column) => {
+                          const cellValue = Number(summaryRow.values?.[column] || 0);
                           const hasValue = cellValue > 0;
                           return (
                             <td
@@ -2539,7 +2595,7 @@ const PlanningScreen = () => {
                         >
                           {summaryRow.isPercentage || summaryRow.isTotalPercentage
                             ? formatReportPercentageTotal(summaryRow.rowTotal)
-                            : formatReportValue(summaryRow.rowTotal, 3)}
+                            : formatReportValue(summaryRow.rowTotal || 0, 3)}
                         </td>
                       </tr>
                     );
@@ -2547,15 +2603,7 @@ const PlanningScreen = () => {
                 </tbody>
               </table>
             </div>
-          ) : (
-            <div className="p-10 text-center text-slate-400 font-bold">
-              {loading ? (
-                <div className="animate-spin border-4 border-slate-200 border-t-primary-600 rounded-full h-8 w-8 mx-auto"></div>
-              ) : (
-                "No data available. Add planning entries to generate the status breakdown."
-              )}
-            </div>
-          ))}
+          )}
       </div>
 
       <ImportModal

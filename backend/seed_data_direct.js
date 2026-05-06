@@ -15,8 +15,6 @@ async function seedData() {
         const worksheet = workbook.Sheets[workbook.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
         
-        let logs = `Total rows found: ${rows.length}\n`;
-        logs += 'Sample rows (first 15):\n';
         let headerIdx = -1;
         for (let i = 0; i < rows.length; i++) {
             if (rows[i] && rows[i][0] === 'Row Labels') {
@@ -35,7 +33,6 @@ async function seedData() {
         for (let c = 1; c < headers.length; c++) {
             const h = String(headers[c] || '').trim().toUpperCase();
             if (h === 'GRAND TOTAL' || h === '(BLANK)') continue;
-            // Normalize SBU name
             let sbuCode = h.replace(/[^A-Z0-9]/g, '');
             sbuColumns.push({ index: c, code: sbuCode });
         }
@@ -43,13 +40,14 @@ async function seedData() {
         const defaultProduct = await Product.findOne() || { _id: new mongoose.Types.ObjectId(), productName: 'Default Product' };
         const defaultCustomer = await Customer.findOne() || { _id: new mongoose.Types.ObjectId(), companyName: 'Default Customer' };
 
-        // Clear existing for 2026-27 to start fresh
-        await Planning.deleteMany({ financialYear: '2026-27' });
-        console.log('Cleared existing 2026-27 data');
+        // Clear existing for both FY to start fresh as requested
+        await Planning.deleteMany({ financialYear: { $in: ['2025-26', '2026-27'] } });
+        console.log('Cleared existing 2025-26 and 2026-27 data');
 
         const entries = [];
         let currentMonthNum = null;
         let currentMonthYear = null;
+        let currentFinancialYear = null;
         
         for (let i = headerIdx + 1; i < rows.length; i++) {
             const row = rows[i];
@@ -58,32 +56,32 @@ async function seedData() {
             const rowLabel = String(row[0]).trim();
             if (rowLabel === 'Grand Total') break;
             
-            // Check if it's a month row (e.g., "April-2025" or "January-2026")
-            const monthMatch = rowLabel.match(/^([a-zA-Z]+)-\d{4}$/i);
+            const monthMatch = rowLabel.match(/^([a-zA-Z]+)-(\d{4})$/i);
             if (monthMatch) {
                 const monthNameFull = monthMatch[1];
-                const dateObj = new Date(`${monthNameFull} 1, 2025`); // Just for parsing month name
+                const year = parseInt(monthMatch[2], 10);
+                const dateObj = new Date(`${monthNameFull} 1, 2000`);
                 const month = dateObj.getMonth();
-                const year = 2026 + (month < 3 ? 1 : 0);
+                
+                const startYear = month >= 3 ? year : year - 1;
+                currentFinancialYear = `${startYear}-${String(startYear + 1).slice(-2)}`;
                 currentMonthYear = `${dateObj.toLocaleString('default', { month: 'short' })}-${String(year).slice(-2)}`;
                 currentMonthNum = ((month - 3 + 12) % 12) + 1;
                 continue;
             }
             
-            // If it's a segment row (e.g., "Debtors - Export")
-            if (rowLabel.startsWith('Debtors - ') && currentMonthYear) {
+            if (rowLabel.startsWith('Debtors - ') && currentMonthYear && currentFinancialYear) {
                 let segmentRaw = rowLabel.replace('Debtors - ', '').trim();
                 let segment = segmentRaw;
                 if (segmentRaw === 'Industries') segment = 'Industry';
                 if (segmentRaw === 'Utility Contractor') segment = 'UC';
                 
-                // For each SBU column, get the value
                 for (const sbuCol of sbuColumns) {
                     const val = row[sbuCol.index];
                     if (typeof val === 'number' && val !== 0) {
                         entries.push({
                             monthYear: currentMonthYear,
-                            financialYear: '2026-27',
+                            financialYear: currentFinancialYear,
                             month: currentMonthNum,
                             customerId: defaultCustomer._id,
                             customerName: defaultCustomer.companyName || defaultCustomer.customerName,
@@ -104,7 +102,7 @@ async function seedData() {
         
         if (entries.length > 0) {
             await Planning.insertMany(entries);
-            console.log(`Successfully seeded ${entries.length} entries for FY 2026-27`);
+            console.log(`Successfully seeded ${entries.length} entries into 2025-26.`);
         } else {
             console.log('No valid entries found to seed');
         }

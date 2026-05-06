@@ -172,6 +172,20 @@ const buildColumnGroups = (entries, field, fallbackLabel, masterMap) => {
         });
     });
 
+    if (groups.length === 0) {
+        const defaults = field === 'mgrCode'
+            ? ['EPC', 'SBU1', 'SBU2', 'SBU3']
+            : ['Export', 'Industry', 'UC', 'Utility'];
+
+        defaults.forEach((d) => {
+            const key = normalizeCodeKey(d);
+            groups.push({
+                key,
+                label: masterMap.get(key) || d
+            });
+        });
+    }
+
     groups.sort((left, right) => left.label.localeCompare(right.label, undefined, { numeric: true, sensitivity: 'base' }));
     return groups;
 };
