@@ -126,6 +126,23 @@ app.get('/api/check-excel', async (req, res) => {
     }
 });
 
+app.get('/api/read-revenue-plan', async (req, res) => {
+    try {
+        const XLSX = require('xlsx');
+        const filePath = 'D:/tally/Quotations/Ularia_1+3M FY27 Revenue Plan_09_04_26R.xlsx';
+        const workbook = XLSX.readFile(filePath);
+        const result = { sheetNames: workbook.SheetNames, sheets: {} };
+        workbook.SheetNames.forEach(name => {
+            const ws = workbook.Sheets[name];
+            const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+            result.sheets[name] = rows.slice(0, 80);
+        });
+        res.json(result);
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
 // Start Scheduler
 scheduler.startScheduler();
 
