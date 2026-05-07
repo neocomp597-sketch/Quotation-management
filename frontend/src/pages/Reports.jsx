@@ -12,7 +12,8 @@ import {
     MdAssignment,
     MdCalendarMonth,
     MdNotifications,
-    MdRefresh
+    MdRefresh,
+    MdKeyboardArrowDown
 } from 'react-icons/md';
 import { quotationService, analyticsService, planningService } from '../services/api';
 import { formatCurrency, formatDate } from '../utils/helpers';
@@ -58,6 +59,7 @@ const QUARTERS = [
     { key: 'Q3', months: ['Oct', 'Nov', 'Dec'] },
     { key: 'Q4', months: ['Jan', 'Feb', 'Mar'] }
 ];
+const PLANNING_SEGMENTS = ['Export', 'Industry', 'UC', 'Utility'];
 
 const getFinancialYears = () => {
     const now = new Date();
@@ -91,8 +93,14 @@ const normalizeRevenueStatus = (value = '') => {
     return '';
 };
 
-const planValue = (value) => formatToLakhs(value, 2);
+const planValue = (value) => Number(value || 0) === 0 ? '-' : formatToLakhs(value, 2);
 const planPct = (value) => Number(value || 0) === 0 ? '-' : `${Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}%`;
+const formatReportValue = (value, decimals = 3) => Number(value || 0) === 0 ? '-' : formatToLakhs(value, decimals);
+const formatReportPercentage = (value, decimals = 2) =>
+    Number(value || 0) === 0 ? '-' : `${Number(value || 0).toLocaleString('en-IN', {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals
+    })}%`;
 const getRevenueSegmentLabel = (segment) => segment === 'UC' ? 'Utility Contractor' : segment;
 const REVENUE_WORKBOOK_SHEETS = ['Summary FY27', 'Productwise', 'Summary FY27_Qtr wise', 'Deffered account Temperarily'];
 
@@ -162,6 +170,9 @@ const buildRevenuePlanView = (report) => {
         };
     });
 
+    const monthsWithData = months.filter(month => month.total > 0);
+    const monthLabelsWithData = monthsWithData.map(month => month.label);
+
     return {
         rows: rows.map(row => ({
             ...row,
@@ -173,7 +184,8 @@ const buildRevenuePlanView = (report) => {
                     .reduce((sum, month) => sum + month.total, 0)
             }))
         })),
-        months,
+        months: monthsWithData,
+        monthLabels: monthLabelsWithData,
         grandTotal,
         monthBudget: grandTotal / 12,
         quarterBudget: grandTotal / 4,
@@ -415,6 +427,7 @@ const Reports = () => {
     // Planning data
     const [planningReport, setPlanningReport] = useState(null);
     const [planningFY, setPlanningFY] = useState('');
+    const [expandedPlanningMonths, setExpandedPlanningMonths] = useState({});
 
     // Follow-up data
     const [followUpData, setFollowUpData] = useState(null);
@@ -430,9 +443,10 @@ const Reports = () => {
     useEffect(() => {
         // Set default FY
         const now = new Date();
-        const fy = now.getMonth() >= 3 ? `${now.getFullYear()}-${now.getFullYear() + 1}` : `${now.getFullYear() - 1}-${now.getFullYear()}`;
+        const fyStart = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+        const fy = `${fyStart}-${String(fyStart + 1).slice(-2)}`;
         setPlanningFY(fy);
-        setRevenuePlanFY(`${now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1}-${String((now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1) + 1).slice(-2)}`);
+        setRevenuePlanFY(fy);
     }, []);
 
     useEffect(() => {
@@ -479,7 +493,7 @@ const Reports = () => {
                 }
                 case 'planning': {
                     if (planningFY) {
-                        const res = await planningService.getMGRReport(planningFY);
+                        const res = await planningService.getMGRReport(planningFY, 'SBU');
                         setPlanningReport(res.data);
                     }
                     break;
@@ -1005,11 +1019,29 @@ const Reports = () => {
     };
 
     const renderPlanning = () => {
-        const currentYear = new Date().getFullYear();
-        const fyOptions = [];
-        for (let y = currentYear - 2; y <= currentYear + 1; y++) {
-            fyOptions.push(`${y}-${y + 1}`);
-        }
+        const fyOptions = getFinancialYears();
+        const planningColumns = planningReport?.mgrCodes?.length > 0
+            ? planningReport.mgrCodes
+            : planningReport?.mgrColumns?.length > 0
+                ? planningReport.mgrColumns
+                : ['EPC', 'SBU1', 'SBU2', 'SBU3'];
+        const monthRows = (planningReport?.rows || []).filter(row => row.isMonth && !row.isSegment);
+        const segmentRows = (planningReport?.rows || []).filter(row => row.isSegment);
+        const visibleMonths = planningReport?.monthLabels?.length > 0
+            ? planningReport.monthLabels
+            : (monthRows.length > 0 ? monthRows.map(row => row.monthLabel || row.month) : getMonthLabels(planningFY));
+        const summaryRows = planningReport ? [
+            (planningReport.rows || []).find(row => row.isTotal),
+            (planningReport.rows || []).find(row => row.isPercentage),
+            (planningReport.rows || []).find(row => row.isPreviousYearValue),
+            (planningReport.rows || []).find(row => row.isTotalPercentage)
+        ].filter(Boolean) : [];
+        const togglePlanningMonth = (month) => {
+            setExpandedPlanningMonths(prev => ({
+                ...prev,
+                [month]: !prev[month]
+            }));
+        };
 
         return (
             <div className="space-y-8">
@@ -1036,27 +1068,84 @@ const Reports = () => {
                                     <tr className="bg-white">
                                         <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest bg-white">Month</th>
                                         <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest bg-white">Type</th>
-                                        {(planningReport.mgrColumns || []).map(col => (
+                                        {planningColumns.map(col => (
                                             <th key={col} className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">{col}</th>
                                         ))}
                                         <th className="px-4 py-4 text-[10px] font-black text-slate-900 uppercase tracking-widest text-right">Total</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-50">
-                                    {(planningReport.rows || []).map((row, i) => {
-                                        const isQuarter = row.month?.startsWith('Q');
-                                        const isGrand = row.month === 'Grand Total' || row.month === 'Percentage';
+                                    {visibleMonths.map(monthLabel => {
+                                        const monthRow = monthRows.find(row => (row.monthLabel || row.month) === monthLabel) || { month: monthLabel, total: 0 };
+                                        const monthSegments = segmentRows.filter(row => row.parentMonth === monthLabel);
+                                        const isOpen = expandedPlanningMonths[monthLabel] ?? false;
                                         return (
-                                            <tr key={i} className={`${isQuarter ? 'bg-primary-50/50 font-black' : isGrand ? 'bg-slate-100 font-black' : 'hover:bg-slate-50'}`}>
-                                                <td className={`px-4 py-3 text-sm font-bold ${isQuarter ? 'text-primary-700 bg-primary-50/50' : isGrand ? 'text-slate-900 bg-slate-100' : 'text-slate-700 bg-white'}`}>{row.month}</td>
-                                                <td className={`px-4 py-3 text-xs font-black uppercase tracking-widest ${row.mgrType === 'MGR 2' ? 'text-indigo-700' : 'text-blue-700'}`}>{row.mgrType || '-'}</td>
-                                                {(planningReport.mgrColumns || []).map(col => (
-                                                    <td key={col} className="px-4 py-3 text-sm font-semibold text-slate-600 text-right">
-                                                        {row.month === 'Percentage' ? `${row[col] || 0}%` : (row[col] || 0).toLocaleString()}
+                                            <React.Fragment key={monthLabel}>
+                                                <tr
+                                                    className="bg-blue-50 font-bold cursor-pointer hover:bg-blue-100/60 transition-colors"
+                                                    onClick={() => togglePlanningMonth(monthLabel)}
+                                                >
+                                                    <td className="px-4 py-3 text-sm font-black text-slate-900">
+                                                        <div className="flex items-center gap-2">
+                                                            <MdKeyboardArrowDown
+                                                                className={`text-slate-700 transition-transform duration-300 ${!isOpen ? '-rotate-90' : ''}`}
+                                                                size={18}
+                                                            />
+                                                            <span>{monthRow.month}</span>
+                                                        </div>
                                                     </td>
+                                                    <td className="px-4 py-3 text-xs font-black uppercase tracking-widest text-blue-700">-</td>
+                                                    {planningColumns.map(col => {
+                                                        const cellValue = Number(monthRow[col] || 0);
+                                                        return (
+                                                            <td key={`${monthLabel}-${col}`} className={`px-4 py-3 text-sm font-bold text-slate-900 text-right ${cellValue > 0 ? 'bg-blue-100/60' : ''}`}>
+                                                                {formatReportValue(cellValue, 0)}
+                                                            </td>
+                                                        );
+                                                    })}
+                                                    <td className={`px-4 py-3 text-sm font-black text-slate-900 text-right ${Number(monthRow.total || 0) > 0 ? 'bg-blue-100/60' : 'bg-slate-50'}`}>
+                                                        {formatReportValue(monthRow.total || 0, 0)}
+                                                    </td>
+                                                </tr>
+                                                {isOpen && (monthSegments.length > 0 ? monthSegments : PLANNING_SEGMENTS.map(segment => ({
+                                                    month: segment,
+                                                    total: 0
+                                                }))).map(segmentRow => (
+                                                    <tr key={`${monthLabel}-${segmentRow.month}`} className="hover:bg-slate-50">
+                                                        <td className="px-4 py-3 pl-12 text-sm font-bold text-slate-700">{segmentRow.month}</td>
+                                                        <td className="px-4 py-3 text-xs font-black uppercase tracking-widest text-slate-400">-</td>
+                                                        {planningColumns.map(col => {
+                                                            const cellValue = Number(segmentRow[col] || 0);
+                                                            return (
+                                                                <td key={`${monthLabel}-${segmentRow.month}-${col}`} className={`px-4 py-3 text-sm font-semibold text-slate-600 text-right ${cellValue > 0 ? 'bg-blue-50/60' : ''}`}>
+                                                                    {formatReportValue(cellValue, 0)}
+                                                                </td>
+                                                            );
+                                                        })}
+                                                        <td className="px-4 py-3 text-sm font-black text-slate-900 text-right bg-slate-50">
+                                                            {formatReportValue(segmentRow.total || 0, 0)}
+                                                        </td>
+                                                    </tr>
                                                 ))}
-                                                <td className="px-4 py-3 text-sm font-black text-slate-900 text-right">
-                                                    {row.month === 'Percentage' ? `${row.total || 0}%` : (row.total || 0).toLocaleString()}
+                                            </React.Fragment>
+                                        );
+                                    })}
+                                    {summaryRows.map(row => {
+                                        const isPercentage = row.isPercentage || row.isTotalPercentage;
+                                        return (
+                                            <tr key={`planning-summary-${row.month}`} className="bg-slate-100 font-black">
+                                                <td className="px-4 py-3 text-sm text-slate-900">{row.isPercentage ? 'Percentage CY' : row.month}</td>
+                                                <td className="px-4 py-3 text-xs uppercase tracking-widest text-slate-500">-</td>
+                                                {planningColumns.map(col => {
+                                                    const cellValue = Number(row[col] || 0);
+                                                    return (
+                                                        <td key={`planning-summary-${row.month}-${col}`} className={`px-4 py-3 text-sm text-slate-900 text-right ${cellValue > 0 ? 'bg-blue-100/60' : ''}`}>
+                                                            {isPercentage ? formatReportPercentage(cellValue) : formatReportValue(cellValue, 3)}
+                                                        </td>
+                                                    );
+                                                })}
+                                                <td className={`px-4 py-3 text-sm text-slate-900 text-right ${Number(row.total || 0) > 0 ? 'bg-blue-100/60' : ''}`}>
+                                                    {isPercentage ? formatReportPercentage(row.total) : formatReportValue(row.total || 0, 3)}
                                                 </td>
                                             </tr>
                                         );
@@ -1085,10 +1174,6 @@ const Reports = () => {
         const hasData = Boolean(revenuePlanReport);
         const workbookSheets = hasData ? buildRevenueWorkbookSheets(revenuePlanReport, revenuePlanEntries, revenuePlanFY) : [];
         const activeSheet = workbookSheets.find(sheet => sheet.name === revenuePlanSheet) || workbookSheets[0];
-        const maxColumns = activeSheet?.rows?.reduce((max, row) => {
-            const count = row.reduce((sum, item) => sum + Number(item.colSpan || 1), 0);
-            return Math.max(max, count);
-        }, 0) || 0;
         const revenueView = hasData ? buildRevenuePlanView(revenuePlanReport) : null;
         const monthLabels = revenuePlanReport?.monthLabels?.length ? revenuePlanReport.monthLabels : getMonthLabels(revenuePlanFY);
 

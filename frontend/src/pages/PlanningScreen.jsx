@@ -229,6 +229,7 @@ const getReportYearOptions = (financialYear) => {
 const PlanningScreen = () => {
   const [financialYear, setFinancialYear] = useState(getFinancialYears()[1]);
   const [entries, setEntries] = useState([]);
+  const [reportEntries, setReportEntries] = useState([]);
   const [combinedReportData, setCombinedReportData] = useState(null);
   const [reportData2, setReportData2] = useState(null);
   const [statusReportData, setStatusReportData] = useState(null);
@@ -326,20 +327,27 @@ const PlanningScreen = () => {
         limit,
         offset,
       };
+      const reportEntriesParams = {
+        ...params,
+        limit: 100000,
+        offset: 0,
+      };
 
       if (isLoadMore) {
         const entriesRes = await planningService.getAll(params);
         setEntries((prev) => [...prev, ...entriesRes.data.data]);
         setTotalEntries(entriesRes.data.total);
       } else {
-        const [entriesRes, sbuReportRes, segmentReportRes, statusReportRes] = await Promise.all([
+        const [entriesRes, reportEntriesRes, sbuReportRes, segmentReportRes, statusReportRes] = await Promise.all([
           planningService.getAll(params),
+          planningService.getAll(reportEntriesParams),
           planningService.getMGRReport(financialYear, "SBU", reportQuery),
           planningService.getMGRReport(financialYear, "SEGMENT", reportQuery),
           planningService.getMGRReport(financialYear, "STATUS", reportQuery),
         ]);
 
         setEntries(entriesRes.data.data || []);
+        setReportEntries(reportEntriesRes.data.data || []);
         setTotalEntries(entriesRes.data.total || 0);
         setCombinedReportData(sbuReportRes.data);
         setReportData2(segmentReportRes.data);
@@ -636,6 +644,43 @@ const PlanningScreen = () => {
       });
     });
   }, [combinedReportData]);
+
+  const getSbuReportCellValue = (row = {}, sbu = "") => {
+    const normalizedSbu = normalizeSbuValue(sbu);
+    const directValue = row[sbu];
+    if (Number(directValue || 0) !== 0) {
+      return Number(directValue || 0);
+    }
+
+    const matchedKey = Object.keys(row).find(
+      (key) => normalizeSbuValue(key) === normalizedSbu,
+    );
+
+    return Number(row[matchedKey] || 0);
+  };
+
+  const getPlanningEntryTotal = (entry = {}) =>
+    Number(entry.totalValue || (Number(entry.qty || 0) * Number(entry.value || 0)) || 0);
+
+  const getEntriesBackedSbuValue = (monthLabel, sbu, segment = "") => {
+    const normalizedSbu = normalizeSbuValue(sbu);
+    const normalizedSegment = normalizeCodeKey(segment);
+
+    return reportEntries
+      .filter((entry) => entry.monthYear === monthLabel)
+      .filter((entry) => normalizeSbuValue(entry.mgrCode) === normalizedSbu)
+      .filter((entry) => !segment || normalizeCodeKey(entry.mgrCode2) === normalizedSegment)
+      .reduce((sum, entry) => sum + getPlanningEntryTotal(entry), 0);
+  };
+
+  const getMergedSbuReportCellValue = (row = {}, sbu = "", monthLabel = "", segment = "") => {
+    const reportValue = getSbuReportCellValue(row, sbu);
+    if (reportValue > 0) {
+      return reportValue;
+    }
+
+    return getEntriesBackedSbuValue(monthLabel || row.monthLabel || row.month, sbu, segment);
+  };
 
   const computedStatusBreakdownData = useMemo(() => {
     const visibleMonths = combinedReportData?.monthYear ? [combinedReportData.monthYear] : monthLabels;
@@ -972,11 +1017,6 @@ const PlanningScreen = () => {
 
   const handleEditEntry = (entry) => {
     setEditingId(entry._id);
-    // Set filter month to the entry's month when editing
-    setFilters((prev) => ({
-      ...prev,
-      month: entry.monthYear,
-    }));
     setNewRow({
       monthYear: entry.monthYear,
       customerId: entry.customerId?._id || entry.customerId || "",
@@ -1910,7 +1950,32 @@ const PlanningScreen = () => {
           </button>
         </div>
 
-        {isReportExpanded && (
+        {isReportExpanded && (() => {
+          const entryMgrCodes = reportEntries.map((entry) => normalizeSbuValue(entry.mgrCode)).filter(Boolean);
+          const allMgrCodes = Array.from(new Set([
+            ...(combinedReportData?.mgrCodes?.length > 0 ? combinedReportData.mgrCodes : ["EPC", "SBU1", "SBU2", "SBU3"]),
+            ...entryMgrCodes,
+          ]));
+          const reportRows = combinedReportData?.rows || [];
+          const monthRows = reportRows.filter((row) => row.isMonth && !row.isSegment);
+          const segmentRows = reportRows.filter((row) => row.isSegment);
+          const summaryRowsInOrder = combinedReportData ? [
+            reportRows.find((row) => row.isTotal),
+            reportRows.find((row) => row.isPercentage),
+            reportRows.find((row) => row.isPreviousYearValue),
+            reportRows.find((row) => row.isTotalPercentage),
+          ].filter(Boolean) : [];
+          const hasSbuValue = (row, sbu, monthLabel = "", segment = "") =>
+            Number(getMergedSbuReportCellValue(row, sbu, monthLabel, segment) || 0) > 0;
+          const visibleMgrCodes = allMgrCodes.filter((sbu) =>
+            [...monthRows, ...segmentRows, ...summaryRowsInOrder].some((row) => hasSbuValue(row, sbu)),
+          );
+          const visibleMonthLabels = (combinedReportData?.monthLabels?.length > 0
+            ? combinedReportData.monthLabels
+            : (monthRows.length > 0 ? monthRows.map((r) => r.monthLabel || r.month) : monthLabels)
+          );
+
+          return (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead>
@@ -1918,7 +1983,7 @@ const PlanningScreen = () => {
                     <th className="py-3 px-4 font-bold text-slate-700 text-left min-w-[200px]">
                       Month / Segment
                     </th>
-                    {(combinedReportData?.mgrCodes?.length > 0 ? combinedReportData.mgrCodes : ['EPC', 'SBU1', 'SBU2', 'SBU3']).map((sbu) => (
+                    {visibleMgrCodes.map((sbu) => (
                       <th
                         key={sbu}
                         className="py-3 px-4 font-bold text-slate-700 text-right min-w-[100px] border-l border-slate-300"
@@ -1932,25 +1997,25 @@ const PlanningScreen = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {(() => {
-                    const mgrCodes = combinedReportData?.mgrCodes?.length > 0 ? combinedReportData.mgrCodes : ['EPC', 'SBU1', 'SBU2', 'SBU3'];
-                    const monthRows = (combinedReportData?.rows || []).filter(
-                      (row) => row.isMonth && !row.isSegment
-                    );
-                    const segmentRows = (combinedReportData?.rows || []).filter(
-                      (row) => row.isSegment
-                    );
-                    const visibleMonths =
-                      combinedReportData?.monthLabels?.length > 0
-                        ? combinedReportData.monthLabels
-                        : (monthRows.length > 0 ? monthRows.map((r) => r.monthLabel || r.month) : monthLabels);
-
-                    return visibleMonths.map((monthLabel) => {
+                  {visibleMonthLabels.length === 0 ? (
+                    <tr>
+                      <td colSpan={visibleMgrCodes.length + 2} className="py-8 px-4 text-center text-slate-400 font-bold">
+                        No SBU-wise planning data available.
+                      </td>
+                    </tr>
+                  ) : (
+                    visibleMonthLabels.map((monthLabel) => {
                       const monthRow = monthRows.find(
                         (r) => (r.monthLabel || r.month) === monthLabel
                       ) || { month: monthLabel, total: 0 };
                       const monthSegments = segmentRows.filter(
                         (r) => r.parentMonth === monthLabel
+                      ).filter(
+                        (r) => Number(r.total || 0) > 0 || visibleMgrCodes.some((sbu) => hasSbuValue(r, sbu, monthLabel, r.month))
+                      );
+                      const monthTotal = visibleMgrCodes.reduce(
+                        (sum, sbu) => sum + getMergedSbuReportCellValue(monthRow, sbu, monthLabel),
+                        0,
                       );
 
                       return (
@@ -1971,8 +2036,8 @@ const PlanningScreen = () => {
                                 </span>
                               </div>
                             </td>
-                            {mgrCodes.map((sbu) => {
-                              const cellValue = Number(monthRow[sbu] || 0);
+                            {visibleMgrCodes.map((sbu) => {
+                              const cellValue = getMergedSbuReportCellValue(monthRow, sbu, monthLabel);
                               return (
                                 <td
                                   key={sbu}
@@ -1983,15 +2048,19 @@ const PlanningScreen = () => {
                               );
                             })}
                             <td
-                              className={`py-3 px-4 text-right text-slate-900 font-black border-l border-slate-300 ${Number(monthRow.total || 0) > 0 ? "bg-blue-100/60" : "bg-slate-50"}`}
+                              className={`py-3 px-4 text-right text-slate-900 font-black border-l border-slate-300 ${monthTotal > 0 ? "bg-blue-100/60" : "bg-slate-50"}`}
                             >
-                              {formatReportValue(monthRow.total || 0, 0)}
+                              {formatReportValue(monthTotal, 0)}
                             </td>
                           </tr>
 
                           {/* SEGMENT ROWS (shown when month is expanded) */}
-                          {expandedSbuWiseMonths[monthLabel] && (monthSegments.length > 0 ?
-                            monthSegments.map((segRow) => (
+                          {expandedSbuWiseMonths[monthLabel] && monthSegments.map((segRow) => {
+                            const segmentTotal = visibleMgrCodes.reduce(
+                              (sum, sbu) => sum + getMergedSbuReportCellValue(segRow, sbu, monthLabel, segRow.month),
+                              0,
+                            );
+                            return (
                               <tr
                                 key={`${monthLabel}-${segRow.month}`}
                                 className="border-b border-slate-100 hover:bg-slate-50"
@@ -1999,8 +2068,8 @@ const PlanningScreen = () => {
                                 <td className="py-3 px-4 text-slate-900 font-bold pl-12">
                                   {segRow.month}
                                 </td>
-                                {mgrCodes.map((sbu) => {
-                                  const val = Number(segRow[sbu] || 0);
+                                {visibleMgrCodes.map((sbu) => {
+                                  const val = getMergedSbuReportCellValue(segRow, sbu, monthLabel, segRow.month);
                                   return (
                                     <td
                                       key={`${monthLabel}-${segRow.month}-${sbu}`}
@@ -2011,58 +2080,18 @@ const PlanningScreen = () => {
                                   );
                                 })}
                                 <td className="py-3 px-4 text-right border-l border-slate-300 bg-slate-50 font-bold text-slate-900">
-                                  {formatReportValue(segRow.total || 0, 0)}
+                                  {formatReportValue(segmentTotal, 0)}
                                 </td>
                               </tr>
-                            )) : (
-                              ['Export', 'Industry', 'UC', 'Utility'].map(seg => (
-                                <tr
-                                  key={`${monthLabel}-${seg}`}
-                                  className="border-b border-slate-100 hover:bg-slate-50"
-                                >
-                                  <td className="py-3 px-4 text-slate-900 font-bold pl-12">
-                                    {seg}
-                                  </td>
-                                  {mgrCodes.map((sbu) => (
-                                    <td
-                                      key={`${monthLabel}-${seg}-${sbu}`}
-                                      className="py-3 px-4 text-right border-l border-slate-200 font-semibold text-slate-700"
-                                    >
-                                      -
-                                    </td>
-                                  ))}
-                                  <td className="py-3 px-4 text-right border-l border-slate-300 bg-slate-50 font-bold text-slate-900">
-                                    -
-                                  </td>
-                                </tr>
-                              ))
-                            )
-                          )}
+                            );
+                          })}
                         </React.Fragment>
                       );
-                    });
-                  })()}
+                    })
+                  )}
 
                   {/* SUMMARY ROWS */}
-                  {(() => {
-                    const mgrCodes = combinedReportData?.mgrCodes?.length > 0 ? combinedReportData.mgrCodes : ['EPC', 'SBU1', 'SBU2', 'SBU3'];
-                    const summaryRowsInOrder = combinedReportData ? [
-                      (combinedReportData.rows || []).find((row) => row.isTotal),
-                      (combinedReportData.rows || []).find((row) => row.isPercentage),
-                      (combinedReportData.rows || []).find(
-                        (row) => row.isPreviousYearValue,
-                      ),
-                      (combinedReportData.rows || []).find(
-                        (row) => row.isTotalPercentage,
-                      ),
-                    ].filter(Boolean) : [
-                      { month: 'Total', isTotal: true, total: 0 },
-                      { month: 'Percentage CY', isPercentage: true, total: 0 },
-                      { month: 'Value (Previous Year)', isPreviousYearValue: true, total: 0 },
-                      { month: 'Percentage PY', isTotalPercentage: true, total: 0 },
-                    ];
-
-                    return summaryRowsInOrder.map((row) => {
+                  {summaryRowsInOrder.map((row) => {
                       const isTotal = row.isTotal;
                       const isPercentage = row.isPercentage;
                       const isPreviousYearValue = row.isPreviousYearValue;
@@ -2085,13 +2114,13 @@ const PlanningScreen = () => {
                           >
                             {isPercentage ? "Percentage CY" : row.month}
                           </td>
-                          {mgrCodes.map((sbu) => {
-                            const cellValue = Number(row[sbu] || 0);
-                            return (
-                              <td
-                                key={`sbu-summary-${row.month}-${sbu}`}
-                                className={`py-3 px-4 text-right border-l border-slate-200 ${isTotal || isPercentage || isPreviousYearValue || isTotalPercentage ? "font-bold text-slate-900" : "text-slate-700"} ${cellValue > 0 ? "bg-blue-100/60" : ""}`}
-                              >
+                          {visibleMgrCodes.map((sbu) => {
+                            const cellValue = getSbuReportCellValue(row, sbu);
+                          return (
+                            <td
+                              key={`sbu-summary-${row.month}-${sbu}`}
+                              className={`py-3 px-4 text-right border-l border-slate-200 ${isTotal || isPercentage || isPreviousYearValue || isTotalPercentage ? "font-bold text-slate-900" : "text-slate-700"} ${cellValue > 0 ? "bg-blue-100/60" : ""}`}
+                            >
                                 {isPercentage || isTotalPercentage
                                   ? formatReportPercentage(cellValue)
                                   : formatReportValue(cellValue, 3)}
@@ -2116,12 +2145,12 @@ const PlanningScreen = () => {
                           </td>
                         </tr>
                       );
-                    });
-                  })()}
+                    })}
                 </tbody>
               </table>
             </div>
-          )}
+          );
+        })()}
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">

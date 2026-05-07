@@ -158,8 +158,12 @@ const buildColumnGroups = (entries, field, fallbackLabel, masterMap) => {
     const groups = [];
     const seen = new Set();
 
-    entries.forEach((entry) => {
-        const rawValue = cleanValue(entry[field]) || fallbackLabel;
+    const defaults = field === 'mgrCode'
+        ? ['EPC', 'SBU1', 'SBU2', 'SBU3']
+        : ['Export', 'Industry', 'UC', 'Utility'];
+
+    const addGroup = (value) => {
+        const rawValue = cleanValue(value) || fallbackLabel;
         const key = normalizeCodeKey(rawValue);
         if (!key || seen.has(key)) {
             return;
@@ -170,24 +174,24 @@ const buildColumnGroups = (entries, field, fallbackLabel, masterMap) => {
             key,
             label: masterMap.get(key) || rawValue
         });
+    };
+
+    defaults.forEach(addGroup);
+
+    entries.forEach((entry) => {
+        addGroup(entry[field]);
     });
-
-    if (groups.length === 0) {
-        const defaults = field === 'mgrCode'
-            ? ['EPC', 'SBU1', 'SBU2', 'SBU3']
-            : ['Export', 'Industry', 'UC', 'Utility'];
-
-        defaults.forEach((d) => {
-            const key = normalizeCodeKey(d);
-            groups.push({
-                key,
-                label: masterMap.get(key) || d
-            });
-        });
-    }
 
     groups.sort((left, right) => left.label.localeCompare(right.label, undefined, { numeric: true, sensitivity: 'base' }));
     return groups;
+};
+
+const getReportColumnLabel = (field, label) => {
+    if (field === 'mgrCode') {
+        return normalizeSbuValue(label);
+    }
+
+    return label;
 };
 
 const buildSummaryRows = (rows, columns, prevRows, flags = {}) => {
@@ -416,7 +420,7 @@ exports.getMGRReport = async (req, res) => {
 
         if (reportType === 'SEGMENT' || reportType === 'MGR2') {
             const columnGroups = buildColumnGroups(entries, 'mgrCode2', 'Unassigned', mgr2MasterMap);
-            const columns = columnGroups.map((group) => group.label);
+            const columns = columnGroups.map((group) => getReportColumnLabel('mgrCode2', group.label));
             const visibleMonthLabels = monthYearFilter
                 ? [monthYearFilter]
                 : monthLabels;
@@ -429,7 +433,7 @@ exports.getMGRReport = async (req, res) => {
                     const sum = sourceEntries
                         .filter((entry) => entry.monthYear === monthLabel && normalizeCodeKey(entry.mgrCode2) === column.key)
                         .reduce((acc, entry) => acc + getMeasureForEntry(entry, 'value'), 0);
-                    row[column.label] = sum;
+                    row[getReportColumnLabel('mgrCode2', column.label)] = sum;
                     total += sum;
                 });
 
@@ -492,7 +496,7 @@ exports.getMGRReport = async (req, res) => {
         }
 
         const sbuGroups = buildColumnGroups(entries, 'mgrCode', 'Unassigned', mgr1MasterMap);
-        const columns = sbuGroups.map((group) => normalizeSbuValue(group.label));
+        const columns = sbuGroups.map((group) => getReportColumnLabel('mgrCode', group.label));
         const visibleMonthLabels = monthYearFilter
             ? [monthYearFilter]
             : monthLabels;
@@ -505,7 +509,7 @@ exports.getMGRReport = async (req, res) => {
                 const sum = sourceEntries
                     .filter((entry) => normalizeCodeKey(entry.mgrCode) === sbu.key)
                     .reduce((acc, entry) => acc + getMeasureForEntry(entry, 'value'), 0);
-                row[normalizeSbuValue(sbu.label)] = sum;
+                row[getReportColumnLabel('mgrCode', sbu.label)] = sum;
                 total += sum;
             });
 
