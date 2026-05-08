@@ -1,6 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { authService, authorizationService } from "../services/api";
+import { MENU_PERMISSION_GROUPS } from "../constants/menuPermissions";
 
 const AuthContext = createContext(null);
 
@@ -90,7 +91,23 @@ export const AuthProvider = ({ children }) => {
             return true;
         }
 
-        return Boolean(permissions?.[permissionKey]);
+        if (Object.prototype.hasOwnProperty.call(permissions || {}, permissionKey)) {
+            return Boolean(permissions?.[permissionKey]);
+        }
+
+        const group = MENU_PERMISSION_GROUPS.find((item) =>
+            item.key === permissionKey || (item.children || []).some((child) => child.key === permissionKey)
+        );
+
+        if (!group) {
+            return false;
+        }
+
+        if (group.key === permissionKey) {
+            return Boolean(permissions?.[group.key]) || (group.children || []).some((child) => Boolean(permissions?.[child.key]));
+        }
+
+        return Boolean(permissions?.[group.key]);
     }, [permissions, user]);
 
     return (

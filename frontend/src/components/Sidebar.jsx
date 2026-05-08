@@ -47,7 +47,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
     const menuStructure = [
         {
             type: 'link',
-            key: 'dashboard',
+            key: 'dashboard_overview',
             name: 'Dashboard',
             icon: <MdDashboard size={22} />,
             path: '/dashboard'
@@ -58,13 +58,12 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             key: 'master',
             icon: <MdFolderOpen size={22} />,
             children: [
-                { name: 'Customers', icon: <MdPeople size={18} />, path: '/customers' },
-                { name: 'Vendors', icon: <MdStorefront size={18} />, path: '/vendors' },
-                { name: 'Products', icon: <MdInventory size={18} />, path: '/products' },
-                { name: 'MGR Master', icon: <MdCategory size={18} />, path: '/mgrs' },
-                { name: 'Attributes', icon: <MdAssignment size={18} />, path: '/attributes' },
-                ...(isAdmin ? [{ name: 'Salespersons', icon: <MdPeople size={18} />, path: '/salespersons' }] : []),
-                { name: 'Terms & Conditions', icon: <MdDescription size={18} />, path: '/terms' },
+                { key: 'master_customers', name: 'Customers', icon: <MdPeople size={18} />, path: '/customers' },
+                { key: 'master_vendors', name: 'Vendors', icon: <MdStorefront size={18} />, path: '/vendors' },
+                { key: 'master_products', name: 'Products', icon: <MdInventory size={18} />, path: '/products' },
+                { key: 'master_mgrs', name: 'MGR Master', icon: <MdCategory size={18} />, path: '/mgrs' },
+                { key: 'master_attributes', name: 'Attributes', icon: <MdAssignment size={18} />, path: '/attributes' },
+                { key: 'master_terms', name: 'Terms & Conditions', icon: <MdDescription size={18} />, path: '/terms' },
             ]
         },
         {
@@ -73,8 +72,8 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             key: 'enquiry',
             icon: <MdAssignment size={22} />,
             children: [
-                { name: 'Leads & Enquiries', icon: <MdAssignment size={18} />, path: '/enquiries' },
-                { name: 'Analytics', icon: <MdAnalytics size={18} />, path: '/enquiries/analytics' },
+                { key: 'enquiry_leads', name: 'Leads & Enquiries', icon: <MdAssignment size={18} />, path: '/enquiries' },
+                { key: 'enquiry_analytics', name: 'Analytics', icon: <MdAnalytics size={18} />, path: '/enquiries/analytics' },
             ]
         },
         {
@@ -83,7 +82,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             key: 'quotation',
             icon: <MdRequestQuote size={22} />,
             children: [
-                { name: 'Quotations', icon: <MdDescription size={18} />, path: '/quotations' },
+                { key: 'quotation_list', name: 'Quotations', icon: <MdDescription size={18} />, path: '/quotations' },
             ]
         },
         {
@@ -92,7 +91,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             key: 'sale',
             icon: <MdPointOfSale size={22} />,
             children: [
-                { name: 'Create Invoice', icon: <MdReceipt size={18} />, path: '/vouchers' },
+                { key: 'sale_invoices', name: 'Create Invoice', icon: <MdReceipt size={18} />, path: '/vouchers' },
             ]
         },
         {
@@ -101,7 +100,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             key: 'purchase',
             icon: <MdShoppingCart size={22} />,
             children: [
-                { name: 'GRN', icon: <MdLocalShipping size={18} />, path: '/grn' },
+                { key: 'purchase_grn', name: 'GRN', icon: <MdLocalShipping size={18} />, path: '/grn' },
             ]
         },
         {
@@ -110,8 +109,8 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             key: 'planning',
             icon: <MdCalendarMonth size={22} />,
             children: [
-                { name: 'Planning Screen', icon: <MdCalendarMonth size={18} />, path: '/planning' },
-                { name: 'Simulations', icon: <MdAutoGraph size={18} />, path: '/simulations' },
+                { key: 'planning_screen', name: 'Planning Screen', icon: <MdCalendarMonth size={18} />, path: '/planning' },
+                { key: 'planning_simulations', name: 'Simulations', icon: <MdAutoGraph size={18} />, path: '/simulations' },
             ]
         },
         {
@@ -120,7 +119,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             key: 'reports',
             icon: <MdBarChart size={22} />,
             children: [
-                { name: 'Reports', icon: <MdBarChart size={18} />, path: '/reports' },
+                { key: 'reports_main', name: 'Reports', icon: <MdBarChart size={18} />, path: '/reports' },
             ]
         },
         {
@@ -129,10 +128,18 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             key: 'admin',
             icon: <MdLock size={22} />,
             children: [
-                { name: 'Authorization', icon: <MdLock size={18} />, path: '/admin/authorization' },
+                { key: 'admin_authorization', name: 'Authorization', icon: <MdLock size={18} />, path: '/admin/authorization' },
+                ...(isAdmin ? [{ key: 'admin_salespersons', name: 'Salespersons', icon: <MdPeople size={18} />, path: '/salespersons' }] : []),
             ]
         },
-    ].filter((item) => hasAccess(item.key));
+    ].map((item) => {
+        if (item.type !== 'group') return item;
+
+        return {
+            ...item,
+            children: item.children.filter((child) => hasAccess(child.key)),
+        };
+    }).filter((item) => item.type === 'link' ? hasAccess(item.key) : item.children.length > 0 || hasAccess(item.key));
 
     const getAutoExpanded = (key, children) => {
         if (expanded[key] !== undefined) return expanded[key];
@@ -263,7 +270,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                     })}
                 </nav>
 
-                {hasAccess('settings') && (
+                {hasAccess('settings_profile') && (
                     <div className="p-3 border-t border-slate-50 shrink-0 bg-white">
                         <NavLink
                             to="/settings"

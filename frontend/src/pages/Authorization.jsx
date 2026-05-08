@@ -3,45 +3,55 @@ import { Navigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import {
     MdLock, MdRefresh, MdTune, MdPeople,
-    MdCheckCircle, MdCancel, MdRestartAlt, MdShield, MdWarning
+    MdCheckCircle, MdCancel, MdRestartAlt, MdShield, MdWarning,
+    MdExpandLess, MdExpandMore, MdAdd, MdDelete, MdSave
 } from 'react-icons/md';
 import { authorizationService, userService } from '../services/api';
-import { ROLE_LABELS, MENU_PERMISSION_GROUPS } from '../constants/menuPermissions';
+import { ROLE_LABELS as BUILTIN_ROLE_LABELS, MENU_PERMISSION_GROUPS } from '../constants/menuPermissions';
 import { useAuth } from '../context/AuthContext';
 
-const ROLE_META = {
-    admin:   { color: 'bg-slate-900 text-white',   border: 'border-slate-200',  badge: 'bg-white/20 text-white',  desc: 'Full system access. All permissions are permanently enabled and cannot be toggled.' },
-    manager: { color: 'bg-primary-600 text-white',  border: 'border-primary-100', badge: 'bg-white/20 text-white', desc: 'Operational access: master data, enquiries, quotations, planning and reports.' },
-    sales:   { color: 'bg-emerald-600 text-white',  border: 'border-emerald-100', badge: 'bg-white/20 text-white', desc: 'Lightweight access: dashboard, enquiries and quotations only.' }
-};
+const childKeysFor = (group) => (group.children || []).map((child) => child.key);
 
-const ROLE_DEFAULTS = {
-    admin:   MENU_PERMISSION_GROUPS.map((g) => g.key),
-    manager: ['dashboard','master','enquiry','quotation','sale','purchase','planning','reports','settings'],
-    sales:   ['dashboard','enquiry','quotation']
+const buildPermissionsFromEnabledSections = (groups, enabledSections = []) => {
+    const enabled = new Set(enabledSections);
+    return groups.reduce((acc, group) => {
+        const childKeys = childKeysFor(group);
+        const groupOn = enabled.has(group.key);
+        const anyChildOn = childKeys.some((key) => enabled.has(key));
+
+        acc[group.key] = groupOn || anyChildOn;
+        childKeys.forEach((key) => {
+            acc[key] = groupOn || enabled.has(key);
+        });
+        return acc;
+    }, {});
 };
 
 const Authorization = () => {
     const { user: currentUser, isAdmin } = useAuth();
 
-    const [roles,          setRoles]          = useState([]);
-    const [menuGroups,     setMenuGroups]     = useState([]);
-    const [users,          setUsers]          = useState([]);
-    const [loading,        setLoading]        = useState(true);
-    const [usersLoading,   setUsersLoading]   = useState(true);
-    const [savingRoles,    setSavingRoles]    = useState({});
+    const [roles, setRoles] = useState([]);
+    const [menuGroups, setMenuGroups] = useState([]);
+    const [users, setUsers] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [usersLoading, setUsersLoading] = useState(true);
+    const [savingRoles, setSavingRoles] = useState({});
     const [resettingRoles, setResettingRoles] = useState({});
-    const [statusByRole,   setStatusByRole]   = useState({});
+    const [statusByRole, setStatusByRole] = useState({});
     const [updatingUserId, setUpdatingUserId] = useState('');
+    const [expandedGroups, setExpandedGroups] = useState({});
 
-    // ── Fetch helpers ────────────────────────────────────────────────────
+    const [showNewRoleForm, setShowNewRoleForm] = useState(false);
+    const [newRoleData, setNewRoleData] = useState({ label: '', description: '' });
+    const [creatingRole, setCreatingRole] = useState(false);
+
     const fetchMatrix = async () => {
         try {
             const res = await authorizationService.getAll();
             setRoles(res.data.roles || []);
             setMenuGroups(res.data.menuGroups || []);
-        } catch {
-            toast.error('Failed to load authorization settings');
+        } catch (err) {
+            toast.error('Error loading permissions');
         }
     };
 
@@ -50,42 +60,74 @@ const Authorization = () => {
         try {
             const res = await userService.getAll();
             setUsers(res.data || []);
-        } catch {
-            toast.error('Failed to load users');
+        } catch (err) {
+            toast.error('Error loading users');
         } finally {
             setUsersLoading(false);
         }
     };
 
-    // ── Init: seed DB defaults, then load data ───────────────────────────
     useEffect(() => {
         if (!isAdmin) return;
         (async () => {
             setLoading(true);
-            await authorizationService.initialize().catch(() => null); // idempotent
+            await authorizationService.initialize().catch(() => null);
             await Promise.all([fetchMatrix(), fetchUsers()]);
             setLoading(false);
         })();
     }, [isAdmin]);
 
-    // ── Admin guard — AFTER all hooks ────────────────────────────────────
     if (!isAdmin) return <Navigate to="/dashboard" replace />;
 
-    const existingAdmin    = users.find((u) => u.role === 'admin');
-    const displayGroups    = menuGroups.length ? menuGroups : MENU_PERMISSION_GROUPS;
-    const enabledCount     = (perms = {}) => Object.values(perms).filter(Boolean).length;
+    const existingAdmin = users.find((u) => u.role === 'admin');
+    const displayGroups = menuGroups.length ? menuGroups : MENU_PERMISSION_GROUPS;
+    
+    const enabledCount = (perms = {}) => displayGroups.reduce((count, group) => {
+        const childKeys = childKeysFor(group);
+        if (!childKeys.length) return count + (perms[group.key] ? 1 : 0);
+        return count + childKeys.filter((key) => perms[key]).length;
+    }, 0);
 
     const handleRefresh = async () => {
         setLoading(true);
         await Promise.all([fetchMatrix(), fetchUsers()]).finally(() => setLoading(false));
     };
 
-    // ── Toggle one permission ────────────────────────────────────────────
-    const handleToggle = async (roleKey, permKey) => {
+    const toggleExpanded = (roleKey, groupKey) => {
+        const key = `${roleKey}-${groupKey}`;
+        setExpandedGroups((prev) => ({ ...prev, [key]: !(prev[key] ?? false) }));
+    };
+
+    const isExpanded = (roleKey, groupKey) => {
+        const key = `${roleKey}-${groupKey}`;
+        return expandedGroups[key] ?? false;
+    };
+
+    const handleToggle = async (roleKey, permKey, group) => {
         const roleObj = roles.find((r) => r.role === roleKey);
         if (!roleObj || roleObj.locked || savingRoles[roleKey]) return;
 
-        const next = { ...roleObj.permissions, [permKey]: !roleObj.permissions?.[permKey] };
+        const targetGroup = group || displayGroups.find((item) => item.key === permKey || childKeysFor(item).includes(permKey));
+        const childKeys = childKeysFor(targetGroup || {});
+        const isParent = targetGroup?.key === permKey;
+        const next = { ...roleObj.permissions };
+
+        if (isParent) {
+            const currentAllOn = childKeys.length
+                ? childKeys.every((key) => roleObj.permissions?.[key])
+                : Boolean(roleObj.permissions?.[permKey]);
+            const nextValue = !currentAllOn;
+            next[permKey] = nextValue;
+            childKeys.forEach((key) => {
+                next[key] = nextValue;
+            });
+        } else {
+            const nextValue = !roleObj.permissions?.[permKey];
+            next[permKey] = nextValue;
+            if (targetGroup) {
+                next[targetGroup.key] = childKeys.some((key) => key === permKey ? nextValue : Boolean(next[key]));
+            }
+        }
 
         setRoles((prev) => prev.map((r) => r.role === roleKey ? { ...r, permissions: next } : r));
         setSavingRoles((prev) => ({ ...prev, [roleKey]: true }));
@@ -96,24 +138,21 @@ const Authorization = () => {
             const saved = res.data?.permissions || next;
             setRoles((prev) => prev.map((r) => r.role === roleKey ? { ...r, permissions: saved } : r));
             setStatusByRole((prev) => ({ ...prev, [roleKey]: 'saved' }));
-            toast.success(`${ROLE_LABELS[roleKey] || roleKey} permissions updated`);
         } catch (err) {
             setRoles((prev) => prev.map((r) => r.role === roleKey ? { ...r, permissions: roleObj.permissions } : r));
             setStatusByRole((prev) => ({ ...prev, [roleKey]: 'error' }));
-            toast.error(err.response?.data?.message || 'Failed to update permissions');
+            toast.error('Failed to save changes');
         } finally {
             setSavingRoles((prev) => ({ ...prev, [roleKey]: false }));
         }
     };
 
-    // ── Reset role to defaults ───────────────────────────────────────────
     const handleReset = async (roleKey) => {
         const roleObj = roles.find((r) => r.role === roleKey);
         if (!roleObj || roleObj.locked || resettingRoles[roleKey]) return;
 
-        const enabled = new Set(ROLE_DEFAULTS[roleKey] || []);
-        const defaults = displayGroups.reduce((acc, g) => ({ ...acc, [g.key]: enabled.has(g.key) }), {});
-
+        const defaults = buildPermissionsFromEnabledSections(displayGroups, (roleKey === 'admin' ? MENU_PERMISSION_GROUPS.map(g => g.key) : roleKey === 'manager' ? ['dashboard', 'master', 'enquiry', 'quotation', 'sale', 'purchase', 'planning', 'reports', 'settings'] : ['dashboard', 'enquiry', 'quotation']));
+        
         setResettingRoles((prev) => ({ ...prev, [roleKey]: true }));
         setStatusByRole((prev) => ({ ...prev, [roleKey]: 'saving' }));
 
@@ -121,127 +160,226 @@ const Authorization = () => {
             const res = await authorizationService.update(roleKey, defaults);
             setRoles((prev) => prev.map((r) => r.role === roleKey ? { ...r, permissions: res.data?.permissions || defaults } : r));
             setStatusByRole((prev) => ({ ...prev, [roleKey]: 'saved' }));
-            toast.success(`${ROLE_LABELS[roleKey] || roleKey} reset to defaults`);
+            toast.success('Permissions reset');
         } catch (err) {
             setStatusByRole((prev) => ({ ...prev, [roleKey]: 'error' }));
-            toast.error(err.response?.data?.message || 'Failed to reset');
+            toast.error('Reset failed');
         } finally {
             setResettingRoles((prev) => ({ ...prev, [roleKey]: false }));
         }
     };
 
-    // ── Change user role ─────────────────────────────────────────────────
     const handleUserRoleChange = async (userId, nextRole) => {
         setUpdatingUserId(userId);
         try {
             const res = await userService.updateRole(userId, nextRole);
             setUsers((prev) => prev.map((u) => u._id === userId ? res.data : u));
-            toast.success(`${res.data.name}'s role updated to ${ROLE_LABELS[nextRole] || nextRole}`);
+            toast.success('User updated');
         } catch (err) {
-            toast.error(err.response?.data?.message || 'Failed to update user role');
+            toast.error('Update failed');
         } finally {
             setUpdatingUserId('');
         }
     };
 
-    // ── JSX ──────────────────────────────────────────────────────────────
-    return (
-        <div className="space-y-8">
-            {/* Page header */}
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
-                        <MdShield className="text-primary-600" size={30} />
-                        Authorization
-                    </h1>
-                    <p className="text-slate-500 font-medium mt-1">Control which sections each role can access. Toggles save instantly.</p>
-                    <div className="flex items-center gap-2 mt-2 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-xl w-fit">
-                        <MdWarning className="text-amber-500" size={14} />
-                        <span className="text-xs font-bold text-amber-700">Changes take effect on the user's next page load.</span>
-                    </div>
-                </div>
-                <button onClick={handleRefresh} className="inline-flex items-center gap-2 px-4 py-3 bg-white border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50 transition-colors">
-                    <MdRefresh size={18} /> Refresh
-                </button>
-            </div>
+    const handleCreateRole = async (e) => {
+        e.preventDefault();
+        if (!newRoleData.label.trim()) return;
+        setCreatingRole(true);
+        try {
+            const res = await authorizationService.createRole(newRoleData.label, newRoleData.description);
+            setRoles((prev) => [...prev, res.data]);
+            setNewRoleData({ label: '', description: '' });
+            setShowNewRoleForm(false);
+            toast.success('Role added');
+        } catch (err) {
+            toast.error('Could not add role');
+        } finally {
+            setCreatingRole(false);
+        }
+    };
 
-            {/* Permission matrix */}
+    const handleDeleteRole = async (roleKey) => {
+        if (!window.confirm('Delete this role?')) return;
+        try {
+            await authorizationService.deleteRole(roleKey);
+            setRoles((prev) => prev.filter((r) => r.role !== roleKey));
+            toast.success('Role deleted');
+        } catch (err) {
+            toast.error('Failed to delete');
+        }
+    };
+
+    return (
+        <div className="max-w-[1400px] mx-auto space-y-12 pb-20">
+            {/* Minimal Header */}
+            <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-slate-100 pb-8">
+                <div>
+                    <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Permissions</h1>
+                    <p className="text-sm text-slate-500 mt-1">Manage user roles and section access.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                    <button onClick={handleRefresh} className="p-2.5 text-slate-400 hover:text-primary-600 border border-slate-200 rounded-lg hover:bg-primary-50/30 transition-colors">
+                        <MdRefresh size={20} />
+                    </button>
+                    <button 
+                        onClick={() => setShowNewRoleForm(!showNewRoleForm)}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-lg font-bold text-sm hover:bg-primary-700 transition-colors shadow-sm"
+                    >
+                        {showNewRoleForm ? 'Cancel' : <><MdAdd size={18} /> Add Role</>}
+                    </button>
+                </div>
+            </header>
+
+            {/* Simple Add Role Form */}
+            {showNewRoleForm && (
+                <div className="bg-primary-50/30 border border-primary-100 rounded-xl p-6">
+                    <form onSubmit={handleCreateRole} className="flex flex-wrap gap-4 items-end">
+                        <div className="flex-1 min-w-[200px]">
+                            <label className="block text-xs font-bold text-primary-600 mb-1.5 ml-1">Role Name</label>
+                            <input 
+                                type="text" 
+                                required
+                                value={newRoleData.label}
+                                onChange={(e) => setNewRoleData({...newRoleData, label: e.target.value})}
+                                placeholder="e.g. Accountant"
+                                className="w-full px-4 py-2.5 bg-white border border-primary-100 rounded-lg text-sm outline-none focus:border-primary-600 transition-colors"
+                            />
+                        </div>
+                        <div className="flex-[2] min-w-[300px]">
+                            <label className="block text-xs font-bold text-primary-600 mb-1.5 ml-1">Description</label>
+                            <input 
+                                type="text" 
+                                value={newRoleData.description}
+                                onChange={(e) => setNewRoleData({...newRoleData, description: e.target.value})}
+                                placeholder="Optional description..."
+                                className="w-full px-4 py-2.5 bg-white border border-primary-100 rounded-lg text-sm outline-none focus:border-primary-600 transition-colors"
+                            />
+                        </div>
+                        <button 
+                            type="submit" 
+                            disabled={creatingRole || !newRoleData.label.trim()}
+                            className="px-6 py-2.5 bg-primary-600 text-white rounded-lg font-bold text-sm hover:bg-primary-700 disabled:opacity-50 transition-colors shadow-sm"
+                        >
+                            {creatingRole ? 'Saving...' : 'Save Role'}
+                        </button>
+                    </form>
+                </div>
+            )}
+
+            {/* Role Cards - Minimal Grid */}
             {loading ? (
-                <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 p-16 text-center">
-                    <div className="animate-spin border-4 border-slate-200 border-t-primary-600 rounded-full h-12 w-12 mx-auto mb-4" />
-                    <p className="text-slate-400 font-semibold text-sm">Loading permissions…</p>
+                <div className="py-20 text-center">
+                    <div className="animate-spin w-8 h-8 border-2 border-slate-200 border-t-primary-600 rounded-full mx-auto" />
                 </div>
             ) : (
-                <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-8">
                     {roles.map((role) => {
-                        const meta    = ROLE_META[role.role] || ROLE_META.sales;
-                        const busy    = savingRoles[role.role] || resettingRoles[role.role];
-                        const status  = statusByRole[role.role];
-                        const badgeLabel = role.locked ? 'Locked' : busy ? 'Saving…' : status === 'saved' ? 'Saved ✓' : status === 'error' ? 'Error' : 'Auto-save';
+                        const busy = savingRoles[role.role] || resettingRoles[role.role];
+                        const status = statusByRole[role.role];
 
                         return (
-                            <section key={role.role} className={`bg-white rounded-[2rem] shadow-sm border overflow-hidden ${meta.border}`}>
-                                {/* Header */}
-                                <div className={`p-6 ${meta.color}`}>
-                                    <div className="flex items-start justify-between gap-3">
-                                        <div className="min-w-0">
-                                            <div className="flex items-center gap-2 flex-wrap">
-                                                <h2 className="text-xl font-black">{ROLE_LABELS[role.role] || role.label}</h2>
-                                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${meta.badge}`}>{badgeLabel}</span>
-                                            </div>
-                                            <p className="text-sm opacity-75 font-medium mt-1 leading-relaxed">{meta.desc}</p>
+                            <section key={role.role} className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm flex flex-col hover:border-primary-100 transition-colors">
+                                {/* Role Header */}
+                                <div className="p-6 border-b border-slate-100 flex items-start justify-between">
+                                    <div>
+                                        <div className="flex items-center gap-2">
+                                            <h2 className="text-lg font-bold text-slate-900">{role.label}</h2>
+                                            {role.locked && <MdLock className="text-slate-300" size={14} title="Locked Role" />}
+                                            {busy && <span className="text-[10px] text-primary-500 font-medium animate-pulse ml-1">Saving...</span>}
+                                            {status === 'saved' && <span className="text-[10px] text-emerald-500 font-medium ml-1">Saved</span>}
                                         </div>
-                                        <div className="text-right shrink-0">
-                                            <p className="text-2xl font-black">{enabledCount(role.permissions)}</p>
-                                            <p className="text-xs opacity-60 font-bold uppercase tracking-widest">/ {displayGroups.length}</p>
-                                        </div>
+                                        <p className="text-xs text-slate-500 mt-1">{role.description || 'Permission group.'}</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <span className="text-xs font-bold text-primary-600">{enabledCount(role.permissions)}</span>
+                                        <span className="text-xs text-slate-400"> / {displayGroups.length} items</span>
                                     </div>
                                 </div>
 
-                                {/* Toggles */}
-                                <div className="p-5 space-y-2">
+                                {/* Minimal Permissions List */}
+                                <div className="flex-1 p-6 space-y-4">
                                     {displayGroups.map((group) => {
-                                        const on = Boolean(role.permissions?.[group.key]);
+                                        const children = group.children || [];
+                                        const childKeys = childKeysFor(group);
+                                        const enabledChildrenCount = childKeys.filter((key) => role.permissions?.[key]).length;
+                                        const hasPartialAccess = childKeys.length ? enabledChildrenCount > 0 : Boolean(role.permissions?.[group.key]);
+                                        const hasFullAccess = childKeys.length ? enabledChildrenCount === childKeys.length : hasPartialAccess;
+                                        const expanded = isExpanded(role.role, group.key);
+
                                         return (
-                                            <div key={`${role.role}-${group.key}`}
-                                                className={`flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border transition-colors ${on ? 'border-primary-100 bg-primary-50/40' : 'border-slate-100 bg-slate-50/50'}`}
-                                            >
-                                                <div className="min-w-0 flex-1">
-                                                    <div className="flex items-center gap-2">
-                                                        {on ? <MdCheckCircle className="text-primary-500 shrink-0" size={14} /> : <MdCancel className="text-slate-300 shrink-0" size={14} />}
-                                                        <span className={`font-bold text-sm ${on ? 'text-slate-900' : 'text-slate-400'}`}>{group.label}</span>
-                                                        {group.key === 'admin' && (
-                                                            <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 text-[9px] font-black uppercase tracking-widest">Admin only</span>
+                                            <div key={`${role.role}-${group.key}`} className="space-y-3">
+                                                <div className="flex items-center justify-between group">
+                                                    <button 
+                                                        onClick={() => toggleExpanded(role.role, group.key)}
+                                                        className="flex items-center gap-2 text-left"
+                                                    >
+                                                        <div className={`transition-transform duration-200 ${expanded ? 'rotate-0' : '-rotate-90'}`}>
+                                                            <MdExpandMore size={18} className={hasPartialAccess ? "text-primary-400" : "text-slate-300"} />
+                                                        </div>
+                                                        <span className={`text-sm font-semibold transition-colors ${hasPartialAccess ? 'text-slate-900' : 'text-slate-400'}`}>
+                                                            {group.label}
+                                                        </span>
+                                                        {children.length > 0 && hasPartialAccess && (
+                                                            <span className="text-[10px] text-primary-600 bg-primary-50 px-1.5 py-0.5 rounded">
+                                                                {enabledChildrenCount}/{children.length}
+                                                            </span>
                                                         )}
+                                                    </button>
+                                                    <div className="flex items-center">
+                                                        <label className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${hasFullAccess ? 'bg-primary-600' : 'bg-slate-200'} ${role.locked || busy ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer'}`}>
+                                                            <input type="checkbox" className="sr-only" checked={hasFullAccess} disabled={role.locked || busy} onChange={() => handleToggle(role.role, group.key, group)} />
+                                                            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${hasFullAccess ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                                                        </label>
                                                     </div>
-                                                    <p className="text-xs text-slate-400 mt-0.5 ml-5 leading-snug">{group.description}</p>
                                                 </div>
-                                                <label className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${on ? 'bg-primary-600' : 'bg-slate-200'} ${role.locked || busy ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
-                                                    <input type="checkbox" className="sr-only" checked={on} disabled={role.locked || busy} onChange={() => handleToggle(role.role, group.key)} />
-                                                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${on ? 'translate-x-6' : 'translate-x-1'}`} />
-                                                </label>
+
+                                                {expanded && children.length > 0 && (
+                                                    <div className="ml-6 space-y-2 border-l border-slate-100 pl-4 py-1">
+                                                        {children.map((child) => {
+                                                            const childOn = Boolean(role.permissions?.[child.key]);
+                                                            return (
+                                                                <div key={`${role.role}-${child.key}`} className="flex items-center justify-between group/child">
+                                                                    <span className={`text-xs font-medium ${childOn ? 'text-primary-700' : 'text-slate-400'}`}>{child.label}</span>
+                                                                    <label className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${childOn ? 'bg-primary-600' : 'bg-slate-200'} ${role.locked || busy ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer'}`}>
+                                                                        <input type="checkbox" className="sr-only" checked={childOn} disabled={role.locked || busy} onChange={() => handleToggle(role.role, child.key, group)} />
+                                                                        <span className={`inline-block h-2.5 w-2.5 transform rounded-full bg-white transition-transform ${childOn ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                                                    </label>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                )}
                                             </div>
                                         );
                                     })}
                                 </div>
 
-                                {/* Footer */}
-                                <div className="px-5 pb-5 flex gap-2">
-                                    {role.locked ? (
-                                        <div className="flex-1 flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-50 text-slate-500 text-xs font-semibold">
-                                            <MdTune size={16} /> Admin access is always fully enabled.
-                                        </div>
-                                    ) : (
+                                {/* Card Actions */}
+                                <div className="p-4 border-t border-slate-50 bg-slate-50/30 flex gap-2">
+                                    {!role.locked && (
                                         <>
-                                            <div className="flex-1 flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-50 text-slate-500 text-xs font-semibold">
-                                                <MdTune size={16} />
-                                                {busy ? 'Saving…' : status === 'saved' ? 'Last change saved.' : status === 'error' ? 'Save failed — try again.' : 'Toggle to update instantly.'}
-                                            </div>
-                                            <button type="button" disabled={busy} onClick={() => handleReset(role.role)}
-                                                className="flex items-center gap-1.5 px-3 py-2.5 bg-white border border-slate-200 rounded-2xl text-xs font-black text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-                                                <MdRestartAlt size={16} /> Reset
+                                            <button 
+                                                onClick={() => handleReset(role.role)}
+                                                className="flex-1 py-2 bg-white border border-slate-200 text-slate-500 rounded-lg text-xs font-bold hover:bg-primary-50 hover:text-primary-600 hover:border-primary-100 transition-colors"
+                                            >
+                                                Reset
                                             </button>
+                                            {role.isCustom && (
+                                                <button 
+                                                    onClick={() => handleDeleteRole(role.role)}
+                                                    className="px-3 py-2 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                                                    title="Delete Role"
+                                                >
+                                                    <MdDelete size={16} />
+                                                </button>
+                                            )}
                                         </>
+                                    )}
+                                    {role.locked && (
+                                        <div className="flex-1 py-2 text-center text-slate-400 text-xs font-bold">
+                                            Standard Role
+                                        </div>
                                     )}
                                 </div>
                             </section>
@@ -250,74 +388,63 @@ const Authorization = () => {
                 </div>
             )}
 
-            {/* User role assignment table */}
-            <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
-                <div className="p-6 border-b border-slate-100 bg-slate-50/70">
-                    <div className="flex items-center gap-3">
-                        <MdPeople className="text-primary-600" size={24} />
-                        <div>
-                            <h2 className="text-2xl font-black text-slate-900">User Role Assignment</h2>
-                            <p className="text-slate-500 font-medium mt-1">Assign application roles to registered users.</p>
-                            <p className="text-sm text-slate-400 font-semibold mt-1">Only one admin allowed. You cannot change your own role.</p>
-                        </div>
-                    </div>
+            {/* Simple Users Table */}
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:border-primary-50 transition-colors">
+                <div className="p-6 border-b border-slate-100">
+                    <h2 className="text-lg font-bold text-slate-900">Users</h2>
+                    <p className="text-xs text-slate-500 mt-1">Assign roles to each user.</p>
                 </div>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                        <thead>
+                            <tr className="bg-slate-50 text-[10px] font-bold uppercase tracking-widest text-slate-400 border-b border-slate-100">
+                                <th className="px-6 py-4">Name</th>
+                                <th className="px-6 py-4">Email</th>
+                                <th className="px-6 py-4">Role</th>
+                                <th className="px-6 py-4 text-right">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                            {users.map((user) => {
+                                const isMe = currentUser?.id === user._id;
+                                const isUpdating = updatingUserId === user._id;
 
-                {usersLoading ? (
-                    <div className="p-10 text-center text-slate-400 font-bold">Loading users…</div>
-                ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left">
-                            <thead className="bg-slate-50/70 border-b border-slate-100 text-slate-400 text-[11px] uppercase tracking-widest font-black">
-                                <tr>
-                                    <th className="px-6 py-4">User</th>
-                                    <th className="px-6 py-4">Email</th>
-                                    <th className="px-6 py-4">Current Role</th>
-                                    <th className="px-6 py-4">Assign Role</th>
-                                    <th className="px-6 py-4">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-50">
-                                {users.map((user) => {
-                                    const isMe      = currentUser?.id === user._id;
-                                    const isUpdating = updatingUserId === user._id;
-                                    return (
-                                        <tr key={user._id} className="hover:bg-slate-50/50 transition-colors">
-                                            <td className="px-6 py-4">
-                                                <p className="font-bold text-slate-900">{user.name}</p>
-                                                {isMe && <span className="inline-flex mt-1 px-2 py-0.5 rounded-full bg-primary-50 text-primary-600 text-[10px] font-black uppercase tracking-widest">You</span>}
-                                            </td>
-                                            <td className="px-6 py-4 text-slate-600 font-medium text-sm">{user.email}</td>
-                                            <td className="px-6 py-4">
-                                                <span className={`px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-widest ${user.role === 'admin' ? 'bg-slate-900 text-white' : user.role === 'manager' ? 'bg-primary-50 text-primary-700' : 'bg-emerald-50 text-emerald-700'}`}>
-                                                    {ROLE_LABELS[user.role] || user.role}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <select value={user.role} disabled={isMe || isUpdating}
-                                                    onChange={(e) => handleUserRoleChange(user._id, e.target.value)}
-                                                    className="px-4 py-2 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-primary-500 bg-white disabled:opacity-60 disabled:cursor-not-allowed"
-                                                >
-                                                    <option value="admin" disabled={Boolean(existingAdmin && existingAdmin._id !== user._id)}>Admin</option>
-                                                    <option value="manager">Manager</option>
-                                                    <option value="sales">Sales</option>
-                                                </select>
-                                            </td>
-                                            <td className="px-6 py-4 text-sm font-semibold">
-                                                {isMe ? <span className="text-slate-400">Self — cannot change</span>
-                                                    : isUpdating ? <span className="text-amber-600">Updating…</span>
-                                                        : <span className="text-emerald-600">Ready</span>}
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
+                                return (
+                                    <tr key={user._id} className="hover:bg-primary-50/20 transition-colors">
+                                        <td className="px-6 py-4">
+                                            <span className="text-sm font-bold text-slate-900">{user.name}</span>
+                                            {isMe && <span className="ml-2 text-[10px] font-bold bg-primary-100 text-primary-700 px-1.5 py-0.5 rounded">You</span>}
+                                        </td>
+                                        <td className="px-6 py-4 text-xs text-slate-500">{user.email}</td>
+                                        <td className="px-6 py-4">
+                                            <select 
+                                                value={user.role} 
+                                                disabled={isMe || isUpdating}
+                                                onChange={(e) => handleUserRoleChange(user._id, e.target.value)}
+                                                className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-primary-600 disabled:opacity-50 transition-colors"
+                                            >
+                                                {roles.map(r => (
+                                                    <option key={r.role} value={r.role}>{r.label}</option>
+                                                ))}
+                                            </select>
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                            {isUpdating ? (
+                                                <span className="text-[10px] font-bold text-primary-400 animate-pulse">Updating...</span>
+                                            ) : (
+                                                <span className="text-[10px] font-bold text-emerald-500">Active</span>
+                                            )}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     );
+
 };
 
 export default Authorization;

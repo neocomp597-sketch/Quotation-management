@@ -225,13 +225,6 @@ const buildSummaryWorkbookSheet = (view, financialYear, filters = {}) => {
     });
 
     const rows = [
-        [
-            cell(`MGR 1: ${filters.mgr1 || 'All'}`, { colSpan: 2 }),
-            cell('Status Filter', { colSpan: 3 }),
-            cell(selectedStatuses, { colSpan: 4 }),
-            cell('Segment Filter', { colSpan: 3 }),
-            cell(filters.segment || 'All segments', { colSpan: 4 })
-        ],
         [cell(`Summary of Revenue (L) for Financial Year ${financialYear}`, { colSpan: header1.length })],
         header1,
         header2
@@ -282,7 +275,6 @@ const buildSummaryWorkbookSheet = (view, financialYear, filters = {}) => {
 
 const buildQuarterWorkbookSheet = (view, financialYear) => {
     const rows = [
-        ['Filter of Year', financialYear, '', '', '', '', ''],
         [cell(`Summary of Revenue (L) for Financial Year ${financialYear}`, { colSpan: 7 })],
         ['Segment', 'Yearly Budget', 'Q1', 'Q2', 'Q3', 'Q4', 'Total']
     ];
@@ -478,6 +470,12 @@ const Reports = () => {
         fetchTabData(activeTab);
     }, [activeTab]);
 
+    useEffect(() => {
+        if (activeTab === 'revenuePlan') {
+            fetchTabData('revenuePlan');
+        }
+    }, [revenuePlanFilters, revenuePlanFY]);
+
     const fetchTabData = async (tab) => {
         setLoading(true);
         try {
@@ -536,12 +534,21 @@ const Reports = () => {
                         if (revenuePlanFilters.mgr1) reportFilters.mgr1 = revenuePlanFilters.mgr1;
                         if (revenuePlanFilters.segment) reportFilters.mgr2 = revenuePlanFilters.segment;
                         if (revenuePlanFilters.statuses.length) reportFilters.status = revenuePlanFilters.statuses.join(',');
-                        const [reportRes, entriesRes] = await Promise.all([
-                            planningService.getMGRReport(fy, 'SBU', reportFilters),
-                            planningService.getAll({ financialYear: fy, limit: 100000, offset: 0 })
-                        ]);
-                        setRevenuePlanReport(reportRes.data);
-                        setRevenuePlanEntries(entriesRes.data?.data || []);
+                        
+                        // Only fetch entries if FY changed or we don't have them
+                        const shouldFetchEntries = revenuePlanEntries.length === 0 || revenuePlanEntries[0]?.financialYear !== fy;
+                        
+                        if (shouldFetchEntries) {
+                            const [reportRes, entriesRes] = await Promise.all([
+                                planningService.getMGRReport(fy, 'SBU', reportFilters),
+                                planningService.getAll({ financialYear: fy, limit: 100000, offset: 0 })
+                            ]);
+                            setRevenuePlanReport(reportRes.data);
+                            setRevenuePlanEntries(entriesRes.data?.data || []);
+                        } else {
+                            const reportRes = await planningService.getMGRReport(fy, 'SBU', reportFilters);
+                            setRevenuePlanReport(reportRes.data);
+                        }
                     }
                     break;
                 }
@@ -682,7 +689,7 @@ const Reports = () => {
                 break;
             }
             case 'revenuePlan': {
-                const sheets = buildRevenueWorkbookSheets(revenuePlanReport, getFilteredRevenuePlanEntries(), revenuePlanFY);
+                const sheets = buildRevenueWorkbookSheets(revenuePlanReport, getFilteredRevenuePlanEntries(), revenuePlanFY, revenuePlanFilters);
                 sheets.forEach(sheet => {
                     const sheetWs = XLSX.utils.aoa_to_sheet(flattenSheetRows(sheet.rows));
                     XLSX.utils.book_append_sheet(wb, sheetWs, sheet.name.slice(0, 31));
@@ -1289,13 +1296,6 @@ const Reports = () => {
 
         const renderSummaryWorkbook = () => {
             const summaryRows = toSheetRows([
-                [
-                    cell(`MGR 1: ${revenuePlanFilters.mgr1 || 'All'}`, { colSpan: 2 }),
-                    cell('Status Filter', { colSpan: 3 }),
-                    cell(selectedStatusLabel, { colSpan: 4 }),
-                    cell('Segment Filter', { colSpan: 3 }),
-                    cell(revenuePlanFilters.segment || 'All segments', { colSpan: 4 })
-                ],
                 [cell(`Summary of Revenue (L) for Financial Year ${revenuePlanFY}`, { colSpan: 10 })],
                 ['Segment', 'Yearly Budget', '% Budget', 'Monthly Budget', 'Quarterly Budget', 'H2 Budget', 'H2 Projected', 'Q1 Budget', 'Q1 Projected', 'Total Projected FY27'],
                 ...revenueView.rows.map(row => [

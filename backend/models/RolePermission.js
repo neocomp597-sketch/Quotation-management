@@ -1,13 +1,24 @@
 const mongoose = require('mongoose');
-const { ROLE_OPTIONS } = require('../config/authorization');
 
 const RolePermissionSchema = new mongoose.Schema(
     {
         role: {
             type: String,
-            enum: ROLE_OPTIONS,
             required: true,
-            unique: true
+            unique: true,
+            trim: true
+        },
+        label: {
+            type: String,
+            default: ''
+        },
+        description: {
+            type: String,
+            default: ''
+        },
+        isCustom: {
+            type: Boolean,
+            default: false
         },
         menuVisibility: {
             type: Map,

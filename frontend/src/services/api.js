@@ -92,7 +92,13 @@ export const authorizationService = {
   update: (role, permissions) =>
     api.put(`/authorization/${role}`, { permissions }),
   initialize: () => api.post("/authorization/initialize"),
+  createRole: (label, description) =>
+    api.post("/authorization/roles", { label, description }),
+  updateRoleMeta: (role, label, description) =>
+    api.patch(`/authorization/roles/${role}`, { label, description }),
+  deleteRole: (role) => api.delete(`/authorization/roles/${role}`),
 };
+
 
 export const mgrService = {
   getAll: (type) => api.get(`/mgrs${type ? `?type=${type}` : ""}`),
