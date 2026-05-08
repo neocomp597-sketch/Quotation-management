@@ -46,6 +46,7 @@ const FY_MONTHS = [
 ];
 
 const STATUS_OPTIONS = [
+  "Budget",
   "Firm",
   "MFC",
   "B & B",
@@ -56,6 +57,7 @@ const STATUS_OPTIONS = [
   "Parked",
 ];
 const STATUS_REPORT_COLUMNS = [
+  "Budget",
   "Firm",
   "MFC",
   "B&B",

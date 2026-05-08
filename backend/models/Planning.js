@@ -15,7 +15,7 @@ const PlanningSchema = new mongoose.Schema({
     mgrCode2: { type: String }, // MGR2 code from MGR master
     status: {
         type: String,
-        enum: ['B & B', 'Firm', 'Invoice', 'Lost', 'MFC', 'Order Received', 'Others', 'Parked'],
+        enum: ['Budget', 'B & B', 'Firm', 'Invoice', 'Lost', 'MFC', 'Order Received', 'Others', 'Parked'],
         required: true
     },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },

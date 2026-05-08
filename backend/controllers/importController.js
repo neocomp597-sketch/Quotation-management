@@ -16,7 +16,7 @@ const toBoolean = (value) => {
     return false;
 };
 const FY_MONTHS = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
-const PLANNING_STATUS_OPTIONS = ['Firm', 'MFC', 'B & B', 'Others', 'Order Received', 'Invoice', 'Lost', 'Parked'];
+const PLANNING_STATUS_OPTIONS = ['Budget', 'Firm', 'MFC', 'B & B', 'Others', 'Order Received', 'Invoice', 'Lost', 'Parked'];
 const cleanCellValue = (value = '') => String(value ?? '').trim().replace(/\s+/g, ' ');
 const normalizeKey = (value = '') => cleanCellValue(value).toUpperCase();
 const buildExactRegex = (value = '') => new RegExp(`^${escapeRegex(cleanCellValue(value))}$`, 'i');

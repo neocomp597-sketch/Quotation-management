@@ -60,6 +60,8 @@ const QUARTERS = [
     { key: 'Q4', months: ['Jan', 'Feb', 'Mar'] }
 ];
 const PLANNING_SEGMENTS = ['Export', 'Industry', 'UC', 'Utility'];
+const REVENUE_PLAN_STATUS_OPTIONS = ['Budget', 'Firm', 'MFC', 'B&B', 'Invoice', 'Order Received', 'Lost', 'Parked', 'Other'];
+const DEFAULT_REVENUE_PLAN_STATUSES = ['Budget', 'Firm', 'MFC', 'B&B', 'Invoice'];
 
 const getFinancialYears = () => {
     const now = new Date();
@@ -92,6 +94,12 @@ const normalizeRevenueStatus = (value = '') => {
     if (key === 'MFC') return 'MFC';
     return '';
 };
+const normalizePlanningStatusFilter = (value = '') => {
+    const key = normalizeRevenueKey(value);
+    if (key === 'B&B' || key === 'BB' || key === 'BANDB') return 'B&B';
+    if (key === 'OTHER' || key === 'OTHERS') return 'Other';
+    return String(value || '').trim();
+};
 
 const planValue = (value) => Number(value || 0) === 0 ? '-' : formatToLakhs(value, 2);
 const planPct = (value) => Number(value || 0) === 0 ? '-' : `${Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}%`;
@@ -119,6 +127,9 @@ const buildRevenuePlanView = (report) => {
                 normalizeRevenueKey(row.month) === normalizeRevenueKey(monthLabel)
                 && normalizeRevenueKey(normalizeRevenueSegment(row.segment)) === normalizeRevenueKey(segment)
             );
+            const budget = rowsForMonth
+                .filter(row => normalizePlanningStatusFilter(row.status) === 'Budget')
+                .reduce((sum, row) => sum + Number(row.value || 0), 0);
             const statusValues = {};
             REVENUE_STATUS_COLUMNS.forEach(status => {
                 statusValues[status] = rowsForMonth
@@ -129,37 +140,42 @@ const buildRevenuePlanView = (report) => {
             return {
                 month: monthLabel,
                 monthName: monthLabel.split('-')[0],
+                budget,
                 ...statusValues,
                 total
             };
         });
 
+        const yearlyBudgetTotal = monthly.reduce((sum, month) => sum + month.budget, 0);
         const yearlyTotal = monthly.reduce((sum, month) => sum + month.total, 0);
         return {
             segment,
+            yearlyBudgetTotal,
             yearlyTotal,
-            monthlyAverage: yearlyTotal / 12,
-            quarterlyAverage: yearlyTotal / 4,
+            monthlyAverage: yearlyBudgetTotal / 12,
+            quarterlyAverage: yearlyBudgetTotal / 4,
+            h2Budget: monthly.slice(6).reduce((sum, month) => sum + month.budget, 0),
             h2Projected: monthly.slice(6).reduce((sum, month) => sum + month.total, 0),
+            q1Budget: monthly.slice(0, 3).reduce((sum, month) => sum + month.budget, 0),
             q1Projected: monthly.slice(0, 3).reduce((sum, month) => sum + month.total, 0),
             totalProjected: yearlyTotal,
             monthly
         };
     });
 
-    const grandTotal = rows.reduce((sum, row) => sum + row.yearlyTotal, 0);
+    const grandTotal = rows.reduce((sum, row) => sum + row.yearlyBudgetTotal, 0);
+    const projectedGrandTotal = rows.reduce((sum, row) => sum + row.yearlyTotal, 0);
     const months = monthLabels.map(monthLabel => {
         const monthRows = rows.map(row => {
             const month = row.monthly.find(item => item.month === monthLabel);
-            const average = row.monthlyAverage || 0;
             return {
                 segment: row.segment,
                 ...month,
-                performance: average > 0 ? (month.total / average) * 100 : 0
+                performance: month.budget > 0 ? (month.total / month.budget) * 100 : 0
             };
         });
         const total = monthRows.reduce((sum, row) => sum + Number(row.total || 0), 0);
-        const budget = grandTotal / 12;
+        const budget = monthRows.reduce((sum, row) => sum + Number(row.budget || 0), 0);
         return {
             label: monthLabel,
             rows: monthRows,
@@ -170,48 +186,51 @@ const buildRevenuePlanView = (report) => {
         };
     });
 
-    const monthsWithData = months.filter(month => month.total > 0);
+    const monthsWithData = months.filter(month => month.total > 0 || month.budget > 0);
     const monthLabelsWithData = monthsWithData.map(month => month.label);
 
     return {
         rows: rows.map(row => ({
             ...row,
-            budgetPercent: grandTotal > 0 ? (row.yearlyTotal / grandTotal) * 100 : 0,
+            budgetPercent: grandTotal > 0 ? (row.yearlyBudgetTotal / grandTotal) * 100 : 0,
             quarters: QUARTERS.map(quarter => ({
                 key: quarter.key,
                 value: row.monthly
                     .filter(month => quarter.months.includes(month.monthName))
-                    .reduce((sum, month) => sum + month.total, 0)
+                    .reduce((sum, month) => sum + month.budget, 0)
             }))
         })),
         months: monthsWithData,
         monthLabels: monthLabelsWithData,
         grandTotal,
+        projectedGrandTotal,
         monthBudget: grandTotal / 12,
         quarterBudget: grandTotal / 4,
         h2Budget: months.slice(6).reduce((sum, month) => sum + month.budget, 0),
         h2Projected: months.slice(6).reduce((sum, month) => sum + month.total, 0),
+        q1Budget: months.slice(0, 3).reduce((sum, month) => sum + month.budget, 0),
         q1Projected: months.slice(0, 3).reduce((sum, month) => sum + month.total, 0)
     };
 };
 
 const toSheetRows = (rows) => rows.map(row => row.map(item => typeof item === 'object' && item !== null ? item : cell(item)));
 
-const buildSummaryWorkbookSheet = (view, financialYear) => {
+const buildSummaryWorkbookSheet = (view, financialYear, filters = {}) => {
+    const selectedStatuses = filters.statuses?.length ? filters.statuses.join(' / ') : 'All statuses';
     const header1 = ['Segment', 'Yearly Budget', '% Budget', 'Monthly Budget', 'Quarterly Budget', 'H2 Budget', 'H2 Projected', 'Q1 Budget', 'Q1 Projected', 'Total Projected FY27'];
     const header2 = Array(header1.length).fill('');
     view.months.forEach(month => {
-        header1.push(cell(month.label, { colSpan: 5 }));
-        header2.push('FIRM', 'MFC', 'B&B', 'Total', '%');
+        header1.push(cell(month.label, { colSpan: 6 }));
+        header2.push('Budget', 'FIRM', 'MFC', 'B&B', 'Total', '%');
     });
 
     const rows = [
         [
-            cell('Filter of MGR 1', { colSpan: 2 }),
-            cell('Filter on Status (multi Select)', { colSpan: 3 }),
-            cell('Firm / MFC / B&B / Invoiced default selected', { colSpan: 4 }),
-            cell('Filter on Segment', { colSpan: 3 }),
-            cell('Default Selected Utility / UC / Export / Industry', { colSpan: 4 })
+            cell(`MGR 1: ${filters.mgr1 || 'All'}`, { colSpan: 2 }),
+            cell('Status Filter', { colSpan: 3 }),
+            cell(selectedStatuses, { colSpan: 4 }),
+            cell('Segment Filter', { colSpan: 3 }),
+            cell(filters.segment || 'All segments', { colSpan: 4 })
         ],
         [cell(`Summary of Revenue (L) for Financial Year ${financialYear}`, { colSpan: header1.length })],
         header1,
@@ -221,19 +240,20 @@ const buildSummaryWorkbookSheet = (view, financialYear) => {
     view.rows.forEach(row => {
         const data = [
             getRevenueSegmentLabel(row.segment),
-            planValue(row.yearlyTotal),
+            planValue(row.yearlyBudgetTotal),
             planPct(row.budgetPercent),
             planValue(row.monthlyAverage),
             planValue(row.quarterlyAverage),
-            planValue(view.h2Budget * (row.budgetPercent / 100)),
+            planValue(row.h2Budget),
             planValue(row.h2Projected),
-            planValue(row.quarterlyAverage),
+            planValue(row.q1Budget),
             planValue(row.q1Projected),
             planValue(row.totalProjected)
         ];
         view.months.forEach(month => {
             const monthRow = month.rows.find(item => item.segment === row.segment) || {};
             data.push(
+                planValue(monthRow.budget),
                 planValue(monthRow.Firm),
                 planValue(monthRow.MFC),
                 planValue(monthRow['B&B']),
@@ -244,15 +264,15 @@ const buildSummaryWorkbookSheet = (view, financialYear) => {
         rows.push(data);
     });
 
-    const totalRow = ['Total', planValue(view.grandTotal), '', planValue(view.monthBudget), planValue(view.quarterBudget), planValue(view.h2Budget), planValue(view.h2Projected), planValue(view.quarterBudget), planValue(view.q1Projected), planValue(view.grandTotal)];
-    view.months.forEach(month => totalRow.push('', '', '', planValue(month.total), planPct(month.performance)));
+    const totalRow = ['Total', planValue(view.grandTotal), '', planValue(view.monthBudget), planValue(view.quarterBudget), planValue(view.h2Budget), planValue(view.h2Projected), planValue(view.q1Budget), planValue(view.q1Projected), planValue(view.projectedGrandTotal)];
+    view.months.forEach(month => totalRow.push(planValue(month.budget), '', '', '', planValue(month.total), planPct(month.performance)));
     rows.push(totalRow);
 
     ['Monthly Revenue', 'Budget', 'Variance wrt monthly Budget'].forEach(label => {
         const row = [label, '', '', '', '', '', '', '', '', ''];
         view.months.forEach(month => {
             const value = label === 'Monthly Revenue' ? month.total : label === 'Budget' ? month.budget : month.variance;
-            row.push('', '', '', planValue(value), label === 'Variance wrt monthly Budget' ? '' : planPct(month.performance));
+            row.push(label === 'Budget' ? planValue(value) : '', '', '', '', label !== 'Budget' ? planValue(value) : '', label === 'Variance wrt monthly Budget' ? '' : planPct(month.performance));
         });
         rows.push(row);
     });
@@ -270,9 +290,9 @@ const buildQuarterWorkbookSheet = (view, financialYear) => {
     view.rows.forEach(row => {
         rows.push([
             getRevenueSegmentLabel(row.segment),
-            planValue(row.yearlyTotal),
+            planValue(row.yearlyBudgetTotal),
             ...row.quarters.map(quarter => planValue(quarter.value)),
-            planValue(row.totalProjected)
+            planValue(row.yearlyBudgetTotal)
         ]);
     });
 
@@ -281,7 +301,7 @@ const buildQuarterWorkbookSheet = (view, financialYear) => {
         planValue(view.grandTotal),
         ...QUARTERS.map(quarter => planValue(view.months
             .filter(month => quarter.months.includes(month.label.split('-')[0]))
-            .reduce((sum, month) => sum + month.total, 0))),
+            .reduce((sum, month) => sum + month.budget, 0))),
         planValue(view.grandTotal)
     ]);
 
@@ -361,11 +381,11 @@ const buildDeferredWorkbookSheet = (entries = []) => {
     return { name: 'Deffered account Temperarily', rows: toSheetRows(rows) };
 };
 
-const buildRevenueWorkbookSheets = (report, entries = [], financialYear = '') => {
+const buildRevenueWorkbookSheets = (report, entries = [], financialYear = '', filters = {}) => {
     const view = buildRevenuePlanView(report);
     const monthLabels = report?.monthLabels?.length ? report.monthLabels : getMonthLabels(financialYear || report?.financialYear || '2026-27');
     return [
-        buildSummaryWorkbookSheet(view, financialYear || report?.financialYear || ''),
+        buildSummaryWorkbookSheet(view, financialYear || report?.financialYear || '', filters),
         buildProductwiseWorkbookSheet(entries, monthLabels),
         buildQuarterWorkbookSheet(view, financialYear || report?.financialYear || ''),
         buildDeferredWorkbookSheet(entries)
@@ -439,6 +459,11 @@ const Reports = () => {
     const [revenuePlanSheet, setRevenuePlanSheet] = useState(REVENUE_WORKBOOK_SHEETS[0]);
     const [expandedRevenueMonths, setExpandedRevenueMonths] = useState({});
     const [revenuePlanError, setRevenuePlanError] = useState('');
+    const [revenuePlanFilters, setRevenuePlanFilters] = useState({
+        mgr1: '',
+        segment: '',
+        statuses: DEFAULT_REVENUE_PLAN_STATUSES
+    });
 
     useEffect(() => {
         // Set default FY
@@ -507,8 +532,12 @@ const Reports = () => {
                     const fy = revenuePlanFY || planningFY;
                     if (fy) {
                         setRevenuePlanError('');
+                        const reportFilters = {};
+                        if (revenuePlanFilters.mgr1) reportFilters.mgr1 = revenuePlanFilters.mgr1;
+                        if (revenuePlanFilters.segment) reportFilters.mgr2 = revenuePlanFilters.segment;
+                        if (revenuePlanFilters.statuses.length) reportFilters.status = revenuePlanFilters.statuses.join(',');
                         const [reportRes, entriesRes] = await Promise.all([
-                            planningService.getMGRReport(fy, 'SBU'),
+                            planningService.getMGRReport(fy, 'SBU', reportFilters),
                             planningService.getAll({ financialYear: fy, limit: 100000, offset: 0 })
                         ]);
                         setRevenuePlanReport(reportRes.data);
@@ -528,6 +557,38 @@ const Reports = () => {
     };
 
     const handleRefresh = () => fetchTabData(activeTab);
+
+    const getFilteredRevenuePlanEntries = (entries = revenuePlanEntries) => {
+        const selectedStatuses = new Set((revenuePlanFilters.statuses || []).map(normalizePlanningStatusFilter));
+        return (entries || []).filter(entry => {
+            const matchesMgr1 = revenuePlanFilters.mgr1 ? normalizeRevenueKey(entry.mgrCode) === normalizeRevenueKey(revenuePlanFilters.mgr1) : true;
+            const matchesSegment = revenuePlanFilters.segment ? normalizeRevenueKey(normalizeRevenueSegment(entry.mgrCode2)) === normalizeRevenueKey(revenuePlanFilters.segment) : true;
+            const matchesStatus = selectedStatuses.size
+                ? selectedStatuses.has(normalizePlanningStatusFilter(entry.status))
+                : true;
+            return matchesMgr1 && matchesSegment && matchesStatus;
+        });
+    };
+
+    const toggleRevenuePlanStatusFilter = (status) => {
+        setRevenuePlanFilters(prev => {
+            const hasStatus = prev.statuses.includes(status);
+            return {
+                ...prev,
+                statuses: hasStatus
+                    ? prev.statuses.filter(item => item !== status)
+                    : [...prev.statuses, status]
+            };
+        });
+    };
+
+    const resetRevenuePlanFilters = () => {
+        setRevenuePlanFilters({
+            mgr1: '',
+            segment: '',
+            statuses: DEFAULT_REVENUE_PLAN_STATUSES
+        });
+    };
 
     // Excel exports per tab
     const handleExport = () => {
@@ -621,7 +682,7 @@ const Reports = () => {
                 break;
             }
             case 'revenuePlan': {
-                const sheets = buildRevenueWorkbookSheets(revenuePlanReport, revenuePlanEntries, revenuePlanFY);
+                const sheets = buildRevenueWorkbookSheets(revenuePlanReport, getFilteredRevenuePlanEntries(), revenuePlanFY);
                 sheets.forEach(sheet => {
                     const sheetWs = XLSX.utils.aoa_to_sheet(flattenSheetRows(sheet.rows));
                     XLSX.utils.book_append_sheet(wb, sheetWs, sheet.name.slice(0, 31));
@@ -1172,10 +1233,19 @@ const Reports = () => {
 
         const fyOptions = getFinancialYears();
         const hasData = Boolean(revenuePlanReport);
-        const workbookSheets = hasData ? buildRevenueWorkbookSheets(revenuePlanReport, revenuePlanEntries, revenuePlanFY) : [];
+        const filteredRevenuePlanEntries = getFilteredRevenuePlanEntries();
+        const workbookSheets = hasData ? buildRevenueWorkbookSheets(revenuePlanReport, filteredRevenuePlanEntries, revenuePlanFY) : [];
         const activeSheet = workbookSheets.find(sheet => sheet.name === revenuePlanSheet) || workbookSheets[0];
         const revenueView = hasData ? buildRevenuePlanView(revenuePlanReport) : null;
         const monthLabels = revenuePlanReport?.monthLabels?.length ? revenuePlanReport.monthLabels : getMonthLabels(revenuePlanFY);
+        const mgr1Options = Array.from(new Set((revenuePlanEntries || []).map(entry => entry.mgrCode).filter(Boolean))).sort();
+        const segmentOptions = Array.from(new Set([
+            ...REVENUE_SEGMENTS,
+            ...(revenuePlanEntries || []).map(entry => normalizeRevenueSegment(entry.mgrCode2)).filter(Boolean)
+        ])).sort();
+        const selectedStatusLabel = revenuePlanFilters.statuses.length
+            ? revenuePlanFilters.statuses.join(' / ')
+            : 'All statuses';
 
         const toggleRevenueMonth = (month) => {
             setExpandedRevenueMonths(prev => ({
@@ -1220,27 +1290,27 @@ const Reports = () => {
         const renderSummaryWorkbook = () => {
             const summaryRows = toSheetRows([
                 [
-                    cell('Filter of MGR 1', { colSpan: 2 }),
-                    cell('Filter on Status (multi Select)', { colSpan: 3 }),
-                    cell('Firm / MFC / B&B / Invoiced default selected', { colSpan: 4 }),
-                    cell('Filter on Segment', { colSpan: 3 }),
-                    cell('Default Selected Utility / UC / Export / Industry', { colSpan: 4 })
+                    cell(`MGR 1: ${revenuePlanFilters.mgr1 || 'All'}`, { colSpan: 2 }),
+                    cell('Status Filter', { colSpan: 3 }),
+                    cell(selectedStatusLabel, { colSpan: 4 }),
+                    cell('Segment Filter', { colSpan: 3 }),
+                    cell(revenuePlanFilters.segment || 'All segments', { colSpan: 4 })
                 ],
                 [cell(`Summary of Revenue (L) for Financial Year ${revenuePlanFY}`, { colSpan: 10 })],
                 ['Segment', 'Yearly Budget', '% Budget', 'Monthly Budget', 'Quarterly Budget', 'H2 Budget', 'H2 Projected', 'Q1 Budget', 'Q1 Projected', 'Total Projected FY27'],
                 ...revenueView.rows.map(row => [
                     getRevenueSegmentLabel(row.segment),
-                    planValue(row.yearlyTotal),
+                    planValue(row.yearlyBudgetTotal),
                     planPct(row.budgetPercent),
                     planValue(row.monthlyAverage),
                     planValue(row.quarterlyAverage),
-                    planValue(revenueView.h2Budget * (row.budgetPercent / 100)),
+                    planValue(row.h2Budget),
                     planValue(row.h2Projected),
-                    planValue(row.quarterlyAverage),
+                    planValue(row.q1Budget),
                     planValue(row.q1Projected),
                     planValue(row.totalProjected)
                 ]),
-                ['Total', planValue(revenueView.grandTotal), '100%', planValue(revenueView.monthBudget), planValue(revenueView.quarterBudget), planValue(revenueView.h2Budget), planValue(revenueView.h2Projected), planValue(revenueView.quarterBudget), planValue(revenueView.q1Projected), planValue(revenueView.grandTotal)]
+                ['Total', planValue(revenueView.grandTotal), '100%', planValue(revenueView.monthBudget), planValue(revenueView.quarterBudget), planValue(revenueView.h2Budget), planValue(revenueView.h2Projected), planValue(revenueView.q1Budget), planValue(revenueView.q1Projected), planValue(revenueView.projectedGrandTotal)]
             ]);
 
             return (
@@ -1249,19 +1319,20 @@ const Reports = () => {
                     {revenueView.months.map((month, index) => {
                         const isOpen = expandedRevenueMonths[month.label] ?? index === 0;
                         const monthRows = toSheetRows([
-                            [cell(month.label, { colSpan: 6 })],
-                            ['Segment', 'FIRM', 'MFC', 'B&B', 'Total', '%'],
+                            [cell(month.label, { colSpan: 7 })],
+                            ['Segment', 'Budget', 'FIRM', 'MFC', 'B&B', 'Total', '%'],
                             ...month.rows.map(row => [
                                 getRevenueSegmentLabel(row.segment),
+                                planValue(row.budget),
                                 planValue(row.Firm),
                                 planValue(row.MFC),
                                 planValue(row['B&B']),
                                 planValue(row.total),
                                 planPct(row.performance)
                             ]),
-                            ['Monthly Revenue', '', '', '', planValue(month.total), planPct(month.performance)],
-                            ['Budget', '', '', '', planValue(month.budget), ''],
-                            ['Variance wrt monthly Budget', '', '', '', planValue(month.variance), '']
+                            ['Monthly Revenue', '', '', '', '', planValue(month.total), planPct(month.performance)],
+                            ['Budget', planValue(month.budget), '', '', '', '', ''],
+                            ['Variance wrt monthly Budget', '', '', '', '', planValue(month.variance), '']
                         ]);
 
                         return (
@@ -1284,7 +1355,7 @@ const Reports = () => {
 
         const renderProductwiseWorkbook = () => {
             const groups = new Map();
-            revenuePlanEntries.forEach(entry => {
+            filteredRevenuePlanEntries.forEach(entry => {
                 const key = `${entry.productName || 'Product'}|${normalizeRevenueSegment(entry.mgrCode2)}|${entry.mgrCode || ''}`;
                 if (!groups.has(key)) {
                     groups.set(key, {
@@ -1353,6 +1424,64 @@ const Reports = () => {
                             </select>
                             <button onClick={() => fetchTabData('revenuePlan')} className="px-4 py-2.5 bg-black text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 transition-colors">
                                 Load Plan
+                            </button>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-1 lg:grid-cols-[minmax(160px,1fr)_minmax(160px,1fr)_minmax(280px,2fr)_auto] gap-3 p-4 bg-slate-50/60 border-b border-slate-200">
+                        <div>
+                            <label className="block text-[9px] font-black uppercase tracking-widest text-slate-500 mb-1">MGR 1</label>
+                            <select
+                                value={revenuePlanFilters.mgr1}
+                                onChange={(e) => setRevenuePlanFilters(prev => ({ ...prev, mgr1: e.target.value }))}
+                                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none focus:ring-4 focus:ring-primary-600/10 focus:border-primary-600"
+                            >
+                                <option value="">All MGR 1</option>
+                                {mgr1Options.map(option => <option key={option} value={option}>{option}</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-[9px] font-black uppercase tracking-widest text-slate-500 mb-1">Segment</label>
+                            <select
+                                value={revenuePlanFilters.segment}
+                                onChange={(e) => setRevenuePlanFilters(prev => ({ ...prev, segment: e.target.value }))}
+                                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none focus:ring-4 focus:ring-primary-600/10 focus:border-primary-600"
+                            >
+                                <option value="">All Segments</option>
+                                {segmentOptions.map(option => <option key={option} value={option}>{getRevenueSegmentLabel(option)}</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-[9px] font-black uppercase tracking-widest text-slate-500 mb-1">Status</label>
+                            <div className="flex flex-wrap gap-2">
+                                {REVENUE_PLAN_STATUS_OPTIONS.map(status => {
+                                    const checked = revenuePlanFilters.statuses.includes(status);
+                                    return (
+                                        <label
+                                            key={status}
+                                            className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl border text-[10px] font-black uppercase tracking-widest cursor-pointer ${checked
+                                                    ? 'bg-black text-white border-black'
+                                                    : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'
+                                                }`}
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={checked}
+                                                onChange={() => toggleRevenuePlanStatusFilter(status)}
+                                                className="sr-only"
+                                            />
+                                            {status}
+                                        </label>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                        <div className="flex items-end">
+                            <button
+                                type="button"
+                                onClick={resetRevenuePlanFilters}
+                                className="w-full px-4 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-slate-100 transition-colors"
+                            >
+                                Reset
                             </button>
                         </div>
                     </div>

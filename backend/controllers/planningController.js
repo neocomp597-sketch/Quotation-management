@@ -5,7 +5,7 @@ const escapeRegex = (value = '') => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 const cleanValue = (value = '') => String(value ?? '').trim().replace(/\s+/g, ' ');
 const normalizeCodeKey = (value = '') => String(value ?? '').trim().replace(/\s+/g, '').toUpperCase();
 
-const STATUS_COLUMNS = ['Firm', 'MFC', 'B & B', 'Others', 'Invoice', 'Lost', 'Parked', 'Order Received'];
+const STATUS_COLUMNS = ['Budget', 'Firm', 'MFC', 'B & B', 'Others', 'Invoice', 'Lost', 'Parked', 'Order Received'];
 const STATUS_ALIASES = {
     'B & B': 'B&B',
     Others: 'Other'
@@ -310,7 +310,7 @@ exports.deleteEntry = async (req, res) => {
 
 exports.getMGRReport = async (req, res) => {
     try {
-        const { financialYear, type, month, year } = req.query;
+        const { financialYear, type, month, year, mgr1, mgr2, status } = req.query;
         if (!financialYear) {
             return res.status(400).json({ message: 'financialYear is required (e.g. 2026-27)' });
         }
@@ -320,6 +320,24 @@ exports.getMGRReport = async (req, res) => {
         const query = { financialYear };
         if (monthYearFilter) {
             query.monthYear = monthYearFilter;
+        }
+        if (cleanValue(mgr1)) {
+            query.mgrCode = cleanValue(mgr1);
+        }
+        if (cleanValue(mgr2)) {
+            query.mgrCode2 = cleanValue(mgr2);
+        }
+        if (cleanValue(status)) {
+            const statuses = String(status)
+                .split(',')
+                .map((item) => cleanValue(item))
+                .map((item) => normalizeStatusValue(item))
+                .filter(Boolean);
+            if (statuses.length === 1) {
+                query.status = statuses[0];
+            } else if (statuses.length > 1) {
+                query.status = { $in: statuses };
+            }
         }
 
         const [mgr1Masters, mgr2Masters, entries] = await Promise.all([

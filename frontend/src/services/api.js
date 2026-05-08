@@ -91,6 +91,7 @@ export const authorizationService = {
   getMy: () => api.get("/authorization/me"),
   update: (role, permissions) =>
     api.put(`/authorization/${role}`, { permissions }),
+  initialize: () => api.post("/authorization/initialize"),
 };
 
 export const mgrService = {
