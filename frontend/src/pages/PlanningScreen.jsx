@@ -23,6 +23,7 @@ import {
   productService,
   mgrService,
   importService,
+  statusService,
 } from "../services/api";
 import * as XLSX from "xlsx";
 import ImportModal from "../components/ImportModal";
@@ -45,17 +46,6 @@ const FY_MONTHS = [
   "Mar",
 ];
 
-const STATUS_OPTIONS = [
-  "Budget",
-  "Firm",
-  "MFC",
-  "B & B",
-  "Others",
-  "Order Received",
-  "Invoice",
-  "Lost",
-  "Parked",
-];
 const STATUS_REPORT_COLUMNS = [
   "Budget",
   "Firm",
@@ -256,11 +246,14 @@ const PlanningScreen = () => {
     useState({});
   const [expandedSbuWiseMonths, setExpandedSbuWiseMonths] = useState({});
   const [isExportExpanded, setIsExportExpanded] = useState(true);
+  const [isGridExpanded, setIsGridExpanded] = useState(true);
 
   const [customers, setCustomers] = useState([]);
   const [products, setProducts] = useState([]);
   const [mgrList, setMgrList] = useState([]);
   const [mgrList2, setMgrList2] = useState([]);
+  const [statusOptions, setStatusOptions] = useState([]);
+  const [statusColorMap, setStatusColorMap] = useState({});
 
   const [editingId, setEditingId] = useState(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -363,35 +356,43 @@ const PlanningScreen = () => {
     }
   }, [financialYear, filters, offset, limit]);
 
-  useEffect(() => {
-    const fetchMasters = async () => {
-      try {
-        const [custRes, prodRes, mgrRes, mgr2Res] = await Promise.all([
-          customerService.getAll(),
-          productService.getAll(),
-          mgrService.getAll("MGR1"),
-          mgrService.getAll("MGR2"),
-        ]);
+  const fetchMasters = useCallback(async () => {
+    try {
+      const [custRes, prodRes, mgrRes, mgr2Res, statusRes] = await Promise.all([
+        customerService.getAll(),
+        productService.getAll(),
+        mgrService.getAll("MGR1"),
+        mgrService.getAll("MGR2"),
+        statusService.getAll(),
+      ]);
 
-        setCustomers(custRes.data);
-        setProducts(prodRes.data);
-        setMgrList(
-          dedupeMgrOptions(
-            mgrRes.data.filter((mgr) => mgr.status === "Active"),
-          ),
-        );
-        setMgrList2(
-          dedupeMgrOptions(
-            mgr2Res.data.filter((mgr) => mgr.status === "Active"),
-          ),
-        );
-      } catch (err) {
-        console.error("Failed to load master data:", err);
-      }
-    };
-
-    fetchMasters();
+      setCustomers(custRes.data);
+      setProducts(prodRes.data);
+      setMgrList(
+        dedupeMgrOptions(
+          mgrRes.data.filter((mgr) => mgr.status === "Active"),
+        ),
+      );
+      setMgrList2(
+        dedupeMgrOptions(
+          mgr2Res.data.filter((mgr) => mgr.status === "Active"),
+        ),
+      );
+      setStatusOptions(statusRes.data.filter(s => s.isActive).map(s => s.name));
+      
+      const colorMap = {};
+      statusRes.data.forEach(s => {
+          colorMap[s.name] = s.color;
+      });
+      setStatusColorMap(colorMap);
+    } catch (err) {
+      console.error("Failed to load master data:", err);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchMasters();
+  }, [fetchMasters]);
 
   // Reset pagination when filters change
   useEffect(() => {
@@ -911,27 +912,6 @@ const PlanningScreen = () => {
       mgrCode2: "",
       status: "",
     });
-  };
-
-  const getStatusClasses = (status) => {
-    switch (status) {
-      case "Firm":
-        return "bg-emerald-50 text-emerald-700";
-      case "MFC":
-        return "bg-amber-50 text-amber-700";
-      case "B & B":
-        return "bg-purple-50 text-purple-700";
-      case "Invoice":
-        return "bg-orange-50 text-orange-700";
-      case "Order Received":
-        return "bg-sky-50 text-sky-700";
-      case "Lost":
-        return "bg-rose-50 text-rose-700";
-      case "Parked":
-        return "bg-slate-200 text-slate-700";
-      default:
-        return "bg-slate-100 text-slate-600";
-    }
   };
 
   const selectCustomer = (customer) => {
@@ -1512,7 +1492,7 @@ const PlanningScreen = () => {
                     className="w-full px-3 py-3 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-primary-500 bg-white"
                   >
                     <option value="">All Statuses</option>
-                    {STATUS_OPTIONS.map((status) => (
+                    {(statusOptions.length > 0 ? statusOptions : ["Budget", "Firm", "MFC", "B & B", "Others", "Order Received", "Invoice", "Lost", "Parked"]).map((status) => (
                       <option key={status} value={status}>
                         {status}
                       </option>
@@ -1770,7 +1750,7 @@ const PlanningScreen = () => {
                         className={compactFieldClass}
                       >
                         <option value="">Select status</option>
-                        {STATUS_OPTIONS.map((status) => (
+                        {(statusOptions.length > 0 ? statusOptions : ["Budget", "Firm", "MFC", "B & B", "Others", "Order Received", "Invoice", "Lost", "Parked"]).map((status) => (
                           <option key={status} value={status}>
                             {status}
                           </option>
@@ -1859,7 +1839,12 @@ const PlanningScreen = () => {
                       <td className="py-3 px-2 text-xs">
                         <div className="flex items-center justify-between gap-1">
                           <span
-                            className={`truncate px-2 py-1 rounded font-bold whitespace-nowrap ${getStatusClasses(entry.status)}`}
+                            className="truncate px-2 py-1 rounded font-bold whitespace-nowrap"
+                            style={{ 
+                                backgroundColor: `${statusColorMap[entry.status] || '#f1f5f9'}20`, 
+                                color: statusColorMap[entry.status] || '#64748b',
+                                border: `1px solid ${statusColorMap[entry.status] || '#cbd5e1'}40`
+                            }}
                             title={entry.status}
                           >
                             {entry.status}
@@ -2290,7 +2275,7 @@ const PlanningScreen = () => {
                                   entry.total += Number(r.value || 0);
                                 });
                               const sbuRows = Array.from(sbuMap.values());
-                              
+
                               if (sbuRows.length === 0) {
                                 return ['EPC', 'SBU1', 'SBU2', 'SBU3'].map(sbu => (
                                   <tr
@@ -2482,7 +2467,7 @@ const PlanningScreen = () => {
                   {(computedStatusBreakdownData?.length > 0 ? computedStatusBreakdownData : []).map((monthData, mIdx) => {
                     const isMonthExpanded = expandedStatusBreakdownMonths[monthData.month];
                     const statusCols = visibleStatusColumns.length > 0 ? visibleStatusColumns : STATUS_REPORT_COLUMNS;
-                    
+
                     return (
                       <React.Fragment key={monthData.month}>
                         {/* Month Header Row */}

@@ -27,6 +27,7 @@ import Vendors from './pages/Vendors';
 import Vouchers from './pages/Vouchers';
 import CreateVoucher from './pages/CreateVoucher';
 import Authorization from './pages/Authorization';
+import StatusMaster from './pages/StatusMaster';
 import ErrorBoundary from './components/ErrorBoundary';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -81,6 +82,7 @@ function App() {
             <Route path="/quotations/:id" element={<PermissionRoute permissionKey="quotation_list"><Layout><CreateQuotation /></Layout></PermissionRoute>} />
             <Route path="/terms" element={<PermissionRoute permissionKey="master_terms"><Layout><Terms /></Layout></PermissionRoute>} />
             <Route path="/settings" element={<PermissionRoute permissionKey="settings_profile"><Layout><Settings /></Layout></PermissionRoute>} />
+            <Route path="/status-master" element={<PermissionRoute permissionKey="master_statuses"><Layout><StatusMaster /></Layout></PermissionRoute>} />
             <Route path="/admin/authorization" element={<PermissionRoute permissionKey="admin_authorization"><Layout><Authorization /></Layout></PermissionRoute>} />
           </Route>
 

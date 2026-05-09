@@ -48,6 +48,7 @@ const notificationRoutes = require("./routes/notificationRoutes");
 const analyticsRoutes = require("./routes/analyticsRoutes");
 const planningRoutes = require("./routes/planningRoutes");
 const authorizationRoutes = require("./routes/authorizationRoutes");
+const statusRoutes = require("./routes/statusRoutes");
 const scheduler = require("./utils/scheduler");
 
 // API Routes
@@ -72,6 +73,7 @@ app.use("/api/notifications", notificationRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/planning", planningRoutes);
 app.use("/api/authorization", authorizationRoutes);
+app.use("/api/statuses", statusRoutes);
 
 app.get('/api/trigger-seed', async (req, res) => {
     try {

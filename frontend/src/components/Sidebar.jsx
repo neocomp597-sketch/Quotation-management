@@ -63,6 +63,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                 { key: 'master_products', name: 'Products', icon: <MdInventory size={18} />, path: '/products' },
                 { key: 'master_mgrs', name: 'MGR Master', icon: <MdCategory size={18} />, path: '/mgrs' },
                 { key: 'master_attributes', name: 'Attributes', icon: <MdAssignment size={18} />, path: '/attributes' },
+                { key: 'master_statuses', name: 'Status', icon: <MdBarChart size={18} />, path: '/status-master' },
                 { key: 'master_terms', name: 'Terms & Conditions', icon: <MdDescription size={18} />, path: '/terms' },
             ]
         },

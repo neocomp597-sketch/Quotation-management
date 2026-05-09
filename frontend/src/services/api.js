@@ -262,4 +262,11 @@ export const notificationService = {
   dismiss: (id) => api.patch(`/notifications/${id}/dismiss`),
 };
 
+export const statusService = {
+  getAll: () => api.get("/statuses"),
+  create: (data) => api.post("/statuses", data),
+  update: (id, data) => api.put(`/statuses/${id}`, data),
+  delete: (id) => api.delete(`/statuses/${id}`),
+};
+
 export default api;

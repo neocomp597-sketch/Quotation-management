@@ -17,6 +17,7 @@ const MENU_GROUPS = [
             { key: 'master_products', label: 'Products', description: 'Product master records' },
             { key: 'master_mgrs', label: 'MGRs', description: 'MGR master hierarchy' },
             { key: 'master_attributes', label: 'Attributes', description: 'Attribute master definitions' },
+            { key: 'master_statuses', label: 'Status Master', description: 'Status master definitions for planning' },
             { key: 'master_terms', label: 'Terms', description: 'Terms and conditions master' }
         ]
     },

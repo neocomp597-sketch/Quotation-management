@@ -15,7 +15,7 @@ import {
     MdRefresh,
     MdKeyboardArrowDown
 } from 'react-icons/md';
-import { quotationService, analyticsService, planningService } from '../services/api';
+import { quotationService, analyticsService, planningService, statusService } from '../services/api';
 import { formatCurrency, formatDate } from '../utils/helpers';
 import { formatToLakhs } from '../utils/formatters';
 import * as XLSX from 'xlsx';
@@ -62,6 +62,25 @@ const QUARTERS = [
 const PLANNING_SEGMENTS = ['Export', 'Industry', 'UC', 'Utility'];
 const REVENUE_PLAN_STATUS_OPTIONS = ['Budget', 'Firm', 'MFC', 'B&B', 'Invoice', 'Order Received', 'Lost', 'Parked', 'Other'];
 const DEFAULT_REVENUE_PLAN_STATUSES = ['Budget', 'Firm', 'MFC', 'B&B', 'Invoice'];
+const REVENUE_PRODUCT_TEMPLATE = [
+    { type: 'I', product: '11KV Indoor ' },
+    { type: '33K', product: '33KV ID/OD' },
+    { type: '11K', product: '11KV Kiosk' },
+    { type: 'SPA', product: 'Spares' }
+];
+const REVENUE_PRODUCT_SEGMENTS = [
+    { segment: 'Utility', code: 'UL' },
+    { segment: 'UC', code: 'UC' },
+    { segment: 'Industry', code: 'IND' },
+    { segment: 'Export', code: 'EXP' }
+];
+const DEFERRED_COLUMNS = [
+    'Sr. No.', 'Customer Name', 'Discom', 'Product', 'Qty', 'Rate', 'Values',
+    '100% Confidance', 'Extra Efforts', 'Shift to Nov', 'Type', 'Category',
+    'Status', 'Confidance', 'Segment', 'Region', 'Remarks', 'CDD',
+    'Drawing Submission', 'Drawing Approval', 'Clearance from Engg',
+    'Indent Elect', 'Indent Mech'
+];
 
 const getFinancialYears = () => {
     const now = new Date();
@@ -110,9 +129,23 @@ const formatReportPercentage = (value, decimals = 2) =>
         maximumFractionDigits: decimals
     })}%`;
 const getRevenueSegmentLabel = (segment) => segment === 'UC' ? 'Utility Contractor' : segment;
+const getRevenueSegmentShortCode = (segment) => REVENUE_PRODUCT_SEGMENTS.find(item => item.segment === normalizeRevenueSegment(segment))?.code || normalizeRevenueSegment(segment);
+const inferRevenueProductType = (productName = '') => {
+    const key = normalizeRevenueKey(productName);
+    if (key.includes('SPARE')) return 'SPA';
+    if (key.includes('KIOSK')) return '11K';
+    if (key.includes('33KV') || key.includes('33K')) return '33K';
+    if (key.includes('11KV') || key.includes('11K')) return 'I';
+    return '';
+};
 const REVENUE_WORKBOOK_SHEETS = ['Summary FY27', 'Productwise', 'Summary FY27_Qtr wise', 'Deffered account Temperarily'];
 
 const cell = (value = '', options = {}) => ({ value, ...options });
+const blankRow = (length) => Array.from({ length }, () => '');
+const sumValues = (rows = [], key) => rows.reduce((sum, row) => sum + Number(row?.[key] || 0), 0);
+const getQuarterMonths = (months = [], quarterIndex) => months.slice(quarterIndex * 3, quarterIndex * 3 + 3);
+const getYtdMonths = (months = [], quarterIndex) => months.slice(0, (quarterIndex + 1) * 3);
+const getMonthRow = (month, segment) => month?.rows?.find(item => normalizeRevenueKey(item.segment) === normalizeRevenueKey(segment)) || {};
 
 const buildRevenuePlanView = (report) => {
     const monthLabels = report?.monthLabels?.length ? report.monthLabels : getMonthLabels(report?.financialYear || '2026-27');
@@ -197,9 +230,10 @@ const buildRevenuePlanView = (report) => {
                 key: quarter.key,
                 value: row.monthly
                     .filter(month => quarter.months.includes(month.monthName))
-                    .reduce((sum, month) => sum + month.budget, 0)
+                    .reduce((sum, month) => sum + month.total, 0)
             }))
         })),
+        allMonths: months,
         months: monthsWithData,
         monthLabels: monthLabelsWithData,
         grandTotal,
@@ -217,15 +251,26 @@ const toSheetRows = (rows) => rows.map(row => row.map(item => typeof item === 'o
 
 const buildSummaryWorkbookSheet = (view, financialYear, filters = {}) => {
     const selectedStatuses = filters.statuses?.length ? filters.statuses.join(' / ') : 'All statuses';
-    const header1 = ['Segment', 'Yearly Budget', '% Budget', 'Monthly Budget', 'Quarterly Budget', 'H2 Budget', 'H2 Projected', 'Q1 Budget', 'Q1 Projected', 'Total Projected FY27'];
-    const header2 = Array(header1.length).fill('');
-    view.months.forEach(month => {
-        header1.push(cell(month.label, { colSpan: 6 }));
-        header2.push('Budget', 'FIRM', 'MFC', 'B&B', 'Total', '%');
+    const months = view.allMonths || view.months || [];
+    const fixedHeaders = ['Segment', 'Yearly Budget', '% Budget', 'Monthly Budget', 'Quarterly Budget', 'H2 Budget', 'H2 Projected ', 'Q1 Budget', ' Q1 Projected', 'Total Projected FY27'];
+    const header1 = [...fixedHeaders];
+    const header2 = blankRow(fixedHeaders.length);
+
+    months.forEach((month, index) => {
+        header1.push(cell(month.label, { colSpan: 4 }), '%');
+        header2.push('FIRM', 'MFC', 'B&B', 'Total', '');
+
+        if ((index + 1) % 3 === 0) {
+            const quarterNo = Math.floor(index / 3) + 1;
+            header1.push(cell(`Total Q${quarterNo}`, { colSpan: 4 }), '', `YTD Q${quarterNo} Budget`, `YTD Q${quarterNo} Projected`, '% Performance');
+            header2.push('FIRM', 'MFC', 'B&B', 'Total', '', '', '', '');
+        }
     });
 
     const rows = [
-        [cell(`Summary of Revenue (L) for Financial Year ${financialYear}`, { colSpan: header1.length })],
+        ['Filter of MGR 1', filters.mgr1 || 'SBU 1/ 2/ 3', '', 'Filter on Status (multi Select)', selectedStatuses, '', '', '', '', 'Filter on Segement', filters.segment ? getRevenueSegmentLabel(filters.segment) : 'Default Selected Utility / UC / Export / Industry', '', '', '', '', '', '', 'Filter of Year', financialYear],
+        blankRow(header1.length),
+        [cell(`Summary of Revenue (Rs L) for Financial Year ${financialYear}`, { colSpan: header1.length })],
         header1,
         header2
     ];
@@ -243,29 +288,106 @@ const buildSummaryWorkbookSheet = (view, financialYear, filters = {}) => {
             planValue(row.q1Projected),
             planValue(row.totalProjected)
         ];
-        view.months.forEach(month => {
-            const monthRow = month.rows.find(item => item.segment === row.segment) || {};
+
+        months.forEach((month, index) => {
+            const monthRow = getMonthRow(month, row.segment);
             data.push(
-                planValue(monthRow.budget),
                 planValue(monthRow.Firm),
                 planValue(monthRow.MFC),
                 planValue(monthRow['B&B']),
                 planValue(monthRow.total),
                 planPct(monthRow.performance)
             );
+
+            if ((index + 1) % 3 === 0) {
+                const quarterIndex = Math.floor(index / 3);
+                const quarterMonths = getQuarterMonths(months, quarterIndex);
+                const ytdMonths = getYtdMonths(months, quarterIndex);
+                const quarterRows = quarterMonths.map(item => getMonthRow(item, row.segment));
+                const ytdBudget = ytdMonths.reduce((sum, item) => sum + Number(getMonthRow(item, row.segment).budget || 0), 0);
+                const ytdProjected = ytdMonths.reduce((sum, item) => sum + Number(getMonthRow(item, row.segment).total || 0), 0);
+                data.push(
+                    planValue(sumValues(quarterRows, 'Firm')),
+                    planValue(sumValues(quarterRows, 'MFC')),
+                    planValue(sumValues(quarterRows, 'B&B')),
+                    planValue(sumValues(quarterRows, 'total')),
+                    '',
+                    planValue(ytdBudget),
+                    planValue(ytdProjected),
+                    planPct(ytdBudget > 0 ? (ytdProjected / ytdBudget) * 100 : 0)
+                );
+            }
         });
         rows.push(data);
     });
 
+    rows.push(blankRow(header1.length));
+
     const totalRow = ['Total', planValue(view.grandTotal), '', planValue(view.monthBudget), planValue(view.quarterBudget), planValue(view.h2Budget), planValue(view.h2Projected), planValue(view.q1Budget), planValue(view.q1Projected), planValue(view.projectedGrandTotal)];
-    view.months.forEach(month => totalRow.push(planValue(month.budget), '', '', '', planValue(month.total), planPct(month.performance)));
+    months.forEach((month, index) => {
+        totalRow.push(
+            planValue(sumValues(month.rows, 'Firm')),
+            planValue(sumValues(month.rows, 'MFC')),
+            planValue(sumValues(month.rows, 'B&B')),
+            planValue(month.total),
+            planPct(month.performance)
+        );
+        if ((index + 1) % 3 === 0) {
+            const quarterIndex = Math.floor(index / 3);
+            const quarterMonths = getQuarterMonths(months, quarterIndex);
+            const ytdMonths = getYtdMonths(months, quarterIndex);
+            const quarterRows = quarterMonths.flatMap(item => item.rows || []);
+            const ytdBudget = ytdMonths.reduce((sum, item) => sum + Number(item.budget || 0), 0);
+            const ytdProjected = ytdMonths.reduce((sum, item) => sum + Number(item.total || 0), 0);
+            totalRow.push(
+                planValue(sumValues(quarterRows, 'Firm')),
+                planValue(sumValues(quarterRows, 'MFC')),
+                planValue(sumValues(quarterRows, 'B&B')),
+                planValue(quarterMonths.reduce((sum, item) => sum + Number(item.total || 0), 0)),
+                '',
+                planValue(ytdBudget),
+                planValue(ytdProjected),
+                planPct(ytdBudget > 0 ? (ytdProjected / ytdBudget) * 100 : 0)
+            );
+        }
+    });
     rows.push(totalRow);
 
-    ['Monthly Revenue', 'Budget', 'Variance wrt monthly Budget'].forEach(label => {
+    const metricRows = [
+        'Monthly Revenue ',
+        `Budget  (Total Revenue: ${Math.round(view.grandTotal / 100)} Cr)`,
+        'Cumulative Budget',
+        'Asking Rate',
+        'Variance wrt monthly Budget',
+        'Variance wrt YTD Budget',
+        'Cumulative Revenue '
+    ];
+
+    metricRows.forEach(label => {
         const row = [label, '', '', '', '', '', '', '', '', ''];
-        view.months.forEach(month => {
-            const value = label === 'Monthly Revenue' ? month.total : label === 'Budget' ? month.budget : month.variance;
-            row.push(label === 'Budget' ? planValue(value) : '', '', '', '', label !== 'Budget' ? planValue(value) : '', label === 'Variance wrt monthly Budget' ? '' : planPct(month.performance));
+        months.forEach((month, index) => {
+            const ytdBudget = months.slice(0, index + 1).reduce((sum, item) => sum + Number(item.budget || 0), 0);
+            const ytdRevenue = months.slice(0, index + 1).reduce((sum, item) => sum + Number(item.total || 0), 0);
+            const remainingMonths = Math.max(12 - index, 1);
+            const askingRate = (view.grandTotal - months.slice(0, index).reduce((sum, item) => sum + Number(item.total || 0), 0)) / remainingMonths;
+            const value = label === 'Monthly Revenue '
+                ? month.total
+                : label.startsWith('Budget')
+                    ? month.budget
+                    : label === 'Cumulative Budget'
+                        ? ytdBudget
+                        : label === 'Asking Rate'
+                            ? askingRate
+                            : label === 'Variance wrt monthly Budget'
+                                ? month.total - month.budget
+                                : label === 'Variance wrt YTD Budget'
+                                    ? ytdRevenue - ytdBudget
+                                    : ytdRevenue;
+            row.push(cell(planValue(value), { colSpan: 4 }), '');
+
+            if ((index + 1) % 3 === 0) {
+                row.push(cell('', { colSpan: 4 }), '', '', '', '');
+            }
         });
         rows.push(row);
     });
@@ -275,26 +397,30 @@ const buildSummaryWorkbookSheet = (view, financialYear, filters = {}) => {
 
 const buildQuarterWorkbookSheet = (view, financialYear) => {
     const rows = [
-        [cell(`Summary of Revenue (L) for Financial Year ${financialYear}`, { colSpan: 7 })],
+        ['Filter of Year'],
+        blankRow(7),
+        [cell(`Summary of Revenue (Rs L) for Financial Year ${financialYear}`, { colSpan: 7 })],
         ['Segment', 'Yearly Budget', 'Q1', 'Q2', 'Q3', 'Q4', 'Total']
     ];
 
+    rows.push(blankRow(7));
     view.rows.forEach(row => {
         rows.push([
             getRevenueSegmentLabel(row.segment),
             planValue(row.yearlyBudgetTotal),
             ...row.quarters.map(quarter => planValue(quarter.value)),
-            planValue(row.yearlyBudgetTotal)
+            planValue(row.totalProjected)
         ]);
     });
 
+    rows.push(blankRow(7));
     rows.push([
         'Total',
         planValue(view.grandTotal),
-        ...QUARTERS.map(quarter => planValue(view.months
+        ...QUARTERS.map(quarter => planValue((view.allMonths || view.months)
             .filter(month => quarter.months.includes(month.label.split('-')[0]))
-            .reduce((sum, month) => sum + month.budget, 0))),
-        planValue(view.grandTotal)
+            .reduce((sum, month) => sum + month.total, 0))),
+        planValue(view.projectedGrandTotal)
     ]);
 
     return { name: 'Summary FY27_Qtr wise', rows: toSheetRows(rows) };
@@ -302,8 +428,8 @@ const buildQuarterWorkbookSheet = (view, financialYear) => {
 
 const buildProductwiseWorkbookSheet = (entries = [], monthLabels = []) => {
     const rows = [
-        ['', '', '', cell('Value', { colSpan: monthLabels.length }), ...Array(Math.max(monthLabels.length - 1, 0)).fill(''), cell('Qty', { colSpan: monthLabels.length }), ...Array(Math.max(monthLabels.length - 1, 0)).fill('')],
-        ['Type', 'Product', 'Category', ...monthLabels, ...monthLabels]
+        [100, '', '', ...monthLabels.map(() => 'Value'), ...monthLabels.map(() => 'Qty')],
+        ['', '', '', ...monthLabels, ...monthLabels]
     ];
 
     const groupMap = new Map();
@@ -313,7 +439,7 @@ const buildProductwiseWorkbookSheet = (entries = [], monthLabels = []) => {
             groupMap.set(key, {
                 product: entry.productName || 'Product',
                 category: normalizeRevenueSegment(entry.mgrCode2),
-                type: entry.mgrCode || '',
+                type: inferRevenueProductType(entry.productName) || entry.mgrCode || '',
                 values: {},
                 qty: {}
             });
@@ -323,14 +449,21 @@ const buildProductwiseWorkbookSheet = (entries = [], monthLabels = []) => {
         group.qty[entry.monthYear] = Number(group.qty[entry.monthYear] || 0) + Number(entry.qty || 0);
     });
 
-    Array.from(groupMap.values()).forEach(group => {
-        rows.push([
-            group.type,
-            group.product,
-            group.category,
-            ...monthLabels.map(month => planValue(group.values[month])),
-            ...monthLabels.map(month => Number(group.qty[month] || 0) || '-')
-        ]);
+    REVENUE_PRODUCT_SEGMENTS.forEach(({ segment, code }) => {
+        REVENUE_PRODUCT_TEMPLATE.forEach(template => {
+            const matches = Array.from(groupMap.values()).filter(group =>
+                normalizeRevenueKey(group.type) === normalizeRevenueKey(template.type)
+                && normalizeRevenueKey(group.category) === normalizeRevenueKey(segment)
+            );
+            rows.push([
+                template.type,
+                template.product,
+                code,
+                ...monthLabels.map(month => planValue(matches.reduce((sum, group) => sum + Number(group.values[month] || 0), 0))),
+                ...monthLabels.map(month => matches.reduce((sum, group) => sum + Number(group.qty[month] || 0), 0) || '-')
+            ]);
+        });
+        rows.push(blankRow(3 + (monthLabels.length * 2)));
     });
 
     return { name: 'Productwise', rows: toSheetRows(rows) };
@@ -341,8 +474,9 @@ const buildDeferredWorkbookSheet = (entries = []) => {
         ['Ref:', 'STL/ULA/Rev/Oct'],
         ['Rev', '0'],
         ['Date', ''],
-        [cell('ULARIA - Deffered account temporarily', { colSpan: 20 })],
-        ['Sr. No.', 'Customer Name', 'Discom', 'Product', 'Qty', 'Rate', 'Values', '100% Confidance', 'Extra Efforts', 'Shift to Nov', 'Type', 'Category', 'Status', 'Confidance', 'Segment', 'Region', 'Remarks', 'CDD', 'Drawing Submission', 'Drawing Approval']
+        blankRow(DEFERRED_COLUMNS.length),
+        [cell('ULARIA - Deffered account temporarily', { colSpan: DEFERRED_COLUMNS.length })],
+        DEFERRED_COLUMNS
     ];
 
     entries.forEach((entry, index) => {
@@ -361,7 +495,10 @@ const buildDeferredWorkbookSheet = (entries = []) => {
             normalizeRevenueSegment(entry.mgrCode2),
             entry.status || '',
             '',
-            normalizeRevenueSegment(entry.mgrCode2),
+            getRevenueSegmentShortCode(entry.mgrCode2),
+            '',
+            '',
+            '',
             '',
             '',
             '',
@@ -394,6 +531,51 @@ const flattenSheetRows = (rows = []) => rows.map(row => {
     });
     return flattened;
 });
+
+const revenueSheetToWorksheet = (sheet) => {
+    const aoa = flattenSheetRows(sheet.rows);
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    const merges = [];
+
+    sheet.rows.forEach((row, rowIndex) => {
+        let colIndex = 0;
+        row.forEach(item => {
+            const span = Number(item.colSpan || 1);
+            if (span > 1) {
+                merges.push({
+                    s: { r: rowIndex, c: colIndex },
+                    e: { r: rowIndex, c: colIndex + span - 1 }
+                });
+            }
+            colIndex += span;
+        });
+    });
+
+    if (merges.length) {
+        ws['!merges'] = merges;
+    }
+
+    const colCount = aoa.reduce((max, row) => Math.max(max, row.length), 0);
+    ws['!cols'] = Array.from({ length: colCount }, (_, index) => {
+        if (sheet.name === 'Summary FY27') {
+            if (index === 0) return { wch: 22 };
+            if (index < 10) return { wch: 13 };
+            return { wch: 9 };
+        }
+        if (sheet.name === 'Productwise') {
+            if (index === 0) return { wch: 8 };
+            if (index === 1) return { wch: 22 };
+            if (index === 2) return { wch: 10 };
+            return { wch: 11 };
+        }
+        if (sheet.name === 'Deffered account Temperarily') {
+            return { wch: [8, 22, 18, 32, 10, 10, 14, 18, 16, 15, 10, 10, 12, 14, 12, 12, 34][index] || 14 };
+        }
+        return { wch: index === 0 ? 20 : 12 };
+    });
+
+    return ws;
+};
 
 const StatCard = ({ icon, label, value, color = 'primary' }) => {
     const colorMap = {
@@ -456,6 +638,20 @@ const Reports = () => {
         segment: '',
         statuses: DEFAULT_REVENUE_PLAN_STATUSES
     });
+    const [statusOptions, setStatusOptions] = useState([]);
+
+    useEffect(() => {
+        const fetchStatuses = async () => {
+            try {
+                const res = await statusService.getAll();
+                const activeStatuses = res.data.filter(s => s.isActive).map(s => s.name);
+                setStatusOptions(activeStatuses);
+            } catch (err) {
+                console.error('Error fetching statuses:', err);
+            }
+        };
+        fetchStatuses();
+    }, []);
 
     useEffect(() => {
         // Set default FY
@@ -691,7 +887,7 @@ const Reports = () => {
             case 'revenuePlan': {
                 const sheets = buildRevenueWorkbookSheets(revenuePlanReport, getFilteredRevenuePlanEntries(), revenuePlanFY, revenuePlanFilters);
                 sheets.forEach(sheet => {
-                    const sheetWs = XLSX.utils.aoa_to_sheet(flattenSheetRows(sheet.rows));
+                    const sheetWs = revenueSheetToWorksheet(sheet);
                     XLSX.utils.book_append_sheet(wb, sheetWs, sheet.name.slice(0, 31));
                 });
                 XLSX.writeFile(wb, `Revenue_Plan_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
@@ -1241,7 +1437,7 @@ const Reports = () => {
         const fyOptions = getFinancialYears();
         const hasData = Boolean(revenuePlanReport);
         const filteredRevenuePlanEntries = getFilteredRevenuePlanEntries();
-        const workbookSheets = hasData ? buildRevenueWorkbookSheets(revenuePlanReport, filteredRevenuePlanEntries, revenuePlanFY) : [];
+        const workbookSheets = hasData ? buildRevenueWorkbookSheets(revenuePlanReport, filteredRevenuePlanEntries, revenuePlanFY, revenuePlanFilters) : [];
         const activeSheet = workbookSheets.find(sheet => sheet.name === revenuePlanSheet) || workbookSheets[0];
         const revenueView = hasData ? buildRevenuePlanView(revenuePlanReport) : null;
         const monthLabels = revenuePlanReport?.monthLabels?.length ? revenuePlanReport.monthLabels : getMonthLabels(revenuePlanFY);
@@ -1262,26 +1458,36 @@ const Reports = () => {
         };
 
         const renderWorkbookTable = (rows = [], options = {}) => (
-            <table className="w-full table-fixed border-collapse text-black bg-white text-[11px]">
+            <table className="min-w-max border-collapse text-black bg-white text-[11px]">
                 <tbody>
                     {rows.map((row, rowIndex) => (
                         <tr key={`${options.keyPrefix || activeSheet?.name || 'sheet'}-${rowIndex}`}>
                             {row.map((item, cellIndex) => {
-                                const isTitle = rowIndex === 1 || String(item.value || '').includes('ULARIA');
+                                const text = String(item.value || '');
+                                const isTitle = text.includes('Summary of Revenue') || text.includes('ULARIA');
                                 const isHeader = options.headerRows?.includes(rowIndex)
                                     ?? (rowIndex === 2 || rowIndex === 3 || (activeSheet?.name !== 'Summary FY27' && rowIndex <= 4));
+                                const isFilter = options.filterRows?.includes(rowIndex);
+                                const isTotal = text === 'Total' || text === 'GRAND TOTAL';
+                                const isSpacer = row.every(cellItem => String(cellItem.value || '').trim() === '');
                                 const isFirstColumn = cellIndex === 0;
                                 return (
                                     <td
                                         key={`${rowIndex}-${cellIndex}`}
                                         colSpan={item.colSpan || 1}
-                                        className={`border border-black px-2 py-1 align-middle break-words ${isTitle
-                                                ? 'font-black text-left text-sm'
-                                                : isHeader
-                                                    ? 'font-black text-center'
-                                                    : isFirstColumn
-                                                        ? 'font-bold text-left'
-                                                        : 'text-right'
+                                        className={`border border-black px-2 py-1 align-middle whitespace-nowrap ${isSpacer
+                                                ? 'h-5 bg-white'
+                                                : isTitle
+                                                    ? 'font-black text-left text-sm bg-white'
+                                                    : isHeader
+                                                        ? 'font-black text-center bg-slate-100'
+                                                        : isFilter
+                                                            ? 'font-bold text-left bg-slate-50'
+                                                            : isTotal
+                                                                ? 'font-black bg-slate-100'
+                                                                : isFirstColumn
+                                                                    ? 'font-bold text-left'
+                                                                    : 'text-right'
                                             }`}
                                     >
                                         {item.value}
@@ -1295,62 +1501,12 @@ const Reports = () => {
         );
 
         const renderSummaryWorkbook = () => {
-            const summaryRows = toSheetRows([
-                [cell(`Summary of Revenue (L) for Financial Year ${revenuePlanFY}`, { colSpan: 10 })],
-                ['Segment', 'Yearly Budget', '% Budget', 'Monthly Budget', 'Quarterly Budget', 'H2 Budget', 'H2 Projected', 'Q1 Budget', 'Q1 Projected', 'Total Projected FY27'],
-                ...revenueView.rows.map(row => [
-                    getRevenueSegmentLabel(row.segment),
-                    planValue(row.yearlyBudgetTotal),
-                    planPct(row.budgetPercent),
-                    planValue(row.monthlyAverage),
-                    planValue(row.quarterlyAverage),
-                    planValue(row.h2Budget),
-                    planValue(row.h2Projected),
-                    planValue(row.q1Budget),
-                    planValue(row.q1Projected),
-                    planValue(row.totalProjected)
-                ]),
-                ['Total', planValue(revenueView.grandTotal), '100%', planValue(revenueView.monthBudget), planValue(revenueView.quarterBudget), planValue(revenueView.h2Budget), planValue(revenueView.h2Projected), planValue(revenueView.q1Budget), planValue(revenueView.q1Projected), planValue(revenueView.projectedGrandTotal)]
-            ]);
-
-            return (
-                <div className="space-y-3">
-                    {renderWorkbookTable(summaryRows, { keyPrefix: 'summary-top', headerRows: [2] })}
-                    {revenueView.months.map((month, index) => {
-                        const isOpen = expandedRevenueMonths[month.label] ?? index === 0;
-                        const monthRows = toSheetRows([
-                            [cell(month.label, { colSpan: 7 })],
-                            ['Segment', 'Budget', 'FIRM', 'MFC', 'B&B', 'Total', '%'],
-                            ...month.rows.map(row => [
-                                getRevenueSegmentLabel(row.segment),
-                                planValue(row.budget),
-                                planValue(row.Firm),
-                                planValue(row.MFC),
-                                planValue(row['B&B']),
-                                planValue(row.total),
-                                planPct(row.performance)
-                            ]),
-                            ['Monthly Revenue', '', '', '', '', planValue(month.total), planPct(month.performance)],
-                            ['Budget', planValue(month.budget), '', '', '', '', ''],
-                            ['Variance wrt monthly Budget', '', '', '', '', planValue(month.variance), '']
-                        ]);
-
-                        return (
-                            <div key={month.label} className="border border-black bg-white">
-                                <button
-                                    type="button"
-                                    onClick={() => toggleRevenueMonth(month.label)}
-                                    className="w-full flex items-center justify-between px-3 py-2 bg-white text-black border-b border-black font-black text-xs uppercase tracking-widest"
-                                >
-                                    <span>{month.label}</span>
-                                    <span>{isOpen ? '-' : '+'}</span>
-                                </button>
-                                {isOpen && renderWorkbookTable(monthRows, { keyPrefix: month.label, headerRows: [0, 1] })}
-                            </div>
-                        );
-                    })}
-                </div>
-            );
+            const summarySheet = workbookSheets.find(sheet => sheet.name === 'Summary FY27');
+            return renderWorkbookTable(summarySheet?.rows || [], {
+                keyPrefix: 'summary-fy27',
+                filterRows: [0],
+                headerRows: [3, 4]
+            });
         };
 
         const renderProductwiseWorkbook = () => {
@@ -1453,7 +1609,7 @@ const Reports = () => {
                         <div>
                             <label className="block text-[9px] font-black uppercase tracking-widest text-slate-500 mb-1">Status</label>
                             <div className="flex flex-wrap gap-2">
-                                {REVENUE_PLAN_STATUS_OPTIONS.map(status => {
+                                {(statusOptions.length > 0 ? statusOptions : REVENUE_PLAN_STATUS_OPTIONS).map(status => {
                                     const checked = revenuePlanFilters.statuses.includes(status);
                                     return (
                                         <label
@@ -1510,10 +1666,11 @@ const Reports = () => {
                             {revenuePlanSheet === 'Summary FY27'
                                 ? renderSummaryWorkbook()
                                 : revenuePlanSheet === 'Productwise'
-                                    ? renderProductwiseWorkbook()
+                                    ? renderWorkbookTable(activeSheet?.rows || [], { keyPrefix: 'productwise', headerRows: [0, 1] })
                                     : renderWorkbookTable(activeSheet?.rows || [], {
                                         keyPrefix: activeSheet?.name,
-                                        headerRows: activeSheet?.name === 'Summary FY27_Qtr wise' ? [1, 2] : [3, 4]
+                                        filterRows: activeSheet?.name === 'Summary FY27_Qtr wise' ? [0] : [0, 1, 2],
+                                        headerRows: activeSheet?.name === 'Summary FY27_Qtr wise' ? [3] : [5]
                                     })}
                         </div>
                     </div>
