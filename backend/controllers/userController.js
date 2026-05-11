@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const { ROLE_OPTIONS } = require('../config/authorization');
+const RolePermission = require('../models/RolePermission');
 
 exports.getAllUsers = async (req, res) => {
     try {
@@ -50,7 +51,10 @@ exports.updateUserRole = async (req, res) => {
         const { id } = req.params;
         const { role } = req.body;
 
-        if (!ROLE_OPTIONS.includes(role)) {
+        const isBuiltIn = ROLE_OPTIONS.includes(role);
+        const customRole = !isBuiltIn ? await RolePermission.findOne({ role }) : null;
+
+        if (!isBuiltIn && !customRole) {
             return res.status(400).json({ message: 'Invalid role supplied' });
         }
 
@@ -65,14 +69,14 @@ exports.updateUserRole = async (req, res) => {
         }
 
         if (role === 'admin') {
-            const existingAdmin = await User.findOne({
+            const adminCount = await User.countDocuments({
                 role: 'admin',
                 _id: { $ne: id }
-            }).select('_id name email');
+            });
 
-            if (existingAdmin) {
+            if (adminCount >= 3) {
                 return res.status(400).json({
-                    message: `Only one admin is allowed for this organization. ${existingAdmin.name} is already assigned as admin.`
+                    message: `A maximum of 3 admins are allowed for this organization.`
                 });
             }
         }

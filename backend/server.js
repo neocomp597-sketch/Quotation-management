@@ -85,6 +85,35 @@ app.get('/api/trigger-seed', async (req, res) => {
     }
 });
 
+app.get('/api/seed-statuses', async (req, res) => {
+    try {
+        const Status = require('./models/Status');
+        const DEFAULT_STATUSES = [
+            { name: 'Budget', color: '#6366f1', isActive: true }, 
+            { name: 'Firm', color: '#10b981', isActive: true }, 
+            { name: 'MFC', color: '#f59e0b', isActive: true }, 
+            { name: 'B & B', color: '#3b82f6', isActive: true }, 
+            { name: 'Others', color: '#64748b', isActive: true }, 
+            { name: 'Order Received', color: '#8b5cf6', isActive: true }, 
+            { name: 'Invoice', color: '#ec4899', isActive: true }, 
+            { name: 'Lost', color: '#ef4444', isActive: true }, 
+            { name: 'Parked', color: '#84cc16', isActive: true }
+        ];
+
+        let added = 0;
+        for (const statusData of DEFAULT_STATUSES) {
+            const existing = await Status.findOne({ name: { $regex: new RegExp(`^${statusData.name}$`, 'i') } });
+            if (!existing) {
+                await Status.create(statusData);
+                added++;
+            }
+        }
+        res.json({ message: `Statuses seeded successfully! Added ${added} new statuses.` });
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
 app.get('/api/check-db', async (req, res) => {
     try {
         const Planning = require('./models/Planning');
@@ -163,9 +192,20 @@ app.use(
 const rootDir = path.resolve();
 app.use(express.static(path.join(rootDir, "dist")));
 
-// SPA fallback — THIS FIXES YOUR ISSUE
-app.get(/(.*)/, (req, res) => {
-  res.sendFile(path.join(rootDir, "dist", "index.html"));
+// SPA fallback — Only in production or if dist exists
+app.get(/.*/, (req, res, next) => {
+  // If it's an API route that reached here, it's a 404 for API
+  if (req.path.startsWith("/api")) {
+    return res.status(404).json({ message: `API route ${req.path} not found` });
+  }
+
+  const indexPath = path.join(rootDir, "dist", "index.html");
+  if (require('fs').existsSync(indexPath)) {
+    res.sendFile(indexPath);
+  } else {
+    // In development, if we reach here, it's a 404
+    res.status(404).send("Not Found");
+  }
 });
 
 const PORT = process.env.PORT || 4003;

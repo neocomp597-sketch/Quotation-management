@@ -11,10 +11,11 @@ exports.getStatuses = async (req, res) => {
 
 exports.createStatus = async (req, res) => {
     try {
-        const { name, color } = req.body;
+        const { name, color, isActive } = req.body;
         const status = new Status({
             name,
             color,
+            isActive: isActive !== undefined ? isActive : true,
             createdBy: req.user._id
         });
         await status.save();

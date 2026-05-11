@@ -304,7 +304,7 @@ const PlanningScreen = () => {
     }
 
     try {
-      const reportQuery = {};
+      const reportQuery = { excludeStatus: "Budget" };
       if (filters.month) {
         const [mName] = filters.month.split("-");
         const startYear = parseInt(financialYear.split("-")[0], 10);

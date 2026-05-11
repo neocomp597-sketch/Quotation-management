@@ -176,7 +176,7 @@ const Authorization = () => {
             setUsers((prev) => prev.map((u) => u._id === userId ? res.data : u));
             toast.success('User updated');
         } catch (err) {
-            toast.error('Update failed');
+            toast.error(err.response?.data?.message || 'Update failed');
         } finally {
             setUpdatingUserId('');
         }

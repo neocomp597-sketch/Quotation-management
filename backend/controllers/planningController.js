@@ -310,7 +310,7 @@ exports.deleteEntry = async (req, res) => {
 
 exports.getMGRReport = async (req, res) => {
     try {
-        const { financialYear, type, month, year, mgr1, mgr2, status } = req.query;
+        const { financialYear, type, month, year, mgr1, mgr2, status, excludeStatus } = req.query;
         if (!financialYear) {
             return res.status(400).json({ message: 'financialYear is required (e.g. 2026-27)' });
         }
@@ -337,6 +337,22 @@ exports.getMGRReport = async (req, res) => {
                 query.status = statuses[0];
             } else if (statuses.length > 1) {
                 query.status = { $in: statuses };
+            }
+        }
+        if (cleanValue(excludeStatus)) {
+            const excludedStatuses = String(excludeStatus)
+                .split(',')
+                .map((item) => cleanValue(item))
+                .map((item) => normalizeStatusValue(item))
+                .filter(Boolean);
+            if (excludedStatuses.length > 0) {
+                if (typeof query.status === 'string') {
+                    query.status = { $in: [query.status], $nin: excludedStatuses };
+                } else if (query.status && query.status.$in) {
+                    query.status.$nin = excludedStatuses;
+                } else {
+                    query.status = { $nin: excludedStatuses };
+                }
             }
         }
 

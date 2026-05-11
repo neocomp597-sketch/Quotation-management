@@ -3,8 +3,8 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getFallbackRoute } from '../constants/menuPermissions';
 
-const PermissionRoute = ({ permissionKey, children }) => {
-    const { user, permissions, loading, hasAccess } = useAuth();
+const PermissionRoute = ({ permissionKey, adminOnly, children }) => {
+    const { user, isAdmin, permissions, loading, hasAccess } = useAuth();
 
     if (loading) {
         return <div className="p-10 text-center">Loading...</div>;
@@ -12,6 +12,10 @@ const PermissionRoute = ({ permissionKey, children }) => {
 
     if (!user) {
         return <Navigate to="/login" replace />;
+    }
+
+    if (adminOnly && !isAdmin) {
+        return <Navigate to={getFallbackRoute(permissions)} replace />;
     }
 
     if (permissionKey && !hasAccess(permissionKey)) {

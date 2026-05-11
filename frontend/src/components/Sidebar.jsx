@@ -63,7 +63,6 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                 { key: 'master_products', name: 'Products', icon: <MdInventory size={18} />, path: '/products' },
                 { key: 'master_mgrs', name: 'MGR Master', icon: <MdCategory size={18} />, path: '/mgrs' },
                 { key: 'master_attributes', name: 'Attributes', icon: <MdAssignment size={18} />, path: '/attributes' },
-                { key: 'master_statuses', name: 'Status', icon: <MdBarChart size={18} />, path: '/status-master' },
                 { key: 'master_terms', name: 'Terms & Conditions', icon: <MdDescription size={18} />, path: '/terms' },
             ]
         },
@@ -130,7 +129,10 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             icon: <MdLock size={22} />,
             children: [
                 { key: 'admin_authorization', name: 'Authorization', icon: <MdLock size={18} />, path: '/admin/authorization' },
-                ...(isAdmin ? [{ key: 'admin_salespersons', name: 'Salespersons', icon: <MdPeople size={18} />, path: '/salespersons' }] : []),
+                ...(isAdmin ? [
+                    { key: 'admin_salespersons', name: 'Salespersons', icon: <MdPeople size={18} />, path: '/salespersons', adminOnly: true },
+                    { key: 'master_statuses', name: 'Status Master', icon: <MdBarChart size={18} />, path: '/status-master', adminOnly: true }
+                ] : []),
             ]
         },
     ].map((item) => {
@@ -138,9 +140,9 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
 
         return {
             ...item,
-            children: item.children.filter((child) => hasAccess(child.key)),
+            children: item.children.filter((child) => child.adminOnly ? isAdmin : hasAccess(child.key)),
         };
-    }).filter((item) => item.type === 'link' ? hasAccess(item.key) : item.children.length > 0 || hasAccess(item.key));
+    }).filter((item) => item.type === 'link' ? (item.adminOnly ? isAdmin : hasAccess(item.key)) : item.children.length > 0 || hasAccess(item.key));
 
     const getAutoExpanded = (key, children) => {
         if (expanded[key] !== undefined) return expanded[key];
