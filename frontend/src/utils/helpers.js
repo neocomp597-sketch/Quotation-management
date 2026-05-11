@@ -39,7 +39,7 @@ export const formatCurrency = (amount, decimals = 2) => {
 export const generateQuotationNo = (sequence) => {
   const year = new Date().getFullYear();
   const seqStr = sequence.toString().padStart(4, "0");
-  return `JAG/QTN/${year}/${seqStr}`;
+  return `ARM/QTN/${year}/${seqStr}`;
 };
 
 /**

@@ -48,7 +48,7 @@ const CompanySettingsSchema = new mongoose.Schema({
     defaultTerms: { type: String },
 
     // Quotation prefix settings
-    quotationPrefix: { type: String, default: 'JAG/QTN' },
+    quotationPrefix: { type: String, default: 'ARM/QTN' },
 
     // User who owns these settings
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, unique: true },

@@ -198,7 +198,7 @@ const VoucherPDF = ({ voucher, images = {}, companySettings }) => {
 
                 <View style={styles.footer}>
                     <Text>This is a computer generated document.</Text>
-                    <Text>JAGUAR ERP - Empowering Your Business</Text>
+                    <Text>ARM ERP - Empowering Your Business</Text>
                 </View>
             </Page>
         </Document>

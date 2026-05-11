@@ -189,7 +189,7 @@ const createQuotation = async (req, res) => {
 
         const normalizedItems = await normalizeQuotationItems(items, siteId);
 
-        // Auto-increment logic for JAG/QTN/YYYY/0001
+        // Auto-increment logic for ARM/QTN/YYYY/0001
         const year = new Date().getFullYear();
         const startOfYear = new Date(year, 0, 1);
         const endOfYear = new Date(year, 11, 31, 23, 59, 59);
@@ -200,7 +200,7 @@ const createQuotation = async (req, res) => {
 
         const sequence = lastQuotationCount + 1;
         const seqStr = sequence.toString().padStart(4, '0');
-        const quotationNo = `JAG/QTN/${year}/${seqStr}`;
+        const quotationNo = `ARM/QTN/${year}/${seqStr}`;
 
         const customerState = customer.billingAddress?.state || '';
         const itemDiscountTotal = calculateTotalDiscount(normalizedItems);

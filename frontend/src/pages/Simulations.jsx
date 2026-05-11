@@ -118,7 +118,7 @@ const Simulations = () => {
               Optimization Sandbox
             </h1>
             <p className="text-slate-500 font-bold text-lg mt-2">
-              Simulate pricing strategies with JAG Strategic Engine V2
+              Simulate pricing strategies with ARM Strategic Engine V2
             </p>
           </div>
           <div className="flex items-center gap-4">
@@ -342,7 +342,7 @@ const Simulations = () => {
                   <div className="flex items-center gap-4">
                     <div className="w-16 h-1 bg-gradient-to-r from-primary-500 to-transparent rounded-full"></div>
                     <span className="text-[11px] font-black uppercase tracking-[0.4em] text-primary-400">
-                      JAG Strategic Engine V2
+                      ARM Strategic Engine V2
                     </span>
                   </div>
                   <h3 className="text-4xl font-black font-outfit leading-tight tracking-tight">

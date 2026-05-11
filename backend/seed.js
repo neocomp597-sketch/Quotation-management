@@ -97,7 +97,7 @@ const seedData = async () => {
         // 3. Seed Products
         await Product.insertMany([
             {
-                productCode: 'JAG-WC-001',
+                productCode: 'ARM-WC-001',
                 productName: 'Rimless Wall Hung WC with Soft Close Seat',
                 hsnCode: '69101000',
                 gstPercentage: 18,
@@ -111,7 +111,7 @@ const seedData = async () => {
                 ]
             },
             {
-                productCode: 'JAG-CP-502',
+                productCode: 'ARM-CP-502',
                 productName: 'Single Lever Basin Mixer - Alive Series',
                 hsnCode: '84818020',
                 gstPercentage: 18,

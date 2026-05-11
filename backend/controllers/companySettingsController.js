@@ -67,7 +67,7 @@ exports.updateCompanySettings = async (req, res) => {
             settings.bankDetails = bankDetails || {};
             settings.authorizedSignatory = authorizedSignatory;
             settings.defaultTerms = defaultTerms;
-            settings.quotationPrefix = quotationPrefix || 'JAG/QTN';
+            settings.quotationPrefix = quotationPrefix || 'ARM/QTN';
 
             await settings.save();
         } else {
@@ -87,7 +87,7 @@ exports.updateCompanySettings = async (req, res) => {
                 bankDetails: bankDetails || {},
                 authorizedSignatory,
                 defaultTerms,
-                quotationPrefix: quotationPrefix || 'JAG/QTN'
+                quotationPrefix: quotationPrefix || 'ARM/QTN'
             });
         }
 

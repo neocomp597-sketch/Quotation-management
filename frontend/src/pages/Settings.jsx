@@ -48,7 +48,7 @@ const Settings = () => {
             signatureImageUrl: ''
         },
         defaultTerms: '',
-        quotationPrefix: 'JAG/QTN'
+        quotationPrefix: 'ARM/QTN'
     });
 
 const [logoUploading, setLogoUploading] = useState(false);
@@ -413,7 +413,7 @@ const [logoUploading, setLogoUploading] = useState(false);
                                     value={companySettings.quotationPrefix}
                                     onChange={handleCompanyChange}
                                     className={inputClass}
-                                    placeholder="JAG/QTN"
+                                    placeholder="ARM/QTN"
                                 />
                             </div>
                         </div>
