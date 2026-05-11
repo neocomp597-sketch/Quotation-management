@@ -28,7 +28,7 @@ const Products = () => {
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [isAttrImportModalOpen, setIsAttrImportModalOpen] = useState(false);
 
-    
+
     // MGR Filters
     const [mgrFilters, setMgrFilters] = useState({
         mgr1: '',
@@ -133,7 +133,7 @@ const Products = () => {
             console.error("Error fetching filter attributes:", err);
         }
     };
-    
+
     const fetchAllAttributes = async () => {
         try {
             const res = await productAttributeService.getAll();
@@ -177,7 +177,7 @@ const Products = () => {
     const handleOpenModal = (product = null) => {
         if (product) {
             setEditingProduct(product);
-            setFormData({ 
+            setFormData({
                 ...product,
                 attributes: product.attributes ? product.attributes.map(a => a._id || a) : [],
                 vendors: product.vendors && product.vendors.length
@@ -226,7 +226,7 @@ const Products = () => {
     const handleFormChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
-        
+
         if (name === 'mgr3') {
             fetchAvailableAttributes(value);
             setFormData(prev => ({ ...prev, attributes: [] }));
@@ -463,7 +463,7 @@ const Products = () => {
 
     const filteredProducts = products.filter(p => {
         const searchLower = searchTerm.toLowerCase();
-        
+
         // Search in basic info
         const matchesBasic = p.productName?.toLowerCase().includes(searchLower) ||
             p.productCode?.toLowerCase().includes(searchLower) ||
@@ -471,7 +471,7 @@ const Products = () => {
             p.uom?.toLowerCase().includes(searchLower);
 
         // Search in MGRs
-        const matchesMGRNames = 
+        const matchesMGRNames =
             p.mgr1?.code?.toLowerCase().includes(searchLower) || p.mgr1?.description?.toLowerCase().includes(searchLower) ||
             p.mgr2?.code?.toLowerCase().includes(searchLower) || p.mgr2?.description?.toLowerCase().includes(searchLower) ||
             p.mgr3?.code?.toLowerCase().includes(searchLower) || p.mgr3?.description?.toLowerCase().includes(searchLower) ||
@@ -479,15 +479,15 @@ const Products = () => {
             p.mgr5?.code?.toLowerCase().includes(searchLower) || p.mgr5?.description?.toLowerCase().includes(searchLower);
 
         // Search in Attributes
-        const matchesAttributeSearch = (p.attributes || []).some(attr => 
-            attr.code?.toLowerCase().includes(searchLower) || 
+        const matchesAttributeSearch = (p.attributes || []).some(attr =>
+            attr.code?.toLowerCase().includes(searchLower) ||
             attr.description?.toLowerCase().includes(searchLower)
         );
 
         // Search in Custom Attributes
         const productCustomAttrs = allProductAttributes[p.productCode] || [];
-        const matchesCustomAttributeSearch = productCustomAttrs.some(attr => 
-            attr.attributeCode?.toLowerCase().includes(searchLower) || 
+        const matchesCustomAttributeSearch = productCustomAttrs.some(attr =>
+            attr.attributeCode?.toLowerCase().includes(searchLower) ||
             attr.attributeValue?.toLowerCase().includes(searchLower)
         );
 
@@ -501,7 +501,7 @@ const Products = () => {
 
         // Attribute filtering: if any attribute filter is selected, product MUST have all of them
         const selectedAttrIds = Object.keys(attributeFilters);
-        const matchesAttributes = selectedAttrIds.length === 0 || 
+        const matchesAttributes = selectedAttrIds.length === 0 ||
             selectedAttrIds.every(id => {
                 const attrObj = allFilterAttributes.find(a => a._id === id);
                 if (!attrObj) return false;
@@ -514,7 +514,7 @@ const Products = () => {
                     if (!attr) return false;
                     const attrId = attr._id || attr;
                     if (attrId === id) return true;
-                    
+
                     if (typeof attr === 'object') {
                         const code = attr.code?.toString().toLowerCase().trim();
                         const desc = attr.description?.toString().toLowerCase().trim();
@@ -523,7 +523,7 @@ const Products = () => {
                     return false;
                 });
                 if (hasStandard) return true;
-                
+
                 // If not found in standard, check in custom attributes
                 const productCustomAttrs = allProductAttributes[p.productCode] || [];
                 return productCustomAttrs.some(ca => {
@@ -585,7 +585,7 @@ const Products = () => {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-black text-slate-900 tracking-tight">Product Catalog</h1>
-                    <p className="text-slate-500 font-medium">Central database for sanitaryware & CP fittings.</p>
+                    <p className="text-slate-500 font-medium">All products at one place.</p>
                 </div>
                 <div className="flex gap-3">
                     <button
@@ -714,11 +714,10 @@ const Products = () => {
                                                     <button
                                                         key={attr._id}
                                                         onClick={() => handleAttributeFilterChange(attr._id)}
-                                                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all border ${
-                                                            attributeFilters[attr._id]
+                                                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all border ${attributeFilters[attr._id]
                                                                 ? 'bg-primary-600 text-white border-primary-600 shadow-sm'
                                                                 : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
-                                                        }`}
+                                                            }`}
                                                     >
                                                         {attr.description}
                                                     </button>
@@ -1198,7 +1197,7 @@ const Products = () => {
                                     </div>
                                 ))}
                             </div>
-                            
+
                             {/* Attributes Selection */}
                             {formData.mgr3 && availableAttributes.length > 0 && (
                                 <div className="mt-8">
@@ -1223,22 +1222,21 @@ const Products = () => {
                                                     const exists = current.includes(attr._id);
                                                     setFormData(prev => ({
                                                         ...prev,
-                                                        attributes: exists 
+                                                        attributes: exists
                                                             ? current.filter(id => id !== attr._id)
                                                             : [...current, attr._id]
                                                     }));
                                                 }}
-                                                className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${
-                                                    (formData.attributes || []).includes(attr._id)
+                                                className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${(formData.attributes || []).includes(attr._id)
                                                         ? 'bg-primary-600 text-white border-primary-600 shadow-lg shadow-primary-600/20'
                                                         : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
-                                                }`}
+                                                    }`}
                                             >
                                                 {attr.description} ({attr.code})
                                             </button>
                                         ))}
                                     </div>
-                                    
+
                                     {/* Custom Imported Attributes */}
                                     {customAttributes.length > 0 && (
                                         <div className="mt-4 pt-4 border-t border-slate-100">
