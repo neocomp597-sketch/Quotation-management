@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MdAdd, MdEdit, MdDelete, MdColorLens } from 'react-icons/md';
+import { MdAdd, MdEdit, MdDelete } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import { statusService } from '../services/api';
 import Modal from '../components/Modal';
@@ -12,7 +12,6 @@ const StatusMaster = () => {
 
     const [formData, setFormData] = useState({
         name: '',
-        color: '#64748b',
         isActive: true
     });
 
@@ -38,14 +37,12 @@ const StatusMaster = () => {
             setEditingStatus(status);
             setFormData({
                 name: status.name,
-                color: status.color || '#64748b',
                 isActive: status.isActive
             });
         } else {
             setEditingStatus(null);
             setFormData({
                 name: '',
-                color: '#64748b',
                 isActive: true
             });
         }
@@ -126,7 +123,6 @@ const StatusMaster = () => {
                                 <thead>
                                     <tr className="bg-slate-50 rounded-xl">
                                         <th className="p-4 text-xs font-black text-slate-400 uppercase tracking-widest first:rounded-l-xl">Status Name</th>
-                                        <th className="p-4 text-xs font-black text-slate-400 uppercase tracking-widest">Color</th>
                                         <th className="p-4 text-xs font-black text-slate-400 uppercase tracking-widest text-center">Is Active</th>
                                         <th className="p-4 text-xs font-black text-slate-400 uppercase tracking-widest text-right last:rounded-r-xl">Actions</th>
                                     </tr>
@@ -135,15 +131,8 @@ const StatusMaster = () => {
                                     {statuses.map(status => (
                                         <tr key={status._id} className="border-b last:border-0 border-slate-50 hover:bg-slate-50/50 transition-colors">
                                             <td className="p-4">
-                                                <div className="flex items-center gap-3">
-                                                    <div 
-                                                        className="w-3 h-3 rounded-full shadow-sm" 
-                                                        style={{ backgroundColor: status.color }}
-                                                    />
-                                                    <span className="text-sm font-bold text-slate-800">{status.name}</span>
-                                                </div>
+                                                <span className="text-sm font-bold text-slate-800">{status.name}</span>
                                             </td>
-                                            <td className="p-4 text-sm font-mono font-medium text-slate-500 uppercase">{status.color}</td>
                                             <td className="p-4 text-center">
                                                 <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm border ${status.isActive
                                                         ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
@@ -174,7 +163,7 @@ const StatusMaster = () => {
                                     ))}
                                     {statuses.length === 0 && (
                                         <tr>
-                                            <td colSpan={4} className="p-8 text-center text-slate-400 text-sm font-medium">
+                                            <td colSpan={3} className="p-8 text-center text-slate-400 text-sm font-medium">
                                                 No statuses found.
                                             </td>
                                         </tr>
@@ -220,26 +209,6 @@ const StatusMaster = () => {
                             placeholder="e.g. In Progress"
                             required
                         />
-                    </div>
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Color Code</label>
-                        <div className="flex gap-3">
-                            <input
-                                type="color"
-                                name="color"
-                                value={formData.color}
-                                onChange={handleFormChange}
-                                className="h-11 w-20 p-1 bg-white border border-slate-200 rounded-xl cursor-pointer"
-                            />
-                            <input
-                                type="text"
-                                name="color"
-                                value={formData.color}
-                                onChange={handleFormChange}
-                                className="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-mono font-bold transition-all uppercase"
-                                placeholder="#000000"
-                            />
-                        </div>
                     </div>
                     <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-200 cursor-pointer" onClick={() => setFormData(prev => ({ ...prev, isActive: !prev.isActive }))}>
                         <div className={`w-12 h-6 rounded-full p-1 transition-colors duration-300 ${formData.isActive ? 'bg-emerald-500' : 'bg-slate-300'}`}>
