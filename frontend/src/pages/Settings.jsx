@@ -411,10 +411,16 @@ const [logoUploading, setLogoUploading] = useState(false);
                                     type="text"
                                     name="quotationPrefix"
                                     value={companySettings.quotationPrefix}
-                                    onChange={handleCompanyChange}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        if (val.toUpperCase().startsWith('ARM') || val === '') {
+                                            handleCompanyChange(e);
+                                        }
+                                    }}
                                     className={inputClass}
                                     placeholder="ARM/QTN"
                                 />
+                                <p className="text-[10px] text-slate-400 mt-1 font-bold">Must start with "ARM" (e.g. ARM/QTN)</p>
                             </div>
                         </div>
 

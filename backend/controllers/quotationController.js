@@ -193,7 +193,9 @@ const createQuotation = async (req, res) => {
         const year = new Date().getFullYear();
         const creatorId = req.user ? req.user.id : undefined;
         const settings = await getAnyCompanySettings(creatorId);
-        const prefix = settings?.quotationPrefix || 'ARM/QTN';
+        const prefix = (settings?.quotationPrefix && settings.quotationPrefix.toUpperCase().startsWith('ARM')) 
+            ? settings.quotationPrefix 
+            : 'ARM/QTN';
         const prefixMatch = `${prefix}/${year}/`;
 
         // Find the quotation with the highest sequence number for this prefix and year
