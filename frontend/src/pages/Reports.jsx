@@ -61,7 +61,7 @@ const QUARTERS = [
 ];
 const PLANNING_SEGMENTS = ['Export', 'Industry', 'UC', 'Utility'];
 const REVENUE_PLAN_STATUS_OPTIONS = ['Budget', 'Firm', 'MFC', 'B&B', 'Invoice', 'Order Received', 'Lost', 'Parked', 'Other'];
-const DEFAULT_REVENUE_PLAN_STATUSES = ['Budget', 'Firm', 'MFC', 'B&B', 'Invoice'];
+const DEFAULT_REVENUE_PLAN_STATUSES = ['Budget'];
 const REVENUE_PRODUCT_TEMPLATE = [
     { type: 'I', product: '11KV Indoor ' },
     { type: '33K', product: '33KV ID/OD' },
@@ -712,7 +712,7 @@ const Reports = () => {
                 }
                 case 'planning': {
                     if (planningFY) {
-                        const res = await planningService.getMGRReport(planningFY, 'SBU');
+                        const res = await planningService.getMGRReport(planningFY, 'SBU', { excludeStatus: 'Budget' });
                         setPlanningReport(res.data);
                     }
                     break;
@@ -726,10 +726,9 @@ const Reports = () => {
                     const fy = revenuePlanFY || planningFY;
                     if (fy) {
                         setRevenuePlanError('');
-                        const reportFilters = {};
+                        const reportFilters = { status: 'Budget' };
                         if (revenuePlanFilters.mgr1) reportFilters.mgr1 = revenuePlanFilters.mgr1;
                         if (revenuePlanFilters.segment) reportFilters.mgr2 = revenuePlanFilters.segment;
-                        if (revenuePlanFilters.statuses.length) reportFilters.status = revenuePlanFilters.statuses.join(',');
                         
                         // Only fetch entries if FY changed or we don't have them
                         const shouldFetchEntries = revenuePlanEntries.length === 0 || revenuePlanEntries[0]?.financialYear !== fy;
@@ -737,7 +736,7 @@ const Reports = () => {
                         if (shouldFetchEntries) {
                             const [reportRes, entriesRes] = await Promise.all([
                                 planningService.getMGRReport(fy, 'SBU', reportFilters),
-                                planningService.getAll({ financialYear: fy, limit: 100000, offset: 0 })
+                                planningService.getAll({ financialYear: fy, status: 'Budget', limit: 100000, offset: 0 })
                             ]);
                             setRevenuePlanReport(reportRes.data);
                             setRevenuePlanEntries(entriesRes.data?.data || []);
@@ -1609,26 +1608,12 @@ const Reports = () => {
                         <div>
                             <label className="block text-[9px] font-black uppercase tracking-widest text-slate-500 mb-1">Status</label>
                             <div className="flex flex-wrap gap-2">
-                                {(statusOptions.length > 0 ? statusOptions : REVENUE_PLAN_STATUS_OPTIONS).map(status => {
-                                    const checked = revenuePlanFilters.statuses.includes(status);
-                                    return (
-                                        <label
-                                            key={status}
-                                            className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl border text-[10px] font-black uppercase tracking-widest cursor-pointer ${checked
-                                                    ? 'bg-black text-white border-black'
-                                                    : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'
-                                                }`}
-                                        >
-                                            <input
-                                                type="checkbox"
-                                                checked={checked}
-                                                onChange={() => toggleRevenuePlanStatusFilter(status)}
-                                                className="sr-only"
-                                            />
-                                            {status}
-                                        </label>
-                                    );
-                                })}
+                                <span className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-black bg-black text-white text-[10px] font-black uppercase tracking-widest">
+                                    Budget
+                                </span>
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest self-center ml-1">
+                                    Locked to Budget
+                                </span>
                             </div>
                         </div>
                         <div className="flex items-end">

@@ -261,6 +261,21 @@ exports.getAllEntries = async (req, res) => {
         if (mgr2) filter.mgrCode2 = mgr2;
         if (status) filter.status = status;
 
+        if (req.query.excludeStatus) {
+            const excluded = req.query.excludeStatus.split(',').map(s => cleanValue(s)).filter(Boolean);
+            if (excluded.length > 0) {
+                if (filter.status) {
+                    if (typeof filter.status === 'string') {
+                        filter.status = { $in: [filter.status], $nin: excluded };
+                    } else if (filter.status.$in) {
+                        filter.status.$nin = excluded;
+                    }
+                } else {
+                    filter.status = { $nin: excluded };
+                }
+            }
+        }
+
         const total = await Planning.countDocuments(filter);
         const entries = await Planning.find(filter)
             .populate('customerId', 'companyName customerName')
@@ -368,6 +383,10 @@ exports.getMGRReport = async (req, res) => {
         const startYear = parseInt(financialYear.split('-')[0], 10);
         const prevFinancialYear = `${startYear - 1}-${String(startYear).slice(-2)}`;
         const prevQuery = { financialYear: prevFinancialYear };
+        
+        // Apply status filters to previous year query too
+        if (query.status) prevQuery.status = query.status;
+
         if (monthYearFilter) {
             const [monthName, yearSuffix] = monthYearFilter.split('-');
             const currentYear = Number(`20${yearSuffix}`);

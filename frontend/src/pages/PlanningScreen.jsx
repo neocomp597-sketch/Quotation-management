@@ -324,9 +324,11 @@ const PlanningScreen = () => {
       };
       const reportEntriesParams = {
         ...params,
+        excludeStatus: "Budget",
         limit: 100000,
         offset: 0,
       };
+
 
       if (isLoadMore) {
         const entriesRes = await planningService.getAll(params);
