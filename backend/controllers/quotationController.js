@@ -189,18 +189,30 @@ const createQuotation = async (req, res) => {
 
         const normalizedItems = await normalizeQuotationItems(items, siteId);
 
-        // Auto-increment logic for ARM/QTN/YYYY/0001
+        // Robust auto-increment logic using prefix from settings and regex for last sequence
         const year = new Date().getFullYear();
-        const startOfYear = new Date(year, 0, 1);
-        const endOfYear = new Date(year, 11, 31, 23, 59, 59);
+        const creatorId = req.user ? req.user.id : undefined;
+        const settings = await getAnyCompanySettings(creatorId);
+        const prefix = settings?.quotationPrefix || 'ARM/QTN';
+        const prefixMatch = `${prefix}/${year}/`;
 
-        const lastQuotationCount = await Quotation.countDocuments({
-            createdAt: { $gte: startOfYear, $lte: endOfYear }
-        });
+        // Find the quotation with the highest sequence number for this prefix and year
+        // We use regex to match the start and sort descending to get the highest
+        const lastQuotation = await Quotation.findOne({
+            quotationNo: new RegExp(`^${prefixMatch.replace(/\//g, '\\/')}`)
+        }).sort({ quotationNo: -1 });
 
-        const sequence = lastQuotationCount + 1;
+        let sequence = 1;
+        if (lastQuotation) {
+            const parts = lastQuotation.quotationNo.split('/');
+            const lastSeq = parseInt(parts[parts.length - 1]);
+            if (!isNaN(lastSeq)) {
+                sequence = lastSeq + 1;
+            }
+        }
+
         const seqStr = sequence.toString().padStart(4, '0');
-        const quotationNo = `ARM/QTN/${year}/${seqStr}`;
+        const quotationNo = `${prefixMatch}${seqStr}`;
 
         const customerState = customer.billingAddress?.state || '';
         const itemDiscountTotal = calculateTotalDiscount(normalizedItems);
