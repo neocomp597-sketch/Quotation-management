@@ -1704,7 +1704,6 @@ const Reports = () => {
                     <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 p-4 border-b border-black" style={{ backgroundColor: normalizeHex(REVENUE_PLAN_COLORS.title) }}>
                         <div>
                             <h2 className="text-lg font-black text-black uppercase">Revenue Plan</h2>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-black">Exact workbook tabs, live from Planning Screen</p>
                         </div>
                         <div className="flex flex-wrap items-center gap-3 p-3 justify-start xl:justify-end">
                             <select
