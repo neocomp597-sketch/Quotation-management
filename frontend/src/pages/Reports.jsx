@@ -18,7 +18,7 @@ import {
 import { quotationService, analyticsService, planningService, statusService } from '../services/api';
 import { formatCurrency, formatDate } from '../utils/helpers';
 import { formatToLakhs } from '../utils/formatters';
-import * as XLSX from 'xlsx';
+import * as XLSX from 'xlsx-js-style';
 import {
     BarChart,
     Bar,
@@ -139,6 +139,23 @@ const inferRevenueProductType = (productName = '') => {
     return '';
 };
 const REVENUE_WORKBOOK_SHEETS = ['Summary FY27', 'Productwise', 'Summary FY27_Qtr wise', 'Deffered account Temperarily'];
+const REVENUE_PLAN_COLORS = {
+    filter: 'D99694',
+    title: 'FFFF00',
+    header: '8EB4E3',
+    utility: '00FF00',
+    utilityContractor: '00FFFF',
+    industry: 'DCE6F2',
+    export: 'CCC1DA',
+    productHeader: 'E6B9B8',
+    productMonth: '00B0F0',
+    productName: 'FFFF66',
+    deferredHeader: 'DBEEF4',
+    deferredGroup: 'FAC090',
+    deferredTotal: 'FFC000',
+    white: 'FFFFFF',
+    black: '000000'
+};
 
 const cell = (value = '', options = {}) => ({ value, ...options });
 const blankRow = (length) => Array.from({ length }, () => '');
@@ -248,6 +265,84 @@ const buildRevenuePlanView = (report) => {
 };
 
 const toSheetRows = (rows) => rows.map(row => row.map(item => typeof item === 'object' && item !== null ? item : cell(item)));
+
+const normalizeHex = (hex = REVENUE_PLAN_COLORS.white) => `#${String(hex).replace('#', '')}`;
+const normalizeCellText = (value = '') => String(value || '').trim();
+const getRevenueRowLabel = (row = []) => normalizeCellText(row.find(item => normalizeCellText(item.value))?.value);
+const getRevenueSegmentFill = (value = '') => {
+    const key = normalizeRevenueKey(value);
+    if (key === 'UTILITY') return REVENUE_PLAN_COLORS.utility;
+    if (key === 'UTILITYCONTRACTOR' || key === 'UC') return REVENUE_PLAN_COLORS.utilityContractor;
+    if (key === 'INDUSTRY' || key === 'NONUTILITYINDUSTRY' || key === 'IND') return REVENUE_PLAN_COLORS.industry;
+    if (key === 'EXPORT' || key === 'EXP') return REVENUE_PLAN_COLORS.export;
+    return '';
+};
+
+const getRevenueCellFill = (sheetName = '', rowIndex = 0, cellIndex = 0, row = [], item = {}, options = {}) => {
+    const text = normalizeCellText(item.value);
+    const rowLabel = getRevenueRowLabel(row);
+
+    if (sheetName === 'Summary FY27') {
+        if (options.filterRows?.includes(rowIndex)) return REVENUE_PLAN_COLORS.filter;
+        if (text.includes('Summary of Revenue')) return REVENUE_PLAN_COLORS.title;
+        if (options.headerRows?.includes(rowIndex)) return REVENUE_PLAN_COLORS.header;
+        if (text === 'Total') return REVENUE_PLAN_COLORS.title;
+        return getRevenueSegmentFill(rowLabel);
+    }
+
+    if (sheetName === 'Summary FY27_Qtr wise') {
+        if (options.filterRows?.includes(rowIndex)) return '';
+        if (text.includes('Summary of Revenue')) return REVENUE_PLAN_COLORS.title;
+        if (options.headerRows?.includes(rowIndex)) return REVENUE_PLAN_COLORS.header;
+        if (text === 'Total') return REVENUE_PLAN_COLORS.title;
+        return getRevenueSegmentFill(rowLabel);
+    }
+
+    if (sheetName === 'Productwise') {
+        if (rowIndex === 0 && cellIndex >= 3) return REVENUE_PLAN_COLORS.productHeader;
+        if (rowIndex === 1 && cellIndex >= 3) return REVENUE_PLAN_COLORS.productMonth;
+        if (cellIndex === 1 && text) return REVENUE_PLAN_COLORS.productName;
+        if ((cellIndex === 0 || cellIndex === 2) && text) return getRevenueSegmentFill(text);
+    }
+
+    if (sheetName === 'Deffered account Temperarily') {
+        if (text.includes('ULARIA')) return '';
+        if (options.headerRows?.includes(rowIndex)) return REVENUE_PLAN_COLORS.deferredHeader;
+        if (text === 'GRAND TOTAL') return REVENUE_PLAN_COLORS.deferredTotal;
+        if (text === 'Total') return REVENUE_PLAN_COLORS.productName;
+        return getRevenueSegmentFill(text) || (text.includes('Utility Contractor Segment') ? REVENUE_PLAN_COLORS.deferredGroup : '');
+    }
+
+    return '';
+};
+
+const getRevenueCellStyle = (sheetName, rowIndex, cellIndex, row, item, options = {}) => {
+    const text = normalizeCellText(item.value);
+    const fill = getRevenueCellFill(sheetName, rowIndex, cellIndex, row, item, options);
+    const isTitle = text.includes('Summary of Revenue') || text.includes('ULARIA');
+    const isHeader = options.headerRows?.includes(rowIndex);
+    const isFilter = options.filterRows?.includes(rowIndex);
+    const isTotal = text === 'Total' || text === 'GRAND TOTAL';
+    const isFirstColumn = cellIndex === 0;
+    const isBlank = !text;
+
+    return {
+        backgroundColor: fill ? normalizeHex(fill) : REVENUE_PLAN_COLORS.white,
+        color: normalizeHex(REVENUE_PLAN_COLORS.black),
+        fontWeight: isTitle || isHeader || isFilter || isTotal || isFirstColumn ? 800 : 500,
+        textAlign: isTitle || isFilter || isFirstColumn ? 'left' : 'right',
+        verticalAlign: 'middle',
+        height: isBlank && !fill ? '20px' : undefined
+    };
+};
+
+const getRevenueExportOptions = (sheetName = '') => {
+    if (sheetName === 'Summary FY27') return { filterRows: [0], headerRows: [3, 4] };
+    if (sheetName === 'Productwise') return { headerRows: [0, 1] };
+    if (sheetName === 'Summary FY27_Qtr wise') return { filterRows: [0], headerRows: [3] };
+    if (sheetName === 'Deffered account Temperarily') return { filterRows: [0, 1, 2], headerRows: [5] };
+    return {};
+};
 
 const buildSummaryWorkbookSheet = (view, financialYear, filters = {}) => {
     const selectedStatuses = filters.statuses?.length ? filters.statuses.join(' / ') : 'All statuses';
@@ -536,6 +631,7 @@ const revenueSheetToWorksheet = (sheet) => {
     const aoa = flattenSheetRows(sheet.rows);
     const ws = XLSX.utils.aoa_to_sheet(aoa);
     const merges = [];
+    const styleOptions = getRevenueExportOptions(sheet.name);
 
     sheet.rows.forEach((row, rowIndex) => {
         let colIndex = 0;
@@ -555,7 +651,45 @@ const revenueSheetToWorksheet = (sheet) => {
         ws['!merges'] = merges;
     }
 
+    sheet.rows.forEach((row, rowIndex) => {
+        let colIndex = 0;
+        row.forEach(item => {
+            const span = Number(item.colSpan || 1);
+            for (let offset = 0; offset < span; offset += 1) {
+                const address = XLSX.utils.encode_cell({ r: rowIndex, c: colIndex + offset });
+                if (!ws[address]) ws[address] = { t: 's', v: '' };
+                const fill = getRevenueCellFill(sheet.name, rowIndex, colIndex, row, item, styleOptions);
+                const text = normalizeCellText(item.value);
+                const isHeader = styleOptions.headerRows?.includes(rowIndex);
+                const isFilter = styleOptions.filterRows?.includes(rowIndex);
+                const isTitle = text.includes('Summary of Revenue') || text.includes('ULARIA');
+                const isTotal = text === 'Total' || text === 'GRAND TOTAL';
+                ws[address].s = {
+                    font: { bold: Boolean(isHeader || isFilter || isTitle || isTotal || colIndex === 0), color: { rgb: REVENUE_PLAN_COLORS.black } },
+                    alignment: { horizontal: isTitle || isFilter || colIndex === 0 ? 'left' : 'right', vertical: 'center', wrapText: false },
+                    border: {
+                        top: { style: 'thin', color: { rgb: REVENUE_PLAN_COLORS.black } },
+                        right: { style: 'thin', color: { rgb: REVENUE_PLAN_COLORS.black } },
+                        bottom: { style: 'thin', color: { rgb: REVENUE_PLAN_COLORS.black } },
+                        left: { style: 'thin', color: { rgb: REVENUE_PLAN_COLORS.black } }
+                    }
+                };
+                if (fill) {
+                    ws[address].s.fill = { patternType: 'solid', fgColor: { rgb: fill } };
+                }
+            }
+            colIndex += span;
+        });
+    });
+
     const colCount = aoa.reduce((max, row) => Math.max(max, row.length), 0);
+    ws['!rows'] = aoa.map((row, rowIndex) => {
+        const options = getRevenueExportOptions(sheet.name);
+        const rowText = row.join(' ');
+        if (rowText.includes('Summary of Revenue') || rowText.includes('ULARIA')) return { hpt: 22 };
+        if (options.headerRows?.includes(rowIndex) || options.filterRows?.includes(rowIndex)) return { hpt: 20 };
+        return { hpt: 18 };
+    });
     ws['!cols'] = Array.from({ length: colCount }, (_, index) => {
         if (sheet.name === 'Summary FY27') {
             if (index === 0) return { wch: 22 };
@@ -1457,11 +1591,12 @@ const Reports = () => {
         };
 
         const renderWorkbookTable = (rows = [], options = {}) => (
-            <table className="min-w-max border-collapse text-black bg-white text-[11px]">
+            <table className="min-w-max border-collapse text-black bg-white text-[11px] font-sans">
                 <tbody>
                     {rows.map((row, rowIndex) => (
                         <tr key={`${options.keyPrefix || activeSheet?.name || 'sheet'}-${rowIndex}`}>
                             {row.map((item, cellIndex) => {
+                                const sheetName = options.sheetName || activeSheet?.name || '';
                                 const text = String(item.value || '');
                                 const isTitle = text.includes('Summary of Revenue') || text.includes('ULARIA');
                                 const isHeader = options.headerRows?.includes(rowIndex)
@@ -1474,6 +1609,7 @@ const Reports = () => {
                                     <td
                                         key={`${rowIndex}-${cellIndex}`}
                                         colSpan={item.colSpan || 1}
+                                        style={getRevenueCellStyle(sheetName, rowIndex, cellIndex, row, item, options)}
                                         className={`border border-black px-2 py-1 align-middle whitespace-nowrap ${isSpacer
                                                 ? 'h-5 bg-white'
                                                 : isTitle
@@ -1503,6 +1639,7 @@ const Reports = () => {
             const summarySheet = workbookSheets.find(sheet => sheet.name === 'Summary FY27');
             return renderWorkbookTable(summarySheet?.rows || [], {
                 keyPrefix: 'summary-fy27',
+                sheetName: 'Summary FY27',
                 filterRows: [0],
                 headerRows: [3, 4]
             });
@@ -1553,7 +1690,7 @@ const Reports = () => {
                                     <span>{month}</span>
                                     <span>{isOpen ? '-' : '+'}</span>
                                 </button>
-                                {isOpen && renderWorkbookTable(rows, { keyPrefix: `product-${month}`, headerRows: [0, 1] })}
+                                {isOpen && renderWorkbookTable(rows, { keyPrefix: `product-${month}`, sheetName: 'Productwise', headerRows: [0, 1] })}
                             </div>
                         );
                     })}
@@ -1563,55 +1700,55 @@ const Reports = () => {
 
         return (
             <div className="space-y-6">
-                <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
-                    <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 p-4 border-b border-slate-200">
+                <div className="bg-white border border-black shadow-sm overflow-hidden">
+                    <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 p-4 border-b border-black" style={{ backgroundColor: normalizeHex(REVENUE_PLAN_COLORS.title) }}>
                         <div>
                             <h2 className="text-lg font-black text-black uppercase">Revenue Plan</h2>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Exact workbook tabs, live from Planning Screen</p>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-black">Exact workbook tabs, live from Planning Screen</p>
                         </div>
                         <div className="flex flex-wrap items-center gap-3 p-3 justify-start xl:justify-end">
                             <select
                                 value={revenuePlanFY}
                                 onChange={(e) => setRevenuePlanFY(e.target.value)}
-                                className="px-4 py-2.5 bg-white border border-slate-200 rounded-xl font-bold text-sm focus:ring-4 focus:ring-primary-600/10 focus:border-primary-600 outline-none"
+                                className="px-4 py-2.5 bg-white border border-black font-bold text-sm outline-none"
                             >
                                 {fyOptions.map(fy => <option key={fy} value={fy}>{fy}</option>)}
                             </select>
-                            <button onClick={() => fetchTabData('revenuePlan')} className="px-4 py-2.5 bg-black text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 transition-colors">
+                            <button onClick={() => fetchTabData('revenuePlan')} className="px-4 py-2.5 bg-black text-white border border-black font-black text-xs uppercase tracking-widest hover:bg-slate-800 transition-colors">
                                 Load Plan
                             </button>
                         </div>
                     </div>
-                    <div className="grid grid-cols-1 lg:grid-cols-[minmax(160px,1fr)_minmax(160px,1fr)_minmax(280px,2fr)_auto] gap-3 p-4 bg-slate-50/60 border-b border-slate-200">
+                    <div className="grid grid-cols-1 lg:grid-cols-[minmax(160px,1fr)_minmax(160px,1fr)_minmax(280px,2fr)_auto] gap-3 p-4 border-b border-black" style={{ backgroundColor: normalizeHex(REVENUE_PLAN_COLORS.filter) }}>
                         <div>
-                            <label className="block text-[9px] font-black uppercase tracking-widest text-slate-500 mb-1">MGR 1</label>
+                            <label className="block text-[9px] font-black uppercase tracking-widest text-black mb-1">MGR 1</label>
                             <select
                                 value={revenuePlanFilters.mgr1}
                                 onChange={(e) => setRevenuePlanFilters(prev => ({ ...prev, mgr1: e.target.value }))}
-                                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none focus:ring-4 focus:ring-primary-600/10 focus:border-primary-600"
+                                className="w-full px-3 py-2 bg-white border border-black font-bold text-sm outline-none"
                             >
                                 <option value="">All MGR 1</option>
                                 {mgr1Options.map(option => <option key={option} value={option}>{option}</option>)}
                             </select>
                         </div>
                         <div>
-                            <label className="block text-[9px] font-black uppercase tracking-widest text-slate-500 mb-1">Segment</label>
+                            <label className="block text-[9px] font-black uppercase tracking-widest text-black mb-1">Segment</label>
                             <select
                                 value={revenuePlanFilters.segment}
                                 onChange={(e) => setRevenuePlanFilters(prev => ({ ...prev, segment: e.target.value }))}
-                                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none focus:ring-4 focus:ring-primary-600/10 focus:border-primary-600"
+                                className="w-full px-3 py-2 bg-white border border-black font-bold text-sm outline-none"
                             >
                                 <option value="">All Segments</option>
                                 {segmentOptions.map(option => <option key={option} value={option}>{getRevenueSegmentLabel(option)}</option>)}
                             </select>
                         </div>
                         <div>
-                            <label className="block text-[9px] font-black uppercase tracking-widest text-slate-500 mb-1">Status</label>
+                            <label className="block text-[9px] font-black uppercase tracking-widest text-black mb-1">Status</label>
                             <div className="flex flex-wrap gap-2">
-                                <span className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-black bg-black text-white text-[10px] font-black uppercase tracking-widest">
+                                <span className="inline-flex items-center gap-2 px-3 py-2 border border-black bg-black text-white text-[10px] font-black uppercase tracking-widest">
                                     Budget
                                 </span>
-                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest self-center ml-1">
+                                <span className="text-[10px] font-black text-black uppercase tracking-widest self-center ml-1">
                                     Locked to Budget
                                 </span>
                             </div>
@@ -1620,13 +1757,13 @@ const Reports = () => {
                             <button
                                 type="button"
                                 onClick={resetRevenuePlanFilters}
-                                className="w-full px-4 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-slate-100 transition-colors"
+                                className="w-full px-4 py-2.5 bg-white border border-black text-black font-black text-xs uppercase tracking-widest hover:bg-slate-100 transition-colors"
                             >
                                 Reset
                             </button>
                         </div>
                     </div>
-                    <div className="flex flex-wrap gap-1 p-2 bg-white border-b border-slate-200">
+                    <div className="flex flex-wrap gap-1 p-2 bg-white border-b border-black">
                         {REVENUE_WORKBOOK_SHEETS.map(sheetName => (
                             <button
                                 key={sheetName}
@@ -1646,14 +1783,15 @@ const Reports = () => {
                 {!hasData ? (
                     <div className="text-center py-20 text-slate-400 font-semibold">Select a financial year and click Load Plan</div>
                 ) : (
-                    <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
+                    <div className="bg-white border border-black shadow-sm overflow-hidden">
                         <div className="max-h-[72vh] overflow-y-auto p-3">
                             {revenuePlanSheet === 'Summary FY27'
                                 ? renderSummaryWorkbook()
                                 : revenuePlanSheet === 'Productwise'
-                                    ? renderWorkbookTable(activeSheet?.rows || [], { keyPrefix: 'productwise', headerRows: [0, 1] })
+                                    ? renderWorkbookTable(activeSheet?.rows || [], { keyPrefix: 'productwise', sheetName: 'Productwise', headerRows: [0, 1] })
                                     : renderWorkbookTable(activeSheet?.rows || [], {
                                         keyPrefix: activeSheet?.name,
+                                        sheetName: activeSheet?.name,
                                         filterRows: activeSheet?.name === 'Summary FY27_Qtr wise' ? [0] : [0, 1, 2],
                                         headerRows: activeSheet?.name === 'Summary FY27_Qtr wise' ? [3] : [5]
                                     })}
