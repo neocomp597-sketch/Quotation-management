@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { MdAdd, MdSearch, MdFilterList, MdVisibility, MdDescription, MdDownload, MdPictureAsPdf, MdDelete, MdEdit, MdCheckCircle, MdReceipt } from 'react-icons/md';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { quotationService } from '../services/api';
 import { formatDate, resolveImageUrl, fetchPdfImageBase64 } from '../utils/helpers';
@@ -10,6 +10,8 @@ import Modal from '../components/Modal';
 
 const Quotations = () => {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const statusFilter = searchParams.get('status');
     const [quotations, setQuotations] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedQuotation, setSelectedQuotation] = useState(null);

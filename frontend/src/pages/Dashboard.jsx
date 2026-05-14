@@ -21,8 +21,8 @@ import { formatCurrency, formatDate } from '../utils/helpers';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import QuotationPDF from '../components/QuotationPDF';
 
-const StatCard = ({ title, value, icon, trend, color, subValue, isTrendUp }) => (
-    <div className="group p-6 bg-white rounded-3xl border border-slate-100 hover:border-primary-600/20 transition-all duration-300 shadow-sm hover:shadow-xl hover:-translate-y-1 relative overflow-hidden">
+const StatCard = ({ title, value, icon, trend, color, subValue, isTrendUp, to }) => (
+    <Link to={to} className="group p-6 bg-white rounded-3xl border border-slate-100 hover:border-primary-600/20 transition-all duration-300 shadow-sm hover:shadow-xl hover:-translate-y-1 relative overflow-hidden block">
         <div className="absolute top-0 right-0 w-24 h-24 bg-slate-50 rounded-bl-full opacity-50 group-hover:scale-110 transition-transform duration-500"></div>
         
         <div className="flex justify-between items-start mb-6 relative">
@@ -42,7 +42,7 @@ const StatCard = ({ title, value, icon, trend, color, subValue, isTrendUp }) => 
             <p className="text-2xl font-black text-slate-900 leading-none">{value}</p>
             <p className="text-xs font-bold text-slate-400 mt-3">{subValue}</p>
         </div>
-    </div>
+    </Link>
 );
 
 const Dashboard = () => {
@@ -90,7 +90,8 @@ const Dashboard = () => {
             desc: "All time generated",
             icon: <MdDescription size={26} />,
             color: "bg-gradient-to-br from-teal-500 to-emerald-600",
-            subValue: "All time generated"
+            subValue: "All time generated",
+            to: "/quotations"
         },
         {
             title: "Draft Quotes",
@@ -98,7 +99,8 @@ const Dashboard = () => {
             desc: "Awaiting finalization",
             icon: <MdSchedule size={26} />,
             color: "bg-gradient-to-br from-amber-400 to-orange-500",
-            subValue: "Awaiting finalization"
+            subValue: "Awaiting finalization",
+            to: "/quotations?status=draft"
         },
         {
             title: "Business Pipeline",
@@ -108,7 +110,8 @@ const Dashboard = () => {
             color: "bg-gradient-to-br from-primary-600 to-accent",
             subValue: "Total quoted value",
             trend: "+100%",
-            isTrendUp: true
+            isTrendUp: true,
+            to: "/reports"
         },
         {
             title: "Registered Customers",
@@ -116,7 +119,8 @@ const Dashboard = () => {
             desc: "Direct & Retail",
             icon: <MdPeople size={26} />,
             color: "bg-gradient-to-br from-blue-500 to-indigo-600",
-            subValue: "Direct & Retail"
+            subValue: "Direct & Retail",
+            to: "/customers"
         },
         {
             title: "Total Products",
@@ -124,7 +128,8 @@ const Dashboard = () => {
             desc: "Active Inventory",
             icon: <MdInventory2 size={26} />,
             color: "bg-gradient-to-br from-purple-500 to-fuchsia-600",
-            subValue: "Active Inventory"
+            subValue: "Active Inventory",
+            to: "/products"
         },
         {
             title: "Total Vendors",
@@ -132,7 +137,8 @@ const Dashboard = () => {
             desc: "Onboarded Suppliers",
             icon: <MdStorefront size={26} />,
             color: "bg-gradient-to-br from-rose-500 to-pink-600",
-            subValue: "Onboarded Suppliers"
+            subValue: "Onboarded Suppliers",
+            to: "/vendors"
         }
     ];
 
@@ -170,6 +176,7 @@ const Dashboard = () => {
                         color={stat.color}
                         subValue={stat.subValue}
                         isTrendUp={stat.isTrendUp}
+                        to={stat.to}
                     />
                 ))}
             </div>

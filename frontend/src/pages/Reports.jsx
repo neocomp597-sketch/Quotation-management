@@ -286,7 +286,8 @@ const getRevenueCellFill = (sheetName = '', rowIndex = 0, cellIndex = 0, row = [
         if (options.filterRows?.includes(rowIndex)) return REVENUE_PLAN_COLORS.filter;
         if (text.includes('Summary of Revenue')) return REVENUE_PLAN_COLORS.title;
         if (options.headerRows?.includes(rowIndex)) return REVENUE_PLAN_COLORS.header;
-        if (text === 'Total') return REVENUE_PLAN_COLORS.title;
+        if (text === 'Total') return '';
+        if (rowLabel === 'Monthly Revenue') return REVENUE_PLAN_COLORS.title;
         return getRevenueSegmentFill(rowLabel);
     }
 
@@ -294,7 +295,7 @@ const getRevenueCellFill = (sheetName = '', rowIndex = 0, cellIndex = 0, row = [
         if (options.filterRows?.includes(rowIndex)) return '';
         if (text.includes('Summary of Revenue')) return REVENUE_PLAN_COLORS.title;
         if (options.headerRows?.includes(rowIndex)) return REVENUE_PLAN_COLORS.header;
-        if (text === 'Total') return REVENUE_PLAN_COLORS.title;
+        if (text === 'Total') return '';
         return getRevenueSegmentFill(rowLabel);
     }
 
@@ -323,13 +324,14 @@ const getRevenueCellStyle = (sheetName, rowIndex, cellIndex, row, item, options 
     const isHeader = options.headerRows?.includes(rowIndex);
     const isFilter = options.filterRows?.includes(rowIndex);
     const isTotal = text === 'Total' || text === 'GRAND TOTAL';
+    const isMonthlyRevenue = sheetName === 'Summary FY27' && getRevenueRowLabel(row) === 'Monthly Revenue';
     const isFirstColumn = cellIndex === 0;
     const isBlank = !text;
 
     return {
         backgroundColor: fill ? normalizeHex(fill) : REVENUE_PLAN_COLORS.white,
         color: normalizeHex(REVENUE_PLAN_COLORS.black),
-        fontWeight: isTitle || isHeader || isFilter || isTotal || isFirstColumn ? 800 : 500,
+        fontWeight: isTitle || isHeader || isFilter || isTotal || isMonthlyRevenue || isFirstColumn ? 800 : 500,
         textAlign: isTitle || isFilter || isFirstColumn ? 'left' : 'right',
         verticalAlign: 'middle',
         height: isBlank && !fill ? '20px' : undefined
@@ -415,8 +417,6 @@ const buildSummaryWorkbookSheet = (view, financialYear, filters = {}) => {
         });
         rows.push(data);
     });
-
-    rows.push(blankRow(header1.length));
 
     const totalRow = ['Total', planValue(view.grandTotal), '', planValue(view.monthBudget), planValue(view.quarterBudget), planValue(view.h2Budget), planValue(view.h2Projected), planValue(view.q1Budget), planValue(view.q1Projected), planValue(view.projectedGrandTotal)];
     months.forEach((month, index) => {
