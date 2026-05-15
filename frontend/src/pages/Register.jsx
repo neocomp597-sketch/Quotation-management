@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import axios from "axios";
 import { toast } from "react-toastify";
 import { useAuth } from "../context/AuthContext";
+import { authService } from "../services/api";
 import { User, Mail, Lock, CheckCircle } from "lucide-react";
 import "./Auth.css";
 
@@ -36,15 +36,13 @@ const Register = () => {
 
     setLoading(true);
     try {
-      const baseUrl =
-        import.meta.env.VITE_API_URL || "http://localhost:4003/api";
-      const res = await axios.post(`${baseUrl}/auth/register`, {
+      const res = await authService.register({
         name,
         email,
         password,
       });
 
-      await login(res.data.token, res.data.user);
+      await login(res.data);
 
       toast.success(
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>

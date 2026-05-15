@@ -3,12 +3,16 @@ const express = require("express");
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const connectDB = require("./config/db");
+const { connectRedis } = require("./config/redis");
 require("dotenv").config();
 
 const app = express();
 
 // Connect to Database
 connectDB();
+connectRedis().catch(() => {
+  console.warn("Redis unavailable at startup; Redis-backed features will retry per request.");
+});
 
 // Middleware
 app.use(
@@ -24,6 +28,29 @@ app.use(
 );
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on("finish", () => {
+    const duration = Date.now() - start;
+    const slowThresholdMs = Number(process.env.SLOW_API_THRESHOLD_MS || 500);
+    if (duration >= slowThresholdMs) {
+      console.warn(`[Slow API] ${req.method} ${req.originalUrl} ${duration}ms ${res.statusCode}`);
+    } else if (process.env.LOG_API_TIMINGS === "true") {
+      console.log(`[API] ${req.method} ${req.originalUrl} ${duration}ms ${res.statusCode}`);
+    }
+  });
+  next();
+});
+app.use((req, res, next) => {
+  const timeoutMs = Number(process.env.API_REQUEST_TIMEOUT_MS || 30000);
+  req.setTimeout(timeoutMs);
+  res.setTimeout(timeoutMs, () => {
+    if (!res.headersSent) {
+      res.status(503).json({ message: "Request timed out" });
+    }
+  });
+  next();
+});
 
 // Route Imports
 const quotationRoutes = require("./routes/quotationRoutes");
@@ -102,7 +129,7 @@ app.get('/api/seed-statuses', async (req, res) => {
 
         let added = 0;
         for (const statusData of DEFAULT_STATUSES) {
-            const existing = await Status.findOne({ name: { $regex: new RegExp(`^${statusData.name}$`, 'i') } });
+            const existing = await Status.findOne({ name: { $regex: new RegExp(`^${statusData.name}$`, 'i') } }).select('_id').lean();
             if (!existing) {
                 await Status.create(statusData);
                 added++;
@@ -211,9 +238,10 @@ app.get(/.*/, (req, res, next) => {
 const PORT = process.env.PORT || 4003;
 
 if (require.main === module) {
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
   });
+  server.timeout = Number(process.env.API_REQUEST_TIMEOUT_MS || 30000);
 }
 
 module.exports = app;

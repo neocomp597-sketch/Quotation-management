@@ -5,7 +5,10 @@ import { productService, uploadService, importService, mgrService, attributeServ
 
 import Modal from '../components/Modal';
 import ImportModal from '../components/ImportModal';
+import PaginationControls from '../components/PaginationControls';
 import { resolveImageUrl, getPlaceholderImage } from '../utils/helpers';
+
+const LIST_PAGE_SIZE = 20;
 
 const emptyVendorRow = () => ({
     vendorId: '',
@@ -20,6 +23,9 @@ const Products = () => {
     const [mgrsData, setMgrsData] = useState({ mgr1: [], mgr2: [], mgr3: [], mgr4: [], mgr5: [] });
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
+    const [page, setPage] = useState(1);
+    const [pagination, setPagination] = useState({ page: 1, limit: LIST_PAGE_SIZE, total: 0, pages: 1 });
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState(null);
     const [isUploading, setIsUploading] = useState(false);
@@ -71,11 +77,27 @@ const Products = () => {
     });
 
     useEffect(() => {
-        fetchProducts();
         fetchMGRs();
         fetchVendors();
         fetchAllAttributes();
     }, []);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(searchTerm.trim());
+            setPage(1);
+        }, 300);
+
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
+
+    useEffect(() => {
+        setPage(1);
+    }, [mgrFilters.mgr1, mgrFilters.mgr2, mgrFilters.mgr3, mgrFilters.mgr4, mgrFilters.mgr5]);
+
+    useEffect(() => {
+        fetchProducts();
+    }, [page, debouncedSearch, mgrFilters.mgr1, mgrFilters.mgr2, mgrFilters.mgr3, mgrFilters.mgr4, mgrFilters.mgr5]);
 
 
     useEffect(() => {
@@ -164,9 +186,22 @@ const Products = () => {
     };
 
     const fetchProducts = async () => {
+        setLoading(true);
         try {
-            const res = await productService.getAll();
-            setProducts(res.data);
+            const res = await productService.getAll({
+                page,
+                limit: LIST_PAGE_SIZE,
+                search: debouncedSearch || undefined,
+                ...Object.fromEntries(Object.entries(mgrFilters).filter(([, value]) => value)),
+            });
+            const payload = res.data;
+            setProducts(Array.isArray(payload) ? payload : payload.data || []);
+            setPagination(payload.pagination || {
+                page: 1,
+                limit: LIST_PAGE_SIZE,
+                total: Array.isArray(payload) ? payload.length : 0,
+                pages: 1,
+            });
         } catch (err) {
             console.error("Error fetching products:", err);
         } finally {
@@ -660,9 +695,9 @@ const Products = () => {
                 </div>
             )}
 
-            <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
+            <div className="mobile-master-shell bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
                 {/* MGR Filters Section */}
-                <div className="px-6 py-6 border-b border-slate-50 bg-white">
+                <div className="mobile-master-toolbar px-6 py-6 border-b border-slate-50 bg-white">
                     <div className="space-y-6">
                         <div className="flex flex-wrap gap-4">
                             {[1, 2, 3, 4, 5].map(num => {
@@ -775,7 +810,7 @@ const Products = () => {
                             {/* Mobile Card View */}
                             <div className="md:hidden p-4 space-y-4 bg-slate-50/50">
                                 {filteredProducts.map((p) => (
-                                    <div key={p._id} className={`bg-white rounded-2xl border shadow-sm overflow-hidden ${selectedIds.includes(p._id) ? 'border-primary-500 ring-1 ring-primary-500' : 'border-slate-100'}`}>
+                                    <div key={p._id} className={`mobile-master-card bg-white rounded-2xl border shadow-sm overflow-hidden ${selectedIds.includes(p._id) ? 'border-primary-500 ring-1 ring-primary-500' : 'border-slate-100'}`}>
                                         <div className="p-4 flex gap-4">
                                             <div
                                                 className="h-20 w-20 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-center flex-shrink-0 cursor-pointer overflow-hidden"
@@ -987,7 +1022,7 @@ const Products = () => {
                                 ) : (
                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 p-6">
                                         {filteredProducts.map((p) => (
-                                            <div key={p._id} className={`bg-white rounded-2xl border hover:shadow-xl transition-all group flex flex-col overflow-hidden ${selectedIds.includes(p._id) ? 'border-primary-400 ring-2 ring-primary-200' : 'border-slate-100 hover:border-primary-100'}`}>
+                                            <div key={p._id} className={`mobile-master-card bg-white rounded-2xl border hover:shadow-xl transition-all group flex flex-col overflow-hidden ${selectedIds.includes(p._id) ? 'border-primary-400 ring-2 ring-primary-200' : 'border-slate-100 hover:border-primary-100'}`}>
                                                 <div className="aspect-square bg-slate-50 relative overflow-hidden group-hover:bg-slate-100 transition-colors">
                                                     {/* Checkbox */}
                                                     <button
@@ -1049,6 +1084,7 @@ const Products = () => {
                                     </div>
                                 )}
                             </div>
+                            <PaginationControls pagination={pagination} onPageChange={setPage} />
                         </>
                     )}
                 </div>

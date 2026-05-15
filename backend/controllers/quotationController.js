@@ -1,14 +1,81 @@
 const Quotation = require('../models/Quotation');
+const Counter = require('../models/Counter');
+const QuotationDraft = require('../models/QuotationDraft');
 const Customer = require('../models/Customer');
 const CompanySettings = require('../models/CompanySettings');
 const Product = require('../models/Product');
 const Vendor = require('../models/Vendor');
 const { getBestVendorForProduct, sortVendorsByPriority, isVendorActive } = require('../utils/vendorSelection');
+const { getRedis } = require('../config/redis');
+const { invalidateQuotationCaches } = require('../utils/cacheInvalidation');
+
+const DRAFT_TTL_SECONDS = 24 * 60 * 60;
+const DASHBOARD_TTL_SECONDS = 60;
+
+const escapeRegex = (value = '') => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const getPagination = (query) => {
+    const page = Math.max(1, Number(query.page || 1));
+    const limit = Math.min(100, Math.max(1, Number(query.limit || 25)));
+    return { page, limit, skip: (page - 1) * limit };
+};
+
+const hasListParams = (query) => Boolean(query.page || query.limit || query.search || query.status);
 
 const asBadRequest = (message) => {
     const error = new Error(message);
     error.statusCode = 400;
     return error;
+};
+
+const getDraftKey = (userId, draftKey = 'new') => (
+    draftKey === 'new'
+        ? `draft:quotation:${userId}`
+        : `draft:quotation:${userId}:${draftKey}`
+);
+
+const readDraftFromRedis = async (userId, draftKey = 'new') => {
+    const redis = await getRedis();
+    if (!redis) return null;
+
+    const rawDraft = await redis.get(getDraftKey(userId, draftKey));
+    if (!rawDraft) return null;
+
+    try {
+        return JSON.parse(rawDraft);
+    } catch {
+        await redis.del(getDraftKey(userId, draftKey));
+        return null;
+    }
+};
+
+const saveDraftToRedis = async (userId, draftKey = 'new', payload = {}) => {
+    const redis = await getRedis();
+    if (!redis) return null;
+
+    const now = new Date().toISOString();
+    const draft = {
+        userId,
+        draftKey,
+        payload,
+        updatedAt: now,
+        expiresAt: new Date(Date.now() + DRAFT_TTL_SECONDS * 1000).toISOString(),
+    };
+
+    await redis.set(getDraftKey(userId, draftKey), JSON.stringify(draft), { EX: DRAFT_TTL_SECONDS });
+    return draft;
+};
+
+const deleteDraftFromRedis = async (userId, draftKey = 'new') => {
+    const redis = await getRedis();
+    if (!redis) return false;
+
+    await redis.del(getDraftKey(userId, draftKey));
+    return true;
+};
+
+const clearQuotationDashboardCache = async () => {
+    await invalidateQuotationCaches();
 };
 
 // Helper Functions for Calculations
@@ -57,12 +124,12 @@ const calculateLineItem = (quantity, rate, discountPercent, gstPercentage) => {
 const getAnyCompanySettings = async (creatorId) => {
     // 1. Try creator's settings
     if (creatorId) {
-        const settings = await CompanySettings.findOne({ userId: creatorId });
+        const settings = await CompanySettings.findOne({ userId: creatorId }).lean();
         if (settings) return settings;
     }
 
     // 2. Try any settings existing in system (Global)
-    const anySettings = await CompanySettings.findOne().sort({ createdAt: 1 });
+    const anySettings = await CompanySettings.findOne().sort({ createdAt: 1 }).lean();
     if (anySettings) return anySettings;
 
     // 3. Absolute Fallback (Fake object so UI doesn't break)
@@ -71,6 +138,17 @@ const getAnyCompanySettings = async (creatorId) => {
         address: { line1: "Business Address", city: "City", state: "State", pincode: "000000" },
         authorizedSignatory: { name: "Authorized Person" }
     };
+};
+
+const generateQuotationNumber = async (prefix, year) => {
+    const counter = await Counter.findOneAndUpdate(
+        { type: 'quotation', prefix, year },
+        { $inc: { seq: 1 } },
+        { new: true, upsert: true, setDefaultsOnInsert: true }
+    );
+
+    const seqStr = counter.seq.toString().padStart(4, '0');
+    return `${prefix}/${year}/${seqStr}`;
 };
 
 const resolveVendorForItem = (product, requestedVendorId) => {
@@ -91,7 +169,8 @@ const resolveVendorForItem = (product, requestedVendorId) => {
         return { selectedVendor: match, isAutoSelected: false };
     }
 
-    const bestVendor = getBestVendorForProduct({ ...product.toObject(), vendors: productVendors });
+    const productObj = product.toObject ? product.toObject() : product;
+    const bestVendor = getBestVendorForProduct({ ...productObj, vendors: productVendors });
     return { selectedVendor: bestVendor, isAutoSelected: true };
 };
 
@@ -106,7 +185,10 @@ const normalizeQuotationItems = async (items, fallbackSiteId) => {
                 throw asBadRequest('Each quotation item must include productId');
             }
 
-            const product = await Product.findById(item.productId).populate('vendors.vendorId');
+            const product = await Product.findById(item.productId)
+                .select('productCode productName hsnCode gstPercentage uom productImageUrl basePrice vendors')
+                .populate('vendors.vendorId', 'name isActive')
+                .lean();
             if (!product) {
                 throw asBadRequest(`Product not found for item: ${item.productId}`);
             }
@@ -184,37 +266,20 @@ const createQuotation = async (req, res) => {
             totalDiscount: requestedTotalDiscount
         } = req.body;
 
-        const customer = await Customer.findById(customerId);
+        const customer = await Customer.findById(customerId)
+            .select('companyName customerName billingAddress')
+            .lean();
         if (!customer) return res.status(404).json({ message: 'Customer not found' });
 
         const normalizedItems = await normalizeQuotationItems(items, siteId);
 
-        // Robust auto-increment logic using prefix from settings and regex for last sequence
         const year = new Date().getFullYear();
         const creatorId = req.user ? req.user.id : undefined;
         const settings = await getAnyCompanySettings(creatorId);
         const prefix = (settings?.quotationPrefix && settings.quotationPrefix.toUpperCase().startsWith('ARM')) 
             ? settings.quotationPrefix 
             : 'ARM/QTN';
-        const prefixMatch = `${prefix}/${year}/`;
-
-        // Find the quotation with the highest sequence number for this prefix and year
-        // We use regex to match the start and sort descending to get the highest
-        const lastQuotation = await Quotation.findOne({
-            quotationNo: new RegExp(`^${prefixMatch.replace(/\//g, '\\/')}`)
-        }).sort({ quotationNo: -1 });
-
-        let sequence = 1;
-        if (lastQuotation) {
-            const parts = lastQuotation.quotationNo.split('/');
-            const lastSeq = parseInt(parts[parts.length - 1]);
-            if (!isNaN(lastSeq)) {
-                sequence = lastSeq + 1;
-            }
-        }
-
-        const seqStr = sequence.toString().padStart(4, '0');
-        const quotationNo = `${prefixMatch}${seqStr}`;
+        const quotationNo = await generateQuotationNumber(prefix, year);
 
         const customerState = customer.billingAddress?.state || '';
         const itemDiscountTotal = calculateTotalDiscount(normalizedItems);
@@ -231,6 +296,9 @@ const createQuotation = async (req, res) => {
 
         const newQuotation = new Quotation({
             quotationNo,
+            quotationNumber: quotationNo,
+            companyId: settings?._id,
+            customerName: customer.companyName || customer.customerName,
             customerId,
             quotationDate: new Date(),
             validTill,
@@ -250,6 +318,11 @@ const createQuotation = async (req, res) => {
         });
 
         await newQuotation.save();
+        await clearQuotationDashboardCache();
+        if (req.user?.id) {
+            await QuotationDraft.deleteOne({ userId: req.user.id, draftKey: 'new' });
+            await deleteDraftFromRedis(req.user.id, 'new');
+        }
         res.status(201).json(newQuotation);
     } catch (error) {
         console.error("Create Quotation Error Stack:", error);
@@ -274,7 +347,9 @@ const updateQuotation = async (req, res) => {
             totalDiscount: requestedTotalDiscount
         } = req.body;
 
-        const customer = await Customer.findById(customerId);
+        const customer = await Customer.findById(customerId)
+            .select('companyName customerName billingAddress')
+            .lean();
         if (!customer) return res.status(404).json({ message: 'Customer not found' });
 
         const normalizedItems = await normalizeQuotationItems(items, siteId);
@@ -307,8 +382,9 @@ const updateQuotation = async (req, res) => {
             termsTemplateId: termsTemplateId || undefined,
             customTerms,
             status: status || 'draft',
-        }, { new: true, runValidators: true });
+        }, { new: true, runValidators: true }).lean();
 
+        await clearQuotationDashboardCache();
         res.json(updatedQuotation);
     } catch (error) {
         console.error("Update Quotation Error:", error);
@@ -319,6 +395,7 @@ const updateQuotation = async (req, res) => {
 const deleteQuotation = async (req, res) => {
     try {
         await Quotation.findByIdAndDelete(req.params.id);
+        await clearQuotationDashboardCache();
         res.json({ message: 'Quotation deleted successfully' });
     } catch (error) {
         res.status(500).json({ message: 'Error deleting quotation' });
@@ -331,7 +408,8 @@ const finalizeQuotation = async (req, res) => {
             req.params.id,
             { status: 'final' },
             { new: true }
-        );
+        ).lean();
+        await clearQuotationDashboardCache();
         res.json(quotation);
     } catch (error) {
         res.status(500).json({ message: 'Error finalizing quotation' });
@@ -346,13 +424,14 @@ module.exports = {
     getQuotationById: async (req, res) => {
         try {
             const quotation = await Quotation.findById(req.params.id)
-                .populate('customerId')
-                .populate('siteId')
-                .populate('items.siteId')
-                .populate('items.productId')
-                .populate('items.vendorId')
-                .populate('termsTemplateId')
-                .populate('createdBy');
+                .populate('customerId', 'customerName companyName gstin billingAddress mobile email logoUrl defaultDiscount')
+                .populate('siteId', 'siteName address')
+                .populate('items.siteId', 'siteName address')
+                .populate('items.productId', 'productName productCode hsnCode gstPercentage uom productImageUrl')
+                .populate('items.vendorId', 'name')
+                .populate('termsTemplateId', 'templateName content isDefault')
+                .populate('createdBy', 'name email')
+                .lean();
             if (!quotation) return res.status(404).json({ message: 'Quotation not found' });
 
             // Fetch company settings with robust fallback
@@ -360,7 +439,7 @@ module.exports = {
             const companySettings = await getAnyCompanySettings(creatorId);
 
             // Return quotation with company settings
-            const quotationObj = quotation.toObject();
+            const quotationObj = { ...quotation };
             quotationObj.companySettings = companySettings;
 
             res.json(quotationObj);
@@ -375,16 +454,64 @@ module.exports = {
             if (req.user && req.user.role !== 'admin') {
                 query.createdBy = req.user.id;
             }
-            const quotations = await Quotation.find(query)
-                .populate('customerId')
-                .populate('siteId')
-                .populate('createdBy')
+
+            const search = String(req.query.search || '').trim();
+            if (search) {
+                const regex = new RegExp(escapeRegex(search), 'i');
+                query.$or = [
+                    { quotationNo: regex },
+                    { quotationNumber: regex },
+                    { customerName: regex },
+                ];
+            }
+            if (req.query.status) {
+                query.status = req.query.status;
+            }
+
+            const listParams = hasListParams(req.query);
+            let quotationsQuery = Quotation.find(query)
+                .select('quotationNo quotationNumber customerName customerId quotationDate validTill grandTotal status siteId createdBy createdAt updatedAt')
+                .populate('customerId', 'customerName companyName gstin logoUrl')
+                .populate('siteId', 'siteName address')
+                .populate('createdBy', 'name email')
                 .sort({ createdAt: -1 });
+
+            if (listParams) {
+                const { page, limit, skip } = getPagination(req.query);
+                const [quotations, total] = await Promise.all([
+                    quotationsQuery.skip(skip).limit(limit).lean(),
+                    Quotation.countDocuments(query),
+                ]);
+
+                const settingsCache = {};
+                const quotationsWithSettings = await Promise.all(quotations.map(async (q) => {
+                    const qObj = { ...q };
+                    const creatorId = q.createdBy?._id || q.createdBy;
+
+                    if (creatorId && !settingsCache[creatorId]) {
+                        settingsCache[creatorId] = await getAnyCompanySettings(creatorId);
+                    }
+                    qObj.companySettings = settingsCache[creatorId] || await getAnyCompanySettings();
+                    return qObj;
+                }));
+
+                return res.json({
+                    data: quotationsWithSettings,
+                    pagination: {
+                        page,
+                        limit,
+                        total,
+                        pages: Math.ceil(total / limit) || 1,
+                    },
+                });
+            }
+
+            const quotations = await quotationsQuery.lean();
 
             // Fetch company settings for each creator (with caching to avoid redundant calls)
             const settingsCache = {};
             const quotationsWithSettings = await Promise.all(quotations.map(async (q) => {
-                const qObj = q.toObject();
+                const qObj = { ...q };
                 const creatorId = q.createdBy?._id || q.createdBy;
 
                 if (creatorId && !settingsCache[creatorId]) {
@@ -406,6 +533,16 @@ module.exports = {
                 query.createdBy = req.user.id;
             }
 
+            const cacheScope = req.user?.role === 'admin' ? 'admin' : `user:${req.user?.id || 'anonymous'}`;
+            const cacheKey = `dashboard:quotations:${cacheScope}`;
+            const redis = await getRedis();
+            if (redis) {
+                const cachedReport = await redis.get(cacheKey);
+                if (cachedReport) {
+                    return res.json(JSON.parse(cachedReport));
+                }
+            }
+
             const [
                 quotations,
                 productCount,
@@ -413,11 +550,16 @@ module.exports = {
                 customerCount,
                 recentQuotations
             ] = await Promise.all([
-                Quotation.find(query),
+                Quotation.find(query).select('grandTotal status createdAt quotationDate').lean(),
                 Product.countDocuments(),
                 Vendor.countDocuments(),
                 Customer.countDocuments(),
-                Quotation.find(query).populate('customerId').sort({ createdAt: -1 }).limit(5)
+                Quotation.find(query)
+                    .select('quotationNo customerName customerId quotationDate grandTotal status createdAt')
+                    .populate('customerId', 'customerName companyName')
+                    .sort({ createdAt: -1 })
+                    .limit(5)
+                    .lean()
             ]);
 
             // Basic Aggregation
@@ -458,7 +600,7 @@ module.exports = {
                 monthlyTrend.push({ month: monthName, total: monthTotal });
             }
 
-            res.json({
+            const report = {
                 summary: {
                     totalQuotations,
                     totalValue,
@@ -469,10 +611,66 @@ module.exports = {
                 },
                 monthlyTrend,
                 recentQuotations
-            });
+            };
+
+            if (redis) {
+                await redis.set(cacheKey, JSON.stringify(report), { EX: DASHBOARD_TTL_SECONDS });
+            }
+
+            res.json(report);
         } catch (error) {
             console.error("Aggregation Error:", error);
             res.status(500).json({ message: 'Error generating reports', error: error.message });
+        }
+    },
+    getDraft: async (req, res) => {
+        try {
+            const draftKey = req.params.draftKey || 'new';
+            const redisDraft = await readDraftFromRedis(req.user.id, draftKey);
+            if (redisDraft) {
+                return res.json(redisDraft);
+            }
+
+            const draft = await QuotationDraft.findOne({
+                userId: req.user.id,
+                draftKey
+            }).select('userId draftKey payload updatedAt expiresAt createdAt').lean();
+
+            res.json(draft || null);
+        } catch (error) {
+            res.status(500).json({ message: 'Error fetching quotation draft' });
+        }
+    },
+    autosaveDraft: async (req, res) => {
+        try {
+            const draftKey = req.params.draftKey || 'new';
+            const redisDraft = await saveDraftToRedis(req.user.id, draftKey, req.body || {});
+            if (redisDraft) {
+                return res.json(redisDraft);
+            }
+
+            const draft = await QuotationDraft.findOneAndUpdate(
+                { userId: req.user.id, draftKey },
+                { payload: req.body || {} },
+                { new: true, upsert: true, setDefaultsOnInsert: true }
+            );
+
+            res.json(draft);
+        } catch (error) {
+            res.status(500).json({ message: 'Error saving quotation draft' });
+        }
+    },
+    deleteDraft: async (req, res) => {
+        try {
+            const draftKey = req.params.draftKey || 'new';
+            await deleteDraftFromRedis(req.user.id, draftKey);
+            await QuotationDraft.deleteOne({
+                userId: req.user.id,
+                draftKey
+            });
+            res.json({ message: 'Draft deleted successfully' });
+        } catch (error) {
+            res.status(500).json({ message: 'Error deleting quotation draft' });
         }
     }
 };

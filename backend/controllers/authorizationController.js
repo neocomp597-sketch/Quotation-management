@@ -44,7 +44,10 @@ const buildRolePayload = (doc) => {
 exports.getAuthorizationMatrix = async (req, res) => {
     try {
         // Fetch ALL role documents (built-in + custom)
-        const documents = await RolePermission.find().sort({ createdAt: 1 });
+        const documents = await RolePermission.find()
+            .select('role label description isCustom menuVisibility createdAt')
+            .sort({ createdAt: 1 })
+            .lean();
 
         // Also ensure the 3 built-in roles exist in the response even if not in DB
         const foundRoles = new Set(documents.map((d) => d.role));
@@ -72,7 +75,9 @@ exports.getAuthorizationMatrix = async (req, res) => {
 exports.getMyPermissions = async (req, res) => {
     try {
         const role     = req.user?.role || 'sales';
-        const document = role === 'admin' ? null : await RolePermission.findOne({ role });
+        const document = role === 'admin'
+            ? null
+            : await RolePermission.findOne({ role }).select('menuVisibility').lean();
         res.json({
             role,
             menuGroups:  MENU_GROUPS,
@@ -121,7 +126,7 @@ exports.createRole = async (req, res) => {
             return res.status(400).json({ message: 'Invalid label — could not create a valid key' });
         }
 
-        const existing = await RolePermission.findOne({ role });
+        const existing = await RolePermission.findOne({ role }).select('_id').lean();
         if (existing) {
             return res.status(409).json({ message: `Role "${role}" already exists` });
         }
@@ -186,7 +191,7 @@ exports.initializeDefaults = async (req, res) => {
         const rolesToSeed = ROLE_OPTIONS.filter((r) => r !== 'admin');
         const results = [];
         for (const role of rolesToSeed) {
-            const existing = await RolePermission.findOne({ role });
+            const existing = await RolePermission.findOne({ role }).select('_id').lean();
             if (!existing) {
                 const defaultPerms = sanitizePermissions(DEFAULT_ROLE_PERMISSIONS[role] || {});
                 await RolePermission.create({

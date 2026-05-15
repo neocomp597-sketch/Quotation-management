@@ -4,7 +4,7 @@ const { updateActivityDate, logStatusChange } = require('../utils/activityHelper
 exports.createEnquiry = async (req, res) => {
     try {
         const { enquiryNo } = req.body;
-        const exists = await Enquiry.findOne({ enquiryNo });
+        const exists = await Enquiry.findOne({ enquiryNo }).select('_id').lean();
         if (exists) {
             return res.status(400).json({ message: `Enquiry with number ${enquiryNo} already exists` });
         }
@@ -25,12 +25,14 @@ exports.createEnquiry = async (req, res) => {
 exports.getAllEnquiries = async (req, res) => {
     try {
         const enquiries = await Enquiry.find()
-            .populate('customerId')
+            .select('enquiryNo customerId status probability items createdBy lastActivityDate createdAt updatedAt')
+            .populate('customerId', 'customerName companyName gstin')
             .populate('createdBy', 'name email')
             .populate('items.vendors', 'name')
             .populate('items.vendorQuotes.vendorId', 'name')
             .populate('items.finalVendor', 'name')
-            .sort({ createdAt: -1 });
+            .sort({ createdAt: -1 })
+            .lean();
         res.json(enquiries);
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -41,10 +43,11 @@ exports.getEnquiryById = async (req, res) => {
     try {
         const { id } = req.params;
         const enquiry = await Enquiry.findById(id)
-            .populate('customerId')
+            .populate('customerId', 'customerName companyName gstin billingAddress mobile email')
             .populate('items.vendors', 'name')
             .populate('items.vendorQuotes.vendorId', 'name')
-            .populate('items.finalVendor', 'name');
+            .populate('items.finalVendor', 'name')
+            .lean();
         if (!enquiry) return res.status(404).json({ message: 'Enquiry not found' });
         res.json(enquiry);
     } catch (err) {

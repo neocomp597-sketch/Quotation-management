@@ -13,6 +13,7 @@ const ProductVendorSchema = new mongoose.Schema(
 
 const ProductSchema = new mongoose.Schema({
     productCode: { type: String, required: true, unique: true },
+    companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'CompanySettings' },
     productName: { type: String, required: true },
     categoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'Category' },
     hsnCode: { type: String, required: true },
@@ -32,6 +33,11 @@ const ProductSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
 });
+
+ProductSchema.index({ productName: 1 });
+ProductSchema.index({ categoryId: 1 });
+ProductSchema.index({ companyId: 1 });
+ProductSchema.index({ productName: 'text', hsnCode: 'text' });
 
 ProductSchema.path('vendors').validate(function (vendors) {
     if (!Array.isArray(vendors) || vendors.length === 0) return true;

@@ -1,8 +1,40 @@
 const Status = require('../models/Status');
 
+const getPagination = (query) => {
+    const page = Math.max(1, Number(query.page || 1));
+    const limit = Math.min(100, Math.max(1, Number(query.limit || 20)));
+    return { page, limit, skip: (page - 1) * limit };
+};
+
 exports.getStatuses = async (req, res) => {
     try {
-        const statuses = await Status.find().sort({ name: 1 });
+        if (req.query.page || req.query.limit) {
+            const { page, limit, skip } = getPagination(req.query);
+            const [statuses, total] = await Promise.all([
+                Status.find()
+                    .select('name color isActive createdAt updatedAt')
+                    .sort({ name: 1 })
+                    .skip(skip)
+                    .limit(limit)
+                    .lean(),
+                Status.countDocuments()
+            ]);
+
+            return res.json({
+                data: statuses,
+                pagination: {
+                    page,
+                    limit,
+                    total,
+                    pages: Math.ceil(total / limit) || 1
+                }
+            });
+        }
+
+        const statuses = await Status.find()
+            .select('name color isActive createdAt updatedAt')
+            .sort({ name: 1 })
+            .lean();
         res.json(statuses);
     } catch (error) {
         res.status(500).json({ message: error.message });

@@ -1,13 +1,19 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
 import { MdArrowBack, MdAdd, MdDelete, MdSave, MdCheckCircle, MdPerson, MdInventory2, MdGavel, MdSearch, MdClose, MdPayments, MdEventAvailable, MdBadge, MdTrendingDown, MdEmail, MdPhone, MdLocationOn, MdExpandMore } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import { customerService, productService, quotationService, termsService, salespersonService, siteService } from '../services/api';
 import { calculateLineItem, resolveImageUrl } from '../utils/helpers';
 import Modal from '../components/Modal';
+import { clearQuotationDraft, setAutosaveStatus, setQuotationDraft } from '../store/quotationDraftSlice';
 
 // Searchable Customer Dropdown Component
-const CustomerSearchDropdown = ({ customers, selectedCustomerId, onSelect }) => {
+const LIST_PAGE_SIZE = 20;
+
+const unwrapList = (payload) => Array.isArray(payload) ? payload : payload?.data || [];
+
+const CustomerSearchDropdown = ({ customers, selectedCustomerId, onSelect, onSearch, isLoading }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const dropdownRef = useRef(null);
@@ -15,16 +21,17 @@ const CustomerSearchDropdown = ({ customers, selectedCustomerId, onSelect }) => 
 
     const selectedCustomer = customers.find(c => c._id === selectedCustomerId);
 
-    const filteredCustomers = useMemo(() => {
-        if (!searchTerm) return customers;
-        const query = searchTerm.toLowerCase();
-        return customers.filter(c =>
-            c.companyName?.toLowerCase().includes(query) ||
-            c.customerName?.toLowerCase().includes(query) ||
-            c.gstin?.toLowerCase().includes(query) ||
-            c.mobile?.includes(query)
-        );
-    }, [customers, searchTerm]);
+    useEffect(() => {
+        if (!onSearch || !isOpen) return undefined;
+
+        const timer = setTimeout(() => {
+            onSearch(searchTerm.trim());
+        }, 300);
+
+        return () => clearTimeout(timer);
+    }, [searchTerm, isOpen, onSearch]);
+
+    const filteredCustomers = customers;
 
     // Close dropdown when clicking outside
     useEffect(() => {
@@ -99,7 +106,11 @@ const CustomerSearchDropdown = ({ customers, selectedCustomerId, onSelect }) => 
 
                     {/* Results List */}
                     <div className="max-h-64 overflow-y-auto">
-                        {filteredCustomers.length > 0 ? (
+                        {isLoading ? (
+                            <div className="p-6 text-center text-slate-400 text-xs font-black uppercase tracking-widest">
+                                Searching customers...
+                            </div>
+                        ) : filteredCustomers.length > 0 ? (
                             filteredCustomers.map(customer => (
                                 <div
                                     key={customer._id}
@@ -170,10 +181,16 @@ const CreateQuotation = () => {
     const navigate = useNavigate();
     const { id } = useParams();
     const isEditMode = !!id;
+    const dispatch = useDispatch();
+    const autosaveStatus = useSelector((state) => state.quotationDraft.autosaveStatus);
+    const lastSavedAt = useSelector((state) => state.quotationDraft.lastSavedAt);
+    const draftKey = isEditMode ? `edit-${id}` : 'new';
+    const localDraftKey = `quotation-draft:${draftKey}`;
 
     // Master Data
     const [customers, setCustomers] = useState([]);
     const [products, setProducts] = useState([]);
+    const [isCustomerSearchLoading, setIsCustomerSearchLoading] = useState(false);
     const [termsTemplates, setTermsTemplates] = useState([]);
     const [salespersons, setSalespersons] = useState([]);
     const [sites, setSites] = useState([]);
@@ -213,6 +230,7 @@ const CreateQuotation = () => {
     const [termsContent, setTermsContent] = useState('');
     const [selectedTermsTemplateId, setSelectedTermsTemplateId] = useState('');
     const [overallDiscount, setOverallDiscount] = useState(0);
+    const [draftRestored, setDraftRestored] = useState(false);
 
     const [newSalesperson, setNewSalesperson] = useState({
         name: '',
@@ -225,13 +243,13 @@ const CreateQuotation = () => {
         const fetchData = async () => {
             try {
                 const [custRes, prodRes, termsRes, salesRes] = await Promise.all([
-                    customerService.getAll(),
-                    productService.getAll(),
+                    customerService.getAll({ page: 1, limit: LIST_PAGE_SIZE }),
+                    productService.getAll({ page: 1, limit: LIST_PAGE_SIZE }),
                     termsService.getAll(),
                     salespersonService.getAll()
                 ]);
-                setCustomers(custRes.data);
-                setProducts(prodRes.data);
+                setCustomers(unwrapList(custRes.data));
+                setProducts(unwrapList(prodRes.data));
                 setTermsTemplates(termsRes.data);
                 setSalespersons(salesRes.data);
 
@@ -256,6 +274,39 @@ const CreateQuotation = () => {
         }
     }, [id]);
 
+    const searchCustomers = async (query = '') => {
+        setIsCustomerSearchLoading(true);
+        try {
+            const res = await customerService.getAll({
+                page: 1,
+                limit: LIST_PAGE_SIZE,
+                search: query || undefined
+            });
+            setCustomers(unwrapList(res.data));
+        } catch (err) {
+            console.error('Error searching customers:', err);
+        } finally {
+            setIsCustomerSearchLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        const timer = setTimeout(async () => {
+            try {
+                const res = await productService.getAll({
+                    page: 1,
+                    limit: LIST_PAGE_SIZE,
+                    search: productSearch.trim() || undefined
+                });
+                setProducts(unwrapList(res.data));
+            } catch (err) {
+                console.error('Error searching products:', err);
+            }
+        }, 300);
+
+        return () => clearTimeout(timer);
+    }, [productSearch]);
+
     // Fetch quotation details if in edit mode
     useEffect(() => {
         if (id) {
@@ -264,6 +315,13 @@ const CreateQuotation = () => {
                 try {
                     const res = await quotationService.getById(id);
                     const q = res.data;
+                    if (q.customerId && typeof q.customerId === 'object') {
+                        setCustomers(prev => (
+                            prev.some(c => c._id === q.customerId._id)
+                                ? prev
+                                : [q.customerId, ...prev]
+                        ));
+                    }
 
                     setHeader({
                         quotationNo: q.quotationNo,
@@ -433,6 +491,86 @@ const CreateQuotation = () => {
 
         return { ...res, finalTaxable, grandTotal, roundOff };
     }, [items, overallDiscount]);
+
+    const draftPayload = useMemo(() => ({
+        header,
+        items,
+        termsContent,
+        selectedTermsTemplateId,
+        overallDiscount,
+        savedAt: new Date().toISOString()
+    }), [header, items, termsContent, selectedTermsTemplateId, overallDiscount]);
+
+    const hasMeaningfulDraft = useMemo(() => (
+        header.customerId ||
+        header.salespersonName ||
+        header.siteId ||
+        items.length > 0 ||
+        termsContent?.trim() ||
+        Number(overallDiscount || 0) > 0
+    ), [header, items, termsContent, overallDiscount]);
+
+    useEffect(() => {
+        if (draftRestored || isEditMode) return;
+
+        const restoreDraft = async () => {
+            try {
+                const rawLocalDraft = localStorage.getItem(localDraftKey);
+                let draft = rawLocalDraft ? JSON.parse(rawLocalDraft) : null;
+
+                if (!draft) {
+                    const res = await quotationService.getDraft(draftKey);
+                    draft = res.data?.payload || null;
+                }
+
+                if (draft?.header) {
+                    setHeader(prev => ({ ...prev, ...draft.header, quotationNo: 'AUTO-GEN' }));
+                    setItems(Array.isArray(draft.items) ? draft.items : []);
+                    setTermsContent(draft.termsContent || '');
+                    setSelectedTermsTemplateId(draft.selectedTermsTemplateId || '');
+                    setOverallDiscount(draft.overallDiscount || 0);
+                    dispatch(setQuotationDraft(draft));
+                    toast.info('Restored your unfinished quotation draft');
+                }
+            } catch (error) {
+                console.error('Draft restore failed:', error);
+            } finally {
+                setDraftRestored(true);
+            }
+        };
+
+        restoreDraft();
+    }, [dispatch, draftKey, draftRestored, isEditMode, localDraftKey]);
+
+    useEffect(() => {
+        if (!draftRestored || isEditMode || !hasMeaningfulDraft) return;
+
+        dispatch(setAutosaveStatus('saving'));
+        const timer = setTimeout(() => {
+            localStorage.setItem(localDraftKey, JSON.stringify(draftPayload));
+            dispatch(setQuotationDraft(draftPayload));
+            dispatch(setAutosaveStatus('saved'));
+        }, 1000);
+
+        return () => clearTimeout(timer);
+    }, [dispatch, draftPayload, draftRestored, hasMeaningfulDraft, isEditMode, localDraftKey]);
+
+    useEffect(() => {
+        if (!draftRestored || isEditMode || !hasMeaningfulDraft) return;
+
+        const timer = setTimeout(async () => {
+            try {
+                dispatch(setAutosaveStatus('saving'));
+                await quotationService.autosaveDraft(draftKey, draftPayload);
+                dispatch(setAutosaveStatus('saved'));
+            } catch (error) {
+                console.error('Backend draft autosave failed:', error);
+                dispatch(setAutosaveStatus('error'));
+            }
+        }, 15000);
+
+        return () => clearTimeout(timer);
+    }, [dispatch, draftKey, draftPayload, draftRestored, hasMeaningfulDraft, isEditMode]);
 
     // Handlers
     const handleHeaderChange = (e) => {
@@ -665,6 +803,9 @@ const CreateQuotation = () => {
                 toast.success('Quotation updated successfully!');
             } else {
                 await quotationService.create(quotationData);
+                localStorage.removeItem(localDraftKey);
+                dispatch(clearQuotationDraft());
+                await quotationService.deleteDraft(draftKey).catch(() => {});
                 toast.success('Quotation created successfully!');
             }
             navigate('/quotations');
@@ -686,7 +827,14 @@ const CreateQuotation = () => {
                     </button>
                     <div>
                         <h1 className="text-3xl font-black text-slate-900 tracking-tight">{isEditMode ? 'Edit Quotation' : 'Create Quotation'}</h1>
-                        <p className="text-slate-500 font-medium">{isEditMode ? 'Editing Reference:' : 'Drafting Reference:'} <span className="text-primary-600 font-bold">{header.quotationNo}</span></p>
+                        <p className="text-slate-500 font-medium">
+                            {isEditMode ? 'Editing Reference:' : 'Drafting Reference:'} <span className="text-primary-600 font-bold">{header.quotationNo}</span>
+                            {!isEditMode && hasMeaningfulDraft && (
+                                <span className="ml-3 text-[10px] uppercase tracking-widest text-slate-400">
+                                    {autosaveStatus === 'saving' ? 'Saving draft...' : lastSavedAt ? 'Draft saved' : ''}
+                                </span>
+                            )}
+                        </p>
                     </div>
                 </div>
                 <div className="flex gap-3">
@@ -725,6 +873,8 @@ const CreateQuotation = () => {
                                     customers={customers}
                                     selectedCustomerId={header.customerId}
                                     onSelect={(customerId) => setHeader(prev => ({ ...prev, customerId }))}
+                                    onSearch={searchCustomers}
+                                    isLoading={isCustomerSearchLoading}
                                 />
                                 {selectedCustomer && (
                                     <div className="mt-4 p-4 rounded-2xl bg-primary-50/50 border border-primary-100/50">

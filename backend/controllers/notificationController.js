@@ -6,7 +6,10 @@ exports.getUnreadNotifications = async (req, res) => {
             userId: req.user._id, 
             isDismissed: false, 
             isRead: false 
-        }).sort({ createdAt: -1 });
+        })
+            .select('userId title message type isRead isDismissed createdAt')
+            .sort({ createdAt: -1 })
+            .lean();
         res.json(notifications);
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -15,7 +18,10 @@ exports.getUnreadNotifications = async (req, res) => {
 
 exports.getAllNotifications = async (req, res) => {
     try {
-        const notifications = await Notification.find({ userId: req.user._id, isDismissed: false }).sort({ createdAt: -1 });
+        const notifications = await Notification.find({ userId: req.user._id, isDismissed: false })
+            .select('userId title message type isRead isDismissed createdAt')
+            .sort({ createdAt: -1 })
+            .lean();
         res.json(notifications);
     } catch (err) {
         res.status(500).json({ message: err.message });

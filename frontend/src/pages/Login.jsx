@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import axios from "axios";
 import { toast } from "react-toastify";
 import { useAuth } from "../context/AuthContext";
+import { authService } from "../services/api";
 import { Eye, EyeOff, CheckCircle } from "lucide-react";
 import "./Auth.css";
 
@@ -42,11 +42,9 @@ const Login = () => {
 
     setLoading(true);
     try {
-      const baseUrl =
-        import.meta.env.VITE_API_URL || "http://localhost:4003/api";
-      const res = await axios.post(`${baseUrl}/auth/login`, formData);
+      const res = await authService.login(formData);
 
-      await login(res.data.token, res.data.user);
+      await login(res.data);
 
       toast.success(
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>

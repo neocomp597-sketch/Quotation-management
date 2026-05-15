@@ -2,7 +2,10 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { MdAdd, MdDelete, MdEdit, MdSearch, MdStorefront } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import Modal from '../components/Modal';
+import PaginationControls from '../components/PaginationControls';
 import { vendorService } from '../services/api';
+
+const LIST_PAGE_SIZE = 20;
 
 const defaultForm = {
     name: '',
@@ -18,14 +21,29 @@ const Vendors = () => {
     const [vendors, setVendors] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
+    const [page, setPage] = useState(1);
+    const [pagination, setPagination] = useState({ page: 1, limit: LIST_PAGE_SIZE, total: 0, pages: 1 });
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingVendor, setEditingVendor] = useState(null);
     const [formData, setFormData] = useState(defaultForm);
 
     const fetchVendors = async () => {
+        setLoading(true);
         try {
-            const res = await vendorService.getAll();
-            setVendors(res.data);
+            const res = await vendorService.getAll(false, {
+                page,
+                limit: LIST_PAGE_SIZE,
+                search: debouncedSearch || undefined
+            });
+            const payload = res.data;
+            setVendors(Array.isArray(payload) ? payload : payload.data || []);
+            setPagination(payload.pagination || {
+                page: 1,
+                limit: LIST_PAGE_SIZE,
+                total: Array.isArray(payload) ? payload.length : 0,
+                pages: 1
+            });
         } catch (err) {
             console.error('Error fetching vendors:', err);
             toast.error('Failed to fetch vendors');
@@ -35,18 +53,20 @@ const Vendors = () => {
     };
 
     useEffect(() => {
-        fetchVendors();
-    }, []);
+        const timer = setTimeout(() => {
+            setDebouncedSearch(searchTerm.trim());
+            setPage(1);
+        }, 300);
 
-    const filteredVendors = useMemo(() => {
-        const q = searchTerm.toLowerCase();
-        return vendors.filter((vendor) =>
-            vendor.name?.toLowerCase().includes(q) ||
-            vendor.contactPerson?.toLowerCase().includes(q) ||
-            vendor.phone?.toLowerCase().includes(q) ||
-            vendor.email?.toLowerCase().includes(q)
-        );
-    }, [searchTerm, vendors]);
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
+
+    useEffect(() => {
+        fetchVendors();
+    }, [page, debouncedSearch]);
+
+    const filteredVendors = useMemo(() => vendors, [vendors]);
+    const pagedVendors = filteredVendors;
 
     const openModal = (vendor = null) => {
         setEditingVendor(vendor);
@@ -121,8 +141,8 @@ const Vendors = () => {
                 </button>
             </div>
 
-            <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
-                <div className="p-6 border-b border-slate-50 flex flex-col md:flex-row gap-4 items-center bg-slate-50/30">
+            <div className="mobile-master-shell bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
+                <div className="mobile-master-toolbar p-6 border-b border-slate-50 flex flex-col md:flex-row gap-4 items-center bg-slate-50/30">
                     <div className="relative flex-1 w-full text-slate-400 focus-within:text-primary-600 transition-colors">
                         <MdSearch className="absolute left-4 top-1/2 -translate-y-1/2" size={20} />
                         <input
@@ -141,6 +161,7 @@ const Vendors = () => {
                         <p className="text-xs uppercase font-black tracking-widest">Loading Vendors...</p>
                     </div>
                 ) : (
+                    <>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left">
                             <thead className="bg-slate-50 text-slate-400 text-[10px] uppercase font-black tracking-widest border-b border-slate-100">
@@ -153,7 +174,7 @@ const Vendors = () => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50">
-                                {filteredVendors.map((vendor) => (
+                                {pagedVendors.map((vendor) => (
                                     <tr key={vendor._id} className="hover:bg-slate-50/50 transition-colors">
                                         <td className="px-8 py-5">
                                             <div className="flex items-center gap-3">
@@ -209,6 +230,8 @@ const Vendors = () => {
                             </tbody>
                         </table>
                     </div>
+                    <PaginationControls pagination={pagination} onPageChange={setPage} />
+                    </>
                 )}
             </div>
 

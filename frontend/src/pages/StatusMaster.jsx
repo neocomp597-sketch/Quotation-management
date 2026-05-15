@@ -3,10 +3,15 @@ import { MdAdd, MdEdit, MdDelete } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import { statusService } from '../services/api';
 import Modal from '../components/Modal';
+import PaginationControls from '../components/PaginationControls';
+
+const LIST_PAGE_SIZE = 20;
 
 const StatusMaster = () => {
     const [statuses, setStatuses] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [page, setPage] = useState(1);
+    const [pagination, setPagination] = useState({ page: 1, limit: LIST_PAGE_SIZE, total: 0, pages: 1 });
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingStatus, setEditingStatus] = useState(null);
 
@@ -15,15 +20,24 @@ const StatusMaster = () => {
         isActive: true
     });
 
+    const pagedStatuses = statuses;
+
     useEffect(() => {
         fetchStatuses();
-    }, []);
+    }, [page]);
 
     const fetchStatuses = async () => {
         setLoading(true);
         try {
-            const res = await statusService.getAll();
-            setStatuses(res.data);
+            const res = await statusService.getAll({ page, limit: LIST_PAGE_SIZE });
+            const payload = res.data;
+            setStatuses(Array.isArray(payload) ? payload : payload.data || []);
+            setPagination(payload.pagination || {
+                page: 1,
+                limit: LIST_PAGE_SIZE,
+                total: Array.isArray(payload) ? payload.length : 0,
+                pages: 1
+            });
         } catch (err) {
             console.error("Error fetching statuses:", err);
             toast.error('Failed to load statuses');
@@ -110,7 +124,7 @@ const StatusMaster = () => {
                 </button>
             </div>
 
-            <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
+            <div className="mobile-master-shell bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
                 <div className="p-6">
                     {loading ? (
                         <div className="py-20 text-center text-slate-400 font-medium">
@@ -118,6 +132,7 @@ const StatusMaster = () => {
                             <p className="text-xs uppercase font-black tracking-widest">Loading...</p>
                         </div>
                     ) : (
+                        <>
                         <div className="overflow-x-auto">
                             <table className="w-full text-left border-collapse">
                                 <thead>
@@ -128,7 +143,7 @@ const StatusMaster = () => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {statuses.map(status => (
+                                    {pagedStatuses.map(status => (
                                         <tr key={status._id} className="border-b last:border-0 border-slate-50 hover:bg-slate-50/50 transition-colors">
                                             <td className="p-4">
                                                 <span className="text-sm font-bold text-slate-800">{status.name}</span>
@@ -171,6 +186,8 @@ const StatusMaster = () => {
                                 </tbody>
                             </table>
                         </div>
+                        <PaginationControls pagination={pagination} onPageChange={setPage} />
+                        </>
                     )}
                 </div>
             </div>

@@ -4,12 +4,18 @@ import { toast } from 'react-toastify';
 import { customerService, uploadService, importService } from '../services/api';
 import Modal from '../components/Modal';
 import ImportModal from '../components/ImportModal';
+import PaginationControls from '../components/PaginationControls';
 import { resolveImageUrl } from '../utils/helpers';
+
+const LIST_PAGE_SIZE = 20;
 
 const Customers = () => {
     const [customers, setCustomers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
+    const [page, setPage] = useState(1);
+    const [pagination, setPagination] = useState({ page: 1, limit: LIST_PAGE_SIZE, total: 0, pages: 1 });
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingCustomer, setEditingCustomer] = useState(null);
     const [isUploading, setIsUploading] = useState(false);
@@ -40,13 +46,34 @@ const Customers = () => {
     });
 
     useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(searchTerm.trim());
+            setPage(1);
+        }, 300);
+
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
+
+    useEffect(() => {
         fetchCustomers();
-    }, []);
+    }, [page, debouncedSearch]);
 
     const fetchCustomers = async () => {
+        setLoading(true);
         try {
-            const res = await customerService.getAll();
-            setCustomers(res.data);
+            const res = await customerService.getAll({
+                page,
+                limit: LIST_PAGE_SIZE,
+                search: debouncedSearch || undefined,
+            });
+            const payload = res.data;
+            setCustomers(Array.isArray(payload) ? payload : payload.data || []);
+            setPagination(payload.pagination || {
+                page: 1,
+                limit: LIST_PAGE_SIZE,
+                total: Array.isArray(payload) ? payload.length : 0,
+                pages: 1,
+            });
         } catch (err) {
             console.error("Error fetching customers:", err);
         } finally {
@@ -194,11 +221,7 @@ const Customers = () => {
         }
     };
 
-    const filteredCustomers = customers.filter(c =>
-        c.customerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.companyName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.gstin?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredCustomers = customers;
 
     return (
         <div className="space-y-6">
@@ -256,8 +279,8 @@ const Customers = () => {
                 </div>
             )}
 
-            <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
-                <div className="p-6 border-b border-slate-50 flex flex-col md:flex-row gap-4 items-center bg-slate-50/30 sticky top-0 z-10">
+            <div className="mobile-master-shell bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
+                <div className="mobile-master-toolbar p-6 border-b border-slate-50 flex flex-col md:flex-row gap-4 items-center bg-slate-50/30 sticky top-0 z-10">
                     <div className="relative flex-1 w-full text-slate-400 focus-within:text-primary-600 transition-colors">
                         <MdSearch className="absolute left-4 top-1/2 -translate-y-1/2" size={20} />
                         <input
@@ -280,7 +303,7 @@ const Customers = () => {
                         {/* Mobile Card View */}
                         <div className="md:hidden p-4 space-y-4 bg-slate-50/50">
                             {filteredCustomers.map((c) => (
-                                <div key={c._id} className={`bg-white p-5 rounded-2xl border shadow-sm transition-all ${selectedIds.includes(c._id) ? 'border-primary-500 ring-1 ring-primary-500' : 'border-slate-100'}`}>
+                                <div key={c._id} className={`mobile-master-card bg-white p-5 rounded-2xl border shadow-sm transition-all ${selectedIds.includes(c._id) ? 'border-primary-500 ring-1 ring-primary-500' : 'border-slate-100'}`}>
                                     <div className="flex justify-between items-start mb-4">
                                         <div className="flex items-center gap-3">
                                             <div
@@ -452,6 +475,7 @@ const Customers = () => {
                                 </tbody>
                             </table>
                         </div>
+                        <PaginationControls pagination={pagination} onPageChange={setPage} />
                     </>
                 )}
             </div>

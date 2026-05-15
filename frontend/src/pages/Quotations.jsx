@@ -7,6 +7,9 @@ import { formatDate, resolveImageUrl, fetchPdfImageBase64 } from '../utils/helpe
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import QuotationPDF from '../components/QuotationPDF';
 import Modal from '../components/Modal';
+import PaginationControls from '../components/PaginationControls';
+
+const LIST_PAGE_SIZE = 20;
 
 const Quotations = () => {
     const navigate = useNavigate();
@@ -18,6 +21,9 @@ const Quotations = () => {
     const [pdfImages, setPdfImages] = useState({});
     const [isPreviewOpen, setIsPreviewOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
+    const [page, setPage] = useState(1);
+    const [pagination, setPagination] = useState({ page: 1, limit: LIST_PAGE_SIZE, total: 0, pages: 1 });
     const [pdfFormat, setPdfFormat] = useState('format1');
     const [companySettings, setCompanySettings] = useState(null);
 
@@ -58,9 +64,25 @@ const Quotations = () => {
     }, [selectedQuotation]);
 
     useEffect(() => {
-        fetchQuotations();
         fetchCompanySettings();
     }, []);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(searchTerm.trim());
+            setPage(1);
+        }, 300);
+
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
+
+    useEffect(() => {
+        setPage(1);
+    }, [statusFilter]);
+
+    useEffect(() => {
+        fetchQuotations();
+    }, [page, debouncedSearch, statusFilter]);
 
     const fetchCompanySettings = async () => {
         try {
@@ -73,9 +95,22 @@ const Quotations = () => {
     };
 
     const fetchQuotations = async () => {
+        setLoading(true);
         try {
-            const res = await quotationService.getAll();
-            setQuotations(res.data);
+            const res = await quotationService.getAll({
+                page,
+                limit: LIST_PAGE_SIZE,
+                search: debouncedSearch || undefined,
+                status: statusFilter || undefined,
+            });
+            const payload = res.data;
+            setQuotations(Array.isArray(payload) ? payload : payload.data || []);
+            setPagination(payload.pagination || {
+                page: 1,
+                limit: LIST_PAGE_SIZE,
+                total: Array.isArray(payload) ? payload.length : 0,
+                pages: 1,
+            });
         } catch (err) {
             console.error("Error fetching quotations:", err);
         } finally {
@@ -134,10 +169,7 @@ const Quotations = () => {
         }
     };
 
-    const filteredQuotations = quotations.filter(q =>
-        q.quotationNo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        q.customerId?.companyName?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredQuotations = quotations;
 
     return (
         <div className="space-y-6">
@@ -155,8 +187,8 @@ const Quotations = () => {
                 </Link>
             </div>
 
-            <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
-                <div className="p-6 border-b border-slate-50 flex flex-col md:flex-row gap-4 items-center bg-slate-50/30">
+            <div className="mobile-master-shell bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
+                <div className="mobile-master-toolbar p-6 border-b border-slate-50 flex flex-col md:flex-row gap-4 items-center bg-slate-50/30">
                     <div className="relative flex-1 w-full text-slate-400 focus-within:text-primary-600 transition-colors">
                         <MdSearch className="absolute left-4 top-1/2 -translate-y-1/2" size={20} />
                         <input
@@ -180,7 +212,7 @@ const Quotations = () => {
                             {/* Mobile Card View */}
                             <div className="md:hidden p-4 space-y-4 bg-slate-50/50">
                                 {filteredQuotations.map((q) => (
-                                    <div key={q._id} className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                                    <div key={q._id} className="mobile-master-card bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
                                         <div className="p-5 border-b border-slate-50">
                                             <div className="flex justify-between items-start mb-2">
                                                 <div>
@@ -395,6 +427,7 @@ const Quotations = () => {
                                     </tbody>
                                 </table>
                             </div>
+                            <PaginationControls pagination={pagination} onPageChange={setPage} />
                         </>
                     )}
                 </div>

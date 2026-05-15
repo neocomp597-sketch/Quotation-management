@@ -3,7 +3,7 @@ const CompanySettings = require('../models/CompanySettings');
 // Get company settings for logged in user
 exports.getCompanySettings = async (req, res) => {
     try {
-        let settings = await CompanySettings.findOne({ userId: req.user.id });
+        let settings = await CompanySettings.findOne({ userId: req.user.id }).lean();
 
         if (!settings) {
             // Return empty settings if not found
@@ -101,7 +101,7 @@ exports.updateCompanySettings = async (req, res) => {
 // Get company settings by user ID (for quotation PDF generation)
 exports.getCompanySettingsByUserId = async (userId) => {
     try {
-        const settings = await CompanySettings.findOne({ userId });
+        const settings = await CompanySettings.findOne({ userId }).lean();
         return settings;
     } catch (error) {
         console.error('Error fetching company settings by userId:', error);

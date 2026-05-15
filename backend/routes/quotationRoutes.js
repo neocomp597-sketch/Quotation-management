@@ -7,7 +7,10 @@ const {
     getQuotationById,
     getAllQuotations,
     finalizeQuotation,
-    getReports
+    getReports,
+    getDraft,
+    autosaveDraft,
+    deleteDraft
 } = require('../controllers/quotationController');
 
 const { protect } = require('../middlewares/authMiddleware');
@@ -17,6 +20,10 @@ router.post('/', protect, createQuotation);
 
 // GET: Get reports
 router.get('/reports', protect, getReports);
+
+router.get('/drafts/:draftKey', protect, getDraft);
+router.put('/drafts/:draftKey', protect, autosaveDraft);
+router.delete('/drafts/:draftKey', protect, deleteDraft);
 
 // GET: Get all quotations
 router.get('/', protect, getAllQuotations);

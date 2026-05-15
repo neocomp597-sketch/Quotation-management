@@ -7,7 +7,8 @@ exports.getAllUsers = async (req, res) => {
     try {
         const users = await User.find()
             .select('_id name email role status createdAt')
-            .sort({ createdAt: -1 });
+            .sort({ createdAt: -1 })
+            .lean();
 
         res.json(users);
     } catch (error) {
@@ -52,7 +53,7 @@ exports.updateUserRole = async (req, res) => {
         const { role } = req.body;
 
         const isBuiltIn = ROLE_OPTIONS.includes(role);
-        const customRole = !isBuiltIn ? await RolePermission.findOne({ role }) : null;
+        const customRole = !isBuiltIn ? await RolePermission.findOne({ role }).select('_id').lean() : null;
 
         if (!isBuiltIn && !customRole) {
             return res.status(400).json({ message: 'Invalid role supplied' });

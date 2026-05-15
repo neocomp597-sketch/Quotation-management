@@ -1,7 +1,9 @@
 /* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { authService, authorizationService } from "../services/api";
+import { useDispatch } from "react-redux";
+import { authService, authorizationService, setAccessToken } from "../services/api";
 import { MENU_PERMISSION_GROUPS } from "../constants/menuPermissions";
+import { clearCredentials, setCredentials, setPermissions as setReduxPermissions } from "../store/authSlice";
 
 const AuthContext = createContext(null);
 
@@ -17,68 +19,74 @@ const normalizeUser = (userData) => {
 };
 
 export const AuthProvider = ({ children }) => {
+    const dispatch = useDispatch();
     const [user, setUser] = useState(null);
     const [permissions, setPermissions] = useState({});
     const [loading, setLoading] = useState(true);
 
     const clearSession = useCallback(() => {
-        localStorage.removeItem("token");
+        setAccessToken(null);
         localStorage.removeItem("user");
         setUser(null);
         setPermissions({});
-    }, []);
+        dispatch(clearCredentials());
+    }, [dispatch]);
 
     const refreshSession = useCallback(async () => {
-        const token = localStorage.getItem("token");
-
-        if (!token) {
-            setUser(null);
-            setPermissions({});
-            setLoading(false);
-            return null;
-        }
-
         setLoading(true);
 
         try {
-            const [userRes, permissionsRes] = await Promise.all([
-                authService.getMe(),
-                authorizationService.getMy(),
-            ]);
+            const session = await authService.refresh();
+            const nextUser = normalizeUser(session.user);
+            const permissionsRes = await authorizationService.getMy();
+            const nextPermissions = permissionsRes.data?.permissions || {};
 
-            const nextUser = normalizeUser(userRes.data);
             localStorage.setItem("user", JSON.stringify(nextUser));
             setUser(nextUser);
-            setPermissions(permissionsRes.data?.permissions || {});
+            setPermissions(nextPermissions);
+            dispatch(setCredentials({ user: nextUser, permissions: nextPermissions }));
 
             return {
                 user: nextUser,
-                permissions: permissionsRes.data?.permissions || {},
+                permissions: nextPermissions,
             };
         } catch (error) {
-            console.error("Failed to refresh session:", error);
             clearSession();
             return null;
         } finally {
             setLoading(false);
         }
-    }, [clearSession]);
+    }, [clearSession, dispatch]);
 
     useEffect(() => {
         refreshSession();
     }, [refreshSession]);
 
-    const login = useCallback(async (token, userData) => {
-        const normalizedUser = normalizeUser(userData);
+    const login = useCallback(async (sessionOrToken, maybeUserData) => {
+        const session = typeof sessionOrToken === "string"
+            ? { accessToken: sessionOrToken, user: maybeUserData }
+            : sessionOrToken;
+        const normalizedUser = normalizeUser(session?.user);
 
-        localStorage.setItem("token", token);
+        setAccessToken(session?.accessToken);
         localStorage.setItem("user", JSON.stringify(normalizedUser));
         setUser(normalizedUser);
 
-        return refreshSession();
-    }, [refreshSession]);
+        const permissionsRes = await authorizationService.getMy();
+        const nextPermissions = permissionsRes.data?.permissions || {};
+        setPermissions(nextPermissions);
+        dispatch(setCredentials({ user: normalizedUser, permissions: nextPermissions }));
+        dispatch(setReduxPermissions(nextPermissions));
 
-    const logout = useCallback(() => {
+        return { user: normalizedUser, permissions: nextPermissions };
+    }, [dispatch]);
+
+    const logout = useCallback(async () => {
+        try {
+            await authService.logout();
+        } catch {
+            // Local cleanup still happens if the network request fails.
+        }
         clearSession();
     }, [clearSession]);
 

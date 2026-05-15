@@ -251,7 +251,8 @@ exports.getFollowUpIntelligence = async (req, res) => {
                 .populate('customerId', 'companyName')
                 .populate('items.finalVendor', 'name')
                 .sort({ followUpDate: 1 })
-                .select('enquiryNo followUpDate probability status items customerId'),
+                .select('enquiryNo followUpDate probability status items customerId')
+                .lean(),
 
             Enquiry.find({
                 status: statusMatch,
@@ -259,7 +260,8 @@ exports.getFollowUpIntelligence = async (req, res) => {
             })
                 .populate('customerId', 'companyName')
                 .sort({ followUpDate: 1 })
-                .select('enquiryNo followUpDate probability status items customerId'),
+                .select('enquiryNo followUpDate probability status items customerId')
+                .lean(),
 
             Enquiry.find({
                 status: statusMatch,
@@ -268,6 +270,7 @@ exports.getFollowUpIntelligence = async (req, res) => {
                 .populate('customerId', 'companyName')
                 .sort({ followUpDate: 1 })
                 .select('enquiryNo followUpDate probability status items customerId')
+                .lean()
         ]);
 
         // High-risk enquiries: inactive + low probability, or overdue follow-ups + low probability
@@ -281,7 +284,8 @@ exports.getFollowUpIntelligence = async (req, res) => {
         })
             .populate('customerId', 'companyName')
             .sort({ lastActivityDate: 1 })
-            .select('enquiryNo lastActivityDate probability status items customerId followUpDate');
+            .select('enquiryNo lastActivityDate probability status items customerId followUpDate')
+            .lean();
 
         res.json({
             today: todayFollowups,
@@ -479,7 +483,8 @@ exports.getProbabilityIntelligence = async (req, res) => {
             .populate('customerId', 'companyName')
             .select('enquiryNo probability status customerId items')
             .sort({ probability: -1 })
-            .limit(10);
+            .limit(10)
+            .lean();
 
         // Low probability that won (insights)
         const lowProbWon = await Enquiry.find({
@@ -490,7 +495,8 @@ exports.getProbabilityIntelligence = async (req, res) => {
             .populate('customerId', 'companyName')
             .select('enquiryNo probability status customerId items')
             .sort({ probability: 1 })
-            .limit(10);
+            .limit(10)
+            .lean();
 
         res.json({
             byStage,
@@ -515,8 +521,10 @@ exports.getHealthScores = async (req, res) => {
         if (status) matchStage.status = status;
 
         let enquiries = await Enquiry.find(matchStage)
+            .select('enquiryNo customerId status probability followUpDate lastActivityDate createdAt')
             .populate('customerId', 'companyName')
-            .sort({ createdAt: -1 });
+            .sort({ createdAt: -1 })
+            .lean();
 
         const data = enquiries.map(e => {
             const healthScore = computeHealthScore(e);
@@ -554,7 +562,8 @@ exports.exportReport = async (req, res) => {
         if (type === 'enquiries') {
             data = await Enquiry.find()
                 .populate('customerId', 'companyName')
-                .select('enquiryNo enquiryDate status probability items');
+                .select('enquiryNo enquiryDate status probability items')
+                .lean();
         } else if (type === 'vendors') {
             const result = await exports.getVendorIntelligence({}, {});
             // This is a workaround — better to call the controller logic directly
@@ -584,7 +593,8 @@ exports.exportReport = async (req, res) => {
             })
                 .populate('customerId', 'companyName')
                 .select('enquiryNo followUpDate probability status')
-                .sort({ followUpDate: 1 });
+                .sort({ followUpDate: 1 })
+                .lean();
         } else if (type === 'conversion') {
             data = await Enquiry.aggregate([
                 {

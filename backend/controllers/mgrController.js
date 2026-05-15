@@ -1,5 +1,11 @@
 const MGR = require('../models/MGR');
 
+const getPagination = (query) => {
+    const page = Math.max(1, Number(query.page || 1));
+    const limit = Math.min(100, Math.max(1, Number(query.limit || 20)));
+    return { page, limit, skip: (page - 1) * limit };
+};
+
 // Get all MGRs
 exports.getAllMGRs = async (req, res) => {
     try {
@@ -8,7 +14,33 @@ exports.getAllMGRs = async (req, res) => {
         if (type) {
             query.mgrType = type;
         }
-        const mgrs = await MGR.find(query).sort({ mgrType: 1, createdAt: -1 });
+        if (req.query.page || req.query.limit) {
+            const { page, limit, skip } = getPagination(req.query);
+            const [mgrs, total] = await Promise.all([
+                MGR.find(query)
+                    .select('code description mgrType status createdAt updatedAt')
+                    .sort({ mgrType: 1, createdAt: -1 })
+                    .skip(skip)
+                    .limit(limit)
+                    .lean(),
+                MGR.countDocuments(query)
+            ]);
+
+            return res.json({
+                data: mgrs,
+                pagination: {
+                    page,
+                    limit,
+                    total,
+                    pages: Math.ceil(total / limit) || 1
+                }
+            });
+        }
+
+        const mgrs = await MGR.find(query)
+            .select('code description mgrType status createdAt updatedAt')
+            .sort({ mgrType: 1, createdAt: -1 })
+            .lean();
         res.json(mgrs);
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -18,7 +50,9 @@ exports.getAllMGRs = async (req, res) => {
 // Get MGR by ID
 exports.getMGRById = async (req, res) => {
     try {
-        const mgr = await MGR.findById(req.params.id);
+        const mgr = await MGR.findById(req.params.id)
+            .select('code description mgrType status createdAt updatedAt')
+            .lean();
         if (!mgr) return res.status(404).json({ message: 'MGR not found' });
         res.json(mgr);
     } catch (err) {

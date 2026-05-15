@@ -1,5 +1,15 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const { getRedis } = require('../config/redis');
+
+const isAccessTokenBlacklisted = async (jti) => {
+    if (!jti) return false;
+
+    const redis = await getRedis();
+    if (!redis) return false;
+
+    return Boolean(await redis.get(`blacklist:access:${jti}`));
+};
 
 exports.protect = async (req, res, next) => {
     let token;
@@ -12,10 +22,18 @@ exports.protect = async (req, res, next) => {
             token = req.headers.authorization.split(' ')[1];
 
             const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret123');
-            const user = await User.findById(decoded.id).select('_id name email role');
+            if (await isAccessTokenBlacklisted(decoded.jti)) {
+                return res.status(401).json({ message: 'Not authorized, token revoked' });
+            }
+
+            const user = await User.findById(decoded.id).select('_id name email role tokenVersion');
 
             if (!user) {
                 return res.status(401).json({ message: 'Not authorized, user not found' });
+            }
+
+            if (typeof decoded.tokenVersion === 'number' && decoded.tokenVersion !== user.tokenVersion) {
+                return res.status(401).json({ message: 'Not authorized, token revoked' });
             }
 
             req.user = {

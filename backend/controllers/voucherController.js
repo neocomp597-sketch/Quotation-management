@@ -5,7 +5,11 @@ const Vendor = require('../models/Vendor');
 // Get all vouchers
 exports.getVouchers = async (req, res) => {
     try {
-        const vouchers = await Voucher.find().sort({ createdAt: -1 }).populate('vendorId', 'vendorName');
+        const vouchers = await Voucher.find()
+            .select('voucherNo voucherType date vendorId items totalAmount createdAt updatedAt')
+            .sort({ createdAt: -1 })
+            .populate('vendorId', 'name vendorName')
+            .lean();
         res.status(200).json(vouchers);
     } catch (error) {
         res.status(500).json({ message: 'Error fetching vouchers', error: error.message });
@@ -15,7 +19,7 @@ exports.getVouchers = async (req, res) => {
 // Get single voucher
 exports.getVoucherById = async (req, res) => {
     try {
-        const voucher = await Voucher.findById(req.params.id);
+        const voucher = await Voucher.findById(req.params.id).lean();
         if (!voucher) {
             return res.status(404).json({ message: 'Voucher not found' });
         }

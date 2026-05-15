@@ -6,7 +6,10 @@ const getAllSites = async (req, res) => {
         let query = {};
         if (customerId) query.customerId = customerId;
 
-        const sites = await Site.find(query).sort({ siteName: 1 });
+        const sites = await Site.find(query)
+            .select('customerId siteName location address contactPerson mobile createdAt updatedAt')
+            .sort({ siteName: 1 })
+            .lean();
         res.json(sites);
     } catch (error) {
         res.status(500).json({ message: 'Error fetching sites' });

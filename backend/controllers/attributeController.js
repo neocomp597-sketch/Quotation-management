@@ -3,7 +3,10 @@ const Attribute = require('../models/Attribute');
 exports.getAttributesByMGR3 = async (req, res) => {
     try {
         const { mgr3Id } = req.params;
-        const attributes = await Attribute.find({ mgr3Id }).populate('mgr3Id');
+        const attributes = await Attribute.find({ mgr3Id })
+            .select('mgr3Id code description status createdAt updatedAt')
+            .populate('mgr3Id', 'code description status')
+            .lean();
         res.json(attributes);
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -15,7 +18,7 @@ exports.createAttribute = async (req, res) => {
         const { mgr3Id, code, description, status } = req.body;
 
         // Check for duplicates
-        const existing = await Attribute.findOne({ mgr3Id, code, description });
+        const existing = await Attribute.findOne({ mgr3Id, code, description }).select('_id').lean();
         if (existing) {
             return res.status(400).json({ message: 'Attribute with this Code and Description already exists for this MGR3' });
         }
@@ -49,7 +52,7 @@ exports.updateAttribute = async (req, res) => {
                 code, 
                 description,
                 _id: { $ne: id }
-            });
+            }).select('_id').lean();
             if (existing) {
                 return res.status(400).json({ message: 'Attribute with this Code and Description already exists' });
             }

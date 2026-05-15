@@ -2,6 +2,9 @@ const mongoose = require('mongoose');
 
 const QuotationSchema = new mongoose.Schema({
     quotationNo: { type: String, required: true, unique: true },
+    quotationNumber: { type: String },
+    companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'CompanySettings' },
+    customerName: { type: String },
     customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer' },
     quotationDate: { type: Date, required: true, default: Date.now },
     validTill: { type: Date, required: true },
@@ -51,5 +54,14 @@ const QuotationSchema = new mongoose.Schema({
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     createdAt: { type: Date, default: Date.now },
 });
+
+QuotationSchema.index({ quotationNumber: 1 });
+QuotationSchema.index({ customerId: 1 });
+QuotationSchema.index({ createdBy: 1 });
+QuotationSchema.index({ createdAt: -1 });
+QuotationSchema.index({ status: 1 });
+QuotationSchema.index({ companyId: 1 });
+QuotationSchema.index({ companyId: 1, quotationNumber: 1 });
+QuotationSchema.index({ customerName: 'text' });
 
 module.exports = mongoose.model('Quotation', QuotationSchema);

@@ -1,23 +1,73 @@
 import axios from "axios";
 
+let accessToken = null;
+let refreshPromise = null;
+
+export const setAccessToken = (token) => {
+  accessToken = token || null;
+};
+
+export const getAccessToken = () => accessToken;
+
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || "http://localhost:4003/api",
+  timeout: 15000,
   headers: {
     "Content-Type": "application/json",
   },
+  withCredentials: true,
 });
 
-// Add interceptors for auth if needed later
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+  if (accessToken) {
+    config.headers.Authorization = `Bearer ${accessToken}`;
   }
   return config;
 });
 
+export const refreshAccessToken = async () => {
+  if (!refreshPromise) {
+    refreshPromise = api
+      .post("/auth/refresh", null, { skipAuthRefresh: true })
+      .then((response) => {
+        setAccessToken(response.data.accessToken);
+        return response.data;
+      })
+      .finally(() => {
+        refreshPromise = null;
+      });
+  }
+
+  return refreshPromise;
+};
+
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+
+    if (
+      error.response?.status === 401 &&
+      originalRequest &&
+      !originalRequest._retry &&
+      !originalRequest.skipAuthRefresh
+    ) {
+      originalRequest._retry = true;
+      try {
+        await refreshAccessToken();
+        originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+        return api(originalRequest);
+      } catch {
+        setAccessToken(null);
+      }
+    }
+
+    return Promise.reject(error);
+  },
+);
+
 export const customerService = {
-  getAll: () => api.get("/customers"),
+  getAll: (params) => api.get("/customers", { params }),
   getById: (id) => api.get(`/customers/${id}`),
   create: (data) => api.post("/customers", data),
   update: (id, data) => api.put(`/customers/${id}`, data),
@@ -28,7 +78,7 @@ export const customerService = {
 };
 
 export const productService = {
-  getAll: () => api.get("/products"),
+  getAll: (params) => api.get("/products", { params }),
   getById: (id) => api.get(`/products/${id}`),
   getVendors: (id, availableOnly = false) =>
     api.get(`/products/${id}/vendors${availableOnly ? "?available=true" : ""}`),
@@ -43,8 +93,8 @@ export const productService = {
 };
 
 export const vendorService = {
-  getAll: (activeOnly = false) =>
-    api.get(`/vendors${activeOnly ? "?active=true" : ""}`),
+  getAll: (activeOnly = false, params = {}) =>
+    api.get("/vendors", { params: { ...(activeOnly ? { active: true } : {}), ...params } }),
   getById: (id) => api.get(`/vendors/${id}`),
   create: (data) => api.post("/vendors", data),
   update: (id, data) => api.patch(`/vendors/${id}`, data),
@@ -52,7 +102,7 @@ export const vendorService = {
 };
 
 export const quotationService = {
-  getAll: () => api.get("/quotations"),
+  getAll: (params) => api.get("/quotations", { params }),
   getById: (id) => api.get(`/quotations/${id}`),
   create: (data) => api.post("/quotations", data),
   update: (id, data) => api.put(`/quotations/${id}`, data),
@@ -61,22 +111,31 @@ export const quotationService = {
   downloadPdf: (id) =>
     api.get(`/quotations/${id}/pdf`, { responseType: "blob" }),
   getReports: () => api.get("/quotations/reports"),
+  getDraft: (draftKey = "new") => api.get(`/quotations/drafts/${draftKey}`),
+  autosaveDraft: (draftKey = "new", payload) =>
+    api.put(`/quotations/drafts/${draftKey}`, payload),
+  deleteDraft: (draftKey = "new") => api.delete(`/quotations/drafts/${draftKey}`),
 };
 
 export const termsService = {
-  getAll: () => api.get("/terms"),
+  getAll: (params) => api.get("/terms", { params }),
   create: (data) => api.post("/terms", data),
   update: (id, data) => api.put(`/terms/${id}`, data),
   delete: (id) => api.delete(`/terms/${id}`),
 };
 
 export const salespersonService = {
-  getAll: () => api.get("/salespersons"),
+  getAll: (params) => api.get("/salespersons", { params }),
   create: (data) => api.post("/salespersons", data),
   delete: (id) => api.delete(`/salespersons/${id}`),
 };
 
 export const authService = {
+  login: (data) => api.post("/auth/login", data),
+  register: (data) => api.post("/auth/register", data),
+  refresh: () => refreshAccessToken(),
+  logout: () => api.post("/auth/logout", null, { skipAuthRefresh: true }),
+  logoutAll: () => api.post("/auth/logout-all"),
   getMe: () => api.get("/auth/me"),
 };
 
@@ -101,7 +160,7 @@ export const authorizationService = {
 
 
 export const mgrService = {
-  getAll: (type) => api.get(`/mgrs${type ? `?type=${type}` : ""}`),
+  getAll: (type, params = {}) => api.get("/mgrs", { params: { ...(type ? { type } : {}), ...params } }),
   getById: (id) => api.get(`/mgrs/${id}`),
   create: (data) => api.post("/mgrs", data),
   update: (id, data) => api.put(`/mgrs/${id}`, data),
@@ -263,7 +322,7 @@ export const notificationService = {
 };
 
 export const statusService = {
-  getAll: () => api.get("/statuses"),
+  getAll: (params) => api.get("/statuses", { params }),
   create: (data) => api.post("/statuses", data),
   update: (id, data) => api.put(`/statuses/${id}`, data),
   delete: (id) => api.delete(`/statuses/${id}`),

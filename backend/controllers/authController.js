@@ -1,12 +1,195 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const User = require('../models/User');
+const { getRedis } = require('../config/redis');
+
+const ACCESS_TOKEN_TTL = process.env.ACCESS_TOKEN_TTL || '20m';
+const REFRESH_TOKEN_DAYS = Number(process.env.REFRESH_TOKEN_DAYS || 30);
+const REFRESH_TOKEN_SECONDS = REFRESH_TOKEN_DAYS * 24 * 60 * 60;
+const REFRESH_COOKIE_NAME = 'refreshToken';
+const DEVICE_COOKIE_NAME = 'deviceId';
+
+const getJwtSecret = () => process.env.JWT_SECRET || 'secret123';
+const getRefreshSecret = () => process.env.JWT_REFRESH_SECRET || `${getJwtSecret()}_refresh`;
+
+const normalizeUser = (user) => ({
+    id: user._id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+});
+
+const hashToken = (token) => crypto.createHash('sha256').update(token).digest('hex');
+
+const parseCookie = (cookieHeader = '') => cookieHeader
+    .split(';')
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .reduce((cookies, part) => {
+        const separatorIndex = part.indexOf('=');
+        if (separatorIndex === -1) return cookies;
+        const key = decodeURIComponent(part.slice(0, separatorIndex));
+        const value = decodeURIComponent(part.slice(separatorIndex + 1));
+        cookies[key] = value;
+        return cookies;
+    }, {});
+
+const createAccessToken = (user) => jwt.sign(
+    {
+        id: user._id,
+        role: user.role,
+        tokenVersion: user.tokenVersion || 0,
+        jti: crypto.randomUUID(),
+    },
+    getJwtSecret(),
+    { expiresIn: ACCESS_TOKEN_TTL }
+);
+
+const createRefreshToken = (user, deviceId) => jwt.sign(
+    {
+        id: user._id,
+        tokenVersion: user.tokenVersion || 0,
+        deviceId,
+        jti: crypto.randomUUID(),
+    },
+    getRefreshSecret(),
+    { expiresIn: `${REFRESH_TOKEN_DAYS}d` }
+);
+
+const setRefreshCookie = (res, token) => {
+    res.cookie(REFRESH_COOKIE_NAME, token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+        maxAge: REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000,
+        path: '/api/auth',
+    });
+};
+
+const setDeviceCookie = (res, deviceId) => {
+    res.cookie(DEVICE_COOKIE_NAME, deviceId, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+        maxAge: REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000,
+        path: '/api/auth',
+    });
+};
+
+const clearRefreshCookie = (res) => {
+    res.clearCookie(REFRESH_COOKIE_NAME, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+        path: '/api/auth',
+    });
+    res.clearCookie(DEVICE_COOKIE_NAME, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+        path: '/api/auth',
+    });
+};
+
+const getDeviceId = (req, decoded) => (
+    decoded?.deviceId ||
+    parseCookie(req.headers.cookie)[DEVICE_COOKIE_NAME] ||
+    req.header('x-device-id') ||
+    crypto.randomUUID()
+);
+
+const refreshKey = (userId, deviceId) => `refresh:${userId}:${deviceId}`;
+const sessionSetKey = (userId) => `sessions:${userId}`;
+
+const storeRefreshSession = async (user, deviceId, refreshToken) => {
+    const redis = await getRedis();
+    const payload = JSON.stringify({
+        tokenHash: hashToken(refreshToken),
+        userId: user._id.toString(),
+        deviceId,
+        role: user.role,
+        createdAt: new Date().toISOString(),
+    });
+
+    if (redis) {
+        await redis.set(refreshKey(user._id, deviceId), payload, { EX: REFRESH_TOKEN_SECONDS });
+        await redis.sAdd(sessionSetKey(user._id), deviceId);
+        await redis.expire(sessionSetKey(user._id), REFRESH_TOKEN_SECONDS);
+    }
+
+    user.refreshTokenHash = hashToken(refreshToken);
+    user.refreshTokenExpiresAt = new Date(Date.now() + REFRESH_TOKEN_SECONDS * 1000);
+    await user.save();
+};
+
+const loadRefreshSession = async (userId, deviceId) => {
+    const redis = await getRedis();
+    if (!redis) return null;
+
+    const raw = await redis.get(refreshKey(userId, deviceId));
+    if (!raw) return null;
+
+    try {
+        return JSON.parse(raw);
+    } catch {
+        return null;
+    }
+};
+
+const revokeRefreshSession = async (userId, deviceId) => {
+    const redis = await getRedis();
+    if (!redis || !userId || !deviceId) return;
+
+    await redis.del(refreshKey(userId, deviceId));
+    await redis.sRem(sessionSetKey(userId), deviceId);
+};
+
+const revokeAllRefreshSessions = async (userId) => {
+    const redis = await getRedis();
+    if (!redis || !userId) return;
+
+    const deviceIds = await redis.sMembers(sessionSetKey(userId));
+    if (deviceIds.length) {
+        await redis.del(deviceIds.map((deviceId) => refreshKey(userId, deviceId)));
+    }
+    await redis.del(sessionSetKey(userId));
+};
+
+const blacklistAccessToken = async (req) => {
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    if (!token) return;
+
+    try {
+        const decoded = jwt.verify(token, getJwtSecret());
+        if (!decoded.jti || !decoded.exp) return;
+
+        const ttl = Math.max(1, decoded.exp - Math.floor(Date.now() / 1000));
+        const redis = await getRedis();
+        if (redis) {
+            await redis.set(`blacklist:access:${decoded.jti}`, '1', { EX: ttl });
+        }
+    } catch {
+        // Logout should still clear the refresh token even if the access token is already expired.
+    }
+};
+
+const issueSession = async (user, res, req, deviceId = getDeviceId(req)) => {
+    const accessToken = createAccessToken(user);
+    const refreshToken = createRefreshToken(user, deviceId);
+
+    await storeRefreshSession(user, deviceId, refreshToken);
+
+    setDeviceCookie(res, deviceId);
+    setRefreshCookie(res, refreshToken);
+    return { accessToken, deviceId, user: normalizeUser(user) };
+};
 
 exports.register = async (req, res) => {
     try {
         const { name, email, password, role } = req.body;
 
-        const existingUser = await User.findOne({ email });
+        const existingUser = await User.findOne({ email }).select('_id').lean();
         if (existingUser) {
             return res.status(400).json({ message: 'User already exists' });
         }
@@ -23,13 +206,8 @@ exports.register = async (req, res) => {
 
         await newUser.save();
 
-        const token = jwt.sign(
-            { id: newUser._id, role: newUser.role },
-            process.env.JWT_SECRET || 'secret123',
-            { expiresIn: '1d' }
-        );
-
-        res.status(201).json({ token, user: { id: newUser._id, name: newUser.name, email: newUser.email, role: newUser.role } });
+        const session = await issueSession(newUser, res, req);
+        res.status(201).json(session);
     } catch (error) {
         res.status(500).json({ message: 'Server Error', error: error.message });
     }
@@ -49,21 +227,103 @@ exports.login = async (req, res) => {
             return res.status(400).json({ message: 'Invalid credentials' });
         }
 
-        const token = jwt.sign(
-            { id: user._id, role: user.role },
-            process.env.JWT_SECRET || 'secret123',
-            { expiresIn: '1d' }
-        );
-
-        res.json({ token, user: { id: user._id, name: user.name, email: user.email, role: user.role } });
+        const session = await issueSession(user, res, req);
+        res.json(session);
     } catch (error) {
         res.status(500).json({ message: 'Server Error', error: error.message });
     }
 };
 
+exports.refresh = async (req, res) => {
+    try {
+        const cookies = parseCookie(req.headers.cookie);
+        const refreshToken = cookies[REFRESH_COOKIE_NAME];
+
+        if (!refreshToken) {
+            return res.status(401).json({ message: 'Refresh token missing' });
+        }
+
+        const decoded = jwt.verify(refreshToken, getRefreshSecret());
+        const user = await User.findById(decoded.id);
+        const deviceId = getDeviceId(req, decoded);
+        const redisSession = await loadRefreshSession(decoded.id, deviceId);
+        const hasValidRedisSession = redisSession?.tokenHash === hashToken(refreshToken);
+        const hasLegacySession = user?.refreshTokenHash === hashToken(refreshToken);
+
+        if (
+            !user ||
+            (!hasValidRedisSession && !hasLegacySession) ||
+            user.tokenVersion !== decoded.tokenVersion ||
+            (user.refreshTokenExpiresAt && user.refreshTokenExpiresAt < new Date())
+        ) {
+            clearRefreshCookie(res);
+            return res.status(401).json({ message: 'Refresh token invalid' });
+        }
+
+        const session = await issueSession(user, res, req, deviceId);
+        res.json(session);
+    } catch (error) {
+        clearRefreshCookie(res);
+        res.status(401).json({ message: 'Refresh token invalid' });
+    }
+};
+
+exports.logout = async (req, res) => {
+    try {
+        const cookies = parseCookie(req.headers.cookie);
+        const refreshToken = cookies[REFRESH_COOKIE_NAME];
+
+        if (refreshToken) {
+            let decoded;
+            try {
+                decoded = jwt.verify(refreshToken, getRefreshSecret());
+                await revokeRefreshSession(decoded.id, decoded.deviceId);
+            } catch {
+                decoded = null;
+            }
+
+            const user = decoded
+                ? await User.findById(decoded.id)
+                : await User.findOne({ refreshTokenHash: hashToken(refreshToken) });
+            if (user) {
+                user.refreshTokenHash = undefined;
+                user.refreshTokenExpiresAt = undefined;
+                await user.save();
+            }
+        }
+
+        await blacklistAccessToken(req);
+        clearRefreshCookie(res);
+        res.json({ message: 'Logged out successfully' });
+    } catch (error) {
+        clearRefreshCookie(res);
+        res.json({ message: 'Logged out successfully' });
+    }
+};
+
+exports.logoutAll = async (req, res) => {
+    try {
+        if (req.user?.id) {
+            await revokeAllRefreshSessions(req.user.id);
+            await User.findByIdAndUpdate(req.user.id, {
+                $inc: { tokenVersion: 1 },
+                $unset: { refreshTokenHash: '', refreshTokenExpiresAt: '' },
+            });
+        }
+
+        clearRefreshCookie(res);
+        res.json({ message: 'Logged out from all devices successfully' });
+    } catch (error) {
+        clearRefreshCookie(res);
+        res.status(500).json({ message: 'Error logging out from all devices' });
+    }
+};
+
 exports.getMe = async (req, res) => {
     try {
-        const user = await User.findById(req.user.id).select('-passwordHash');
+        const user = await User.findById(req.user.id)
+            .select('_id name email role status createdAt updatedAt')
+            .lean();
         res.json(user);
     } catch (error) {
         res.status(500).json({ message: 'Server Error' });

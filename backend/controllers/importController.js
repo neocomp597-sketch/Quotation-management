@@ -7,6 +7,7 @@ const MGR = require('../models/MGR');
 const Vendor = require('../models/Vendor');
 const Planning = require('../models/Planning');
 const { deriveBasePriceFromVendors } = require('../utils/vendorSelection');
+const { invalidateCustomerCaches, invalidateProductCaches } = require('../utils/cacheInvalidation');
 
 const escapeRegex = (value = '') => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const toBoolean = (value) => {
@@ -63,6 +64,7 @@ const loadPlanningCustomers = async (lookupValues) => {
             { companyName: { $in: lookupValues } }
         ]
     })
+        .select('externalCode customerName companyName')
         .collation({ locale: 'en', strength: 2 })
         .lean();
 
@@ -80,6 +82,7 @@ const loadPlanningProducts = async (lookupValues) => {
             { productName: { $in: lookupValues } }
         ]
     })
+        .select('productCode productName')
         .collation({ locale: 'en', strength: 2 })
         .lean();
 
@@ -95,6 +98,7 @@ const loadPlanningMgrs = async (lookupValues, mgrType) => {
         mgrType,
         code: { $in: lookupValues }
     })
+        .select('code mgrType')
         .collation({ locale: 'en', strength: 2 })
         .lean();
 
@@ -344,6 +348,7 @@ const importProducts = async (req, res) => {
             }
         }
 
+        await invalidateProductCaches();
         res.status(200).json({
             message: `Import completed. ${results.success} products imported, ${results.failed} failed.`,
             ...results
@@ -463,6 +468,7 @@ const importCustomers = async (req, res) => {
             }
         }
 
+        await invalidateCustomerCaches();
         res.status(200).json({
             message: `Import completed. ${results.success} customers imported, ${results.failed} failed.`,
             ...results

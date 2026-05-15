@@ -278,11 +278,13 @@ exports.getAllEntries = async (req, res) => {
 
         const total = await Planning.countDocuments(filter);
         const entries = await Planning.find(filter)
+            .select('customerId productId financialYear monthYear mgrCode mgrCode2 status qty value totalValue remarks createdAt updatedAt')
             .populate('customerId', 'companyName customerName')
             .populate('productId', 'productName')
             .sort({ createdAt: -1 })
             .skip(Number(offset))
-            .limit(Number(limit));
+            .limit(Number(limit))
+            .lean();
 
         res.json({
             total,
