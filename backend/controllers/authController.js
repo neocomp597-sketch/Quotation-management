@@ -260,8 +260,16 @@ exports.refresh = async (req, res) => {
             return res.status(401).json({ message: 'Refresh token invalid' });
         }
 
-        const session = await issueSession(user, res, req, deviceId);
-        res.json(session);
+        // Keep refresh idempotent. A page reload can trigger overlapping refresh
+        // requests; rotating the refresh token here lets the later request treat
+        // the earlier token as stolen and clear the cookie.
+        setDeviceCookie(res, deviceId);
+        setRefreshCookie(res, refreshToken);
+        res.json({
+            accessToken: createAccessToken(user),
+            deviceId,
+            user: normalizeUser(user),
+        });
     } catch (error) {
         clearRefreshCookie(res);
         res.status(401).json({ message: 'Refresh token invalid' });

@@ -1,12 +1,40 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { MdArrowBack, MdAdd, MdDelete, MdSave, MdCheckCircle, MdPerson, MdInventory2, MdGavel, MdSearch, MdClose, MdPayments, MdEventAvailable, MdBadge, MdTrendingDown, MdEmail, MdPhone, MdLocationOn, MdExpandMore } from 'react-icons/md';
+import { MdArrowBack, MdAdd, MdDelete, MdSave, MdCheckCircle, MdPerson, MdInventory2, MdGavel, MdSearch, MdClose, MdPayments, MdEventAvailable, MdBadge, MdTrendingDown, MdEmail, MdPhone, MdLocationOn, MdExpandMore, MdCloudDone, MdCloudOff, MdWifiOff } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import { customerService, productService, quotationService, termsService, salespersonService, siteService } from '../services/api';
 import { calculateLineItem, resolveImageUrl } from '../utils/helpers';
 import Modal from '../components/Modal';
 import { clearQuotationDraft, setAutosaveStatus, setQuotationDraft } from '../store/quotationDraftSlice';
+
+// Skeleton loader for product rows
+const SkeletonRow = () => (
+    <tr className="animate-pulse">
+        <td className="px-6 py-4"><div className="h-3 w-6 bg-slate-200 rounded" /></td>
+        <td className="px-4 py-4"><div className="h-10 w-10 bg-slate-200 rounded-lg" /></td>
+        <td className="px-4 py-4"><div className="space-y-2"><div className="h-3 w-32 bg-slate-200 rounded" /><div className="h-2 w-24 bg-slate-100 rounded" /></div></td>
+        <td className="px-4 py-4"><div className="h-6 w-full bg-slate-200 rounded" /></td>
+        <td className="px-4 py-4"><div className="h-6 w-full bg-slate-200 rounded" /></td>
+        <td className="px-4 py-4"><div className="h-6 w-12 bg-slate-200 rounded mx-auto" /></td>
+        <td className="px-4 py-4"><div className="h-6 w-16 bg-slate-200 rounded ml-auto" /></td>
+        <td className="px-4 py-4"><div className="h-6 w-10 bg-slate-200 rounded mx-auto" /></td>
+        <td className="px-6 py-4"><div className="h-4 w-20 bg-slate-200 rounded ml-auto" /></td>
+        <td className="px-4 py-4"><div className="h-6 w-6 bg-slate-200 rounded mx-auto" /></td>
+    </tr>
+);
+
+// Offline save queue utility
+const OFFLINE_QUEUE_KEY = 'quotation-offline-queue';
+const getOfflineQueue = () => {
+    try { return JSON.parse(localStorage.getItem(OFFLINE_QUEUE_KEY) || '[]'); } catch { return []; }
+};
+const addToOfflineQueue = (payload) => {
+    const queue = getOfflineQueue();
+    queue.push({ ...payload, queuedAt: new Date().toISOString() });
+    localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue));
+};
+const clearOfflineQueue = () => localStorage.removeItem(OFFLINE_QUEUE_KEY);
 
 // Searchable Customer Dropdown Component
 const LIST_PAGE_SIZE = 20;
@@ -196,6 +224,8 @@ const CreateQuotation = () => {
     const [sites, setSites] = useState([]);
 
     // UI State
+    const [isSaving, setIsSaving] = useState(false);
+    const [saveSuccess, setSaveSuccess] = useState(false);
     const [, setLoading] = useState(false);
     const [isProductModalOpen, setIsProductModalOpen] = useState(false);
     const [isSalespersonModalOpen, setIsSalespersonModalOpen] = useState(false);
@@ -745,6 +775,51 @@ const CreateQuotation = () => {
         }
     };
 
+    // Build minimal save payload — strips vendorOptions to reduce size
+    const buildSavePayload = useCallback((status) => {
+        return {
+            ...header,
+            items: items.map(item => {
+                const bestVendor = !item.vendorId ? getBestVendor(item.vendorOptions || []) : null;
+                const selectedVendorId = item.vendorId || (bestVendor ? (bestVendor.vendorId?._id || bestVendor.vendorId) : undefined);
+                const selectedVendorName = item.vendorName || bestVendor?.vendorId?.name || '';
+                const selectedVendorPrice = item.vendorPrice || bestVendor?.price || item.rate;
+                const selectedVendorStock = item.vendorStockAtSelection ?? bestVendor?.stock ?? 0;
+
+                return {
+                    productId: item.productId,
+                    productSnapshot: {
+                        productName: item.productName,
+                        productCode: item.productCode,
+                        hsnCode: item.hsnCode,
+                        gstPercentage: item.gstPercentage,
+                        uom: item.uom,
+                        productImageUrl: item.productImageUrl
+                    },
+                    siteId: item.siteId || header.siteId || undefined,
+                    quantity: item.quantity,
+                    unitPrice: item.unitPrice || item.rate,
+                    rate: item.rate,
+                    discountPercent: item.discountPercent,
+                    discountAmount: item.discountAmount,
+                    taxableAmount: item.taxableAmount,
+                    gstAmount: item.gstAmount,
+                    lineTotal: item.lineTotal,
+                    vendorId: selectedVendorId,
+                    vendorName: selectedVendorName,
+                    vendorPrice: selectedVendorPrice,
+                    vendorStockAtSelection: selectedVendorStock,
+                    isVendorAutoSelected: item.vendorId ? item.isVendorAutoSelected !== false : true
+                    // NOTE: vendorOptions intentionally excluded to reduce payload
+                };
+            }),
+            termsTemplateId: selectedTermsTemplateId,
+            customTerms: termsContent,
+            totalDiscount: totals.itemDiscount + Number(overallDiscount),
+            status
+        };
+    }, [header, items, selectedTermsTemplateId, termsContent, totals, overallDiscount]);
+
     const handleSubmit = async (status) => {
         if (!header.customerId) {
             toast.error('Please select a Customer');
@@ -755,67 +830,69 @@ const CreateQuotation = () => {
             return;
         }
 
-        setLoading(true);
+        setIsSaving(true);
+        setSaveSuccess(false);
+
+        const quotationData = buildSavePayload(status);
+
         try {
-            const quotationData = {
-                ...header,
-                items: items.map(item => {
-                    const bestVendor = !item.vendorId ? getBestVendor(item.vendorOptions || []) : null;
-                    const selectedVendorId = item.vendorId || (bestVendor ? (bestVendor.vendorId?._id || bestVendor.vendorId) : undefined);
-                    const selectedVendorName = item.vendorName || bestVendor?.vendorId?.name || '';
-                    const selectedVendorPrice = item.vendorPrice || bestVendor?.price || item.rate;
-                    const selectedVendorStock = item.vendorStockAtSelection ?? bestVendor?.stock ?? 0;
-
-                    return {
-                        productId: item.productId,
-                        productSnapshot: {
-                            productName: item.productName,
-                            productCode: item.productCode,
-                            hsnCode: item.hsnCode,
-                            gstPercentage: item.gstPercentage,
-                            uom: item.uom,
-                            productImageUrl: item.productImageUrl
-                        },
-                        siteId: item.siteId || header.siteId || undefined,
-                        quantity: item.quantity,
-                        unitPrice: item.unitPrice || item.rate,
-                        rate: item.rate,
-                        discountPercent: item.discountPercent,
-                        discountAmount: item.discountAmount,
-                        taxableAmount: item.taxableAmount,
-                        gstAmount: item.gstAmount,
-                        lineTotal: item.lineTotal,
-                        vendorId: selectedVendorId,
-                        vendorName: selectedVendorName,
-                        vendorPrice: selectedVendorPrice,
-                        vendorStockAtSelection: selectedVendorStock,
-                        isVendorAutoSelected: item.vendorId ? item.isVendorAutoSelected !== false : true
-                    };
-                }),
-                termsTemplateId: selectedTermsTemplateId,
-                customTerms: termsContent,
-                totalDiscount: totals.itemDiscount + Number(overallDiscount),
-                status
-            };
-
             if (isEditMode) {
                 await quotationService.update(id, quotationData);
+                setSaveSuccess(true);
                 toast.success('Quotation updated successfully!');
             } else {
                 await quotationService.create(quotationData);
+                // Clean up drafts on success
                 localStorage.removeItem(localDraftKey);
                 dispatch(clearQuotationDraft());
                 await quotationService.deleteDraft(draftKey).catch(() => {});
+                clearOfflineQueue();
+                setSaveSuccess(true);
                 toast.success('Quotation created successfully!');
             }
-            navigate('/quotations');
+            // Small delay for success animation, then navigate
+            setTimeout(() => navigate('/quotations'), 300);
         } catch (err) {
             console.error(err);
-            toast.error(err.response?.data?.message || 'Error saving quotation');
+
+            // Offline / network error detection
+            const isNetworkError = !err.response && (err.code === 'ERR_NETWORK' || err.message?.includes('Network'));
+            if (isNetworkError && !isEditMode) {
+                addToOfflineQueue(quotationData);
+                toast.warning(
+                    'Network unavailable. Quotation saved locally and will sync when online.',
+                    { autoClose: 5000 }
+                );
+            } else {
+                toast.error(err.response?.data?.message || 'Error saving quotation');
+            }
         } finally {
-            setLoading(false);
+            setIsSaving(false);
         }
     };
+
+    // Retry offline queue when back online
+    useEffect(() => {
+        const handleOnline = async () => {
+            const queue = getOfflineQueue();
+            if (queue.length === 0) return;
+
+            for (const payload of queue) {
+                try {
+                    await quotationService.create(payload);
+                    toast.success('Offline quotation synced successfully!');
+                } catch (err) {
+                    console.error('Failed to sync offline quotation:', err);
+                    toast.error('Failed to sync offline quotation. Will retry.');
+                    return; // Stop processing — keep remaining in queue
+                }
+            }
+            clearOfflineQueue();
+        };
+
+        window.addEventListener('online', handleOnline);
+        return () => window.removeEventListener('online', handleOnline);
+    }, []);
 
     return (
         <div className="space-y-6 pb-24">
@@ -840,16 +917,29 @@ const CreateQuotation = () => {
                 <div className="flex gap-3">
                     <button
                         onClick={() => handleSubmit('draft')}
-                        className="px-6 py-3.5 bg-white border border-slate-200 text-slate-600 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-slate-50 transition-all active:scale-95"
+                        disabled={isSaving}
+                        className="px-6 py-3.5 bg-white border border-slate-200 text-slate-600 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-slate-50 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                     >
+                        {isSaving ? (
+                            <div className="h-4 w-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+                        ) : saveSuccess ? (
+                            <MdCloudDone size={16} className="text-emerald-500" />
+                        ) : null}
                         Save Draft
                     </button>
                     <button
                         onClick={() => handleSubmit('final')}
-                        className="px-8 py-3.5 bg-primary-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-primary-700 transition-all shadow-xl shadow-primary-600/20 active:scale-95 flex items-center gap-2"
+                        disabled={isSaving}
+                        className="px-8 py-3.5 bg-primary-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-primary-700 transition-all shadow-xl shadow-primary-600/20 active:scale-95 flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
                     >
-                        <MdCheckCircle size={18} />
-                        Finalize & Issue
+                        {isSaving ? (
+                            <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        ) : saveSuccess ? (
+                            <MdCloudDone size={18} />
+                        ) : (
+                            <MdCheckCircle size={18} />
+                        )}
+                        {isSaving ? 'Saving...' : 'Finalize & Issue'}
                     </button>
                 </div>
             </div>
@@ -1009,22 +1099,155 @@ const CreateQuotation = () => {
                                         </div>
                                     </div>
                                 </div>
+                                {selectedCustomer && (
+                                    <div className="mt-4 p-4 rounded-2xl bg-primary-50/50 border border-primary-100/50">
+                                        <p className="text-xs text-primary-800 font-bold mb-1">{selectedCustomer.customerName}</p>
+                                        <p className="text-[10px] text-primary-600/80 leading-relaxed uppercase font-black tracking-tighter">
+                                            {selectedCustomer.billingAddress.line1}, {selectedCustomer.billingAddress.city}, {selectedCustomer.billingAddress.state}
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="space-y-6">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Quotation Date</label>
+                                        <input type="date" value={header.quotationDate} disabled className="w-full px-4 py-3.5 bg-slate-100 border border-slate-200 rounded-2xl text-xs font-bold text-slate-400 cursor-not-allowed" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Valid Until</label>
+                                        <div className="relative">
+                                            <MdEventAvailable className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                                            <input
+                                                type="date"
+                                                name="validTill"
+                                                value={header.validTill}
+                                                onChange={handleHeaderChange}
+                                                className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-xs font-bold"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Sales Representative</label>
+                                        <div className="flex gap-2">
+                                            <div className="relative flex-1">
+                                                <select
+                                                    name="salespersonName"
+                                                    value={header.salespersonName}
+                                                    onChange={handleHeaderChange}
+                                                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold appearance-none bg-white"
+                                                >
+                                                    <option value="">Select Salesperson</option>
+                                                    {salespersons.map(s => (
+                                                        <option key={s._id} value={s.name}>{s.name}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsSalespersonModalOpen(true)}
+                                                className="p-3.5 bg-primary-50 text-primary-600 rounded-2xl border border-primary-100 hover:bg-primary-100 transition-all"
+                                            >
+                                                <MdAdd size={20} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Payment Terms</label>
+                                        <select
+                                            name="paymentTerms"
+                                            value={header.paymentTerms}
+                                            onChange={handleHeaderChange}
+                                            className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold appearance-none bg-white font-mono"
+                                        >
+                                            <option value="Advanced">100% Advanced</option>
+                                            <option value="15 Days Credit">15 Days Credit</option>
+                                            <option value="30 Days Credit">30 Days Credit</option>
+                                            <option value="Against Delivery">Against Delivery</option>
+                                        </select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Site/Project Selection</label>
+                                        <div className="flex gap-2">
+                                            <select
+                                                name="siteId"
+                                                value={header.siteId}
+                                                onChange={handleHeaderChange}
+                                                className="flex-1 px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold appearance-none bg-white"
+                                            >
+                                                <option value="">Select Site (Optional)</option>
+                                                {sites.map(s => (
+                                                    <option key={s._id} value={s._id}>{s.siteName}</option>
+                                                ))}
+                                            </select>
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsSiteModalOpen(true)}
+                                                className="p-3.5 bg-primary-50 text-primary-600 rounded-2xl border border-primary-100 hover:bg-primary-100 transition-all"
+                                            >
+                                                <MdAdd size={20} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Invoice Details */}
+                                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-3">
+                                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200 pb-2 mb-2">Tax Invoice Details (Optional)</h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div className="space-y-1">
+                                            <label className="text-[9px] font-bold text-slate-400 uppercase">IRN Number</label>
+                                            <input
+                                                type="text"
+                                                name="irnNo"
+                                                value={header.irnNo}
+                                                onChange={handleHeaderChange}
+                                                placeholder="e.g. 1234567890ABC..."
+                                                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-primary-500/10"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[9px] font-bold text-slate-400 uppercase">Ack Number</label>
+                                            <input
+                                                type="text"
+                                                name="ackNo"
+                                                value={header.ackNo}
+                                                onChange={handleHeaderChange}
+                                                placeholder="e.g. 9876543210"
+                                                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-primary-500/10"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[9px] font-bold text-slate-400 uppercase">Ack Date</label>
+                                            <input
+                                                type="date"
+                                                name="ackDate"
+                                                value={header.ackDate}
+                                                onChange={handleHeaderChange}
+                                                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-primary-500/10"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
 
                     {/* 2. Product Line Items */}
                     <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
-                        <div className="p-6 border-b border-slate-50 bg-slate-50/30 flex items-center justify-between">
+                        <div className="p-4 md:p-6 border-b border-slate-50 bg-slate-50/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                             <div className="flex items-center gap-3">
-                                <div className="h-10 w-10 rounded-xl bg-primary-50 flex items-center justify-center text-primary-600">
+                                <div className="h-10 w-10 shrink-0 rounded-xl bg-primary-50 flex items-center justify-center text-primary-600">
                                     <MdInventory2 size={20} />
                                 </div>
-                                <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest">Inventory Assignment</h2>
+                                <h2 className="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-widest leading-tight">Inventory Assignment</h2>
                             </div>
                             <button
                                 onClick={() => setIsProductModalOpen(true)}
-                                className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-primary-600/20 active:scale-95"
+                                className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-primary-600/20 active:scale-95"
                             >
                                 <MdAdd size={18} /> Add Product
                             </button>
@@ -1119,6 +1342,7 @@ const CreateQuotation = () => {
                                                 <td className="px-4 py-4">
                                                     <input
                                                         type="number"
+                                                        inputMode="decimal"
                                                         value={item.quantity}
                                                         onChange={(e) => updateItem(index, 'quantity', e.target.value)}
                                                         className="w-full text-center py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold outline-none focus:ring-2 focus:ring-primary-500/10"
@@ -1127,6 +1351,7 @@ const CreateQuotation = () => {
                                                 <td className="px-4 py-4">
                                                     <input
                                                         type="number"
+                                                        inputMode="decimal"
                                                         value={item.rate}
                                                         onChange={(e) => updateItem(index, 'rate', e.target.value)}
                                                         className="w-full text-right px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold outline-none focus:ring-2 focus:ring-primary-500/10"
@@ -1135,6 +1360,7 @@ const CreateQuotation = () => {
                                                 <td className="px-4 py-4">
                                                     <input
                                                         type="number"
+                                                        inputMode="decimal"
                                                         value={item.discountPercent}
                                                         onChange={(e) => updateItem(index, 'discountPercent', e.target.value)}
                                                         className="w-full text-center py-2 bg-primary-50 border border-primary-100 rounded-lg text-sm font-black text-primary-700 outline-none focus:ring-2 focus:ring-primary-500/10"
@@ -1194,7 +1420,7 @@ const CreateQuotation = () => {
 
                 {/* Right Side: Calculation & Meta (4 cols) */}
                 <div className="xl:col-span-4 h-fit sticky top-24 space-y-6">
-                    <div className="bg-slate-900 text-white rounded-[2.5rem] shadow-2xl p-8 border border-slate-800">
+                    <div className="bg-slate-900 text-white rounded-[2rem] md:rounded-[2.5rem] shadow-2xl p-6 md:p-8 border border-slate-800 mx-4 md:mx-0">
                         <h3 className="text-lg font-black tracking-tight mb-8 flex items-center justify-between border-b border-white/10 pb-4">
                             Financial Audit
                             <span className="text-[10px] font-black uppercase text-slate-500 bg-white/5 px-3 py-1 rounded-full">Pro-forma</span>
@@ -1217,6 +1443,7 @@ const CreateQuotation = () => {
                                         <MdTrendingDown className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600" size={18} />
                                         <input
                                             type="number"
+                                            inputMode="decimal"
                                             value={overallDiscount}
                                             onChange={(e) => setOverallDiscount(e.target.value)}
                                             className="w-full pl-12 pr-4 py-3 bg-white/5 border border-white/10 rounded-2xl focus:ring-2 focus:ring-primary-500 outline-none text-sm font-bold text-primary-400"
@@ -1453,6 +1680,40 @@ const CreateQuotation = () => {
                     </button>
                 </form>
             </Modal>
+
+            {/* Mobile Sticky Totals Bar */}
+            <div className="fixed bottom-0 left-0 right-0 z-40 xl:hidden bg-slate-900/95 backdrop-blur-xl border-t border-white/10 px-4 py-3 safe-area-pb">
+                <div className="flex items-center justify-between gap-3 max-w-screen-xl mx-auto">
+                    <div className="flex-1 min-w-0">
+                        <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Grand Total</div>
+                        <div className="text-xl font-black text-white tracking-tight flex items-center gap-0.5">
+                            <span className="text-xs text-primary-400">₹</span>
+                            {totals.grandTotal.toLocaleString()}
+                        </div>
+                        <div className="text-[9px] text-slate-500 font-bold">
+                            {items.length} item{items.length !== 1 ? 's' : ''} • Tax: ₹{totals.gst.toLocaleString()}
+                        </div>
+                    </div>
+                    <div className="flex gap-2 flex-shrink-0">
+                        <button
+                            onClick={() => handleSubmit('draft')}
+                            disabled={isSaving}
+                            className="px-4 py-3 bg-white/10 text-white rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-white/20 transition-all disabled:opacity-50 flex items-center gap-1.5"
+                        >
+                            {isSaving ? <div className="h-3 w-3 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <MdSave size={14} />}
+                            Draft
+                        </button>
+                        <button
+                            onClick={() => handleSubmit('final')}
+                            disabled={isSaving}
+                            className="px-5 py-3 bg-primary-600 text-white rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-primary-700 transition-all shadow-lg shadow-primary-600/30 disabled:opacity-70 flex items-center gap-1.5"
+                        >
+                            {isSaving ? <div className="h-3 w-3 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <MdCheckCircle size={14} />}
+                            Finalize
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div >
     );
 };

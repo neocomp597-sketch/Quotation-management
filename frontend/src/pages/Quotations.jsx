@@ -203,9 +203,31 @@ const Quotations = () => {
 
                 <div>
                     {loading ? (
-                        <div className="p-20 text-center">
-                            <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-primary-500 border-t-transparent mb-4"></div>
-                            <p className="text-slate-400 font-black uppercase tracking-widest text-xs">Syncing Quotation Data...</p>
+                        <div className="hidden md:block">
+                            <table className="w-full text-left">
+                                <thead className="bg-slate-50 text-slate-400 text-[10px] uppercase font-black tracking-widest border-b border-slate-100">
+                                    <tr>
+                                        <th className="px-8 py-5">Ref Number</th>
+                                        <th className="px-8 py-5">Customer Info</th>
+                                        <th className="px-8 py-5">Validity</th>
+                                        <th className="px-8 py-5 text-right">Net Amount</th>
+                                        <th className="px-8 py-5 text-center">Status</th>
+                                        <th className="px-8 py-5 text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-50">
+                                    {[...Array(5)].map((_, i) => (
+                                        <tr key={i} className="animate-pulse">
+                                            <td className="px-8 py-5"><div className="space-y-2"><div className="h-3.5 w-28 bg-slate-200 rounded" /><div className="h-2.5 w-20 bg-slate-100 rounded" /></div></td>
+                                            <td className="px-8 py-5"><div className="space-y-2"><div className="h-3.5 w-36 bg-slate-200 rounded" /><div className="h-2.5 w-24 bg-slate-100 rounded" /></div></td>
+                                            <td className="px-8 py-5"><div className="h-3 w-24 bg-slate-200 rounded" /></td>
+                                            <td className="px-8 py-5 text-right"><div className="h-5 w-24 bg-slate-200 rounded ml-auto" /></td>
+                                            <td className="px-8 py-5"><div className="flex justify-center"><div className="h-6 w-16 bg-slate-200 rounded-xl" /></div></td>
+                                            <td className="px-8 py-5"><div className="flex justify-end gap-2">{[...Array(4)].map((_, j) => <div key={j} className="h-9 w-9 bg-slate-100 rounded-xl" />)}</div></td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
                         </div>
                     ) : (
                         <>

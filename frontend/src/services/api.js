@@ -28,7 +28,7 @@ api.interceptors.request.use((config) => {
 export const refreshAccessToken = async () => {
   if (!refreshPromise) {
     refreshPromise = api
-      .post("/auth/refresh", null, { skipAuthRefresh: true })
+      .post("/auth/refresh", {}, { skipAuthRefresh: true })
       .then((response) => {
         setAccessToken(response.data.accessToken);
         return response.data;
@@ -134,7 +134,7 @@ export const authService = {
   login: (data) => api.post("/auth/login", data),
   register: (data) => api.post("/auth/register", data),
   refresh: () => refreshAccessToken(),
-  logout: () => api.post("/auth/logout", null, { skipAuthRefresh: true }),
+  logout: () => api.post("/auth/logout", {}, { skipAuthRefresh: true }),
   logoutAll: () => api.post("/auth/logout-all"),
   getMe: () => api.get("/auth/me"),
 };
