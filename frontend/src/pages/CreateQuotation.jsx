@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { MdArrowBack, MdAdd, MdDelete, MdSave, MdCheckCircle, MdPerson, MdInventory2, MdGavel, MdSearch, MdClose, MdPayments, MdEventAvailable, MdBadge, MdTrendingDown, MdEmail, MdPhone, MdLocationOn, MdExpandMore, MdCloudDone, MdCloudOff, MdWifiOff } from 'react-icons/md';
+import { MdArrowBack, MdAdd, MdDelete, MdSave, MdCheckCircle, MdPerson, MdInventory2, MdGavel, MdSearch, MdClose, MdPayments, MdEventAvailable, MdBadge, MdTrendingDown, MdEmail, MdPhone, MdLocationOn, MdExpandMore, MdCloudDone, MdCloudOff, MdWifiOff, MdWarning } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import { customerService, productService, quotationService, termsService, salespersonService, siteService } from '../services/api';
 import { calculateLineItem, resolveImageUrl } from '../utils/helpers';
@@ -261,6 +261,7 @@ const CreateQuotation = () => {
     const [selectedTermsTemplateId, setSelectedTermsTemplateId] = useState('');
     const [overallDiscount, setOverallDiscount] = useState(0);
     const [draftRestored, setDraftRestored] = useState(false);
+    const [duplicateWarning, setDuplicateWarning] = useState(null);
 
     const [newSalesperson, setNewSalesperson] = useState({
         name: '',
@@ -413,9 +414,6 @@ const CreateQuotation = () => {
 
                     setSelectedTermsTemplateId(q.termsTemplateId?._id || q.termsTemplateId || '');
                     setTermsContent(q.customTerms || '');
-                    setOverallDiscount(q.totalDiscount - (q.items.reduce((sum, i) => sum + i.discountAmount, 0)) || 0); // Approximation if needed, or better logic if backend stores strictly. Ideally stores "additionalDiscount" distinct from line discounts. Check backend logic? Backend stores totalDiscount which is sum of all. So we might need to reverse engineer or just set it to 0 if simple. 
-                    // Actually, the frontend calculates `totalDiscount` as `itemDiscount + overallDiscount`.
-                    // So `overallDiscount = totalDiscount - itemDiscount`.
                     const totalItemDiscount = q.items.reduce((sum, i) => sum + (i.discountAmount || 0), 0);
                     setOverallDiscount(Math.max(0, (q.totalDiscount || 0) - totalItemDiscount));
 
@@ -452,7 +450,6 @@ const CreateQuotation = () => {
     useEffect(() => {
         let timer;
         if (isSiteModalOpen && addressInputRef.current) {
-            // Small timeout to ensure the modal DOM is fully ready
             timer = setTimeout(() => {
                 if (window.google && window.google.maps && window.google.maps.places) {
                     autocompleteRef.current = new window.google.maps.places.Autocomplete(addressInputRef.current, {
@@ -471,7 +468,6 @@ const CreateQuotation = () => {
                         }
                     });
 
-                    // Prevent Enter key from closing modal when selecting a location
                     const handleKeyDown = (e) => {
                         if (e.key === 'Enter') {
                             const pacContainer = document.querySelector('.pac-container');
@@ -495,6 +491,33 @@ const CreateQuotation = () => {
     const selectedCustomer = useMemo(() =>
         customers.find(c => c._id === header.customerId),
         [header.customerId, customers]);
+
+    // Check for duplicate customer
+    useEffect(() => {
+        if (selectedCustomer) {
+            const checkDuplicate = async () => {
+                try {
+                    const res = await customerService.checkDuplicate({
+                        gstin: selectedCustomer.gstin,
+                        mobile: selectedCustomer.mobile,
+                        email: selectedCustomer.email,
+                        excludeId: selectedCustomer._id
+                    });
+                    if (res.data?.isDuplicate) {
+                        setDuplicateWarning(res.data.duplicate);
+                    } else {
+                        setDuplicateWarning(null);
+                    }
+                } catch (err) {
+                    console.error("Duplicate check failed:", err);
+                    setDuplicateWarning(null);
+                }
+            };
+            checkDuplicate();
+        } else {
+            setDuplicateWarning(null);
+        }
+    }, [selectedCustomer]);
 
     const filteredProducts = useMemo(() =>
         products.filter(p =>
@@ -561,6 +584,7 @@ const CreateQuotation = () => {
                     setOverallDiscount(draft.overallDiscount || 0);
                     dispatch(setQuotationDraft(draft));
                     toast.info('Restored your unfinished quotation draft');
+                    console.info(`[Observability] Draft restored from ${rawLocalDraft ? 'local' : 'backend'} storage`);
                 }
             } catch (error) {
                 console.error('Draft restore failed:', error);
@@ -834,6 +858,7 @@ const CreateQuotation = () => {
         setSaveSuccess(false);
 
         const quotationData = buildSavePayload(status);
+        const startTime = performance.now();
 
         try {
             if (isEditMode) {
@@ -850,9 +875,14 @@ const CreateQuotation = () => {
                 setSaveSuccess(true);
                 toast.success('Quotation created successfully!');
             }
+            const duration = performance.now() - startTime;
+            console.info(`[Observability] Quotation save completed in ${duration.toFixed(2)}ms`);
+
             // Small delay for success animation, then navigate
             setTimeout(() => navigate('/quotations'), 300);
         } catch (err) {
+            const duration = performance.now() - startTime;
+            console.error(`[Observability] Quotation save failed after ${duration.toFixed(2)}ms`, err);
             console.error(err);
 
             // Offline / network error detection
@@ -966,6 +996,19 @@ const CreateQuotation = () => {
                                     onSearch={searchCustomers}
                                     isLoading={isCustomerSearchLoading}
                                 />
+                                {duplicateWarning && (
+                                    <div className="mt-3 p-3 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-3">
+                                        <div className="p-1.5 bg-amber-100 text-amber-600 rounded-lg shrink-0">
+                                            <MdWarning size={16} />
+                                        </div>
+                                        <div>
+                                            <p className="text-xs font-bold text-amber-900 mb-0.5">Warning: Duplicate Customer Detected</p>
+                                            <p className="text-[10px] font-medium text-amber-700 leading-snug">
+                                                Another record shares the same GSTIN/Phone/Email ({duplicateWarning.companyName}). Please verify.
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
                                 {selectedCustomer && (
                                     <div className="mt-4 p-4 rounded-2xl bg-primary-50/50 border border-primary-100/50">
                                         <p className="text-xs text-primary-800 font-bold mb-1">{selectedCustomer.customerName}</p>

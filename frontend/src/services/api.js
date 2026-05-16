@@ -75,11 +75,11 @@ export const customerService = {
   bulkDelete: (ids) => api.post("/customers/bulk-delete", { ids }),
   bulkUpdate: (ids, updateData) =>
     api.patch("/customers/bulk-update", { ids, updateData }),
+  checkDuplicate: (params) => api.get("/customers/check-duplicate", { params }),
 };
 
 export const productService = {
   getAll: (params) => api.get("/products", { params }),
-  getById: (id) => api.get(`/products/${id}`),
   getVendors: (id, availableOnly = false) =>
     api.get(`/products/${id}/vendors${availableOnly ? "?available=true" : ""}`),
   updateVendor: (productId, vendorId, data) =>

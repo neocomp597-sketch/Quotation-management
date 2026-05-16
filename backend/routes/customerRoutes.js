@@ -7,7 +7,8 @@ const {
     updateCustomer,
     deleteCustomer,
     bulkDeleteCustomers,
-    bulkUpdateCustomers
+    bulkUpdateCustomers,
+    checkDuplicateCustomer
 } = require('../controllers/customerController');
 
 const { protect } = require('../middlewares/authMiddleware');
@@ -20,6 +21,7 @@ router.post('/bulk-delete', protect, bulkDeleteCustomers);
 router.patch('/bulk-update', protect, bulkUpdateCustomers);
 
 // Single item operations
+router.get('/check-duplicate', protect, checkDuplicateCustomer);
 router.get('/:id', protect, getCustomerById);
 router.put('/:id', protect, updateCustomer);
 router.delete('/:id', protect, deleteCustomer);

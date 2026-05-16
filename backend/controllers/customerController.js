@@ -206,6 +206,12 @@ const bulkDeleteCustomers = async (req, res) => {
             deletedCount: result.deletedCount
         });
     } catch (error) {
+
+        res.json({
+            message: `${result.deletedCount} customers deleted successfully`,
+            deletedCount: result.deletedCount
+        });
+    } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Error deleting customers' });
     }
@@ -240,6 +246,24 @@ const bulkUpdateCustomers = async (req, res) => {
     }
 };
 
+// Check Duplicate Customer
+const checkDuplicateCustomer = async (req, res) => {
+    try {
+        const { gstin, mobile, email, excludeId } = req.query;
+        if (!gstin && !mobile && !email) {
+            return res.json({ isDuplicate: false });
+        }
+        const duplicate = await findDuplicateCustomer({ gstin, mobile, email }, excludeId);
+        if (duplicate) {
+            return res.json({ isDuplicate: true, duplicate });
+        }
+        res.json({ isDuplicate: false });
+    } catch (error) {
+        console.error('Error checking duplicate customer:', error);
+        res.status(500).json({ message: 'Error checking duplicate customer' });
+    }
+};
+
 module.exports = {
     createCustomer,
     getAllCustomers,
@@ -248,4 +272,5 @@ module.exports = {
     deleteCustomer,
     bulkDeleteCustomers,
     bulkUpdateCustomers,
+    checkDuplicateCustomer,
 };
