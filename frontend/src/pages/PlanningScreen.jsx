@@ -279,6 +279,16 @@ const PlanningScreen = () => {
   const customerAnchorRef = useRef(null);
   const productAnchorRef = useRef(null);
 
+  const [mgr1Search, setMgr1Search] = useState("");
+  const [mgr2Search, setMgr2Search] = useState("");
+  const [statusSearch, setStatusSearch] = useState("");
+  const [showMgr1Dropdown, setShowMgr1Dropdown] = useState(false);
+  const [showMgr2Dropdown, setShowMgr2Dropdown] = useState(false);
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+  const mgr1AnchorRef = useRef(null);
+  const mgr2AnchorRef = useRef(null);
+  const statusAnchorRef = useRef(null);
+
   // Initialize filters with month as primary filter
   const initializeFilters = () => {
     return {
@@ -404,6 +414,52 @@ const PlanningScreen = () => {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Click outside to close dropdown portals
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        customerAnchorRef.current &&
+        !customerAnchorRef.current.contains(event.target) &&
+        !event.target.closest(".portal-dropdown-content")
+      ) {
+        setShowCustomerDropdown(false);
+      }
+      if (
+        productAnchorRef.current &&
+        !productAnchorRef.current.contains(event.target) &&
+        !event.target.closest(".portal-dropdown-content")
+      ) {
+        setShowProductDropdown(false);
+      }
+      if (
+        mgr1AnchorRef.current &&
+        !mgr1AnchorRef.current.contains(event.target) &&
+        !event.target.closest(".portal-dropdown-content")
+      ) {
+        setShowMgr1Dropdown(false);
+      }
+      if (
+        mgr2AnchorRef.current &&
+        !mgr2AnchorRef.current.contains(event.target) &&
+        !event.target.closest(".portal-dropdown-content")
+      ) {
+        setShowMgr2Dropdown(false);
+      }
+      if (
+        statusAnchorRef.current &&
+        !statusAnchorRef.current.contains(event.target) &&
+        !event.target.closest(".portal-dropdown-content")
+      ) {
+        setShowStatusDropdown(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   // Keep month filter empty when financial year changes
   useEffect(() => {
@@ -937,6 +993,61 @@ const PlanningScreen = () => {
     setShowProductDropdown(false);
   };
 
+  const selectMgr1 = (mgr) => {
+    handleNewRowChange("mgrCode", mgr.code);
+    setMgr1Search("");
+    setShowMgr1Dropdown(false);
+  };
+
+  const selectMgr2 = (mgr) => {
+    handleNewRowChange("mgrCode2", mgr.code);
+    setMgr2Search("");
+    setShowMgr2Dropdown(false);
+  };
+
+  const selectStatus = (status) => {
+    handleNewRowChange("status", status);
+    setStatusSearch("");
+    setShowStatusDropdown(false);
+  };
+
+  const filteredMgrList = useMemo(() => {
+    if (!mgr1Search) return mgrList;
+    return mgrList.filter((mgr) =>
+      (mgr.code || "").toLowerCase().includes(mgr1Search.toLowerCase()) ||
+      (mgr.description || "").toLowerCase().includes(mgr1Search.toLowerCase())
+    );
+  }, [mgrList, mgr1Search]);
+
+  const filteredMgrList2 = useMemo(() => {
+    if (!mgr2Search) return mgrList2;
+    return mgrList2.filter((mgr) =>
+      (mgr.code || "").toLowerCase().includes(mgr2Search.toLowerCase()) ||
+      (mgr.description || "").toLowerCase().includes(mgr2Search.toLowerCase())
+    );
+  }, [mgrList2, mgr2Search]);
+
+  const filteredStatusList = useMemo(() => {
+    const statuses =
+      statusOptions.length > 0
+        ? statusOptions
+        : [
+            "Budget",
+            "Firm",
+            "MFC",
+            "B & B",
+            "Others",
+            "Order Received",
+            "Invoice",
+            "Lost",
+            "Parked",
+          ];
+    if (!statusSearch) return statuses;
+    return statuses.filter((status) =>
+      (status || "").toLowerCase().includes(statusSearch.toLowerCase())
+    );
+  }, [statusOptions, statusSearch]);
+
   const handleSaveEntry = async () => {
     // Validate entry month selection
     if (!newRow.monthYear) {
@@ -1321,7 +1432,7 @@ const PlanningScreen = () => {
     const isRightAligned = className.includes("text-right");
 
     return (
-      <th className={`py-3 px-3 ${className}`}>
+      <th className={`py-3 px-3 border border-slate-200 ${className}`}>
         <button
           type="button"
           onClick={() => requestSort(key)}
@@ -1433,7 +1544,7 @@ const PlanningScreen = () => {
                     }
                     className="w-full px-3 py-3 border border-primary-300 rounded-xl text-sm font-bold outline-none focus:border-primary-500 bg-primary-50"
                   >
-                    <option value="">Select month...</option>
+                    <option value="">Select</option>
                     {monthLabels.map((month) => (
                       <option key={month} value={month}>
                         {month}
@@ -1521,7 +1632,7 @@ const PlanningScreen = () => {
           </div>
 
           <div className="overflow-hidden">
-            <table className="w-full table-fixed text-left text-sm">
+            <table className="w-full table-fixed text-left text-sm border-collapse border border-slate-200">
               <colgroup>
                 <col className="w-[8%]" />
                 <col className="w-[17%]" />
@@ -1564,7 +1675,7 @@ const PlanningScreen = () => {
               </thead>
               <tbody className="divide-y divide-slate-50">
                 <tr className="bg-primary-50/40 border-b border-primary-100 align-top">
-                  <td className="py-2 px-2">
+                  <td className="py-2 px-2 border border-slate-200">
                     <select
                       value={newRow.monthYear}
                       onChange={(e) =>
@@ -1576,7 +1687,7 @@ const PlanningScreen = () => {
                       }}
                       className="w-full px-2.5 py-2.5 border border-primary-400 rounded-lg text-xs font-black outline-none focus:border-primary-500 bg-primary-50"
                     >
-                      <option value="">Select month</option>
+                      <option value="">Select</option>
                       {monthLabels.map((month) => (
                         <option key={month} value={month}>
                           {month}
@@ -1584,7 +1695,7 @@ const PlanningScreen = () => {
                       ))}
                     </select>
                   </td>
-                  <td ref={customerAnchorRef} className="py-2 px-2">
+                  <td ref={customerAnchorRef} className="py-2 px-2 border border-slate-200">
                     <input
                       type="text"
                       value={customerSearch}
@@ -1626,7 +1737,7 @@ const PlanningScreen = () => {
                       </div>
                     </PortalDropdown>
                   </td>
-                  <td ref={productAnchorRef} className="py-2 px-2">
+                  <td ref={productAnchorRef} className="py-2 px-2 border border-slate-200">
                     <input
                       type="text"
                       value={productSearch}
@@ -1662,7 +1773,7 @@ const PlanningScreen = () => {
                       </div>
                     </PortalDropdown>
                   </td>
-                  <td className="py-2 px-2">
+                  <td className="py-2 px-2 border border-slate-200">
                     <input
                       type="number"
                       value={newRow.qty}
@@ -1677,7 +1788,7 @@ const PlanningScreen = () => {
                       className={compactNumericFieldClass}
                     />
                   </td>
-                  <td className="py-2 px-2">
+                  <td className="py-2 px-2 border border-slate-200">
                     <input
                       type="number"
                       min="0"
@@ -1693,71 +1804,173 @@ const PlanningScreen = () => {
                       className={compactNumericFieldClass}
                     />
                   </td>
-                  <td className="py-2 px-2 bg-amber-50/80">
+                  <td className="py-2 px-2 bg-amber-50/80 border border-slate-200">
                     <div className="px-2.5 py-2.5 rounded-lg bg-amber-50 border border-amber-100 text-sm font-black text-slate-900 text-right">
                       {formatToIndian(calculatedTotal, 2)}
                     </div>
                   </td>
-                  <td className="py-2 px-2">
-                    <select
-                      value={newRow.mgrCode}
-                      onChange={(e) =>
-                        handleNewRowChange("mgrCode", e.target.value)
-                      }
-                      onFocus={() => {
+                  <td ref={mgr1AnchorRef} className="py-2 px-2 border border-slate-200">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowMgr1Dropdown(!showMgr1Dropdown);
                         setShowCustomerDropdown(false);
                         setShowProductDropdown(false);
+                        setShowMgr2Dropdown(false);
+                        setShowStatusDropdown(false);
                       }}
-                      className={compactFieldClass}
+                      className={`${compactFieldClass} flex justify-between items-center bg-white text-left font-bold w-full`}
                     >
-                      <option value="">Select MGR 1</option>
-                      {mgrList.map((mgr) => (
-                        <option key={mgr._id} value={mgr.code}>
-                          {mgr.code} - {mgr.description}
-                        </option>
-                      ))}
-                    </select>
+                      <span className="truncate">
+                        {newRow.mgrCode ? getCanonicalMgrCode(newRow.mgrCode, mgrList) : "Select"}
+                      </span>
+                      <MdKeyboardArrowDown className="text-slate-400 shrink-0 ml-1" size={16} />
+                    </button>
+                    <PortalDropdown isOpen={showMgr1Dropdown} anchorRef={mgr1AnchorRef}>
+                      <div className="portal-dropdown-content bg-white border border-slate-200 rounded-xl shadow-xl max-h-56 flex flex-col overflow-hidden">
+                        <div className="p-2 border-b border-slate-100 bg-slate-50">
+                          <input
+                            type="text"
+                            value={mgr1Search}
+                            onChange={(e) => setMgr1Search(e.target.value)}
+                            onClick={(e) => e.stopPropagation()}
+                            placeholder="Search MGR 1..."
+                            className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-primary-500 bg-white"
+                          />
+                        </div>
+                        <div className="overflow-y-auto custom-scrollbar flex-1 max-h-40">
+                          <button
+                            type="button"
+                            onClick={() => selectMgr1({ code: "" })}
+                            className="w-full text-left px-3 py-2 text-xs font-bold text-slate-400 hover:bg-slate-50 border-b border-slate-50"
+                          >
+                            Select
+                          </button>
+                          {filteredMgrList.map((mgr) => (
+                            <button
+                              key={mgr._id}
+                              type="button"
+                              onClick={() => selectMgr1(mgr)}
+                              className="w-full text-left px-3 py-2 text-xs font-bold hover:bg-primary-50 transition-colors border-b border-slate-50 text-slate-700"
+                            >
+                              {mgr.code} - {mgr.description}
+                            </button>
+                          ))}
+                          {filteredMgrList.length === 0 && (
+                            <div className="px-3 py-2 text-xs text-slate-400 italic">No managers found</div>
+                          )}
+                        </div>
+                      </div>
+                    </PortalDropdown>
                   </td>
-                  <td className="py-2 px-2">
-                    <select
-                      value={newRow.mgrCode2}
-                      onChange={(e) =>
-                        handleNewRowChange("mgrCode2", e.target.value)
-                      }
-                      onFocus={() => {
+                  <td ref={mgr2AnchorRef} className="py-2 px-2 border border-slate-200">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowMgr2Dropdown(!showMgr2Dropdown);
                         setShowCustomerDropdown(false);
                         setShowProductDropdown(false);
+                        setShowMgr1Dropdown(false);
+                        setShowStatusDropdown(false);
                       }}
-                      className={compactFieldClass}
+                      className={`${compactFieldClass} flex justify-between items-center bg-white text-left font-bold w-full`}
                     >
-                      <option value="">Select MGR 2</option>
-                      {mgrList2.map((mgr) => (
-                        <option key={mgr._id} value={mgr.code}>
-                          {mgr.code} - {mgr.description}
-                        </option>
-                      ))}
-                    </select>
+                      <span className="truncate">
+                        {newRow.mgrCode2 ? getCanonicalMgrCode(newRow.mgrCode2, mgrList2) : "Select"}
+                      </span>
+                      <MdKeyboardArrowDown className="text-slate-400 shrink-0 ml-1" size={16} />
+                    </button>
+                    <PortalDropdown isOpen={showMgr2Dropdown} anchorRef={mgr2AnchorRef}>
+                      <div className="portal-dropdown-content bg-white border border-slate-200 rounded-xl shadow-xl max-h-56 flex flex-col overflow-hidden">
+                        <div className="p-2 border-b border-slate-100 bg-slate-50">
+                          <input
+                            type="text"
+                            value={mgr2Search}
+                            onChange={(e) => setMgr2Search(e.target.value)}
+                            onClick={(e) => e.stopPropagation()}
+                            placeholder="Search MGR 2..."
+                            className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-primary-500 bg-white"
+                          />
+                        </div>
+                        <div className="overflow-y-auto custom-scrollbar flex-1 max-h-40">
+                          <button
+                            type="button"
+                            onClick={() => selectMgr2({ code: "" })}
+                            className="w-full text-left px-3 py-2 text-xs font-bold text-slate-400 hover:bg-slate-50 border-b border-slate-50"
+                          >
+                            Select
+                          </button>
+                          {filteredMgrList2.map((mgr) => (
+                            <button
+                              key={mgr._id}
+                              type="button"
+                              onClick={() => selectMgr2(mgr)}
+                              className="w-full text-left px-3 py-2 text-xs font-bold hover:bg-primary-50 transition-colors border-b border-slate-50 text-slate-700"
+                            >
+                              {mgr.code} - {mgr.description}
+                            </button>
+                          ))}
+                          {filteredMgrList2.length === 0 && (
+                            <div className="px-3 py-2 text-xs text-slate-400 italic">No managers found</div>
+                          )}
+                        </div>
+                      </div>
+                    </PortalDropdown>
                   </td>
-                  <td className="py-2 px-2">
+                  <td ref={statusAnchorRef} className="py-2 px-2 border border-slate-200">
                     <div className="space-y-2">
-                      <select
-                        value={newRow.status}
-                        onChange={(e) =>
-                          handleNewRowChange("status", e.target.value)
-                        }
-                        onFocus={() => {
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowStatusDropdown(!showStatusDropdown);
                           setShowCustomerDropdown(false);
                           setShowProductDropdown(false);
+                          setShowMgr1Dropdown(false);
+                          setShowMgr2Dropdown(false);
                         }}
-                        className={compactFieldClass}
+                        className={`${compactFieldClass} flex justify-between items-center bg-white text-left font-bold w-full`}
                       >
-                        <option value="">Select status</option>
-                        {(statusOptions.length > 0 ? statusOptions : ["Budget", "Firm", "MFC", "B & B", "Others", "Order Received", "Invoice", "Lost", "Parked"]).map((status) => (
-                          <option key={status} value={status}>
-                            {status}
-                          </option>
-                        ))}
-                      </select>
+                        <span className="truncate">
+                          {newRow.status ? newRow.status : "Select"}
+                        </span>
+                        <MdKeyboardArrowDown className="text-slate-400 shrink-0 ml-1" size={16} />
+                      </button>
+                      <PortalDropdown isOpen={showStatusDropdown} anchorRef={statusAnchorRef}>
+                        <div className="portal-dropdown-content bg-white border border-slate-200 rounded-xl shadow-xl max-h-56 flex flex-col overflow-hidden">
+                          <div className="p-2 border-b border-slate-100 bg-slate-50">
+                            <input
+                              type="text"
+                              value={statusSearch}
+                              onChange={(e) => setStatusSearch(e.target.value)}
+                              onClick={(e) => e.stopPropagation()}
+                              placeholder="Search status..."
+                              className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-primary-500 bg-white"
+                            />
+                          </div>
+                          <div className="overflow-y-auto custom-scrollbar flex-1 max-h-40">
+                            <button
+                              type="button"
+                              onClick={() => selectStatus("")}
+                              className="w-full text-left px-3 py-2 text-xs font-bold text-slate-400 hover:bg-slate-50 border-b border-slate-50"
+                            >
+                              Select
+                            </button>
+                            {filteredStatusList.map((status) => (
+                              <button
+                                key={status}
+                                type="button"
+                                onClick={() => selectStatus(status)}
+                                className="w-full text-left px-3 py-2 text-xs font-bold hover:bg-primary-50 transition-colors border-b border-slate-50 text-slate-700"
+                              >
+                                {status}
+                              </button>
+                            ))}
+                            {filteredStatusList.length === 0 && (
+                              <div className="px-3 py-2 text-xs text-slate-400 italic">No statuses found</div>
+                            )}
+                          </div>
+                        </div>
+                      </PortalDropdown>
                       <div className="flex items-center gap-2">
                         <button
                           onClick={handleSaveEntry}
@@ -1792,29 +2005,29 @@ const PlanningScreen = () => {
                       key={entry._id}
                       className={`hover:bg-slate-50 transition-colors ${editingId === entry._id ? "bg-primary-50/60" : ""}`}
                     >
-                      <td className="py-3 px-2 font-bold text-slate-700 text-xs whitespace-nowrap">
+                      <td className="py-3 px-2 font-bold text-slate-700 text-xs whitespace-nowrap border border-slate-200">
                         {entry.monthYear}
                       </td>
-                      <td className="py-3 px-2 font-bold text-slate-900 text-xs">
-                        <p className="truncate" title={entry.customerName}>
-                          {entry.customerName}
+                      <td className="py-3 px-2 font-bold text-slate-900 text-xs border border-slate-200">
+                        <p className="truncate" title={entry.customerId?.companyName || entry.customerId?.customerName || getCustomerById(entry.customerId)?.companyName || "-"}>
+                          {entry.customerId?.companyName || entry.customerId?.customerName || getCustomerById(entry.customerId)?.companyName || "-"}
                         </p>
                       </td>
-                      <td className="py-3 px-2 text-slate-700 text-xs">
-                        <p className="truncate" title={entry.productName}>
-                          {entry.productName}
+                      <td className="py-3 px-2 text-slate-700 text-xs border border-slate-200">
+                        <p className="truncate" title={entry.productId?.productName || getProductById(entry.productId)?.productName || "-"}>
+                          {entry.productId?.productName || getProductById(entry.productId)?.productName || "-"}
                         </p>
                       </td>
-                      <td className="py-3 px-2 text-right font-bold text-slate-700 text-xs whitespace-nowrap">
+                      <td className="py-3 px-2 text-right font-bold text-slate-700 text-xs whitespace-nowrap border border-slate-200">
                         {entry.qty}
                       </td>
-                      <td className="py-3 px-2 text-right font-bold text-slate-700 text-xs whitespace-nowrap">
+                      <td className="py-3 px-2 text-right font-bold text-slate-700 text-xs whitespace-nowrap border border-slate-200">
                         {entry.value?.toLocaleString()}
                       </td>
-                      <td className="py-3 px-2 text-right font-black text-slate-900 text-xs bg-amber-50/50 whitespace-nowrap">
+                      <td className="py-3 px-2 text-right font-black text-slate-900 text-xs bg-amber-50/50 whitespace-nowrap border border-slate-200">
                         {entry.totalValue?.toLocaleString()}
                       </td>
-                      <td className="py-3 px-2 text-xs whitespace-nowrap">
+                      <td className="py-3 px-2 text-xs whitespace-nowrap border border-slate-200">
                         <span
                           className="block truncate px-2 py-1 bg-blue-50 text-blue-700 rounded font-bold"
                           title={getCanonicalMgrCode(entry.mgrCode, mgrList)}
@@ -1822,7 +2035,7 @@ const PlanningScreen = () => {
                           {getCanonicalMgrCode(entry.mgrCode, mgrList)}
                         </span>
                       </td>
-                      <td className="py-3 px-2 text-xs whitespace-nowrap">
+                      <td className="py-3 px-2 text-xs whitespace-nowrap border border-slate-200">
                         <span
                           className="block truncate px-2 py-1 bg-indigo-50 text-indigo-700 rounded font-bold"
                           title={
@@ -1838,7 +2051,7 @@ const PlanningScreen = () => {
                           ) || "-"}
                         </span>
                       </td>
-                      <td className="py-3 px-2 text-xs">
+                      <td className="py-3 px-2 text-xs border border-slate-200">
                         <div className="flex items-center justify-between gap-1">
                           <span
                             className="truncate px-2 py-1 rounded font-bold whitespace-nowrap"
@@ -1908,6 +2121,7 @@ const PlanningScreen = () => {
             )}
           </div>
         </>
+      </div>
 
        <div className="bg-white rounded-2xl shadow-sm border border-slate-100/80 overflow-hidden transition-all duration-300 hover:shadow-md hover:border-slate-200/60">
         <div
@@ -1969,21 +2183,21 @@ const PlanningScreen = () => {
 
           return (
             <div className="overflow-x-auto custom-scrollbar">
-              <table className="w-full text-left text-sm border-collapse">
+              <table className="w-full text-left text-sm border-collapse border border-slate-200">
                 <thead>
                   <tr className="bg-slate-50/70 border-b border-slate-100">
-                    <th className="py-3.5 px-5 font-black text-slate-500 text-left min-w-[200px] uppercase tracking-wider text-[10px]">
+                    <th className="py-3.5 px-5 font-black text-slate-500 text-left min-w-[200px] uppercase tracking-wider text-[10px] border border-slate-200">
                       Month / Segment
                     </th>
                     {visibleMgrCodes.map((sbu) => (
                       <th
                         key={sbu}
-                        className="py-3.5 px-4 font-black text-slate-500 text-right min-w-[110px] border-l border-slate-100/50 uppercase tracking-wider text-[10px]"
+                        className="py-3.5 px-4 font-black text-slate-500 text-right min-w-[110px] border border-slate-200 uppercase tracking-wider text-[10px]"
                       >
                         {sbu}
                       </th>
                     ))}
-                    <th className="py-3.5 px-4 font-black text-slate-600 text-right bg-slate-100/40 min-w-[110px] border-l border-slate-100 uppercase tracking-wider text-[10px]">
+                    <th className="py-3.5 px-4 font-black text-slate-600 text-right bg-slate-100/40 min-w-[110px] border border-slate-200 uppercase tracking-wider text-[10px]">
                       Total
                     </th>
                   </tr>
@@ -1991,7 +2205,7 @@ const PlanningScreen = () => {
                 <tbody>
                   {visibleMonthLabels.length === 0 ? (
                     <tr>
-                      <td colSpan={visibleMgrCodes.length + 2} className="py-10 px-5 text-center text-slate-400 font-bold">
+                      <td colSpan={visibleMgrCodes.length + 2} className="py-10 px-5 text-center text-slate-400 font-bold border border-slate-200">
                         No SBU-wise planning data available.
                       </td>
                     </tr>
@@ -2009,7 +2223,7 @@ const PlanningScreen = () => {
                         (sum, sbu) => sum + getMergedSbuReportCellValue(monthRow, sbu, monthLabel),
                         0,
                       );
-
+ 
                       return (
                         <React.Fragment key={monthLabel}>
                           {/* MONTH ROW */}
@@ -2017,7 +2231,7 @@ const PlanningScreen = () => {
                             className="bg-indigo-50/20 hover:bg-indigo-50/40 border-l-4 border-l-indigo-500 transition-all border-b border-slate-100 font-bold cursor-pointer"
                             onClick={() => toggleSbuWiseMonth(monthLabel)}
                           >
-                            <td className="py-3.5 px-4 text-slate-800">
+                            <td className="py-3.5 px-4 text-slate-800 border border-slate-200">
                               <div className="flex items-center gap-2">
                                 <MdKeyboardArrowDown
                                   className={`text-indigo-500 transition-transform duration-300 ${!expandedSbuWiseMonths[monthLabel] ? "-rotate-90" : ""}`}
@@ -2033,7 +2247,7 @@ const PlanningScreen = () => {
                               return (
                                 <td
                                   key={sbu}
-                                  className="py-3.5 px-4 text-right border-l border-slate-100/50"
+                                  className="py-3.5 px-4 text-right border border-slate-200"
                                 >
                                   {cellValue > 0 ? (
                                     <span className="inline-flex items-center justify-end px-2.5 py-1 rounded-full bg-indigo-50/70 text-indigo-700 text-[11px] font-black min-w-[70px] border border-indigo-100/40 shadow-sm hover:scale-105 transition-all">
@@ -2045,7 +2259,7 @@ const PlanningScreen = () => {
                                 </td>
                               );
                             })}
-                            <td className="py-3.5 px-4 text-right border-l border-slate-100 bg-indigo-50/10">
+                            <td className="py-3.5 px-4 text-right border border-slate-200 bg-indigo-50/10">
                               {monthTotal > 0 ? (
                                 <span className="inline-flex items-center justify-end px-2.5 py-1 rounded-full bg-indigo-100/50 text-indigo-800 text-[11px] font-black min-w-[70px] border border-indigo-200/30 shadow-sm">
                                   {formatReportValue(monthTotal, 0)}
@@ -2055,7 +2269,7 @@ const PlanningScreen = () => {
                               )}
                             </td>
                           </tr>
-
+ 
                           {/* SEGMENT ROWS (shown when month is expanded) */}
                           {expandedSbuWiseMonths[monthLabel] && monthSegments.map((segRow) => {
                             const segmentTotal = visibleMgrCodes.reduce(
@@ -2067,7 +2281,7 @@ const PlanningScreen = () => {
                                 key={`${monthLabel}-${segRow.month}`}
                                 className="border-b border-slate-100/60 bg-slate-50/20 hover:bg-slate-50/60 transition-colors border-l-4 border-l-slate-200"
                               >
-                                <td className="py-3 px-4 text-slate-600 font-bold pl-8 text-xs">
+                                <td className="py-3 px-4 text-slate-600 font-bold pl-8 text-xs border border-slate-200">
                                   {segRow.month}
                                 </td>
                                 {visibleMgrCodes.map((sbu) => {
@@ -2075,7 +2289,7 @@ const PlanningScreen = () => {
                                   return (
                                     <td
                                       key={`${monthLabel}-${segRow.month}-${sbu}`}
-                                      className="py-3 px-4 text-right border-l border-slate-100/30 text-xs"
+                                      className="py-3 px-4 text-right border-slate-200 text-xs"
                                     >
                                       {val > 0 ? (
                                         <span className="inline-flex items-center justify-end px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-extrabold min-w-[64px] border border-slate-200/40">
@@ -2087,7 +2301,7 @@ const PlanningScreen = () => {
                                     </td>
                                   );
                                 })}
-                                <td className="py-3 px-4 text-right border-l border-slate-100/30 bg-slate-50/30 font-bold text-slate-700 text-xs">
+                                <td className="py-3 px-4 text-right border-slate-200 bg-slate-50/30 font-bold text-slate-700 text-xs">
                                   {segmentTotal > 0 ? formatReportValue(segmentTotal, 0) : "-"}
                                 </td>
                               </tr>
@@ -2097,14 +2311,14 @@ const PlanningScreen = () => {
                       );
                     })
                   )}
-
+ 
                   {/* SUMMARY ROWS */}
                   {summaryRowsInOrder.map((row) => {
                     const isTotal = row.isTotal;
                     const isPercentage = row.isPercentage;
                     const isPreviousYearValue = row.isPreviousYearValue;
                     const isTotalPercentage = row.isTotalPercentage;
-
+ 
                     return (
                       <tr
                         key={`sbu-summary-${row.month}`}
@@ -2118,7 +2332,7 @@ const PlanningScreen = () => {
                         }`}
                       >
                         <td
-                          className="py-3.5 px-5 font-extrabold text-xs uppercase tracking-wide"
+                          className="py-3.5 px-5 font-extrabold text-xs uppercase tracking-wide border border-slate-200"
                         >
                           {isPercentage ? "Percentage CY" : row.month}
                         </td>
@@ -2127,7 +2341,7 @@ const PlanningScreen = () => {
                           return (
                             <td
                               key={`sbu-summary-${row.month}-${sbu}`}
-                              className="py-3.5 px-4 text-right border-l border-slate-100/50"
+                              className="py-3.5 px-4 text-right border-slate-200"
                             >
                               {cellValue > 0 ? (
                                 <span className={`inline-flex items-center justify-end px-2.5 py-1 rounded-full text-[11px] font-black min-w-[70px] border ${isTotal
@@ -2147,7 +2361,7 @@ const PlanningScreen = () => {
                           );
                         })}
                         <td
-                          className="py-3.5 px-4 text-right border-l border-slate-100 bg-slate-100/20 font-black text-xs"
+                          className="py-3.5 px-4 text-right border border-slate-200 bg-slate-100/20 font-black text-xs"
                         >
                           {isPercentage || isTotalPercentage
                             ? formatReportPercentageTotal(row.total)
@@ -2196,21 +2410,21 @@ const PlanningScreen = () => {
 
         {isReportExpanded2 && (
           <div className="overflow-x-auto custom-scrollbar">
-            <table className="w-full text-left text-sm border-collapse">
+            <table className="w-full text-left text-sm border-collapse border border-slate-200">
               <thead>
                 <tr className="bg-slate-50/70 border-b border-slate-100">
-                  <th className="py-3.5 px-5 font-black text-slate-500 text-left min-w-[200px] uppercase tracking-wider text-[10px]">
+                  <th className="py-3.5 px-5 font-black text-slate-500 text-left min-w-[200px] uppercase tracking-wider text-[10px] border border-slate-200">
                     Month
                   </th>
                   {(reportData2?.mgrCodes?.length > 0 ? reportData2.mgrCodes : ['Export', 'Industry', 'UC', 'Utility']).map((mgr) => (
                     <th
                       key={mgr}
-                      className="py-3.5 px-4 font-black text-slate-500 text-right min-w-[110px] border-l border-slate-100/50 uppercase tracking-wider text-[10px]"
+                      className="py-3.5 px-4 font-black text-slate-500 text-right min-w-[110px] uppercase tracking-wider text-[10px] border border-slate-200"
                     >
                       {mgr}
                     </th>
                   ))}
-                  <th className="py-3.5 px-4 font-black text-slate-600 text-right bg-slate-100/40 min-w-[110px] border-l border-slate-100 uppercase tracking-wider text-[10px]">
+                  <th className="py-3.5 px-4 font-black text-slate-600 text-right bg-slate-100/40 min-w-[110px] uppercase tracking-wider text-[10px] border border-slate-200">
                     Total
                   </th>
                 </tr>
@@ -2227,20 +2441,20 @@ const PlanningScreen = () => {
                     reportData2?.monthLabels?.length > 0
                       ? reportData2.monthLabels
                       : (monthRowsByLabel.size > 0 ? Array.from(monthRowsByLabel.keys()) : monthLabels);
-
+ 
                   return segmentMonthLabels.map((monthLabel) => {
                     const monthRow = monthRowsByLabel.get(monthLabel) || {
                       month: monthLabel,
                       total: 0,
                     };
-
+ 
                     return (
                       <React.Fragment key={monthLabel}>
                         <tr
                           className="bg-sky-50/20 hover:bg-sky-50/40 border-l-4 border-l-sky-500 transition-all border-b border-slate-100 font-bold cursor-pointer"
                           onClick={() => toggleSegmentMonth(monthLabel)}
                         >
-                          <td className="py-3.5 px-4 text-slate-800">
+                          <td className="py-3.5 px-4 text-slate-800 border border-slate-200">
                             <div className="flex items-center gap-2">
                               <MdKeyboardArrowDown
                                 className={`text-sky-500 transition-transform duration-300 ${!expandedSegmentMonths[monthLabel] ? "-rotate-90" : ""}`}
@@ -2254,7 +2468,7 @@ const PlanningScreen = () => {
                             return (
                               <td
                                 key={mgr}
-                                className="py-3.5 px-4 text-right border-l border-slate-100/50"
+                                className="py-3.5 px-4 text-right border border-slate-200"
                               >
                                 {cellValue > 0 ? (
                                   <span className="inline-flex items-center justify-end px-2.5 py-1 rounded-full bg-sky-50/70 text-sky-700 text-[11px] font-black min-w-[70px] border border-sky-100/40 shadow-sm hover:scale-105 transition-all">
@@ -2267,7 +2481,7 @@ const PlanningScreen = () => {
                             );
                           })}
                           <td
-                            className="py-3.5 px-4 text-right border-l border-slate-100 bg-sky-50/10"
+                            className="py-3.5 px-4 text-right bg-sky-50/10 border border-slate-200"
                           >
                             {Number(monthRow.total || 0) > 0 ? (
                               <span className="inline-flex items-center justify-end px-2.5 py-1 rounded-full bg-sky-100/50 text-sky-800 text-[11px] font-black min-w-[70px] border border-sky-200/30 shadow-sm">
@@ -2291,7 +2505,7 @@ const PlanningScreen = () => {
                               );
                               return match || value || "Unassigned";
                             };
-
+ 
                             (combinedReportData?.sbuWise || [])
                               .filter((r) => r.month === monthLabel)
                               .forEach((r) => {
@@ -2315,37 +2529,37 @@ const PlanningScreen = () => {
                                 entry.total += Number(r.value || 0);
                               });
                             const sbuRows = Array.from(sbuMap.values());
-
+ 
                             if (sbuRows.length === 0) {
                               return ['EPC', 'SBU1', 'SBU2', 'SBU3'].map(sbu => (
                                 <tr
                                   key={`${monthLabel}-${sbu}`}
                                   className="border-b border-slate-100/60 bg-slate-50/20 hover:bg-slate-50/60 transition-colors border-l-4 border-l-slate-200"
                                 >
-                                  <td className="py-3 px-4 text-slate-600 font-bold pl-8 text-xs">
+                                  <td className="py-3 px-4 text-slate-600 font-bold pl-8 text-xs border border-slate-200">
                                     <span>{sbu}</span>
                                   </td>
                                   {mgrCodes.map((mgr) => (
                                     <td
                                       key={mgr}
-                                      className="py-3 px-4 text-right border-l border-slate-100/30 text-xs text-slate-300"
+                                      className="py-3 px-4 text-right text-xs text-slate-300 border border-slate-200"
                                     >
                                       -
                                     </td>
                                   ))}
-                                  <td className="py-3 px-4 text-right border-l border-slate-100/30 bg-slate-50/30 font-bold text-slate-300 text-xs">
+                                  <td className="py-3 px-4 text-right bg-slate-50/30 font-bold text-xs text-slate-300 border border-slate-200">
                                     -
                                   </td>
                                 </tr>
                               ));
                             }
-
+ 
                             return sbuRows.map((row) => (
                               <tr
                                 key={`${monthLabel}-${row.normalizedSbu}`}
                                 className="border-b border-slate-100/60 bg-slate-50/20 hover:bg-slate-50/60 transition-colors border-l-4 border-l-slate-200"
                               >
-                                <td className="py-3 px-4 text-slate-600 font-bold pl-8 text-xs">
+                                <td className="py-3 px-4 text-slate-600 font-bold pl-8 text-xs border border-slate-200">
                                   <span>{row.sbu}</span>
                                 </td>
                                 {mgrCodes.map((mgr) => {
@@ -2353,7 +2567,7 @@ const PlanningScreen = () => {
                                   return (
                                     <td
                                       key={mgr}
-                                      className="py-3 px-4 text-right border-l border-slate-100/30 text-xs"
+                                      className="py-3 px-4 text-right text-xs border border-slate-200"
                                     >
                                       {val > 0 ? (
                                         <span className="inline-flex items-center justify-end px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-extrabold min-w-[64px] border border-slate-200/40">
@@ -2366,7 +2580,7 @@ const PlanningScreen = () => {
                                   );
                                 })}
                                 <td
-                                  className="py-3 px-4 text-right border-l border-slate-100/30 bg-slate-50/30 font-bold text-slate-700 text-xs"
+                                  className="py-3 px-4 text-right bg-slate-50/30 font-bold text-slate-700 text-xs border border-slate-200"
                                 >
                                   {row.total > 0 ? formatReportValue(row.total, 3) : "-"}
                                 </td>
@@ -2394,13 +2608,13 @@ const PlanningScreen = () => {
                     { month: 'Value (Previous Year)', isPreviousYearValue: true, total: 0 },
                     { month: 'Percentage PY', isTotalPercentage: true, total: 0 },
                   ];
-
+ 
                   return summaryRowsInOrder.map((row) => {
                     const isTotal = row.isTotal;
                     const isPercentage = row.isPercentage;
                     const isPreviousYearValue = row.isPreviousYearValue;
                     const isTotalPercentage = row.isTotalPercentage;
-
+ 
                     return (
                       <tr
                         key={row.month}
@@ -2414,7 +2628,7 @@ const PlanningScreen = () => {
                           }`}
                       >
                         <td
-                          className="py-3.5 px-5 font-extrabold text-xs uppercase tracking-wide"
+                          className="py-3.5 px-5 font-extrabold text-xs uppercase tracking-wide border border-slate-200"
                         >
                           {isPercentage ? "Percentage CY" : row.month}
                         </td>
@@ -2423,7 +2637,7 @@ const PlanningScreen = () => {
                           return (
                             <td
                               key={mgr}
-                              className="py-3.5 px-4 text-right border-l border-slate-100/50"
+                              className="py-3.5 px-4 text-right border-slate-200 border"
                             >
                               {cellValue > 0 ? (
                                 <span className={`inline-flex items-center justify-end px-2.5 py-1 rounded-full text-[11px] font-black min-w-[70px] border ${isTotal
@@ -2443,7 +2657,7 @@ const PlanningScreen = () => {
                           );
                         })}
                         <td
-                          className="py-3.5 px-4 text-right border-l border-slate-100 bg-slate-100/20 font-black text-xs"
+                          className="py-3.5 px-4 text-right bg-slate-100/20 font-black text-xs border border-slate-200"
                         >
                           {isPercentage || isTotalPercentage
                             ? formatReportPercentageTotal(row.total)
@@ -2497,21 +2711,21 @@ const PlanningScreen = () => {
 
         {isStatusBreakdownExpanded && (
           <div className="overflow-x-auto custom-scrollbar">
-            <table className="w-full text-sm border-collapse">
+            <table className="w-full text-sm border-collapse border border-slate-200">
               <thead>
                 <tr className="bg-slate-50/70 border-b border-slate-100">
-                  <th className="py-3.5 px-4 text-left font-black text-slate-500 text-[10px] min-w-[90px] border-r border-slate-100/50 uppercase tracking-wider">Month</th>
-                  <th className="py-3.5 px-3 text-left font-black text-slate-500 text-[10px] min-w-[110px] border-r border-slate-100/50 uppercase tracking-wider">SBU/EPC</th>
-                  <th className="py-3.5 px-3 text-left font-black text-slate-500 text-[10px] min-w-[110px] border-r border-slate-100/50 uppercase tracking-wider">Segment</th>
+                  <th className="py-3.5 px-4 text-left font-black text-slate-500 text-[10px] min-w-[90px] border border-slate-200 uppercase tracking-wider">Month</th>
+                  <th className="py-3.5 px-3 text-left font-black text-slate-500 text-[10px] min-w-[110px] border border-slate-200 uppercase tracking-wider">SBU/EPC</th>
+                  <th className="py-3.5 px-3 text-left font-black text-slate-500 text-[10px] min-w-[110px] border border-slate-200 uppercase tracking-wider">Segment</th>
                   {(visibleStatusColumns.length > 0 ? visibleStatusColumns : STATUS_REPORT_COLUMNS).map((column) => (
                     <th
                       key={`status-breakdown-header-${column}`}
-                      className="py-3.5 px-3 text-right font-black text-slate-500 text-[10px] min-w-[80px] border-r border-slate-100/50 uppercase tracking-wider"
+                      className="py-3.5 px-3 text-right font-black text-slate-500 text-[10px] min-w-[80px] border border-slate-200 uppercase tracking-wider"
                     >
                       {column}
                     </th>
                   ))}
-                  <th className="py-3.5 px-3 text-right font-black text-slate-600 text-[10px] min-w-[90px] bg-slate-100/40 border-r border-slate-100 uppercase tracking-wider">
+                  <th className="py-3.5 px-3 text-right font-black text-slate-600 text-[10px] min-w-[90px] bg-slate-100/40 border border-slate-200 uppercase tracking-wider">
                     Total
                   </th>
                 </tr>
@@ -2528,19 +2742,19 @@ const PlanningScreen = () => {
                         className="bg-emerald-50/20 border-l-4 border-l-emerald-500 border-b border-slate-100 cursor-pointer hover:bg-emerald-50/40 transition-colors font-bold"
                         onClick={() => toggleStatusBreakdownMonth(monthData.month)}
                       >
-                        <td className="py-3 px-4 text-emerald-900 font-extrabold uppercase tracking-wider text-[11px] flex items-center gap-2 border-r border-slate-100/50">
+                        <td className="py-3 px-4 text-emerald-900 font-extrabold uppercase tracking-wider text-[11px] flex items-center gap-2 border border-slate-200">
                           <MdKeyboardArrowDown
                             className={`text-emerald-500 transition-transform duration-200 ${!isMonthExpanded ? "-rotate-90" : ""}`}
                             size={18}
                           />
                           {monthData.month}
                         </td>
-                        <td className="py-3 px-3 border-r border-slate-100/50"></td>
-                        <td className="py-3 px-3 border-r border-slate-100/50"></td>
+                        <td className="py-3 px-3 border border-slate-200"></td>
+                        <td className="py-3 px-3 border border-slate-200"></td>
                         {statusCols.map(col => {
                           const cellVal = monthData.monthTotalStatuses?.[col] || 0;
                           return (
-                            <td key={col} className="py-3 px-3 text-right border-r border-slate-100/50">
+                            <td key={col} className="py-3 px-3 text-right border border-slate-200">
                               {cellVal > 0 ? (
                                 <span className="inline-flex items-center justify-end px-2.5 py-1 rounded-full bg-emerald-50/70 text-emerald-700 text-[11px] font-black min-w-[70px] border border-emerald-100/40 shadow-sm">
                                   {formatReportValue(cellVal, 3)}
@@ -2551,7 +2765,7 @@ const PlanningScreen = () => {
                             </td>
                           );
                         })}
-                        <td className="py-3 px-3 text-right font-black text-emerald-950 bg-emerald-50/30">
+                        <td className="py-3 px-3 text-right font-black text-emerald-950 bg-emerald-50/30 border border-slate-200">
                           {monthData.monthGrandTotal > 0 ? (
                             <span className="inline-flex items-center justify-end px-2.5 py-1 rounded-full bg-emerald-100/50 text-emerald-800 text-[11px] font-black min-w-[70px] border border-emerald-200/30 shadow-sm">
                               {formatReportValue(monthData.monthGrandTotal || 0, 3)}
@@ -2578,15 +2792,15 @@ const PlanningScreen = () => {
                               className="bg-slate-50/40 border-b border-slate-100 cursor-pointer hover:bg-slate-100/60 transition-colors border-l-4 border-l-slate-300"
                               onClick={() => toggleStatusBreakdownSbu(monthData.month, sbuGroup.sbu)}
                             >
-                              <td className="py-2.5 px-4 border-r border-slate-100/30"></td>
-                              <td className="py-2.5 px-3 text-slate-700 font-extrabold flex items-center gap-2 border-r border-slate-100/30 text-xs">
+                              <td className="py-2.5 px-4 border border-slate-200"></td>
+                              <td className="py-2.5 px-3 text-slate-700 font-extrabold flex items-center gap-2 border border-slate-200 text-xs">
                                 <MdKeyboardArrowDown
                                   className={`text-slate-400 transition-transform duration-200 ${!isSbuExpanded ? "-rotate-90" : ""}`}
                                   size={16}
                                 />
                                 {sbuGroup.sbu}
                               </td>
-                              <td colSpan={statusCols.length + 2} className="bg-slate-50/10"></td>
+                              <td colSpan={statusCols.length + 2} className="bg-slate-50/10 border border-slate-200"></td>
                             </tr>
 
                             {isSbuExpanded && (
@@ -2599,15 +2813,15 @@ const PlanningScreen = () => {
                                 ]).map((seg) => {
                                   return (
                                     <tr key={`${monthData.month}-${sbuGroup.sbu}-${seg.segment}`} className="bg-white border-b border-slate-100/40 hover:bg-slate-50/40 transition-colors border-l-4 border-l-slate-200">
-                                      <td className="py-2 px-4 border-r border-slate-100/30"></td>
-                                      <td className="py-2 px-3 border-r border-slate-100/30"></td>
-                                      <td className="py-2 px-6 text-slate-600 font-bold border-r border-slate-100/30 text-xs pl-8">
+                                      <td className="py-2 px-4 border border-slate-200"></td>
+                                      <td className="py-2 px-3 border border-slate-200"></td>
+                                      <td className="py-2 px-6 text-slate-600 font-bold border border-slate-200 text-xs pl-8">
                                         {seg.segment}
                                       </td>
                                       {statusCols.map(col => {
                                         const cellVal = seg.statuses?.[col] || 0;
                                         return (
-                                          <td key={col} className="py-2 px-3 text-right border-r border-slate-100/30 text-xs">
+                                          <td key={col} className="py-2 px-3 text-right border border-slate-200 text-xs">
                                             {cellVal > 0 ? (
                                               <span className="inline-flex items-center justify-end px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-extrabold min-w-[64px] border border-slate-200/40">
                                                 {formatReportValue(cellVal, 3)}
@@ -2618,7 +2832,7 @@ const PlanningScreen = () => {
                                           </td>
                                         );
                                       })}
-                                      <td className="py-2 px-3 text-right font-bold text-slate-700 bg-slate-50/30 text-xs">
+                                      <td className="py-2 px-3 text-right font-bold text-slate-700 bg-slate-50/30 text-xs border border-slate-200">
                                         {seg.total > 0 ? formatReportValue(seg.total || 0, 3) : "-"}
                                       </td>
                                     </tr>
@@ -2626,13 +2840,13 @@ const PlanningScreen = () => {
                                 })}
                                 {/* SBU TOTAL Row */}
                                 <tr className="bg-teal-50/30 font-bold border-b border-teal-100 border-l-4 border-l-teal-400">
-                                  <td className="py-2 px-4 border-r border-teal-100/50"></td>
-                                  <td className="py-2 px-3 border-r border-teal-100/50"></td>
-                                  <td className="py-2 px-6 text-teal-900 border-r border-teal-100/50 uppercase tracking-tight text-[11px] font-black pl-8">SBU TOTAL</td>
+                                  <td className="py-2 px-4 border border-slate-200"></td>
+                                  <td className="py-2 px-3 border border-slate-200"></td>
+                                  <td className="py-2 px-6 text-teal-900 border border-slate-200 uppercase tracking-tight text-[11px] font-black pl-8">SBU TOTAL</td>
                                   {statusCols.map(col => {
                                     const cellVal = sbuGroup.sbuTotalStatuses?.[col] || 0;
                                     return (
-                                      <td key={col} className="py-2 px-3 text-right border-r border-teal-100/50">
+                                      <td key={col} className="py-2 px-3 text-right border border-slate-200">
                                         {cellVal > 0 ? (
                                           <span className="inline-flex items-center justify-end px-2.5 py-0.5 rounded-full bg-teal-100/50 text-teal-800 text-[10px] font-black min-w-[64px] border border-teal-200/30">
                                             {formatReportValue(cellVal, 3)}
@@ -2643,7 +2857,7 @@ const PlanningScreen = () => {
                                       </td>
                                     );
                                   })}
-                                  <td className="py-2 px-3 text-right font-black text-teal-950 bg-teal-50/40 text-xs">
+                                  <td className="py-2 px-3 text-right font-black text-teal-950 bg-teal-50/40 text-xs border border-slate-200">
                                     {sbuGroup.sbuGrandTotal > 0 ? formatReportValue(sbuGroup.sbuGrandTotal || 0, 3) : "-"}
                                   </td>
                                 </tr>
@@ -2671,7 +2885,7 @@ const PlanningScreen = () => {
                     >
                       <td
                         colSpan={3}
-                        className="py-3.5 px-4 font-extrabold text-xs uppercase tracking-wide border-r border-slate-100/50"
+                        className="py-3.5 px-4 font-extrabold text-xs uppercase tracking-wide border border-slate-200"
                       >
                         {summaryRow.label}
                       </td>
@@ -2680,7 +2894,7 @@ const PlanningScreen = () => {
                         return (
                           <td
                             key={`${summaryRow.key}-${column}`}
-                            className="py-3.5 px-3 text-right border-r border-slate-100/50"
+                            className="py-3.5 px-3 text-right border border-slate-200"
                           >
                             {cellValue > 0 ? (
                               <span className={`inline-flex items-center justify-end px-2.5 py-1 rounded-full text-[11px] font-black min-w-[70px] border ${isYellowLabel
@@ -2698,7 +2912,7 @@ const PlanningScreen = () => {
                         );
                       })}
                       <td
-                        className="py-3.5 px-3 text-right font-black border-r border-slate-100 bg-slate-100/20 text-xs"
+                        className="py-3.5 px-3 text-right font-black border border-slate-200 bg-slate-100/20 text-xs"
                       >
                         {summaryRow.isPercentage || summaryRow.isTotalPercentage
                           ? formatReportPercentageTotal(summaryRow.rowTotal)
@@ -2711,7 +2925,6 @@ const PlanningScreen = () => {
             </table>
           </div>
         )}
-      </div>
       </div>
 
       <ImportModal
