@@ -19,7 +19,8 @@ export const MENU_PERMISSION_GROUPS = [
             { key: 'master_products', label: 'Products', description: 'Product master records', defaultRoute: '/products' },
             { key: 'master_mgrs', label: 'MGRs', description: 'MGR master hierarchy', defaultRoute: '/mgrs' },
             { key: 'master_attributes', label: 'Attributes', description: 'Attribute master definitions', defaultRoute: '/attributes' },
-            { key: 'master_terms', label: 'Terms', description: 'Terms and conditions master', defaultRoute: '/terms' }
+            { key: 'master_terms', label: 'Terms', description: 'Terms and conditions master', defaultRoute: '/terms' },
+            { key: 'master_territories', label: 'Territories', description: 'Territory master management', defaultRoute: '/territory-master' }
         ]
     },
     {

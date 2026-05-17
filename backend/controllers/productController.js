@@ -6,11 +6,13 @@ const {
     deriveBasePriceFromVendors,
     isVendorActive
 } = require('../utils/vendorSelection');
-const { getRedis } = require('../config/redis');
 const { invalidateProductCaches } = require('../utils/cacheInvalidation');
+const { getCachedJson, makeCacheKey, setCachedJson } = require('../utils/apiCache');
 
 const PRODUCTS_CACHE_KEY = 'products:all';
 const PRODUCTS_CACHE_TTL_SECONDS = 10 * 60;
+const PRODUCTS_LIST_CACHE_TTL_SECONDS = Number(process.env.PRODUCTS_LIST_CACHE_TTL_SECONDS || 300);
+const PRODUCTS_DETAIL_CACHE_TTL_SECONDS = Number(process.env.PRODUCTS_DETAIL_CACHE_TTL_SECONDS || 300);
 
 const escapeRegex = (value = '') => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -243,12 +245,12 @@ const getAllProducts = async (req, res) => {
     try {
         const listParams = hasListParams(req.query);
         const query = buildProductQuery(req.query);
-        const redis = listParams ? null : await getRedis();
-        if (!listParams && redis) {
-            const cachedProducts = await redis.get(PRODUCTS_CACHE_KEY);
-            if (cachedProducts) {
-                return res.json(JSON.parse(cachedProducts));
-            }
+        const cacheKey = listParams
+            ? makeCacheKey('products:list', req)
+            : PRODUCTS_CACHE_KEY;
+        const { redis, value: cachedProducts } = await getCachedJson(cacheKey);
+        if (cachedProducts) {
+            return res.json(cachedProducts);
         }
 
         let productsQuery = Product.find(query)
@@ -268,7 +270,7 @@ const getAllProducts = async (req, res) => {
                 productsQuery.skip(skip).limit(limit).lean(),
                 Product.countDocuments(query),
             ]);
-            return res.json({
+            const response = {
                 data: products.map(buildProductResponse),
                 pagination: {
                     page,
@@ -276,14 +278,14 @@ const getAllProducts = async (req, res) => {
                     total,
                     pages: Math.ceil(total / limit) || 1,
                 },
-            });
+            };
+            await setCachedJson(redis, cacheKey, response, PRODUCTS_LIST_CACHE_TTL_SECONDS);
+            return res.json(response);
         }
 
         const products = await productsQuery.lean();
         const response = products.map(buildProductResponse);
-        if (!listParams && redis) {
-            await redis.set(PRODUCTS_CACHE_KEY, JSON.stringify(response), { EX: PRODUCTS_CACHE_TTL_SECONDS });
-        }
+        await setCachedJson(redis, cacheKey, response, PRODUCTS_CACHE_TTL_SECONDS);
 
         res.json(response);
     } catch (error) {
@@ -295,11 +297,19 @@ const getAllProducts = async (req, res) => {
 // Get Product by ID
 const getProductById = async (req, res) => {
     try {
+        const cacheKey = `products:detail:${req.params.id}`;
+        const { redis, value: cachedProduct } = await getCachedJson(cacheKey);
+        if (cachedProduct) {
+            return res.json(cachedProduct);
+        }
+
         const product = await fetchProductByIdWithRelations(req.params.id);
         if (!product) {
             return res.status(404).json({ message: 'Product not found' });
         }
-        res.json(buildProductResponse(product));
+        const response = buildProductResponse(product);
+        await setCachedJson(redis, cacheKey, response, PRODUCTS_DETAIL_CACHE_TTL_SECONDS);
+        res.json(response);
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Error fetching product' });
@@ -309,6 +319,12 @@ const getProductById = async (req, res) => {
 // Get Product Vendors
 const getProductVendors = async (req, res) => {
     try {
+        const cacheKey = makeCacheKey(`products:vendors:${req.params.id}`, req);
+        const { redis, value: cachedVendors } = await getCachedJson(cacheKey);
+        if (cachedVendors) {
+            return res.json(cachedVendors);
+        }
+
         const product = await Product.findById(req.params.id)
             .select('vendors')
             .populate('vendors.vendorId', 'name isActive')
@@ -322,6 +338,7 @@ const getProductVendors = async (req, res) => {
             vendors = vendors.filter((entry) => Number(entry.stock) > 0 && isVendorActive(entry));
         }
 
+        await setCachedJson(redis, cacheKey, vendors, PRODUCTS_DETAIL_CACHE_TTL_SECONDS);
         res.json(vendors);
     } catch (error) {
         console.error(error);

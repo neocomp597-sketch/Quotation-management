@@ -8,9 +8,13 @@ const Vendor = require('../models/Vendor');
 const { getBestVendorForProduct, sortVendorsByPriority, isVendorActive } = require('../utils/vendorSelection');
 const { getRedis } = require('../config/redis');
 const { invalidateQuotationCaches } = require('../utils/cacheInvalidation');
+const { getCachedJson, makeCacheKey, setCachedJson } = require('../utils/apiCache');
 
 const DRAFT_TTL_SECONDS = 24 * 60 * 60;
 const DASHBOARD_TTL_SECONDS = 60;
+const QUOTATIONS_LIST_CACHE_TTL_SECONDS = Number(process.env.QUOTATIONS_LIST_CACHE_TTL_SECONDS || 120);
+const QUOTATIONS_DETAIL_CACHE_TTL_SECONDS = Number(process.env.QUOTATIONS_DETAIL_CACHE_TTL_SECONDS || 300);
+const COMPANY_SETTINGS_CACHE_TTL_SECONDS = Number(process.env.COMPANY_SETTINGS_CACHE_TTL_SECONDS || 600);
 
 const escapeRegex = (value = '') => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -122,22 +126,34 @@ const calculateLineItem = (quantity, rate, discountPercent, gstPercentage) => {
 };
 
 const getAnyCompanySettings = async (creatorId) => {
+    const cacheKey = creatorId ? `company-settings:user:${creatorId}` : 'company-settings:any';
+    const { redis, value: cachedSettings } = await getCachedJson(cacheKey);
+    if (cachedSettings) return cachedSettings;
+
     // 1. Try creator's settings
     if (creatorId) {
         const settings = await CompanySettings.findOne({ userId: creatorId }).lean();
-        if (settings) return settings;
+        if (settings) {
+            await setCachedJson(redis, cacheKey, settings, COMPANY_SETTINGS_CACHE_TTL_SECONDS);
+            return settings;
+        }
     }
 
     // 2. Try any settings existing in system (Global)
     const anySettings = await CompanySettings.findOne().sort({ createdAt: 1 }).lean();
-    if (anySettings) return anySettings;
+    if (anySettings) {
+        await setCachedJson(redis, cacheKey, anySettings, COMPANY_SETTINGS_CACHE_TTL_SECONDS);
+        return anySettings;
+    }
 
     // 3. Absolute Fallback (Fake object so UI doesn't break)
-    return {
+    const fallback = {
         companyName: "Your Business Name",
         address: { line1: "Business Address", city: "City", state: "State", pincode: "000000" },
         authorizedSignatory: { name: "Authorized Person" }
     };
+    await setCachedJson(redis, cacheKey, fallback, 60);
+    return fallback;
 };
 
 const generateQuotationNumber = async (prefix, year) => {
@@ -267,7 +283,7 @@ const createQuotation = async (req, res) => {
         } = req.body;
 
         const customer = await Customer.findById(customerId)
-            .select('companyName customerName billingAddress')
+            .select('companyName customerName billingAddress territory')
             .lean();
         if (!customer) return res.status(404).json({ message: 'Customer not found' });
 
@@ -314,6 +330,7 @@ const createQuotation = async (req, res) => {
             termsTemplateId: termsTemplateId || undefined,
             customTerms,
             status: status || 'draft',
+            territory: customer.territory || null,
             createdBy: req.user ? req.user.id : undefined,
         });
 
@@ -348,7 +365,7 @@ const updateQuotation = async (req, res) => {
         } = req.body;
 
         const customer = await Customer.findById(customerId)
-            .select('companyName customerName billingAddress')
+            .select('companyName customerName billingAddress territory')
             .lean();
         if (!customer) return res.status(404).json({ message: 'Customer not found' });
 
@@ -382,6 +399,7 @@ const updateQuotation = async (req, res) => {
             termsTemplateId: termsTemplateId || undefined,
             customTerms,
             status: status || 'draft',
+            territory: customer.territory || null,
         }, { new: true, runValidators: true }).lean();
 
         await clearQuotationDashboardCache();
@@ -423,12 +441,19 @@ module.exports = {
     finalizeQuotation,
     getQuotationById: async (req, res) => {
         try {
+            const cacheKey = `quotations:detail:${req.params.id}`;
+            const { redis, value: cachedQuotation } = await getCachedJson(cacheKey);
+            if (cachedQuotation) {
+                return res.json(cachedQuotation);
+            }
+
             const quotation = await Quotation.findById(req.params.id)
                 .populate('customerId', 'customerName companyName gstin billingAddress mobile email logoUrl defaultDiscount')
                 .populate('siteId', 'siteName address')
                 .populate('items.siteId', 'siteName address')
                 .populate('items.productId', 'productName productCode hsnCode gstPercentage uom productImageUrl')
                 .populate('items.vendorId', 'name')
+                .populate('territory', 'name type')
                 .populate('termsTemplateId', 'templateName content isDefault')
                 .populate('createdBy', 'name email')
                 .lean();
@@ -442,6 +467,7 @@ module.exports = {
             const quotationObj = { ...quotation };
             quotationObj.companySettings = companySettings;
 
+            await setCachedJson(redis, cacheKey, quotationObj, QUOTATIONS_DETAIL_CACHE_TTL_SECONDS);
             res.json(quotationObj);
         } catch (error) {
             console.error("Error fetching quotation:", error);
@@ -452,27 +478,63 @@ module.exports = {
         try {
             let query = {};
             if (req.user && req.user.role !== 'admin') {
-                query.createdBy = req.user.id;
+                const Territory = require('../models/Territory');
+                const userTerritories = await Territory.find({
+                    $or: [
+                        { manager: req.user.id },
+                        { salesReps: req.user.id }
+                    ]
+                }).select('_id').lean();
+                
+                const territoryIds = userTerritories.map(t => t._id);
+                
+                query.$or = [
+                    { territory: { $in: territoryIds } },
+                    { createdBy: req.user.id }
+                ];
+            }
+
+            if (req.query.territory) {
+                query.territory = req.query.territory;
             }
 
             const search = String(req.query.search || '').trim();
             if (search) {
                 const regex = new RegExp(escapeRegex(search), 'i');
-                query.$or = [
+                const searchOr = [
                     { quotationNo: regex },
                     { quotationNumber: regex },
                     { customerName: regex },
                 ];
+                if (query.$or) {
+                    query.$and = [
+                        { $or: query.$or },
+                        { $or: searchOr }
+                    ];
+                    delete query.$or;
+                } else {
+                    query.$or = searchOr;
+                }
             }
             if (req.query.status) {
                 query.status = req.query.status;
             }
 
             const listParams = hasListParams(req.query);
+            const cacheKey = makeCacheKey('quotations:list', req, {
+                territory: req.query.territory || null,
+                listParams,
+            });
+            const { redis, value: cachedQuotations } = await getCachedJson(cacheKey);
+            if (cachedQuotations) {
+                return res.json(cachedQuotations);
+            }
+
             let quotationsQuery = Quotation.find(query)
-                .select('quotationNo quotationNumber customerName customerId quotationDate validTill grandTotal status siteId createdBy createdAt updatedAt')
+                .select('quotationNo quotationNumber customerName customerId quotationDate validTill grandTotal status siteId territory createdBy createdAt updatedAt')
                 .populate('customerId', 'customerName companyName gstin logoUrl')
                 .populate('siteId', 'siteName address')
+                .populate('territory', 'name type')
                 .populate('createdBy', 'name email')
                 .sort({ createdAt: -1 });
 
@@ -495,7 +557,7 @@ module.exports = {
                     return qObj;
                 }));
 
-                return res.json({
+                const response = {
                     data: quotationsWithSettings,
                     pagination: {
                         page,
@@ -503,7 +565,9 @@ module.exports = {
                         total,
                         pages: Math.ceil(total / limit) || 1,
                     },
-                });
+                };
+                await setCachedJson(redis, cacheKey, response, QUOTATIONS_LIST_CACHE_TTL_SECONDS);
+                return res.json(response);
             }
 
             const quotations = await quotationsQuery.lean();
@@ -521,6 +585,7 @@ module.exports = {
                 return qObj;
             }));
 
+            await setCachedJson(redis, cacheKey, quotationsWithSettings, QUOTATIONS_LIST_CACHE_TTL_SECONDS);
             res.json(quotationsWithSettings);
         } catch (error) {
             res.status(500).json({ message: 'Error fetching quotations' });
@@ -530,7 +595,20 @@ module.exports = {
         try {
             let query = {};
             if (req.user && req.user.role !== 'admin') {
-                query.createdBy = req.user.id;
+                const Territory = require('../models/Territory');
+                const userTerritories = await Territory.find({
+                    $or: [
+                        { manager: req.user.id },
+                        { salesReps: req.user.id }
+                    ]
+                }).select('_id').lean();
+                
+                const territoryIds = userTerritories.map(t => t._id);
+                
+                query.$or = [
+                    { territory: { $in: territoryIds } },
+                    { createdBy: req.user.id }
+                ];
             }
 
             const cacheScope = req.user?.role === 'admin' ? 'admin' : `user:${req.user?.id || 'anonymous'}`;

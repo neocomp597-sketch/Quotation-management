@@ -22,8 +22,12 @@ const PlanningSchema = new mongoose.Schema({
 });
 
 PlanningSchema.index({ financialYear: 1, monthYear: 1 });
+PlanningSchema.index({ financialYear: 1, status: 1 });
+PlanningSchema.index({ financialYear: 1, status: 1, createdAt: -1 });
+PlanningSchema.index({ financialYear: 1, monthYear: 1, status: 1 });
 PlanningSchema.index({ financialYear: 1, mgrCode: 1, monthYear: 1 });
 PlanningSchema.index({ financialYear: 1, mgrCode2: 1, monthYear: 1 });
+PlanningSchema.index({ financialYear: 1, mgrCode: 1, mgrCode2: 1, status: 1, monthYear: 1 });
 PlanningSchema.index({ financialYear: 1, customerId: 1, productId: 1, mgrCode: 1, mgrCode2: 1, status: 1, monthYear: 1 });
 
 // Auto-calculate totalValue before save

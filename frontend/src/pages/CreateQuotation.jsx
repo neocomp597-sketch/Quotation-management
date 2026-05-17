@@ -4,7 +4,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { MdArrowBack, MdAdd, MdDelete, MdSave, MdCheckCircle, MdPerson, MdInventory2, MdGavel, MdSearch, MdClose, MdPayments, MdEventAvailable, MdBadge, MdTrendingDown, MdEmail, MdPhone, MdLocationOn, MdExpandMore, MdCloudDone, MdCloudOff, MdWifiOff, MdWarning } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import { customerService, productService, quotationService, termsService, salespersonService, siteService } from '../services/api';
-import { calculateLineItem, resolveImageUrl } from '../utils/helpers';
+import { calculateLineItem, resolveImageUrl, getPlaceholderImage } from '../utils/helpers';
 import Modal from '../components/Modal';
 import { clearQuotationDraft, setAutosaveStatus, setQuotationDraft } from '../store/quotationDraftSlice';
 
@@ -36,6 +36,7 @@ const addToOfflineQueue = (payload) => {
 };
 const clearOfflineQueue = () => localStorage.removeItem(OFFLINE_QUEUE_KEY);
 
+
 // Searchable Customer Dropdown Component
 const LIST_PAGE_SIZE = 20;
 
@@ -44,6 +45,7 @@ const unwrapList = (payload) => Array.isArray(payload) ? payload : payload?.data
 const CustomerSearchDropdown = ({ customers, selectedCustomerId, onSelect, onSearch, isLoading }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    const [logoErrors, setLogoErrors] = useState({});
     const dropdownRef = useRef(null);
     const inputRef = useRef(null);
 
@@ -96,10 +98,27 @@ const CustomerSearchDropdown = ({ customers, selectedCustomerId, onSelect, onSea
             {/* Selected Value Display / Trigger */}
             <div
                 onClick={() => setIsOpen(!isOpen)}
-                className={`w-full pl-12 pr-10 py-3.5 bg-slate-50 border rounded-2xl cursor-pointer transition-all flex items-center ${isOpen ? 'border-primary-500 ring-4 ring-primary-500/10' : 'border-slate-200 hover:border-slate-300'
+                className={`w-full pl-14 pr-10 py-3.5 bg-slate-50 border rounded-2xl cursor-pointer transition-all flex items-center relative ${isOpen ? 'border-primary-500 ring-4 ring-primary-500/10' : 'border-slate-200 hover:border-slate-300'
                     }`}
             >
-                <MdPerson className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                {selectedCustomer ? (
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 h-7 w-7 rounded-lg bg-white border border-slate-100 p-0.5 flex-shrink-0 flex items-center justify-center overflow-hidden">
+                        {selectedCustomer.logoUrl && !logoErrors[selectedCustomer._id] ? (
+                            <img 
+                                src={resolveImageUrl(selectedCustomer.logoUrl)} 
+                                alt="" 
+                                className="h-full w-full object-contain" 
+                                onError={() => setLogoErrors(prev => ({ ...prev, [selectedCustomer._id]: true }))}
+                            />
+                        ) : (
+                            <div className="h-full w-full flex items-center justify-center text-primary-600 font-bold text-xs bg-primary-50 rounded-lg uppercase">
+                                {selectedCustomer.companyName?.substring(0, 1)}
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    <MdPerson className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                )}
                 <span className={`text-sm font-bold truncate flex-1 ${selectedCustomer ? 'text-slate-900' : 'text-slate-400'}`}>
                     {selectedCustomer ? `${selectedCustomer.companyName} (${selectedCustomer.gstin})` : 'Search & Select Customer...'}
                 </span>
@@ -133,38 +152,53 @@ const CustomerSearchDropdown = ({ customers, selectedCustomerId, onSelect, onSea
                     </div>
 
                     {/* Results List */}
-                    <div className="max-h-64 overflow-y-auto">
-                        {isLoading ? (
-                            <div className="p-6 text-center text-slate-400 text-xs font-black uppercase tracking-widest">
-                                Searching customers...
+                    <div className="max-h-64 overflow-y-auto relative">
+                        {isLoading && (
+                            <div className="absolute top-0 left-0 w-full h-1 bg-primary-100 overflow-hidden z-20">
+                                <div 
+                                    className="h-full bg-primary-500 rounded animate-pulse" 
+                                    style={{
+                                        width: '50%',
+                                        animation: 'pulse 1.5s infinite ease-in-out'
+                                    }} 
+                                />
                             </div>
-                        ) : filteredCustomers.length > 0 ? (
+                        )}
+
+                        {filteredCustomers.length > 0 ? (
                             filteredCustomers.map(customer => (
                                 <div
                                     key={customer._id}
                                     onClick={() => handleSelect(customer)}
-                                    className={`px-4 py-3 cursor-pointer transition-all hover:bg-primary-50 border-b border-slate-50 last:border-b-0 ${selectedCustomerId === customer._id ? 'bg-primary-50' : ''
+                                    className={`px-4 py-3 cursor-pointer transition-all hover:bg-primary-50 border-b border-slate-50 last:border-b-0 flex items-center gap-3 ${selectedCustomerId === customer._id ? 'bg-primary-50' : ''
                                         }`}
                                 >
-                                    <div className="flex items-center gap-3">
-                                        {customer.logoUrl ? (
-                                            <div className="h-10 w-10 rounded-lg bg-white border border-slate-100 p-1 flex-shrink-0">
-                                                <img src={resolveImageUrl(customer.logoUrl)} alt="" className="h-full w-full object-contain" />
-                                            </div>
+                                    <div className="h-10 w-10 rounded-lg bg-white border border-slate-100 p-1 flex-shrink-0 flex items-center justify-center overflow-hidden">
+                                        {customer.logoUrl && !logoErrors[customer._id] ? (
+                                            <img 
+                                                src={resolveImageUrl(customer.logoUrl)} 
+                                                alt="" 
+                                                className="h-full w-full object-contain" 
+                                                onError={() => setLogoErrors(prev => ({ ...prev, [customer._id]: true }))}
+                                            />
                                         ) : (
-                                            <div className="h-10 w-10 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
-                                                <MdPerson className="text-slate-400" size={20} />
+                                            <div className="h-full w-full flex items-center justify-center text-primary-600 font-bold text-sm bg-primary-50 rounded-lg uppercase">
+                                                {customer.companyName?.substring(0, 1)}
                                             </div>
                                         )}
-                                        <div className="flex-1 min-w-0">
-                                            <div className="font-bold text-slate-900 text-sm truncate">{customer.companyName}</div>
-                                            <div className="text-[10px] text-slate-500 font-medium truncate">
-                                                {customer.customerName} • {customer.gstin}
-                                            </div>
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="font-bold text-slate-900 text-sm truncate">{customer.companyName}</div>
+                                        <div className="text-[10px] text-slate-500 font-medium truncate">
+                                            {customer.customerName} • {customer.gstin}
                                         </div>
                                     </div>
                                 </div>
                             ))
+                        ) : isLoading ? (
+                            <div className="p-6 text-center text-slate-400 text-xs font-black uppercase tracking-widest animate-pulse">
+                                Searching customers...
+                            </div>
                         ) : (
                             <div className="p-6 text-center text-slate-400 text-sm font-medium">
                                 No customers found matching "{searchTerm}"

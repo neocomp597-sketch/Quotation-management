@@ -1,4 +1,5 @@
 const Enquiry = require('../models/Enquiry');
+const Quotation = require('../models/Quotation');
 const mongoose = require('mongoose');
 
 // Compute health score for an enquiry (0-100)
@@ -305,30 +306,35 @@ exports.getVendorIntelligence = async (req, res) => {
 
         let matchStage = {};
         if (from || to) {
-            matchStage.enquiryDate = {};
-            if (from) matchStage.enquiryDate.$gte = new Date(from);
-            if (to) matchStage.enquiryDate.$lte = new Date(to);
+            matchStage.createdAt = {};
+            if (from) matchStage.createdAt.$gte = new Date(from);
+            if (to) matchStage.createdAt.$lte = new Date(to);
         }
 
-        const vendors = await Enquiry.aggregate([
+        const vendors = await Quotation.aggregate([
             { $match: matchStage },
             { $unwind: '$items' },
-            { $unwind: { path: '$items.vendorQuotes', preserveNullAndEmptyArrays: true } },
             {
                 $group: {
-                    _id: '$items.vendorQuotes.vendorId',
-                    vendorName: { $first: '$items.vendorQuotes.vendorName' },
+                    _id: '$items.vendorId',
+                    vendorName: { $first: '$items.vendorName' },
                     quoteCount: { $sum: 1 },
-                    avgPrice: { $avg: '$items.vendorQuotes.price' },
+                    avgPrice: { $avg: '$items.vendorPrice' },
                     winCount: {
                         $sum: {
-                            $cond: [{ $eq: ['$items.finalVendor', '$items.vendorQuotes.vendorId'] }, 1, 0]
+                            $cond: [{ $eq: ['$status', 'ordered'] }, 1, 0]
                         }
                     }
                 }
             },
             {
-                $addFields: {
+                $project: {
+                    _id: 1,
+                    vendorName: { $ifNull: ['$vendorName', 'Unknown Vendor'] },
+                    quoteCount: 1,
+                    avgPrice: 1,
+                    winCount: 1,
+                    lossCount: { $subtract: ['$quoteCount', '$winCount'] },
                     winRatio: {
                         $cond: [
                             { $gt: ['$quoteCount', 0] },
@@ -343,6 +349,7 @@ exports.getVendorIntelligence = async (req, res) => {
 
         res.json(vendors);
     } catch (err) {
+        console.error('[Analytics Error] getVendorIntelligence:', err);
         res.status(500).json({ message: err.message });
     }
 };
@@ -353,33 +360,34 @@ exports.getProductIntelligence = async (req, res) => {
 
         let matchStage = {};
         if (from || to) {
-            matchStage.enquiryDate = {};
-            if (from) matchStage.enquiryDate.$gte = new Date(from);
-            if (to) matchStage.enquiryDate.$lte = new Date(to);
+            matchStage.createdAt = {};
+            if (from) matchStage.createdAt.$gte = new Date(from);
+            if (to) matchStage.createdAt.$lte = new Date(to);
         }
 
-        const products = await Enquiry.aggregate([
+        const products = await Quotation.aggregate([
             { $match: matchStage },
             { $unwind: '$items' },
             {
                 $group: {
-                    _id: '$items.productName',
+                    _id: '$items.productSnapshot.productName',
                     enquiryCount: { $sum: 1 },
                     wonCount: {
                         $sum: {
-                            $cond: [{ $in: ['$status', ['PO Received', 'Finalized']] }, 1, 0]
+                            $cond: [{ $eq: ['$status', 'ordered'] }, 1, 0]
                         }
                     },
-                    lostCount: {
-                        $sum: { $cond: [{ $eq: ['$status', 'Lost'] }, 1, 0] }
-                    },
-                    vendorCount: {
-                        $sum: { $cond: [{ $gt: [{ $size: { $ifNull: ['$items.vendors', []] } }, 0] }, 1, 0] }
-                    }
+                    vendors: { $addToSet: '$items.vendorId' }
                 }
             },
             {
-                $addFields: {
+                $project: {
+                    _id: 1,
+                    productName: '$_id',
+                    enquiryCount: 1,
+                    wonCount: 1,
+                    lostCount: { $subtract: ['$enquiryCount', '$wonCount'] },
+                    vendorCount: { $size: '$vendors' },
                     conversionRate: {
                         $cond: [
                             { $gt: ['$enquiryCount', 0] },
@@ -394,6 +402,7 @@ exports.getProductIntelligence = async (req, res) => {
 
         res.json(products);
     } catch (err) {
+        console.error('[Analytics Error] getProductIntelligence:', err);
         res.status(500).json({ message: err.message });
     }
 };

@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const User = require('../models/User');
 const { getRedis } = require('../config/redis');
+const { enqueueLegacyRefreshSession } = require('../queues/authSessionQueue');
 
 const ACCESS_TOKEN_TTL = process.env.ACCESS_TOKEN_TTL || '20m';
 const REFRESH_TOKEN_DAYS = Number(process.env.REFRESH_TOKEN_DAYS || 30);
@@ -104,8 +105,10 @@ const sessionSetKey = (userId) => `sessions:${userId}`;
 
 const storeRefreshSession = async (user, deviceId, refreshToken) => {
     const redis = await getRedis();
+    const tokenHash = hashToken(refreshToken);
+    const expiresAt = new Date(Date.now() + REFRESH_TOKEN_SECONDS * 1000);
     const payload = JSON.stringify({
-        tokenHash: hashToken(refreshToken),
+        tokenHash,
         userId: user._id.toString(),
         deviceId,
         role: user.role,
@@ -116,10 +119,27 @@ const storeRefreshSession = async (user, deviceId, refreshToken) => {
         await redis.set(refreshKey(user._id, deviceId), payload, { EX: REFRESH_TOKEN_SECONDS });
         await redis.sAdd(sessionSetKey(user._id), deviceId);
         await redis.expire(sessionSetKey(user._id), REFRESH_TOKEN_SECONDS);
+        let queued = false;
+        try {
+            queued = await enqueueLegacyRefreshSession({
+                userId: user._id.toString(),
+                tokenHash,
+                expiresAt: expiresAt.toISOString(),
+            });
+        } catch (error) {
+            console.error('Failed to enqueue legacy refresh session persistence:', error.message);
+        }
+        if (!queued) {
+            await User.findByIdAndUpdate(user._id, {
+                refreshTokenHash: tokenHash,
+                refreshTokenExpiresAt: expiresAt,
+            });
+        }
+        return;
     }
 
-    user.refreshTokenHash = hashToken(refreshToken);
-    user.refreshTokenExpiresAt = new Date(Date.now() + REFRESH_TOKEN_SECONDS * 1000);
+    user.refreshTokenHash = tokenHash;
+    user.refreshTokenExpiresAt = expiresAt;
     await user.save();
 };
 

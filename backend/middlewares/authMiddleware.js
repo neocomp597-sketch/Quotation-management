@@ -1,6 +1,9 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const { getRedis } = require('../config/redis');
+const { getCachedJson, setCachedJson } = require('../utils/apiCache');
+
+const AUTH_USER_CACHE_TTL_SECONDS = Number(process.env.AUTH_USER_CACHE_TTL_SECONDS || 300);
 
 const isAccessTokenBlacklisted = async (jti) => {
     if (!jti) return false;
@@ -26,7 +29,16 @@ exports.protect = async (req, res, next) => {
                 return res.status(401).json({ message: 'Not authorized, token revoked' });
             }
 
-            const user = await User.findById(decoded.id).select('_id name email role tokenVersion');
+            const cacheKey = `auth:user:${decoded.id}:v${decoded.tokenVersion ?? 0}`;
+            const { redis, value: cachedUser } = await getCachedJson(cacheKey);
+            let user = cachedUser;
+
+            if (!user) {
+                user = await User.findById(decoded.id).select('_id name email role tokenVersion').lean();
+                if (user) {
+                    await setCachedJson(redis, cacheKey, user, AUTH_USER_CACHE_TTL_SECONDS);
+                }
+            }
 
             if (!user) {
                 return res.status(401).json({ message: 'Not authorized, user not found' });

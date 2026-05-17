@@ -93,14 +93,14 @@ const SegmentWise = ({ data, financialYear }) => {
     return (
         <div className="space-y-0 rounded-2xl border border-slate-100 overflow-hidden bg-white">
             {/* Header */}
-            <div className="px-6 py-4 bg-gradient-to-r from-emerald-50 to-teal-50 border-b border-slate-200 flex justify-between items-center">
+            <div className="px-6 py-4 bg-gradient-to-r from-indigo-50 to-blue-50 border-b border-indigo-100 flex justify-between items-center">
                 <div>
                     <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Segment Wise Status Breakdown</h3>
                     <p className="text-xs font-bold text-slate-600 mt-1">{monthYear}</p>
                 </div>
                 <button
                     onClick={exportSegmentBreakdown}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 font-bold text-xs uppercase tracking-widest hover:bg-slate-50 transition-colors"
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-indigo-100 text-indigo-700 font-bold text-xs uppercase tracking-widest hover:bg-indigo-50 hover:text-indigo-800 transition-colors shadow-sm"
                 >
                     <MdDownload size={16} />
                     Export
@@ -111,21 +111,21 @@ const SegmentWise = ({ data, financialYear }) => {
             <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
                     <thead>
-                        <tr className="bg-slate-50 border-b border-slate-200">
-                            <th className="px-6 py-3 font-black text-slate-700 text-xs min-w-[200px]">Particulars</th>
+                        <tr className="bg-indigo-50/50 border-b border-indigo-100">
+                            <th className="px-6 py-3 font-black text-indigo-900 text-xs min-w-[200px] uppercase tracking-wider">Particulars</th>
                             {sbuCodes.map((sbu) => (
-                                <th key={sbu} className="px-4 py-3 font-black text-slate-700 text-right text-xs min-w-[100px]">
+                                <th key={sbu} className="px-4 py-3 font-black text-indigo-900 text-right text-xs min-w-[100px] uppercase tracking-wider">
                                     {sbu}
                                 </th>
                             ))}
-                            <th className="px-4 py-3 font-black text-slate-900 text-right text-xs bg-slate-100 min-w-[100px]">
+                            <th className="px-4 py-3 font-black text-indigo-950 text-right text-xs bg-indigo-100/50 min-w-[100px] uppercase tracking-wider">
                                 Total
                             </th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody className="divide-y divide-indigo-50/50">
                         {/* Month Row */}
-                        <tr className="bg-blue-50 hover:bg-blue-100/50 transition-colors border-b-2 border-slate-200">
+                        <tr className="bg-blue-50/80 hover:bg-blue-100/80 transition-colors border-b-2 border-blue-100">
                             <td
                                 onClick={() => toggleMonth(monthYear)}
                                 className="px-6 py-4 font-bold text-slate-900 flex items-center gap-2 cursor-pointer"
@@ -149,7 +149,7 @@ const SegmentWise = ({ data, financialYear }) => {
                                     )}
                                 </td>
                             ))}
-                            <td className="px-4 py-4 text-right font-black text-slate-900 bg-slate-50">
+                            <td className="px-4 py-4 text-right font-black text-indigo-950 bg-blue-100/30">
                                 {formatToIndian(breakdown.Total?.total || 0, 2)}
                             </td>
                         </tr>
@@ -166,7 +166,7 @@ const SegmentWise = ({ data, financialYear }) => {
                             return (
                                 <React.Fragment key={segment}>
                                     {/* Segment Row */}
-                                    <tr className="bg-slate-50 hover:bg-slate-100/50 transition-colors">
+                                    <tr className="bg-indigo-50/20 hover:bg-indigo-50/40 transition-colors">
                                         <td
                                             onClick={() => toggleSegment(segmentKey)}
                                             className="px-6 py-3 font-bold text-slate-700 flex items-center gap-2 cursor-pointer"
@@ -187,7 +187,7 @@ const SegmentWise = ({ data, financialYear }) => {
                                                 )}
                                             </td>
                                         ))}
-                                        <td className="px-4 py-3 text-right font-bold text-slate-900 bg-slate-100/60">
+                                        <td className="px-4 py-3 text-right font-bold text-indigo-900 bg-indigo-50/40">
                                             {formatToIndian(segmentTotal, 2)}
                                         </td>
                                     </tr>
@@ -198,14 +198,14 @@ const SegmentWise = ({ data, financialYear }) => {
                                         const sbuSplit = statusData?.sbuSplit || {};
 
                                         return (
-                                            <tr key={status} className="bg-white hover:bg-slate-50/50 transition-colors">
+                                            <tr key={status} className="bg-white hover:bg-indigo-50/20 transition-colors">
                                                 <td className="px-6 py-3 pl-20 font-semibold text-slate-600 text-sm">{status}</td>
                                                 {sbuCodes.map((sbu) => (
                                                     <td key={sbu} className="px-4 py-3 text-right text-slate-700 font-semibold">
                                                         {formatToIndian(sbuSplit[sbu] || 0, 2)}
                                                     </td>
                                                 ))}
-                                                <td className="px-4 py-3 text-right text-slate-900 font-bold bg-slate-50/50">
+                                                <td className="px-4 py-3 text-right text-indigo-900 font-bold bg-indigo-50/20">
                                                     {formatToIndian(statusData?.total || 0, 2)}
                                                 </td>
                                             </tr>
@@ -216,14 +216,14 @@ const SegmentWise = ({ data, financialYear }) => {
                         })}
 
                         {/* Total Row */}
-                        <tr className="bg-amber-50 border-t-2 border-t-amber-200">
-                            <td className="px-6 py-4 font-black text-slate-900 uppercase">Total</td>
+                        <tr className="bg-emerald-50 border-t-2 border-emerald-200">
+                            <td className="px-6 py-4 font-black text-emerald-900 uppercase">Total</td>
                             {sbuCodes.map((sbu) => (
-                                <td key={sbu} className="px-4 py-4 text-right font-black text-slate-900">
+                                <td key={sbu} className="px-4 py-4 text-right font-black text-emerald-900">
                                     {formatToIndian(breakdown.Total?.segmentSplit?.[sbu] || 0, 2)}
                                 </td>
                             ))}
-                            <td className="px-4 py-4 text-right font-black text-slate-900 bg-amber-100">
+                            <td className="px-4 py-4 text-right font-black text-emerald-950 bg-emerald-100/80">
                                 {formatToIndian(breakdown.Total?.total || 0, 2)}
                             </td>
                         </tr>

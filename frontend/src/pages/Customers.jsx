@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { MdAdd, MdSearch, MdEdit, MdDelete, MdPerson, MdEmail, MdPhone, MdLocationOn, MdBusiness, MdCloudUpload, MdVisibility, MdFileUpload, MdCheckBox, MdCheckBoxOutlineBlank, MdDeleteSweep } from 'react-icons/md';
 import { toast } from 'react-toastify';
-import { customerService, uploadService, importService } from '../services/api';
+import { customerService, uploadService, importService, territoryService } from '../services/api';
 import Modal from '../components/Modal';
 import ImportModal from '../components/ImportModal';
 import PaginationControls from '../components/PaginationControls';
@@ -20,6 +20,8 @@ const Customers = () => {
     const [editingCustomer, setEditingCustomer] = useState(null);
     const [isUploading, setIsUploading] = useState(false);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+    const [territories, setTerritories] = useState([]);
+    const [selectedTerritory, setSelectedTerritory] = useState('');
 
     // Bulk selection state
     const [selectedIds, setSelectedIds] = useState([]);
@@ -42,8 +44,21 @@ const Customers = () => {
         },
         defaultDiscount: 0,
         logoUrl: '',
+        territory: '',
         notes: ''
     });
+
+    useEffect(() => {
+        const fetchTerritories = async () => {
+            try {
+                const res = await territoryService.getAll();
+                setTerritories(res.data || []);
+            } catch (err) {
+                console.error("Error fetching territories:", err);
+            }
+        };
+        fetchTerritories();
+    }, []);
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -56,7 +71,7 @@ const Customers = () => {
 
     useEffect(() => {
         fetchCustomers();
-    }, [page, debouncedSearch]);
+    }, [page, debouncedSearch, selectedTerritory]);
 
     const fetchCustomers = async () => {
         setLoading(true);
@@ -65,6 +80,7 @@ const Customers = () => {
                 page,
                 limit: LIST_PAGE_SIZE,
                 search: debouncedSearch || undefined,
+                territory: selectedTerritory || undefined,
             });
             const payload = res.data;
             setCustomers(Array.isArray(payload) ? payload : payload.data || []);
@@ -86,7 +102,8 @@ const Customers = () => {
             setEditingCustomer(customer);
             setFormData({
                 ...customer,
-                billingAddress: { ...customer.billingAddress }
+                billingAddress: { ...customer.billingAddress },
+                territory: customer.territory?._id || customer.territory || ''
             });
         } else {
             setEditingCustomer(null);
@@ -104,6 +121,7 @@ const Customers = () => {
                 },
                 defaultDiscount: 0,
                 logoUrl: '',
+                territory: '',
                 notes: ''
             });
         }
@@ -157,11 +175,15 @@ const Customers = () => {
         }
 
         try {
+            const payload = {
+                ...formData,
+                territory: formData.territory || undefined
+            };
             if (editingCustomer) {
-                await customerService.update(editingCustomer._id, formData);
+                await customerService.update(editingCustomer._id, payload);
                 toast.success('Customer updated successfully!');
             } else {
-                await customerService.create(formData);
+                await customerService.create(payload);
                 toast.success('Customer created successfully!');
             }
             fetchCustomers();
@@ -280,7 +302,7 @@ const Customers = () => {
             )}
 
             <div className="mobile-master-shell bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
-                <div className="mobile-master-toolbar p-6 border-b border-slate-50 flex flex-col md:flex-row gap-4 items-center bg-slate-50/30 sticky top-0 z-10">
+                <div className="mobile-master-toolbar p-6 border-b border-slate-50 flex flex-col md:flex-row gap-4 items-center bg-slate-50/30 sticky top-0 z-10 w-full">
                     <div className="relative flex-1 w-full text-slate-400 focus-within:text-primary-600 transition-colors">
                         <MdSearch className="absolute left-4 top-1/2 -translate-y-1/2" size={20} />
                         <input
@@ -290,6 +312,21 @@ const Customers = () => {
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
+                    </div>
+                    <div className="w-full md:w-64">
+                        <select
+                            value={selectedTerritory}
+                            onChange={(e) => {
+                                setSelectedTerritory(e.target.value);
+                                setPage(1);
+                            }}
+                            className="w-full px-4 py-3.5 bg-white border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm text-slate-900 font-medium transition-all"
+                        >
+                            <option value="">All Territories</option>
+                            {territories.map(t => (
+                                <option key={t._id} value={t._id}>{t.name} ({t.type})</option>
+                            ))}
+                        </select>
                     </div>
                 </div>
 
@@ -342,8 +379,15 @@ const Customers = () => {
                                         <div className="flex items-center gap-2 text-slate-600 font-medium overflow-hidden">
                                             <MdEmail size={14} className="text-slate-400 flex-shrink-0" /> <span className="truncate">{c.email}</span>
                                         </div>
-                                        <div className="col-span-2 flex items-center gap-2 text-slate-600 font-medium">
-                                            <MdLocationOn size={14} className="text-slate-400" /> {c.billingAddress?.city}, {c.billingAddress?.state}
+                                        <div className="col-span-2 flex items-center gap-2 text-slate-600 font-medium justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <MdLocationOn size={14} className="text-slate-400" /> {c.billingAddress?.city}, {c.billingAddress?.state}
+                                            </div>
+                                            {c.territory && (
+                                                <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100/50">
+                                                    {c.territory.name}
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
 
@@ -399,6 +443,7 @@ const Customers = () => {
                                         <th className="px-4 py-5">Company & Info</th>
                                         <th className="px-8 py-5">GSTIN</th>
                                         <th className="px-8 py-5">Location</th>
+                                        <th className="px-8 py-5">Territory</th>
                                         <th className="px-8 py-5 text-right">Actions</th>
                                     </tr>
                                 </thead>
@@ -445,6 +490,15 @@ const Customers = () => {
                                             <td className="px-8 py-5">
                                                 <div className="text-sm font-bold text-slate-700">{c.billingAddress?.city}</div>
                                                 <div className="text-[10px] text-slate-400 font-black uppercase tracking-tighter">{c.billingAddress?.state}</div>
+                                            </td>
+                                            <td className="px-8 py-5">
+                                                {c.territory ? (
+                                                    <span className="text-xs font-bold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-100/50">
+                                                        {c.territory.name}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-xs font-bold text-slate-400">Unassigned</span>
+                                                )}
                                             </td>
                                             <td className="px-8 py-5 text-right">
                                                 <div className="flex items-center justify-end gap-2">
@@ -635,7 +689,7 @@ const Customers = () => {
                                     <input
                                         type="text"
                                         name="gstin"
-                                        value={formData.gstin}
+                                        value={formData.gstin || ''}
                                         onChange={handleFormChange}
                                         className="w-full px-4 py-3.5 bg-primary-50/50 border border-primary-100 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-mono font-black text-primary-700 uppercase"
                                         placeholder="15-Digit Code"
@@ -707,6 +761,33 @@ const Customers = () => {
                                             <option value="Tamil Nadu">Tamil Nadu</option>
                                             <option value="Uttar Pradesh">Uttar Pradesh</option>
                                             <option value="Telangana">Telangana</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-6">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Billing Pincode</label>
+                                        <input
+                                            type="text"
+                                            name="billingAddress.pincode"
+                                            value={formData.billingAddress?.pincode || ''}
+                                            onChange={handleFormChange}
+                                            className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold"
+                                            placeholder="Pincode"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Territory Override</label>
+                                        <select
+                                            name="territory"
+                                            value={formData.territory?._id || formData.territory || ''}
+                                            onChange={handleFormChange}
+                                            className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold"
+                                        >
+                                            <option value="">Auto-Assign (Based on Rules)</option>
+                                            {territories.map(t => (
+                                                <option key={t._id} value={t._id}>{t.name} ({t.type})</option>
+                                            ))}
                                         </select>
                                     </div>
                                 </div>

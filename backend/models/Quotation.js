@@ -51,6 +51,7 @@ const QuotationSchema = new mongoose.Schema({
     ackDate: { type: Date },
     irnNo: { type: String },
     status: { type: String, enum: ['draft', 'final', 'ordered'], default: 'draft' },
+    territory: { type: mongoose.Schema.Types.ObjectId, ref: 'Territory' },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     createdAt: { type: Date, default: Date.now },
 });
@@ -63,5 +64,6 @@ QuotationSchema.index({ status: 1 });
 QuotationSchema.index({ companyId: 1 });
 QuotationSchema.index({ companyId: 1, quotationNumber: 1 });
 QuotationSchema.index({ customerName: 'text' });
+QuotationSchema.index({ territory: 1 });
 
 module.exports = mongoose.model('Quotation', QuotationSchema);

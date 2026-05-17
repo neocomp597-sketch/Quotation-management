@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { MdAdd, MdSearch, MdFilterList, MdVisibility, MdDescription, MdDownload, MdPictureAsPdf, MdDelete, MdEdit, MdCheckCircle, MdReceipt } from 'react-icons/md';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { quotationService } from '../services/api';
+import { quotationService, territoryService } from '../services/api';
 import { formatDate, resolveImageUrl, fetchPdfImageBase64 } from '../utils/helpers';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import QuotationPDF from '../components/QuotationPDF';
@@ -26,6 +26,20 @@ const Quotations = () => {
     const [pagination, setPagination] = useState({ page: 1, limit: LIST_PAGE_SIZE, total: 0, pages: 1 });
     const [pdfFormat, setPdfFormat] = useState('format1');
     const [companySettings, setCompanySettings] = useState(null);
+    const [territories, setTerritories] = useState([]);
+    const [selectedTerritory, setSelectedTerritory] = useState('');
+
+    useEffect(() => {
+        const fetchTerritories = async () => {
+            try {
+                const res = await territoryService.getAll();
+                setTerritories(res.data || []);
+            } catch (err) {
+                console.error("Error fetching territories:", err);
+            }
+        };
+        fetchTerritories();
+    }, []);
 
     useEffect(() => {
         if (!selectedQuotation) return;
@@ -82,7 +96,7 @@ const Quotations = () => {
 
     useEffect(() => {
         fetchQuotations();
-    }, [page, debouncedSearch, statusFilter]);
+    }, [page, debouncedSearch, statusFilter, selectedTerritory]);
 
     const fetchCompanySettings = async () => {
         try {
@@ -102,6 +116,7 @@ const Quotations = () => {
                 limit: LIST_PAGE_SIZE,
                 search: debouncedSearch || undefined,
                 status: statusFilter || undefined,
+                territory: selectedTerritory || undefined,
             });
             const payload = res.data;
             setQuotations(Array.isArray(payload) ? payload : payload.data || []);
@@ -188,7 +203,7 @@ const Quotations = () => {
             </div>
 
             <div className="mobile-master-shell bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
-                <div className="mobile-master-toolbar p-6 border-b border-slate-50 flex flex-col md:flex-row gap-4 items-center bg-slate-50/30">
+                <div className="mobile-master-toolbar p-6 border-b border-slate-50 flex flex-col md:flex-row gap-4 items-center bg-slate-50/30 w-full">
                     <div className="relative flex-1 w-full text-slate-400 focus-within:text-primary-600 transition-colors">
                         <MdSearch className="absolute left-4 top-1/2 -translate-y-1/2" size={20} />
                         <input
@@ -198,6 +213,21 @@ const Quotations = () => {
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
+                    </div>
+                    <div className="w-full md:w-64">
+                        <select
+                            value={selectedTerritory}
+                            onChange={(e) => {
+                                setSelectedTerritory(e.target.value);
+                                setPage(1);
+                            }}
+                            className="w-full px-4 py-3.5 bg-white border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-bold text-slate-900 transition-all shadow-sm"
+                        >
+                            <option value="">All Territories</option>
+                            {territories.map(t => (
+                                <option key={t._id} value={t._id}>{t.name} ({t.type})</option>
+                            ))}
+                        </select>
                     </div>
                 </div>
 
@@ -240,7 +270,14 @@ const Quotations = () => {
                                                 <div>
                                                     <span className="text-[10px] font-black uppercase tracking-widest text-primary-600 bg-primary-50 px-2 py-1 rounded-md">{q.quotationNo}</span>
                                                     <h3 className="font-bold text-slate-900 mt-2 text-sm">{q.customerId?.companyName}</h3>
-                                                    <p className="text-xs text-slate-400 font-medium">{q.customerId?.customerName}</p>
+                                                    <div className="flex flex-wrap items-center gap-2 mt-1">
+                                                        <p className="text-xs text-slate-400 font-medium">{q.customerId?.customerName}</p>
+                                                        {q.territory && (
+                                                            <span className="px-1.5 py-0.5 bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-md text-[9px] font-black uppercase tracking-wider">
+                                                                {q.territory.name}
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </div>
                                                 <span className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border ${q.status === 'ordered'
                                                     ? 'bg-blue-50 text-blue-600 border-blue-100'
@@ -344,8 +381,17 @@ const Quotations = () => {
                                                     <div className="text-[10px] text-slate-400 font-bold uppercase">{formatDate(q.quotationDate)}</div>
                                                 </td>
                                                 <td className="px-8 py-5">
-                                                    <div className="font-bold text-slate-700">{q.customerId?.companyName}</div>
-                                                    <div className="text-[10px] text-slate-400 font-black uppercase tracking-tighter">{q.customerId?.customerName}</div>
+                                                    <div className="flex items-center gap-3">
+                                                        <div>
+                                                            <div className="font-bold text-slate-700">{q.customerId?.companyName}</div>
+                                                            <div className="text-[10px] text-slate-400 font-black uppercase tracking-tighter">{q.customerId?.customerName}</div>
+                                                        </div>
+                                                        {q.territory && (
+                                                            <span className="px-2 py-0.5 bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-lg text-[9px] font-black uppercase tracking-widest whitespace-nowrap">
+                                                                {q.territory.name}
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </td>
                                                 <td className="px-8 py-5">
                                                     <div className="text-xs font-bold text-rose-500 uppercase tracking-tighter flex items-center gap-1">

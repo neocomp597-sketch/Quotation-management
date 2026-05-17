@@ -1,15 +1,27 @@
 const CompanySettings = require('../models/CompanySettings');
+const { getCachedJson, makeCacheKey, setCachedJson } = require('../utils/apiCache');
+const { invalidateViaQueueOrNow } = require('../queues/cacheInvalidationQueue');
+
+const COMPANY_SETTINGS_CACHE_TTL_SECONDS = Number(process.env.COMPANY_SETTINGS_CACHE_TTL_SECONDS || 600);
 
 // Get company settings for logged in user
 exports.getCompanySettings = async (req, res) => {
     try {
+        const cacheKey = makeCacheKey('company-settings:me', req);
+        const { hit, redis, value: cachedSettings } = await getCachedJson(cacheKey);
+        if (hit) {
+            return res.json(cachedSettings);
+        }
+
         let settings = await CompanySettings.findOne({ userId: req.user.id }).lean();
 
         if (!settings) {
+            await setCachedJson(redis, cacheKey, null, 60);
             // Return empty settings if not found
             return res.json(null);
         }
 
+        await setCachedJson(redis, cacheKey, settings, COMPANY_SETTINGS_CACHE_TTL_SECONDS);
         res.json(settings);
     } catch (error) {
         console.error('Error fetching company settings:', error);
@@ -91,6 +103,7 @@ exports.updateCompanySettings = async (req, res) => {
             });
         }
 
+        await invalidateViaQueueOrNow('company-settings:*', 'quotations:*');
         res.json(settings);
     } catch (error) {
         console.error('Error updating company settings:', error);

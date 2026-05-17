@@ -25,4 +25,6 @@ const StatusSchema = new mongoose.Schema({
     }
 });
 
+StatusSchema.index({ isActive: 1, name: 1 });
+
 module.exports = mongoose.model('Status', StatusSchema);

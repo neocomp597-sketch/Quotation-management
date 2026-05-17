@@ -1,5 +1,12 @@
 const Planning = require('../models/Planning');
 const MGR = require('../models/MGR');
+const { getCachedJson, makeCacheKey, setCachedJson } = require('../utils/apiCache');
+const { invalidateViaQueueOrNow } = require('../queues/cacheInvalidationQueue');
+
+const PLANNING_LIST_CACHE_TTL_SECONDS = Number(process.env.PLANNING_LIST_CACHE_TTL_SECONDS || 120);
+const PLANNING_REPORT_CACHE_TTL_SECONDS = Number(process.env.PLANNING_REPORT_CACHE_TTL_SECONDS || 300);
+const MGR_MASTER_CACHE_TTL_SECONDS = Number(process.env.MGR_MASTER_CACHE_TTL_SECONDS || 600);
+const PLANNING_REPORT_SELECT = 'financialYear monthYear mgrCode mgrCode2 status qty value totalValue';
 
 const escapeRegex = (value = '') => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const cleanValue = (value = '') => String(value ?? '').trim().replace(/\s+/g, ' ');
@@ -45,6 +52,16 @@ const resolveMgrCode = async (value, mgrType) => {
     });
 
     return match?.code || cleaned;
+};
+
+const getMgrMasters = async (mgrType) => {
+    const cacheKey = `planning:mgr-masters:${mgrType}`;
+    const { redis, value: cachedMasters } = await getCachedJson(cacheKey);
+    if (cachedMasters) return cachedMasters;
+
+    const masters = await MGR.find({ mgrType }).select('code').lean();
+    await setCachedJson(redis, cacheKey, masters, MGR_MASTER_CACHE_TTL_SECONDS);
+    return masters;
 };
 
 const normalizePlanningPayload = async (payload = {}) => {
@@ -245,6 +262,7 @@ exports.createEntry = async (req, res) => {
             createdBy: req.user?.id
         });
         await entry.save();
+        await invalidateViaQueueOrNow('planning:*');
         res.status(201).json(entry);
     } catch (err) {
         res.status(400).json({ message: err.message });
@@ -276,20 +294,30 @@ exports.getAllEntries = async (req, res) => {
             }
         }
 
-        const total = await Planning.countDocuments(filter);
-        const entries = await Planning.find(filter)
-            .select('customerId productId financialYear monthYear mgrCode mgrCode2 status qty value totalValue remarks createdAt updatedAt')
-            .populate('customerId', 'companyName customerName')
-            .populate('productId', 'productName')
-            .sort({ createdAt: -1 })
-            .skip(Number(offset))
-            .limit(Number(limit))
-            .lean();
+        const cacheKey = makeCacheKey('planning:list', req, { filter });
+        const { redis, value: cachedEntries } = await getCachedJson(cacheKey);
+        if (cachedEntries) {
+            return res.json(cachedEntries);
+        }
 
-        res.json({
+        const [total, entries] = await Promise.all([
+            Planning.countDocuments(filter),
+            Planning.find(filter)
+                .select('customerId productId financialYear monthYear mgrCode mgrCode2 status qty value totalValue remarks createdAt updatedAt')
+                .populate('customerId', 'companyName customerName')
+                .populate('productId', 'productName')
+                .sort({ createdAt: -1 })
+                .skip(Number(offset))
+                .limit(Number(limit))
+                .lean(),
+        ]);
+
+        const response = {
             total,
             data: entries
-        });
+        };
+        await setCachedJson(redis, cacheKey, response, PLANNING_LIST_CACHE_TTL_SECONDS);
+        res.json(response);
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
@@ -308,6 +336,7 @@ exports.updateEntry = async (req, res) => {
             runValidators: true
         });
         if (!updated) return res.status(404).json({ message: 'Entry not found' });
+        await invalidateViaQueueOrNow('planning:*');
         res.json(updated);
     } catch (err) {
         res.status(400).json({ message: err.message });
@@ -319,6 +348,7 @@ exports.deleteEntry = async (req, res) => {
         const { id } = req.params;
         const result = await Planning.findByIdAndDelete(id);
         if (!result) return res.status(404).json({ message: 'Entry not found' });
+        await invalidateViaQueueOrNow('planning:*');
         res.json({ message: 'Entry deleted' });
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -373,20 +403,16 @@ exports.getMGRReport = async (req, res) => {
             }
         }
 
-        const [mgr1Masters, mgr2Masters, entries] = await Promise.all([
-            MGR.find({ mgrType: 'MGR1' }).select('code').lean(),
-            MGR.find({ mgrType: 'MGR2' }).select('code').lean(),
-            Planning.find(query).lean()
-        ]);
+        const cacheKey = makeCacheKey('planning:mgr-report', req, { query, reportType, monthYearFilter });
+        const { redis, value: cachedReport } = await getCachedJson(cacheKey);
+        if (cachedReport) {
+            return res.json(cachedReport);
+        }
 
-        const mgr1MasterMap = new Map(mgr1Masters.map((item) => [normalizeCodeKey(item.code), item.code]));
-        const mgr2MasterMap = new Map(mgr2Masters.map((item) => [normalizeCodeKey(item.code), item.code]));
-        const monthLabels = monthYearFilter ? [monthYearFilter] : getFinancialYearMonthLabels(financialYear);
         const startYear = parseInt(financialYear.split('-')[0], 10);
         const prevFinancialYear = `${startYear - 1}-${String(startYear).slice(-2)}`;
         const prevQuery = { financialYear: prevFinancialYear };
         
-        // Apply status filters to previous year query too
         if (query.status) prevQuery.status = query.status;
 
         if (monthYearFilter) {
@@ -395,7 +421,17 @@ exports.getMGRReport = async (req, res) => {
             const prevMonthLabel = `${monthName}-${String(currentYear - 1).slice(-2)}`;
             prevQuery.monthYear = prevMonthLabel;
         }
-        const prevEntries = await Planning.find(prevQuery).lean();
+
+        const [mgr1Masters, mgr2Masters, entries, prevEntries] = await Promise.all([
+            getMgrMasters('MGR1'),
+            getMgrMasters('MGR2'),
+            Planning.find(query).select(PLANNING_REPORT_SELECT).lean(),
+            Planning.find(prevQuery).select(PLANNING_REPORT_SELECT).lean()
+        ]);
+
+        const mgr1MasterMap = new Map(mgr1Masters.map((item) => [normalizeCodeKey(item.code), item.code]));
+        const mgr2MasterMap = new Map(mgr2Masters.map((item) => [normalizeCodeKey(item.code), item.code]));
+        const monthLabels = monthYearFilter ? [monthYearFilter] : getFinancialYearMonthLabels(financialYear);
 
         if (reportType === 'STATUS') {
             const sbuGroups = buildColumnGroups(entries, 'mgrCode', 'Unassigned', mgr1MasterMap);
@@ -455,7 +491,7 @@ exports.getMGRReport = async (req, res) => {
                 .filter((row) => row.isTotal)
                 .reduce((acc, row) => acc + Number(row.total || 0), 0);
 
-            return res.json({
+            const response = {
                 financialYear,
                 month: cleanValue(month),
                 year: cleanValue(year),
@@ -470,7 +506,9 @@ exports.getMGRReport = async (req, res) => {
                     matchesSource: sourceTotal === reportTotal
                 },
                 rows
-            });
+            };
+            await setCachedJson(redis, cacheKey, response, PLANNING_REPORT_CACHE_TTL_SECONDS);
+            return res.json(response);
         }
 
         if (reportType === 'SEGMENT' || reportType === 'MGR2') {
@@ -531,7 +569,7 @@ exports.getMGRReport = async (req, res) => {
             const summaryRows = buildSummaryRows(monthRows, columns, prevMonthRows);
             reportRows.push(...summaryRows);
 
-            return res.json({
+            const response = {
                 financialYear,
                 month: cleanValue(month),
                 year: cleanValue(year),
@@ -547,7 +585,9 @@ exports.getMGRReport = async (req, res) => {
                     matchesSource: entries.reduce((acc, entry) => acc + getMeasureForEntry(entry, 'value'), 0) === Number(summaryRows.find((row) => row.isTotal)?.total || 0)
                 },
                 rows: reportRows
-            });
+            };
+            await setCachedJson(redis, cacheKey, response, PLANNING_REPORT_CACHE_TTL_SECONDS);
+            return res.json(response);
         }
 
         const sbuGroups = buildColumnGroups(entries, 'mgrCode', 'Unassigned', mgr1MasterMap);
@@ -630,7 +670,7 @@ exports.getMGRReport = async (req, res) => {
             value: getMeasureForEntry(entry, 'value')
         }));
 
-        return res.json({
+        const response = {
             financialYear,
             month: cleanValue(month),
             year: cleanValue(year),
@@ -650,7 +690,9 @@ exports.getMGRReport = async (req, res) => {
             sbuWise,
             prevYearStatusTotals: buildStatusBreakdown(prevEntries).Total,
             rows: reportRows
-        });
+        };
+        await setCachedJson(redis, cacheKey, response, PLANNING_REPORT_CACHE_TTL_SECONDS);
+        return res.json(response);
     } catch (err) {
         console.error('[Planning Error] getMGRReport:', err);
         res.status(500).json({ message: err.message });

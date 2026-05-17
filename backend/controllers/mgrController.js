@@ -1,4 +1,8 @@
 const MGR = require('../models/MGR');
+const { getCachedJson, makeCacheKey, setCachedJson } = require('../utils/apiCache');
+const { invalidateViaQueueOrNow } = require('../queues/cacheInvalidationQueue');
+
+const MGR_CACHE_TTL_SECONDS = Number(process.env.MGR_CACHE_TTL_SECONDS || 600);
 
 const getPagination = (query) => {
     const page = Math.max(1, Number(query.page || 1));
@@ -14,6 +18,13 @@ exports.getAllMGRs = async (req, res) => {
         if (type) {
             query.mgrType = type;
         }
+
+        const cacheKey = makeCacheKey('mgrs:list', req, { query });
+        const { redis, value: cachedMgrs } = await getCachedJson(cacheKey);
+        if (cachedMgrs) {
+            return res.json(cachedMgrs);
+        }
+
         if (req.query.page || req.query.limit) {
             const { page, limit, skip } = getPagination(req.query);
             const [mgrs, total] = await Promise.all([
@@ -26,7 +37,7 @@ exports.getAllMGRs = async (req, res) => {
                 MGR.countDocuments(query)
             ]);
 
-            return res.json({
+            const response = {
                 data: mgrs,
                 pagination: {
                     page,
@@ -34,13 +45,16 @@ exports.getAllMGRs = async (req, res) => {
                     total,
                     pages: Math.ceil(total / limit) || 1
                 }
-            });
+            };
+            await setCachedJson(redis, cacheKey, response, MGR_CACHE_TTL_SECONDS);
+            return res.json(response);
         }
 
         const mgrs = await MGR.find(query)
             .select('code description mgrType status createdAt updatedAt')
             .sort({ mgrType: 1, createdAt: -1 })
             .lean();
+        await setCachedJson(redis, cacheKey, mgrs, MGR_CACHE_TTL_SECONDS);
         res.json(mgrs);
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -65,6 +79,7 @@ exports.createMGR = async (req, res) => {
     const mgr = new MGR(req.body);
     try {
         const newMGR = await mgr.save();
+        await invalidateViaQueueOrNow('mgrs:*', 'planning:*');
         res.status(201).json(newMGR);
     } catch (err) {
         if (err.code === 11000) {
@@ -79,6 +94,7 @@ exports.updateMGR = async (req, res) => {
     try {
         const updatedMGR = await MGR.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
         if (!updatedMGR) return res.status(404).json({ message: 'MGR not found' });
+        await invalidateViaQueueOrNow('mgrs:*', 'planning:*');
         res.json(updatedMGR);
     } catch (err) {
         if (err.code === 11000) {
@@ -93,6 +109,7 @@ exports.deleteMGR = async (req, res) => {
     try {
         const deletedMGR = await MGR.findByIdAndDelete(req.params.id);
         if (!deletedMGR) return res.status(404).json({ message: 'MGR not found' });
+        await invalidateViaQueueOrNow('mgrs:*', 'planning:*');
         res.json({ message: 'MGR deleted' });
     } catch (err) {
         res.status(500).json({ message: err.message });

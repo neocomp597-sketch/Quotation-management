@@ -22,7 +22,8 @@ import {
     MdShoppingCart,
     MdLocalShipping,
     MdCalendarMonth,
-    MdLock
+    MdLock,
+    MdMap
 } from 'react-icons/md';
 import { useAuth } from '../context/AuthContext';
 
@@ -61,6 +62,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                 { key: 'master_customers', name: 'Customers', icon: <MdPeople size={18} />, path: '/customers' },
                 { key: 'master_vendors', name: 'Vendors', icon: <MdStorefront size={18} />, path: '/vendors' },
                 { key: 'master_products', name: 'Products', icon: <MdInventory size={18} />, path: '/products' },
+                { key: 'master_territories', name: 'Territory Master', icon: <MdMap size={18} />, path: '/territory-master' },
                 { key: 'master_mgrs', name: 'MGR Master', icon: <MdCategory size={18} />, path: '/mgrs' },
                 { key: 'master_attributes', name: 'Attributes', icon: <MdAssignment size={18} />, path: '/attributes' },
                 { key: 'master_terms', name: 'Terms & Conditions', icon: <MdDescription size={18} />, path: '/terms' },

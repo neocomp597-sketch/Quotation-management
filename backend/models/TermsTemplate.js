@@ -8,4 +8,7 @@ const TermsTemplateSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now },
 });
 
+TermsTemplateSchema.index({ createdAt: -1 });
+TermsTemplateSchema.index({ isDefault: 1, createdAt: -1 });
+
 module.exports = mongoose.model('TermsTemplate', TermsTemplateSchema);

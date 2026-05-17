@@ -1909,20 +1909,23 @@ const PlanningScreen = () => {
           </div>
         </>
 
-      </div>
-
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+       <div className="bg-white rounded-2xl shadow-sm border border-slate-100/80 overflow-hidden transition-all duration-300 hover:shadow-md hover:border-slate-200/60">
         <div
-          className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center cursor-pointer hover:bg-slate-100/50 transition-colors"
+          className="p-5 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 to-indigo-50/10 flex justify-between items-center cursor-pointer select-none group"
           onClick={() => setIsReportExpanded(!isReportExpanded)}
         >
-          <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
-            <MdKeyboardArrowDown
-              className={`text-slate-500 transition-transform duration-300 ${!isReportExpanded ? "-rotate-90" : ""}`}
-              size={20}
-            />
-            SBU Wise - FY {financialYear}
-          </h2>
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-black text-xs shadow-sm transition-all group-hover:scale-110">
+              SBU
+            </div>
+            <h2 className="text-xs font-extrabold text-slate-700 uppercase tracking-widest flex items-center gap-2">
+              <MdKeyboardArrowDown
+                className={`text-slate-400 transition-transform duration-300 ${!isReportExpanded ? "-rotate-90 text-slate-400" : "text-indigo-600"}`}
+                size={20}
+              />
+              SBU Wise - FY {financialYear}
+            </h2>
+          </div>
           <button
             type="button"
             onClick={(e) => {
@@ -1932,7 +1935,7 @@ const PlanningScreen = () => {
             disabled={
               !combinedReportData || !combinedReportData.mgrCodes?.length
             }
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 font-bold text-xs uppercase tracking-widest hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 font-extrabold text-xs uppercase tracking-widest hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <MdDownload size={16} />
             Export
@@ -1965,22 +1968,22 @@ const PlanningScreen = () => {
           );
 
           return (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
+            <div className="overflow-x-auto custom-scrollbar">
+              <table className="w-full text-left text-sm border-collapse">
                 <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200">
-                    <th className="py-3 px-4 font-bold text-slate-700 text-left min-w-[200px]">
+                  <tr className="bg-slate-50/70 border-b border-slate-100">
+                    <th className="py-3.5 px-5 font-black text-slate-500 text-left min-w-[200px] uppercase tracking-wider text-[10px]">
                       Month / Segment
                     </th>
                     {visibleMgrCodes.map((sbu) => (
                       <th
                         key={sbu}
-                        className="py-3 px-4 font-bold text-slate-700 text-right min-w-[100px] border-l border-slate-300"
+                        className="py-3.5 px-4 font-black text-slate-500 text-right min-w-[110px] border-l border-slate-100/50 uppercase tracking-wider text-[10px]"
                       >
                         {sbu}
                       </th>
                     ))}
-                    <th className="py-3 px-4 font-bold text-slate-900 text-right bg-slate-100 min-w-[100px] border-l border-slate-300">
+                    <th className="py-3.5 px-4 font-black text-slate-600 text-right bg-slate-100/40 min-w-[110px] border-l border-slate-100 uppercase tracking-wider text-[10px]">
                       Total
                     </th>
                   </tr>
@@ -1988,7 +1991,7 @@ const PlanningScreen = () => {
                 <tbody>
                   {visibleMonthLabels.length === 0 ? (
                     <tr>
-                      <td colSpan={visibleMgrCodes.length + 2} className="py-8 px-4 text-center text-slate-400 font-bold">
+                      <td colSpan={visibleMgrCodes.length + 2} className="py-10 px-5 text-center text-slate-400 font-bold">
                         No SBU-wise planning data available.
                       </td>
                     </tr>
@@ -2011,16 +2014,16 @@ const PlanningScreen = () => {
                         <React.Fragment key={monthLabel}>
                           {/* MONTH ROW */}
                           <tr
-                            className="border-b-2 border-slate-200 bg-blue-50 font-bold cursor-pointer hover:bg-blue-100/60 transition-colors"
+                            className="bg-indigo-50/20 hover:bg-indigo-50/40 border-l-4 border-l-indigo-500 transition-all border-b border-slate-100 font-bold cursor-pointer"
                             onClick={() => toggleSbuWiseMonth(monthLabel)}
                           >
-                            <td className="py-3 px-4 text-slate-900">
+                            <td className="py-3.5 px-4 text-slate-800">
                               <div className="flex items-center gap-2">
                                 <MdKeyboardArrowDown
-                                  className={`text-slate-700 transition-transform duration-300 ${!expandedSbuWiseMonths[monthLabel] ? "-rotate-90" : ""}`}
+                                  className={`text-indigo-500 transition-transform duration-300 ${!expandedSbuWiseMonths[monthLabel] ? "-rotate-90" : ""}`}
                                   size={18}
                                 />
-                                <span className="font-black">
+                                <span className="font-extrabold text-xs tracking-wide">
                                   {monthRow.month}
                                 </span>
                               </div>
@@ -2030,16 +2033,26 @@ const PlanningScreen = () => {
                               return (
                                 <td
                                   key={sbu}
-                                  className={`py-3 px-4 text-right text-slate-900 font-bold border-l border-slate-300 ${cellValue > 0 ? "bg-blue-100/60" : ""}`}
+                                  className="py-3.5 px-4 text-right border-l border-slate-100/50"
                                 >
-                                  {formatReportValue(cellValue, 0)}
+                                  {cellValue > 0 ? (
+                                    <span className="inline-flex items-center justify-end px-2.5 py-1 rounded-full bg-indigo-50/70 text-indigo-700 text-[11px] font-black min-w-[70px] border border-indigo-100/40 shadow-sm hover:scale-105 transition-all">
+                                      {formatReportValue(cellValue, 0)}
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-300 font-normal">-</span>
+                                  )}
                                 </td>
                               );
                             })}
-                            <td
-                              className={`py-3 px-4 text-right text-slate-900 font-black border-l border-slate-300 ${monthTotal > 0 ? "bg-blue-100/60" : "bg-slate-50"}`}
-                            >
-                              {formatReportValue(monthTotal, 0)}
+                            <td className="py-3.5 px-4 text-right border-l border-slate-100 bg-indigo-50/10">
+                              {monthTotal > 0 ? (
+                                <span className="inline-flex items-center justify-end px-2.5 py-1 rounded-full bg-indigo-100/50 text-indigo-800 text-[11px] font-black min-w-[70px] border border-indigo-200/30 shadow-sm">
+                                  {formatReportValue(monthTotal, 0)}
+                                </span>
+                              ) : (
+                                <span className="text-slate-300 font-normal">-</span>
+                              )}
                             </td>
                           </tr>
 
@@ -2052,9 +2065,9 @@ const PlanningScreen = () => {
                             return (
                               <tr
                                 key={`${monthLabel}-${segRow.month}`}
-                                className="border-b border-slate-100 hover:bg-slate-50"
+                                className="border-b border-slate-100/60 bg-slate-50/20 hover:bg-slate-50/60 transition-colors border-l-4 border-l-slate-200"
                               >
-                                <td className="py-3 px-4 text-slate-900 font-bold pl-12">
+                                <td className="py-3 px-4 text-slate-600 font-bold pl-8 text-xs">
                                   {segRow.month}
                                 </td>
                                 {visibleMgrCodes.map((sbu) => {
@@ -2062,14 +2075,20 @@ const PlanningScreen = () => {
                                   return (
                                     <td
                                       key={`${monthLabel}-${segRow.month}-${sbu}`}
-                                      className={`py-3 px-4 text-right border-l border-slate-200 font-semibold text-slate-700 ${val > 0 ? "bg-blue-50/60" : ""}`}
+                                      className="py-3 px-4 text-right border-l border-slate-100/30 text-xs"
                                     >
-                                      {formatReportValue(val, 0)}
+                                      {val > 0 ? (
+                                        <span className="inline-flex items-center justify-end px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-extrabold min-w-[64px] border border-slate-200/40">
+                                          {formatReportValue(val, 0)}
+                                        </span>
+                                      ) : (
+                                        <span className="text-slate-300 font-normal">-</span>
+                                      )}
                                     </td>
                                   );
                                 })}
-                                <td className="py-3 px-4 text-right border-l border-slate-300 bg-slate-50 font-bold text-slate-900">
-                                  {formatReportValue(segmentTotal, 0)}
+                                <td className="py-3 px-4 text-right border-l border-slate-100/30 bg-slate-50/30 font-bold text-slate-700 text-xs">
+                                  {segmentTotal > 0 ? formatReportValue(segmentTotal, 0) : "-"}
                                 </td>
                               </tr>
                             );
@@ -2081,60 +2100,62 @@ const PlanningScreen = () => {
 
                   {/* SUMMARY ROWS */}
                   {summaryRowsInOrder.map((row) => {
-                      const isTotal = row.isTotal;
-                      const isPercentage = row.isPercentage;
-                      const isPreviousYearValue = row.isPreviousYearValue;
-                      const isTotalPercentage = row.isTotalPercentage;
+                    const isTotal = row.isTotal;
+                    const isPercentage = row.isPercentage;
+                    const isPreviousYearValue = row.isPreviousYearValue;
+                    const isTotalPercentage = row.isTotalPercentage;
 
-                      return (
-                        <tr
-                          key={`sbu-summary-${row.month}`}
-                          className={`border-b transition-colors ${isTotal
-                            ? "bg-amber-50 border-amber-200 font-black"
-                            : isPreviousYearValue
-                              ? "bg-amber-100/70 border-amber-200 font-bold"
-                              : isPercentage || isTotalPercentage
-                                ? "bg-slate-50 border-slate-200"
-                                : "border-slate-50 hover:bg-slate-50"
-                            }`}
+                    return (
+                      <tr
+                        key={`sbu-summary-${row.month}`}
+                        className={`border-b border-slate-200/60 transition-colors ${isTotal
+                          ? "bg-emerald-50/60 border-t border-emerald-100 font-black text-emerald-900"
+                          : isPreviousYearValue
+                            ? "bg-amber-50/50 border-t border-amber-100 font-bold text-amber-900"
+                            : isPercentage || isTotalPercentage
+                              ? "bg-violet-50/50 border-t border-violet-100 text-violet-900"
+                              : "border-slate-100 hover:bg-slate-50 text-slate-700"
+                        }`}
+                      >
+                        <td
+                          className="py-3.5 px-5 font-extrabold text-xs uppercase tracking-wide"
                         >
-                          <td
-                            className={`py-3 px-4 ${isTotal || isPercentage || isPreviousYearValue || isTotalPercentage ? "font-black text-slate-900" : "font-semibold text-slate-600"}`}
-                          >
-                            {isPercentage ? "Percentage CY" : row.month}
-                          </td>
-                          {visibleMgrCodes.map((sbu) => {
-                            const cellValue = getSbuReportCellValue(row, sbu);
+                          {isPercentage ? "Percentage CY" : row.month}
+                        </td>
+                        {visibleMgrCodes.map((sbu) => {
+                          const cellValue = getSbuReportCellValue(row, sbu);
                           return (
                             <td
                               key={`sbu-summary-${row.month}-${sbu}`}
-                              className={`py-3 px-4 text-right border-l border-slate-200 ${isTotal || isPercentage || isPreviousYearValue || isTotalPercentage ? "font-bold text-slate-900" : "text-slate-700"} ${cellValue > 0 ? "bg-blue-100/60" : ""}`}
+                              className="py-3.5 px-4 text-right border-l border-slate-100/50"
                             >
-                                {isPercentage || isTotalPercentage
-                                  ? formatReportPercentage(cellValue)
-                                  : formatReportValue(cellValue, 3)}
-                              </td>
-                            );
-                          })}
-                          <td
-                            className={`py-3 px-4 text-right border-l border-slate-300 ${Number(row.total || 0) > 0
-                              ? "bg-blue-100/60"
-                              : isTotal
-                                ? "bg-amber-100"
-                                : isPreviousYearValue
-                                  ? "bg-amber-200/80"
-                                  : isPercentage || isTotalPercentage
-                                    ? "bg-slate-100"
-                                    : "bg-amber-50/50"
-                            } ${isTotal ? "font-black" : "font-bold"} text-slate-900`}
-                          >
-                            {isPercentage || isTotalPercentage
-                              ? formatReportPercentageTotal(row.total)
-                              : formatReportValue(row.total || 0, 3)}
-                          </td>
-                        </tr>
-                      );
-                    })}
+                              {cellValue > 0 ? (
+                                <span className={`inline-flex items-center justify-end px-2.5 py-1 rounded-full text-[11px] font-black min-w-[70px] border ${isTotal
+                                  ? "bg-emerald-100/50 text-emerald-800 border-emerald-200/40"
+                                  : isPreviousYearValue
+                                    ? "bg-amber-100/50 text-amber-800 border-amber-200/40"
+                                    : "bg-violet-100/50 text-violet-800 border-violet-200/40"
+                                }`}>
+                                  {isPercentage || isTotalPercentage
+                                    ? formatReportPercentage(cellValue)
+                                    : formatReportValue(cellValue, 3)}
+                                </span>
+                              ) : (
+                                <span className="text-slate-300 font-normal">-</span>
+                              )}
+                            </td>
+                          );
+                        })}
+                        <td
+                          className="py-3.5 px-4 text-right border-l border-slate-100 bg-slate-100/20 font-black text-xs"
+                        >
+                          {isPercentage || isTotalPercentage
+                            ? formatReportPercentageTotal(row.total)
+                            : formatReportValue(row.total || 0, 3)}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -2142,18 +2163,23 @@ const PlanningScreen = () => {
         })()}
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-100/80 overflow-hidden transition-all duration-300 hover:shadow-md hover:border-slate-200/60">
         <div
-          className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center cursor-pointer hover:bg-slate-100/50 transition-colors"
+          className="p-5 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 to-sky-50/10 flex justify-between items-center cursor-pointer select-none group"
           onClick={() => setIsReportExpanded2(!isReportExpanded2)}
         >
-          <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
-            <MdKeyboardArrowDown
-              className={`text-slate-500 transition-transform duration-300 ${!isReportExpanded2 ? "-rotate-90" : ""}`}
-              size={20}
-            />
-            Segment Wise - FY {financialYear}
-          </h2>
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center font-black text-xs shadow-sm transition-all group-hover:scale-110">
+              SEG
+            </div>
+            <h2 className="text-xs font-extrabold text-slate-700 uppercase tracking-widest flex items-center gap-2">
+              <MdKeyboardArrowDown
+                className={`text-slate-400 transition-transform duration-300 ${!isReportExpanded2 ? "-rotate-90 text-slate-400" : "text-sky-600"}`}
+                size={20}
+              />
+              Segment Wise - FY {financialYear}
+            </h2>
+          </div>
           <button
             type="button"
             onClick={(e) => {
@@ -2161,7 +2187,7 @@ const PlanningScreen = () => {
               exportReportToExcel(reportData2, "Segment Wise Report");
             }}
             disabled={!reportData2 || !reportData2.mgrCodes?.length}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 font-bold text-xs uppercase tracking-widest hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 font-extrabold text-xs uppercase tracking-widest hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <MdDownload size={16} />
             Export
@@ -2169,264 +2195,289 @@ const PlanningScreen = () => {
         </div>
 
         {isReportExpanded2 && (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="bg-amber-50 border-b border-amber-100">
-                    <th className="py-3 px-4 font-black text-slate-700 min-w-[160px]">
-                      Month
+          <div className="overflow-x-auto custom-scrollbar">
+            <table className="w-full text-left text-sm border-collapse">
+              <thead>
+                <tr className="bg-slate-50/70 border-b border-slate-100">
+                  <th className="py-3.5 px-5 font-black text-slate-500 text-left min-w-[200px] uppercase tracking-wider text-[10px]">
+                    Month
+                  </th>
+                  {(reportData2?.mgrCodes?.length > 0 ? reportData2.mgrCodes : ['Export', 'Industry', 'UC', 'Utility']).map((mgr) => (
+                    <th
+                      key={mgr}
+                      className="py-3.5 px-4 font-black text-slate-500 text-right min-w-[110px] border-l border-slate-100/50 uppercase tracking-wider text-[10px]"
+                    >
+                      {mgr}
                     </th>
-                    {(reportData2?.mgrCodes?.length > 0 ? reportData2.mgrCodes : ['Export', 'Industry', 'UC', 'Utility']).map((mgr) => (
-                      <th
-                        key={mgr}
-                        className="py-3 px-4 font-black text-slate-700 text-right min-w-[100px]"
-                      >
-                        {mgr}
-                      </th>
-                    ))}
-                    <th className="py-3 px-4 font-black text-slate-900 text-right bg-amber-100 min-w-[100px]">
-                      Total
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(() => {
-                    const mgrCodes = reportData2?.mgrCodes?.length > 0 ? reportData2.mgrCodes : ['Export', 'Industry', 'UC', 'Utility'];
-                    const monthRowsByLabel = new Map(
-                      (reportData2?.rows || [])
-                        .filter((row) => row.isMonth && !row.isSegment)
-                        .map((row) => [row.monthLabel || row.month, row]),
-                    );
-                    const segmentMonthLabels =
-                      reportData2?.monthLabels?.length > 0
-                        ? reportData2.monthLabels
-                        : (monthRowsByLabel.size > 0 ? Array.from(monthRowsByLabel.keys()) : monthLabels);
+                  ))}
+                  <th className="py-3.5 px-4 font-black text-slate-600 text-right bg-slate-100/40 min-w-[110px] border-l border-slate-100 uppercase tracking-wider text-[10px]">
+                    Total
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {(() => {
+                  const mgrCodes = reportData2?.mgrCodes?.length > 0 ? reportData2.mgrCodes : ['Export', 'Industry', 'UC', 'Utility'];
+                  const monthRowsByLabel = new Map(
+                    (reportData2?.rows || [])
+                      .filter((row) => row.isMonth && !row.isSegment)
+                      .map((row) => [row.monthLabel || row.month, row]),
+                  );
+                  const segmentMonthLabels =
+                    reportData2?.monthLabels?.length > 0
+                      ? reportData2.monthLabels
+                      : (monthRowsByLabel.size > 0 ? Array.from(monthRowsByLabel.keys()) : monthLabels);
 
-                    return segmentMonthLabels.map((monthLabel) => {
-                      const monthRow = monthRowsByLabel.get(monthLabel) || {
-                        month: monthLabel,
-                        total: 0,
-                      };
+                  return segmentMonthLabels.map((monthLabel) => {
+                    const monthRow = monthRowsByLabel.get(monthLabel) || {
+                      month: monthLabel,
+                      total: 0,
+                    };
 
-                      return (
-                        <React.Fragment key={monthLabel}>
-                          <tr
-                            className="border-b-2 border-slate-200 bg-blue-50 font-bold cursor-pointer hover:bg-blue-100/60 transition-colors"
-                            onClick={() => toggleSegmentMonth(monthLabel)}
-                          >
-                            <td className="py-3 px-4 text-slate-900">
-                              <div className="flex items-center gap-2">
-                                <MdKeyboardArrowDown
-                                  className={`text-slate-700 transition-transform duration-300 ${!expandedSegmentMonths[monthLabel] ? "-rotate-90" : ""}`}
-                                  size={18}
-                                />
-                                {monthRow.month}
-                              </div>
-                            </td>
-                            {mgrCodes.map((mgr) => {
-                              const cellValue = Number(monthRow[mgr] || 0);
-                              return (
-                                <td
-                                  key={mgr}
-                                  className={`py-3 px-4 text-right text-slate-900 font-bold ${cellValue > 0 ? "bg-blue-100/60" : ""}`}
-                                >
-                                  {formatReportValue(cellValue, 3)}
-                                </td>
-                              );
-                            })}
-                            <td
-                              className={`py-3 px-4 text-right text-slate-900 font-black ${Number(monthRow.total || 0) > 0 ? "bg-blue-100/60" : "bg-slate-50"}`}
-                            >
-                              {formatReportValue(monthRow.total || 0, 3)}
-                            </td>
-                          </tr>
-                          {expandedSegmentMonths[monthLabel] &&
-                            (() => {
-                              const sbuMap = new Map();
-                              const resolveSbuLabel = (value) => {
-                                const normalized = normalizeSbuValue(value);
-                                const match = (
-                                  combinedReportData?.mgrCodes || []
-                                ).find(
-                                  (code) =>
-                                    normalizeSbuValue(code) === normalized,
-                                );
-                                return match || value || "Unassigned";
-                              };
-
-                              (combinedReportData?.sbuWise || [])
-                                .filter((r) => r.month === monthLabel)
-                                .forEach((r) => {
-                                  const canonicalSbu = resolveSbuLabel(r.sbu);
-                                  const normalizedSbu =
-                                    normalizeSbuValue(canonicalSbu);
-                                  const key = normalizedSbu || canonicalSbu;
-                                  if (!sbuMap.has(key)) {
-                                    sbuMap.set(key, {
-                                      normalizedSbu,
-                                      sbu: canonicalSbu,
-                                      values: {},
-                                      total: 0,
-                                    });
-                                  }
-                                  const entry = sbuMap.get(key);
-                                  const segKey = r.segment || "Unassigned";
-                                  entry.values[segKey] =
-                                    (entry.values[segKey] || 0) +
-                                    Number(r.value || 0);
-                                  entry.total += Number(r.value || 0);
-                                });
-                              const sbuRows = Array.from(sbuMap.values());
-
-                              if (sbuRows.length === 0) {
-                                return ['EPC', 'SBU1', 'SBU2', 'SBU3'].map(sbu => (
-                                  <tr
-                                    key={`${monthLabel}-${sbu}`}
-                                    className="border-b border-slate-100 hover:bg-slate-50"
-                                  >
-                                    <td className="py-3 px-4 text-slate-900 font-bold pl-12">
-                                      <span>{sbu}</span>
-                                    </td>
-                                    {mgrCodes.map((mgr) => (
-                                      <td
-                                        key={mgr}
-                                        className="py-3 px-4 text-right text-slate-700"
-                                      >
-                                        -
-                                      </td>
-                                    ))}
-                                    <td className="py-3 px-4 text-right text-slate-900 font-bold bg-amber-50/50">
-                                      -
-                                    </td>
-                                  </tr>
-                                ));
-                              }
-
-                              return sbuRows.map((row) => (
-                                <tr
-                                  key={`${monthLabel}-${row.normalizedSbu}`}
-                                  className="border-b border-slate-100 hover:bg-slate-50"
-                                >
-                                  <td className="py-3 px-4 text-slate-900 font-bold pl-12">
-                                    <span>{row.sbu}</span>
-                                  </td>
-                                  {mgrCodes.map((mgr) => {
-                                    const val = Number(row.values[mgr] || 0);
-                                    return (
-                                      <td
-                                        key={mgr}
-                                        className={`py-3 px-4 text-right text-slate-700 ${val > 0 ? "bg-blue-100/60" : ""}`}
-                                      >
-                                        {formatReportValue(val, 3)}
-                                      </td>
-                                    );
-                                  })}
-                                  <td
-                                    className={`py-3 px-4 text-right text-slate-900 font-bold ${Number(row.total || 0) > 0 ? "bg-blue-100/60" : "bg-amber-50/50"}`}
-                                  >
-                                    {formatReportValue(row.total, 3)}
-                                  </td>
-                                </tr>
-                              ));
-                            })()}
-                        </React.Fragment>
-                      );
-                    });
-                  })()}
-                  {(() => {
-                    const mgrCodes = reportData2?.mgrCodes?.length > 0 ? reportData2.mgrCodes : ['Export', 'Industry', 'UC', 'Utility'];
-                    const summaryRowsInOrder = reportData2 ? [
-                      (reportData2.rows || []).find((row) => row.isTotal),
-                      (reportData2.rows || []).find((row) => row.isPercentage),
-                      (reportData2.rows || []).find(
-                        (row) => row.isPreviousYearValue,
-                      ),
-                      (reportData2.rows || []).find(
-                        (row) => row.isTotalPercentage,
-                      ),
-                    ].filter(Boolean) : [
-                      { month: 'Total', isTotal: true, total: 0 },
-                      { month: 'Percentage CY', isPercentage: true, total: 0 },
-                      { month: 'Value (Previous Year)', isPreviousYearValue: true, total: 0 },
-                      { month: 'Percentage PY', isTotalPercentage: true, total: 0 },
-                    ];
-
-                    return summaryRowsInOrder.map((row) => {
-                      const isTotal = row.isTotal;
-                      const isPercentage = row.isPercentage;
-                      const isPreviousYearValue = row.isPreviousYearValue;
-                      const isTotalPercentage = row.isTotalPercentage;
-
-                      return (
+                    return (
+                      <React.Fragment key={monthLabel}>
                         <tr
-                          key={row.month}
-                          className={`border-b transition-colors ${isTotal
-                              ? "bg-amber-50 border-amber-200 font-black"
-                              : isPreviousYearValue
-                                ? "bg-amber-100/70 border-amber-200 font-bold"
-                                : isPercentage || isTotalPercentage
-                                  ? "bg-slate-50 border-slate-200"
-                                  : "border-slate-50 hover:bg-slate-50"
-                            }`}
+                          className="bg-sky-50/20 hover:bg-sky-50/40 border-l-4 border-l-sky-500 transition-all border-b border-slate-100 font-bold cursor-pointer"
+                          onClick={() => toggleSegmentMonth(monthLabel)}
                         >
-                          <td
-                            className={`py-3 px-4 ${isTotal || isPercentage || isPreviousYearValue || isTotalPercentage ? "font-black text-slate-900" : "font-semibold text-slate-600"}`}
-                          >
-                            {isPercentage ? "Percentage CY" : row.month}
+                          <td className="py-3.5 px-4 text-slate-800">
+                            <div className="flex items-center gap-2">
+                              <MdKeyboardArrowDown
+                                className={`text-sky-500 transition-transform duration-300 ${!expandedSegmentMonths[monthLabel] ? "-rotate-90" : ""}`}
+                                size={18}
+                              />
+                              <span className="font-extrabold text-xs tracking-wide">{monthRow.month}</span>
+                            </div>
                           </td>
                           {mgrCodes.map((mgr) => {
-                            const cellValue = Number(row[mgr] || 0);
+                            const cellValue = Number(monthRow[mgr] || 0);
                             return (
                               <td
                                 key={mgr}
-                                className={`py-3 px-4 text-right ${isTotal || isPercentage || isPreviousYearValue || isTotalPercentage ? "font-bold text-slate-900" : "text-slate-700"} ${cellValue > 0 ? "bg-blue-100/60" : ""}`}
+                                className="py-3.5 px-4 text-right border-l border-slate-100/50"
                               >
-                                {isPercentage || isTotalPercentage
-                                  ? formatReportPercentage(cellValue)
-                                  : formatReportValue(cellValue, 3)}
+                                {cellValue > 0 ? (
+                                  <span className="inline-flex items-center justify-end px-2.5 py-1 rounded-full bg-sky-50/70 text-sky-700 text-[11px] font-black min-w-[70px] border border-sky-100/40 shadow-sm hover:scale-105 transition-all">
+                                    {formatReportValue(cellValue, 3)}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-300 font-normal">-</span>
+                                )}
                               </td>
                             );
                           })}
                           <td
-                            className={`py-3 px-4 text-right ${Number(row.total || 0) > 0
-                                ? "bg-blue-100/60"
-                                : isTotal
-                                  ? "bg-amber-100"
-                                  : isPreviousYearValue
-                                    ? "bg-amber-200/80"
-                                    : isPercentage || isTotalPercentage
-                                      ? "bg-slate-100"
-                                      : "bg-amber-50/50"
-                              } ${isTotal ? "font-black" : "font-bold"} text-slate-900`}
+                            className="py-3.5 px-4 text-right border-l border-slate-100 bg-sky-50/10"
                           >
-                            {isPercentage || isTotalPercentage
-                              ? formatReportPercentageTotal(row.total)
-                              : formatReportValue(row.total || 0, 3)}
+                            {Number(monthRow.total || 0) > 0 ? (
+                              <span className="inline-flex items-center justify-end px-2.5 py-1 rounded-full bg-sky-100/50 text-sky-800 text-[11px] font-black min-w-[70px] border border-sky-200/30 shadow-sm">
+                                {formatReportValue(monthRow.total || 0, 3)}
+                              </span>
+                            ) : (
+                              <span className="text-slate-300 font-normal">-</span>
+                            )}
                           </td>
                         </tr>
-                      );
-                    });
-                  })()}
-                </tbody>
-              </table>
-            </div>
-          )}
+                        {expandedSegmentMonths[monthLabel] &&
+                          (() => {
+                            const sbuMap = new Map();
+                            const resolveSbuLabel = (value) => {
+                              const normalized = normalizeSbuValue(value);
+                              const match = (
+                                combinedReportData?.mgrCodes || []
+                              ).find(
+                                (code) =>
+                                  normalizeSbuValue(code) === normalized,
+                              );
+                              return match || value || "Unassigned";
+                            };
+
+                            (combinedReportData?.sbuWise || [])
+                              .filter((r) => r.month === monthLabel)
+                              .forEach((r) => {
+                                const canonicalSbu = resolveSbuLabel(r.sbu);
+                                const normalizedSbu =
+                                  normalizeSbuValue(canonicalSbu);
+                                const key = normalizedSbu || canonicalSbu;
+                                if (!sbuMap.has(key)) {
+                                  sbuMap.set(key, {
+                                    normalizedSbu,
+                                    sbu: canonicalSbu,
+                                    values: {},
+                                    total: 0,
+                                  });
+                                }
+                                const entry = sbuMap.get(key);
+                                const segKey = r.segment || "Unassigned";
+                                entry.values[segKey] =
+                                  (entry.values[segKey] || 0) +
+                                  Number(r.value || 0);
+                                entry.total += Number(r.value || 0);
+                              });
+                            const sbuRows = Array.from(sbuMap.values());
+
+                            if (sbuRows.length === 0) {
+                              return ['EPC', 'SBU1', 'SBU2', 'SBU3'].map(sbu => (
+                                <tr
+                                  key={`${monthLabel}-${sbu}`}
+                                  className="border-b border-slate-100/60 bg-slate-50/20 hover:bg-slate-50/60 transition-colors border-l-4 border-l-slate-200"
+                                >
+                                  <td className="py-3 px-4 text-slate-600 font-bold pl-8 text-xs">
+                                    <span>{sbu}</span>
+                                  </td>
+                                  {mgrCodes.map((mgr) => (
+                                    <td
+                                      key={mgr}
+                                      className="py-3 px-4 text-right border-l border-slate-100/30 text-xs text-slate-300"
+                                    >
+                                      -
+                                    </td>
+                                  ))}
+                                  <td className="py-3 px-4 text-right border-l border-slate-100/30 bg-slate-50/30 font-bold text-slate-300 text-xs">
+                                    -
+                                  </td>
+                                </tr>
+                              ));
+                            }
+
+                            return sbuRows.map((row) => (
+                              <tr
+                                key={`${monthLabel}-${row.normalizedSbu}`}
+                                className="border-b border-slate-100/60 bg-slate-50/20 hover:bg-slate-50/60 transition-colors border-l-4 border-l-slate-200"
+                              >
+                                <td className="py-3 px-4 text-slate-600 font-bold pl-8 text-xs">
+                                  <span>{row.sbu}</span>
+                                </td>
+                                {mgrCodes.map((mgr) => {
+                                  const val = Number(row.values[mgr] || 0);
+                                  return (
+                                    <td
+                                      key={mgr}
+                                      className="py-3 px-4 text-right border-l border-slate-100/30 text-xs"
+                                    >
+                                      {val > 0 ? (
+                                        <span className="inline-flex items-center justify-end px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-extrabold min-w-[64px] border border-slate-200/40">
+                                          {formatReportValue(val, 3)}
+                                        </span>
+                                      ) : (
+                                        <span className="text-slate-300 font-normal">-</span>
+                                      )}
+                                    </td>
+                                  );
+                                })}
+                                <td
+                                  className="py-3 px-4 text-right border-l border-slate-100/30 bg-slate-50/30 font-bold text-slate-700 text-xs"
+                                >
+                                  {row.total > 0 ? formatReportValue(row.total, 3) : "-"}
+                                </td>
+                              </tr>
+                            ));
+                          })()}
+                      </React.Fragment>
+                    );
+                  });
+                })()}
+                {(() => {
+                  const mgrCodes = reportData2?.mgrCodes?.length > 0 ? reportData2.mgrCodes : ['Export', 'Industry', 'UC', 'Utility'];
+                  const summaryRowsInOrder = reportData2 ? [
+                    (reportData2.rows || []).find((row) => row.isTotal),
+                    (reportData2.rows || []).find((row) => row.isPercentage),
+                    (reportData2.rows || []).find(
+                      (row) => row.isPreviousYearValue,
+                    ),
+                    (reportData2.rows || []).find(
+                      (row) => row.isTotalPercentage,
+                    ),
+                  ].filter(Boolean) : [
+                    { month: 'Total', isTotal: true, total: 0 },
+                    { month: 'Percentage CY', isPercentage: true, total: 0 },
+                    { month: 'Value (Previous Year)', isPreviousYearValue: true, total: 0 },
+                    { month: 'Percentage PY', isTotalPercentage: true, total: 0 },
+                  ];
+
+                  return summaryRowsInOrder.map((row) => {
+                    const isTotal = row.isTotal;
+                    const isPercentage = row.isPercentage;
+                    const isPreviousYearValue = row.isPreviousYearValue;
+                    const isTotalPercentage = row.isTotalPercentage;
+
+                    return (
+                      <tr
+                        key={row.month}
+                        className={`border-b border-slate-200/60 transition-colors ${isTotal
+                            ? "bg-emerald-50/60 border-t border-emerald-100 font-black text-emerald-900"
+                            : isPreviousYearValue
+                              ? "bg-amber-50/50 border-t border-amber-100 font-bold text-amber-900"
+                              : isPercentage || isTotalPercentage
+                                ? "bg-violet-50/50 border-t border-violet-100 text-violet-900"
+                                : "border-slate-100 hover:bg-slate-50 text-slate-700"
+                          }`}
+                      >
+                        <td
+                          className="py-3.5 px-5 font-extrabold text-xs uppercase tracking-wide"
+                        >
+                          {isPercentage ? "Percentage CY" : row.month}
+                        </td>
+                        {mgrCodes.map((mgr) => {
+                          const cellValue = Number(row[mgr] || 0);
+                          return (
+                            <td
+                              key={mgr}
+                              className="py-3.5 px-4 text-right border-l border-slate-100/50"
+                            >
+                              {cellValue > 0 ? (
+                                <span className={`inline-flex items-center justify-end px-2.5 py-1 rounded-full text-[11px] font-black min-w-[70px] border ${isTotal
+                                  ? "bg-emerald-100/50 text-emerald-800 border-emerald-200/40"
+                                  : isPreviousYearValue
+                                    ? "bg-amber-100/50 text-amber-800 border-amber-200/40"
+                                    : "bg-violet-100/50 text-violet-800 border-violet-200/40"
+                                }`}>
+                                  {isPercentage || isTotalPercentage
+                                    ? formatReportPercentage(cellValue)
+                                    : formatReportValue(cellValue, 3)}
+                                </span>
+                              ) : (
+                                <span className="text-slate-300 font-normal">-</span>
+                              )}
+                            </td>
+                          );
+                        })}
+                        <td
+                          className="py-3.5 px-4 text-right border-l border-slate-100 bg-slate-100/20 font-black text-xs"
+                        >
+                          {isPercentage || isTotalPercentage
+                            ? formatReportPercentageTotal(row.total)
+                            : formatReportValue(row.total || 0, 3)}
+                        </td>
+                      </tr>
+                    );
+                  });
+                })()}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-100/80 overflow-hidden transition-all duration-300 hover:shadow-md hover:border-slate-200/60">
         <div
-          className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center cursor-pointer hover:bg-slate-100/50 transition-colors"
+          className="p-5 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 to-emerald-50/10 flex justify-between items-center cursor-pointer select-none group"
           onClick={() =>
             setIsStatusBreakdownExpanded(!isStatusBreakdownExpanded)
           }
         >
-          <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
-            <MdKeyboardArrowDown
-              className={`text-slate-500 transition-transform duration-300 ${!isStatusBreakdownExpanded ? "-rotate-90" : ""}`}
-              size={20}
-            />
-            Status Breakdown Summary - FY {financialYear}
-          </h2>
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-black text-xs shadow-sm transition-all group-hover:scale-110">
+              STT
+            </div>
+            <h2 className="text-xs font-extrabold text-slate-700 uppercase tracking-widest flex items-center gap-2">
+              <MdKeyboardArrowDown
+                className={`text-slate-400 transition-transform duration-300 ${!isStatusBreakdownExpanded ? "-rotate-90 text-slate-400" : "text-emerald-600"}`}
+                size={20}
+              />
+              Status Breakdown Summary - FY {financialYear}
+            </h2>
+          </div>
           <button
             type="button"
             onClick={(e) => {
@@ -2437,7 +2488,7 @@ const PlanningScreen = () => {
               !computedStatusBreakdownData ||
               !computedStatusBreakdownData.length
             }
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 font-bold text-xs uppercase tracking-widest hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 font-extrabold text-xs uppercase tracking-widest hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <MdDownload size={16} />
             Export
@@ -2445,183 +2496,222 @@ const PlanningScreen = () => {
         </div>
 
         {isStatusBreakdownExpanded && (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-slate-100 border-b border-slate-300">
-                    <th className="py-3 px-3 text-left font-black text-slate-900 text-[11px] min-w-[90px] border-r border-slate-200">Month</th>
-                    <th className="py-3 px-3 text-left font-black text-slate-900 text-[11px] min-w-[110px] border-r border-slate-200">SBU/EPC</th>
-                    <th className="py-3 px-3 text-left font-black text-slate-900 text-[11px] min-w-[110px] border-r border-slate-200">Segment</th>
-                    {(visibleStatusColumns.length > 0 ? visibleStatusColumns : STATUS_REPORT_COLUMNS).map((column) => (
-                      <th
-                        key={`status-breakdown-header-${column}`}
-                        className="py-3 px-3 text-right font-black text-slate-900 text-[11px] min-w-[80px] border-r border-slate-200"
-                      >
-                        {column}
-                      </th>
-                    ))}
-                    <th className="py-3 px-3 text-right font-black text-slate-900 text-[11px] min-w-[90px] bg-slate-200/50 border-r border-slate-200">
-                      Total
+          <div className="overflow-x-auto custom-scrollbar">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="bg-slate-50/70 border-b border-slate-100">
+                  <th className="py-3.5 px-4 text-left font-black text-slate-500 text-[10px] min-w-[90px] border-r border-slate-100/50 uppercase tracking-wider">Month</th>
+                  <th className="py-3.5 px-3 text-left font-black text-slate-500 text-[10px] min-w-[110px] border-r border-slate-100/50 uppercase tracking-wider">SBU/EPC</th>
+                  <th className="py-3.5 px-3 text-left font-black text-slate-500 text-[10px] min-w-[110px] border-r border-slate-100/50 uppercase tracking-wider">Segment</th>
+                  {(visibleStatusColumns.length > 0 ? visibleStatusColumns : STATUS_REPORT_COLUMNS).map((column) => (
+                    <th
+                      key={`status-breakdown-header-${column}`}
+                      className="py-3.5 px-3 text-right font-black text-slate-500 text-[10px] min-w-[80px] border-r border-slate-100/50 uppercase tracking-wider"
+                    >
+                      {column}
                     </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(computedStatusBreakdownData?.length > 0 ? computedStatusBreakdownData : []).map((monthData, mIdx) => {
-                    const isMonthExpanded = expandedStatusBreakdownMonths[monthData.month];
-                    const statusCols = visibleStatusColumns.length > 0 ? visibleStatusColumns : STATUS_REPORT_COLUMNS;
+                  ))}
+                  <th className="py-3.5 px-3 text-right font-black text-slate-600 text-[10px] min-w-[90px] bg-slate-100/40 border-r border-slate-100 uppercase tracking-wider">
+                    Total
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {(computedStatusBreakdownData?.length > 0 ? computedStatusBreakdownData : []).map((monthData, mIdx) => {
+                  const isMonthExpanded = expandedStatusBreakdownMonths[monthData.month];
+                  const statusCols = visibleStatusColumns.length > 0 ? visibleStatusColumns : STATUS_REPORT_COLUMNS;
 
-                    return (
-                      <React.Fragment key={monthData.month}>
-                        {/* Month Header Row */}
-                        <tr
-                          className="bg-slate-100/50 border-b border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors font-bold"
-                          onClick={() => toggleStatusBreakdownMonth(monthData.month)}
-                        >
-                          <td className="py-2.5 px-3 text-slate-900 font-black uppercase tracking-wider text-[11px] flex items-center gap-2 border-r border-slate-200">
-                            <MdKeyboardArrowDown
-                              className={`text-slate-500 transition-transform duration-200 ${!isMonthExpanded ? "-rotate-90" : ""}`}
-                              size={18}
-                            />
-                            {monthData.month}
-                          </td>
-                          <td className="py-2.5 px-3 border-r border-slate-200"></td>
-                          <td className="py-2.5 px-3 border-r border-slate-200"></td>
-                          {statusCols.map(col => (
-                            <td key={col} className="py-2.5 px-3 text-right text-slate-900 border-r border-slate-200 font-black">
-                              {formatReportValue(monthData.monthTotalStatuses?.[col] || 0, 3)}
-                            </td>
-                          ))}
-                          <td className="py-2.5 px-3 text-right font-black text-slate-900 bg-slate-200/50">
-                            {formatReportValue(monthData.monthGrandTotal || 0, 3)}
-                          </td>
-                        </tr>
-
-                        {isMonthExpanded && (monthData.sbuGroups?.length > 0 ? monthData.sbuGroups : [
-                          { sbu: 'EPC', segmentGroups: [], sbuTotalStatuses: {}, sbuGrandTotal: 0 },
-                          { sbu: 'SBU1', segmentGroups: [], sbuTotalStatuses: {}, sbuGrandTotal: 0 },
-                          { sbu: 'SBU2', segmentGroups: [], sbuTotalStatuses: {}, sbuGrandTotal: 0 },
-                          { sbu: 'SBU3', segmentGroups: [], sbuTotalStatuses: {}, sbuGrandTotal: 0 }
-                        ]).map((sbuGroup, sIdx) => {
-                          const sbuKey = `${monthData.month}-${sbuGroup.sbu}`;
-                          const isSbuExpanded = expandedStatusBreakdownSbus[sbuKey];
-
-                          return (
-                            <React.Fragment key={sbuGroup.sbu}>
-                              {/* SBU Header Row */}
-                              <tr
-                                className="bg-white border-b border-slate-100 cursor-pointer hover:bg-slate-50 transition-colors"
-                                onClick={() => toggleStatusBreakdownSbu(monthData.month, sbuGroup.sbu)}
-                              >
-                                <td className="py-2 px-3 border-r border-slate-200"></td>
-                                <td className="py-2 px-3 text-slate-800 font-bold flex items-center gap-2 border-r border-slate-200">
-                                  <MdKeyboardArrowDown
-                                    className={`text-slate-400 transition-transform duration-200 ${!isSbuExpanded ? "-rotate-90" : ""}`}
-                                    size={16}
-                                  />
-                                  {sbuGroup.sbu}
-                                </td>
-                                <td colSpan={statusCols.length + 2} className="bg-white/50"></td>
-                              </tr>
-
-                              {isSbuExpanded && (
-                                <>
-                                  {(sbuGroup.segmentGroups?.length > 0 ? sbuGroup.segmentGroups : [
-                                    { segment: 'Export', statuses: {}, total: 0 },
-                                    { segment: 'Industry', statuses: {}, total: 0 },
-                                    { segment: 'UC', statuses: {}, total: 0 },
-                                    { segment: 'Utility', statuses: {}, total: 0 }
-                                  ]).map((seg) => {
-                                    return (
-                                      <tr key={`${monthData.month}-${sbuGroup.sbu}-${seg.segment}`} className="border-b border-slate-200 hover:bg-slate-50/50 transition-colors">
-                                        <td className="py-1.5 px-3 border-r border-slate-200"></td>
-                                        <td className="py-1.5 px-3 border-r border-slate-200"></td>
-                                        <td className="py-1.5 px-6 text-slate-800 font-black border-r border-slate-200 bg-white">
-                                          {seg.segment}
-                                        </td>
-                                        {statusCols.map(col => (
-                                          <td key={col} className="py-1.5 px-3 text-right text-slate-600 border-r border-slate-200 text-[13px]">
-                                            {formatReportValue(seg.statuses?.[col] || 0, 3)}
-                                          </td>
-                                        ))}
-                                        <td className="py-1.5 px-3 text-right font-black text-slate-900 bg-slate-50/30">
-                                          {formatReportValue(seg.total || 0, 3)}
-                                        </td>
-                                      </tr>
-                                    );
-                                  })}
-                                  {/* SBU TOTAL Row */}
-                                  <tr className="bg-yellow-50 font-bold border-b border-slate-200">
-                                    <td className="py-2 px-3 border-r border-slate-200"></td>
-                                    <td className="py-2 px-3 border-r border-slate-200"></td>
-                                    <td className="py-2 px-6 text-slate-900 border-r border-slate-200 uppercase tracking-tight text-[12px] font-black">SBU TOTAL</td>
-                                    {statusCols.map(col => (
-                                      <td key={col} className="py-2 px-3 text-right text-slate-900 border-r border-slate-200 font-black">
-                                        {formatReportValue(sbuGroup.sbuTotalStatuses?.[col] || 0, 3)}
-                                      </td>
-                                    ))}
-                                    <td className="py-2 px-3 text-right font-black text-slate-900 bg-yellow-100/20">
-                                      {formatReportValue(sbuGroup.sbuGrandTotal || 0, 3)}
-                                    </td>
-                                  </tr>
-                                </>
-                              )}
-                            </React.Fragment>
-                          );
-                        })}
-                      </React.Fragment>
-                    );
-                  })}
-                  {(statusBreakdownSummaryRows?.length > 0 ? statusBreakdownSummaryRows : [
-                    { key: 'total', label: 'TOTAL', isTotal: true, values: {}, rowTotal: 0 },
-                    { key: 'percentage', label: 'Percentage CY', isPercentage: true, values: {}, rowTotal: 0 },
-                    { key: 'prev-year', label: 'Value (Previous Year)', isPreviousYearValue: true, values: {}, rowTotal: 0 },
-                    { key: 'prev-percentage', label: 'Percentage PY', isTotalPercentage: true, values: {}, rowTotal: 0 }
-                  ]).map((summaryRow) => {
-                    const isYellowLabel = summaryRow.isTotal || summaryRow.isPreviousYearValue;
-                    const statusCols = visibleStatusColumns.length > 0 ? visibleStatusColumns : STATUS_REPORT_COLUMNS;
-
-                    return (
+                  return (
+                    <React.Fragment key={monthData.month}>
+                      {/* Month Header Row */}
                       <tr
-                        key={`status-breakdown-${summaryRow.key}`}
-                        className={`border-b-2 border-slate-200 ${isYellowLabel ? "bg-amber-50" : "bg-slate-50"}`}
+                        className="bg-emerald-50/20 border-l-4 border-l-emerald-500 border-b border-slate-100 cursor-pointer hover:bg-emerald-50/40 transition-colors font-bold"
+                        onClick={() => toggleStatusBreakdownMonth(monthData.month)}
                       >
-                        <td
-                          colSpan={3}
-                          className={`py-3 px-3 font-black text-slate-900 uppercase tracking-wider text-[11px] border-r border-slate-200 ${isYellowLabel ? "bg-amber-100/40" : "bg-slate-100/40"
-                            }`}
-                        >
-                          {summaryRow.label}
+                        <td className="py-3 px-4 text-emerald-900 font-extrabold uppercase tracking-wider text-[11px] flex items-center gap-2 border-r border-slate-100/50">
+                          <MdKeyboardArrowDown
+                            className={`text-emerald-500 transition-transform duration-200 ${!isMonthExpanded ? "-rotate-90" : ""}`}
+                            size={18}
+                          />
+                          {monthData.month}
                         </td>
-                        {statusCols.map((column) => {
-                          const cellValue = Number(summaryRow.values?.[column] || 0);
-                          const hasValue = cellValue > 0;
+                        <td className="py-3 px-3 border-r border-slate-100/50"></td>
+                        <td className="py-3 px-3 border-r border-slate-100/50"></td>
+                        {statusCols.map(col => {
+                          const cellVal = monthData.monthTotalStatuses?.[col] || 0;
                           return (
-                            <td
-                              key={`${summaryRow.key}-${column}`}
-                              className={`py-3 px-3 text-right font-black text-slate-900 border-r border-slate-200 ${hasValue ? "bg-blue-100/60" : ""
-                                }`}
-                            >
-                              {summaryRow.isPercentage || summaryRow.isTotalPercentage
-                                ? formatReportPercentage(cellValue)
-                                : formatReportValue(cellValue, 3)}
+                            <td key={col} className="py-3 px-3 text-right border-r border-slate-100/50">
+                              {cellVal > 0 ? (
+                                <span className="inline-flex items-center justify-end px-2.5 py-1 rounded-full bg-emerald-50/70 text-emerald-700 text-[11px] font-black min-w-[70px] border border-emerald-100/40 shadow-sm">
+                                  {formatReportValue(cellVal, 3)}
+                                </span>
+                              ) : (
+                                <span className="text-slate-300 font-normal">-</span>
+                              )}
                             </td>
                           );
                         })}
-                        <td
-                          className={`py-3 px-3 text-right font-black text-slate-900 ${Number(summaryRow.rowTotal || 0) > 0 ? "bg-blue-100/60" : (isYellowLabel ? "bg-amber-100/50" : "bg-slate-100/50")
-                            }`}
-                        >
-                          {summaryRow.isPercentage || summaryRow.isTotalPercentage
-                            ? formatReportPercentageTotal(summaryRow.rowTotal)
-                            : formatReportValue(summaryRow.rowTotal || 0, 3)}
+                        <td className="py-3 px-3 text-right font-black text-emerald-950 bg-emerald-50/30">
+                          {monthData.monthGrandTotal > 0 ? (
+                            <span className="inline-flex items-center justify-end px-2.5 py-1 rounded-full bg-emerald-100/50 text-emerald-800 text-[11px] font-black min-w-[70px] border border-emerald-200/30 shadow-sm">
+                              {formatReportValue(monthData.monthGrandTotal || 0, 3)}
+                            </span>
+                          ) : (
+                            <span className="text-slate-300 font-normal">-</span>
+                          )}
                         </td>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+
+                      {isMonthExpanded && (monthData.sbuGroups?.length > 0 ? monthData.sbuGroups : [
+                        { sbu: 'EPC', segmentGroups: [], sbuTotalStatuses: {}, sbuGrandTotal: 0 },
+                        { sbu: 'SBU1', segmentGroups: [], sbuTotalStatuses: {}, sbuGrandTotal: 0 },
+                        { sbu: 'SBU2', segmentGroups: [], sbuTotalStatuses: {}, sbuGrandTotal: 0 },
+                        { sbu: 'SBU3', segmentGroups: [], sbuTotalStatuses: {}, sbuGrandTotal: 0 }
+                      ]).map((sbuGroup, sIdx) => {
+                        const sbuKey = `${monthData.month}-${sbuGroup.sbu}`;
+                        const isSbuExpanded = expandedStatusBreakdownSbus[sbuKey];
+
+                        return (
+                          <React.Fragment key={sbuGroup.sbu}>
+                            {/* SBU Header Row */}
+                            <tr
+                              className="bg-slate-50/40 border-b border-slate-100 cursor-pointer hover:bg-slate-100/60 transition-colors border-l-4 border-l-slate-300"
+                              onClick={() => toggleStatusBreakdownSbu(monthData.month, sbuGroup.sbu)}
+                            >
+                              <td className="py-2.5 px-4 border-r border-slate-100/30"></td>
+                              <td className="py-2.5 px-3 text-slate-700 font-extrabold flex items-center gap-2 border-r border-slate-100/30 text-xs">
+                                <MdKeyboardArrowDown
+                                  className={`text-slate-400 transition-transform duration-200 ${!isSbuExpanded ? "-rotate-90" : ""}`}
+                                  size={16}
+                                />
+                                {sbuGroup.sbu}
+                              </td>
+                              <td colSpan={statusCols.length + 2} className="bg-slate-50/10"></td>
+                            </tr>
+
+                            {isSbuExpanded && (
+                              <>
+                                {(sbuGroup.segmentGroups?.length > 0 ? sbuGroup.segmentGroups : [
+                                  { segment: 'Export', statuses: {}, total: 0 },
+                                  { segment: 'Industry', statuses: {}, total: 0 },
+                                  { segment: 'UC', statuses: {}, total: 0 },
+                                  { segment: 'Utility', statuses: {}, total: 0 }
+                                ]).map((seg) => {
+                                  return (
+                                    <tr key={`${monthData.month}-${sbuGroup.sbu}-${seg.segment}`} className="bg-white border-b border-slate-100/40 hover:bg-slate-50/40 transition-colors border-l-4 border-l-slate-200">
+                                      <td className="py-2 px-4 border-r border-slate-100/30"></td>
+                                      <td className="py-2 px-3 border-r border-slate-100/30"></td>
+                                      <td className="py-2 px-6 text-slate-600 font-bold border-r border-slate-100/30 text-xs pl-8">
+                                        {seg.segment}
+                                      </td>
+                                      {statusCols.map(col => {
+                                        const cellVal = seg.statuses?.[col] || 0;
+                                        return (
+                                          <td key={col} className="py-2 px-3 text-right border-r border-slate-100/30 text-xs">
+                                            {cellVal > 0 ? (
+                                              <span className="inline-flex items-center justify-end px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-extrabold min-w-[64px] border border-slate-200/40">
+                                                {formatReportValue(cellVal, 3)}
+                                              </span>
+                                            ) : (
+                                              <span className="text-slate-300 font-normal">-</span>
+                                            )}
+                                          </td>
+                                        );
+                                      })}
+                                      <td className="py-2 px-3 text-right font-bold text-slate-700 bg-slate-50/30 text-xs">
+                                        {seg.total > 0 ? formatReportValue(seg.total || 0, 3) : "-"}
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                                {/* SBU TOTAL Row */}
+                                <tr className="bg-teal-50/30 font-bold border-b border-teal-100 border-l-4 border-l-teal-400">
+                                  <td className="py-2 px-4 border-r border-teal-100/50"></td>
+                                  <td className="py-2 px-3 border-r border-teal-100/50"></td>
+                                  <td className="py-2 px-6 text-teal-900 border-r border-teal-100/50 uppercase tracking-tight text-[11px] font-black pl-8">SBU TOTAL</td>
+                                  {statusCols.map(col => {
+                                    const cellVal = sbuGroup.sbuTotalStatuses?.[col] || 0;
+                                    return (
+                                      <td key={col} className="py-2 px-3 text-right border-r border-teal-100/50">
+                                        {cellVal > 0 ? (
+                                          <span className="inline-flex items-center justify-end px-2.5 py-0.5 rounded-full bg-teal-100/50 text-teal-800 text-[10px] font-black min-w-[64px] border border-teal-200/30">
+                                            {formatReportValue(cellVal, 3)}
+                                          </span>
+                                        ) : (
+                                          <span className="text-slate-300 font-normal">-</span>
+                                        )}
+                                      </td>
+                                    );
+                                  })}
+                                  <td className="py-2 px-3 text-right font-black text-teal-950 bg-teal-50/40 text-xs">
+                                    {sbuGroup.sbuGrandTotal > 0 ? formatReportValue(sbuGroup.sbuGrandTotal || 0, 3) : "-"}
+                                  </td>
+                                </tr>
+                              </>
+                            )}
+                          </React.Fragment>
+                        );
+                      })}
+                    </React.Fragment>
+                  );
+                })}
+                {(statusBreakdownSummaryRows?.length > 0 ? statusBreakdownSummaryRows : [
+                  { key: 'total', label: 'TOTAL', isTotal: true, values: {}, rowTotal: 0 },
+                  { key: 'percentage', label: 'Percentage CY', isPercentage: true, values: {}, rowTotal: 0 },
+                  { key: 'prev-year', label: 'Value (Previous Year)', isPreviousYearValue: true, values: {}, rowTotal: 0 },
+                  { key: 'prev-percentage', label: 'Percentage PY', isTotalPercentage: true, values: {}, rowTotal: 0 }
+                ]).map((summaryRow) => {
+                  const isYellowLabel = summaryRow.isTotal || summaryRow.isPreviousYearValue;
+                  const statusCols = visibleStatusColumns.length > 0 ? visibleStatusColumns : STATUS_REPORT_COLUMNS;
+
+                  return (
+                    <tr
+                      key={`status-breakdown-${summaryRow.key}`}
+                      className={`border-b border-slate-200/60 transition-colors ${isYellowLabel ? "border-t border-emerald-100 bg-emerald-50/60 font-black text-emerald-900" : "border-t border-indigo-100 bg-indigo-50/50 text-indigo-900"}`}
+                    >
+                      <td
+                        colSpan={3}
+                        className="py-3.5 px-4 font-extrabold text-xs uppercase tracking-wide border-r border-slate-100/50"
+                      >
+                        {summaryRow.label}
+                      </td>
+                      {statusCols.map((column) => {
+                        const cellValue = Number(summaryRow.values?.[column] || 0);
+                        return (
+                          <td
+                            key={`${summaryRow.key}-${column}`}
+                            className="py-3.5 px-3 text-right border-r border-slate-100/50"
+                          >
+                            {cellValue > 0 ? (
+                              <span className={`inline-flex items-center justify-end px-2.5 py-1 rounded-full text-[11px] font-black min-w-[70px] border ${isYellowLabel
+                                ? "bg-emerald-100/50 text-emerald-800 border-emerald-200/40"
+                                : "bg-indigo-100/50 text-indigo-800 border-indigo-200/40"
+                              }`}>
+                                {summaryRow.isPercentage || summaryRow.isTotalPercentage
+                                  ? formatReportPercentage(cellValue)
+                                  : formatReportValue(cellValue, 3)}
+                              </span>
+                            ) : (
+                              <span className="text-slate-300 font-normal">-</span>
+                            )}
+                          </td>
+                        );
+                      })}
+                      <td
+                        className="py-3.5 px-3 text-right font-black border-r border-slate-100 bg-slate-100/20 text-xs"
+                      >
+                        {summaryRow.isPercentage || summaryRow.isTotalPercentage
+                          ? formatReportPercentageTotal(summaryRow.rowTotal)
+                          : formatReportValue(summaryRow.rowTotal || 0, 3)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
       </div>
 
       <ImportModal

@@ -37,6 +37,10 @@ const ProductSchema = new mongoose.Schema({
 ProductSchema.index({ productName: 1 });
 ProductSchema.index({ categoryId: 1 });
 ProductSchema.index({ companyId: 1 });
+ProductSchema.index({ updatedAt: -1 });
+ProductSchema.index({ status: 1, updatedAt: -1 });
+ProductSchema.index({ mgr1: 1, updatedAt: -1 });
+ProductSchema.index({ mgr2: 1, updatedAt: -1 });
 ProductSchema.index({ productName: 'text', hsnCode: 'text' });
 
 ProductSchema.path('vendors').validate(function (vendors) {

@@ -8,4 +8,6 @@ const SalespersonSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now },
 });
 
+SalespersonSchema.index({ status: 1, name: 1 });
+
 module.exports = mongoose.model('Salesperson', SalespersonSchema);

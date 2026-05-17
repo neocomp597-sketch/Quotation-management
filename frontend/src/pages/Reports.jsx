@@ -339,9 +339,9 @@ const getRevenueCellStyle = (sheetName, rowIndex, cellIndex, row, item, options 
 };
 
 const getRevenueExportOptions = (sheetName = '') => {
-    if (sheetName === 'Summary FY27') return { filterRows: [0], headerRows: [3, 4] };
+    if (sheetName === 'Summary FY27') return { headerRows: [1, 2] };
     if (sheetName === 'Productwise') return { headerRows: [0, 1] };
-    if (sheetName === 'Summary FY27_Qtr wise') return { filterRows: [0], headerRows: [3] };
+    if (sheetName === 'Summary FY27_Qtr wise') return { headerRows: [1] };
     if (sheetName === 'Deffered account Temperarily') return { filterRows: [0, 1, 2], headerRows: [5] };
     return {};
 };
@@ -365,8 +365,6 @@ const buildSummaryWorkbookSheet = (view, financialYear, filters = {}) => {
     });
 
     const rows = [
-        ['Filter of MGR 1', filters.mgr1 || 'SBU 1/ 2/ 3', '', 'Filter on Status (multi Select)', selectedStatuses, '', '', '', '', 'Filter on Segement', filters.segment ? getRevenueSegmentLabel(filters.segment) : 'Default Selected Utility / UC / Export / Industry', '', '', '', '', '', '', 'Filter of Year', financialYear],
-        blankRow(header1.length),
         [cell(`Summary of Revenue (Rs L) for Financial Year ${financialYear}`, { colSpan: header1.length })],
         header1,
         header2
@@ -492,8 +490,6 @@ const buildSummaryWorkbookSheet = (view, financialYear, filters = {}) => {
 
 const buildQuarterWorkbookSheet = (view, financialYear) => {
     const rows = [
-        ['Filter of Year'],
-        blankRow(7),
         [cell(`Summary of Revenue (Rs L) for Financial Year ${financialYear}`, { colSpan: 7 })],
         ['Segment', 'Yearly Budget', 'Q1', 'Q2', 'Q3', 'Q4', 'Total']
     ];
@@ -1640,8 +1636,7 @@ const Reports = () => {
             return renderWorkbookTable(summarySheet?.rows || [], {
                 keyPrefix: 'summary-fy27',
                 sheetName: 'Summary FY27',
-                filterRows: [0],
-                headerRows: [3, 4]
+                headerRows: [1, 2]
             });
         };
 
@@ -1718,7 +1713,7 @@ const Reports = () => {
                             </button>
                         </div>
                     </div>
-                    <div className="grid grid-cols-1 lg:grid-cols-[minmax(160px,1fr)_minmax(160px,1fr)_minmax(280px,2fr)_auto] gap-3 p-4 border-b border-black" style={{ backgroundColor: normalizeHex(REVENUE_PLAN_COLORS.filter) }}>
+                    <div className="grid grid-cols-1 lg:grid-cols-[minmax(160px,1fr)_minmax(160px,1fr)_auto] gap-3 p-4 border-b border-black" style={{ backgroundColor: normalizeHex(REVENUE_PLAN_COLORS.filter) }}>
                         <div>
                             <label className="block text-[9px] font-black uppercase tracking-widest text-black mb-1">MGR 1</label>
                             <select
@@ -1740,17 +1735,6 @@ const Reports = () => {
                                 <option value="">All Segments</option>
                                 {segmentOptions.map(option => <option key={option} value={option}>{getRevenueSegmentLabel(option)}</option>)}
                             </select>
-                        </div>
-                        <div>
-                            <label className="block text-[9px] font-black uppercase tracking-widest text-black mb-1">Status</label>
-                            <div className="flex flex-wrap gap-2">
-                                <span className="inline-flex items-center gap-2 px-3 py-2 border border-black bg-black text-white text-[10px] font-black uppercase tracking-widest">
-                                    Budget
-                                </span>
-                                <span className="text-[10px] font-black text-black uppercase tracking-widest self-center ml-1">
-                                    Locked to Budget
-                                </span>
-                            </div>
                         </div>
                         <div className="flex items-end">
                             <button
@@ -1791,8 +1775,8 @@ const Reports = () => {
                                     : renderWorkbookTable(activeSheet?.rows || [], {
                                         keyPrefix: activeSheet?.name,
                                         sheetName: activeSheet?.name,
-                                        filterRows: activeSheet?.name === 'Summary FY27_Qtr wise' ? [0] : [0, 1, 2],
-                                        headerRows: activeSheet?.name === 'Summary FY27_Qtr wise' ? [3] : [5]
+                                        filterRows: activeSheet?.name === 'Summary FY27_Qtr wise' ? [] : [0, 1, 2],
+                                        headerRows: activeSheet?.name === 'Summary FY27_Qtr wise' ? [1] : [5]
                                     })}
                         </div>
                     </div>

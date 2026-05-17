@@ -328,4 +328,11 @@ export const statusService = {
   delete: (id) => api.delete(`/statuses/${id}`),
 };
 
+export const territoryService = {
+  getAll: (params) => api.get("/territories", { params }),
+  create: (data) => api.post("/territories", data),
+  update: (id, data) => api.put(`/territories/${id}`, data),
+  delete: (id) => api.delete(`/territories/${id}`),
+};
+
 export default api;

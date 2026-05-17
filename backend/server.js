@@ -1,16 +1,20 @@
 const express = require("express");
-// Force restart 1
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const connectDB = require("./config/db");
-const { connectRedis } = require("./config/redis");
+const { connectRedis, disconnectRedis } = require("./config/redis");
+const { closeBullMq } = require("./config/bullmq");
+const { startAuthSessionWorker } = require("./queues/authSessionQueue");
+const { startCacheInvalidationWorker } = require("./queues/cacheInvalidationQueue");
 require("dotenv").config();
 
 const app = express();
 
 // Connect to Database
-connectDB();
-connectRedis().catch(() => {
+const dbStartupPromise = connectDB();
+const redisStartupPromise = connectRedis().then(() => {
+  console.log("Redis connected");
+}).catch(() => {
   console.warn("Redis unavailable at startup; Redis-backed features will retry per request.");
 });
 
@@ -76,6 +80,7 @@ const analyticsRoutes = require("./routes/analyticsRoutes");
 const planningRoutes = require("./routes/planningRoutes");
 const authorizationRoutes = require("./routes/authorizationRoutes");
 const statusRoutes = require("./routes/statusRoutes");
+const territoryRoutes = require("./routes/territoryRoutes");
 const scheduler = require("./utils/scheduler");
 
 // API Routes
@@ -101,6 +106,7 @@ app.use("/api/analytics", analyticsRoutes);
 app.use("/api/planning", planningRoutes);
 app.use("/api/authorization", authorizationRoutes);
 app.use("/api/statuses", statusRoutes);
+app.use("/api/territories", territoryRoutes);
 
 app.get('/api/trigger-seed', async (req, res) => {
     try {
@@ -202,7 +208,13 @@ app.get('/api/read-revenue-plan', async (req, res) => {
 });
 
 // Start Scheduler
-scheduler.startScheduler();
+const startBackgroundServices = async () => {
+  await dbStartupPromise;
+  await redisStartupPromise;
+  await startCacheInvalidationWorker();
+  await startAuthSessionWorker();
+  await scheduler.startScheduler();
+};
 
 // Serve Static Files
 // Serve Static Files with logging
@@ -242,6 +254,23 @@ if (require.main === module) {
     console.log(`Server running on port ${PORT}`);
   });
   server.timeout = Number(process.env.API_REQUEST_TIMEOUT_MS || 30000);
+
+  startBackgroundServices().catch((error) => {
+    console.error("Failed to start background services:", error.message);
+  });
+
+  const shutdown = async (signal) => {
+    console.log(`${signal} received. Closing server...`);
+    server.close(async () => {
+      scheduler.stopScheduler();
+      await closeBullMq();
+      await disconnectRedis();
+      process.exit(0);
+    });
+  };
+
+  process.on("SIGINT", () => shutdown("SIGINT"));
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
 }
 
 module.exports = app;

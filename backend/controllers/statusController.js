@@ -1,4 +1,8 @@
 const Status = require('../models/Status');
+const { getCachedJson, makeCacheKey, setCachedJson } = require('../utils/apiCache');
+const { invalidateViaQueueOrNow } = require('../queues/cacheInvalidationQueue');
+
+const STATUSES_CACHE_TTL_SECONDS = Number(process.env.STATUSES_CACHE_TTL_SECONDS || 600);
 
 const getPagination = (query) => {
     const page = Math.max(1, Number(query.page || 1));
@@ -8,6 +12,12 @@ const getPagination = (query) => {
 
 exports.getStatuses = async (req, res) => {
     try {
+        const cacheKey = makeCacheKey('statuses:list', req);
+        const { redis, value: cachedStatuses } = await getCachedJson(cacheKey);
+        if (cachedStatuses) {
+            return res.json(cachedStatuses);
+        }
+
         if (req.query.page || req.query.limit) {
             const { page, limit, skip } = getPagination(req.query);
             const [statuses, total] = await Promise.all([
@@ -20,7 +30,7 @@ exports.getStatuses = async (req, res) => {
                 Status.countDocuments()
             ]);
 
-            return res.json({
+            const response = {
                 data: statuses,
                 pagination: {
                     page,
@@ -28,13 +38,16 @@ exports.getStatuses = async (req, res) => {
                     total,
                     pages: Math.ceil(total / limit) || 1
                 }
-            });
+            };
+            await setCachedJson(redis, cacheKey, response, STATUSES_CACHE_TTL_SECONDS);
+            return res.json(response);
         }
 
         const statuses = await Status.find()
             .select('name color isActive createdAt updatedAt')
             .sort({ name: 1 })
             .lean();
+        await setCachedJson(redis, cacheKey, statuses, STATUSES_CACHE_TTL_SECONDS);
         res.json(statuses);
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -51,6 +64,7 @@ exports.createStatus = async (req, res) => {
             createdBy: req.user._id
         });
         await status.save();
+        await invalidateViaQueueOrNow('statuses:*', 'planning:*');
         res.status(201).json(status);
     } catch (error) {
         res.status(400).json({ message: error.message });
@@ -66,6 +80,7 @@ exports.updateStatus = async (req, res) => {
             { new: true }
         );
         if (!status) return res.status(404).json({ message: 'Status not found' });
+        await invalidateViaQueueOrNow('statuses:*', 'planning:*');
         res.json(status);
     } catch (error) {
         res.status(400).json({ message: error.message });
@@ -76,6 +91,7 @@ exports.deleteStatus = async (req, res) => {
     try {
         const status = await Status.findByIdAndDelete(req.params.id);
         if (!status) return res.status(404).json({ message: 'Status not found' });
+        await invalidateViaQueueOrNow('statuses:*', 'planning:*');
         res.json({ message: 'Status deleted successfully' });
     } catch (error) {
         res.status(500).json({ message: error.message });

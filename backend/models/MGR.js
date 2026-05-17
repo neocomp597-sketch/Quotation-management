@@ -10,5 +10,7 @@ const MGRSchema = new mongoose.Schema({
 
 // Since the combination of type and code should likely be unique
 MGRSchema.index({ mgrType: 1, code: 1 }, { unique: true });
+MGRSchema.index({ mgrType: 1, createdAt: -1 });
+MGRSchema.index({ status: 1, mgrType: 1 });
 
 module.exports = mongoose.model('MGR', MGRSchema);

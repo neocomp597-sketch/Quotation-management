@@ -1,6 +1,9 @@
 const { getRedis } = require('../config/redis');
+const { clearMemoryCache } = require('./apiCache');
 
 const invalidateCache = async (...patterns) => {
+    clearMemoryCache(...patterns);
+
     const redis = await getRedis();
     if (!redis) return;
 
@@ -20,10 +23,14 @@ const invalidateCache = async (...patterns) => {
 const invalidateCustomerCaches = () => invalidateCache('customers:*', 'dashboard:quotations:*');
 const invalidateProductCaches = () => invalidateCache('products:*', 'dashboard:quotations:*');
 const invalidateQuotationCaches = () => invalidateCache('quotations:*', 'dashboard:quotations:*');
+const invalidatePlanningCaches = () => invalidateCache('planning:*');
+const invalidateStatusCaches = () => invalidateCache('statuses:*', 'planning:*');
 
 module.exports = {
     invalidateCache,
     invalidateCustomerCaches,
+    invalidatePlanningCaches,
     invalidateProductCaches,
     invalidateQuotationCaches,
+    invalidateStatusCaches,
 };
