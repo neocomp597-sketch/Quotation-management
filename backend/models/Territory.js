@@ -5,7 +5,7 @@ const TerritorySchema = new mongoose.Schema({
     name: { type: String, required: true },
     type: { 
         type: String, 
-        enum: ['Country', 'Zone', 'State', 'City', 'Area', 'Custom'], 
+        enum: ['Country', 'Zone', 'State', 'City', 'Area', 'Custom', 'country', 'zone', 'state', 'city', 'area', 'custom'], 
         required: true 
     },
     parent: { type: mongoose.Schema.Types.ObjectId, ref: 'Territory', default: null, index: true },

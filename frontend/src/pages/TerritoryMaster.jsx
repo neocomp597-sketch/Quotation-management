@@ -5,8 +5,12 @@ import {
     MdKeyboardArrowRight, MdInfoOutline 
 } from 'react-icons/md';
 import { toast } from 'react-toastify';
-import { territoryService, salespersonService } from '../services/api';
+import { territoryService, userService } from '../services/api';
 import Modal from '../components/Modal';
+
+const TERRITORY_TYPE_OPTIONS = ['Country', 'Zone', 'State', 'City', 'Area', 'Custom'];
+const TERRITORY_LOAD_TOAST_ID = 'territory-master-territories-load-error';
+const USER_LOAD_TOAST_ID = 'territory-master-users-load-error';
 
 const TerritoryMaster = () => {
     const [territories, setTerritories] = useState([]);
@@ -20,7 +24,7 @@ const TerritoryMaster = () => {
     
     const [formData, setFormData] = useState({
         name: '',
-        type: 'city',
+        type: 'City',
         parent: '',
         manager: '',
         salesReps: [],
@@ -33,15 +37,28 @@ const TerritoryMaster = () => {
     const fetchAllData = useCallback(async () => {
         setLoading(true);
         try {
-            const [terrRes, userRes] = await Promise.all([
+            const [terrResult, userResult] = await Promise.allSettled([
                 territoryService.getAll(),
-                salespersonService.getAll()
+                userService.getAll()
             ]);
-            setTerritories(terrRes.data || []);
-            setUsers(userRes.data || []);
-        } catch (err) {
-            console.error('Error fetching territory data:', err);
-            toast.error('Failed to load data.');
+
+            if (terrResult.status === 'fulfilled') {
+                setTerritories(Array.isArray(terrResult.value.data) ? terrResult.value.data : []);
+            } else {
+                console.error('Error fetching territories:', terrResult.reason);
+                toast.error(terrResult.reason?.response?.data?.message || 'Failed to load territories.', {
+                    toastId: TERRITORY_LOAD_TOAST_ID
+                });
+            }
+
+            if (userResult.status === 'fulfilled') {
+                setUsers(Array.isArray(userResult.value.data) ? userResult.value.data : []);
+            } else {
+                console.error('Error fetching users:', userResult.reason);
+                toast.error(userResult.reason?.response?.data?.message || 'Failed to load users.', {
+                    toastId: USER_LOAD_TOAST_ID
+                });
+            }
         } finally {
             setLoading(false);
         }
@@ -73,7 +90,7 @@ const TerritoryMaster = () => {
             setEditingTerritory(null);
             setFormData({
                 name: '',
-                type: 'city',
+                type: 'City',
                 parent: '',
                 manager: '',
                 salesReps: [],
@@ -170,12 +187,12 @@ const TerritoryMaster = () => {
 
                     return (
                         <div key={node._id} className="group/node">
-                            <div className="flex items-center justify-between p-3.5 bg-white border border-slate-100 hover:border-indigo-100 hover:shadow-md rounded-2xl transition-all">
+                            <div className="flex items-center justify-between p-3.5 bg-white border border-slate-100 hover:border-primary-100 hover:shadow-md rounded-2xl transition-all">
                                 <div className="flex items-center gap-3">
                                     {hasChildren ? (
                                         <button 
                                             onClick={() => handleToggleNode(node._id)}
-                                            className="p-1 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-indigo-600 transition-colors"
+                                            className="p-1 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-primary-600 transition-colors"
                                         >
                                             {isExpanded ? <MdExpandMore size={18} /> : <MdChevronRight size={18} />}
                                         </button>
@@ -184,13 +201,13 @@ const TerritoryMaster = () => {
                                             <MdKeyboardArrowRight size={16} />
                                         </div>
                                     )}
-                                    <div className="p-2 bg-indigo-50/50 text-indigo-600 rounded-xl">
+                                    <div className="p-2 bg-primary-50/50 text-primary-600 rounded-xl">
                                         <MdMap size={18} />
                                     </div>
                                     <div>
                                         <div className="flex items-center gap-2">
                                             <span className="font-bold text-slate-800 text-sm md:text-base">{node.name}</span>
-                                            <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded bg-indigo-50 text-indigo-700">
+                                            <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded bg-primary-50 text-primary-700">
                                                 {node.type}
                                             </span>
                                         </div>
@@ -212,7 +229,7 @@ const TerritoryMaster = () => {
                                 <div className="flex gap-1.5 opacity-0 group-hover/node:opacity-100 transition-opacity">
                                     <button 
                                         onClick={() => handleOpenModal(node)}
-                                        className="p-2 bg-white border border-slate-100 text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all shadow-sm"
+                                        className="p-2 bg-white border border-slate-100 text-primary-600 hover:bg-primary-50 rounded-xl transition-all shadow-sm"
                                         title="Edit Territory"
                                     >
                                         <MdEdit size={16} />
@@ -243,7 +260,7 @@ const TerritoryMaster = () => {
                 </div>
                 <button
                     onClick={() => handleOpenModal()}
-                    className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3.5 rounded-2xl font-bold transition-all shadow-xl shadow-indigo-600/20 uppercase text-xs tracking-widest active:scale-95 shrink-0"
+                    className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3.5 rounded-2xl font-bold transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95 shrink-0"
                 >
                     <MdAdd size={20} />
                     <span>Create Territory</span>
@@ -252,7 +269,7 @@ const TerritoryMaster = () => {
 
             {loading ? (
                 <div className="p-20 text-center text-slate-400 font-medium">
-                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-indigo-500 border-t-transparent mb-4"></div>
+                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-primary-500 border-t-transparent mb-4"></div>
                     <p className="text-xs uppercase font-black tracking-widest">Loading Territories...</p>
                 </div>
             ) : (
@@ -261,7 +278,7 @@ const TerritoryMaster = () => {
                     <div className="lg:col-span-2 space-y-4">
                         <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm p-6">
                             <h2 className="text-lg font-black text-slate-800 mb-4 flex items-center gap-2">
-                                <MdMap size={22} className="text-indigo-600" />
+                                <MdMap size={22} className="text-primary-600" />
                                 Geographic Hierarchy Tree
                             </h2>
                             {territories.length === 0 ? (
@@ -278,12 +295,12 @@ const TerritoryMaster = () => {
 
                     {/* Right 1 Column: Mini summary of Rules */}
                     <div className="space-y-6">
-                        <div className="bg-gradient-to-br from-indigo-50 to-blue-50/50 rounded-[2rem] border border-indigo-100/50 p-6 space-y-4">
-                            <h3 className="font-black text-indigo-950 uppercase tracking-widest text-xs flex items-center gap-2">
-                                <MdInfoOutline size={18} className="text-indigo-600" />
+                        <div className="bg-gradient-to-br from-primary-50 to-blue-50/50 rounded-[2rem] border border-primary-100/50 p-6 space-y-4">
+                            <h3 className="font-black text-primary-950 uppercase tracking-widest text-xs flex items-center gap-2">
+                                <MdInfoOutline size={18} className="text-primary-600" />
                                 Hierarchy Routing Rules
                             </h3>
-                            <ul className="space-y-3 text-xs text-indigo-900/80 font-semibold leading-relaxed list-decimal pl-4">
+                            <ul className="space-y-3 text-xs text-primary-900/80 font-semibold leading-relaxed list-decimal pl-4">
                                 <li><strong>Country → Zone → State → City → Area</strong> hierarchy scales to unlimited levels.</li>
                                 <li><strong>Auto-Assignment</strong> tags new customers based on matching pincode or city name.</li>
                                 <li>Pincode matches first (highest priority), then falls back to lowercase City.</li>
@@ -310,7 +327,7 @@ const TerritoryMaster = () => {
                         </button>
                         <button
                             onClick={handleSubmit}
-                            className="bg-indigo-600 hover:bg-indigo-700 text-white px-10 py-3.5 rounded-2xl font-black transition-all shadow-xl shadow-indigo-600/20 uppercase text-[10px] tracking-widest active:scale-95"
+                            className="bg-primary-600 hover:bg-primary-700 text-white px-10 py-3.5 rounded-2xl font-black transition-all shadow-xl shadow-primary-600/20 uppercase text-[10px] tracking-widest active:scale-95"
                         >
                             {editingTerritory ? "Update Details" : "Create Territory"}
                         </button>
@@ -327,7 +344,7 @@ const TerritoryMaster = () => {
                                 type="text"
                                 value={formData.name}
                                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none text-sm font-bold"
+                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-bold"
                                 placeholder="e.g. Pune City, West Zone"
                                 required
                             />
@@ -340,13 +357,11 @@ const TerritoryMaster = () => {
                             <select
                                 value={formData.type}
                                 onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none text-sm font-bold"
+                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-bold"
                             >
-                                <option value="country">Country</option>
-                                <option value="zone">Zone</option>
-                                <option value="state">State</option>
-                                <option value="city">City</option>
-                                <option value="area">Area</option>
+                                {TERRITORY_TYPE_OPTIONS.map(type => (
+                                    <option key={type} value={type}>{type}</option>
+                                ))}
                             </select>
                         </div>
                     </div>
@@ -359,7 +374,7 @@ const TerritoryMaster = () => {
                             <select
                                 value={formData.parent}
                                 onChange={(e) => setFormData({ ...formData, parent: e.target.value })}
-                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none text-sm font-bold"
+                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-bold"
                             >
                                 <option value="">None (Top Level)</option>
                                 {territories
@@ -377,7 +392,7 @@ const TerritoryMaster = () => {
                             <select
                                 value={formData.manager}
                                 onChange={(e) => setFormData({ ...formData, manager: e.target.value })}
-                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none text-sm font-bold"
+                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-bold"
                             >
                                 <option value="">Unassigned</option>
                                 {users.map(u => (
@@ -393,15 +408,15 @@ const TerritoryMaster = () => {
                             Sales Representatives Mapping
                         </label>
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 p-4 bg-slate-50 border border-slate-100 rounded-2xl max-h-48 overflow-y-auto custom-scrollbar">
-                            {users.map(u => {
+                            {users.filter(u => u.role?.toLowerCase() === 'sales').map(u => {
                                 const isChecked = formData.salesReps.includes(u._id);
                                 return (
-                                    <label key={u._id} className="flex items-center gap-3 p-2 bg-white rounded-xl border border-slate-100 hover:border-indigo-100 cursor-pointer transition-all">
+                                    <label key={u._id} className="flex items-center gap-3 p-2 bg-white rounded-xl border border-slate-100 hover:border-primary-100 cursor-pointer transition-all">
                                         <input
                                             type="checkbox"
                                             checked={isChecked}
                                             onChange={() => handleSalesRepToggle(u._id)}
-                                            className="rounded text-indigo-600 focus:ring-indigo-500/20 h-4.5 w-4.5"
+                                            className="rounded text-primary-600 focus:ring-primary-500/20 h-4.5 w-4.5"
                                         />
                                         <div className="overflow-hidden">
                                             <p className="text-xs font-bold text-slate-800 truncate">{u.name}</p>
@@ -430,7 +445,7 @@ const TerritoryMaster = () => {
                                         ...formData, 
                                         rules: { ...formData.rules, cities: e.target.value } 
                                     })}
-                                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none text-sm font-bold"
+                                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-bold"
                                     placeholder="e.g. Pune, Pimpri Chinchwad"
                                 />
                             </div>
@@ -446,7 +461,7 @@ const TerritoryMaster = () => {
                                         ...formData, 
                                         rules: { ...formData.rules, pincodes: e.target.value } 
                                     })}
-                                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none text-sm font-bold"
+                                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-bold"
                                     placeholder="e.g. 411001, 411014"
                                 />
                             </div>

@@ -4,7 +4,7 @@ const userController = require('../controllers/userController'); // Ensure you h
 const { protect, admin } = require('../middlewares/authMiddleware');
 
 // Define user routes here
-router.get('/', protect, admin, userController.getAllUsers);
+router.get('/', protect, userController.getAllUsers);
 router.put('/profile', protect, userController.updateUserProfile);
 router.patch('/:id/role', protect, admin, userController.updateUserRole);
 

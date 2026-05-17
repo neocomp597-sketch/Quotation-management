@@ -39,9 +39,19 @@ const getAutoAssignedTerritory = async (billingAddress, shippingAddress, company
 // Get all territories
 const getTerritories = async (req, res) => {
     try {
-        const companyId = req.headers['x-company-id'] || req.query.companyId;
+        let companyId = req.headers['x-company-id'] || req.query.companyId;
         if (!companyId) {
-            return res.status(400).json({ message: "Company ID is required" });
+            const CompanySettings = require('../models/CompanySettings');
+            const settings = await CompanySettings.findOne({ userId: req.user.id }).lean()
+                || await CompanySettings.findOne().sort({ createdAt: 1 }).lean();
+            if (settings) {
+                companyId = settings._id;
+            }
+        }
+
+        if (!companyId) {
+            // Gracefully return empty array if no company is configured yet, avoiding toast error
+            return res.json([]);
         }
 
         const territories = await Territory.find({ companyId })
@@ -60,9 +70,18 @@ const getTerritories = async (req, res) => {
 // Create a new territory
 const createTerritory = async (req, res) => {
     try {
-        const companyId = req.headers['x-company-id'] || req.body.companyId;
+        let companyId = req.headers['x-company-id'] || req.body.companyId;
         if (!companyId) {
-            return res.status(400).json({ message: "Company ID is required" });
+            const CompanySettings = require('../models/CompanySettings');
+            const settings = await CompanySettings.findOne({ userId: req.user.id }).lean()
+                || await CompanySettings.findOne().sort({ createdAt: 1 }).lean();
+            if (settings) {
+                companyId = settings._id;
+            }
+        }
+
+        if (!companyId) {
+            return res.status(400).json({ message: "Please configure Company Settings first in the Settings menu before creating territories." });
         }
 
         const { name, type, parent, manager, salesReps, rules } = req.body;
