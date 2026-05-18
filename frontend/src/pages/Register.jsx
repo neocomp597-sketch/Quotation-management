@@ -3,13 +3,14 @@ import { useNavigate, Link } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useAuth } from "../context/AuthContext";
 import { authService } from "../services/api";
-import { User, Mail, Lock, CheckCircle } from "lucide-react";
+import { CheckCircle } from "lucide-react";
 import "./Auth.css";
 
 const Register = () => {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
+    companyName: "",
     password: "",
     confirmPassword: "",
   });
@@ -18,7 +19,7 @@ const Register = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
 
-  const { name, email, password, confirmPassword } = formData;
+  const { name, email, companyName, password, confirmPassword } = formData;
 
   const onChange = (e) =>
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -39,6 +40,7 @@ const Register = () => {
       const res = await authService.register({
         name,
         email,
+        companyName,
         password,
       });
 
@@ -108,6 +110,17 @@ const Register = () => {
               value={email}
               onChange={onChange}
               placeholder="john@example.com"
+              required
+            />
+          </div>
+          <div className="form-group">
+            <label>Company Name</label>
+            <input
+              type="text"
+              name="companyName"
+              value={companyName}
+              onChange={onChange}
+              placeholder="Acme Enterprises"
               required
             />
           </div>

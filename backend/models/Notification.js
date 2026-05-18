@@ -12,4 +12,6 @@ const NotificationSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now }
 });
 
+const tenantPlugin = require('./plugins/tenantPlugin');
+NotificationSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('Notification', NotificationSchema);

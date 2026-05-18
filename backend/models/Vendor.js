@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('./plugins/tenantPlugin');
 
 const phoneRegex = /^\+?[0-9()\-\s]{7,20}$/;
 
@@ -37,5 +38,7 @@ const VendorSchema = new mongoose.Schema(
     },
     { timestamps: true }
 );
+
+VendorSchema.plugin(tenantPlugin);
 
 module.exports = mongoose.model('Vendor', VendorSchema);

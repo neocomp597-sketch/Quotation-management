@@ -141,6 +141,7 @@ export const authService = {
 
 export const userService = {
   getAll: () => api.get("/users"),
+  create: (data) => api.post("/users", data),
   updateProfile: (data) => api.put("/users/profile", data),
   updateRole: (id, role) => api.patch(`/users/${id}/role`, { role }),
 };

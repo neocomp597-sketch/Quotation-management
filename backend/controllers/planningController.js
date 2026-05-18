@@ -2,6 +2,7 @@ const Planning = require('../models/Planning');
 const MGR = require('../models/MGR');
 const { getCachedJson, makeCacheKey, setCachedJson } = require('../utils/apiCache');
 const { invalidateViaQueueOrNow } = require('../queues/cacheInvalidationQueue');
+const { getTenantId } = require('../middlewares/tenantContext');
 
 const PLANNING_LIST_CACHE_TTL_SECONDS = Number(process.env.PLANNING_LIST_CACHE_TTL_SECONDS || 120);
 const PLANNING_REPORT_CACHE_TTL_SECONDS = Number(process.env.PLANNING_REPORT_CACHE_TTL_SECONDS || 300);
@@ -55,7 +56,7 @@ const resolveMgrCode = async (value, mgrType) => {
 };
 
 const getMgrMasters = async (mgrType) => {
-    const cacheKey = `planning:mgr-masters:${mgrType}`;
+    const cacheKey = `planning:mgr-masters:${getTenantId() || 'unknown'}:${mgrType}`;
     const { redis, value: cachedMasters } = await getCachedJson(cacheKey);
     if (cachedMasters) return cachedMasters;
 

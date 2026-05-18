@@ -92,7 +92,7 @@ const createCustomer = async (req, res) => {
         let assignedTerritory = territory;
         if (!assignedTerritory) {
             const { getAutoAssignedTerritory } = require('./territoryController');
-            const companyId = req.headers['x-company-id'] || req.body.companyId;
+            const companyId = req.user?.companyId || req.headers['x-company-id'] || req.body.companyId;
             assignedTerritory = await getAutoAssignedTerritory(billingAddress, shippingAddress, companyId);
         }
 
@@ -182,7 +182,7 @@ const getAllCustomers = async (req, res) => {
 // Get Customer by ID
 const getCustomerById = async (req, res) => {
     try {
-        const cacheKey = `customers:detail:${req.params.id}`;
+        const cacheKey = `customers:detail:${req.user?.companyId || 'unknown'}:${req.params.id}`;
         const { redis, value: cachedCustomer } = await getCachedJson(cacheKey);
         if (cachedCustomer) {
             return res.json(cachedCustomer);
@@ -218,7 +218,7 @@ const updateCustomer = async (req, res) => {
         let assignedTerritory = territory;
         if (assignedTerritory === undefined) {
             const { getAutoAssignedTerritory } = require('./territoryController');
-            const companyId = req.headers['x-company-id'] || req.body.companyId;
+            const companyId = req.user?.companyId || req.headers['x-company-id'] || req.body.companyId;
             assignedTerritory = await getAutoAssignedTerritory(billingAddress, shippingAddress, companyId);
         }
 

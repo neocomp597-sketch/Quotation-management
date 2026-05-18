@@ -1,9 +1,9 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('./plugins/tenantPlugin');
 
 const CustomerSchema = new mongoose.Schema({
     externalCode: { type: String, default: '', index: true },
-    companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'CompanySettings' },
-    customerName: { type: String, required: true },
+        customerName: { type: String, required: true },
     companyName: { type: String, required: true },
     gstin: { type: String, default: '' },
     billingAddress: {
@@ -41,5 +41,7 @@ CustomerSchema.index({ companyId: 1, mobile: 1 });
 CustomerSchema.index({ companyId: 1, email: 1 });
 CustomerSchema.index({ territory: 1 });
 CustomerSchema.index({ territory: 1, createdAt: -1 });
+
+CustomerSchema.plugin(tenantPlugin);
 
 module.exports = mongoose.model('Customer', CustomerSchema);

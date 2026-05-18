@@ -297,7 +297,7 @@ const getAllProducts = async (req, res) => {
 // Get Product by ID
 const getProductById = async (req, res) => {
     try {
-        const cacheKey = `products:detail:${req.params.id}`;
+        const cacheKey = `products:detail:${req.user?.companyId || 'unknown'}:${req.params.id}`;
         const { redis, value: cachedProduct } = await getCachedJson(cacheKey);
         if (cachedProduct) {
             return res.json(cachedProduct);

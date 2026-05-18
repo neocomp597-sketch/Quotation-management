@@ -4,7 +4,6 @@ const StatusSchema = new mongoose.Schema({
     name: {
         type: String,
         required: true,
-        unique: true,
         trim: true
     },
     color: {
@@ -26,5 +25,8 @@ const StatusSchema = new mongoose.Schema({
 });
 
 StatusSchema.index({ isActive: 1, name: 1 });
+StatusSchema.index({ companyId: 1, name: 1 }, { unique: true });
 
+const tenantPlugin = require('./plugins/tenantPlugin');
+StatusSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('Status', StatusSchema);

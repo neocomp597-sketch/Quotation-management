@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const User = require('../models/User');
+const Company = require('../models/Company');
 const { getRedis } = require('../config/redis');
 const { enqueueLegacyRefreshSession } = require('../queues/authSessionQueue');
 
@@ -19,6 +20,7 @@ const normalizeUser = (user) => ({
     name: user.name,
     email: user.email,
     role: user.role,
+    companyId: user.companyId,
 });
 
 const hashToken = (token) => crypto.createHash('sha256').update(token).digest('hex');
@@ -40,6 +42,7 @@ const createAccessToken = (user) => jwt.sign(
     {
         id: user._id,
         role: user.role,
+        companyId: user.companyId,
         tokenVersion: user.tokenVersion || 0,
         jti: crypto.randomUUID(),
     },
@@ -206,29 +209,40 @@ const issueSession = async (user, res, req, deviceId = getDeviceId(req)) => {
 };
 
 exports.register = async (req, res) => {
+    let newCompany = null;
+
     try {
-        const { name, email, password, role } = req.body;
+        const { name, email, password, companyName } = req.body;
 
         const existingUser = await User.findOne({ email }).select('_id').lean();
         if (existingUser) {
             return res.status(400).json({ message: 'User already exists' });
         }
 
+        const resolvedCompanyName = (companyName || `${name}'s Company`).trim();
+        if (!resolvedCompanyName) {
+            return res.status(400).json({ message: 'Company name is required' });
+        }
+
+        newCompany = await Company.create({ name: resolvedCompanyName });
+
         const salt = await bcrypt.genSalt(10);
         const passwordHash = await bcrypt.hash(password, salt);
 
-        const newUser = new User({
+        const newUser = await User.create({
             name,
             email,
             passwordHash,
-            role: 'sales' // Force 'sales' role for public registration
+            role: 'admin',
+            companyId: newCompany._id,
         });
-
-        await newUser.save();
 
         const session = await issueSession(newUser, res, req);
         res.status(201).json(session);
     } catch (error) {
+        if (newCompany?._id) {
+            await Company.deleteOne({ _id: newCompany._id }).catch(() => {});
+        }
         res.status(500).json({ message: 'Server Error', error: error.message });
     }
 };
@@ -350,7 +364,7 @@ exports.logoutAll = async (req, res) => {
 exports.getMe = async (req, res) => {
     try {
         const user = await User.findById(req.user.id)
-            .select('_id name email role status createdAt updatedAt')
+            .select('_id name email role status companyId createdAt updatedAt')
             .lean();
         res.json(user);
     } catch (error) {

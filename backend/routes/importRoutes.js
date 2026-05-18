@@ -39,10 +39,10 @@ const upload = multer({
 });
 
 // Import routes
-router.post('/products', upload.single('file'), importProducts);
+router.post('/products', protect, upload.single('file'), importProducts);
 router.post('/customers', protect, upload.single('file'), importCustomers);
-router.post('/attributes', upload.single('file'), importAttributes);
-router.post('/attribute-master', upload.single('file'), importAttributeMaster);
+router.post('/attributes', protect, upload.single('file'), importAttributes);
+router.post('/attribute-master', protect, upload.single('file'), importAttributeMaster);
 router.post('/planning', protect, upload.single('file'), importPlanning);
 
 // Template download routes

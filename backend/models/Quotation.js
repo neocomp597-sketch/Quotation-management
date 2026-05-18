@@ -1,10 +1,10 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('./plugins/tenantPlugin');
 
 const QuotationSchema = new mongoose.Schema({
-    quotationNo: { type: String, required: true, unique: true },
+    quotationNo: { type: String, required: true },
     quotationNumber: { type: String },
-    companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'CompanySettings' },
-    customerName: { type: String },
+        customerName: { type: String },
     customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer' },
     quotationDate: { type: Date, required: true, default: Date.now },
     validTill: { type: Date, required: true },
@@ -62,8 +62,11 @@ QuotationSchema.index({ createdBy: 1 });
 QuotationSchema.index({ createdAt: -1 });
 QuotationSchema.index({ status: 1 });
 QuotationSchema.index({ companyId: 1 });
+QuotationSchema.index({ companyId: 1, quotationNo: 1 }, { unique: true });
 QuotationSchema.index({ companyId: 1, quotationNumber: 1 });
 QuotationSchema.index({ customerName: 'text' });
 QuotationSchema.index({ territory: 1 });
+
+QuotationSchema.plugin(tenantPlugin);
 
 module.exports = mongoose.model('Quotation', QuotationSchema);

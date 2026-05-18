@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('./plugins/tenantPlugin');
 
 const ProductVendorSchema = new mongoose.Schema(
     {
@@ -12,9 +13,8 @@ const ProductVendorSchema = new mongoose.Schema(
 );
 
 const ProductSchema = new mongoose.Schema({
-    productCode: { type: String, required: true, unique: true },
-    companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'CompanySettings' },
-    productName: { type: String, required: true },
+    productCode: { type: String, required: true },
+        productName: { type: String, required: true },
     categoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'Category' },
     hsnCode: { type: String, required: true },
     gstPercentage: { type: Number, required: true },
@@ -42,6 +42,7 @@ ProductSchema.index({ status: 1, updatedAt: -1 });
 ProductSchema.index({ mgr1: 1, updatedAt: -1 });
 ProductSchema.index({ mgr2: 1, updatedAt: -1 });
 ProductSchema.index({ productName: 'text', hsnCode: 'text' });
+ProductSchema.index({ companyId: 1, productCode: 1 }, { unique: true });
 
 ProductSchema.path('vendors').validate(function (vendors) {
     if (!Array.isArray(vendors) || vendors.length === 0) return true;
@@ -63,5 +64,7 @@ ProductSchema.path('vendors').validate(function (vendors) {
 ProductSchema.pre('save', function () {
     this.updatedAt = new Date();
 });
+
+ProductSchema.plugin(tenantPlugin);
 
 module.exports = mongoose.model('Product', ProductSchema);

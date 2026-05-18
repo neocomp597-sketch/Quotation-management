@@ -1,7 +1,8 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('./plugins/tenantPlugin');
 
 const TerritorySchema = new mongoose.Schema({
-    companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'CompanySettings', index: true },
+    companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company', index: true },
     name: { type: String, required: true },
     type: { 
         type: String, 
@@ -19,5 +20,7 @@ const TerritorySchema = new mongoose.Schema({
 }, { timestamps: true });
 
 TerritorySchema.index({ companyId: 1, name: 1 });
+
+TerritorySchema.plugin(tenantPlugin);
 
 module.exports = mongoose.model('Territory', TerritorySchema);

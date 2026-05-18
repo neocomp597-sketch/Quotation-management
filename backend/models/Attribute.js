@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('./plugins/tenantPlugin');
 
 const AttributeSchema = new mongoose.Schema({
     mgr3Id: { type: mongoose.Schema.Types.ObjectId, ref: 'MGR', required: true },
@@ -9,6 +10,8 @@ const AttributeSchema = new mongoose.Schema({
 });
 
 // Combination of mgr3Id, code, and description should be unique
-AttributeSchema.index({ mgr3Id: 1, code: 1, description: 1 }, { unique: true });
+AttributeSchema.index({ companyId: 1, mgr3Id: 1, code: 1, description: 1 }, { unique: true });
+
+AttributeSchema.plugin(tenantPlugin);
 
 module.exports = mongoose.model('Attribute', AttributeSchema);

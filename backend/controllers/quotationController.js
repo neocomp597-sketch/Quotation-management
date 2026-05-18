@@ -126,11 +126,23 @@ const calculateLineItem = (quantity, rate, discountPercent, gstPercentage) => {
 };
 
 const getAnyCompanySettings = async (creatorId) => {
-    const cacheKey = creatorId ? `company-settings:user:${creatorId}` : 'company-settings:any';
+    const tenantId = require('../middlewares/tenantContext').getTenantId();
+    const cacheKey = tenantId
+        ? `company-settings:tenant:${tenantId}`
+        : (creatorId ? `company-settings:user:${creatorId}` : 'company-settings:any');
     const { redis, value: cachedSettings } = await getCachedJson(cacheKey);
     if (cachedSettings) return cachedSettings;
 
-    // 1. Try creator's settings
+    // 1. Try current tenant's settings
+    if (tenantId) {
+        const settings = await CompanySettings.findOne({ companyId: tenantId }).lean();
+        if (settings) {
+            await setCachedJson(redis, cacheKey, settings, COMPANY_SETTINGS_CACHE_TTL_SECONDS);
+            return settings;
+        }
+    }
+
+    // 2. Try creator's settings for legacy calls outside tenant context
     if (creatorId) {
         const settings = await CompanySettings.findOne({ userId: creatorId }).lean();
         if (settings) {
@@ -139,14 +151,14 @@ const getAnyCompanySettings = async (creatorId) => {
         }
     }
 
-    // 2. Try any settings existing in system (Global)
+    // 3. Try any settings visible in the current context
     const anySettings = await CompanySettings.findOne().sort({ createdAt: 1 }).lean();
     if (anySettings) {
         await setCachedJson(redis, cacheKey, anySettings, COMPANY_SETTINGS_CACHE_TTL_SECONDS);
         return anySettings;
     }
 
-    // 3. Absolute Fallback (Fake object so UI doesn't break)
+    // 4. Absolute Fallback (Fake object so UI doesn't break)
     const fallback = {
         companyName: "Your Business Name",
         address: { line1: "Business Address", city: "City", state: "State", pincode: "000000" },
@@ -313,7 +325,7 @@ const createQuotation = async (req, res) => {
         const newQuotation = new Quotation({
             quotationNo,
             quotationNumber: quotationNo,
-            companyId: settings?._id,
+            companyId: req.user?.companyId,
             customerName: customer.companyName || customer.customerName,
             customerId,
             quotationDate: new Date(),
@@ -441,7 +453,7 @@ module.exports = {
     finalizeQuotation,
     getQuotationById: async (req, res) => {
         try {
-            const cacheKey = `quotations:detail:${req.params.id}`;
+            const cacheKey = `quotations:detail:${req.user?.companyId || 'unknown'}:${req.params.id}`;
             const { redis, value: cachedQuotation } = await getCachedJson(cacheKey);
             if (cachedQuotation) {
                 return res.json(cachedQuotation);
@@ -611,7 +623,9 @@ module.exports = {
                 ];
             }
 
-            const cacheScope = req.user?.role === 'admin' ? 'admin' : `user:${req.user?.id || 'anonymous'}`;
+            const cacheScope = req.user?.role === 'admin'
+                ? `tenant:${req.user?.companyId || 'unknown'}:admin`
+                : `tenant:${req.user?.companyId || 'unknown'}:user:${req.user?.id || 'anonymous'}`;
             const cacheKey = `dashboard:quotations:${cacheScope}`;
             const redis = await getRedis();
             if (redis) {

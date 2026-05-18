@@ -5,14 +5,71 @@ const RolePermission = require('../models/RolePermission');
 
 exports.getAllUsers = async (req, res) => {
     try {
-        const users = await User.find()
-            .select('_id name email role status createdAt')
+        const users = await User.find({ companyId: req.user.companyId })
+            .select('_id name email role status companyId createdAt')
             .sort({ createdAt: -1 })
             .lean();
 
         res.json(users);
     } catch (error) {
         res.status(500).json({ message: 'Failed to load users', error: error.message });
+    }
+};
+
+exports.createUser = async (req, res) => {
+    try {
+        const { name, email, password, role = 'sales', status = true } = req.body;
+
+        if (!name || !email || !password) {
+            return res.status(400).json({ message: 'Name, email, and password are required' });
+        }
+
+        const isBuiltIn = ROLE_OPTIONS.includes(role);
+        const customRole = !isBuiltIn ? await RolePermission.findOne({ role }).select('_id').lean() : null;
+        if (!isBuiltIn && !customRole) {
+            return res.status(400).json({ message: 'Invalid role supplied' });
+        }
+
+        const existingUser = await User.findOne({ email }).select('_id').lean();
+        if (existingUser) {
+            return res.status(400).json({ message: 'User already exists' });
+        }
+
+        if (role === 'admin') {
+            const adminCount = await User.countDocuments({
+                companyId: req.user.companyId,
+                role: 'admin',
+            });
+
+            if (adminCount >= 3) {
+                return res.status(400).json({
+                    message: 'A maximum of 3 admins are allowed for this organization.'
+                });
+            }
+        }
+
+        const salt = await bcrypt.genSalt(10);
+        const passwordHash = await bcrypt.hash(password, salt);
+        const user = await User.create({
+            name,
+            email,
+            passwordHash,
+            role,
+            status,
+            companyId: req.user.companyId,
+        });
+
+        res.status(201).json({
+            _id: user._id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            status: user.status,
+            companyId: user.companyId,
+            createdAt: user.createdAt,
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to create user', error: error.message });
     }
 };
 
@@ -63,7 +120,7 @@ exports.updateUserRole = async (req, res) => {
             return res.status(400).json({ message: 'You cannot change your own role from this screen.' });
         }
 
-        const user = await User.findById(id);
+        const user = await User.findOne({ _id: id, companyId: req.user.companyId });
 
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
@@ -71,6 +128,7 @@ exports.updateUserRole = async (req, res) => {
 
         if (role === 'admin') {
             const adminCount = await User.countDocuments({
+                companyId: req.user.companyId,
                 role: 'admin',
                 _id: { $ne: id }
             });

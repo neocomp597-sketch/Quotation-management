@@ -5,7 +5,6 @@ const RolePermissionSchema = new mongoose.Schema(
         role: {
             type: String,
             required: true,
-            unique: true,
             trim: true
         },
         label: {
@@ -31,4 +30,7 @@ const RolePermissionSchema = new mongoose.Schema(
     }
 );
 
+const tenantPlugin = require('./plugins/tenantPlugin');
+RolePermissionSchema.plugin(tenantPlugin);
+RolePermissionSchema.index({ companyId: 1, role: 1 }, { unique: true });
 module.exports = mongoose.model('RolePermission', RolePermissionSchema);

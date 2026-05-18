@@ -13,7 +13,7 @@ exports.getCompanySettings = async (req, res) => {
             return res.json(cachedSettings);
         }
 
-        let settings = await CompanySettings.findOne({ userId: req.user.id }).lean();
+        let settings = await CompanySettings.findOne({ companyId: req.user.companyId }).lean();
 
         if (!settings) {
             await setCachedJson(redis, cacheKey, null, 60);
@@ -62,7 +62,7 @@ exports.updateCompanySettings = async (req, res) => {
             return res.status(400).json({ message: 'Complete address is required (line1, city, state, pincode)' });
         }
 
-        let settings = await CompanySettings.findOne({ userId: req.user.id });
+        let settings = await CompanySettings.findOne({ companyId: req.user.companyId });
 
         if (settings) {
             // Update existing settings
@@ -86,6 +86,7 @@ exports.updateCompanySettings = async (req, res) => {
             // Create new settings
             settings = await CompanySettings.create({
                 userId: req.user.id,
+                companyId: req.user.companyId,
                 companyName,
                 tagline: tagline || '',
                 logoUrl,
@@ -114,7 +115,10 @@ exports.updateCompanySettings = async (req, res) => {
 // Get company settings by user ID (for quotation PDF generation)
 exports.getCompanySettingsByUserId = async (userId) => {
     try {
-        const settings = await CompanySettings.findOne({ userId }).lean();
+        const user = await require('../models/User').findById(userId).select('companyId').lean();
+        const settings = user?.companyId
+            ? await CompanySettings.findOne({ companyId: user.companyId }).lean()
+            : null;
         return settings;
     } catch (error) {
         console.error('Error fetching company settings by userId:', error);

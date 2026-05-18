@@ -42,4 +42,6 @@ PlanningSchema.pre('findByIdAndUpdate', function() {
     }
 });
 
+const tenantPlugin = require('./plugins/tenantPlugin');
+PlanningSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('Planning', PlanningSchema);

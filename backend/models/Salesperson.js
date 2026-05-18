@@ -10,4 +10,6 @@ const SalespersonSchema = new mongoose.Schema({
 
 SalespersonSchema.index({ status: 1, name: 1 });
 
+const tenantPlugin = require('./plugins/tenantPlugin');
+SalespersonSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('Salesperson', SalespersonSchema);

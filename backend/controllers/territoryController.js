@@ -39,15 +39,7 @@ const getAutoAssignedTerritory = async (billingAddress, shippingAddress, company
 // Get all territories
 const getTerritories = async (req, res) => {
     try {
-        let companyId = req.headers['x-company-id'] || req.query.companyId;
-        if (!companyId) {
-            const CompanySettings = require('../models/CompanySettings');
-            const settings = await CompanySettings.findOne({ userId: req.user.id }).lean()
-                || await CompanySettings.findOne().sort({ createdAt: 1 }).lean();
-            if (settings) {
-                companyId = settings._id;
-            }
-        }
+        let companyId = req.user.companyId || req.headers['x-company-id'] || req.query.companyId;
 
         if (!companyId) {
             // Gracefully return empty array if no company is configured yet, avoiding toast error
@@ -70,15 +62,7 @@ const getTerritories = async (req, res) => {
 // Create a new territory
 const createTerritory = async (req, res) => {
     try {
-        let companyId = req.headers['x-company-id'] || req.body.companyId;
-        if (!companyId) {
-            const CompanySettings = require('../models/CompanySettings');
-            const settings = await CompanySettings.findOne({ userId: req.user.id }).lean()
-                || await CompanySettings.findOne().sort({ createdAt: 1 }).lean();
-            if (settings) {
-                companyId = settings._id;
-            }
-        }
+        let companyId = req.user.companyId || req.headers['x-company-id'] || req.body.companyId;
 
         if (!companyId) {
             return res.status(400).json({ message: "Please configure Company Settings first in the Settings menu before creating territories." });
@@ -94,7 +78,7 @@ const createTerritory = async (req, res) => {
             manager: manager || null,
             salesReps: salesReps || [],
             rules: rules || { cities: [], pincodes: [] },
-            createdBy: req.user?._id || null
+            createdBy: req.user?.id || null
         });
 
         await newTerritory.save();

@@ -71,8 +71,8 @@ const hashValue = (value) => crypto
 
 const getUserCacheScope = (req) => (
     req.user?.role === 'admin'
-        ? 'admin'
-        : `user:${req.user?.id || 'anonymous'}`
+        ? `tenant:${req.user?.companyId || 'unknown'}:admin`
+        : `tenant:${req.user?.companyId || 'unknown'}:user:${req.user?.id || 'anonymous'}`
 );
 
 const makeCacheKey = (namespace, req, parts = {}) => (

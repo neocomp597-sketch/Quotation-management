@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('./plugins/tenantPlugin');
 
 const CompanySettingsSchema = new mongoose.Schema({
     // Basic Company Information
@@ -50,8 +51,8 @@ const CompanySettingsSchema = new mongoose.Schema({
     // Quotation prefix settings
     quotationPrefix: { type: String, default: 'ARM/QTN' },
 
-    // User who owns these settings
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, unique: true },
+    // User who originally configured these settings
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
 
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
@@ -61,5 +62,8 @@ const CompanySettingsSchema = new mongoose.Schema({
 CompanySettingsSchema.pre('save', async function () {
     this.updatedAt = Date.now();
 });
+
+CompanySettingsSchema.plugin(tenantPlugin);
+CompanySettingsSchema.index({ companyId: 1 }, { unique: true });
 
 module.exports = mongoose.model('CompanySettings', CompanySettingsSchema);

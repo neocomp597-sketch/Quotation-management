@@ -44,6 +44,9 @@ const Authorization = () => {
     const [showNewRoleForm, setShowNewRoleForm] = useState(false);
     const [newRoleData, setNewRoleData] = useState({ label: '', description: '' });
     const [creatingRole, setCreatingRole] = useState(false);
+    const [showNewUserForm, setShowNewUserForm] = useState(false);
+    const [newUserData, setNewUserData] = useState({ name: '', email: '', password: '', role: 'sales' });
+    const [creatingUser, setCreatingUser] = useState(false);
 
     const fetchMatrix = async () => {
         try {
@@ -207,6 +210,30 @@ const Authorization = () => {
             toast.success('Role deleted');
         } catch (err) {
             toast.error('Failed to delete');
+        }
+    };
+
+    const handleCreateUser = async (e) => {
+        e.preventDefault();
+        if (!newUserData.name.trim() || !newUserData.email.trim() || !newUserData.password.trim()) return;
+
+        setCreatingUser(true);
+        try {
+            const res = await userService.create({
+                name: newUserData.name.trim(),
+                email: newUserData.email.trim(),
+                password: newUserData.password,
+                role: newUserData.role || 'sales',
+            });
+
+            setUsers((prev) => [res.data, ...prev]);
+            setNewUserData({ name: '', email: '', password: '', role: 'sales' });
+            setShowNewUserForm(false);
+            toast.success('User created');
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Could not create user');
+        } finally {
+            setCreatingUser(false);
         }
     };
 
@@ -390,10 +417,76 @@ const Authorization = () => {
 
             {/* Simple Users Table */}
             <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:border-primary-50 transition-colors">
-                <div className="p-6 border-b border-slate-100">
-                    <h2 className="text-lg font-bold text-slate-900">Users</h2>
-                    <p className="text-xs text-slate-500 mt-1">Assign roles to each user.</p>
+                <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <h2 className="text-lg font-bold text-slate-900">Team Users</h2>
+                        <p className="text-xs text-slate-500 mt-1">Create company users and assign their roles.</p>
+                    </div>
+                    <button
+                        onClick={() => setShowNewUserForm((prev) => !prev)}
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-lg font-bold text-sm hover:bg-primary-700 transition-colors shadow-sm"
+                    >
+                        {showNewUserForm ? 'Cancel' : <><MdAdd size={18} /> Add User</>}
+                    </button>
                 </div>
+                {showNewUserForm && (
+                    <form onSubmit={handleCreateUser} className="p-6 bg-primary-50/20 border-b border-primary-100 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4 items-end">
+                        <div>
+                            <label className="block text-xs font-bold text-primary-600 mb-1.5 ml-1">Name</label>
+                            <input
+                                type="text"
+                                required
+                                value={newUserData.name}
+                                onChange={(e) => setNewUserData((prev) => ({ ...prev, name: e.target.value }))}
+                                className="w-full px-4 py-2.5 bg-white border border-primary-100 rounded-lg text-sm outline-none focus:border-primary-600 transition-colors"
+                                placeholder="Full name"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-primary-600 mb-1.5 ml-1">Email</label>
+                            <input
+                                type="email"
+                                required
+                                value={newUserData.email}
+                                onChange={(e) => setNewUserData((prev) => ({ ...prev, email: e.target.value }))}
+                                className="w-full px-4 py-2.5 bg-white border border-primary-100 rounded-lg text-sm outline-none focus:border-primary-600 transition-colors"
+                                placeholder="name@company.com"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-primary-600 mb-1.5 ml-1">Password</label>
+                            <input
+                                type="password"
+                                required
+                                minLength={6}
+                                value={newUserData.password}
+                                onChange={(e) => setNewUserData((prev) => ({ ...prev, password: e.target.value }))}
+                                className="w-full px-4 py-2.5 bg-white border border-primary-100 rounded-lg text-sm outline-none focus:border-primary-600 transition-colors"
+                                placeholder="Temporary password"
+                                autoComplete="new-password"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-primary-600 mb-1.5 ml-1">Role</label>
+                            <select
+                                value={newUserData.role}
+                                onChange={(e) => setNewUserData((prev) => ({ ...prev, role: e.target.value }))}
+                                className="w-full px-4 py-2.5 bg-white border border-primary-100 rounded-lg text-sm font-bold outline-none focus:border-primary-600 transition-colors"
+                            >
+                                {roles.map((role) => (
+                                    <option key={role.role} value={role.role}>{role.label}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <button
+                            type="submit"
+                            disabled={creatingUser}
+                            className="px-6 py-2.5 bg-primary-600 text-white rounded-lg font-bold text-sm hover:bg-primary-700 disabled:opacity-50 transition-colors shadow-sm"
+                        >
+                            {creatingUser ? 'Creating...' : 'Create User'}
+                        </button>
+                    </form>
+                )}
                 <div className="overflow-x-auto">
                     <table className="w-full text-left">
                         <thead>

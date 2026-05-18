@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const EnquirySchema = new mongoose.Schema({
-    enquiryNo: { type: String, required: true, unique: true },
+    enquiryNo: { type: String, required: true },
     enquiryDate: { type: Date, required: true, default: Date.now },
     customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', required: true },
     refReceivedFrom: { type: String }, // OUR Ref. received from
@@ -83,4 +83,7 @@ EnquirySchema.pre(['updateOne', 'updateMany'], function() {
     this.set({ lastActivityDate: new Date() });
 });
 
+const tenantPlugin = require('./plugins/tenantPlugin');
+EnquirySchema.plugin(tenantPlugin);
+EnquirySchema.index({ companyId: 1, enquiryNo: 1 }, { unique: true });
 module.exports = mongoose.model('Enquiry', EnquirySchema);

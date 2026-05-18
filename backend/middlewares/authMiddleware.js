@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const { getRedis } = require('../config/redis');
 const { getCachedJson, setCachedJson } = require('../utils/apiCache');
+const { runWithTenant } = require('./tenantContext');
 
 const AUTH_USER_CACHE_TTL_SECONDS = Number(process.env.AUTH_USER_CACHE_TTL_SECONDS || 300);
 
@@ -34,7 +35,7 @@ exports.protect = async (req, res, next) => {
             let user = cachedUser;
 
             if (!user) {
-                user = await User.findById(decoded.id).select('_id name email role tokenVersion').lean();
+                user = await User.findById(decoded.id).select('_id name email role tokenVersion companyId').lean();
                 if (user) {
                     await setCachedJson(redis, cacheKey, user, AUTH_USER_CACHE_TTL_SECONDS);
                 }
@@ -52,9 +53,11 @@ exports.protect = async (req, res, next) => {
                 id: user._id.toString(),
                 name: user.name,
                 email: user.email,
-                role: user.role
+                role: user.role,
+                companyId: user.companyId?.toString?.() || user.companyId
             };
-            next();
+
+            runWithTenant(req.user.companyId, () => next());
         } catch (error) {
             console.error(error);
             res.status(401).json({ message: 'Not authorized, token failed' });

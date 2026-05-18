@@ -15,4 +15,6 @@ QuotationDraftSchema.pre('findOneAndUpdate', function () {
     this.set({ updatedAt: new Date() });
 });
 
+const tenantPlugin = require('./plugins/tenantPlugin');
+QuotationDraftSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('QuotationDraft', QuotationDraftSchema);

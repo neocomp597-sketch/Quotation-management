@@ -11,4 +11,6 @@ const TermsTemplateSchema = new mongoose.Schema({
 TermsTemplateSchema.index({ createdAt: -1 });
 TermsTemplateSchema.index({ isDefault: 1, createdAt: -1 });
 
+const tenantPlugin = require('./plugins/tenantPlugin');
+TermsTemplateSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('TermsTemplate', TermsTemplateSchema);

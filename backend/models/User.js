@@ -10,7 +10,10 @@ const UserSchema = new mongoose.Schema({
     tokenVersion: { type: Number, default: 0 },
     role: { type: String, default: 'sales' },
     status: { type: Boolean, default: true },
+    companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company', required: true, index: true },
     createdAt: { type: Date, default: Date.now },
 });
+
+UserSchema.index({ companyId: 1, email: 1 }, { unique: true });
 
 module.exports = mongoose.model('User', UserSchema);
