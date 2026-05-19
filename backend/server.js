@@ -213,6 +213,53 @@ app.get('/api/read-revenue-plan', async (req, res) => {
 const startBackgroundServices = async () => {
   await dbStartupPromise;
   await redisStartupPromise;
+
+  // Database Migration for 'Sept' month entries
+  try {
+    const Planning = require("./models/Planning");
+    const FY_MONTH_NAMES = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
+    const entries = await Planning.find({
+      $or: [
+        { monthYear: /Sept/i },
+        { month: { $lt: 1 } },
+        { month: { $gt: 12 } },
+        { month: null }
+      ]
+    });
+    if (entries.length > 0) {
+      console.log(`[Migration] Found ${entries.length} planning documents with invalid months. Correcting...`);
+      let updatedCount = 0;
+      for (const entry of entries) {
+        let changed = false;
+        if (entry.monthYear && entry.monthYear.toLowerCase().startsWith('sept')) {
+          const parts = entry.monthYear.split('-');
+          const yearSuffix = parts[1];
+          entry.monthYear = `Sep-${yearSuffix}`;
+          changed = true;
+        }
+        if (entry.monthYear) {
+          const prefix = entry.monthYear.split('-')[0].substring(0, 3);
+          const expectedMonth = FY_MONTH_NAMES.findIndex(
+            m => m.toLowerCase() === prefix.toLowerCase()
+          ) + 1;
+          if (expectedMonth > 0 && entry.month !== expectedMonth) {
+            entry.month = expectedMonth;
+            changed = true;
+          }
+        }
+        if (changed) {
+          await entry.save();
+          updatedCount++;
+        }
+      }
+      console.log(`[Migration] Successfully updated ${updatedCount} planning documents.`);
+    } else {
+      console.log("[Migration] No invalid planning documents found.");
+    }
+  } catch (migErr) {
+    console.error("[Migration] Error during startup migration:", migErr.message);
+  }
+
   await startCacheInvalidationWorker();
   await startAuthSessionWorker();
   await scheduler.startScheduler();

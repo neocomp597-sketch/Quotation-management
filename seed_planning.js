@@ -92,7 +92,7 @@ async function seed() {
             const startYear = month >= 3 ? year : year - 1;
             const financialYear = `${startYear}-${String(startYear + 1).slice(-2)}`;
             const monthName = FY_MONTHS[(month - 3 + 12) % 12];
-            const monthYear = `${dateObj.toLocaleString('default', { month: 'short' })}-${String(year).slice(-2)}`;
+            const monthYear = `${monthName}-${String(year).slice(-2)}`;
             const monthNum = ((month - 3 + 12) % 12) + 1; // Apr=1, Mar=12
 
             // Customer

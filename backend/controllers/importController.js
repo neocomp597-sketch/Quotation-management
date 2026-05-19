@@ -167,6 +167,18 @@ const resolvePlanningMonthInfo = (financialYear, monthYear) => {
     const normalizedInput = normalizeKey(cleanedMonthYear).replace(/\s+/g, '-');
     let monthIndex = validMonthLabels.findIndex((label) => normalizeKey(label) === normalizedInput);
 
+    if (monthIndex === -1 && normalizedInput) {
+        const parts = normalizedInput.split('-');
+        if (parts.length === 2) {
+            const inputMonthPrefix = parts[0].substring(0, 3);
+            const inputYearSuffix = parts[1];
+            monthIndex = validMonthLabels.findIndex((label) => {
+                const labelParts = normalizeKey(label).split('-');
+                return labelParts[0].substring(0, 3) === inputMonthPrefix && labelParts[1] === inputYearSuffix;
+            });
+        }
+    }
+
     if (monthIndex === -1 && typeof rawMonthYear === 'number' && Number.isFinite(rawMonthYear)) {
         const date = excelSerialDateToDate(rawMonthYear);
         if (!Number.isNaN(date.getTime())) {
@@ -230,7 +242,6 @@ const getCurrentFinancialYear = () => {
     return `${startYear}-${String(startYear + 1).slice(-2)}`;
 };
 
-// Import Products from Excel/CSV
 const importProducts = async (req, res) => {
     try {
         if (!req.file) {

@@ -1091,7 +1091,7 @@ const PlanningScreen = () => {
         value: Number(newRow.value),
         mgrCode: getCanonicalMgrCode(newRow.mgrCode, mgrList),
         mgrCode2: getCanonicalMgrCode(newRow.mgrCode2, mgrList2),
-        month: FY_MONTHS.indexOf(monthToUse.split("-")[0]) + 1,
+        month: FY_MONTHS.indexOf(monthToUse.split("-")[0].substring(0, 3)) + 1,
       };
 
       if (editingId) {
