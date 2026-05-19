@@ -270,7 +270,7 @@ export const productAttributeService = {
 };
 
 export const voucherService = {
-  getAll: () => api.get("/vouchers"),
+  getAll: (params = {}) => api.get("/vouchers", { params }),
   getById: (id) => api.get(`/vouchers/${id}`),
   create: (data) => api.post("/vouchers", data),
   update: (id, data) => api.put(`/vouchers/${id}`, data),
@@ -334,6 +334,12 @@ export const territoryService = {
   create: (data) => api.post("/territories", data),
   update: (id, data) => api.put(`/territories/${id}`, data),
   delete: (id) => api.delete(`/territories/${id}`),
+};
+
+export const footerPageService = {
+  getAll: () => api.get("/footer-pages"),
+  getBySlug: (slug) => api.get(`/footer-pages/${slug}`),
+  update: (slug, data) => api.put(`/footer-pages/${slug}`, data),
 };
 
 export default api;

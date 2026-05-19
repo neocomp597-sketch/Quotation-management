@@ -3,6 +3,43 @@ const MGR = require('../models/MGR');
 const { getCachedJson, makeCacheKey, setCachedJson } = require('../utils/apiCache');
 const { invalidateViaQueueOrNow } = require('../queues/cacheInvalidationQueue');
 const { getTenantId } = require('../middlewares/tenantContext');
+const RolePermission = require('../models/RolePermission');
+const { resolvePermissions } = require('../config/authorization');
+
+const isPreviousYear = (financialYear) => {
+    if (!financialYear) return false;
+    const startYear = parseInt(financialYear.split('-')[0], 10);
+    if (isNaN(startYear)) return false;
+    
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentFYStartYear = currentMonth >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+    
+    return startYear < currentFYStartYear;
+};
+
+const getRolePermissions = async (role) => {
+    const { DEFAULT_ROLE_PERMISSIONS } = require('../config/authorization');
+    if (role === 'admin') {
+        return { ...DEFAULT_ROLE_PERMISSIONS.admin };
+    }
+    const document = await RolePermission.findOne({ role }).select('menuVisibility').lean();
+    return resolvePermissions(role, document?.menuVisibility || {});
+};
+
+const checkPrevYearEditPermission = async (user, financialYear) => {
+    if (!financialYear) return true;
+    if (user.role === 'admin') return true;
+    
+    if (isPreviousYear(financialYear)) {
+        const permissions = await getRolePermissions(user.role);
+        if (!permissions.planning_edit_prev_year) {
+            return false;
+        }
+    }
+    return true;
+};
+
 
 const PLANNING_LIST_CACHE_TTL_SECONDS = Number(process.env.PLANNING_LIST_CACHE_TTL_SECONDS || 120);
 const PLANNING_REPORT_CACHE_TTL_SECONDS = Number(process.env.PLANNING_REPORT_CACHE_TTL_SECONDS || 300);
@@ -257,6 +294,12 @@ const buildSummaryRows = (rows, columns, prevRows, flags = {}) => {
 exports.createEntry = async (req, res) => {
     try {
         const normalizedBody = await normalizePlanningPayload(req.body);
+        
+        const canEdit = await checkPrevYearEditPermission(req.user, normalizedBody.financialYear);
+        if (!canEdit) {
+            return res.status(403).json({ message: 'You do not have permission to add entries in previous financial years.' });
+        }
+
         const entry = new Planning({
             ...normalizedBody,
             totalValue: (normalizedBody.qty || 0) * (normalizedBody.value || 0),
@@ -278,7 +321,18 @@ exports.getAllEntries = async (req, res) => {
         if (month) filter.monthYear = month;
         if (mgr1) filter.mgrCode = mgr1;
         if (mgr2) filter.mgrCode2 = mgr2;
-        if (status) filter.status = status;
+        if (status) {
+            const statuses = String(status)
+                .split(',')
+                .map((item) => cleanValue(item))
+                .map((item) => normalizeStatusValue(item))
+                .filter(Boolean);
+            if (statuses.length === 1) {
+                filter.status = statuses[0];
+            } else if (statuses.length > 1) {
+                filter.status = { $in: statuses };
+            }
+        }
 
         if (req.query.excludeStatus) {
             const excluded = req.query.excludeStatus.split(',').map(s => cleanValue(s)).filter(Boolean);
@@ -327,7 +381,17 @@ exports.getAllEntries = async (req, res) => {
 exports.updateEntry = async (req, res) => {
     try {
         const { id } = req.params;
+        const entry = await Planning.findById(id);
+        if (!entry) return res.status(404).json({ message: 'Entry not found' });
+
         const updateData = await normalizePlanningPayload(req.body);
+
+        const canEditOriginal = await checkPrevYearEditPermission(req.user, entry.financialYear);
+        const canEditNew = await checkPrevYearEditPermission(req.user, updateData.financialYear || entry.financialYear);
+        if (!canEditOriginal || !canEditNew) {
+            return res.status(403).json({ message: 'You do not have permission to edit/update previous year entries.' });
+        }
+
         if (updateData.qty !== undefined && updateData.value !== undefined) {
             updateData.totalValue = updateData.qty * updateData.value;
         }
@@ -336,7 +400,6 @@ exports.updateEntry = async (req, res) => {
             new: true,
             runValidators: true
         });
-        if (!updated) return res.status(404).json({ message: 'Entry not found' });
         await invalidateViaQueueOrNow('planning:*');
         res.json(updated);
     } catch (err) {
@@ -347,8 +410,15 @@ exports.updateEntry = async (req, res) => {
 exports.deleteEntry = async (req, res) => {
     try {
         const { id } = req.params;
-        const result = await Planning.findByIdAndDelete(id);
-        if (!result) return res.status(404).json({ message: 'Entry not found' });
+        const entry = await Planning.findById(id);
+        if (!entry) return res.status(404).json({ message: 'Entry not found' });
+
+        const canEdit = await checkPrevYearEditPermission(req.user, entry.financialYear);
+        if (!canEdit) {
+            return res.status(403).json({ message: 'You do not have permission to delete previous year entries.' });
+        }
+
+        await Planning.findByIdAndDelete(id);
         await invalidateViaQueueOrNow('planning:*');
         res.json({ message: 'Entry deleted' });
     } catch (err) {

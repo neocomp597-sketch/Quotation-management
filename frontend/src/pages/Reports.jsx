@@ -61,7 +61,7 @@ const QUARTERS = [
 ];
 const PLANNING_SEGMENTS = ['Export', 'Industry', 'UC', 'Utility'];
 const REVENUE_PLAN_STATUS_OPTIONS = ['Budget', 'Firm', 'MFC', 'B&B', 'Invoice', 'Order Received', 'Lost', 'Parked', 'Other'];
-const DEFAULT_REVENUE_PLAN_STATUSES = ['Budget'];
+const DEFAULT_REVENUE_PLAN_STATUSES = [];
 const REVENUE_PRODUCT_TEMPLATE = [
     { type: 'I', product: '11KV Indoor ' },
     { type: '33K', product: '33KV ID/OD' },
@@ -117,6 +117,13 @@ const normalizePlanningStatusFilter = (value = '') => {
     const key = normalizeRevenueKey(value);
     if (key === 'B&B' || key === 'BB' || key === 'BANDB') return 'B&B';
     if (key === 'OTHER' || key === 'OTHERS') return 'Other';
+    if (key === 'FIRM') return 'Firm';
+    if (key === 'MFC') return 'MFC';
+    if (key === 'INVOICE') return 'Invoice';
+    if (key === 'BUDGET') return 'Budget';
+    if (key === 'ORDERRECEIVED') return 'Order Received';
+    if (key === 'LOST') return 'Lost';
+    if (key === 'PARKED') return 'Parked';
     return String(value || '').trim();
 };
 
@@ -856,24 +863,24 @@ const Reports = () => {
                     const fy = revenuePlanFY || planningFY;
                     if (fy) {
                         setRevenuePlanError('');
-                        const reportFilters = { status: 'Budget' };
+                        const reportStatus = (revenuePlanFilters.statuses || []).join(',');
+                        const reportFilters = {};
+                        if (reportStatus) {
+                            reportFilters.status = reportStatus;
+                        }
                         if (revenuePlanFilters.mgr1) reportFilters.mgr1 = revenuePlanFilters.mgr1;
                         if (revenuePlanFilters.segment) reportFilters.mgr2 = revenuePlanFilters.segment;
-                        
-                        // Only fetch entries if FY changed or we don't have them
-                        const shouldFetchEntries = revenuePlanEntries.length === 0 || revenuePlanEntries[0]?.financialYear !== fy;
-                        
-                        if (shouldFetchEntries) {
-                            const [reportRes, entriesRes] = await Promise.all([
-                                planningService.getMGRReport(fy, 'SBU', reportFilters),
-                                planningService.getAll({ financialYear: fy, status: 'Budget', limit: 100000, offset: 0 })
-                            ]);
-                            setRevenuePlanReport(reportRes.data);
-                            setRevenuePlanEntries(entriesRes.data?.data || []);
-                        } else {
-                            const reportRes = await planningService.getMGRReport(fy, 'SBU', reportFilters);
-                            setRevenuePlanReport(reportRes.data);
+                        const entryFilters = { financialYear: fy, limit: 100000, offset: 0 };
+                        if (reportStatus) {
+                            entryFilters.status = reportStatus;
                         }
+                        
+                        const [reportRes, entriesRes] = await Promise.all([
+                            planningService.getMGRReport(fy, 'SBU', reportFilters),
+                            planningService.getAll(entryFilters)
+                        ]);
+                        setRevenuePlanReport(reportRes.data);
+                        setRevenuePlanEntries(entriesRes.data?.data || []);
                     }
                     break;
                 }
@@ -1713,7 +1720,7 @@ const Reports = () => {
                             </button>
                         </div>
                     </div>
-                    <div className="grid grid-cols-1 lg:grid-cols-[minmax(160px,1fr)_minmax(160px,1fr)_auto] gap-3 p-4 border-b border-black" style={{ backgroundColor: normalizeHex(REVENUE_PLAN_COLORS.filter) }}>
+                    <div className="grid grid-cols-1 lg:grid-cols-[minmax(150px,1.2fr)_minmax(150px,1.2fr)_1fr_auto] gap-3 p-4 border-b border-black" style={{ backgroundColor: normalizeHex(REVENUE_PLAN_COLORS.filter) }}>
                         <div>
                             <label className="block text-[9px] font-black uppercase tracking-widest text-black mb-1">MGR 1</label>
                             <select
@@ -1735,6 +1742,33 @@ const Reports = () => {
                                 <option value="">All Segments</option>
                                 {segmentOptions.map(option => <option key={option} value={option}>{getRevenueSegmentLabel(option)}</option>)}
                             </select>
+                        </div>
+                        <div>
+                            <label className="block text-[9px] font-black uppercase tracking-widest text-black mb-1">Status</label>
+                            <div className="flex flex-wrap gap-1.5 items-center">
+                                {(statusOptions.length > 0 ? statusOptions : REVENUE_PLAN_STATUS_OPTIONS)
+                                    .filter(status => {
+                                        const normalized = String(status || '').trim().replace(/\s+/g, '').toUpperCase();
+                                        return ['MFC', 'INVOICE', 'FIRM', 'B&B', 'BB', 'BANDB', 'BUDGET'].includes(normalized);
+                                    })
+                                    .map(status => {
+                                        const isSelected = revenuePlanFilters.statuses.includes(status);
+                                        return (
+                                            <button
+                                                key={status}
+                                                type="button"
+                                                onClick={() => toggleRevenuePlanStatusFilter(status)}
+                                                className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-wider border border-black transition-all duration-150 ${
+                                                    isSelected
+                                                        ? 'bg-black text-white shadow-sm'
+                                                        : 'bg-white text-black hover:bg-slate-50'
+                                                }`}
+                                            >
+                                                {status}
+                                            </button>
+                                        );
+                                    })}
+                            </div>
                         </div>
                         <div className="flex items-end">
                             <button

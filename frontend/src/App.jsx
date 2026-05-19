@@ -33,6 +33,8 @@ import ErrorBoundary from './components/ErrorBoundary';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 
+import FooterPageView from './pages/FooterPageView';
+
 function App() {
   return (
     <AuthProvider>
@@ -70,9 +72,15 @@ function App() {
             <Route path="/enquiries/create" element={<PermissionRoute permissionKey="enquiry_leads"><Layout><CreateEnquiry /></Layout></PermissionRoute>} />
             <Route path="/enquiries/edit/:id" element={<PermissionRoute permissionKey="enquiry_leads"><Layout><CreateEnquiry /></Layout></PermissionRoute>} />
             <Route path="/products" element={<PermissionRoute permissionKey="master_products"><Layout><Products /></Layout></PermissionRoute>} />
-            <Route path="/vouchers" element={<PermissionRoute permissionKey="sale_invoices"><Layout><Vouchers /></Layout></PermissionRoute>} />
-            <Route path="/vouchers/new" element={<PermissionRoute permissionKey="sale_invoices"><Layout><CreateVoucher /></Layout></PermissionRoute>} />
-            <Route path="/vouchers/:id" element={<PermissionRoute permissionKey="sale_invoices"><Layout><CreateVoucher /></Layout></PermissionRoute>} />
+            <Route path="/invoices" element={<PermissionRoute permissionKey="sale_invoices"><Layout><Vouchers mode="invoice" /></Layout></PermissionRoute>} />
+            <Route path="/invoices/new" element={<PermissionRoute permissionKey="sale_invoices"><Layout><CreateVoucher mode="invoice" /></Layout></PermissionRoute>} />
+            <Route path="/invoices/:id" element={<PermissionRoute permissionKey="sale_invoices"><Layout><CreateVoucher mode="invoice" /></Layout></PermissionRoute>} />
+            <Route path="/vouchers" element={<Navigate to="/grn" replace />} />
+            <Route path="/vouchers/new" element={<Navigate to="/grn/new" replace />} />
+            <Route path="/vouchers/:id" element={<Navigate to="/grn" replace />} />
+            <Route path="/grn" element={<PermissionRoute permissionKey="purchase_grn"><Layout><Vouchers mode="grn" /></Layout></PermissionRoute>} />
+            <Route path="/grn/new" element={<PermissionRoute permissionKey="purchase_grn"><Layout><CreateVoucher mode="grn" /></Layout></PermissionRoute>} />
+            <Route path="/grn/:id" element={<PermissionRoute permissionKey="purchase_grn"><Layout><CreateVoucher mode="grn" /></Layout></PermissionRoute>} />
             <Route path="/mgrs" element={<PermissionRoute permissionKey="master_mgrs"><Layout><MGRMaster /></Layout></PermissionRoute>} />
             <Route path="/attributes" element={<PermissionRoute permissionKey="master_attributes"><Layout><Attributes /></Layout></PermissionRoute>} />
             <Route path="/planning" element={<PermissionRoute permissionKey="planning_screen"><Layout><ErrorBoundary><PlanningScreen /></ErrorBoundary></Layout></PermissionRoute>} />
@@ -86,6 +94,7 @@ function App() {
             <Route path="/settings" element={<PermissionRoute permissionKey="settings_profile"><Layout><Settings /></Layout></PermissionRoute>} />
             <Route path="/status-master" element={<PermissionRoute adminOnly={true}><Layout><StatusMaster /></Layout></PermissionRoute>} />
             <Route path="/admin/authorization" element={<PermissionRoute permissionKey="admin_authorization"><Layout><Authorization /></Layout></PermissionRoute>} />
+            <Route path="/info/:slug" element={<Layout><FooterPageView /></Layout>} />
           </Route>
 
           {/* Fallback route */}

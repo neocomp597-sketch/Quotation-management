@@ -1,10 +1,30 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import { Link } from 'react-router-dom';
+import { footerPageService } from '../services/api';
 
 const Layout = ({ children }) => {
     const [sidebarOpen, setSidebarOpen] = useState(true);
+    const [footerPages, setFooterPages] = useState([
+        { slug: 'privacy-policy', label: 'Privacy Policy' },
+        { slug: 'terms-of-service', label: 'Terms of Service' },
+        { slug: 'help-center', label: 'Help Center' }
+    ]);
+
+    useEffect(() => {
+        const fetchFooterPages = async () => {
+            try {
+                const res = await footerPageService.getAll();
+                if (res.data && Array.isArray(res.data)) {
+                    setFooterPages(res.data);
+                }
+            } catch (err) {
+                console.error("Failed to load footer pages", err);
+            }
+        };
+        fetchFooterPages();
+    }, []);
 
     return (
         <div className="min-h-screen bg-slate-50/50 relative overflow-hidden">
@@ -26,9 +46,15 @@ const Layout = ({ children }) => {
                 <div className="px-6 md:px-10 max-w-full mx-auto border-t border-slate-100 pt-8 flex flex-col md:flex-row items-center justify-between text-slate-400 text-xs font-bold uppercase tracking-widest gap-6">
                     <p>&copy; {new Date().getFullYear()} ARCRM. Always Ready CRM.</p>
                     <div className="flex flex-wrap justify-center items-center gap-6 md:gap-10">
-                        <Link to="#" className="hover:text-primary-600 transition-colors">Privacy Policy</Link>
-                        <Link to="#" className="hover:text-primary-600 transition-colors">Terms of Service</Link>
-                        <Link to="#" className="hover:text-primary-600 transition-colors">Help Center</Link>
+                        {footerPages.map(page => (
+                            <Link 
+                                key={page.slug} 
+                                to={`/info/${page.slug}`} 
+                                className="hover:text-primary-600 transition-colors"
+                            >
+                                {page.label}
+                            </Link>
+                        ))}
                     </div>
                 </div>
             </footer>

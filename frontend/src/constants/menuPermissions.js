@@ -35,21 +35,20 @@ export const MENU_PERMISSION_GROUPS = [
     },
     {
         key: 'quotation',
-        label: 'Quotation',
-        description: 'Quotation screens and actions',
+        label: 'Sales',
+        description: 'Quotation and sales invoice screens',
         defaultRoute: '/quotations',
         children: [
-            { key: 'quotation_list', label: 'Quotations', description: 'Quotation list and creation screens', defaultRoute: '/quotations' }
+            { key: 'quotation_list', label: 'Quotations', description: 'Quotation list and creation screens', defaultRoute: '/quotations' },
+            { key: 'sale_invoices', label: 'Create Invoice', description: 'Sales outward invoice screens', defaultRoute: '/invoices' }
         ]
     },
     {
         key: 'sale',
-        label: 'Sale',
-        description: 'Sales voucher and invoice workflow',
-        defaultRoute: '/vouchers',
-        children: [
-            { key: 'sale_invoices', label: 'Create Invoice', description: 'Sales voucher and invoice screens', defaultRoute: '/vouchers' }
-        ]
+        label: 'Material Received',
+        description: 'Material received navigation group',
+        defaultRoute: null,
+        children: []
     },
     {
         key: 'purchase',
@@ -57,7 +56,7 @@ export const MENU_PERMISSION_GROUPS = [
         description: 'Purchase and GRN navigation group',
         defaultRoute: null,
         children: [
-            { key: 'purchase_grn', label: 'GRN', description: 'Goods receipt note screens', defaultRoute: null }
+            { key: 'purchase_grn', label: 'GRN', description: 'Goods receipt note and sale return screens', defaultRoute: '/grn' }
         ]
     },
     {
@@ -67,7 +66,11 @@ export const MENU_PERMISSION_GROUPS = [
         defaultRoute: '/planning',
         children: [
             { key: 'planning_screen', label: 'Planning Screen', description: 'Revenue planning workspace', defaultRoute: '/planning' },
-            { key: 'planning_simulations', label: 'Simulations', description: 'Planning simulation screens', defaultRoute: '/simulations' }
+            { key: 'planning_simulations', label: 'Simulations', description: 'Planning simulation screens', defaultRoute: '/simulations' },
+            { key: 'planning_edit_prev_year', label: 'Edit Previous Year Entries', description: 'Allow adding/editing/deleting planning entries in previous financial years', defaultRoute: '/planning' },
+            { key: 'planning_view_sbu_wise', label: 'View SBU Wise Summary', description: 'Access to SBU-wise summary in Planning Screen', defaultRoute: '/planning' },
+            { key: 'planning_view_segment_wise', label: 'View Segment Wise Summary', description: 'Access to Segment-wise summary in Planning Screen', defaultRoute: '/planning' },
+            { key: 'planning_view_status_breakdown', label: 'View Status Breakdown Summary', description: 'Access to Status Breakdown summary in Planning Screen', defaultRoute: '/planning' }
         ]
     },
     {

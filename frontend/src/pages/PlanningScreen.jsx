@@ -29,6 +29,7 @@ import * as XLSX from "xlsx";
 import ImportModal from "../components/ImportModal";
 import PortalDropdown from "../components/PortalDropdown";
 import { formatToLakhs, formatToIndian } from "../utils/formatters";
+import { useAuth } from "../context/AuthContext";
 
 // Financial year months (Apr-Mar)
 const FY_MONTHS = [
@@ -51,11 +52,7 @@ const STATUS_REPORT_COLUMNS = [
   "Firm",
   "MFC",
   "B&B",
-  "Other",
   "Invoice",
-  "Lost",
-  "Parked",
-  "Order Received",
 ];
 const STATUS_REPORT_ROWS = [
   { key: "Firm", label: "Firm", aliases: ["Firm"] },
@@ -66,14 +63,6 @@ const STATUS_REPORT_ROWS = [
     aliases: ["B&B", "B & B", "Book & Bill"],
   },
   { key: "MFC", label: "MFC", aliases: ["MFC"] },
-  { key: "Other", label: "Others", aliases: ["Other", "Others"] },
-  { key: "Lost", label: "Lost", aliases: ["Lost"] },
-  { key: "Parked", label: "Parked", aliases: ["Parked"] },
-  {
-    key: "Order Received",
-    label: "Order Received",
-    aliases: ["Order Received"],
-  },
 ];
 // Generate financial year options (current + next 2)
 const getFinancialYears = () => {
@@ -147,11 +136,7 @@ const STATUS_BREAKDOWN_ORDERED_ROWS = [
   { key: "Firm", label: "FIRM" },
   { key: "MFC", label: "MFC" },
   { key: "B&B", label: "B&B" },
-  { key: "Other", label: "OTHERS" },
-  { key: "Order Received", label: "ORDER RECEIVED" },
   { key: "Invoice", label: "INVOICE" },
-  { key: "Lost", label: "LOST" },
-  { key: "Parked", label: "PARKED" },
 ];
 
 const dedupeMgrOptions = (items = []) => {
@@ -219,7 +204,25 @@ const getReportYearOptions = (financialYear) => {
 };
 
 const PlanningScreen = () => {
+  const { hasAccess } = useAuth();
   const [financialYear, setFinancialYear] = useState(getFinancialYears()[1]);
+
+  const isSelectedYearPrevious = useMemo(() => {
+    if (!financialYear) return false;
+    const startYear = parseInt(financialYear.split("-")[0], 10);
+    if (isNaN(startYear)) return false;
+
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentFYStartYear = currentMonth >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+
+    return startYear < currentFYStartYear;
+  }, [financialYear]);
+
+  const canEdit = useMemo(() => {
+    if (!isSelectedYearPrevious) return true;
+    return hasAccess("planning_edit_prev_year");
+  }, [isSelectedYearPrevious, hasAccess]);
   const [entries, setEntries] = useState([]);
   const [reportEntries, setReportEntries] = useState([]);
   const [combinedReportData, setCombinedReportData] = useState(null);
@@ -1028,7 +1031,7 @@ const PlanningScreen = () => {
   }, [mgrList2, mgr2Search]);
 
   const filteredStatusList = useMemo(() => {
-    const statuses =
+    const allStatuses =
       statusOptions.length > 0
         ? statusOptions
         : [
@@ -1042,6 +1045,10 @@ const PlanningScreen = () => {
             "Lost",
             "Parked",
           ];
+    const statuses = allStatuses.filter(status => {
+      const normalized = String(status || '').trim().replace(/\s+/g, '').toUpperCase();
+      return ['MFC', 'INVOICE', 'FIRM', 'B&B', 'BB', 'BANDB', 'BUDGET'].includes(normalized);
+    });
     if (!statusSearch) return statuses;
     return statuses.filter((status) =>
       (status || "").toLowerCase().includes(statusSearch.toLowerCase())
@@ -1497,13 +1504,20 @@ const PlanningScreen = () => {
           >
             <MdRefresh size={20} />
           </button>
-          <button
-            onClick={() => setIsImportModalOpen(true)}
-            className="px-5 py-3 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center gap-2"
-          >
-            <MdFileUpload size={18} />
-            Import
-          </button>
+          {isSelectedYearPrevious && !canEdit && (
+            <span className="text-xs font-bold text-amber-600 bg-amber-50 px-3 py-2 rounded-lg border border-amber-200 flex items-center gap-1.5 shadow-sm">
+              ⚠️ Read-only (Previous Year)
+            </span>
+          )}
+          {canEdit && (
+            <button
+              onClick={() => setIsImportModalOpen(true)}
+              className="px-5 py-3 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center gap-2"
+            >
+              <MdFileUpload size={18} />
+              Import
+            </button>
+          )}
           <button
             onClick={exportToExcel}
             className="px-5 py-3 bg-primary-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-primary-700 transition-all flex items-center gap-2"
@@ -1605,11 +1619,16 @@ const PlanningScreen = () => {
                     className="w-full px-3 py-3 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-primary-500 bg-white"
                   >
                     <option value="">All Statuses</option>
-                    {(statusOptions.length > 0 ? statusOptions : ["Budget", "Firm", "MFC", "B & B", "Others", "Order Received", "Invoice", "Lost", "Parked"]).map((status) => (
-                      <option key={status} value={status}>
-                        {status}
-                      </option>
-                    ))}
+                    {(statusOptions.length > 0 ? statusOptions : ["Budget", "Firm", "MFC", "B & B", "Others", "Order Received", "Invoice", "Lost", "Parked"])
+                      .filter(status => {
+                        const normalized = String(status || '').trim().replace(/\s+/g, '').toUpperCase();
+                        return ['MFC', 'INVOICE', 'FIRM', 'B&B', 'BB', 'BANDB', 'BUDGET'].includes(normalized);
+                      })
+                      .map((status) => (
+                        <option key={status} value={status}>
+                          {status}
+                        </option>
+                      ))}
                   </select>
                 </div>
               </div>
@@ -1674,26 +1693,33 @@ const PlanningScreen = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                <tr className="bg-primary-50/40 border-b border-primary-100 align-top">
+                {canEdit && (
+                  <tr className="bg-primary-50/40 border-b border-primary-100 align-top">
                   <td className="py-2 px-2 border border-slate-200">
-                    <select
-                      value={newRow.monthYear}
-                      onChange={(e) =>
-                        handleNewRowChange("monthYear", e.target.value)
-                      }
-                      onFocus={() => {
-                        setShowCustomerDropdown(false);
-                        setShowProductDropdown(false);
-                      }}
-                      className="w-full px-2.5 py-2.5 border border-primary-400 rounded-lg text-xs font-black outline-none focus:border-primary-500 bg-primary-50"
-                    >
-                      <option value="">Select</option>
-                      {monthLabels.map((month) => (
-                        <option key={month} value={month}>
-                          {month}
-                        </option>
-                      ))}
-                    </select>
+                    {editingId ? (
+                      <div className="w-full px-3 py-2.5 bg-slate-100 border border-slate-200 rounded-lg text-xs font-black text-slate-500 text-center select-none shadow-sm">
+                        {newRow.monthYear}
+                      </div>
+                    ) : (
+                      <select
+                        value={newRow.monthYear}
+                        onChange={(e) =>
+                          handleNewRowChange("monthYear", e.target.value)
+                        }
+                        onFocus={() => {
+                          setShowCustomerDropdown(false);
+                          setShowProductDropdown(false);
+                        }}
+                        className="w-full px-2.5 py-2.5 border border-primary-400 rounded-lg text-xs font-black outline-none focus:border-primary-500 bg-primary-50"
+                      >
+                        <option value="">Select</option>
+                        {monthLabels.map((month) => (
+                          <option key={month} value={month}>
+                            {month}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </td>
                   <td ref={customerAnchorRef} className="py-2 px-2 border border-slate-200">
                     <input
@@ -1992,6 +2018,7 @@ const PlanningScreen = () => {
                     </div>
                   </td>
                 </tr>
+                )}
 
                 {loading ? (
                   <tr>
@@ -2065,20 +2092,24 @@ const PlanningScreen = () => {
                             {entry.status}
                           </span>
                           <div className="flex items-center gap-1">
-                            <button
-                              onClick={() => handleEditEntry(entry)}
-                              className={`p-1.5 rounded-lg transition-all ${editingId === entry._id ? "text-primary-600 bg-primary-50" : "text-slate-400 hover:text-primary-600 hover:bg-primary-50"}`}
-                              title="Edit Entry"
-                            >
-                              <MdEdit size={16} />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteEntry(entry._id)}
-                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
-                              title="Delete Entry"
-                            >
-                              <MdDelete size={16} />
-                            </button>
+                            {canEdit && (
+                              <>
+                                <button
+                                  onClick={() => handleEditEntry(entry)}
+                                  className={`p-1.5 rounded-lg transition-all ${editingId === entry._id ? "text-primary-600 bg-primary-50" : "text-slate-400 hover:text-primary-600 hover:bg-primary-50"}`}
+                                  title="Edit Entry"
+                                >
+                                  <MdEdit size={16} />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteEntry(entry._id)}
+                                  className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                                  title="Delete Entry"
+                                >
+                                  <MdDelete size={16} />
+                                </button>
+                              </>
+                            )}
                           </div>
                         </div>
                       </td>
@@ -2123,7 +2154,8 @@ const PlanningScreen = () => {
         </>
       </div>
 
-       <div className="bg-white rounded-2xl shadow-sm border border-slate-100/80 overflow-hidden transition-all duration-300 hover:shadow-md hover:border-slate-200/60">
+      {hasAccess('planning_view_sbu_wise') && (
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-100/80 overflow-hidden transition-all duration-300 hover:shadow-md hover:border-slate-200/60">
         <div
           className="p-5 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 to-indigo-50/10 flex justify-between items-center cursor-pointer select-none group"
           onClick={() => setIsReportExpanded(!isReportExpanded)}
@@ -2375,8 +2407,10 @@ const PlanningScreen = () => {
             </div>
           );
         })()}
-      </div>
+        </div>
+      )}
 
+      {hasAccess('planning_view_segment_wise') && (
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100/80 overflow-hidden transition-all duration-300 hover:shadow-md hover:border-slate-200/60">
         <div
           className="p-5 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 to-sky-50/10 flex justify-between items-center cursor-pointer select-none group"
@@ -2671,8 +2705,10 @@ const PlanningScreen = () => {
             </table>
           </div>
         )}
-      </div>
+        </div>
+      )}
 
+      {hasAccess('planning_view_status_breakdown') && (
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100/80 overflow-hidden transition-all duration-300 hover:shadow-md hover:border-slate-200/60">
         <div
           className="p-5 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 to-emerald-50/10 flex justify-between items-center cursor-pointer select-none group"
@@ -2925,7 +2961,8 @@ const PlanningScreen = () => {
             </table>
           </div>
         )}
-      </div>
+        </div>
+      )}
 
       <ImportModal
         isOpen={isImportModalOpen}

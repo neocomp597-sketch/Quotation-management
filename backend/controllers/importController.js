@@ -1,4 +1,41 @@
 const XLSX = require('xlsx');
+const RolePermission = require('../models/RolePermission');
+const { resolvePermissions } = require('../config/authorization');
+
+const isPreviousYear = (financialYear) => {
+    if (!financialYear) return false;
+    const startYear = parseInt(financialYear.split('-')[0], 10);
+    if (isNaN(startYear)) return false;
+    
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentFYStartYear = currentMonth >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+    
+    return startYear < currentFYStartYear;
+};
+
+const getRolePermissions = async (role) => {
+    const { DEFAULT_ROLE_PERMISSIONS } = require('../config/authorization');
+    if (role === 'admin') {
+        return { ...DEFAULT_ROLE_PERMISSIONS.admin };
+    }
+    const document = await RolePermission.findOne({ role }).select('menuVisibility').lean();
+    return resolvePermissions(role, document?.menuVisibility || {});
+};
+
+const checkPrevYearEditPermission = async (user, financialYear) => {
+    if (!financialYear) return true;
+    if (!user) return true;
+    if (user.role === 'admin') return true;
+    
+    if (isPreviousYear(financialYear)) {
+        const permissions = await getRolePermissions(user.role);
+        if (!permissions.planning_edit_prev_year) {
+            return false;
+        }
+    }
+    return true;
+};
 const Product = require('../models/Product');
 const Customer = require('../models/Customer');
 const ProductAttribute = require('../models/ProductAttribute');
@@ -600,6 +637,10 @@ const importPlanning = async (req, res) => {
                 const financialYear = cleanCellValue(
                     row['Financial Year'] || row.financialYear || row.FY || selectedFinancialYear
                 );
+                const canEdit = await checkPrevYearEditPermission(req.user, financialYear);
+                if (!canEdit) {
+                    throw new Error(`You do not have permission to import entries for previous financial year (${financialYear})`);
+                }
                 const rawMonthYear = row['Month & Year'] ?? row.monthYear ?? row.Month ?? row.month;
                 const monthYear = cleanCellValue(rawMonthYear);
                 const customerLookup = cleanCellValue(

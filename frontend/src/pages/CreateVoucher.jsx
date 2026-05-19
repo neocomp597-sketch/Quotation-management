@@ -2,15 +2,17 @@ import React, { useState, useEffect, useRef } from 'react';
 import { MdAdd, MdDelete, MdSave, MdArrowBack, MdPrint, MdEdit } from 'react-icons/md';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { voucherService, vendorService, productService } from '../services/api';
+import { voucherService, vendorService, productService, customerService } from '../services/api';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import VoucherPDF from '../components/VoucherPDF';
 import PortalDropdown from '../components/PortalDropdown';
 
-const CreateVoucher = () => {
+const CreateVoucher = ({ mode = 'grn' }) => {
     const navigate = useNavigate();
     const { id } = useParams();
     const isEditMode = Boolean(id);
+    const isInvoiceMode = mode === 'invoice';
+    const basePath = isInvoiceMode ? '/invoices' : '/grn';
     
     const [loading, setLoading] = useState(false);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -25,16 +27,21 @@ const CreateVoucher = () => {
 
     // Master data
     const [vendors, setVendors] = useState([]);
+    const [customers, setCustomers] = useState([]);
     const [products, setProducts] = useState([]);
+    const [grnOptions, setGrnOptions] = useState([]);
 
     // Form state
     const [voucherData, setVoucherData] = useState({
-        voucherType: 'Purchase',
-        voucherNumber: `VCH-${Date.now()}`,
+        voucherType: isInvoiceMode ? 'Invoice' : 'Purchase',
+        voucherNumber: `${isInvoiceMode ? 'INV' : 'GRN'}-${Date.now()}`,
         date: new Date().toISOString().split('T')[0],
         vendorId: '',
         vendorName: '',
+        customerId: '',
+        customerName: '',
         contactNumber: '',
+        referenceVoucherId: '',
         items: [
             { id: Date.now(), srNumber: 1, productId: '', productName: '', qty: 0, uom: 'Pcs', price: 0, amount: 0, taxPercentage: 5, taxAmount: 0 }
         ]
@@ -50,17 +57,35 @@ const CreateVoucher = () => {
     const fetchMasterData = async () => {
         try {
             const { companySettingsService } = await import('../services/api');
-            const [vendorsRes, productsRes, settingsRes] = await Promise.all([
+            const [vendorsRes, customersRes, productsRes, settingsRes, grnRes] = await Promise.all([
                 vendorService.getAll(true),
+                customerService.getAll({ limit: 100000 }),
                 productService.getAll(),
-                companySettingsService.get()
+                companySettingsService.get(),
+                voucherService.getAll({ type: 'Purchase' })
             ]);
             setVendors(vendorsRes.data);
+            setCustomers(customersRes.data?.data || customersRes.data || []);
             setProducts(productsRes.data);
+            setGrnOptions(grnRes.data || []);
             if (settingsRes.data) setCompanySettings(settingsRes.data);
         } catch (error) {
             console.error("Error fetching master data:", error);
             toast.error("Failed to load master data");
+        }
+    };
+
+    const handleCustomerChange = (value) => {
+        const selectedCustomer = customers.find(c => c._id === value);
+        if (selectedCustomer) {
+            setVoucherData(prev => ({
+                ...prev,
+                customerId: selectedCustomer._id,
+                customerName: selectedCustomer.companyName || selectedCustomer.customerName || selectedCustomer.name || '',
+                contactNumber: selectedCustomer.phone || selectedCustomer.mobile || selectedCustomer.contactNumber || ''
+            }));
+        } else {
+            setVoucherData(prev => ({ ...prev, customerId: '', customerName: value }));
         }
     };
 
@@ -173,9 +198,10 @@ const CreateVoucher = () => {
     const grandTotal = totalAmount + totalTax;
 
     const handleSubmit = async () => {
-        // Validations
         if (!voucherData.date) return toast.error("Date is required");
-        if (!voucherData.vendorName?.trim()) return toast.error("Vendor Name is required");
+        const isCustomerParty = ['Invoice', 'Sale Return'].includes(voucherData.voucherType);
+        if (isCustomerParty && !voucherData.customerName?.trim()) return toast.error("Customer Name is required");
+        if (!isCustomerParty && !voucherData.vendorName?.trim()) return toast.error("Vendor Name is required");
         if (voucherData.items.length === 0) return toast.error("Add at least one product");
 
         const isValidItems = voucherData.items.every(item => item.productName && item.qty > 0 && item.price >= 0);
@@ -185,6 +211,7 @@ const CreateVoucher = () => {
             setLoading(true);
             const payload = {
                 ...voucherData,
+                voucherType: isInvoiceMode ? 'Invoice' : voucherData.voucherType,
                 totalQty,
                 totalAmount,
                 totalTax,
@@ -194,11 +221,11 @@ const CreateVoucher = () => {
             let savedId;
             if (isEditMode) {
                 const res = await voucherService.update(id, payload);
-                savedId = res.data?.voucher?._id;
+                    savedId = res.data?.voucher?._id;
                 toast.success("Voucher Updated");
             } else {
                 const res = await voucherService.create(payload);
-                savedId = res.data?.voucher?._id;
+                    savedId = res.data?.voucher?._id;
                 toast.success("Voucher Created");
             }
             
@@ -217,14 +244,14 @@ const CreateVoucher = () => {
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                     <button
-                        onClick={() => navigate('/vouchers')}
+                        onClick={() => navigate(basePath)}
                         className="p-2.5 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-primary-600 hover:bg-primary-50 transition-all active:scale-95 shadow-sm"
                     >
                         <MdArrowBack size={20} />
                     </button>
                     <div>
-                        <h1 className="text-3xl font-black text-slate-900 tracking-tight">{isEditMode ? 'Edit Voucher' : 'Voucher Entry'}</h1>
-                        <p className="text-slate-500 font-medium tracking-tight">Purchase / Sale Return processing</p>
+                        <h1 className="text-3xl font-black text-slate-900 tracking-tight">{isEditMode ? (isInvoiceMode ? 'Edit Invoice' : 'Edit GRN') : (isInvoiceMode ? 'Create Invoice' : 'GRN Entry')}</h1>
+                        <p className="text-slate-500 font-medium tracking-tight">{isInvoiceMode ? 'Sales outward, GST billing and stock deduction' : 'Purchase inward and sale return processing'}</p>
                     </div>
                 </div>
                 <button
@@ -233,7 +260,7 @@ const CreateVoucher = () => {
                     className="flex items-center gap-2 bg-slate-900 hover:bg-black text-white px-6 py-3 rounded-xl font-bold transition-all shadow-xl disabled:opacity-50"
                 >
                     <MdSave size={20} />
-                    <span>{loading ? 'Saving...' : (isEditMode ? 'Update Voucher' : 'Save & Update Stock')}</span>
+                    <span>{loading ? 'Saving...' : (isEditMode ? (isInvoiceMode ? 'Update Invoice' : 'Update GRN') : 'Save & Update Stock')}</span>
                 </button>
             </div>
 
@@ -250,7 +277,7 @@ const CreateVoucher = () => {
                         />
                     </div>
                     <div className="bg-amber-50/50 p-4 rounded-xl border border-amber-100">
-                        <label className="text-xs font-black uppercase text-amber-600 tracking-widest block mb-2">Voucher Number</label>
+                        <label className="text-xs font-black uppercase text-amber-600 tracking-widest block mb-2">{isInvoiceMode ? 'Invoice Number' : 'GRN Number'}</label>
                         <input
                             type="text"
                             className="w-full px-4 py-2.5 bg-white border border-amber-200 rounded-lg focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 outline-none text-slate-900 font-bold transition-all"
@@ -259,20 +286,61 @@ const CreateVoucher = () => {
                         />
                     </div>
                     <div className="bg-emerald-50/50 p-4 rounded-xl border border-emerald-100">
-                        <label className="text-xs font-black uppercase text-emerald-600 tracking-widest block mb-2">Voucher Type</label>
+                        <label className="text-xs font-black uppercase text-emerald-600 tracking-widest block mb-2">Transaction Type</label>
                         <select
                             className="w-full px-4 py-2.5 bg-white border border-emerald-200 rounded-lg focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none text-slate-900 font-bold transition-all"
                             value={voucherData.voucherType}
-                            onChange={(e) => setVoucherData({ ...voucherData, voucherType: e.target.value })}
+                            onChange={(e) => {
+                                const newType = e.target.value;
+                                setVoucherData(prev => ({
+                                    ...prev,
+                                    voucherType: newType,
+                                    vendorId: '',
+                                    vendorName: '',
+                                    customerId: '',
+                                    customerName: '',
+                                    contactNumber: '',
+                                    referenceVoucherId: ''
+                                }));
+                            }}
+                            disabled={isInvoiceMode}
                         >
-                            <option value="Purchase">Purchase</option>
-                            <option value="Sale Return">Sale Return</option>
+                            {isInvoiceMode ? (
+                                <option value="Invoice">Invoice</option>
+                            ) : (
+                                <>
+                                    <option value="Purchase">Purchase</option>
+                                    <option value="Sale Return">Sale Return</option>
+                                </>
+                            )}
                         </select>
                     </div>
                 </div>
 
-                {/* Vendor Details */}
+                {/* Party Details */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50/50 p-6 rounded-2xl border border-slate-100">
+                    {['Invoice', 'Sale Return'].includes(voucherData.voucherType) ? (
+                    <div>
+                        <label className="text-xs font-black uppercase text-slate-400 tracking-widest block mb-2">Customer Name</label>
+                        <select
+                            className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-slate-900 font-bold transition-all"
+                            value={voucherData.customerId || ''}
+                            onChange={(e) => handleCustomerChange(e.target.value)}
+                        >
+                            <option value="">Select Customer</option>
+                            {customers.map(c => (
+                                <option key={c._id} value={c._id}>{c.companyName || c.customerName || c.name}</option>
+                            ))}
+                        </select>
+                        <input
+                            type="text"
+                            placeholder="Or type customer name"
+                            className="mt-2 w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-slate-900 font-bold transition-all"
+                            value={voucherData.customerName || ''}
+                            onChange={(e) => setVoucherData({ ...voucherData, customerId: '', customerName: e.target.value })}
+                        />
+                    </div>
+                    ) : (
                     <div className="relative">
                         <label className="text-xs font-black uppercase text-slate-400 tracking-widest block mb-2">Vendor Name</label>
                         <input
@@ -309,6 +377,7 @@ const CreateVoucher = () => {
                             </ul>
                         </PortalDropdown>
                     </div>
+                    )}
                     <div>
                         <label className="text-xs font-black uppercase text-slate-400 tracking-widest block mb-2">Contact Number</label>
                         <input
@@ -319,6 +388,21 @@ const CreateVoucher = () => {
                             onChange={(e) => setVoucherData({ ...voucherData, contactNumber: e.target.value })}
                         />
                     </div>
+                    {!isInvoiceMode && voucherData.voucherType === 'Sale Return' && (
+                        <div className="md:col-span-2">
+                            <label className="text-xs font-black uppercase text-slate-400 tracking-widest block mb-2">Link Existing GRN</label>
+                            <select
+                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-slate-900 font-bold transition-all"
+                                value={voucherData.referenceVoucherId || ''}
+                                onChange={(e) => setVoucherData({ ...voucherData, referenceVoucherId: e.target.value })}
+                            >
+                                <option value="">Select GRN</option>
+                                {grnOptions.map(grn => (
+                                    <option key={grn._id} value={grn._id}>{grn.voucherNumber} - {grn.vendorName}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
                 </div>
 
                 {/* Product Grid */}
@@ -496,7 +580,7 @@ const CreateVoucher = () => {
                                 <button
                                     onClick={() => {
                                         setShowSuccessModal(false);
-                                        navigate(`/vouchers/${savedVoucherId}`);
+                                        navigate(`${basePath}/${savedVoucherId}`);
                                     }}
                                     className="w-full flex items-center justify-center gap-2 py-3.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-900 rounded-xl font-bold transition-all hover:scale-[1.02] active:scale-95"
                                 >
@@ -506,12 +590,15 @@ const CreateVoucher = () => {
                             <button
                                 onClick={() => {
                                     setVoucherData({
-                                        voucherType: 'Purchase',
-                                        voucherNumber: `VCH-${Date.now()}`,
+                                        voucherType: isInvoiceMode ? 'Invoice' : 'Purchase',
+                                        voucherNumber: `${isInvoiceMode ? 'INV' : 'GRN'}-${Date.now()}`,
                                         date: new Date().toISOString().split('T')[0],
                                         vendorId: '',
                                         vendorName: '',
+                                        customerId: '',
+                                        customerName: '',
                                         contactNumber: '',
+                                        referenceVoucherId: '',
                                         items: [
                                             { id: Date.now(), srNumber: 1, productId: '', productName: '', qty: 0, uom: 'Pcs', price: 0, amount: 0, taxPercentage: 5, taxAmount: 0 }
                                         ]
@@ -523,10 +610,10 @@ const CreateVoucher = () => {
                                 <MdAdd size={20} /> Create New
                             </button>
                             <button
-                                onClick={() => navigate('/vouchers')}
+                                onClick={() => navigate(basePath)}
                                 className="w-full flex items-center justify-center gap-2 pt-2 text-slate-400 hover:text-slate-900 font-bold transition-colors"
                             >
-                                Go to Vouchers List
+                                Go to {isInvoiceMode ? 'Invoices' : 'GRN'} List
                             </button>
                         </div>
                     </div>

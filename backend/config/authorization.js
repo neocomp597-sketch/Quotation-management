@@ -32,19 +32,18 @@ const MENU_GROUPS = [
     },
     {
         key: 'quotation',
-        label: 'Quotation',
-        description: 'Quotation screens and actions',
+        label: 'Sales',
+        description: 'Quotation and sales invoice screens',
         children: [
-            { key: 'quotation_list', label: 'Quotations', description: 'Quotation list and creation screens' }
+            { key: 'quotation_list', label: 'Quotations', description: 'Quotation list and creation screens' },
+            { key: 'sale_invoices', label: 'Create Invoice', description: 'Sales outward invoice screens' }
         ]
     },
     {
         key: 'sale',
-        label: 'Sale',
-        description: 'Sales voucher and invoice workflow',
-        children: [
-            { key: 'sale_invoices', label: 'Create Invoice', description: 'Sales voucher and invoice screens' }
-        ]
+        label: 'Material Received',
+        description: 'Material received navigation group',
+        children: []
     },
     {
         key: 'purchase',
@@ -60,7 +59,11 @@ const MENU_GROUPS = [
         description: 'Revenue planning and simulation screens',
         children: [
             { key: 'planning_screen', label: 'Planning Screen', description: 'Revenue planning workspace' },
-            { key: 'planning_simulations', label: 'Simulations', description: 'Planning simulation screens' }
+            { key: 'planning_simulations', label: 'Simulations', description: 'Planning simulation screens' },
+            { key: 'planning_edit_prev_year', label: 'Edit Previous Year Entries', description: 'Allow adding/editing/deleting planning entries in previous financial years' },
+            { key: 'planning_view_sbu_wise', label: 'View SBU Wise Summary', description: 'Access to SBU-wise summary in Planning Screen' },
+            { key: 'planning_view_segment_wise', label: 'View Segment Wise Summary', description: 'Access to Segment-wise summary in Planning Screen' },
+            { key: 'planning_view_status_breakdown', label: 'View Status Breakdown Summary', description: 'Access to Status Breakdown summary in Planning Screen' }
         ]
     },
     {

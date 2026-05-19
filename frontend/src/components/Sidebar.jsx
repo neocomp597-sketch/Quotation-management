@@ -86,16 +86,15 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             icon: <MdRequestQuote size={22} />,
             children: [
                 { key: 'quotation_list', name: 'Quotations', icon: <MdDescription size={18} />, path: '/quotations' },
+                { key: 'sale_invoices', name: 'Create Invoice', icon: <MdReceipt size={18} />, path: '/invoices' },
             ]
         },
         {
             type: 'group',
-            name: 'Sale',
+            name: 'Material Received',
             key: 'sale',
             icon: <MdPointOfSale size={22} />,
-            children: [
-                { key: 'sale_invoices', name: 'Create Invoice', icon: <MdReceipt size={18} />, path: '/vouchers' },
-            ]
+            children: []
         },
         {
             type: 'group',

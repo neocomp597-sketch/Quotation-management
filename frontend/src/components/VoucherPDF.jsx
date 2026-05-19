@@ -60,6 +60,9 @@ const VoucherPDF = ({ voucher, images = {}, companySettings }) => {
     if (!voucher) return null;
 
     const items = voucher.items || [];
+    const isCustomerParty = ['Invoice', 'Sale Return'].includes(voucher.voucherType);
+    const partyLabel = isCustomerParty ? 'Customer' : 'Vendor';
+    const partyName = isCustomerParty ? voucher.customerName : voucher.vendorName;
 
     // Helper to get image source
     const resolveImage = (url) => {
@@ -108,8 +111,8 @@ const VoucherPDF = ({ voucher, images = {}, companySettings }) => {
                                 <Text style={styles.qtnMetaValue}>{new Date(voucher.date).toLocaleDateString('en-GB')}</Text>
                             </View>
                             <View style={[styles.qtnMetaRow, { borderBottomWidth: 0 }]}>
-                                <Text style={styles.qtnMetaLabel}>Vendor</Text>
-                                <Text style={styles.qtnMetaValue}>{voucher.vendorName}</Text>
+                                <Text style={styles.qtnMetaLabel}>{partyLabel}</Text>
+                                <Text style={styles.qtnMetaValue}>{partyName}</Text>
                             </View>
                         </View>
                     </View>
@@ -141,7 +144,7 @@ const VoucherPDF = ({ voucher, images = {}, companySettings }) => {
 
                     {/* Vendor Box */}
                     <View style={styles.customerBox}>
-                        <Text style={styles.customerLabel}>Vendor / Origin: {voucher.vendorName}</Text>
+                        <Text style={styles.customerLabel}>{partyLabel}: {partyName}</Text>
                         {voucher.contactNumber ? (
                             <Text style={{ fontSize: 9, marginTop: 4 }}>Contact: {voucher.contactNumber}</Text>
                         ) : null}

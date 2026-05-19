@@ -2,13 +2,80 @@ const Voucher = require('../models/Voucher');
 const Product = require('../models/Product');
 const Vendor = require('../models/Vendor');
 
+const normalizeVoucherType = (type = '') => String(type || '').trim();
+const isInvoiceType = (type = '') => normalizeVoucherType(type) === 'Invoice';
+const isInwardType = (type = '') => ['Purchase', 'Sale Return'].includes(normalizeVoucherType(type));
+
+const cleanObjectIds = (voucherData = {}) => {
+    if (voucherData.vendorId === '') delete voucherData.vendorId;
+    if (voucherData.customerId === '') delete voucherData.customerId;
+    if (voucherData.referenceVoucherId === '') delete voucherData.referenceVoucherId;
+    if (voucherData.items && Array.isArray(voucherData.items)) {
+        voucherData.items.forEach(item => {
+            if (item.productId === '') delete item.productId;
+        });
+    }
+};
+
+const adjustProductStock = async (voucherData, direction) => {
+    for (const item of voucherData.items || []) {
+        if (!item.productId) continue;
+
+        const product = await Product.findById(item.productId);
+        if (!product) continue;
+
+        const qty = Number(item.qty || 0);
+        const stockDelta = direction === 'out' ? -qty : qty;
+        let vendorUpdated = false;
+
+        if (voucherData.vendorId) {
+            const vendorIndex = product.vendors.findIndex(
+                v => v.vendorId.toString() === voucherData.vendorId.toString()
+            );
+
+            if (vendorIndex > -1) {
+                product.vendors[vendorIndex].stock = Math.max(0, Number(product.vendors[vendorIndex].stock || 0) + stockDelta);
+                vendorUpdated = true;
+            } else if (direction === 'in') {
+                product.vendors.push({
+                    vendorId: voucherData.vendorId,
+                    price: item.price,
+                    stock: qty,
+                    isPrimary: product.vendors.length === 0
+                });
+                vendorUpdated = true;
+            }
+        }
+
+        if (!vendorUpdated && product.vendors.length > 0) {
+            let primaryIndex = product.vendors.findIndex(v => v.isPrimary);
+            if (primaryIndex === -1) primaryIndex = 0;
+            product.vendors[primaryIndex].stock = Math.max(0, Number(product.vendors[primaryIndex].stock || 0) + stockDelta);
+        }
+
+        await product.save();
+    }
+};
+
 // Get all vouchers
 exports.getVouchers = async (req, res) => {
     try {
-        const vouchers = await Voucher.find()
-            .select('voucherNo voucherType date vendorId items totalAmount createdAt updatedAt')
+        const { scope, type } = req.query;
+        const filter = {};
+        if (type) {
+            filter.voucherType = type;
+        } else if (scope === 'invoice') {
+            filter.voucherType = 'Invoice';
+        } else if (scope === 'grn') {
+            filter.voucherType = { $in: ['Purchase', 'Sale Return'] };
+        }
+
+        const vouchers = await Voucher.find(filter)
+            .select('voucherNumber voucherType date vendorId customerId vendorName customerName contactNumber items totalQty totalTax grandTotal totalAmount referenceVoucherId createdAt updatedAt')
             .sort({ createdAt: -1 })
             .populate('vendorId', 'name vendorName')
+            .populate('customerId', 'companyName customerName')
+            .populate('referenceVoucherId', 'voucherNumber')
             .lean();
         res.status(200).json(vouchers);
     } catch (error) {
@@ -37,57 +104,36 @@ exports.createVoucher = async (req, res) => {
         // Ensure standard fields formatting
         voucherData.date = new Date(voucherData.date);
         
-        // Prevent Mongoose CastError by deleting empty ObjectIds
-        if (voucherData.vendorId === '') delete voucherData.vendorId;
-        if (voucherData.items && Array.isArray(voucherData.items)) {
-            voucherData.items.forEach(item => {
-                if (item.productId === '') delete item.productId;
-            });
+        cleanObjectIds(voucherData);
+
+        if (voucherData.voucherType === 'Invoice') {
+            delete voucherData.vendorId;
+            delete voucherData.vendorName;
+            delete voucherData.referenceVoucherId;
+            if (!voucherData.customerName) {
+                return res.status(400).json({ message: 'Customer Name is required for invoices' });
+            }
+        } else if (voucherData.voucherType === 'Purchase') {
+            delete voucherData.customerId;
+            delete voucherData.customerName;
+            delete voucherData.referenceVoucherId;
+            if (!voucherData.vendorName) {
+                return res.status(400).json({ message: 'Vendor Name is required for Purchase/GRN entries' });
+            }
+        } else if (voucherData.voucherType === 'Sale Return') {
+            delete voucherData.vendorId;
+            delete voucherData.vendorName;
+            if (!voucherData.customerName) {
+                return res.status(400).json({ message: 'Customer Name is required for Sale Return entries' });
+            }
+        } else {
+            return res.status(400).json({ message: 'Invalid voucher type' });
         }
         
         const newVoucher = new Voucher(voucherData);
         await newVoucher.save();
 
-        // Update Inventory in Products
-        // Both Purchase and Sale Return effectively INCREASE the physical stock in hand
-        for (const item of voucherData.items) {
-            if (item.productId) {
-                const product = await Product.findById(item.productId);
-                if (product) {
-                    let vendorUpdated = false;
-                    const stockIncrease = Number(item.qty);
-
-                    if (voucherData.vendorId) {
-                        const vendorIndex = product.vendors.findIndex(
-                            v => v.vendorId.toString() === voucherData.vendorId.toString()
-                        );
-                        
-                        if (vendorIndex > -1) {
-                            product.vendors[vendorIndex].stock += stockIncrease;
-                            vendorUpdated = true;
-                        } else {
-                            // If vendor not in product vendor list, maybe add it
-                            product.vendors.push({
-                                vendorId: voucherData.vendorId,
-                                price: item.price,
-                                stock: stockIncrease,
-                                isPrimary: product.vendors.length === 0
-                            });
-                            vendorUpdated = true;
-                        }
-                    }
-
-                    if (!vendorUpdated && product.vendors.length > 0) {
-                        // Fallback: increase stock of the primary or first vendor
-                        let primaryIndex = product.vendors.findIndex(v => v.isPrimary);
-                        if(primaryIndex === -1) primaryIndex = 0;
-                        product.vendors[primaryIndex].stock += stockIncrease;
-                    }
-                    
-                    await product.save();
-                }
-            }
-        }
+        await adjustProductStock(voucherData, isInvoiceType(voucherData.voucherType) ? 'out' : 'in');
 
         res.status(201).json({ message: 'Voucher saved successfully', voucher: newVoucher });
     } catch (error) {
@@ -98,15 +144,22 @@ exports.createVoucher = async (req, res) => {
     }
 };
 
-// Update voucher (optional, not specifically requested to update inventory on edit yet)
 exports.updateVoucher = async (req, res) => {
     try {
         const voucherData = req.body;
-        if (voucherData.vendorId === '') delete voucherData.vendorId;
-        if (voucherData.items && Array.isArray(voucherData.items)) {
-            voucherData.items.forEach(item => {
-                if (item.productId === '') delete item.productId;
-            });
+        cleanObjectIds(voucherData);
+
+        if (voucherData.voucherType === 'Invoice') {
+            delete voucherData.vendorId;
+            delete voucherData.vendorName;
+            delete voucherData.referenceVoucherId;
+        } else if (voucherData.voucherType === 'Purchase') {
+            delete voucherData.customerId;
+            delete voucherData.customerName;
+            delete voucherData.referenceVoucherId;
+        } else if (voucherData.voucherType === 'Sale Return') {
+            delete voucherData.vendorId;
+            delete voucherData.vendorName;
         }
 
         const voucher = await Voucher.findByIdAndUpdate(req.params.id, voucherData, { new: true });
