@@ -1,6 +1,5 @@
 const Planning = require('../models/Planning');
 const MGR = require('../models/MGR');
-const Status = require('../models/Status');
 const { getCachedJson, makeCacheKey, setCachedJson } = require('../utils/apiCache');
 const { invalidateViaQueueOrNow } = require('../queues/cacheInvalidationQueue');
 const { getTenantId } = require('../middlewares/tenantContext');
@@ -359,7 +358,7 @@ exports.getAllEntries = async (req, res) => {
         const [total, entries] = await Promise.all([
             Planning.countDocuments(filter),
             Planning.find(filter)
-                .select('customerId productId customerName productName financialYear monthYear mgrCode mgrCode2 status qty value totalValue remarks createdAt updatedAt')
+                .select('customerId productId financialYear monthYear mgrCode mgrCode2 status qty value totalValue remarks createdAt updatedAt')
                 .populate('customerId', 'companyName customerName')
                 .populate('productId', 'productName')
                 .sort({ createdAt: -1 })
@@ -374,48 +373,6 @@ exports.getAllEntries = async (req, res) => {
         };
         await setCachedJson(redis, cacheKey, response, PLANNING_LIST_CACHE_TTL_SECONDS);
         res.json(response);
-    } catch (err) {
-        res.status(500).json({ message: err.message });
-    }
-};
-
-exports.getDebugStats = async (req, res) => {
-    try {
-        const counts = await Planning.aggregate([
-            { $group: { _id: "$financialYear", count: { $sum: 1 } } }
-        ]);
-        const samples2025 = await Planning.find({ financialYear: '2025-26' }).limit(3).lean();
-        const samples2026 = await Planning.find({ financialYear: '2026-27' }).limit(3).lean();
-        const uniqueProducts = await Planning.distinct("productName");
-        const uniqueMgr2 = await Planning.distinct("mgrCode2");
-        const uniqueStatuses = await Planning.distinct("status");
-        
-        res.json({
-            counts,
-            uniqueProducts,
-            uniqueMgr2,
-            uniqueStatuses,
-            samples2025,
-            samples2026
-        });
-    } catch (err) {
-        res.status(500).json({ message: err.message });
-    }
-};
-
-exports.getFilters = async (req, res) => {
-    try {
-        const [mgr1, mgr2, statuses] = await Promise.all([
-            MGR.find({ mgrType: 'MGR1', status: 'Active' }).select('code description status').lean(),
-            MGR.find({ mgrType: 'MGR2', status: 'Active' }).select('code description status').lean(),
-            Status.find({}).select('name color isActive').lean()
-        ]);
-
-        res.json({
-            mgr1,
-            mgr2,
-            statuses
-        });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }

@@ -67,7 +67,7 @@ const setRefreshCookie = (res, token) => {
         secure: process.env.NODE_ENV === 'production',
         sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
         maxAge: REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000,
-        path: '/',
+        path: '/api/auth',
     });
 };
 
@@ -77,7 +77,7 @@ const setDeviceCookie = (res, deviceId) => {
         secure: process.env.NODE_ENV === 'production',
         sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
         maxAge: REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000,
-        path: '/',
+        path: '/api/auth',
     });
 };
 
@@ -86,13 +86,13 @@ const clearRefreshCookie = (res) => {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-        path: '/',
+        path: '/api/auth',
     });
     res.clearCookie(DEVICE_COOKIE_NAME, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-        path: '/',
+        path: '/api/auth',
     });
 };
 
@@ -205,7 +205,7 @@ const issueSession = async (user, res, req, deviceId = getDeviceId(req)) => {
 
     setDeviceCookie(res, deviceId);
     setRefreshCookie(res, refreshToken);
-    return { accessToken, refreshToken, deviceId, user: normalizeUser(user) };
+    return { accessToken, deviceId, user: normalizeUser(user) };
 };
 
 exports.register = async (req, res) => {
@@ -271,7 +271,7 @@ exports.login = async (req, res) => {
 exports.refresh = async (req, res) => {
     try {
         const cookies = parseCookie(req.headers.cookie);
-        const refreshToken = cookies[REFRESH_COOKIE_NAME] || req.body.refreshToken || req.header('x-refresh-token');
+        const refreshToken = cookies[REFRESH_COOKIE_NAME];
 
         if (!refreshToken) {
             return res.status(401).json({ message: 'Refresh token missing' });
@@ -301,7 +301,6 @@ exports.refresh = async (req, res) => {
         setRefreshCookie(res, refreshToken);
         res.json({
             accessToken: createAccessToken(user),
-            refreshToken,
             deviceId,
             user: normalizeUser(user),
         });

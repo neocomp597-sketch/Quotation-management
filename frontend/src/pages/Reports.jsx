@@ -140,9 +140,9 @@ const getRevenueSegmentShortCode = (segment) => REVENUE_PRODUCT_SEGMENTS.find(it
 const inferRevenueProductType = (productName = '') => {
     const key = normalizeRevenueKey(productName);
     if (key.includes('SPARE')) return 'SPA';
-    if (key.includes('33KV') || key.includes('33K')) return '33K';
     if (key.includes('KIOSK')) return '11K';
-    if (key.includes('12KV') || key.includes('12K') || key.includes('11KV') || key.includes('11K')) return 'I';
+    if (key.includes('33KV') || key.includes('33K')) return '33K';
+    if (key.includes('11KV') || key.includes('11K')) return 'I';
     return '';
 };
 const REVENUE_WORKBOOK_SHEETS = ['Summary FY27', 'Productwise', 'Summary FY27_Qtr wise', 'Deffered account Temperarily'];
@@ -537,7 +537,7 @@ const buildProductwiseWorkbookSheet = (entries = [], monthLabels = []) => {
             groupMap.set(key, {
                 product: entry.productName || 'Product',
                 category: normalizeRevenueSegment(entry.mgrCode2),
-                type: inferRevenueProductType(entry.productName) || entry.mgrCode || 'SPA',
+                type: inferRevenueProductType(entry.productName) || entry.mgrCode || '',
                 values: {},
                 qty: {}
             });
@@ -547,32 +547,8 @@ const buildProductwiseWorkbookSheet = (entries = [], monthLabels = []) => {
         group.qty[entry.monthYear] = Number(group.qty[entry.monthYear] || 0) + Number(entry.qty || 0);
     });
 
-    // Dynamically build segment list from default segments + any additional segments present in the entries
-    const activeSegments = [...REVENUE_PRODUCT_SEGMENTS];
-    groupMap.forEach(group => {
-        const seg = group.category;
-        if (seg && !activeSegments.some(item => normalizeRevenueKey(item.segment) === normalizeRevenueKey(seg))) {
-            activeSegments.push({
-                segment: seg,
-                code: (getRevenueSegmentShortCode(seg) || seg.slice(0, 3).toUpperCase()).substring(0, 5)
-            });
-        }
-    });
-
-    // Dynamically build product templates list from default templates + any additional types present in the entries
-    const activeTemplates = [...REVENUE_PRODUCT_TEMPLATE];
-    groupMap.forEach(group => {
-        const t = group.type;
-        if (t && !activeTemplates.some(item => normalizeRevenueKey(item.type) === normalizeRevenueKey(t))) {
-            activeTemplates.push({
-                type: t,
-                product: t === 'EPC' ? 'EPC Products' : `${t} Products`
-            });
-        }
-    });
-
-    activeSegments.forEach(({ segment, code }) => {
-        activeTemplates.forEach(template => {
+    REVENUE_PRODUCT_SEGMENTS.forEach(({ segment, code }) => {
+        REVENUE_PRODUCT_TEMPLATE.forEach(template => {
             const matches = Array.from(groupMap.values()).filter(group =>
                 normalizeRevenueKey(group.type) === normalizeRevenueKey(template.type)
                 && normalizeRevenueKey(group.category) === normalizeRevenueKey(segment)
@@ -804,8 +780,8 @@ const Reports = () => {
     useEffect(() => {
         const fetchStatuses = async () => {
             try {
-                const res = await planningService.getFilters();
-                const activeStatuses = (res.data.statuses || []).filter(s => s.isActive).map(s => s.name);
+                const res = await statusService.getAll();
+                const activeStatuses = res.data.filter(s => s.isActive).map(s => s.name);
                 setStatusOptions(activeStatuses);
             } catch (err) {
                 console.error('Error fetching statuses:', err);
@@ -1677,7 +1653,7 @@ const Reports = () => {
                 const key = `${entry.productName || 'Product'}|${normalizeRevenueSegment(entry.mgrCode2)}|${entry.mgrCode || ''}`;
                 if (!groups.has(key)) {
                     groups.set(key, {
-                        type: inferRevenueProductType(entry.productName) || entry.mgrCode || 'SPA',
+                        type: entry.mgrCode || '',
                         product: entry.productName || 'Product',
                         category: normalizeRevenueSegment(entry.mgrCode2),
                         values: {},

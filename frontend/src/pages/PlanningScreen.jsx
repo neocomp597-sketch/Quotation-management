@@ -239,7 +239,7 @@ const PlanningScreen = () => {
   const [isReportExpanded, setIsReportExpanded] = useState(false);
   const [isReportExpanded2, setIsReportExpanded2] = useState(false);
   const [isStatusBreakdownExpanded, setIsStatusBreakdownExpanded] =
-    useState(false);
+    useState(true);
   const [expandedSegmentMonths, setExpandedSegmentMonths] = useState({});
   const [expandedStatusBreakdownMonths, setExpandedStatusBreakdownMonths] =
     useState({});
@@ -373,28 +373,30 @@ const PlanningScreen = () => {
 
   const fetchMasters = useCallback(async () => {
     try {
-      const [custRes, prodRes, filtersRes] = await Promise.all([
+      const [custRes, prodRes, mgrRes, mgr2Res, statusRes] = await Promise.all([
         customerService.getAll(),
         productService.getAll(),
-        planningService.getFilters(),
+        mgrService.getAll("MGR1"),
+        mgrService.getAll("MGR2"),
+        statusService.getAll(),
       ]);
 
       setCustomers(custRes.data);
       setProducts(prodRes.data);
       setMgrList(
         dedupeMgrOptions(
-          (filtersRes.data.mgr1 || []).filter((mgr) => mgr.status === "Active"),
+          mgrRes.data.filter((mgr) => mgr.status === "Active"),
         ),
       );
       setMgrList2(
         dedupeMgrOptions(
-          (filtersRes.data.mgr2 || []).filter((mgr) => mgr.status === "Active"),
+          mgr2Res.data.filter((mgr) => mgr.status === "Active"),
         ),
       );
-      setStatusOptions((filtersRes.data.statuses || []).filter(s => s.isActive).map(s => s.name));
+      setStatusOptions(statusRes.data.filter(s => s.isActive).map(s => s.name));
       
       const colorMap = {};
-      (filtersRes.data.statuses || []).forEach(s => {
+      statusRes.data.forEach(s => {
           colorMap[s.name] = s.color;
       });
       setStatusColorMap(colorMap);
