@@ -9,6 +9,16 @@ export const setAccessToken = (token) => {
 
 export const getAccessToken = () => accessToken;
 
+export const setRefreshToken = (token) => {
+  if (token) {
+    localStorage.setItem("refreshToken", token);
+  } else {
+    localStorage.removeItem("refreshToken");
+  }
+};
+
+export const getRefreshToken = () => localStorage.getItem("refreshToken");
+
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || "http://localhost:4003/api",
   timeout: 15000,
@@ -27,11 +37,27 @@ api.interceptors.request.use((config) => {
 
 export const refreshAccessToken = async () => {
   if (!refreshPromise) {
+    const localRefreshToken = getRefreshToken();
     refreshPromise = api
-      .post("/auth/refresh", {}, { skipAuthRefresh: true })
+      .post(
+        "/auth/refresh",
+        { refreshToken: localRefreshToken },
+        {
+          headers: localRefreshToken ? { "x-refresh-token": localRefreshToken } : {},
+          skipAuthRefresh: true,
+        }
+      )
       .then((response) => {
         setAccessToken(response.data.accessToken);
+        if (response.data.refreshToken) {
+          setRefreshToken(response.data.refreshToken);
+        }
         return response.data;
+      })
+      .catch((err) => {
+        setAccessToken(null);
+        setRefreshToken(null);
+        throw err;
       })
       .finally(() => {
         refreshPromise = null;
@@ -302,6 +328,7 @@ export const analyticsService = {
 
 export const planningService = {
   getAll: (params = {}) => api.get("/planning", { params }),
+  getFilters: () => api.get("/planning/filters"),
   create: (data) => api.post("/planning", data),
   update: (id, data) => api.put(`/planning/${id}`, data),
   delete: (id) => api.delete(`/planning/${id}`),

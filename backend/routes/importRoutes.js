@@ -86,7 +86,7 @@ router.get('/missing-codes/:filename', (req, res) => {
 });
 
 // Specialized seeding endpoint for Tally Sales Register
-router.post('/seed-file', async (req, res) => {
+router.get('/seed-file', async (req, res) => {
     try {
         const XLSX = require('xlsx');
         const path = require('path');

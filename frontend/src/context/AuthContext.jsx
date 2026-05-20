@@ -1,7 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { useDispatch } from "react-redux";
-import { authService, authorizationService, setAccessToken } from "../services/api";
+import { authService, authorizationService, setAccessToken, setRefreshToken } from "../services/api";
 import { MENU_PERMISSION_GROUPS } from "../constants/menuPermissions";
 import { clearCredentials, setCredentials, setPermissions as setReduxPermissions } from "../store/authSlice";
 
@@ -26,6 +26,7 @@ export const AuthProvider = ({ children }) => {
 
     const clearSession = useCallback(() => {
         setAccessToken(null);
+        setRefreshToken(null);
         localStorage.removeItem("user");
         setUser(null);
         setPermissions({});
@@ -38,6 +39,11 @@ export const AuthProvider = ({ children }) => {
         try {
             const session = await authService.refresh();
             const nextUser = normalizeUser(session.user);
+            
+            if (session?.refreshToken) {
+                setRefreshToken(session.refreshToken);
+            }
+
             const permissionsRes = await authorizationService.getMy();
             const nextPermissions = permissionsRes.data?.permissions || {};
 
@@ -69,6 +75,9 @@ export const AuthProvider = ({ children }) => {
         const normalizedUser = normalizeUser(session?.user);
 
         setAccessToken(session?.accessToken);
+        if (session?.refreshToken) {
+            setRefreshToken(session.refreshToken);
+        }
         localStorage.setItem("user", JSON.stringify(normalizedUser));
         setUser(normalizedUser);
 
