@@ -8,15 +8,15 @@ const invalidateCache = async (...patterns) => {
     if (!redis) return;
 
     for (const pattern of patterns.filter(Boolean)) {
-        let cursor = 0;
+        let cursor = '0';
         do {
             const scanResult = await redis.scan(cursor, { MATCH: pattern, COUNT: 100 });
-            cursor = Number(scanResult.cursor);
+            cursor = String(scanResult.cursor || '0');
             const keys = scanResult.keys || [];
             if (keys.length) {
                 await redis.del(keys);
             }
-        } while (cursor !== 0);
+        } while (cursor !== '0');
     }
 };
 
