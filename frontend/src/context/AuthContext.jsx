@@ -38,11 +38,20 @@ export const AuthProvider = ({ children }) => {
         try {
             const session = await authService.refresh();
             const nextUser = normalizeUser(session.user);
-            const permissionsRes = await authorizationService.getMy();
-            const nextPermissions = permissionsRes.data?.permissions || {};
 
             localStorage.setItem("user", JSON.stringify(nextUser));
             setUser(nextUser);
+
+            // Fetch permissions separately so a failure here
+            // doesn't wipe the authenticated session.
+            let nextPermissions = {};
+            try {
+                const permissionsRes = await authorizationService.getMy();
+                nextPermissions = permissionsRes.data?.permissions || {};
+            } catch (permErr) {
+                console.warn("Failed to load permissions after refresh:", permErr);
+            }
+
             setPermissions(nextPermissions);
             dispatch(setCredentials({ user: nextUser, permissions: nextPermissions }));
 

@@ -260,6 +260,14 @@ const startBackgroundServices = async () => {
     console.error("[Migration] Error during startup migration:", migErr.message);
   }
 
+  try {
+      const RolePermission = require("./models/RolePermission");
+      await RolePermission.collection.dropIndex('role_1');
+      console.log('[Migration] Dropped old role_1 index successfully.');
+  } catch (err) {
+      // Ignore if index doesn't exist
+  }
+
   await startCacheInvalidationWorker();
   await startAuthSessionWorker();
   await scheduler.startScheduler();

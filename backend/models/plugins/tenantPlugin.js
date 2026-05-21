@@ -86,11 +86,20 @@ module.exports = function tenantPlugin(schema, options = {}) {
 
                 const update = this.getUpdate?.();
                 if (update && this.options.upsert) {
-                    update.$setOnInsert = {
-                        ...(update.$setOnInsert || {}),
+                    const hasAtomic = Object.keys(update).some(key => key.startsWith('$'));
+                    let nextUpdate = { ...update };
+                    
+                    if (!hasAtomic) {
+                        // If it's a raw object, wrap it in $set
+                        nextUpdate = { $set: update };
+                    }
+                    
+                    nextUpdate.$setOnInsert = {
+                        ...(nextUpdate.$setOnInsert || {}),
                         companyId,
                     };
-                    this.setUpdate(update);
+                    
+                    this.setUpdate(nextUpdate);
                 }
             }
 

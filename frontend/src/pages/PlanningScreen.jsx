@@ -239,7 +239,7 @@ const PlanningScreen = () => {
   const [isReportExpanded, setIsReportExpanded] = useState(false);
   const [isReportExpanded2, setIsReportExpanded2] = useState(false);
   const [isStatusBreakdownExpanded, setIsStatusBreakdownExpanded] =
-    useState(true);
+    useState(false);
   const [expandedSegmentMonths, setExpandedSegmentMonths] = useState({});
   const [expandedStatusBreakdownMonths, setExpandedStatusBreakdownMonths] =
     useState({});
@@ -248,8 +248,8 @@ const PlanningScreen = () => {
   const [expandedStatusBreakdownSegments, setExpandedStatusBreakdownSegments] =
     useState({});
   const [expandedSbuWiseMonths, setExpandedSbuWiseMonths] = useState({});
-  const [isExportExpanded, setIsExportExpanded] = useState(true);
-  const [isGridExpanded, setIsGridExpanded] = useState(true);
+  const [isExportExpanded, setIsExportExpanded] = useState(false);
+  const [isGridExpanded, setIsGridExpanded] = useState(false);
 
   const [customers, setCustomers] = useState([]);
   const [products, setProducts] = useState([]);
@@ -532,7 +532,7 @@ const PlanningScreen = () => {
       const next = { ...prev };
       monthLabels.forEach((month) => {
         if (typeof next[month] === "undefined") {
-          next[month] = true;
+          next[month] = false;
         }
       });
       return next;

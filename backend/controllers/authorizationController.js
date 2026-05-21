@@ -100,8 +100,8 @@ exports.updateRolePermissions = async (req, res) => {
         const sanitizedPermissions = sanitizePermissions(req.body?.permissions || {});
         const doc = await RolePermission.findOneAndUpdate(
             { role },
-            { menuVisibility: sanitizedPermissions },
-            { new: true, upsert: true, setDefaultsOnInsert: true, runValidators: false }
+            { $set: { menuVisibility: sanitizedPermissions } },
+            { returnDocument: 'after', upsert: true, setDefaultsOnInsert: true, runValidators: false }
         );
 
         res.json(buildRolePayload(doc));
@@ -191,16 +191,25 @@ exports.initializeDefaults = async (req, res) => {
         const rolesToSeed = ROLE_OPTIONS.filter((r) => r !== 'admin');
         const results = [];
         for (const role of rolesToSeed) {
-            const existing = await RolePermission.findOne({ role }).select('_id').lean();
-            if (!existing) {
-                const defaultPerms = sanitizePermissions(DEFAULT_ROLE_PERMISSIONS[role] || {});
-                await RolePermission.create({
-                    role,
-                    label:       ROLE_LABELS[role] || role,
-                    description: '',
-                    isCustom:    false,
-                    menuVisibility: defaultPerms
-                });
+            const defaultPerms = sanitizePermissions(DEFAULT_ROLE_PERMISSIONS[role] || {});
+            
+            // Use updateOne with upsert to avoid E11000 duplicate key race conditions
+            // when React StrictMode double-mounts and calls initialize twice concurrently.
+            const result = await RolePermission.updateOne(
+                { role },
+                {
+                    $setOnInsert: {
+                        role,
+                        label: ROLE_LABELS[role] || role,
+                        description: '',
+                        isCustom: false,
+                        menuVisibility: defaultPerms
+                    }
+                },
+                { upsert: true }
+            );
+
+            if (result.upsertedCount > 0) {
                 results.push({ role, action: 'seeded' });
             } else {
                 results.push({ role, action: 'already_exists' });

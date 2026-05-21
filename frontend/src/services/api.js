@@ -33,8 +33,19 @@ export const refreshAccessToken = async () => {
         setAccessToken(response.data.accessToken);
         return response.data;
       })
-      .finally(() => {
+      .catch((err) => {
+        // Clear immediately on failure so the next attempt can retry
         refreshPromise = null;
+        throw err;
+      })
+      .then((data) => {
+        // Keep the resolved promise cached briefly so React StrictMode
+        // double-invocations (and other rapid callers) reuse it instead
+        // of firing a second HTTP request.
+        setTimeout(() => {
+          refreshPromise = null;
+        }, 2000);
+        return data;
       });
   }
 
