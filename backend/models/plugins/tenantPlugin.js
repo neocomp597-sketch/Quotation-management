@@ -43,7 +43,7 @@ module.exports = function tenantPlugin(schema, options = {}) {
         });
     }
 
-    schema.pre('save', function () {
+    schema.pre('validate', function () {
         if (!this.companyId) {
             const companyId = getTenantId();
             if (companyId) {

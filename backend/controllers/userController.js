@@ -2,9 +2,20 @@ const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const { ROLE_OPTIONS } = require('../config/authorization');
 const RolePermission = require('../models/RolePermission');
+const { getTenantId } = require('../middlewares/tenantContext');
 
 exports.getAllUsers = async (req, res) => {
     try {
+        const fs = require('fs');
+        fs.writeFileSync('d:\\tally\\Quotations\\backend\\debug.txt', `Call to getAllUsers:\nUser: ${JSON.stringify(req.user)}\nTime: ${new Date().toISOString()}`);
+    } catch (fsErr) {
+        console.error('Failed to write to debug file:', fsErr);
+    }
+    try {
+        if (!req.user?.companyId) {
+            return res.status(400).json({ message: 'Company context missing' });
+        }
+
         const users = await User.find({ companyId: req.user.companyId })
             .select('_id name email role status companyId createdAt')
             .sort({ createdAt: -1 })
@@ -12,6 +23,13 @@ exports.getAllUsers = async (req, res) => {
 
         res.json(users);
     } catch (error) {
+        console.error('[getAllUsers] Error:', error.message, error.stack);
+        try {
+            const fs = require('fs');
+            fs.writeFileSync('d:\\tally\\Quotations\\backend\\debug.txt', `Error: ${error.message}\nStack: ${error.stack}\nTime: ${new Date().toISOString()}`);
+        } catch (fsErr) {
+            console.error('Failed to write to debug file:', fsErr);
+        }
         res.status(500).json({ message: 'Failed to load users', error: error.message });
     }
 };
@@ -19,6 +37,11 @@ exports.getAllUsers = async (req, res) => {
 exports.createUser = async (req, res) => {
     try {
         const { name, email, password, role = 'sales', status = true } = req.body;
+
+        const companyId = req.user?.companyId || getTenantId?.();
+        if (!companyId) {
+            return res.status(400).json({ message: 'Company context missing' });
+        }
 
         if (!name || !email || !password) {
             return res.status(400).json({ message: 'Name, email, and password are required' });
@@ -37,7 +60,7 @@ exports.createUser = async (req, res) => {
 
         if (role === 'admin') {
             const adminCount = await User.countDocuments({
-                companyId: req.user.companyId,
+                companyId,
                 role: 'admin',
             });
 
@@ -56,7 +79,7 @@ exports.createUser = async (req, res) => {
             passwordHash,
             role,
             status,
-            companyId: req.user.companyId,
+            companyId,
         });
 
         res.status(201).json({
@@ -69,6 +92,7 @@ exports.createUser = async (req, res) => {
             createdAt: user.createdAt,
         });
     } catch (error) {
+        console.error('[createUser] Error:', error.message, error.stack);
         res.status(500).json({ message: 'Failed to create user', error: error.message });
     }
 };
@@ -94,7 +118,7 @@ exports.updateUserProfile = async (req, res) => {
                 name: updatedUser.name,
                 email: updatedUser.email,
                 role: updatedUser.role,
-                token: req.headers.authorization.split(' ')[1] // Return same token
+                token: req.headers.authorization.split(' ')[1]
             });
         } else {
             res.status(404).json({ message: 'User not found' });
@@ -156,3 +180,72 @@ exports.updateUserRole = async (req, res) => {
     }
 };
 
+exports.updateUser = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, email, password } = req.body;
+
+        const user = await User.findOne({ _id: id, companyId: req.user.companyId });
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        if (email && email !== user.email) {
+            const existing = await User.findOne({ email }).select('_id').lean();
+            if (existing) {
+                return res.status(400).json({ message: 'Email already exists' });
+            }
+            user.email = email;
+        }
+
+        if (name) user.name = name;
+        if (password) {
+            const salt = await bcrypt.genSalt(10);
+            user.passwordHash = await bcrypt.hash(password, salt);
+        }
+
+        const updatedUser = await user.save();
+        res.json({
+            _id: updatedUser._id,
+            name: updatedUser.name,
+            email: updatedUser.email,
+            role: updatedUser.role,
+            status: updatedUser.status,
+            createdAt: updatedUser.createdAt
+        });
+    } catch (error) {
+        console.error('[updateUser] Error:', error.message);
+        res.status(500).json({ message: 'Failed to update user', error: error.message });
+    }
+};
+
+exports.deleteUser = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        if (req.user.id === id) {
+            return res.status(400).json({ message: 'You cannot delete your own account.' });
+        }
+
+        const user = await User.findOne({ _id: id, companyId: req.user.companyId });
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        if (user.role === 'admin') {
+            const adminCount = await User.countDocuments({
+                companyId: req.user.companyId,
+                role: 'admin'
+            });
+            if (adminCount <= 1) {
+                return res.status(400).json({ message: 'Cannot delete the last admin of the organization.' });
+            }
+        }
+
+        await User.deleteOne({ _id: id });
+        res.json({ message: 'User deleted successfully' });
+    } catch (error) {
+        console.error('[deleteUser] Error:', error.message);
+        res.status(500).json({ message: 'Failed to delete user', error: error.message });
+    }
+};

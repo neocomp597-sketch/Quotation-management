@@ -89,16 +89,10 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                 { key: 'sale_invoices', name: 'Create Invoice', icon: <MdReceipt size={18} />, path: '/invoices' },
             ]
         },
+
         {
             type: 'group',
             name: 'Material Received',
-            key: 'sale',
-            icon: <MdPointOfSale size={22} />,
-            children: []
-        },
-        {
-            type: 'group',
-            name: 'Purchase',
             key: 'purchase',
             icon: <MdShoppingCart size={22} />,
             children: [
@@ -225,11 +219,10 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                                             toggleMenu(item.key);
                                         }
                                     }}
-                                    className={`w-full flex items-center gap-4 px-4 py-3 rounded-2xl transition-all duration-200 group relative ${
-                                        hasActiveChild
+                                    className={`w-full flex items-center gap-4 px-4 py-3 rounded-2xl transition-all duration-200 group relative ${hasActiveChild
                                             ? 'text-primary-600 bg-primary-50'
                                             : 'text-slate-500 hover:bg-slate-50 hover:text-primary-600'
-                                    }`}
+                                        }`}
                                 >
                                     <div className="transition-transform duration-300 group-hover:scale-110 shrink-0">
                                         {item.icon}

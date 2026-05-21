@@ -4,7 +4,7 @@ import { toast } from 'react-toastify';
 import {
     MdLock, MdRefresh, MdTune, MdPeople,
     MdCheckCircle, MdCancel, MdRestartAlt, MdShield, MdWarning,
-    MdExpandLess, MdExpandMore, MdAdd, MdDelete, MdSave
+    MdExpandLess, MdExpandMore, MdAdd, MdDelete, MdSave, MdEdit, MdClose
 } from 'react-icons/md';
 import { authorizationService, userService } from '../services/api';
 import { ROLE_LABELS as BUILTIN_ROLE_LABELS, MENU_PERMISSION_GROUPS } from '../constants/menuPermissions';
@@ -47,6 +47,10 @@ const Authorization = () => {
     const [showNewUserForm, setShowNewUserForm] = useState(false);
     const [newUserData, setNewUserData] = useState({ name: '', email: '', password: '', role: 'sales' });
     const [creatingUser, setCreatingUser] = useState(false);
+    
+    const [editingUserId, setEditingUserId] = useState(null);
+    const [editingUserData, setEditingUserData] = useState({ name: '', email: '', password: '', role: '' });
+
 
     const fetchMatrix = async () => {
         try {
@@ -234,6 +238,48 @@ const Authorization = () => {
             toast.error(err.response?.data?.message || 'Could not create user');
         } finally {
             setCreatingUser(false);
+        }
+    };
+
+    const handleStartEditUser = (user) => {
+        setEditingUserId(user._id);
+        setEditingUserData({ name: user.name, email: user.email, password: '', role: user.role });
+    };
+
+    const handleCancelEditUser = () => {
+        setEditingUserId(null);
+        setEditingUserData({ name: '', email: '', password: '', role: '' });
+    };
+
+    const handleSaveUser = async () => {
+        if (!editingUserData.name.trim() || !editingUserData.email.trim()) return;
+        setUpdatingUserId(editingUserId);
+        try {
+            const data = { ...editingUserData };
+            if (!data.password) delete data.password;
+            
+            const res = await userService.update(editingUserId, data);
+            setUsers((prev) => prev.map((u) => u._id === editingUserId ? res.data : u));
+            setEditingUserId(null);
+            toast.success('User updated');
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Failed to update user');
+        } finally {
+            setUpdatingUserId('');
+        }
+    };
+
+    const handleDeleteUser = async (userId) => {
+        if (!window.confirm('Are you sure you want to delete this user?')) return;
+        setUpdatingUserId(userId);
+        try {
+            await userService.delete(userId);
+            setUsers((prev) => prev.filter((u) => u._id !== userId));
+            toast.success('User deleted');
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Failed to delete user');
+        } finally {
+            setUpdatingUserId('');
         }
     };
 
@@ -494,16 +540,79 @@ const Authorization = () => {
                                 <th className="px-6 py-4">Name</th>
                                 <th className="px-6 py-4">Email</th>
                                 <th className="px-6 py-4">Role</th>
-                                <th className="px-6 py-4 text-right">Status</th>
+                                <th className="px-6 py-4">Status</th>
+                                <th className="px-6 py-4 text-right">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
                             {users.map((user) => {
                                 const isMe = currentUser?.id === user._id;
                                 const isUpdating = updatingUserId === user._id;
+                                const isEditing = editingUserId === user._id;
+
+                                if (isEditing) {
+                                    return (
+                                        <tr key={user._id} className="bg-primary-50/40 transition-colors">
+                                            <td className="px-6 py-4">
+                                                <input
+                                                    type="text"
+                                                    value={editingUserData.name}
+                                                    onChange={(e) => setEditingUserData(prev => ({...prev, name: e.target.value}))}
+                                                    className="w-full px-3 py-1.5 bg-white border border-primary-200 rounded-lg text-sm font-bold outline-none focus:border-primary-500"
+                                                />
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <input
+                                                    type="email"
+                                                    value={editingUserData.email}
+                                                    onChange={(e) => setEditingUserData(prev => ({...prev, email: e.target.value}))}
+                                                    className="w-full px-3 py-1.5 bg-white border border-primary-200 rounded-lg text-sm outline-none focus:border-primary-500"
+                                                />
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <select 
+                                                    value={editingUserData.role} 
+                                                    disabled={isMe || isUpdating}
+                                                    onChange={(e) => setEditingUserData(prev => ({...prev, role: e.target.value}))}
+                                                    className="w-full px-3 py-1.5 bg-white border border-primary-200 rounded-lg text-xs font-bold outline-none focus:border-primary-500 disabled:opacity-50"
+                                                >
+                                                    {roles.map(r => (
+                                                        <option key={r.role} value={r.role}>{r.label}</option>
+                                                    ))}
+                                                </select>
+                                                <div className="mt-2">
+                                                    <input
+                                                        type="password"
+                                                        placeholder="New password (optional)"
+                                                        value={editingUserData.password}
+                                                        onChange={(e) => setEditingUserData(prev => ({...prev, password: e.target.value}))}
+                                                        className="w-full px-3 py-1.5 bg-white border border-primary-200 rounded-lg text-xs outline-none focus:border-primary-500"
+                                                    />
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                {isUpdating ? (
+                                                    <span className="text-[10px] font-bold text-primary-400 animate-pulse">Saving...</span>
+                                                ) : (
+                                                    <span className="text-[10px] font-bold text-emerald-500">Active</span>
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <div className="flex items-center justify-end gap-2">
+                                                    <button onClick={handleSaveUser} disabled={isUpdating} className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors">
+                                                        <MdSave size={18} />
+                                                    </button>
+                                                    <button onClick={handleCancelEditUser} disabled={isUpdating} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
+                                                        <MdClose size={18} />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                }
 
                                 return (
-                                    <tr key={user._id} className="hover:bg-primary-50/20 transition-colors">
+                                    <tr key={user._id} className="hover:bg-primary-50/20 transition-colors group">
                                         <td className="px-6 py-4">
                                             <span className="text-sm font-bold text-slate-900">{user.name}</span>
                                             {isMe && <span className="ml-2 text-[10px] font-bold bg-primary-100 text-primary-700 px-1.5 py-0.5 rounded">You</span>}
@@ -521,12 +630,34 @@ const Authorization = () => {
                                                 ))}
                                             </select>
                                         </td>
-                                        <td className="px-6 py-4 text-right">
+                                        <td className="px-6 py-4">
                                             {isUpdating ? (
                                                 <span className="text-[10px] font-bold text-primary-400 animate-pulse">Updating...</span>
                                             ) : (
                                                 <span className="text-[10px] font-bold text-emerald-500">Active</span>
                                             )}
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                            <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button 
+                                                    onClick={() => handleStartEditUser(user)}
+                                                    disabled={isUpdating}
+                                                    className="p-1.5 text-primary-600 hover:bg-primary-50 rounded-lg disabled:opacity-50 transition-colors"
+                                                    title="Edit User"
+                                                >
+                                                    <MdEdit size={16} />
+                                                </button>
+                                                {!isMe && (
+                                                    <button 
+                                                        onClick={() => handleDeleteUser(user._id)}
+                                                        disabled={isUpdating}
+                                                        className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg disabled:opacity-50 transition-colors"
+                                                        title="Delete User"
+                                                    >
+                                                        <MdDelete size={16} />
+                                                    </button>
+                                                )}
+                                            </div>
                                         </td>
                                     </tr>
                                 );

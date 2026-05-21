@@ -144,6 +144,8 @@ export const userService = {
   create: (data) => api.post("/users", data),
   updateProfile: (data) => api.put("/users/profile", data),
   updateRole: (id, role) => api.patch(`/users/${id}/role`, { role }),
+  update: (id, data) => api.put(`/users/${id}`, data),
+  delete: (id) => api.delete(`/users/${id}`),
 };
 
 export const authorizationService = {

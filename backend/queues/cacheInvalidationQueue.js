@@ -33,13 +33,7 @@ const enqueueCacheInvalidation = async (...patterns) => {
 };
 
 const invalidateViaQueueOrNow = async (...patterns) => {
-    try {
-        const queued = await enqueueCacheInvalidation(...patterns);
-        if (queued) return;
-    } catch (error) {
-        console.error('[CacheInvalidationQueue] enqueue failed:', error.message);
-    }
-
+    // Perform invalidation directly and synchronously to bypass the fragile background queue
     await invalidateCache(...patterns);
 };
 

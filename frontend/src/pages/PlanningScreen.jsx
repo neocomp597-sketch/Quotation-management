@@ -1108,7 +1108,11 @@ const PlanningScreen = () => {
       setProductSearch("");
       setShowCustomerDropdown(false);
       setShowProductDropdown(false);
-      await fetchData();
+      if (offset !== 0) {
+        setOffset(0);
+      } else {
+        await fetchData();
+      }
     } catch (err) {
       toast.error(
         err.response?.data?.message ||
@@ -1161,7 +1165,11 @@ const PlanningScreen = () => {
     try {
       await planningService.delete(id);
       toast.success("Entry removed");
-      await fetchData();
+      if (offset !== 0) {
+        setOffset(0);
+      } else {
+        await fetchData();
+      }
     } catch {
       toast.error("Failed to delete entry");
     }
@@ -1739,27 +1747,31 @@ const PlanningScreen = () => {
                       className={compactFieldClass}
                     />
                     <PortalDropdown
-                      isOpen={
-                        showCustomerDropdown && filteredCustomers.length > 0
-                      }
+                      isOpen={showCustomerDropdown}
                       anchorRef={customerAnchorRef}
                     >
-                      <div className="bg-white border border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto custom-scrollbar">
-                        {filteredCustomers.map((customer) => (
-                          <button
-                            key={customer._id}
-                            onClick={() => selectCustomer(customer)}
-                            className="w-full text-left px-3 py-2.5 text-sm font-bold hover:bg-primary-50 transition-colors border-b border-slate-50"
-                          >
-                            <div>
-                              {customer.companyName || customer.customerName}
-                            </div>
-                            <div className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                              {customer.externalCode ||
-                                getFallbackCode("CUST", customer._id)}
-                            </div>
-                          </button>
-                        ))}
+                      <div className="portal-dropdown-content bg-white border border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto custom-scrollbar">
+                        {filteredCustomers.length > 0 ? (
+                          filteredCustomers.map((customer) => (
+                            <button
+                              key={customer._id}
+                              onClick={() => selectCustomer(customer)}
+                              className="w-full text-left px-3 py-2.5 text-sm font-bold hover:bg-primary-50 transition-colors border-b border-slate-50"
+                            >
+                              <div>
+                                {customer.companyName || customer.customerName}
+                              </div>
+                              <div className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                                {customer.externalCode ||
+                                  getFallbackCode("CUST", customer._id)}
+                              </div>
+                            </button>
+                          ))
+                        ) : (
+                          <div className="px-4 py-3 text-sm text-slate-500 font-bold text-center">
+                            No customers found
+                          </div>
+                        )}
                       </div>
                     </PortalDropdown>
                   </td>
@@ -1781,21 +1793,25 @@ const PlanningScreen = () => {
                       className={compactFieldClass}
                     />
                     <PortalDropdown
-                      isOpen={
-                        showProductDropdown && filteredProducts.length > 0
-                      }
+                      isOpen={showProductDropdown}
                       anchorRef={productAnchorRef}
                     >
-                      <div className="bg-white border border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto custom-scrollbar">
-                        {filteredProducts.map((product) => (
-                          <button
-                            key={product._id}
-                            onClick={() => selectProduct(product)}
-                            className="w-full text-left px-3 py-2.5 text-sm font-bold hover:bg-primary-50 transition-colors border-b border-slate-50"
-                          >
-                            {product.productName}
-                          </button>
-                        ))}
+                      <div className="portal-dropdown-content bg-white border border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto custom-scrollbar">
+                        {filteredProducts.length > 0 ? (
+                          filteredProducts.map((product) => (
+                            <button
+                              key={product._id}
+                              onClick={() => selectProduct(product)}
+                              className="w-full text-left px-3 py-2.5 text-sm font-bold hover:bg-primary-50 transition-colors border-b border-slate-50"
+                            >
+                              {product.productName}
+                            </button>
+                          ))
+                        ) : (
+                          <div className="px-4 py-3 text-sm text-slate-500 font-bold text-center">
+                            No products found
+                          </div>
+                        )}
                       </div>
                     </PortalDropdown>
                   </td>

@@ -49,12 +49,21 @@ exports.protect = async (req, res, next) => {
                 return res.status(401).json({ message: 'Not authorized, token revoked' });
             }
 
+            let resolvedCompanyId = user.companyId?.toString?.() || user.companyId;
+            if (!resolvedCompanyId && user.role === 'admin') {
+                const Company = require('../models/Company');
+                const firstCompany = await Company.findOne().lean();
+                if (firstCompany) {
+                    resolvedCompanyId = firstCompany._id.toString();
+                }
+            }
+
             req.user = {
                 id: user._id.toString(),
                 name: user.name,
                 email: user.email,
                 role: user.role,
-                companyId: user.companyId?.toString?.() || user.companyId
+                companyId: resolvedCompanyId
             };
 
             runWithTenant(req.user.companyId, () => next());

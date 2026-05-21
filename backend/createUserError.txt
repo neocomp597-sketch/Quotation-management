@@ -1,0 +1,6 @@
+ValidationError: User validation failed: companyId: Path `companyId` is required.
+    at model.validate (D:\tally\Quotations\backend\node_modules\mongoose\lib\document.js:2864:36)
+    at async model.$__save (D:\tally\Quotations\backend\node_modules\mongoose\lib\model.js:393:7)
+    at async model.save (D:\tally\Quotations\backend\node_modules\mongoose\lib\model.js:667:5)
+    at async Function.create (D:\tally\Quotations\backend\node_modules\mongoose\lib\model.js:2747:5)
+    at async exports.createUser (D:\tally\Quotations\backend\controllers\userController.js:53:22)
