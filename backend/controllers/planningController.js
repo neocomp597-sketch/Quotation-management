@@ -6,9 +6,28 @@ const { getTenantId } = require('../middlewares/tenantContext');
 const RolePermission = require('../models/RolePermission');
 const { resolvePermissions } = require('../config/authorization');
 
+const normalizeFinancialYear = (fy) => {
+    if (!fy) return fy;
+    let clean = String(fy).trim().replace(/[\s\-\/]+/g, '-');
+    const match = clean.match(/^(\d{2,4})-(\d{2,4})$/);
+    if (match) {
+        let start = match[1];
+        let end = match[2];
+        if (start.length === 2) {
+            start = '20' + start;
+        }
+        if (end.length === 4) {
+            end = end.slice(-2);
+        }
+        return `${start}-${end}`;
+    }
+    return fy;
+};
+
 const isPreviousYear = (financialYear) => {
     if (!financialYear) return false;
-    const startYear = parseInt(financialYear.split('-')[0], 10);
+    const normalizedFY = normalizeFinancialYear(financialYear);
+    const startYear = parseInt(normalizedFY.split('-')[0], 10);
     if (isNaN(startYear)) return false;
     
     const now = new Date();
@@ -17,6 +36,7 @@ const isPreviousYear = (financialYear) => {
     
     return startYear < currentFYStartYear;
 };
+
 
 const getRolePermissions = async (role) => {
     const { DEFAULT_ROLE_PERMISSIONS } = require('../config/authorization');
@@ -109,7 +129,7 @@ const normalizePlanningPayload = async (payload = {}) => {
         normalized.monthYear = cleanValue(normalized.monthYear);
     }
     if (Object.prototype.hasOwnProperty.call(normalized, 'financialYear')) {
-        normalized.financialYear = cleanValue(normalized.financialYear);
+        normalized.financialYear = normalizeFinancialYear(cleanValue(normalized.financialYear));
     }
     if (Object.prototype.hasOwnProperty.call(normalized, 'customerName')) {
         normalized.customerName = cleanValue(normalized.customerName);
@@ -128,7 +148,8 @@ const normalizePlanningPayload = async (payload = {}) => {
 };
 
 const getFinancialYearMonthLabels = (financialYear) => {
-    const startYear = parseInt(financialYear.split('-')[0], 10);
+    const normalizedFY = normalizeFinancialYear(financialYear);
+    const startYear = parseInt(normalizedFY.split('-')[0], 10);
 
     return FY_MONTH_NAMES.map((name, idx) => {
         const year = idx < 9 ? startYear : startYear + 1;
@@ -315,7 +336,8 @@ exports.createEntry = async (req, res) => {
 
 exports.getAllEntries = async (req, res) => {
     try {
-        const { financialYear, month, mgr1, mgr2, status, limit = 5, offset = 0 } = req.query;
+        const { financialYear: rawFY, month, mgr1, mgr2, status, limit = 5, offset = 0 } = req.query;
+        const financialYear = normalizeFinancialYear(rawFY);
         const filter = {};
         if (financialYear) filter.financialYear = financialYear;
         if (month) filter.monthYear = month;
@@ -358,7 +380,7 @@ exports.getAllEntries = async (req, res) => {
         const [total, entries] = await Promise.all([
             Planning.countDocuments(filter),
             Planning.find(filter)
-                .select('customerId productId financialYear monthYear mgrCode mgrCode2 status qty value totalValue remarks createdAt updatedAt')
+                .select('customerId productId productName customerName financialYear monthYear mgrCode mgrCode2 status qty value totalValue remarks createdAt updatedAt')
                 .populate('customerId', 'companyName customerName')
                 .populate('productId', 'productName')
                 .sort({ createdAt: -1 })
@@ -428,7 +450,8 @@ exports.deleteEntry = async (req, res) => {
 
 exports.getMGRReport = async (req, res) => {
     try {
-        const { financialYear, type, month, year, mgr1, mgr2, status, excludeStatus } = req.query;
+        const { financialYear: rawFY, type, month, year, mgr1, mgr2, status, excludeStatus } = req.query;
+        const financialYear = normalizeFinancialYear(rawFY);
         if (!financialYear) {
             return res.status(400).json({ message: 'financialYear is required (e.g. 2026-27)' });
         }

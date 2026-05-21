@@ -140,9 +140,9 @@ const getRevenueSegmentShortCode = (segment) => REVENUE_PRODUCT_SEGMENTS.find(it
 const inferRevenueProductType = (productName = '') => {
     const key = normalizeRevenueKey(productName);
     if (key.includes('SPARE')) return 'SPA';
-    if (key.includes('KIOSK')) return '11K';
     if (key.includes('33KV') || key.includes('33K')) return '33K';
-    if (key.includes('11KV') || key.includes('11K')) return 'I';
+    if (key.includes('KIOSK')) return '11K';
+    if (key.includes('11KV') || key.includes('11K') || key.includes('INDOOR')) return 'I';
     return '';
 };
 const REVENUE_WORKBOOK_SHEETS = ['Summary FY27', 'Productwise', 'Summary FY27_Qtr wise', 'Deffered account Temperarily'];
@@ -532,12 +532,13 @@ const buildProductwiseWorkbookSheet = (entries = [], monthLabels = []) => {
 
     const groupMap = new Map();
     entries.forEach(entry => {
-        const key = `${entry.productName || 'Product'}|${normalizeRevenueSegment(entry.mgrCode2)}`;
+        const productName = entry.productName || entry.productId?.productName || 'Product';
+        const key = `${productName}|${normalizeRevenueSegment(entry.mgrCode2)}`;
         if (!groupMap.has(key)) {
             groupMap.set(key, {
-                product: entry.productName || 'Product',
+                product: productName,
                 category: normalizeRevenueSegment(entry.mgrCode2),
-                type: inferRevenueProductType(entry.productName) || entry.mgrCode || '',
+                type: inferRevenueProductType(productName) || entry.mgrCode || '',
                 values: {},
                 qty: {}
             });
@@ -547,22 +548,41 @@ const buildProductwiseWorkbookSheet = (entries = [], monthLabels = []) => {
         group.qty[entry.monthYear] = Number(group.qty[entry.monthYear] || 0) + Number(entry.qty || 0);
     });
 
+    const matchedKeys = new Set();
+
     REVENUE_PRODUCT_SEGMENTS.forEach(({ segment, code }) => {
         REVENUE_PRODUCT_TEMPLATE.forEach(template => {
-            const matches = Array.from(groupMap.values()).filter(group =>
+            const matches = Array.from(groupMap.entries()).filter(([, group]) =>
                 normalizeRevenueKey(group.type) === normalizeRevenueKey(template.type)
                 && normalizeRevenueKey(group.category) === normalizeRevenueKey(segment)
             );
+            matches.forEach(([key]) => matchedKeys.add(key));
             rows.push([
                 template.type,
                 template.product,
                 code,
-                ...monthLabels.map(month => planValue(matches.reduce((sum, group) => sum + Number(group.values[month] || 0), 0))),
-                ...monthLabels.map(month => matches.reduce((sum, group) => sum + Number(group.qty[month] || 0), 0) || '-')
+                ...monthLabels.map(month => planValue(matches.reduce((sum, [, group]) => sum + Number(group.values[month] || 0), 0))),
+                ...monthLabels.map(month => matches.reduce((sum, [, group]) => sum + Number(group.qty[month] || 0), 0) || '-')
             ]);
         });
         rows.push(blankRow(3 + (monthLabels.length * 2)));
     });
+
+    // Append unmatched entries so no data is silently dropped
+    const unmatchedGroups = Array.from(groupMap.entries()).filter(([key]) => !matchedKeys.has(key));
+    if (unmatchedGroups.length > 0) {
+        rows.push(['Others', '', '', ...monthLabels.map(() => ''), ...monthLabels.map(() => '')]);
+        unmatchedGroups.forEach(([, group]) => {
+            rows.push([
+                group.type || '-',
+                group.product,
+                group.category,
+                ...monthLabels.map(month => planValue(group.values[month])),
+                ...monthLabels.map(month => Number(group.qty[month] || 0) || '-')
+            ]);
+        });
+        rows.push(blankRow(3 + (monthLabels.length * 2)));
+    }
 
     return { name: 'Productwise', rows: toSheetRows(rows) };
 };
@@ -578,11 +598,13 @@ const buildDeferredWorkbookSheet = (entries = []) => {
     ];
 
     entries.forEach((entry, index) => {
+        const customerName = entry.customerName || entry.customerId?.customerName || '';
+        const productName = entry.productName || entry.productId?.productName || '';
         rows.push([
             index + 1,
-            entry.customerName || '',
-            entry.customerName || '',
-            entry.productName || '',
+            customerName,
+            customerName,
+            productName,
             Number(entry.qty || 0) || '',
             Number(entry.value || 0) || '',
             planValue(entry.totalValue || (Number(entry.qty || 0) * Number(entry.value || 0))),
@@ -1650,11 +1672,12 @@ const Reports = () => {
         const renderProductwiseWorkbook = () => {
             const groups = new Map();
             filteredRevenuePlanEntries.forEach(entry => {
-                const key = `${entry.productName || 'Product'}|${normalizeRevenueSegment(entry.mgrCode2)}|${entry.mgrCode || ''}`;
+                const productName = entry.productName || entry.productId?.productName || 'Product';
+                const key = `${productName}|${normalizeRevenueSegment(entry.mgrCode2)}|${entry.mgrCode || ''}`;
                 if (!groups.has(key)) {
                     groups.set(key, {
                         type: entry.mgrCode || '',
-                        product: entry.productName || 'Product',
+                        product: productName,
                         category: normalizeRevenueSegment(entry.mgrCode2),
                         values: {},
                         qty: {}

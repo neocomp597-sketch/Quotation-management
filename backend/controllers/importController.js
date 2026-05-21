@@ -2,9 +2,28 @@ const XLSX = require('xlsx');
 const RolePermission = require('../models/RolePermission');
 const { resolvePermissions } = require('../config/authorization');
 
+const normalizeFinancialYear = (fy) => {
+    if (!fy) return fy;
+    let clean = String(fy).trim().replace(/[\s\-\/]+/g, '-');
+    const match = clean.match(/^(\d{2,4})-(\d{2,4})$/);
+    if (match) {
+        let start = match[1];
+        let end = match[2];
+        if (start.length === 2) {
+            start = '20' + start;
+        }
+        if (end.length === 4) {
+            end = end.slice(-2);
+        }
+        return `${start}-${end}`;
+    }
+    return fy;
+};
+
 const isPreviousYear = (financialYear) => {
     if (!financialYear) return false;
-    const startYear = parseInt(financialYear.split('-')[0], 10);
+    const normalizedFY = normalizeFinancialYear(financialYear);
+    const startYear = parseInt(normalizedFY.split('-')[0], 10);
     if (isNaN(startYear)) return false;
     
     const now = new Date();
@@ -143,11 +162,12 @@ const loadPlanningMgrs = async (lookupValues, mgrType) => {
 };
 
 const getPlanningMonthLabels = (financialYear) => {
-    if (!/^\d{4}-\d{2}$/.test(financialYear)) {
+    const normalizedFY = normalizeFinancialYear(financialYear);
+    if (!/^\d{4}-\d{2}$/.test(normalizedFY)) {
         throw new Error('Financial Year must be in the format 2025-26');
     }
 
-    const startYear = parseInt(financialYear.split('-')[0], 10);
+    const startYear = parseInt(normalizedFY.split('-')[0], 10);
     return FY_MONTHS.map((month, idx) => {
         const year = idx < 9 ? startYear : startYear + 1;
         return `${month}-${year.toString().slice(-2)}`;
@@ -545,7 +565,7 @@ const importPlanning = async (req, res) => {
             return res.status(400).json({ message: 'No data found in file' });
         }
 
-        const selectedFinancialYear = cleanCellValue(req.body.financialYear || req.query.financialYear);
+        const selectedFinancialYear = normalizeFinancialYear(cleanCellValue(req.body.financialYear || req.query.financialYear));
 
         // PHASE 1: Collect all unique lookups
         const uniqueCustomerCodes = new Set();
@@ -640,14 +660,15 @@ const importPlanning = async (req, res) => {
         const bulkOps = [];
         const BATCH_SIZE = 1000;
 
+
         for (let i = 0; i < data.length; i++) {
             const row = data[i];
             results.processed = i + 1;
 
             try {
-                const financialYear = cleanCellValue(
+                const financialYear = normalizeFinancialYear(cleanCellValue(
                     row['Financial Year'] || row.financialYear || row.FY || selectedFinancialYear
-                );
+                ));
                 const canEdit = await checkPrevYearEditPermission(req.user, financialYear);
                 if (!canEdit) {
                     throw new Error(`You do not have permission to import entries for previous financial year (${financialYear})`);
@@ -777,7 +798,7 @@ const importPlanning = async (req, res) => {
 // Generate Planning Template
 const getPlanningTemplate = async (req, res) => {
     try {
-        const financialYear = cleanCellValue(req.query.financialYear) || getCurrentFinancialYear();
+        const financialYear = normalizeFinancialYear(cleanCellValue(req.query.financialYear)) || getCurrentFinancialYear();
         const monthLabels = getPlanningMonthLabels(financialYear);
         const [customer, product, mgr1, mgr2] = await Promise.all([
             Customer.findOne().sort({ createdAt: 1 }),
