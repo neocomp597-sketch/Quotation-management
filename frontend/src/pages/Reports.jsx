@@ -51,7 +51,7 @@ const STATUS_COLORS = {
     'Lost': '#ef4444', 'Finalized': '#059669',
 };
 const REVENUE_SEGMENTS = ['Utility', 'UC', 'Industry', 'Export'];
-const REVENUE_STATUS_COLUMNS = ['Firm', 'MFC', 'B&B'];
+const REVENUE_STATUS_COLUMNS = ['Firm', 'MFC', 'B&B', 'Invoice'];
 const FY_MONTH_NAMES = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
 const QUARTERS = [
     { key: 'Q1', months: ['Apr', 'May', 'Jun'] },
@@ -109,7 +109,8 @@ const normalizeRevenueSegment = (value = '') => {
 const normalizeRevenueStatus = (value = '') => {
     const key = normalizeRevenueKey(value);
     if (key === 'B&B' || key === 'BB' || key === 'BANDB') return 'B&B';
-    if (key === 'FIRM' || key === 'INVOICE') return 'Firm';
+    if (key === 'FIRM') return 'Firm';
+    if (key === 'INVOICE') return 'Invoice';
     if (key === 'MFC') return 'MFC';
     return '';
 };
@@ -361,13 +362,13 @@ const buildSummaryWorkbookSheet = (view, financialYear, filters = {}) => {
     const header2 = blankRow(fixedHeaders.length);
 
     months.forEach((month, index) => {
-        header1.push(cell(month.label, { colSpan: 4 }), '%');
-        header2.push('FIRM', 'MFC', 'B&B', 'Total', '');
+        header1.push(cell(month.label, { colSpan: 5 }), '%');
+        header2.push('FIRM', 'MFC', 'B&B', 'Invoice', 'Total', '');
 
         if ((index + 1) % 3 === 0) {
             const quarterNo = Math.floor(index / 3) + 1;
-            header1.push(cell(`Total Q${quarterNo}`, { colSpan: 4 }), '', `YTD Q${quarterNo} Budget`, `YTD Q${quarterNo} Projected`, '% Performance');
-            header2.push('FIRM', 'MFC', 'B&B', 'Total', '', '', '', '');
+            header1.push(cell(`Total Q${quarterNo}`, { colSpan: 5 }), '', `YTD Q${quarterNo} Budget`, `YTD Q${quarterNo} Projected`, '% Performance');
+            header2.push('FIRM', 'MFC', 'B&B', 'Invoice', 'Total', '', '', '', '');
         }
     });
 
@@ -397,6 +398,7 @@ const buildSummaryWorkbookSheet = (view, financialYear, filters = {}) => {
                 planValue(monthRow.Firm),
                 planValue(monthRow.MFC),
                 planValue(monthRow['B&B']),
+                planValue(monthRow.Invoice),
                 planValue(monthRow.total),
                 planPct(monthRow.performance)
             );
@@ -412,6 +414,7 @@ const buildSummaryWorkbookSheet = (view, financialYear, filters = {}) => {
                     planValue(sumValues(quarterRows, 'Firm')),
                     planValue(sumValues(quarterRows, 'MFC')),
                     planValue(sumValues(quarterRows, 'B&B')),
+                    planValue(sumValues(quarterRows, 'Invoice')),
                     planValue(sumValues(quarterRows, 'total')),
                     '',
                     planValue(ytdBudget),
@@ -429,6 +432,7 @@ const buildSummaryWorkbookSheet = (view, financialYear, filters = {}) => {
             planValue(sumValues(month.rows, 'Firm')),
             planValue(sumValues(month.rows, 'MFC')),
             planValue(sumValues(month.rows, 'B&B')),
+            planValue(sumValues(month.rows, 'Invoice')),
             planValue(month.total),
             planPct(month.performance)
         );
@@ -443,6 +447,7 @@ const buildSummaryWorkbookSheet = (view, financialYear, filters = {}) => {
                 planValue(sumValues(quarterRows, 'Firm')),
                 planValue(sumValues(quarterRows, 'MFC')),
                 planValue(sumValues(quarterRows, 'B&B')),
+                planValue(sumValues(quarterRows, 'Invoice')),
                 planValue(quarterMonths.reduce((sum, item) => sum + Number(item.total || 0), 0)),
                 '',
                 planValue(ytdBudget),
@@ -483,10 +488,10 @@ const buildSummaryWorkbookSheet = (view, financialYear, filters = {}) => {
                                 : label === 'Variance wrt YTD Budget'
                                     ? ytdRevenue - ytdBudget
                                     : ytdRevenue;
-            row.push(cell(planValue(value), { colSpan: 4 }), '');
+            row.push(cell(planValue(value), { colSpan: 5 }), '');
 
             if ((index + 1) % 3 === 0) {
-                row.push(cell('', { colSpan: 4 }), '', '', '', '');
+                row.push(cell('', { colSpan: 5 }), '', '', '', '');
             }
         });
         rows.push(row);
