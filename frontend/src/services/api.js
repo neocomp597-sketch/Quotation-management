@@ -56,6 +56,18 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+    const message = error.response?.data?.message || "";
+
+    if (
+      error.response?.status === 403 &&
+      /account deactivated|company account is suspended/i.test(message)
+    ) {
+      setAccessToken(null);
+      localStorage.removeItem("user");
+      if (window.location.pathname !== "/login") {
+        window.location.assign("/login");
+      }
+    }
 
     if (
       error.response?.status === 401 &&
@@ -170,6 +182,15 @@ export const authorizationService = {
   updateRoleMeta: (role, label, description) =>
     api.patch(`/authorization/roles/${role}`, { label, description }),
   deleteRole: (role) => api.delete(`/authorization/roles/${role}`),
+};
+
+export const superAdminService = {
+  getCompanyStats: () => api.get("/super-admin/company-stats"),
+  getCompanies: () => api.get("/super-admin/companies"),
+  getUsers: (params) => api.get("/super-admin/users", { params }),
+  getAuditLogs: (params) => api.get("/super-admin/audit-logs", { params }),
+  updateCompanyStatus: (id, data) => api.patch(`/super-admin/companies/${id}/status`, data),
+  updateUserStatus: (id, data) => api.patch(`/super-admin/users/${id}/status`, data),
 };
 
 

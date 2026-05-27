@@ -1,4 +1,5 @@
 const Salesperson = require('../models/Salesperson');
+const User = require('../models/User');
 const { getCachedJson, makeCacheKey, setCachedJson } = require('../utils/apiCache');
 const { invalidateViaQueueOrNow } = require('../queues/cacheInvalidationQueue');
 
@@ -20,7 +21,7 @@ const getAllSalespersons = async (req, res) => {
 
         if (req.query.page || req.query.limit) {
             const { page, limit, skip } = getPagination(req.query);
-            const [salespersons, total] = await Promise.all([
+            let [salespersons, total] = await Promise.all([
                 Salesperson.find({ status: 'Active' })
                     .select('name email mobile role status createdAt updatedAt')
                     .sort({ name: 1 })
@@ -29,6 +30,29 @@ const getAllSalespersons = async (req, res) => {
                     .lean(),
                 Salesperson.countDocuments({ status: 'Active' })
             ]);
+
+            if (total === 0) {
+                const userFilter = {
+                    role: { $in: ['sales', 'SALESPERSON', 'SalesPerson', 'salesperson'] },
+                    status: { $ne: false },
+                    isActive: { $ne: false },
+                };
+                const [users, userTotal] = await Promise.all([
+                    User.find(userFilter)
+                        .select('_id name email mobile role status isActive createdAt updatedAt')
+                        .sort({ name: 1 })
+                        .skip(skip)
+                        .limit(limit)
+                        .lean(),
+                    User.countDocuments(userFilter),
+                ]);
+                salespersons = users.map((user) => ({
+                    ...user,
+                    mobile: user.mobile || '',
+                    status: user.status === false || user.isActive === false ? 'Inactive' : 'Active',
+                }));
+                total = userTotal;
+            }
 
             const response = {
                 data: salespersons,
@@ -43,10 +67,25 @@ const getAllSalespersons = async (req, res) => {
             return res.json(response);
         }
 
-        const salespersons = await Salesperson.find({ status: 'Active' })
+        let salespersons = await Salesperson.find({ status: 'Active' })
             .select('name email mobile role status createdAt updatedAt')
             .sort({ name: 1 })
             .lean();
+        if (!salespersons.length) {
+            const users = await User.find({
+                role: { $in: ['sales', 'SALESPERSON', 'SalesPerson', 'salesperson'] },
+                status: { $ne: false },
+                isActive: { $ne: false },
+            })
+                .select('_id name email mobile role status isActive createdAt updatedAt')
+                .sort({ name: 1 })
+                .lean();
+            salespersons = users.map((user) => ({
+                ...user,
+                mobile: user.mobile || '',
+                status: user.status === false || user.isActive === false ? 'Inactive' : 'Active',
+            }));
+        }
         await setCachedJson(redis, cacheKey, salespersons, SALESPERSON_CACHE_TTL_SECONDS);
         res.json(salespersons);
     } catch (error) {

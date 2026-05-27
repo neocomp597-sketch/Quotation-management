@@ -5,6 +5,12 @@ const CompanySchema = new mongoose.Schema(
         name: { type: String, required: true, trim: true },
         slug: { type: String, trim: true, lowercase: true, index: true },
         isActive: { type: Boolean, default: true },
+        status: {
+            type: String,
+            enum: ['ACTIVE', 'SUSPENDED', 'DISABLED'],
+            default: 'ACTIVE',
+            index: true,
+        },
     },
     { timestamps: true }
 );

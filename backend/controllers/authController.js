@@ -5,6 +5,7 @@ const User = require('../models/User');
 const Company = require('../models/Company');
 const { getRedis } = require('../config/redis');
 const { enqueueLegacyRefreshSession } = require('../queues/authSessionQueue');
+const { isSuperAdminRole } = require('../middlewares/authMiddleware');
 
 const ACCESS_TOKEN_TTL = process.env.ACCESS_TOKEN_TTL || '20m';
 const REFRESH_TOKEN_DAYS = Number(process.env.REFRESH_TOKEN_DAYS || 30);
@@ -22,6 +23,21 @@ const normalizeUser = (user) => ({
     role: user.role,
     companyId: user.companyId,
 });
+
+const ensureLoginAllowed = async (user) => {
+    if (user.status === false || user.isActive === false) {
+        return 'Account deactivated';
+    }
+
+    if (!isSuperAdminRole(user.role) && user.companyId) {
+        const company = await Company.findById(user.companyId).select('isActive status').lean();
+        if (!company || company.isActive === false || ['SUSPENDED', 'DISABLED'].includes(company.status)) {
+            return 'Company account is suspended';
+        }
+    }
+
+    return null;
+};
 
 const hashToken = (token) => crypto.createHash('sha256').update(token).digest('hex');
 
@@ -261,6 +277,11 @@ exports.login = async (req, res) => {
             return res.status(400).json({ message: 'Invalid credentials' });
         }
 
+        const blockedReason = await ensureLoginAllowed(user);
+        if (blockedReason) {
+            return res.status(403).json({ message: blockedReason });
+        }
+
         const session = await issueSession(user, res, req);
         res.json(session);
     } catch (error) {
@@ -292,6 +313,12 @@ exports.refresh = async (req, res) => {
         ) {
             clearRefreshCookie(res);
             return res.status(401).json({ message: 'Refresh token invalid' });
+        }
+
+        const blockedReason = await ensureLoginAllowed(user);
+        if (blockedReason) {
+            clearRefreshCookie(res);
+            return res.status(403).json({ message: blockedReason });
         }
 
         // Keep refresh idempotent. A page reload can trigger overlapping refresh

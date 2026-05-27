@@ -23,13 +23,14 @@ import {
     MdLocalShipping,
     MdCalendarMonth,
     MdLock,
-    MdMap
+    MdMap,
+    MdAdminPanelSettings
 } from 'react-icons/md';
 import { useAuth } from '../context/AuthContext';
 
 const Sidebar = ({ isOpen, toggleSidebar }) => {
     const location = useLocation();
-    const { isAdmin, hasAccess } = useAuth();
+    const { isAdmin, isSuperAdmin, hasAccess } = useAuth();
 
     const [expanded, setExpanded] = useState({});
 
@@ -125,19 +126,37 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             icon: <MdLock size={22} />,
             children: [
                 { key: 'admin_authorization', name: 'Authorization', icon: <MdLock size={18} />, path: '/admin/authorization' },
-                ...(isAdmin ? [
+                ...(isAdmin || isSuperAdmin ? [
                     { key: 'admin_salespersons', name: 'Salespersons', icon: <MdPeople size={18} />, path: '/salespersons', adminOnly: true }
                 ] : []),
             ]
         },
+        ...(isSuperAdmin ? [{
+            type: 'group',
+            name: 'Platform',
+            key: 'platform',
+            icon: <MdAdminPanelSettings size={22} />,
+            children: [
+                { key: 'super_admin_console', name: 'Super Admin', icon: <MdAdminPanelSettings size={18} />, path: '/super-admin', superAdminOnly: true },
+            ],
+        }] : []),
     ].map((item) => {
         if (item.type !== 'group') return item;
 
         return {
             ...item,
-            children: item.children.filter((child) => child.adminOnly ? isAdmin : hasAccess(child.key)),
+            children: item.children.filter((child) => {
+                if (child.superAdminOnly) return isSuperAdmin;
+                return child.adminOnly ? (isAdmin || isSuperAdmin) : hasAccess(child.key);
+            }),
         };
-    }).filter((item) => item.type === 'link' ? (item.adminOnly ? isAdmin : hasAccess(item.key)) : item.children.length > 0 || hasAccess(item.key));
+    }).filter((item) => {
+        if (item.type === 'link') {
+            if (item.superAdminOnly) return isSuperAdmin;
+            return item.adminOnly ? (isAdmin || isSuperAdmin) : hasAccess(item.key);
+        }
+        return item.children.length > 0 || hasAccess(item.key);
+    });
 
     const getAutoExpanded = (key, children) => {
         if (expanded[key] !== undefined) return expanded[key];

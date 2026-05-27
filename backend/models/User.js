@@ -10,7 +10,15 @@ const UserSchema = new mongoose.Schema({
     tokenVersion: { type: Number, default: 0 },
     role: { type: String, default: 'sales' },
     status: { type: Boolean, default: true },
-    companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company', required: true, index: true },
+    isActive: { type: Boolean, default: true },
+    companyId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Company',
+        required: function () {
+            return this.role !== 'SUPER_ADMIN';
+        },
+        index: true,
+    },
     createdAt: { type: Date, default: Date.now },
 });
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { MdArrowBack, MdAdd, MdDelete, MdCheckCircle, MdPerson, MdSearch, MdBadge, MdExpandMore, MdOutlineDriveFileRenameOutline, MdNumbers, MdStar } from 'react-icons/md';
+import { MdArrowBack, MdAdd, MdDelete, MdCheckCircle, MdPerson, MdSearch, MdBadge, MdExpandMore, MdOutlineDriveFileRenameOutline, MdNumbers, MdStar, MdClose } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import { customerService, enquiryService, salespersonService, vendorService } from '../services/api';
 import Modal from '../components/Modal';
@@ -297,6 +297,77 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
             }
             if (onClose) onClose();
             else navigate('/enquiries');
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Error saving enquiry');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSaveAndNew = async () => {
+        if (isEditMode) {
+            await handleSubmit();
+            return;
+        }
+
+        if (!header.enquiryNo || !header.customerId) {
+            toast.error('Enquiry No and Customer are required');
+            return;
+        }
+
+        const activeStages = ['New', 'Contacted', 'Quotation Pending', 'Quotation Received', 'Negotiation'];
+        if (activeStages.includes(header.status) && !header.followUpDate) {
+            toast.error(`Follow-up Date is required when status is ${header.status}`);
+            return;
+        }
+
+        const finalStages = ['Finalized', 'PO Received', 'Won'];
+        if (finalStages.includes(header.status)) {
+            const missingVendorItem = items.findIndex(i => !i.finalVendor);
+            if (missingVendorItem !== -1) {
+                toast.error(`Final Vendor selection is required for all items before saving as ${header.status}. Check Item ${missingVendorItem + 1}`);
+                return;
+            }
+        }
+
+        const payloadHistory = [...followUpLog];
+        if (newFollowUpNote.trim() !== '') {
+            payloadHistory.push({
+                note: newFollowUpNote,
+                actionType: newFollowUpAction,
+                date: new Date()
+            });
+        }
+
+        setLoading(true);
+        try {
+            await enquiryService.create({ ...header, items, followUpHistory: payloadHistory });
+            toast.success('Enquiry created successfully');
+            setHeader({
+                enquiryNo: '',
+                enquiryDate: new Date().toISOString().split('T')[0],
+                customerId: '',
+                refReceivedFrom: '',
+                followUpDate: '',
+                status: 'New',
+                probability: 0,
+                remarks: '',
+                closureReason: ''
+            });
+            setFollowUpLog([]);
+            setNewFollowUpNote('');
+            setNewFollowUpAction('Call');
+            setItems([{
+                productName: '',
+                quantity: 1,
+                uom: 'Pcs',
+                actionStatus: 'VISIT CUSTOMER',
+                salespersonName: '',
+                agentName: '',
+                vendors: [],
+                vendorQuotes: [],
+                finalVendor: ''
+            }]);
         } catch (err) {
             toast.error(err.response?.data?.message || 'Error saving enquiry');
         } finally {
@@ -646,6 +717,38 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
                             </div>
                         </div>
                     </div>
+                </div>
+
+                <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-end gap-3">
+                    <button
+                        type="button"
+                        onClick={handleSubmit}
+                        disabled={loading}
+                        className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-primary-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-primary-700 transition-all shadow-xl shadow-primary-600/20 disabled:opacity-60"
+                    >
+                        <MdCheckCircle size={18} />
+                        {isEditMode ? 'Save' : 'Save'}
+                    </button>
+                    {!isEditMode && (
+                        <button
+                            type="button"
+                            onClick={handleSaveAndNew}
+                            disabled={loading}
+                            className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-slate-800 transition-all disabled:opacity-60"
+                        >
+                            <MdAdd size={18} />
+                            Save & New
+                        </button>
+                    )}
+                    <button
+                        type="button"
+                        onClick={() => onClose ? onClose() : navigate('/enquiries')}
+                        disabled={loading}
+                        className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-white border border-slate-200 text-slate-600 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-slate-50 transition-all disabled:opacity-60"
+                    >
+                        <MdClose size={18} />
+                        Cancel
+                    </button>
                 </div>
 
             </div>

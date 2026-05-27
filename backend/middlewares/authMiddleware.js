@@ -5,6 +5,9 @@ const { getCachedJson, setCachedJson } = require('../utils/apiCache');
 const { runWithTenant } = require('./tenantContext');
 
 const AUTH_USER_CACHE_TTL_SECONDS = Number(process.env.AUTH_USER_CACHE_TTL_SECONDS || 300);
+const SUPER_ADMIN_ROLE = 'SUPER_ADMIN';
+
+const isSuperAdminRole = (role) => role === SUPER_ADMIN_ROLE || role === 'super_admin';
 
 const isAccessTokenBlacklisted = async (jti) => {
     if (!jti) return false;
@@ -35,7 +38,7 @@ exports.protect = async (req, res, next) => {
             let user = cachedUser;
 
             if (!user) {
-                user = await User.findById(decoded.id).select('_id name email role tokenVersion companyId').lean();
+                user = await User.findById(decoded.id).select('_id name email role tokenVersion companyId status isActive').lean();
                 if (user) {
                     await setCachedJson(redis, cacheKey, user, AUTH_USER_CACHE_TTL_SECONDS);
                 }
@@ -49,12 +52,25 @@ exports.protect = async (req, res, next) => {
                 return res.status(401).json({ message: 'Not authorized, token revoked' });
             }
 
+            if (user.status === false || user.isActive === false) {
+                return res.status(403).json({ message: 'Account deactivated' });
+            }
+
             let resolvedCompanyId = user.companyId?.toString?.() || user.companyId;
+            const isSuperAdmin = isSuperAdminRole(user.role);
             if (!resolvedCompanyId && user.role === 'admin') {
                 const Company = require('../models/Company');
                 const firstCompany = await Company.findOne().lean();
                 if (firstCompany) {
                     resolvedCompanyId = firstCompany._id.toString();
+                }
+            }
+
+            if (!isSuperAdmin && resolvedCompanyId) {
+                const Company = require('../models/Company');
+                const company = await Company.findById(resolvedCompanyId).select('isActive status').lean();
+                if (!company || company.isActive === false || ['SUSPENDED', 'DISABLED'].includes(company.status)) {
+                    return res.status(403).json({ message: 'Company account is suspended' });
                 }
             }
 
@@ -85,3 +101,13 @@ exports.admin = (req, res, next) => {
         res.status(401).json({ message: 'Not authorized as an admin' });
     }
 };
+
+exports.superAdmin = (req, res, next) => {
+    if (req.user && isSuperAdminRole(req.user.role)) {
+        next();
+    } else {
+        res.status(403).json({ message: 'Not authorized as a super admin' });
+    }
+};
+
+exports.isSuperAdminRole = isSuperAdminRole;

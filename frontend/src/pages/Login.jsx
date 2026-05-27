@@ -4,6 +4,7 @@ import { toast } from "react-toastify";
 import { useAuth } from "../context/AuthContext";
 import { authService } from "../services/api";
 import { Eye, EyeOff, CheckCircle } from "lucide-react";
+import { getFallbackRoute } from "../constants/menuPermissions";
 import "./Auth.css";
 
 const Login = () => {
@@ -44,7 +45,7 @@ const Login = () => {
     try {
       const res = await authService.login(formData);
 
-      await login(res.data);
+      const session = await login(res.data);
 
       toast.success(
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -71,7 +72,9 @@ const Login = () => {
       );
 
       setTimeout(() => {
-        navigate("/dashboard");
+        const role = session.user?.role;
+        const isSuperAdmin = role === "SUPER_ADMIN" || role === "super_admin";
+        navigate(isSuperAdmin ? "/dashboard" : getFallbackRoute(session.permissions) || "/dashboard");
       }, 800);
     } catch (err) {
       const errorMessage = err.response?.data?.message || "Login failed";

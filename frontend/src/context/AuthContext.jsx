@@ -104,6 +104,10 @@ export const AuthProvider = ({ children }) => {
             return false;
         }
 
+        if (user.role === "SUPER_ADMIN" || user.role === "super_admin") {
+            return true;
+        }
+
         if (!permissionKey) {
             return true;
         }
@@ -138,6 +142,7 @@ export const AuthProvider = ({ children }) => {
                 refreshSession,
                 hasAccess,
                 isAdmin: user?.role === "admin",
+                isSuperAdmin: user?.role === "SUPER_ADMIN" || user?.role === "super_admin",
             }}
         >
             {children}

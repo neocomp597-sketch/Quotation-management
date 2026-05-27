@@ -82,6 +82,7 @@ const authorizationRoutes = require("./routes/authorizationRoutes");
 const statusRoutes = require("./routes/statusRoutes");
 const territoryRoutes = require("./routes/territoryRoutes");
 const footerPageRoutes = require("./routes/footerPageRoutes");
+const superAdminRoutes = require("./routes/superAdminRoutes");
 const scheduler = require("./utils/scheduler");
 
 // API Routes
@@ -109,6 +110,7 @@ app.use("/api/authorization", authorizationRoutes);
 app.use("/api/statuses", statusRoutes);
 app.use("/api/territories", territoryRoutes);
 app.use("/api/footer-pages", footerPageRoutes);
+app.use("/api/super-admin", superAdminRoutes);
 
 app.get('/api/trigger-seed', async (req, res) => {
     try {
