@@ -18,7 +18,8 @@ const MENU_GROUPS = [
             { key: 'master_mgrs', label: 'MGRs', description: 'MGR master hierarchy' },
             { key: 'master_attributes', label: 'Attributes', description: 'Attribute master definitions' },
             { key: 'master_statuses', label: 'Status Master', description: 'Status master definitions for planning' },
-            { key: 'master_terms', label: 'Terms', description: 'Terms and conditions master' }
+            { key: 'master_terms', label: 'Terms', description: 'Terms and conditions master' },
+            { key: 'master_territories', label: 'Territories', description: 'Territory master management' }
         ]
     },
     {

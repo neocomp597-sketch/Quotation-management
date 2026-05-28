@@ -4,9 +4,10 @@ import { toast } from 'react-toastify';
 import {
     MdLock, MdRefresh, MdTune, MdPeople,
     MdCheckCircle, MdCancel, MdRestartAlt, MdShield, MdWarning,
-    MdExpandLess, MdExpandMore, MdAdd, MdDelete, MdSave, MdEdit, MdClose
+    MdExpandLess, MdExpandMore, MdAdd, MdDelete, MdSave, MdEdit, MdClose,
+    MdBusiness
 } from 'react-icons/md';
-import { authorizationService, userService } from '../services/api';
+import { authorizationService, userService, superAdminService } from '../services/api';
 import { ROLE_LABELS as BUILTIN_ROLE_LABELS, MENU_PERMISSION_GROUPS } from '../constants/menuPermissions';
 import { useAuth } from '../context/AuthContext';
 
@@ -28,7 +29,7 @@ const buildPermissionsFromEnabledSections = (groups, enabledSections = []) => {
 };
 
 const Authorization = () => {
-    const { user: currentUser, isAdmin } = useAuth();
+    const { user: currentUser, isAdmin, isSuperAdmin } = useAuth();
 
     const [roles, setRoles] = useState([]);
     const [menuGroups, setMenuGroups] = useState([]);
@@ -51,10 +52,14 @@ const Authorization = () => {
     const [editingUserId, setEditingUserId] = useState(null);
     const [editingUserData, setEditingUserData] = useState({ name: '', email: '', password: '', role: '' });
 
+    const [companies, setCompanies] = useState([]);
+    const [selectedCompanyId, setSelectedCompanyId] = useState('');
+    const [companiesLoading, setCompaniesLoading] = useState(false);
 
-    const fetchMatrix = async () => {
+    const fetchMatrix = async (companyId = selectedCompanyId) => {
         try {
-            const res = await authorizationService.getAll();
+            const params = companyId ? { companyId } : {};
+            const res = await authorizationService.getAll(params);
             setRoles(res.data.roles || []);
             setMenuGroups(res.data.menuGroups || []);
         } catch (err) {
@@ -62,10 +67,11 @@ const Authorization = () => {
         }
     };
 
-    const fetchUsers = async () => {
+    const fetchUsers = async (companyId = selectedCompanyId) => {
         setUsersLoading(true);
         try {
-            const res = await userService.getAll();
+            const params = companyId ? { companyId } : {};
+            const res = await userService.getAll(params);
             setUsers(res.data || []);
         } catch (err) {
             toast.error('Error loading users');
@@ -74,17 +80,41 @@ const Authorization = () => {
         }
     };
 
+    // Load company list if super admin
     useEffect(() => {
-        if (!isAdmin) return;
+        if (!isSuperAdmin) return;
+        (async () => {
+            setCompaniesLoading(true);
+            try {
+                const res = await superAdminService.getCompanies();
+                const list = res.data || [];
+                setCompanies(list);
+                if (list.length > 0) {
+                    setSelectedCompanyId(list[0]._id);
+                }
+            } catch (err) {
+                toast.error('Failed to load company list');
+            } finally {
+                setCompaniesLoading(false);
+            }
+        })();
+    }, [isSuperAdmin]);
+
+    // Load matrix and users when isAdmin is true, or when selectedCompanyId changes for super admin
+    useEffect(() => {
+        if (!isAdmin && !isSuperAdmin) return;
+        if (isSuperAdmin && !selectedCompanyId) return;
+
         (async () => {
             setLoading(true);
-            await authorizationService.initialize().catch(() => null);
-            await Promise.all([fetchMatrix(), fetchUsers()]);
+            const params = selectedCompanyId ? { companyId: selectedCompanyId } : {};
+            await authorizationService.initialize(params).catch(() => null);
+            await Promise.all([fetchMatrix(selectedCompanyId), fetchUsers(selectedCompanyId)]);
             setLoading(false);
         })();
-    }, [isAdmin]);
+    }, [isAdmin, isSuperAdmin, selectedCompanyId]);
 
-    if (!isAdmin) return <Navigate to="/dashboard" replace />;
+    if (!isAdmin && !isSuperAdmin) return <Navigate to="/dashboard" replace />;
 
     const existingAdmin = users.find((u) => u.role === 'admin');
     const displayGroups = menuGroups.length ? menuGroups : MENU_PERMISSION_GROUPS;
@@ -97,7 +127,7 @@ const Authorization = () => {
 
     const handleRefresh = async () => {
         setLoading(true);
-        await Promise.all([fetchMatrix(), fetchUsers()]).finally(() => setLoading(false));
+        await Promise.all([fetchMatrix(selectedCompanyId), fetchUsers(selectedCompanyId)]).finally(() => setLoading(false));
     };
 
     const toggleExpanded = (roleKey, groupKey) => {
@@ -141,7 +171,8 @@ const Authorization = () => {
         setStatusByRole((prev) => ({ ...prev, [roleKey]: 'saving' }));
 
         try {
-            const res = await authorizationService.update(roleKey, next);
+            const params = selectedCompanyId ? { companyId: selectedCompanyId } : {};
+            const res = await authorizationService.update(roleKey, next, params);
             const saved = res.data?.permissions || next;
             setRoles((prev) => prev.map((r) => r.role === roleKey ? { ...r, permissions: saved } : r));
             setStatusByRole((prev) => ({ ...prev, [roleKey]: 'saved' }));
@@ -164,7 +195,8 @@ const Authorization = () => {
         setStatusByRole((prev) => ({ ...prev, [roleKey]: 'saving' }));
 
         try {
-            const res = await authorizationService.update(roleKey, defaults);
+            const params = selectedCompanyId ? { companyId: selectedCompanyId } : {};
+            const res = await authorizationService.update(roleKey, defaults, params);
             setRoles((prev) => prev.map((r) => r.role === roleKey ? { ...r, permissions: res.data?.permissions || defaults } : r));
             setStatusByRole((prev) => ({ ...prev, [roleKey]: 'saved' }));
             toast.success('Permissions reset');
@@ -179,7 +211,8 @@ const Authorization = () => {
     const handleUserRoleChange = async (userId, nextRole) => {
         setUpdatingUserId(userId);
         try {
-            const res = await userService.updateRole(userId, nextRole);
+            const params = selectedCompanyId ? { companyId: selectedCompanyId } : {};
+            const res = await userService.updateRole(userId, nextRole, params);
             setUsers((prev) => prev.map((u) => u._id === userId ? res.data : u));
             toast.success('User updated');
         } catch (err) {
@@ -194,7 +227,8 @@ const Authorization = () => {
         if (!newRoleData.label.trim()) return;
         setCreatingRole(true);
         try {
-            const res = await authorizationService.createRole(newRoleData.label, newRoleData.description);
+            const params = selectedCompanyId ? { companyId: selectedCompanyId } : {};
+            const res = await authorizationService.createRole(newRoleData.label, newRoleData.description, params);
             setRoles((prev) => [...prev, res.data]);
             setNewRoleData({ label: '', description: '' });
             setShowNewRoleForm(false);
@@ -209,7 +243,8 @@ const Authorization = () => {
     const handleDeleteRole = async (roleKey) => {
         if (!window.confirm('Delete this role?')) return;
         try {
-            await authorizationService.deleteRole(roleKey);
+            const params = selectedCompanyId ? { companyId: selectedCompanyId } : {};
+            await authorizationService.deleteRole(roleKey, params);
             setRoles((prev) => prev.filter((r) => r.role !== roleKey));
             toast.success('Role deleted');
         } catch (err) {
@@ -223,12 +258,16 @@ const Authorization = () => {
 
         setCreatingUser(true);
         try {
-            const res = await userService.create({
+            const payload = {
                 name: newUserData.name.trim(),
                 email: newUserData.email.trim(),
                 password: newUserData.password,
                 role: newUserData.role || 'sales',
-            });
+            };
+            if (selectedCompanyId) {
+                payload.companyId = selectedCompanyId;
+            }
+            const res = await userService.create(payload);
 
             setUsers((prev) => [res.data, ...prev]);
             setNewUserData({ name: '', email: '', password: '', role: 'sales' });
@@ -258,7 +297,8 @@ const Authorization = () => {
             const data = { ...editingUserData };
             if (!data.password) delete data.password;
             
-            const res = await userService.update(editingUserId, data);
+            const params = selectedCompanyId ? { companyId: selectedCompanyId } : {};
+            const res = await userService.update(editingUserId, data, params);
             setUsers((prev) => prev.map((u) => u._id === editingUserId ? res.data : u));
             setEditingUserId(null);
             toast.success('User updated');
@@ -273,7 +313,8 @@ const Authorization = () => {
         if (!window.confirm('Are you sure you want to delete this user?')) return;
         setUpdatingUserId(userId);
         try {
-            await userService.delete(userId);
+            const params = selectedCompanyId ? { companyId: selectedCompanyId } : {};
+            await userService.delete(userId, params);
             setUsers((prev) => prev.filter((u) => u._id !== userId));
             toast.success('User deleted');
         } catch (err) {
@@ -283,13 +324,59 @@ const Authorization = () => {
         }
     };
 
+    const activeCompanyObj = companies.find((c) => c._id === selectedCompanyId);
+    const activeCompanyName = activeCompanyObj ? (activeCompanyObj.companyName || activeCompanyObj.name) : '';
+
     return (
         <div className="max-w-[1400px] mx-auto space-y-12 pb-20">
+            {/* Super Admin Company Selector Banner */}
+            {isSuperAdmin && (
+                <div className="bg-slate-900 text-white rounded-2xl p-6 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6">
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-xl bg-primary-600 flex items-center justify-center text-white shrink-0 animate-pulse">
+                            <MdShield size={24} />
+                        </div>
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs font-black uppercase tracking-widest text-primary-400">Platform Control</span>
+                                <span className="bg-primary-600/30 text-primary-300 text-[10px] font-bold px-2 py-0.5 rounded-full">Super Admin Scoped</span>
+                            </div>
+                            <h2 className="text-lg font-black tracking-tight mt-0.5">Platform Scoped View</h2>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                        <span className="text-sm text-slate-400 font-bold flex items-center gap-1.5">
+                            <MdBusiness size={18} />
+                            Scope Company:
+                        </span>
+                        {companiesLoading ? (
+                            <span className="text-xs text-slate-500">Loading companies...</span>
+                        ) : (
+                            <select
+                                value={selectedCompanyId}
+                                onChange={(e) => setSelectedCompanyId(e.target.value)}
+                                className="bg-slate-800 text-white border border-slate-700 px-4 py-2.5 rounded-xl text-sm font-bold outline-none focus:border-primary-500 transition-colors cursor-pointer"
+                            >
+                                {companies.map((c) => (
+                                    <option key={c._id} value={c._id}>
+                                        {c.companyName || c.name}
+                                    </option>
+                                ))}
+                            </select>
+                        )}
+                    </div>
+                </div>
+            )}
+
             {/* Minimal Header */}
             <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-slate-100 pb-8">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Permissions</h1>
-                    <p className="text-sm text-slate-500 mt-1">Manage user roles and section access.</p>
+                    <p className="text-sm text-slate-500 mt-1">
+                        {isSuperAdmin && activeCompanyName 
+                            ? `Manage user roles and section access for ${activeCompanyName}.`
+                            : 'Manage user roles and section access.'}
+                    </p>
                 </div>
                 <div className="flex items-center gap-2">
                     <button onClick={handleRefresh} className="p-2.5 text-slate-400 hover:text-primary-600 border border-slate-200 rounded-lg hover:bg-primary-50/30 transition-colors">

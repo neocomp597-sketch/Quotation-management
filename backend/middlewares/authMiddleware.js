@@ -5,9 +5,11 @@ const { getCachedJson, setCachedJson } = require('../utils/apiCache');
 const { runWithTenant } = require('./tenantContext');
 
 const AUTH_USER_CACHE_TTL_SECONDS = Number(process.env.AUTH_USER_CACHE_TTL_SECONDS || 300);
-const SUPER_ADMIN_ROLE = 'SUPER_ADMIN';
-
-const isSuperAdminRole = (role) => role === SUPER_ADMIN_ROLE || role === 'super_admin';
+const isSuperAdminRole = (role) => {
+    if (!role) return false;
+    const normalized = role.toLowerCase();
+    return normalized === 'super_admin' || normalized === 'superadmin';
+};
 
 const isAccessTokenBlacklisted = async (jti) => {
     if (!jti) return false;
@@ -58,7 +60,13 @@ exports.protect = async (req, res, next) => {
 
             let resolvedCompanyId = user.companyId?.toString?.() || user.companyId;
             const isSuperAdmin = isSuperAdminRole(user.role);
-            if (!resolvedCompanyId && user.role === 'admin') {
+
+            if (isSuperAdmin) {
+                const queryCompanyId = req.query.companyId || req.headers['x-company-id'] || req.body?.companyId;
+                if (queryCompanyId) {
+                    resolvedCompanyId = queryCompanyId.toString();
+                }
+            } else if (!resolvedCompanyId && user.role === 'admin') {
                 const Company = require('../models/Company');
                 const firstCompany = await Company.findOne().lean();
                 if (firstCompany) {
@@ -95,7 +103,7 @@ exports.protect = async (req, res, next) => {
 };
 
 exports.admin = (req, res, next) => {
-    if (req.user && req.user.role === 'admin') {
+    if (req.user && (req.user.role === 'admin' || isSuperAdminRole(req.user.role))) {
         next();
     } else {
         res.status(401).json({ message: 'Not authorized as an admin' });

@@ -108,6 +108,10 @@ export const AuthProvider = ({ children }) => {
             return true;
         }
 
+        if (user.role === "admin" || user.role === "Admin") {
+            return true;
+        }
+
         if (!permissionKey) {
             return true;
         }
@@ -141,7 +145,7 @@ export const AuthProvider = ({ children }) => {
                 logout,
                 refreshSession,
                 hasAccess,
-                isAdmin: user?.role === "admin",
+                isAdmin: user?.role === "admin" || user?.role === "Admin",
                 isSuperAdmin: user?.role === "SUPER_ADMIN" || user?.role === "super_admin",
             }}
         >

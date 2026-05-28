@@ -163,25 +163,25 @@ export const authService = {
 };
 
 export const userService = {
-  getAll: () => api.get("/users"),
+  getAll: (params) => api.get("/users", { params }),
   create: (data) => api.post("/users", data),
   updateProfile: (data) => api.put("/users/profile", data),
-  updateRole: (id, role) => api.patch(`/users/${id}/role`, { role }),
-  update: (id, data) => api.put(`/users/${id}`, data),
-  delete: (id) => api.delete(`/users/${id}`),
+  updateRole: (id, role, params) => api.patch(`/users/${id}/role`, { role }, { params }),
+  update: (id, data, params) => api.put(`/users/${id}`, data, { params }),
+  delete: (id, params) => api.delete(`/users/${id}`, { params }),
 };
 
 export const authorizationService = {
-  getAll: () => api.get("/authorization"),
+  getAll: (params) => api.get("/authorization", { params }),
   getMy: () => api.get("/authorization/me"),
-  update: (role, permissions) =>
-    api.put(`/authorization/${role}`, { permissions }),
-  initialize: () => api.post("/authorization/initialize"),
-  createRole: (label, description) =>
-    api.post("/authorization/roles", { label, description }),
-  updateRoleMeta: (role, label, description) =>
-    api.patch(`/authorization/roles/${role}`, { label, description }),
-  deleteRole: (role) => api.delete(`/authorization/roles/${role}`),
+  update: (role, permissions, params) =>
+    api.put(`/authorization/${role}`, { permissions }, { params }),
+  initialize: (params) => api.post("/authorization/initialize", {}, { params }),
+  createRole: (label, description, params) =>
+    api.post("/authorization/roles", { label, description }, { params }),
+  updateRoleMeta: (role, label, description, params) =>
+    api.patch(`/authorization/roles/${role}`, { label, description }, { params }),
+  deleteRole: (role, params) => api.delete(`/authorization/roles/${role}`, { params }),
 };
 
 export const superAdminService = {

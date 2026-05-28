@@ -6,12 +6,6 @@ const { getTenantId } = require('../middlewares/tenantContext');
 
 exports.getAllUsers = async (req, res) => {
     try {
-        const fs = require('fs');
-        fs.writeFileSync('d:\\tally\\Quotations\\backend\\debug.txt', `Call to getAllUsers:\nUser: ${JSON.stringify(req.user)}\nTime: ${new Date().toISOString()}`);
-    } catch (fsErr) {
-        console.error('Failed to write to debug file:', fsErr);
-    }
-    try {
         if (!req.user?.companyId) {
             return res.status(400).json({ message: 'Company context missing' });
         }
@@ -24,12 +18,6 @@ exports.getAllUsers = async (req, res) => {
         res.json(users);
     } catch (error) {
         console.error('[getAllUsers] Error:', error.message, error.stack);
-        try {
-            const fs = require('fs');
-            fs.writeFileSync('d:\\tally\\Quotations\\backend\\debug.txt', `Error: ${error.message}\nStack: ${error.stack}\nTime: ${new Date().toISOString()}`);
-        } catch (fsErr) {
-            console.error('Failed to write to debug file:', fsErr);
-        }
         res.status(500).json({ message: 'Failed to load users', error: error.message });
     }
 };
@@ -183,7 +171,7 @@ exports.updateUserRole = async (req, res) => {
 exports.updateUser = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, email, password } = req.body;
+        const { name, email, password, role } = req.body;
 
         const user = await User.findOne({ _id: id, companyId: req.user.companyId });
         if (!user) {
@@ -202,6 +190,34 @@ exports.updateUser = async (req, res) => {
         if (password) {
             const salt = await bcrypt.genSalt(10);
             user.passwordHash = await bcrypt.hash(password, salt);
+        }
+
+        // Handle role change if provided and different
+        if (role && role !== user.role) {
+            if (req.user.id === id) {
+                return res.status(400).json({ message: 'You cannot change your own role.' });
+            }
+
+            const isBuiltIn = ROLE_OPTIONS.includes(role);
+            const customRole = !isBuiltIn ? await RolePermission.findOne({ role }).select('_id').lean() : null;
+            if (!isBuiltIn && !customRole) {
+                return res.status(400).json({ message: 'Invalid role supplied' });
+            }
+
+            if (role === 'admin') {
+                const adminCount = await User.countDocuments({
+                    companyId: req.user.companyId,
+                    role: 'admin',
+                    _id: { $ne: id }
+                });
+                if (adminCount >= 3) {
+                    return res.status(400).json({
+                        message: 'A maximum of 3 admins are allowed for this organization.'
+                    });
+                }
+            }
+
+            user.role = role;
         }
 
         const updatedUser = await user.save();
