@@ -1,5 +1,49 @@
 const Enquiry = require('../models/Enquiry');
+const Counter = require('../models/Counter');
+const mongoose = require('mongoose');
 const { updateActivityDate, logStatusChange } = require('../utils/activityHelper');
+
+let indexDropped = false;
+
+const ensureIndexDropped = async () => {
+    if (indexDropped) return;
+    try {
+        const db = mongoose.connection.db;
+        if (!db) {
+            console.warn('[Migration Warning] Database connection not ready for index drop check');
+            return;
+        }
+        const collections = await db.listCollections({ name: 'enquiries' }).toArray();
+        if (collections.length > 0) {
+            const indexes = await db.collection('enquiries').indexes();
+            const hasLegacyIndex = indexes.some(idx => idx.name === 'enquiryNo_1');
+            if (hasLegacyIndex) {
+                console.log('[Migration] Found legacy unique index enquiryNo_1 on enquiries. Dropping it...');
+                await db.collection('enquiries').dropIndex('enquiryNo_1');
+                console.log('[Migration] Successfully dropped legacy unique index enquiryNo_1.');
+            }
+        }
+        indexDropped = true;
+    } catch (err) {
+        console.error('[Migration Error] Failed to drop legacy index:', err.message);
+    }
+};
+
+const generateEnquiryNumber = async (companyId) => {
+    const year = new Date().getFullYear();
+    const prefix = 'ENQ';
+    
+    // Find counter for enquiry type, companyId, prefix, and year
+    // Scoped per tenant (companyId)
+    const counter = await Counter.findOneAndUpdate(
+        { type: 'enquiry', companyId: companyId || null, prefix, year },
+        { $inc: { seq: 1 } },
+        { new: true, upsert: true, setDefaultsOnInsert: true }
+    );
+
+    const seqStr = counter.seq.toString().padStart(4, '0');
+    return `${prefix}/${year}/${seqStr}`;
+};
 
 const cleanEnquiryBody = (body) => {
     if (!body) return body;
@@ -42,16 +86,26 @@ const cleanEnquiryBody = (body) => {
 
 exports.createEnquiry = async (req, res) => {
     try {
+        await ensureIndexDropped();
         req.body = cleanEnquiryBody(req.body);
+
+        // Auto-generate enquiry number if left empty
+        if (!req.body.enquiryNo || String(req.body.enquiryNo).trim() === '') {
+            req.body.enquiryNo = await generateEnquiryNumber(req.user?.companyId);
+        }
+
         const { enquiryNo } = req.body;
         const exists = await Enquiry.findOne({ enquiryNo }).select('_id').lean();
         if (exists) {
             console.error(`[Enquiry Create Error] Enquiry with number ${enquiryNo} already exists`);
-            return res.status(400).json({ message: `Enquiry with number ${enquiryNo} already exists` });
+            return res.status(400).json({ 
+                message: `Enquiry number "${enquiryNo}" already exists in the system. Please enter a different number or leave it blank to auto-generate a unique number.` 
+            });
         }
 
         const newEnquiry = new Enquiry({
             ...req.body,
+            companyId: req.user?.companyId,
             createdBy: req.user?._id,
             lastActivityDate: new Date() // Set initial activity date
         });
@@ -60,12 +114,21 @@ exports.createEnquiry = async (req, res) => {
         res.status(201).json(newEnquiry);
     } catch (err) {
         console.error('[Enquiry Create Error] Exception caught during save:', err);
+        
+        // Catch duplicate key errors gracefully
+        if (err.code === 11000 || err.message.includes('E11000') || err.message.includes('duplicate key')) {
+            return res.status(400).json({ 
+                message: 'This Enquiry Number is already in use. Please enter a unique number or leave it blank to auto-generate.' 
+            });
+        }
+
         res.status(400).json({ message: err.message });
     }
 };
 
 exports.getAllEnquiries = async (req, res) => {
     try {
+        await ensureIndexDropped();
         const enquiries = await Enquiry.find()
             .select('enquiryNo customerId status probability items createdBy lastActivityDate createdAt updatedAt')
             .populate('customerId', 'customerName companyName gstin')
@@ -139,6 +202,14 @@ exports.updateEnquiry = async (req, res) => {
         res.json(updatedEnquiry);
     } catch (err) {
         console.error('[Enquiry Update Error] Exception caught during update:', err);
+
+        // Catch duplicate key errors gracefully on updates
+        if (err.code === 11000 || err.message.includes('E11000') || err.message.includes('duplicate key')) {
+            return res.status(400).json({ 
+                message: 'The Enquiry Number you entered is already in use. Please choose a unique number.' 
+            });
+        }
+
         res.status(400).json({ message: err.message });
     }
 };

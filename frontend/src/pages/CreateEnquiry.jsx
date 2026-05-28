@@ -89,6 +89,35 @@ const CustomerSearchDropdown = ({ customers, selectedCustomerId, onSelect }) => 
     );
 };
 
+const generateNextEnquiryNumber = (existingEnquiries = []) => {
+    let maxNum = 0;
+    let prefix = '';
+    
+    existingEnquiries.forEach(e => {
+        const str = String(e.enquiryNo || '').trim();
+        const match = str.match(/^(.*?)(\d+)$/);
+        if (match) {
+            const currentPrefix = match[1];
+            const num = parseInt(match[2], 10);
+            if (num > maxNum) {
+                maxNum = num;
+                prefix = currentPrefix;
+            }
+        }
+    });
+
+    if (maxNum > 0) {
+        const nextNum = maxNum + 1;
+        const origNumStr = existingEnquiries.find(e => String(e.enquiryNo).endsWith(String(maxNum)))?.enquiryNo || '';
+        const numMatch = origNumStr.match(/(\d+)$/);
+        const paddingLen = numMatch ? numMatch[1].length : 0;
+        const nextNumStr = String(nextNum).padStart(paddingLen, '0');
+        return `${prefix}${nextNumStr}`;
+    }
+    
+    return '5001';
+};
+
 const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
     const navigate = useNavigate();
     const params = useParams();
@@ -143,6 +172,16 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
                 setCustomers(custRes.data);
                 setSalespersons(salesRes.data);
                 setAllVendors(vendRes.data);
+
+                if (!id) {
+                    try {
+                        const enqRes = await enquiryService.getAll();
+                        const nextEnqNo = generateNextEnquiryNumber(enqRes.data || []);
+                        setHeader(prev => ({ ...prev, enquiryNo: nextEnqNo }));
+                    } catch (enqErr) {
+                        console.error("Error generating next enquiry number:", enqErr);
+                    }
+                }
             } catch (err) {
                 console.error("Error fetching data:", err);
             }
@@ -256,8 +295,8 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
     };
 
     const handleSubmit = async () => {
-        if (!header.enquiryNo || !header.customerId) {
-            toast.error('Enquiry No and Customer are required');
+        if (!header.customerId) {
+            toast.error('Customer is required');
             return;
         }
 
@@ -330,8 +369,8 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
             return;
         }
 
-        if (!header.enquiryNo || !header.customerId) {
-            toast.error('Enquiry No and Customer are required');
+        if (!header.customerId) {
+            toast.error('Customer is required');
             return;
         }
 
@@ -384,8 +423,17 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
             const payload = { ...cleanedHeader, items: cleanedItems, followUpHistory: payloadHistory };
             await enquiryService.create(payload);
             toast.success('Enquiry created successfully');
+
+            let nextEnqNo = '5001';
+            try {
+                const enqRes = await enquiryService.getAll();
+                nextEnqNo = generateNextEnquiryNumber(enqRes.data || []);
+            } catch (enqErr) {
+                console.error("Failed to pre-fetch next number on save & new:", enqErr);
+            }
+
             setHeader({
-                enquiryNo: '',
+                enquiryNo: nextEnqNo,
                 enquiryDate: new Date().toISOString().split('T')[0],
                 customerId: '',
                 refReceivedFrom: '',
@@ -454,7 +502,7 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
                     </div>
                     <div className="p-8 grid grid-cols-1 md:grid-cols-4 gap-8">
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Enquiry Number <span className="text-rose-500">*</span></label>
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Enquiry Number <span className="text-xs text-slate-400 lowercase font-medium">(Leave blank to auto-generate)</span></label>
                             <div className="relative">
                                 <MdNumbers className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
                                 <input
@@ -462,7 +510,7 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
                                     name="enquiryNo"
                                     value={header.enquiryNo}
                                     onChange={handleHeaderChange}
-                                    placeholder="e.g. ABC/123"
+                                    placeholder="e.g. ENQ/2026/0001 (or leave blank)"
                                     className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-bold"
                                 />
                             </div>

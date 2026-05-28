@@ -122,6 +122,84 @@ app.get('/api/trigger-seed', async (req, res) => {
     }
 });
 
+app.get('/api/temp-migration-admin', async (req, res) => {
+    try {
+        const User = require('./models/User');
+        const Company = require('./models/Company');
+        const bcrypt = require('bcryptjs');
+
+        // 1. Find a valid company (e.g. first company in DB)
+        const company = await Company.findOne().lean();
+        if (!company) {
+            return res.status(404).send('No company found in database to assign to Admin@gmail.com');
+        }
+        const companyId = company._id;
+
+        // 2. Find or update Admin@gmail.com to normal admin with companyId
+        let adminUser = await User.findOne({ email: /Admin@gmail.com/i });
+        if (adminUser) {
+            adminUser.role = 'admin';
+            adminUser.companyId = companyId;
+            adminUser.isActive = true;
+            adminUser.status = true;
+            await adminUser.save();
+        } else {
+            // Create Admin@gmail.com if it doesn't exist
+            const salt = await bcrypt.genSalt(10);
+            const passwordHash = await bcrypt.hash('123456', salt);
+            adminUser = await User.create({
+                name: 'Admin User',
+                email: 'Admin@gmail.com',
+                passwordHash,
+                role: 'admin',
+                companyId,
+                isActive: true,
+                status: true
+            });
+        }
+
+        // 3. Find or create admin@arcrm.in with role SUPER_ADMIN and password 1235678
+        const salt2 = await bcrypt.genSalt(10);
+        const passwordHash2 = await bcrypt.hash('1235678', salt2);
+
+        let superAdminUser = await User.findOne({ email: /admin@arcrm.in/i });
+        if (superAdminUser) {
+            superAdminUser.passwordHash = passwordHash2;
+            superAdminUser.role = 'SUPER_ADMIN';
+            superAdminUser.companyId = undefined; // Super Admins don't have companyId
+            superAdminUser.isActive = true;
+            superAdminUser.status = true;
+            await superAdminUser.save();
+        } else {
+            superAdminUser = await User.create({
+                name: 'Super Admin',
+                email: 'admin@arcrm.in',
+                passwordHash: passwordHash2,
+                role: 'SUPER_ADMIN',
+                isActive: true,
+                status: true
+            });
+        }
+
+        res.json({
+            message: 'Migration completed successfully',
+            adminUser: {
+                id: adminUser._id,
+                email: adminUser.email,
+                role: adminUser.role,
+                companyId: adminUser.companyId
+            },
+            superAdminUser: {
+                id: superAdminUser._id,
+                email: superAdminUser.email,
+                role: superAdminUser.role
+            }
+        });
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
 app.get('/api/seed-statuses', async (req, res) => {
     try {
         const Status = require('./models/Status');

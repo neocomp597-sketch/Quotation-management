@@ -50,6 +50,7 @@ function App() {
         draggable
         pauseOnHover
         theme="light"
+        style={{ zIndex: 100000 }}
         toastStyle={{
           borderRadius: '1rem',
           fontWeight: '600',
