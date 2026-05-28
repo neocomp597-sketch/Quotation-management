@@ -32,7 +32,6 @@ const CustomerSchema = new mongoose.Schema({
 CustomerSchema.index({ mobile: 1 });
 CustomerSchema.index({ email: 1 });
 CustomerSchema.index({ gstin: 1 });
-CustomerSchema.index({ companyId: 1 });
 CustomerSchema.index({ customerName: 1 });
 CustomerSchema.index({ companyName: 1 });
 CustomerSchema.index({ createdAt: -1 });

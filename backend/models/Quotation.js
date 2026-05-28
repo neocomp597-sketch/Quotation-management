@@ -61,7 +61,6 @@ QuotationSchema.index({ customerId: 1 });
 QuotationSchema.index({ createdBy: 1 });
 QuotationSchema.index({ createdAt: -1 });
 QuotationSchema.index({ status: 1 });
-QuotationSchema.index({ companyId: 1 });
 QuotationSchema.index({ companyId: 1, quotationNo: 1 }, { unique: true });
 QuotationSchema.index({ companyId: 1, quotationNumber: 1 });
 QuotationSchema.index({ customerName: 'text' });

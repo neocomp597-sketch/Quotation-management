@@ -261,6 +261,13 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
             return;
         }
 
+        // Ensure all items have a Product Name
+        const emptyProductIndex = items.findIndex(item => !item.productName || item.productName.trim() === '');
+        if (emptyProductIndex !== -1) {
+            toast.error(`Product Name is required for all items. Check Item ${emptyProductIndex + 1}`);
+            return;
+        }
+
         const activeStages = ['New', 'Contacted', 'Quotation Pending', 'Quotation Received', 'Negotiation'];
         if (activeStages.includes(header.status) && !header.followUpDate) {
             toast.error(`Follow-up Date is required when status is ${header.status}`);
@@ -284,10 +291,23 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
                 date: new Date()
             });
         }
+
+        const cleanedItems = items.map(item => {
+            const cleaned = { ...item };
+            if (cleaned.finalVendor === '') {
+                delete cleaned.finalVendor;
+            }
+            return cleaned;
+        });
+
+        const cleanedHeader = { ...header };
+        if (cleanedHeader.assignedTo === '') {
+            delete cleanedHeader.assignedTo;
+        }
         
         setLoading(true);
         try {
-            const payload = { ...header, items, followUpHistory: payloadHistory };
+            const payload = { ...cleanedHeader, items: cleanedItems, followUpHistory: payloadHistory };
             if (isEditMode) {
                 await enquiryService.update(id, payload);
                 toast.success('Enquiry updated successfully');
@@ -315,6 +335,13 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
             return;
         }
 
+        // Ensure all items have a Product Name
+        const emptyProductIndex = items.findIndex(item => !item.productName || item.productName.trim() === '');
+        if (emptyProductIndex !== -1) {
+            toast.error(`Product Name is required for all items. Check Item ${emptyProductIndex + 1}`);
+            return;
+        }
+
         const activeStages = ['New', 'Contacted', 'Quotation Pending', 'Quotation Received', 'Negotiation'];
         if (activeStages.includes(header.status) && !header.followUpDate) {
             toast.error(`Follow-up Date is required when status is ${header.status}`);
@@ -339,9 +366,23 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
             });
         }
 
+        const cleanedItems = items.map(item => {
+            const cleaned = { ...item };
+            if (cleaned.finalVendor === '') {
+                delete cleaned.finalVendor;
+            }
+            return cleaned;
+        });
+
+        const cleanedHeader = { ...header };
+        if (cleanedHeader.assignedTo === '') {
+            delete cleanedHeader.assignedTo;
+        }
+
         setLoading(true);
         try {
-            await enquiryService.create({ ...header, items, followUpHistory: payloadHistory });
+            const payload = { ...cleanedHeader, items: cleanedItems, followUpHistory: payloadHistory };
+            await enquiryService.create(payload);
             toast.success('Enquiry created successfully');
             setHeader({
                 enquiryNo: '',

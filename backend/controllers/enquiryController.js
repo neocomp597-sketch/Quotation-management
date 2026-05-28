@@ -1,11 +1,52 @@
 const Enquiry = require('../models/Enquiry');
 const { updateActivityDate, logStatusChange } = require('../utils/activityHelper');
 
+const cleanEnquiryBody = (body) => {
+    if (!body) return body;
+    
+    // Clean header fields
+    if (body.assignedTo === '') {
+        delete body.assignedTo;
+    }
+    if (body.followUpDate === '') {
+        delete body.followUpDate;
+    }
+    
+    // Clean items
+    if (Array.isArray(body.items)) {
+        body.items = body.items.map(item => {
+            const cleanedItem = { ...item };
+            if (cleanedItem.finalVendor === '') {
+                delete cleanedItem.finalVendor;
+            }
+            if (Array.isArray(cleanedItem.vendors)) {
+                cleanedItem.vendors = cleanedItem.vendors.filter(v => v !== '');
+            }
+            if (Array.isArray(cleanedItem.vendorQuotes)) {
+                cleanedItem.vendorQuotes = cleanedItem.vendorQuotes.map(vq => {
+                    const cleanedVq = { ...vq };
+                    if (cleanedVq.vendorId === '') {
+                        delete cleanedVq.vendorId;
+                    }
+                    if (cleanedVq.price === '') {
+                        delete cleanedVq.price;
+                    }
+                    return cleanedVq;
+                }).filter(vq => vq.vendorId);
+            }
+            return cleanedItem;
+        });
+    }
+    return body;
+};
+
 exports.createEnquiry = async (req, res) => {
     try {
+        req.body = cleanEnquiryBody(req.body);
         const { enquiryNo } = req.body;
         const exists = await Enquiry.findOne({ enquiryNo }).select('_id').lean();
         if (exists) {
+            console.error(`[Enquiry Create Error] Enquiry with number ${enquiryNo} already exists`);
             return res.status(400).json({ message: `Enquiry with number ${enquiryNo} already exists` });
         }
 
@@ -18,6 +59,7 @@ exports.createEnquiry = async (req, res) => {
         await newEnquiry.save();
         res.status(201).json(newEnquiry);
     } catch (err) {
+        console.error('[Enquiry Create Error] Exception caught during save:', err);
         res.status(400).json({ message: err.message });
     }
 };
@@ -35,6 +77,7 @@ exports.getAllEnquiries = async (req, res) => {
             .lean();
         res.json(enquiries);
     } catch (err) {
+        console.error('[Enquiry Fetch Error] Exception caught:', err);
         res.status(500).json({ message: err.message });
     }
 };
@@ -51,12 +94,14 @@ exports.getEnquiryById = async (req, res) => {
         if (!enquiry) return res.status(404).json({ message: 'Enquiry not found' });
         res.json(enquiry);
     } catch (err) {
+        console.error('[Enquiry Fetch ID Error] Exception caught:', err);
         res.status(500).json({ message: err.message });
     }
 };
 
 exports.updateEnquiry = async (req, res) => {
     try {
+        req.body = cleanEnquiryBody(req.body);
         const { id } = req.params;
         const { status, lossReason } = req.body;
 
@@ -68,6 +113,7 @@ exports.updateEnquiry = async (req, res) => {
 
         // Enforce: If changing to Lost, lossReason MUST be provided
         if (status === 'Lost' && !lossReason) {
+            console.error(`[Enquiry Update Error] Missing lossReason for Lost status on Enquiry ID ${id}`);
             return res.status(400).json({
                 message: 'lossReason is required when marking enquiry as Lost',
                 requiredField: 'lossReason',
@@ -92,6 +138,7 @@ exports.updateEnquiry = async (req, res) => {
 
         res.json(updatedEnquiry);
     } catch (err) {
+        console.error('[Enquiry Update Error] Exception caught during update:', err);
         res.status(400).json({ message: err.message });
     }
 };
