@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useAuth } from "../context/AuthContext";
 import { authService } from "../services/api";
@@ -16,6 +16,7 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
 
   const { login } = useAuth(); // Use Auth Context
 
@@ -72,9 +73,21 @@ const Login = () => {
       );
 
       setTimeout(() => {
+        const storedReturnTo = sessionStorage.getItem("arcrm:returnTo");
+        if (storedReturnTo) {
+          sessionStorage.removeItem("arcrm:returnTo");
+        }
+
         const role = session.user?.role;
         const isSuperAdmin = role === "SUPER_ADMIN" || role === "super_admin";
-        navigate(isSuperAdmin ? "/dashboard" : getFallbackRoute(session.permissions) || "/dashboard");
+        const fallbackTarget = isSuperAdmin
+          ? "/dashboard"
+          : getFallbackRoute(session.permissions) || "/dashboard";
+        const target = storedReturnTo && storedReturnTo !== "/login"
+          ? storedReturnTo
+          : location.state?.from?.pathname || fallbackTarget;
+
+        navigate(target, { replace: true });
       }, 800);
     } catch (err) {
       const errorMessage = err.response?.data?.message || "Login failed";
