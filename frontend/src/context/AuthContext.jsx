@@ -69,31 +69,6 @@ export const AuthProvider = ({ children }) => {
     const [permissions, setPermissions] = useState({});
     const [loading, setLoading] = useState(true);
 
-    const bootstrapFromStoredSession = useCallback(async () => {
-        const storedUser = readStoredUser();
-        const storedToken = readStoredAccessToken();
-
-        if (storedUser && storedToken && isTokenValidForBoot(storedToken)) {
-            setAccessToken(storedToken);
-            setUser(storedUser);
-
-            let nextPermissions = {};
-            try {
-                const permissionsRes = await authorizationService.getMy();
-                nextPermissions = permissionsRes.data?.permissions || {};
-            } catch (permErr) {
-                console.warn("Failed to load permissions from stored session:", permErr);
-            }
-
-            setPermissions(nextPermissions);
-            dispatch(setCredentials({ user: storedUser, permissions: nextPermissions }));
-            setLoading(false);
-            return;
-        }
-
-        await refreshSession();
-    }, [dispatch, refreshSession]);
-
     const clearSession = useCallback(() => {
         setAccessToken(null);
         localStorage.removeItem("user");
@@ -139,6 +114,31 @@ export const AuthProvider = ({ children }) => {
             setLoading(false);
         }
     }, [clearSession, dispatch]);
+
+    const bootstrapFromStoredSession = useCallback(async () => {
+        const storedUser = readStoredUser();
+        const storedToken = readStoredAccessToken();
+
+        if (storedUser && storedToken && isTokenValidForBoot(storedToken)) {
+            setAccessToken(storedToken);
+            setUser(storedUser);
+
+            let nextPermissions = {};
+            try {
+                const permissionsRes = await authorizationService.getMy();
+                nextPermissions = permissionsRes.data?.permissions || {};
+            } catch (permErr) {
+                console.warn("Failed to load permissions from stored session:", permErr);
+            }
+
+            setPermissions(nextPermissions);
+            dispatch(setCredentials({ user: storedUser, permissions: nextPermissions }));
+            setLoading(false);
+            return;
+        }
+
+        await refreshSession();
+    }, [dispatch, refreshSession]);
 
     useEffect(() => {
         bootstrapFromStoredSession();
