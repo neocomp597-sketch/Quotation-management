@@ -18015,5 +18015,12 @@
     "companyName": "TEST RR",
     "gstin": "",
     "logoUrl": ""
+  },
+  {
+    "_id": "6a19243b2da0e114dc8c88c7",
+    "customerName": "ASDJ013",
+    "companyName": "techgrove",
+    "gstin": "27RCBCQ7403OXZG",
+    "logoUrl": ""
   }
 ]

@@ -2,9 +2,69 @@ import axios from "axios";
 
 let accessToken = null;
 let refreshPromise = null;
+let refreshTimer = null;
+
+const ACCESS_TOKEN_REFRESH_SKEW_MS = 60 * 1000;
+
+try {
+  accessToken = localStorage.getItem("accessToken") || null;
+} catch {
+  accessToken = null;
+}
+
+const decodeJwtPayload = (token) => {
+  if (!token || typeof token !== "string") {
+    return null;
+  }
+
+  const parts = token.split(".");
+  if (parts.length < 2) {
+    return null;
+  }
+
+  try {
+    const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
+    return JSON.parse(atob(padded));
+  } catch {
+    return null;
+  }
+};
+
+const scheduleProactiveRefresh = (token) => {
+  if (refreshTimer) {
+    clearTimeout(refreshTimer);
+    refreshTimer = null;
+  }
+
+  const payload = decodeJwtPayload(token);
+  const expiresAt = payload?.exp ? payload.exp * 1000 : null;
+  if (!expiresAt) {
+    return;
+  }
+
+  const refreshAt = Math.max(Date.now() + 5000, expiresAt - ACCESS_TOKEN_REFRESH_SKEW_MS);
+  const delay = Math.max(5000, refreshAt - Date.now());
+
+  refreshTimer = setTimeout(() => {
+    refreshAccessToken().catch(() => {
+      // The normal response interceptor will handle a real refresh failure.
+    });
+  }, delay);
+};
 
 export const setAccessToken = (token) => {
   accessToken = token || null;
+  try {
+    if (accessToken) {
+      localStorage.setItem("accessToken", accessToken);
+    } else {
+      localStorage.removeItem("accessToken");
+    }
+  } catch {
+    // Ignore storage failures and keep the in-memory token working.
+  }
+  scheduleProactiveRefresh(accessToken);
 };
 
 export const getAccessToken = () => accessToken;
@@ -19,6 +79,10 @@ const api = axios.create({
 });
 
 api.interceptors.request.use((config) => {
+  if (/\/auth\/(refresh|logout|login|register)$/.test(config.url || "")) {
+    return config;
+  }
+
   if (accessToken) {
     config.headers.Authorization = `Bearer ${accessToken}`;
   }
@@ -57,6 +121,9 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
     const message = error.response?.data?.message || "";
+    const isExpiredAuthError =
+      error.response?.status === 401 &&
+      /token expired|jwt expired|token failed|token invalid|no token|refresh token missing|refresh token invalid/i.test(message);
 
     if (
       error.response?.status === 403 &&
@@ -70,7 +137,7 @@ api.interceptors.response.use(
     }
 
     if (
-      error.response?.status === 401 &&
+      (isExpiredAuthError || error.response?.status === 401) &&
       originalRequest &&
       !originalRequest._retry &&
       !originalRequest.skipAuthRefresh
@@ -82,6 +149,10 @@ api.interceptors.response.use(
         return api(originalRequest);
       } catch {
         setAccessToken(null);
+        localStorage.removeItem("user");
+        if (window.location.pathname !== "/login") {
+          window.location.assign("/login");
+        }
       }
     }
 

@@ -1526,12 +1526,12 @@ const Reports = () => {
                                                         const cellValue = Number(monthRow[col] || 0);
                                                         return (
                                                             <td key={`${monthLabel}-${col}`} className={`px-4 py-3 text-sm font-bold text-slate-900 text-right ${cellValue > 0 ? 'bg-blue-100/60' : ''}`}>
-                                                                {formatReportValue(cellValue, 0)}
+                                                                {formatReportValue(cellValue, 2)}
                                                             </td>
                                                         );
                                                     })}
                                                     <td className={`px-4 py-3 text-sm font-black text-slate-900 text-right ${Number(monthRow.total || 0) > 0 ? 'bg-blue-100/60' : 'bg-slate-50'}`}>
-                                                        {formatReportValue(monthRow.total || 0, 0)}
+                                                        {formatReportValue(monthRow.total || 0, 2)}
                                                     </td>
                                                 </tr>
                                                 {isOpen && (monthSegments.length > 0 ? monthSegments : PLANNING_SEGMENTS.map(segment => ({
@@ -1545,12 +1545,12 @@ const Reports = () => {
                                                             const cellValue = Number(segmentRow[col] || 0);
                                                             return (
                                                                 <td key={`${monthLabel}-${segmentRow.month}-${col}`} className={`px-4 py-3 text-sm font-semibold text-slate-600 text-right ${cellValue > 0 ? 'bg-blue-50/60' : ''}`}>
-                                                                    {formatReportValue(cellValue, 0)}
+                                                                    {formatReportValue(cellValue, 2)}
                                                                 </td>
                                                             );
                                                         })}
                                                         <td className="px-4 py-3 text-sm font-black text-slate-900 text-right bg-slate-50">
-                                                            {formatReportValue(segmentRow.total || 0, 0)}
+                                                            {formatReportValue(segmentRow.total || 0, 2)}
                                                         </td>
                                                     </tr>
                                                 ))}

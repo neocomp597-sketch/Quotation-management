@@ -92,7 +92,15 @@ exports.protect = async (req, res, next) => {
 
             runWithTenant(req.user.companyId, () => next());
         } catch (error) {
-            console.error(error);
+            if (error?.name === 'TokenExpiredError') {
+                return res.status(401).json({ message: 'Not authorized, token expired' });
+            }
+
+            if (error?.name === 'JsonWebTokenError') {
+                return res.status(401).json({ message: 'Not authorized, token invalid' });
+            }
+
+            console.error('Auth middleware error:', error);
             res.status(401).json({ message: 'Not authorized, token failed' });
         }
     }

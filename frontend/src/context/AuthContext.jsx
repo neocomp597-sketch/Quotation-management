@@ -18,11 +18,81 @@ const normalizeUser = (userData) => {
     };
 };
 
+const readStoredUser = () => {
+    try {
+        const raw = localStorage.getItem("user");
+        return raw ? normalizeUser(JSON.parse(raw)) : null;
+    } catch {
+        return null;
+    }
+};
+
+const readStoredAccessToken = () => {
+    try {
+        return localStorage.getItem("accessToken") || null;
+    } catch {
+        return null;
+    }
+};
+
+const decodeJwtPayload = (token) => {
+    if (!token || typeof token !== "string") {
+        return null;
+    }
+
+    const parts = token.split(".");
+    if (parts.length < 2) {
+        return null;
+    }
+
+    try {
+        const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+        const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
+        return JSON.parse(atob(padded));
+    } catch {
+        return null;
+    }
+};
+
+const isTokenValidForBoot = (token, skewSeconds = 60) => {
+    const payload = decodeJwtPayload(token);
+    if (!payload?.exp) {
+        return false;
+    }
+
+    return payload.exp * 1000 > Date.now() + (skewSeconds * 1000);
+};
+
 export const AuthProvider = ({ children }) => {
     const dispatch = useDispatch();
-    const [user, setUser] = useState(null);
+    const [user, setUser] = useState(() => readStoredUser());
     const [permissions, setPermissions] = useState({});
     const [loading, setLoading] = useState(true);
+
+    const bootstrapFromStoredSession = useCallback(async () => {
+        const storedUser = readStoredUser();
+        const storedToken = readStoredAccessToken();
+
+        if (storedUser && storedToken && isTokenValidForBoot(storedToken)) {
+            setAccessToken(storedToken);
+            setUser(storedUser);
+
+            let nextPermissions = {};
+            try {
+                const permissionsRes = await authorizationService.getMy();
+                nextPermissions = permissionsRes.data?.permissions || {};
+            } catch (permErr) {
+                console.warn("Failed to load permissions from stored session:", permErr);
+            }
+
+            setPermissions(nextPermissions);
+            dispatch(setCredentials({ user: storedUser, permissions: nextPermissions }));
+            setLoading(false);
+            return;
+        }
+
+        await refreshSession();
+    }, [dispatch, refreshSession]);
 
     const clearSession = useCallback(() => {
         setAccessToken(null);
@@ -39,6 +109,7 @@ export const AuthProvider = ({ children }) => {
             const session = await authService.refresh();
             const nextUser = normalizeUser(session.user);
 
+            setAccessToken(session.accessToken);
             localStorage.setItem("user", JSON.stringify(nextUser));
             setUser(nextUser);
 
@@ -60,7 +131,9 @@ export const AuthProvider = ({ children }) => {
                 permissions: nextPermissions,
             };
         } catch (error) {
-            clearSession();
+            if (!readStoredUser()) {
+                clearSession();
+            }
             return null;
         } finally {
             setLoading(false);
@@ -68,8 +141,8 @@ export const AuthProvider = ({ children }) => {
     }, [clearSession, dispatch]);
 
     useEffect(() => {
-        refreshSession();
-    }, [refreshSession]);
+        bootstrapFromStoredSession();
+    }, [bootstrapFromStoredSession]);
 
     const login = useCallback(async (sessionOrToken, maybeUserData) => {
         const session = typeof sessionOrToken === "string"

@@ -16,11 +16,11 @@ const CompanySettingsSchema = new mongoose.Schema({
 
     // Address Details
     address: {
-        line1: { type: String, required: true },
+        line1: { type: String, default: '' },
         line2: { type: String },
-        city: { type: String, required: true },
-        state: { type: String, required: true },
-        pincode: { type: String, required: true },
+        city: { type: String, default: '' },
+        state: { type: String, default: '' },
+        pincode: { type: String, default: '' },
         country: { type: String, default: 'India' }
     },
 
@@ -40,7 +40,7 @@ const CompanySettingsSchema = new mongoose.Schema({
 
     // Authorized Signatory
     authorizedSignatory: {
-        name: { type: String, required: true },
+        name: { type: String, default: '' },
         designation: { type: String },
         signatureImageUrl: { type: String }
     },

@@ -2299,7 +2299,7 @@ const PlanningScreen = () => {
                                 >
                                   {cellValue > 0 ? (
                                     <span className="inline-flex items-center justify-end px-2.5 py-1 rounded-full bg-indigo-50/70 text-indigo-700 text-[11px] font-black min-w-[70px] border border-indigo-100/40 shadow-sm hover:scale-105 transition-all">
-                                      {formatReportValue(cellValue, 0)}
+                                      {formatReportValue(cellValue, 2)}
                                     </span>
                                   ) : (
                                     <span className="text-slate-300 font-normal">-</span>
@@ -2310,7 +2310,7 @@ const PlanningScreen = () => {
                             <td className="py-3.5 px-4 text-right border border-slate-200 bg-indigo-50/10">
                               {monthTotal > 0 ? (
                                 <span className="inline-flex items-center justify-end px-2.5 py-1 rounded-full bg-indigo-100/50 text-indigo-800 text-[11px] font-black min-w-[70px] border border-indigo-200/30 shadow-sm">
-                                  {formatReportValue(monthTotal, 0)}
+                                {formatReportValue(monthTotal, 2)}
                                 </span>
                               ) : (
                                 <span className="text-slate-300 font-normal">-</span>
@@ -2341,7 +2341,7 @@ const PlanningScreen = () => {
                                     >
                                       {val > 0 ? (
                                         <span className="inline-flex items-center justify-end px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-extrabold min-w-[64px] border border-slate-200/40">
-                                          {formatReportValue(val, 0)}
+                                          {formatReportValue(val, 2)}
                                         </span>
                                       ) : (
                                         <span className="text-slate-300 font-normal">-</span>
@@ -2350,7 +2350,7 @@ const PlanningScreen = () => {
                                   );
                                 })}
                                 <td className="py-3 px-4 text-right border-slate-200 bg-slate-50/30 font-bold text-slate-700 text-xs">
-                                  {segmentTotal > 0 ? formatReportValue(segmentTotal, 0) : "-"}
+                                  {segmentTotal > 0 ? formatReportValue(segmentTotal, 2) : "-"}
                                 </td>
                               </tr>
                             );
