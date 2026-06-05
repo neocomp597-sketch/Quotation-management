@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { MdAdd, MdSearch, MdReceipt, MdDelete, MdEdit, MdPrint } from 'react-icons/md';
+import { MdAdd, MdSearch, MdReceipt, MdDelete, MdEdit, MdPrint, MdVisibility } from 'react-icons/md';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { voucherService } from '../services/api';
 import { formatDate } from '../utils/helpers';
-import { PDFDownloadLink } from '@react-pdf/renderer';
+import { pdf } from '@react-pdf/renderer';
 import VoucherPDF from '../components/VoucherPDF';
 
 const Vouchers = ({ mode = 'grn' }) => {
@@ -16,6 +16,7 @@ const Vouchers = ({ mode = 'grn' }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [companySettings, setCompanySettings] = useState(null);
     const [currentPage, setCurrentPage] = useState(1);
+    const [downloadingPdfId, setDownloadingPdfId] = useState(null);
     const itemsPerPage = 6;
 
     useEffect(() => {
@@ -53,6 +54,26 @@ const Vouchers = ({ mode = 'grn' }) => {
                 console.error(err);
                 toast.error('Failed to delete voucher');
             }
+        }
+    };
+
+    const handleDownloadPdf = async (voucher) => {
+        try {
+            setDownloadingPdfId(voucher._id);
+            const blob = await pdf(<VoucherPDF voucher={voucher} companySettings={companySettings} />).toBlob();
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `Voucher-${voucher.voucherNumber.replace(/\//g, '-')}.pdf`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error(err);
+            toast.error('Failed to generate PDF');
+        } finally {
+            setDownloadingPdfId(null);
         }
     };
 
@@ -144,23 +165,27 @@ const Vouchers = ({ mode = 'grn' }) => {
                                             <td className="px-8 py-5 text-right">
                                                 <div className="flex items-center justify-end gap-2">
                                                     <button
+                                                        onClick={() => navigate(`${basePath}/view/${v._id}`)}
+                                                        className="p-2 text-primary-600 hover:bg-primary-50 rounded-lg transition-all"
+                                                        title="View voucher"
+                                                    >
+                                                        <MdVisibility size={20} />
+                                                    </button>
+                                                    <button
                                                         onClick={() => navigate(`${basePath}/${v._id}`)}
                                                         className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
                                                         title="Edit voucher"
                                                     >
                                                         <MdEdit size={20} />
                                                     </button>
-                                                    <PDFDownloadLink document={<VoucherPDF voucher={v} companySettings={companySettings} />} fileName={`Voucher-${v.voucherNumber.replace(/\//g, '-')}.pdf`}>
-                                                        {({ loading: pdfLoading }) => (
-                                                            <button
-                                                                disabled={pdfLoading}
-                                                                className="p-2 text-primary-600 hover:bg-primary-50 rounded-lg transition-all disabled:opacity-50"
-                                                                title="Print voucher"
-                                                            >
-                                                                <MdPrint size={20} />
-                                                            </button>
-                                                        )}
-                                                    </PDFDownloadLink>
+                                                    <button
+                                                        onClick={() => handleDownloadPdf(v)}
+                                                        disabled={downloadingPdfId === v._id}
+                                                        className="p-2 text-primary-600 hover:bg-primary-50 rounded-lg transition-all disabled:opacity-50"
+                                                        title="Print voucher"
+                                                    >
+                                                        <MdPrint size={20} />
+                                                    </button>
                                                     <button
                                                         onClick={() => handleDelete(v._id)}
                                                         className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"

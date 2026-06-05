@@ -1,15 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MdAdd, MdDelete, MdSave, MdArrowBack, MdPrint, MdEdit } from 'react-icons/md';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { voucherService, vendorService, productService, customerService } from '../services/api';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import VoucherPDF from '../components/VoucherPDF';
 import PortalDropdown from '../components/PortalDropdown';
 
-const CreateVoucher = ({ mode = 'grn' }) => {
+const CreateVoucher = ({ mode = 'grn', isViewOnly = false }) => {
     const navigate = useNavigate();
     const { id } = useParams();
+    const { pathname } = useLocation();
+    const isViewOnlyMode = isViewOnly || pathname.includes('/view/');
     const isEditMode = Boolean(id);
     const isInvoiceMode = mode === 'invoice';
     const basePath = isInvoiceMode ? '/invoices' : '/grn';
@@ -250,18 +252,41 @@ const CreateVoucher = ({ mode = 'grn' }) => {
                         <MdArrowBack size={20} />
                     </button>
                     <div>
-                        <h1 className="text-3xl font-black text-slate-900 tracking-tight">{isEditMode ? (isInvoiceMode ? 'Edit Invoice' : 'Edit GRN') : (isInvoiceMode ? 'Create Invoice' : 'GRN Entry')}</h1>
-                        <p className="text-slate-500 font-medium tracking-tight">{isInvoiceMode ? 'Sales outward, GST billing and stock deduction' : 'Purchase inward and sale return processing'}</p>
+                        <h1 className="text-3xl font-black text-slate-900 tracking-tight">
+                            {isViewOnlyMode ? (isInvoiceMode ? 'View Invoice' : 'View GRN') : isEditMode ? (isInvoiceMode ? 'Edit Invoice' : 'Edit GRN') : (isInvoiceMode ? 'Create Invoice' : 'GRN Entry')}
+                        </h1>
+                        <p className="text-slate-500 font-medium tracking-tight">
+                            {isViewOnlyMode ? (isInvoiceMode ? 'Invoice details and stock transaction details' : 'GRN details and purchase breakdown') : isInvoiceMode ? 'Sales outward, GST billing and stock deduction' : 'Purchase inward and sale return processing'}
+                        </p>
                     </div>
                 </div>
-                <button
-                    onClick={handleSubmit}
-                    disabled={loading}
-                    className="flex items-center gap-2 bg-slate-900 hover:bg-black text-white px-6 py-3 rounded-xl font-bold transition-all shadow-xl disabled:opacity-50"
-                >
-                    <MdSave size={20} />
-                    <span>{loading ? 'Saving...' : (isEditMode ? (isInvoiceMode ? 'Update Invoice' : 'Update GRN') : 'Save & Update Stock')}</span>
-                </button>
+                {!isViewOnlyMode ? (
+                    <button
+                        onClick={handleSubmit}
+                        disabled={loading}
+                        className="flex items-center gap-2 bg-slate-900 hover:bg-black text-white px-6 py-3 rounded-xl font-bold transition-all shadow-xl disabled:opacity-50"
+                    >
+                        <MdSave size={20} />
+                        <span>{loading ? 'Saving...' : (isEditMode ? (isInvoiceMode ? 'Update Invoice' : 'Update GRN') : 'Save & Update Stock')}</span>
+                    </button>
+                ) : (
+                    companySettings && (
+                        <PDFDownloadLink
+                            document={<VoucherPDF voucher={voucherData} companySettings={companySettings} />}
+                            fileName={`Voucher-${voucherData.voucherNumber?.replace(/\//g, '-')}.pdf`}
+                        >
+                            {({ loading: pdfLoading }) => (
+                                <button
+                                    disabled={pdfLoading}
+                                    className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-xl disabled:opacity-50 active:scale-95"
+                                >
+                                    <MdPrint size={20} />
+                                    <span>{pdfLoading ? 'Preparing PDF...' : 'Print Voucher'}</span>
+                                </button>
+                            )}
+                        </PDFDownloadLink>
+                    )
+                )}
             </div>
 
             <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200 space-y-8">
@@ -274,6 +299,7 @@ const CreateVoucher = ({ mode = 'grn' }) => {
                             className="w-full px-4 py-2.5 bg-white border border-blue-200 rounded-lg focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none text-slate-900 font-bold transition-all"
                             value={voucherData.date}
                             onChange={(e) => setVoucherData({ ...voucherData, date: e.target.value })}
+                            disabled={isViewOnlyMode}
                         />
                     </div>
                     <div className="bg-amber-50/50 p-4 rounded-xl border border-amber-100">
@@ -283,6 +309,7 @@ const CreateVoucher = ({ mode = 'grn' }) => {
                             className="w-full px-4 py-2.5 bg-white border border-amber-200 rounded-lg focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 outline-none text-slate-900 font-bold transition-all"
                             value={voucherData.voucherNumber}
                             onChange={(e) => setVoucherData({ ...voucherData, voucherNumber: e.target.value })}
+                            disabled={isViewOnlyMode}
                         />
                     </div>
                     <div className="bg-emerald-50/50 p-4 rounded-xl border border-emerald-100">
@@ -303,7 +330,7 @@ const CreateVoucher = ({ mode = 'grn' }) => {
                                     referenceVoucherId: ''
                                 }));
                             }}
-                            disabled={isInvoiceMode}
+                            disabled={isInvoiceMode || isViewOnlyMode}
                         >
                             {isInvoiceMode ? (
                                 <option value="Invoice">Invoice</option>
@@ -326,6 +353,7 @@ const CreateVoucher = ({ mode = 'grn' }) => {
                             className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-slate-900 font-bold transition-all"
                             value={voucherData.customerId || ''}
                             onChange={(e) => handleCustomerChange(e.target.value)}
+                            disabled={isViewOnlyMode}
                         >
                             <option value="">Select Customer</option>
                             {customers.map(c => (
@@ -338,6 +366,7 @@ const CreateVoucher = ({ mode = 'grn' }) => {
                             className="mt-2 w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-slate-900 font-bold transition-all"
                             value={voucherData.customerName || ''}
                             onChange={(e) => setVoucherData({ ...voucherData, customerId: '', customerName: e.target.value })}
+                            disabled={isViewOnlyMode}
                         />
                     </div>
                     ) : (
@@ -349,16 +378,19 @@ const CreateVoucher = ({ mode = 'grn' }) => {
                             className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-slate-900 font-bold transition-all"
                             value={voucherData.vendorName || ''}
                             onFocus={(e) => {
+                                if (isViewOnlyMode) return;
                                 setVendorAnchorRef({ current: e.target });
                                 setVendorDropdownOpen(true);
                             }}
                             onBlur={() => setVendorDropdownOpen(false)}
                             onChange={(e) => {
+                                if (isViewOnlyMode) return;
                                 const val = e.target.value;
                                 setVoucherData({ ...voucherData, vendorId: '', vendorName: val });
                                 setVendorAnchorRef({ current: e.target });
                                 setVendorDropdownOpen(true);
                             }}
+                            disabled={isViewOnlyMode}
                         />
                         <PortalDropdown isOpen={vendorDropdownOpen && vendors.length > 0} anchorRef={vendorAnchorRef}>
                             <ul className="w-full bg-white border border-slate-200 rounded-2xl shadow-2xl max-h-64 overflow-y-auto divide-y divide-slate-50 overflow-hidden">
@@ -386,6 +418,7 @@ const CreateVoucher = ({ mode = 'grn' }) => {
                             className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-slate-900 font-bold transition-all"
                             value={voucherData.contactNumber}
                             onChange={(e) => setVoucherData({ ...voucherData, contactNumber: e.target.value })}
+                            disabled={isViewOnlyMode}
                         />
                     </div>
                     {!isInvoiceMode && voucherData.voucherType === 'Sale Return' && (
@@ -395,6 +428,7 @@ const CreateVoucher = ({ mode = 'grn' }) => {
                                 className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-slate-900 font-bold transition-all"
                                 value={voucherData.referenceVoucherId || ''}
                                 onChange={(e) => setVoucherData({ ...voucherData, referenceVoucherId: e.target.value })}
+                                disabled={isViewOnlyMode}
                             >
                                 <option value="">Select GRN</option>
                                 {grnOptions.map(grn => (
@@ -417,7 +451,7 @@ const CreateVoucher = ({ mode = 'grn' }) => {
                                 <th className="px-4 py-4 text-right">Price</th>
                                 <th className="px-4 py-4 text-right">Amount</th>
                                 <th className="px-4 py-4 text-center">Tax %</th>
-                                <th className="px-4 py-4 text-center">Action</th>
+                                {!isViewOnlyMode && <th className="px-4 py-4 text-center">Action</th>}
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -431,14 +465,17 @@ const CreateVoucher = ({ mode = 'grn' }) => {
                                             className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none text-sm font-bold text-slate-900"
                                             value={item.productName || ''}
                                             onFocus={(e) => {
+                                                if (isViewOnlyMode) return;
                                                 setProductAnchorRef({ current: e.target });
                                                 setActiveProductDropdown(item.id);
                                             }}
                                             onBlur={() => setActiveProductDropdown(null)}
                                             onChange={(e) => {
+                                                if (isViewOnlyMode) return;
                                                 setProductAnchorRef({ current: e.target });
                                                 handleItemChange(item.id, 'productName', e.target.value);
                                             }}
+                                            disabled={isViewOnlyMode}
                                         />
                                         <PortalDropdown isOpen={activeProductDropdown === item.id && products.length > 0} anchorRef={productAnchorRef}>
                                             <ul className="w-full bg-white border border-slate-200 rounded-2xl shadow-2xl max-h-64 overflow-y-auto divide-y divide-slate-50 overflow-hidden">
@@ -466,6 +503,7 @@ const CreateVoucher = ({ mode = 'grn' }) => {
                                             className="w-full px-3 py-2 text-center bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none text-sm font-bold text-slate-900"
                                             value={item.qty || ''}
                                             onChange={(e) => handleItemChange(item.id, 'qty', e.target.value)}
+                                            disabled={isViewOnlyMode}
                                         />
                                     </td>
                                     <td className="px-4 py-3">
@@ -473,6 +511,7 @@ const CreateVoucher = ({ mode = 'grn' }) => {
                                             className="w-full px-2 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none text-xs font-bold text-slate-900"
                                             value={item.uom}
                                             onChange={(e) => handleItemChange(item.id, 'uom', e.target.value)}
+                                            disabled={isViewOnlyMode}
                                         >
                                             <option value="Pcs">Pcs</option>
                                             <option value="Nos">Nos</option>
@@ -490,6 +529,7 @@ const CreateVoucher = ({ mode = 'grn' }) => {
                                             className="w-full px-3 py-2 text-right bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none text-sm font-bold text-slate-900"
                                             value={item.price || ''}
                                             onChange={(e) => handleItemChange(item.id, 'price', e.target.value)}
+                                            disabled={isViewOnlyMode}
                                         />
                                     </td>
                                     <td className="px-4 py-3 text-right font-black text-slate-900">
@@ -503,30 +543,35 @@ const CreateVoucher = ({ mode = 'grn' }) => {
                                                 className="w-16 px-2 py-2 text-center bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none text-sm font-bold text-slate-900"
                                                 value={item.taxPercentage || ''}
                                                 onChange={(e) => handleItemChange(item.id, 'taxPercentage', e.target.value)}
+                                                disabled={isViewOnlyMode}
                                             />
                                         </div>
                                     </td>
-                                    <td className="px-4 py-3 text-center">
-                                        <button
-                                            onClick={() => removeRow(item.id)}
-                                            className="p-2 text-rose-400 hover:bg-rose-50 hover:text-rose-600 rounded-lg transition-all"
-                                            disabled={voucherData.items.length === 1}
-                                        >
-                                            <MdDelete size={20} />
-                                        </button>
-                                    </td>
+                                    {!isViewOnlyMode && (
+                                        <td className="px-4 py-3 text-center">
+                                            <button
+                                                onClick={() => removeRow(item.id)}
+                                                className="p-2 text-rose-400 hover:bg-rose-50 hover:text-rose-600 rounded-lg transition-all"
+                                                disabled={voucherData.items.length === 1}
+                                            >
+                                                <MdDelete size={20} />
+                                            </button>
+                                        </td>
+                                    )}
                                 </tr>
                             ))}
                         </tbody>
                     </table>
-                    <div className="p-4 border-t border-slate-200 bg-slate-50">
-                        <button
-                            onClick={addRow}
-                            className="flex items-center gap-2 text-primary-600 font-bold hover:text-primary-700 transition-colors text-sm"
-                        >
-                            <MdAdd size={20} /> Add New Row
-                        </button>
-                    </div>
+                    {!isViewOnlyMode && (
+                        <div className="p-4 border-t border-slate-200 bg-slate-50">
+                            <button
+                                onClick={addRow}
+                                className="flex items-center gap-2 text-primary-600 font-bold hover:text-primary-700 transition-colors text-sm"
+                            >
+                                <MdAdd size={20} /> Add New Row
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 {/* Totals Section */}

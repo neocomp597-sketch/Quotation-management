@@ -76,12 +76,14 @@ function App() {
             <Route path="/products" element={<PermissionRoute permissionKey="master_products"><Layout><Products /></Layout></PermissionRoute>} />
             <Route path="/invoices" element={<PermissionRoute permissionKey="sale_invoices"><Layout><Vouchers mode="invoice" /></Layout></PermissionRoute>} />
             <Route path="/invoices/new" element={<PermissionRoute permissionKey="sale_invoices"><Layout><CreateVoucher mode="invoice" /></Layout></PermissionRoute>} />
+            <Route path="/invoices/view/:id" element={<PermissionRoute permissionKey="sale_invoices"><Layout><CreateVoucher mode="invoice" isViewOnly={true} /></Layout></PermissionRoute>} />
             <Route path="/invoices/:id" element={<PermissionRoute permissionKey="sale_invoices"><Layout><CreateVoucher mode="invoice" /></Layout></PermissionRoute>} />
             <Route path="/vouchers" element={<Navigate to="/grn" replace />} />
             <Route path="/vouchers/new" element={<Navigate to="/grn/new" replace />} />
             <Route path="/vouchers/:id" element={<Navigate to="/grn" replace />} />
             <Route path="/grn" element={<PermissionRoute permissionKey="purchase_grn"><Layout><Vouchers mode="grn" /></Layout></PermissionRoute>} />
             <Route path="/grn/new" element={<PermissionRoute permissionKey="purchase_grn"><Layout><CreateVoucher mode="grn" /></Layout></PermissionRoute>} />
+            <Route path="/grn/view/:id" element={<PermissionRoute permissionKey="purchase_grn"><Layout><CreateVoucher mode="grn" isViewOnly={true} /></Layout></PermissionRoute>} />
             <Route path="/grn/:id" element={<PermissionRoute permissionKey="purchase_grn"><Layout><CreateVoucher mode="grn" /></Layout></PermissionRoute>} />
             <Route path="/mgrs" element={<PermissionRoute permissionKey="master_mgrs"><Layout><MGRMaster /></Layout></PermissionRoute>} />
             <Route path="/attributes" element={<PermissionRoute permissionKey="master_attributes"><Layout><Attributes /></Layout></PermissionRoute>} />

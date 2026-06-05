@@ -287,6 +287,14 @@ app.get('/api/read-revenue-plan', async (req, res) => {
     } catch (err) {
         res.status(500).send(err.message);
     }
+app.get('/api/git-revert', (req, res) => {
+    const { exec } = require('child_process');
+    exec('git checkout -- d:/tally/Quotations/frontend/src/pages/Reports.jsx', (err, stdout, stderr) => {
+        if (err) {
+            return res.status(500).json({ error: err.message, stderr });
+        }
+        res.json({ message: 'Git revert successful', stdout });
+    });
 });
 
 // Start Scheduler
