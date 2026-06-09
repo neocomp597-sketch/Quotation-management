@@ -32,6 +32,75 @@ const asBadRequest = (message) => {
     return error;
 };
 
+const getQuotationRefSequence = (quotation = {}) => {
+    const ref = String(quotation.quotationNumber || quotation.quotationNo || '').trim();
+    const match = ref.match(/(\d+)$/);
+    return match ? Number(match[1]) : Number.NEGATIVE_INFINITY;
+};
+
+const sortQuotationsByRefDesc = (quotations = []) => (
+    [...quotations].sort((a, b) => {
+        const sequenceDiff = getQuotationRefSequence(b) - getQuotationRefSequence(a);
+        if (sequenceDiff !== 0) return sequenceDiff;
+
+        const refA = String(a.quotationNumber || a.quotationNo || '');
+        const refB = String(b.quotationNumber || b.quotationNo || '');
+        const refDiff = refB.localeCompare(refA, undefined, { numeric: true, sensitivity: 'base' });
+        if (refDiff !== 0) return refDiff;
+
+        return new Date(b.createdAt || b.quotationDate || 0) - new Date(a.createdAt || a.quotationDate || 0);
+    })
+);
+
+const normalizeReference = (value) => String(value || '').trim();
+
+const getReferenceSuffix = (value) => {
+    const match = normalizeReference(value).match(/(\d+)$/);
+    return match ? match[1] : normalizeReference(value);
+};
+
+const findQuotationWithReference = async ({ companyId, references, excludeId }) => {
+    const refs = [...new Set((references || []).map(normalizeReference).filter(Boolean))];
+    const suffixes = [...new Set(refs.map(getReferenceSuffix).filter(Boolean))];
+    if (!refs.length && !suffixes.length) return null;
+
+    const query = {
+        $or: [
+            { quotationNo: { $in: refs } },
+            { quotationNumber: { $in: refs } },
+            ...suffixes.flatMap((suffix) => {
+                const escapedSuffix = escapeRegex(suffix);
+                return [
+                    { quotationNo: new RegExp(`${escapedSuffix}$`) },
+                    { quotationNumber: new RegExp(`${escapedSuffix}$`) },
+                ];
+            }),
+        ],
+    };
+    if (companyId) {
+        query.companyId = companyId;
+    }
+    if (excludeId) {
+        query._id = { $ne: excludeId };
+    }
+
+    return Quotation.findOne(query)
+        .select('quotationNo quotationNumber')
+        .lean();
+};
+
+const ensureUniqueQuotationReference = async ({ companyId, quotationNo, quotationNumber, excludeId }) => {
+    const duplicate = await findQuotationWithReference({
+        companyId,
+        references: [quotationNo, quotationNumber],
+        excludeId,
+    });
+    if (duplicate) {
+        const duplicateRef = duplicate.quotationNo || duplicate.quotationNumber;
+        throw asBadRequest(`Quotation reference number "${duplicateRef}" already exists. Please use a unique reference number.`);
+    }
+};
+
 const getDraftKey = (userId, draftKey = 'new') => (
     draftKey === 'new'
         ? `draft:quotation:${userId}`
@@ -179,6 +248,21 @@ const generateQuotationNumber = async (prefix, year) => {
     return `${prefix}/${year}/${seqStr}`;
 };
 
+const generateUniqueQuotationNumber = async (prefix, year, companyId) => {
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+        const quotationNo = await generateQuotationNumber(prefix, year);
+        const duplicate = await findQuotationWithReference({
+            companyId,
+            references: [quotationNo],
+        });
+        if (!duplicate) {
+            return quotationNo;
+        }
+    }
+
+    throw asBadRequest('Could not generate a unique quotation reference number. Please try again.');
+};
+
 const resolveVendorForItem = (product, requestedVendorId) => {
     const productVendors = sortVendorsByPriority(product.vendors || []);
 
@@ -307,7 +391,12 @@ const createQuotation = async (req, res) => {
         const prefix = (settings?.quotationPrefix && settings.quotationPrefix.toUpperCase().startsWith('ARM')) 
             ? settings.quotationPrefix 
             : 'ARM/QTN';
-        const quotationNo = await generateQuotationNumber(prefix, year);
+        const quotationNo = await generateUniqueQuotationNumber(prefix, year, req.user?.companyId);
+        await ensureUniqueQuotationReference({
+            companyId: req.user?.companyId,
+            quotationNo,
+            quotationNumber: quotationNo,
+        });
 
         const customerState = customer.billingAddress?.state || '';
         const itemDiscountTotal = calculateTotalDiscount(normalizedItems);
@@ -355,6 +444,9 @@ const createQuotation = async (req, res) => {
         res.status(201).json(newQuotation);
     } catch (error) {
         console.error("Create Quotation Error Stack:", error);
+        if (error.code === 11000) {
+            return res.status(400).json({ message: 'Quotation reference number already exists. Please use a unique reference number.' });
+        }
         res.status(error.statusCode || 500).json({ message: error.message || 'Error creating quotation' });
     }
 };
@@ -381,6 +473,26 @@ const updateQuotation = async (req, res) => {
             .lean();
         if (!customer) return res.status(404).json({ message: 'Customer not found' });
 
+        const refUpdates = {};
+        const requestedQuotationNo = normalizeReference(req.body.quotationNo);
+        const requestedQuotationNumber = normalizeReference(req.body.quotationNumber);
+        if (requestedQuotationNo) {
+            refUpdates.quotationNo = requestedQuotationNo;
+        }
+        if (requestedQuotationNumber) {
+            refUpdates.quotationNumber = requestedQuotationNumber;
+        } else if (requestedQuotationNo) {
+            refUpdates.quotationNumber = requestedQuotationNo;
+        }
+        if (refUpdates.quotationNo || refUpdates.quotationNumber) {
+            await ensureUniqueQuotationReference({
+                companyId: req.user?.companyId,
+                quotationNo: refUpdates.quotationNo,
+                quotationNumber: refUpdates.quotationNumber,
+                excludeId: id,
+            });
+        }
+
         const normalizedItems = await normalizeQuotationItems(items, siteId);
         const customerState = customer.billingAddress?.state || '';
 
@@ -397,6 +509,7 @@ const updateQuotation = async (req, res) => {
         const roundOff = Number((roundedGrandTotal - tempGrandTotal).toFixed(2));
 
         const updatedQuotation = await Quotation.findByIdAndUpdate(id, {
+            ...refUpdates,
             customerId,
             items: normalizedItems,
             validTill,
@@ -418,6 +531,9 @@ const updateQuotation = async (req, res) => {
         res.json(updatedQuotation);
     } catch (error) {
         console.error("Update Quotation Error:", error);
+        if (error.code === 11000) {
+            return res.status(400).json({ message: 'Quotation reference number already exists. Please use a unique reference number.' });
+        }
         res.status(error.statusCode || 500).json({ message: error.message || 'Error updating quotation' });
     }
 };
@@ -428,7 +544,29 @@ const deleteQuotation = async (req, res) => {
         await clearQuotationDashboardCache();
         res.json({ message: 'Quotation deleted successfully' });
     } catch (error) {
-        res.status(500).json({ message: 'Error deleting quotation' });
+        console.error("Delete Quotation Error:", error);
+        res.status(500).json({ message: 'Error deleting quotation', error: error.message });
+    }
+};
+
+const updateStatus = async (req, res) => {
+    try {
+        const { status } = req.body;
+        const allowed = ['draft', 'final', 'ordered'];
+        if (!status || !allowed.includes(status)) {
+            return res.status(400).json({ message: `Invalid status. Allowed: ${allowed.join(', ')}` });
+        }
+        const quotation = await Quotation.findByIdAndUpdate(
+            req.params.id,
+            { status },
+            { new: true }
+        ).lean();
+        if (!quotation) return res.status(404).json({ message: 'Quotation not found' });
+        await clearQuotationDashboardCache();
+        res.json(quotation);
+    } catch (error) {
+        console.error("Update Status Error:", error);
+        res.status(500).json({ message: 'Error updating quotation status' });
     }
 };
 
@@ -450,6 +588,7 @@ module.exports = {
     createQuotation,
     updateQuotation,
     deleteQuotation,
+    updateStatus,
     finalizeQuotation,
     getQuotationById: async (req, res) => {
         try {
@@ -536,6 +675,7 @@ module.exports = {
             const cacheKey = makeCacheKey('quotations:list', req, {
                 territory: req.query.territory || null,
                 listParams,
+                sort: 'quotation-ref-sequence-desc-v1',
             });
             const { redis, value: cachedQuotations } = await getCachedJson(cacheKey);
             if (cachedQuotations) {
@@ -547,15 +687,15 @@ module.exports = {
                 .populate('customerId', 'customerName companyName gstin logoUrl')
                 .populate('siteId', 'siteName address')
                 .populate('territory', 'name type')
-                .populate('createdBy', 'name email')
-                .sort({ createdAt: -1 });
+                .populate('createdBy', 'name email');
 
             if (listParams) {
                 const { page, limit, skip } = getPagination(req.query);
-                const [quotations, total] = await Promise.all([
-                    quotationsQuery.skip(skip).limit(limit).lean(),
+                const [allQuotations, total] = await Promise.all([
+                    quotationsQuery.lean(),
                     Quotation.countDocuments(query),
                 ]);
+                const quotations = sortQuotationsByRefDesc(allQuotations).slice(skip, skip + limit);
 
                 const settingsCache = {};
                 const quotationsWithSettings = await Promise.all(quotations.map(async (q) => {
@@ -582,7 +722,7 @@ module.exports = {
                 return res.json(response);
             }
 
-            const quotations = await quotationsQuery.lean();
+            const quotations = sortQuotationsByRefDesc(await quotationsQuery.lean());
 
             // Fetch company settings for each creator (with caching to avoid redundant calls)
             const settingsCache = {};

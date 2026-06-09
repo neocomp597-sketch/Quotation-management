@@ -200,6 +200,7 @@ const CreateVoucher = ({ mode = 'grn', isViewOnly = false }) => {
     const grandTotal = totalAmount + totalTax;
 
     const handleSubmit = async () => {
+        if (loading) return;
         if (!voucherData.date) return toast.error("Date is required");
         const isCustomerParty = ['Invoice', 'Sale Return'].includes(voucherData.voucherType);
         if (isCustomerParty && !voucherData.customerName?.trim()) return toast.error("Customer Name is required");

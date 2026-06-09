@@ -4,19 +4,23 @@ const { clearMemoryCache } = require('./apiCache');
 const invalidateCache = async (...patterns) => {
     clearMemoryCache(...patterns);
 
-    const redis = await getRedis();
-    if (!redis) return;
+    try {
+        const redis = await getRedis();
+        if (!redis) return;
 
-    for (const pattern of patterns.filter(Boolean)) {
-        let cursor = '0';
-        do {
-            const scanResult = await redis.scan(cursor, { MATCH: pattern, COUNT: 100 });
-            cursor = String(scanResult.cursor || '0');
-            const keys = scanResult.keys || [];
-            if (keys.length) {
-                await redis.del(keys);
-            }
-        } while (cursor !== '0');
+        for (const pattern of patterns.filter(Boolean)) {
+            let cursor = '0';
+            do {
+                const scanResult = await redis.scan(cursor, { MATCH: pattern, COUNT: 100 });
+                cursor = String(scanResult.cursor || '0');
+                const keys = scanResult.keys || [];
+                if (keys.length) {
+                    await redis.del(keys);
+                }
+            } while (cursor !== '0');
+        }
+    } catch (redisError) {
+        console.warn("Redis cache invalidation failed:", redisError.message);
     }
 };
 

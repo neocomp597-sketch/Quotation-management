@@ -4,6 +4,7 @@ const {
     createQuotation,
     updateQuotation,
     deleteQuotation,
+    updateStatus,
     getQuotationById,
     getAllQuotations,
     finalizeQuotation,
@@ -36,6 +37,9 @@ router.put('/:id', protect, updateQuotation);
 
 // DELETE: Delete Quotation
 router.delete('/:id', protect, deleteQuotation);
+
+// PATCH: Update Quotation Status
+router.patch('/:id/status', protect, updateStatus);
 
 // PATCH: Finalize Quotation
 router.patch('/:id/finalize', protect, finalizeQuotation);

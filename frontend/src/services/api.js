@@ -200,6 +200,7 @@ export const quotationService = {
   getById: (id) => api.get(`/quotations/${id}`),
   create: (data) => api.post("/quotations", data),
   update: (id, data) => api.put(`/quotations/${id}`, data),
+  updateStatus: (id, status) => api.patch(`/quotations/${id}/status`, { status }),
   delete: (id) => api.delete(`/quotations/${id}`),
   finalize: (id) => api.patch(`/quotations/${id}/finalize`),
   downloadPdf: (id) =>

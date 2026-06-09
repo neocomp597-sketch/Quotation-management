@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { MdArrowBack, MdAdd, MdDelete, MdCheckCircle, MdPerson, MdSearch, MdBadge, MdExpandMore, MdOutlineDriveFileRenameOutline, MdNumbers, MdStar, MdClose } from 'react-icons/md';
+import { MdArrowBack, MdAdd, MdDelete, MdCheckCircle, MdPerson, MdSearch, MdBadge, MdExpandMore, MdOutlineDriveFileRenameOutline, MdNumbers, MdClose } from 'react-icons/md';
 import { toast } from 'react-toastify';
-import { customerService, enquiryService, salespersonService, vendorService } from '../services/api';
+import { customerService, enquiryService, vendorService } from '../services/api';
 import Modal from '../components/Modal';
 
 // Reuse CustomerSearchDropdown from CreateQuotation pattern
@@ -125,7 +125,6 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
     const isEditMode = !!id;
 
     const [customers, setCustomers] = useState([]);
-    const [salespersons, setSalespersons] = useState([]);
     const [allVendors, setAllVendors] = useState([]);
     const [loading, setLoading] = useState(false);
 
@@ -133,8 +132,20 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
         enquiryNo: '',
         enquiryDate: new Date().toISOString().split('T')[0],
         customerId: '',
+        companyName: '',
+        contactPerson: '',
         refReceivedFrom: '',
         followUpDate: '',
+        contactDesignation: '',
+        contactMobile: '',
+        contactEmail: '',
+        siteAddress: '',
+        projectName: '',
+        requiredDeliveryDate: '',
+        priority: 'Medium',
+        budget: '',
+        technicalSpecifications: '',
+        attachmentName: '',
         status: 'New',
         probability: 0,
         remarks: '',
@@ -164,13 +175,11 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const [custRes, salesRes, vendRes] = await Promise.all([
+                const [custRes, vendRes] = await Promise.all([
                     customerService.getAll(),
-                    salespersonService.getAll(),
                     vendorService.getAll(true) 
                 ]);
                 setCustomers(custRes.data);
-                setSalespersons(salesRes.data);
                 setAllVendors(vendRes.data);
 
                 if (!id) {
@@ -198,8 +207,20 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
                         enquiryNo: e.enquiryNo,
                         enquiryDate: new Date(e.enquiryDate).toISOString().split('T')[0],
                         customerId: e.customerId._id || e.customerId,
+                        companyName: e.companyName || e.customerId?.companyName || '',
+                        contactPerson: e.contactPerson || e.customerId?.customerName || '',
                         refReceivedFrom: e.refReceivedFrom || '',
                         followUpDate: e.followUpDate ? new Date(e.followUpDate).toISOString().split('T')[0] : '',
+                        contactDesignation: e.contactDesignation || '',
+                        contactMobile: e.contactMobile || e.customerId?.mobile || '',
+                        contactEmail: e.contactEmail || e.customerId?.email || '',
+                        siteAddress: e.siteAddress || '',
+                        projectName: e.projectName || '',
+                        requiredDeliveryDate: e.requiredDeliveryDate ? new Date(e.requiredDeliveryDate).toISOString().split('T')[0] : '',
+                        priority: e.priority || 'Medium',
+                        budget: e.budget || '',
+                        technicalSpecifications: e.technicalSpecifications || '',
+                        attachmentName: e.attachmentName || '',
                         status: e.status || 'New',
                         probability: e.probability || 0,
                         remarks: e.remarks || '',
@@ -232,6 +253,25 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
     const handleHeaderChange = (e) => {
         const { name, value } = e.target;
         setHeader(prev => ({ ...prev, [name]: value }));
+    };
+
+    const formatCustomerAddress = (customer) => {
+        const address = customer?.billingAddress;
+        if (!address) return '';
+        return [address.line1, address.line2, address.city, address.state, address.pincode].filter(Boolean).join(', ');
+    };
+
+    const handleCustomerSelect = (customerId) => {
+        const customer = customers.find(c => c._id === customerId);
+        setHeader(prev => ({
+            ...prev,
+            customerId,
+            companyName: customer?.companyName || prev.companyName,
+            contactPerson: customer?.customerName || prev.contactPerson,
+            contactMobile: customer?.mobile || prev.contactMobile,
+            contactEmail: customer?.email || prev.contactEmail,
+            siteAddress: formatCustomerAddress(customer) || prev.siteAddress
+        }));
     };
 
     const updateItem = (index, field, value) => {
@@ -307,12 +347,6 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
             return;
         }
 
-        const activeStages = ['New', 'Contacted', 'Quotation Pending', 'Quotation Received', 'Negotiation'];
-        if (activeStages.includes(header.status) && !header.followUpDate) {
-            toast.error(`Follow-up Date is required when status is ${header.status}`);
-            return;
-        }
-
         const finalStages = ['Finalized', 'PO Received', 'Won'];
         if (finalStages.includes(header.status)) {
             const missingVendorItem = items.findIndex(i => !i.finalVendor);
@@ -342,6 +376,12 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
         const cleanedHeader = { ...header };
         if (cleanedHeader.assignedTo === '') {
             delete cleanedHeader.assignedTo;
+        }
+        if (cleanedHeader.followUpDate === '') {
+            delete cleanedHeader.followUpDate;
+        }
+        if (cleanedHeader.requiredDeliveryDate === '') {
+            delete cleanedHeader.requiredDeliveryDate;
         }
         
         setLoading(true);
@@ -381,12 +421,6 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
             return;
         }
 
-        const activeStages = ['New', 'Contacted', 'Quotation Pending', 'Quotation Received', 'Negotiation'];
-        if (activeStages.includes(header.status) && !header.followUpDate) {
-            toast.error(`Follow-up Date is required when status is ${header.status}`);
-            return;
-        }
-
         const finalStages = ['Finalized', 'PO Received', 'Won'];
         if (finalStages.includes(header.status)) {
             const missingVendorItem = items.findIndex(i => !i.finalVendor);
@@ -417,6 +451,12 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
         if (cleanedHeader.assignedTo === '') {
             delete cleanedHeader.assignedTo;
         }
+        if (cleanedHeader.followUpDate === '') {
+            delete cleanedHeader.followUpDate;
+        }
+        if (cleanedHeader.requiredDeliveryDate === '') {
+            delete cleanedHeader.requiredDeliveryDate;
+        }
 
         setLoading(true);
         try {
@@ -436,8 +476,20 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
                 enquiryNo: nextEnqNo,
                 enquiryDate: new Date().toISOString().split('T')[0],
                 customerId: '',
+                companyName: '',
+                contactPerson: '',
                 refReceivedFrom: '',
                 followUpDate: '',
+                contactDesignation: '',
+                contactMobile: '',
+                contactEmail: '',
+                siteAddress: '',
+                projectName: '',
+                requiredDeliveryDate: '',
+                priority: 'Medium',
+                budget: '',
+                technicalSpecifications: '',
+                attachmentName: '',
                 status: 'New',
                 probability: 0,
                 remarks: '',
@@ -464,7 +516,7 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
         }
     };
 
-    const isClosedStatus = ['Won', 'Lost', 'Finalized', 'PO Received'].includes(header.status);
+    const selectedCustomer = customers.find(c => c._id === header.customerId);
 
     const content = (
         <div className={`space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 ${isOpen ? '' : 'pb-24'}`}>
@@ -493,16 +545,20 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
 
             <div className="grid grid-cols-1 gap-8">
                 {/* Header Information */}
-                <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
-                    <div className="p-6 border-b border-slate-50 bg-slate-50/30 flex items-center gap-3">
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                    <div className="p-5 border-b border-slate-100 bg-slate-50/60 flex items-center gap-3">
                         <div className="h-10 w-10 rounded-xl bg-primary-50 flex items-center justify-center text-primary-600">
                             <MdBadge size={20} />
                         </div>
-                        <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest">Enquiry Details</h2>
+                        <div>
+                            <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest">Industrial Enquiry Form</h2>
+                            <p className="text-xs font-semibold text-slate-500 mt-0.5">Capture enquiry, customer, project, and requirement details</p>
+                        </div>
                     </div>
-                    <div className="p-8 grid grid-cols-1 md:grid-cols-4 gap-8">
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Enquiry Number <span className="text-xs text-slate-400 lowercase font-medium">(Leave blank to auto-generate)</span></label>
+                    <div className="p-5 md:p-6 space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Enquiry No.</label>
                             <div className="relative">
                                 <MdNumbers className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
                                 <input
@@ -510,119 +566,194 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
                                     name="enquiryNo"
                                     value={header.enquiryNo}
                                     onChange={handleHeaderChange}
-                                    placeholder="e.g. ENQ/2026/0001 (or leave blank)"
+                                        placeholder="Leave blank to auto-generate"
                                     className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-bold"
                                 />
                             </div>
                         </div>
 
-                        <div className="space-y-2 md:col-span-2">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Customer <span className="text-rose-500">*</span></label>
-                            <CustomerSearchDropdown
-                                customers={customers}
-                                selectedCustomerId={header.customerId}
-                                onSelect={(val) => setHeader(prev => ({ ...prev, customerId: val }))}
-                            />
-                        </div>
-
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Enquiry Date</label>
-                            <input
-                                type="date"
-                                name="enquiryDate"
-                                value={header.enquiryDate}
-                                onChange={handleHeaderChange}
-                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold"
-                            />
-                        </div>
-
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Overall Status</label>
-                            <select
-                                name="status"
-                                value={header.status}
-                                onChange={handleHeaderChange}
-                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold text-primary-700"
-                            >
-                                {['New', 'Contacted', 'Quotation Pending', 'Quotation Received', 'Negotiation', 'Finalized', 'PO Received', 'Lost'].map(s => (
-                                    <option key={s} value={s}>{s}</option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Closure Probability (%)</label>
-                            <input
-                                type="number"
-                                name="probability"
-                                min="0" max="100"
-                                value={header.probability}
-                                onChange={handleHeaderChange}
-                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold"
-                            />
-                        </div>
-                        
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                                Follow-up Date {!isClosedStatus && <span className="text-rose-500">*</span>}
-                            </label>
-                            <input
-                                type="date"
-                                name="followUpDate"
-                                value={header.followUpDate}
-                                onChange={handleHeaderChange}
-                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold"
-                            />
-                        </div>
-
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Reference</label>
-                            <input
-                                type="text"
-                                name="refReceivedFrom"
-                                value={header.refReceivedFrom}
-                                onChange={handleHeaderChange}
-                                placeholder="Source of Lead"
-                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold"
-                            />
-                        </div>
-                        
-                        {isClosedStatus && (
-                            <div className="space-y-2 md:col-span-4 p-4 bg-slate-50 border border-slate-200 rounded-2xl">
-                                <label className="text-[10px] font-black text-slate-700 uppercase tracking-widest">Closure Reason (required for final status)</label>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Enquiry Date</label>
                                 <input
-                                    type="text"
-                                    name="closureReason"
-                                    value={header.closureReason}
+                                    type="date"
+                                    name="enquiryDate"
+                                    value={header.enquiryDate}
                                     onChange={handleHeaderChange}
-                                    placeholder={`Why was it ${header.status}?`}
-                                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none text-sm font-bold mt-2"
+                                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold"
                                 />
                             </div>
-                        )}
-                        
-                        <div className="space-y-2 md:col-span-4">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Remarks</label>
+
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Project Name</label>
+                                <input
+                                    type="text"
+                                    name="projectName"
+                                    value={header.projectName}
+                                    onChange={handleHeaderChange}
+                                    placeholder="Project / plant / site"
+                                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold"
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Required Delivery Date</label>
+                                <input
+                                    type="date"
+                                    name="requiredDeliveryDate"
+                                    value={header.requiredDeliveryDate}
+                                    onChange={handleHeaderChange}
+                                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                            <div className="space-y-2 lg:col-span-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Company Name <span className="text-rose-500">*</span></label>
+                                <CustomerSearchDropdown
+                                    customers={customers}
+                                    selectedCustomerId={header.customerId}
+                                    onSelect={handleCustomerSelect}
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Designation</label>
+                                <input
+                                    type="text"
+                                    name="contactDesignation"
+                                    value={header.contactDesignation}
+                                    onChange={handleHeaderChange}
+                                    placeholder="Purchase manager, owner..."
+                                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Contact Person</label>
+                                <input
+                                    type="text"
+                                    name="contactPerson"
+                                    value={header.contactPerson}
+                                    onChange={handleHeaderChange}
+                                    placeholder="Contact person"
+                                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Mobile No.</label>
+                                <input
+                                    type="tel"
+                                    name="contactMobile"
+                                    value={header.contactMobile}
+                                    onChange={handleHeaderChange}
+                                    placeholder="Mobile number"
+                                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Email</label>
+                                <input
+                                    type="email"
+                                    name="contactEmail"
+                                    value={header.contactEmail}
+                                    onChange={handleHeaderChange}
+                                    placeholder="Email address"
+                                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Address</label>
                             <textarea
-                                name="remarks"
-                                value={header.remarks}
+                                name="siteAddress"
+                                value={header.siteAddress}
                                 onChange={handleHeaderChange}
-                                placeholder="Additional notes about this enquiry..."
-                                rows="2"
+                                placeholder={selectedCustomer?.billingAddress ? `${selectedCustomer.billingAddress.line1 || ''} ${selectedCustomer.billingAddress.line2 || ''} ${selectedCustomer.billingAddress.city || ''}`.trim() : 'Site / billing / delivery address'}
+                                rows="3"
                                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold resize-none"
                             ></textarea>
                         </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Budget</label>
+                                <input
+                                    type="text"
+                                    name="budget"
+                                    value={header.budget}
+                                    onChange={handleHeaderChange}
+                                    placeholder="Optional"
+                                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold"
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Priority</label>
+                                <select
+                                    name="priority"
+                                    value={header.priority}
+                                    onChange={handleHeaderChange}
+                                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold text-slate-700"
+                                >
+                                    {['Low', 'Medium', 'High', 'Urgent'].map(s => (
+                                        <option key={s} value={s}>{s}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Technical Specifications</label>
+                            <textarea
+                                name="technicalSpecifications"
+                                value={header.technicalSpecifications}
+                                onChange={handleHeaderChange}
+                                placeholder="Model, make, rating, dimensions, process notes, or other specifications"
+                                rows="4"
+                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold resize-none"
+                            ></textarea>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Attachment</label>
+                                <input
+                                    type="file"
+                                    onChange={(e) => setHeader(prev => ({ ...prev, attachmentName: e.target.files?.[0]?.name || '' }))}
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold file:mr-4 file:rounded-xl file:border-0 file:bg-primary-50 file:px-4 file:py-2 file:text-xs file:font-black file:text-primary-700"
+                                />
+                                {header.attachmentName && <p className="text-xs font-bold text-slate-500 ml-1">Selected: {header.attachmentName}</p>}
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Remarks</label>
+                                <textarea
+                                    name="remarks"
+                                    value={header.remarks}
+                                    onChange={handleHeaderChange}
+                                    placeholder="Additional notes about this enquiry"
+                                    rows="3"
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold resize-none"
+                                ></textarea>
+                            </div>
+                        </div>
+
                     </div>
                 </div>
 
                 {/* Items Table */}
-                <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
                     <div className="p-6 border-b border-slate-50 bg-slate-50/30 flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             <div className="h-10 w-10 rounded-xl bg-orange-50 flex items-center justify-center text-orange-600">
                                 <MdOutlineDriveFileRenameOutline size={20} />
                             </div>
-                            <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest">Enquiry Items & Progress</h2>
+                            <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest">Product / Service Required</h2>
                         </div>
                         <button
                             onClick={addItem}
@@ -637,11 +768,9 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
                             <thead>
                                 <tr className="bg-slate-50/50">
                                     <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Sr.</th>
-                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 min-w-[200px]">Product Name</th>
-                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 w-24">Qty</th>
-                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 w-32">UOM</th>
-                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 min-w-[150px]">Vendors & Quotes</th>
-                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Final Vendor</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 min-w-[360px]">Product / Service Required</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 w-28">Quantity</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 w-36">Unit</th>
                                     <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 w-16 text-center">Del</th>
                                 </tr>
                             </thead>
@@ -650,37 +779,13 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
                                     <tr key={index} className="group hover:bg-slate-50/50 transition-colors border-b border-slate-100 last:border-0">
                                         <td className="px-6 py-4 text-xs font-bold text-slate-400">{index + 1}</td>
                                         <td className="px-4 py-3">
-                                            <input
-                                                type="text"
+                                            <textarea
+                                                rows="3"
                                                 value={item.productName}
                                                 onChange={(e) => updateItem(index, 'productName', e.target.value)}
-                                                className="w-full px-4 py-2 bg-slate-50 border border-transparent rounded-xl focus:border-primary-500 focus:bg-white outline-none text-xs font-bold transition-all"
-                                                placeholder="Enter product..."
-                                            />
-                                            <div className="flex gap-2 mt-2">
-                                                <select
-                                                    value={item.actionStatus}
-                                                    onChange={(e) => updateItem(index, 'actionStatus', e.target.value)}
-                                                    className="flex-1 px-3 py-1.5 bg-slate-100 border border-transparent rounded-lg outline-none text-[10px] font-bold transition-all text-primary-700 uppercase"
-                                                >
-                                                    {[
-                                                        'VISIT CUSTOMER', 'Quotation given', 'Followup date time', 
-                                                        'quotation revise', 'quotation finalise', 'po received', 'enquiry won'
-                                                    ].map(s => (
-                                                        <option key={s} value={s}>{s}</option>
-                                                    ))}
-                                                </select>
-                                                <select
-                                                    value={item.salespersonName}
-                                                    onChange={(e) => updateItem(index, 'salespersonName', e.target.value)}
-                                                    className="w-32 px-3 py-1.5 bg-slate-100 border border-transparent rounded-lg outline-none text-[10px] font-bold transition-all"
-                                                >
-                                                    <option value="">Salesman</option>
-                                                    {salespersons.map(s => (
-                                                        <option key={s._id} value={s.name}>{s.name}</option>
-                                                    ))}
-                                                </select>
-                                            </div>
+                                                className="w-full px-4 py-3 bg-slate-50 border border-transparent rounded-xl focus:border-primary-500 focus:bg-white outline-none text-xs font-bold transition-all resize-none"
+                                                placeholder="Product / service required"
+                                            ></textarea>
                                         </td>
                                         <td className="px-4 py-3 align-top">
                                             <input
@@ -696,43 +801,9 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
                                                 onChange={(e) => updateItem(index, 'uom', e.target.value)}
                                                 className="w-full px-3 py-2 bg-slate-50 border border-transparent rounded-xl focus:border-primary-500 focus:bg-white outline-none text-xs font-bold transition-all appearance-none"
                                             >
-                                                {['Pcs', 'Set', 'Ltr', 'Pack', 'Doz', 'Kg', 'Mtr'].map(u => (
+                                                {['Pcs', 'Nos', 'Kg', 'Meter', 'Set', 'Ltr'].map(u => (
                                                     <option key={u} value={u}>{u}</option>
                                                 ))}
-                                            </select>
-                                        </td>
-                                        <td className="px-4 py-3 align-top">
-                                            <button
-                                                onClick={() => setVendorModal({ isOpen: true, itemIndex: index })}
-                                                className={`w-full py-2 px-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all border outline-none ${item.vendors.length > 0 ? "bg-primary-50 text-primary-700 border-primary-200" : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"}`}
-                                            >
-                                                {item.vendors.length > 0 ? `${item.vendors.length} Vendors Cited` : 'Compare Vendors'}
-                                            </button>
-                                            {item.vendors.length > 0 && (
-                                                <div className="mt-2 flex flex-wrap gap-1">
-                                                    {item.vendors.map(vId => {
-                                                        const v = allVendors.find(vend => vend._id === vId);
-                                                        return v ? (
-                                                            <span key={vId} className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md text-[9px] font-bold border border-slate-200 whitespace-nowrap">
-                                                                {v.name}
-                                                            </span>
-                                                        ) : null;
-                                                    })}
-                                                </div>
-                                            )}
-                                        </td>
-                                        <td className="px-4 py-3 align-top">
-                                            <select
-                                                value={item.finalVendor}
-                                                onChange={(e) => updateItem(index, 'finalVendor', e.target.value)}
-                                                className={`w-full px-3 py-2 border rounded-xl outline-none text-xs font-bold transition-all ${item.finalVendor ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-slate-50 border-transparent text-slate-500"}`}
-                                                disabled={item.vendors.length === 0}
-                                            >
-                                                <option value="">Pending Selection</option>
-                                                {item.vendors.map(vId => {
-                                                    const v = allVendors.find(vend => vend._id === vId);
-                                                    return v ? <option key={vId} value={vId}>{v.name}</option> : null;
-                                                })}
                                             </select>
                                         </td>
                                         <td className="px-4 py-3 text-center align-top">
@@ -747,64 +818,6 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
                                 ))}
                             </tbody>
                         </table>
-                    </div>
-                </div>
-
-                {/* Follow Up Tracking */}
-                <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
-                    <div className="p-6 border-b border-slate-50 bg-slate-50/30 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded-xl bg-purple-50 flex items-center justify-center text-purple-600">
-                                <MdStar size={20} />
-                            </div>
-                            <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest">Follow-Up Log</h2>
-                        </div>
-                    </div>
-                    
-                    <div className="p-6 md:p-8 grid md:grid-cols-2 gap-8">
-                        <div>
-                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Add Follow-up Note</h3>
-                            <div className="space-y-4">
-                                <select 
-                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-bold text-slate-700"
-                                    value={newFollowUpAction}
-                                    onChange={(e) => setNewFollowUpAction(e.target.value)}
-                                >
-                                    <option value="Call">Phone Call</option>
-                                    <option value="Email">Email Sent</option>
-                                    <option value="Visit">Site/Client Visit</option>
-                                    <option value="Meeting">Meeting</option>
-                                    <option value="Other">Other</option>
-                                </select>
-                                <textarea 
-                                    rows="3" 
-                                    placeholder="What was discussed?"
-                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-bold text-slate-700 resize-none"
-                                    value={newFollowUpNote}
-                                    onChange={(e) => setNewFollowUpNote(e.target.value)}
-                                ></textarea>
-                                <p className="text-[10px] text-slate-400 font-medium italic">Note: Save Enquiry to officially add this note.</p>
-                            </div>
-                        </div>
-
-                        <div>
-                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">History Trail</h3>
-                            <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
-                                {followUpLog.length === 0 ? (
-                                    <p className="text-sm font-medium text-slate-400 bg-slate-50 p-4 rounded-xl border border-slate-100">No previous follow-up logs found.</p>
-                                ) : (
-                                    followUpLog.map((log, i) => (
-                                        <div key={i} className="bg-slate-50 border border-slate-100 p-4 rounded-xl flex flex-col gap-2">
-                                            <div className="flex justify-between items-center">
-                                                <span className="px-2 py-1 bg-white text-xs font-bold text-slate-600 rounded drop-shadow-sm border border-slate-100">{log.actionType}</span>
-                                                <span className="text-[10px] font-bold text-slate-400">{new Date(log.date).toLocaleString()}</span>
-                                            </div>
-                                            <p className="text-sm text-slate-800 font-medium">{log.note}</p>
-                                        </div>
-                                    ))
-                                )}
-                            </div>
-                        </div>
                     </div>
                 </div>
 

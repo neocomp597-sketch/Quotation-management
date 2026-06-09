@@ -55,6 +55,9 @@ const cleanEnquiryBody = (body) => {
     if (body.followUpDate === '') {
         delete body.followUpDate;
     }
+    if (body.requiredDeliveryDate === '') {
+        delete body.requiredDeliveryDate;
+    }
     
     // Clean items
     if (Array.isArray(body.items)) {
@@ -130,7 +133,7 @@ exports.getAllEnquiries = async (req, res) => {
     try {
         await ensureIndexDropped();
         const enquiries = await Enquiry.find()
-            .select('enquiryNo customerId status probability items createdBy lastActivityDate createdAt updatedAt')
+            .select('enquiryNo enquiryDate followUpDate customerId status probability priority projectName requiredDeliveryDate items createdBy lastActivityDate createdAt updatedAt')
             .populate('customerId', 'customerName companyName gstin')
             .populate('createdBy', 'name email')
             .populate('items.vendors', 'name')

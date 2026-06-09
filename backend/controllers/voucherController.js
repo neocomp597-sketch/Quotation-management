@@ -72,7 +72,7 @@ exports.getVouchers = async (req, res) => {
 
         const vouchers = await Voucher.find(filter)
             .select('voucherNumber voucherType date vendorId customerId vendorName customerName contactNumber items totalQty totalTax grandTotal totalAmount referenceVoucherId createdAt updatedAt')
-            .sort({ createdAt: -1 })
+            .sort({ voucherNumber: -1, createdAt: -1 })
             .populate('vendorId', 'name vendorName')
             .populate('customerId', 'companyName customerName')
             .populate('referenceVoucherId', 'voucherNumber')
@@ -105,6 +105,17 @@ exports.createVoucher = async (req, res) => {
         voucherData.date = new Date(voucherData.date);
         
         cleanObjectIds(voucherData);
+
+        // Check for duplicate voucher number within the same company
+        if (voucherData.voucherNumber) {
+            const existing = await Voucher.findOne({
+                companyId: req.user?.companyId,
+                voucherNumber: String(voucherData.voucherNumber).trim()
+            }).lean();
+            if (existing) {
+                return res.status(400).json({ message: 'Voucher Number already exists' });
+            }
+        }
 
         if (voucherData.voucherType === 'Invoice') {
             delete voucherData.vendorId;
@@ -148,6 +159,18 @@ exports.updateVoucher = async (req, res) => {
     try {
         const voucherData = req.body;
         cleanObjectIds(voucherData);
+
+        // Check for duplicate voucher number on update within the same company
+        if (voucherData.voucherNumber) {
+            const existing = await Voucher.findOne({
+                companyId: req.user?.companyId,
+                voucherNumber: String(voucherData.voucherNumber).trim(),
+                _id: { $ne: req.params.id }
+            }).lean();
+            if (existing) {
+                return res.status(400).json({ message: 'Voucher Number already exists' });
+            }
+        }
 
         if (voucherData.voucherType === 'Invoice') {
             delete voucherData.vendorId;

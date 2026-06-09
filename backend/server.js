@@ -242,6 +242,16 @@ app.get('/api/check-db', async (req, res) => {
     }
 });
 
+app.get('/api/debug-quotations', async (req, res) => {
+    try {
+        const Quotation = require('./models/Quotation');
+        const quotations = await Quotation.find({}).lean();
+        res.json(quotations);
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
 app.get('/api/cleanup-data', async (req, res) => {
     try {
         const Planning = require('./models/Planning');
@@ -287,6 +297,7 @@ app.get('/api/read-revenue-plan', async (req, res) => {
     } catch (err) {
         res.status(500).send(err.message);
     }
+});
 app.get('/api/git-revert', (req, res) => {
     const { exec } = require('child_process');
     exec('git checkout -- d:/tally/Quotations/frontend/src/pages/Reports.jsx', (err, stdout, stderr) => {
@@ -417,5 +428,21 @@ if (require.main === module) {
   process.on("SIGINT", () => shutdown("SIGINT"));
   process.on("SIGTERM", () => shutdown("SIGTERM"));
 }
+
+// Temporary Debug: Inspect quotations in DB
+(async () => {
+    try {
+        require('fs').writeFileSync(require('path').join(__dirname, 'test_run.txt'), 'Hello at ' + new Date().toISOString());
+        await dbStartupPromise;
+        const Quotation = require('./models/Quotation');
+        const quotations = await Quotation.find({}).lean();
+        const output = quotations.map(q => `ID: ${q._id}, quotationNo: ${q.quotationNo}, companyId: ${q.companyId}, status: ${q.status}`).join('\n');
+        require('fs').writeFileSync(require('path').join(__dirname, 'debug_output.txt'), `Total quotations: ${quotations.length}\n${output}`);
+        console.log("[DEBUG] Written quotations to debug_output.txt");
+    } catch (err) {
+        require('fs').writeFileSync(require('path').join(__dirname, 'debug_error.txt'), `Error: ${err.message}\nStack: ${err.stack}`);
+        console.error("[DEBUG] Error writing quotations:", err);
+    }
+})();
 
 module.exports = app;

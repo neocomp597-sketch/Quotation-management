@@ -173,8 +173,8 @@ const Quotations = () => {
     const handleMarkAsOrdered = async (id) => {
         if (window.confirm("Mark this quotation as ORDERED? This will reflect in your sales reports.")) {
             try {
-                // Update status to 'ordered'
-                await quotationService.update(id, { status: 'ordered' });
+                // Update status to 'ordered' using dedicated status endpoint
+                await quotationService.updateStatus(id, 'ordered');
                 toast.success('Quotation marked as ORDERED!');
                 fetchQuotations();
             } catch (err) {
@@ -345,12 +345,7 @@ const Quotations = () => {
                                                         </button>
                                                     )}
                                                 </PDFDownloadLink>
-                                                <button
-                                                    onClick={() => handleDelete(q._id)}
-                                                    className="p-2 text-slate-400 hover:text-rose-600 hover:bg-white rounded-lg transition-all"
-                                                >
-                                                    <MdDelete size={18} />
-                                                </button>
+
                                             </div>
                                         </div>
                                     </div>
@@ -476,13 +471,7 @@ const Quotations = () => {
                                                             )}
                                                         </PDFDownloadLink>
 
-                                                        <button
-                                                            onClick={() => handleDelete(q._id)}
-                                                            className="p-2.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
-                                                            title="Purge Record"
-                                                        >
-                                                            <MdDelete size={18} />
-                                                        </button>
+
                                                     </div>
                                                 </td>
                                             </tr>
