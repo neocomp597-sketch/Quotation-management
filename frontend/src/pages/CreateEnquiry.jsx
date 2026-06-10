@@ -2,8 +2,9 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { MdArrowBack, MdAdd, MdDelete, MdCheckCircle, MdPerson, MdSearch, MdBadge, MdExpandMore, MdOutlineDriveFileRenameOutline, MdNumbers, MdClose } from 'react-icons/md';
 import { toast } from 'react-toastify';
-import { customerService, enquiryService, vendorService } from '../services/api';
+import { customerService, enquiryService, vendorService, productService } from '../services/api';
 import Modal from '../components/Modal';
+import PortalDropdown from '../components/PortalDropdown';
 
 // Reuse CustomerSearchDropdown from CreateQuotation pattern
 const CustomerSearchDropdown = ({ customers, selectedCustomerId, onSelect }) => {
@@ -89,6 +90,145 @@ const CustomerSearchDropdown = ({ customers, selectedCustomerId, onSelect }) => 
     );
 };
 
+const ProductSearchAutocomplete = ({ value, onChange, products, onSelectProduct }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+    const anchorRef = useRef(null);
+    const dropdownRef = useRef(null);
+    const inputRef = useRef(null);
+
+    const filteredProducts = useMemo(() => {
+        const query = (searchTerm || value || '').toLowerCase();
+        if (!query) return products;
+        return products.filter(p =>
+            p.productName?.toLowerCase().includes(query) ||
+            p.productCode?.toLowerCase().includes(query)
+        );
+    }, [products, searchTerm, value]);
+
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (
+                anchorRef.current && !anchorRef.current.contains(event.target) &&
+                dropdownRef.current && !dropdownRef.current.contains(event.target)
+            ) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const handleTextChange = (e) => {
+        const val = e.target.value;
+        onChange(val);
+        setIsOpen(true);
+    };
+
+    const handleSelect = (product) => {
+        onSelectProduct(product);
+        setIsOpen(false);
+        setSearchTerm('');
+    };
+
+    const handleSearchButtonClick = (e) => {
+        e.stopPropagation();
+        const nextState = !isOpen;
+        setIsOpen(nextState);
+        if (nextState) {
+            setTimeout(() => {
+                if (inputRef.current) inputRef.current.focus();
+            }, 100);
+        }
+    };
+
+    return (
+        <div ref={anchorRef} className="relative w-full">
+            <div className="relative">
+                <textarea
+                    rows="3"
+                    value={value || ''}
+                    onChange={handleTextChange}
+                    onFocus={() => setIsOpen(true)}
+                    className="w-full pl-4 pr-10 py-3 bg-slate-50 border border-transparent rounded-xl focus:border-primary-500 focus:bg-white outline-none text-xs font-bold transition-all resize-none"
+                    placeholder="Product / service required"
+                />
+                <button
+                    type="button"
+                    onClick={handleSearchButtonClick}
+                    className={`absolute right-3 top-3 transition-colors ${isOpen ? 'text-primary-600' : 'text-slate-400 hover:text-primary-600'}`}
+                >
+                    <MdSearch size={18} />
+                </button>
+            </div>
+            <PortalDropdown isOpen={isOpen} anchorRef={anchorRef}>
+                <div ref={dropdownRef} className="bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[320px]">
+                    <div className="p-3 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2">
+                        <div className="relative flex-1">
+                            <MdSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                            <input
+                                ref={inputRef}
+                                type="text"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                placeholder="Search product name or code..."
+                                className="w-full pl-10 pr-8 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none"
+                            />
+                            {searchTerm && (
+                                <button
+                                    type="button"
+                                    onClick={() => setSearchTerm('')}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-rose-500 transition-colors"
+                                >
+                                    <MdClose size={14} />
+                                </button>
+                            )}
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setIsOpen(false)}
+                            className="p-1.5 hover:bg-slate-200 active:scale-95 rounded-lg text-slate-400 hover:text-slate-600 transition-all flex items-center justify-center shrink-0"
+                            title="Close dropdown"
+                        >
+                            <MdClose size={18} />
+                        </button>
+                    </div>
+                    <div className="overflow-y-auto max-h-60 divide-y divide-slate-50">
+                        {filteredProducts.length > 0 ? (
+                            filteredProducts.map(product => (
+                                <div 
+                                    key={product._id} 
+                                    onClick={() => handleSelect(product)} 
+                                    className="px-4 py-3 cursor-pointer hover:bg-primary-50 transition-colors text-left"
+                                >
+                                    <div className="font-bold text-slate-900 text-xs">
+                                        {product.productName || 'Unnamed Product'}
+                                    </div>
+                                    <div className="text-[10px] text-slate-500 font-semibold uppercase mt-0.5 flex items-center gap-1.5 flex-wrap">
+                                        <span className="text-primary-600 bg-primary-50 px-1.5 py-0.5 rounded text-[9px] font-black">
+                                            {product.productCode}
+                                        </span>
+                                        <span>•</span>
+                                        <span>HSN: {product.hsnCode || 'N/A'}</span>
+                                        <span>•</span>
+                                        <span>GST: {product.gstPercentage}%</span>
+                                        <span>•</span>
+                                        <span>UOM: {product.uom}</span>
+                                    </div>
+                                </div>
+                            ))
+                        ) : (
+                            <div className="p-6 text-center text-slate-400 text-xs font-semibold">
+                                No matching products found.
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </PortalDropdown>
+        </div>
+    );
+};
+
 const generateNextEnquiryNumber = (existingEnquiries = []) => {
     let maxNum = 0;
     let prefix = '';
@@ -126,6 +266,7 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
 
     const [customers, setCustomers] = useState([]);
     const [allVendors, setAllVendors] = useState([]);
+    const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(false);
 
     const [header, setHeader] = useState({
@@ -175,12 +316,14 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const [custRes, vendRes] = await Promise.all([
+                const [custRes, vendRes, prodRes] = await Promise.all([
                     customerService.getAll(),
-                    vendorService.getAll(true) 
+                    vendorService.getAll(true),
+                    productService.getAll()
                 ]);
                 setCustomers(custRes.data);
                 setAllVendors(vendRes.data);
+                setProducts(Array.isArray(prodRes.data) ? prodRes.data : prodRes.data?.data || []);
 
                 if (!id) {
                     try {
@@ -277,6 +420,32 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
     const updateItem = (index, field, value) => {
         const newItems = [...items];
         newItems[index][field] = value;
+        setItems(newItems);
+    };
+
+    const handleProductSelect = (index, product) => {
+        const newItems = [...items];
+        newItems[index].productName = product.productName;
+        const validUoms = ['Pcs', 'Nos', 'Kg', 'Meter', 'Mtr', 'Set', 'Ltr', 'Pack', 'Doz'];
+        const productUom = product.uom || 'Pcs';
+        const matchedUom = validUoms.find(u => u.toLowerCase() === productUom.toLowerCase());
+        newItems[index].uom = matchedUom || 'Pcs';
+
+        if (product.vendors && Array.isArray(product.vendors) && product.vendors.length > 0) {
+            const mappedVendorIds = product.vendors.map(v => typeof v.vendorId === 'object' ? v.vendorId._id : v.vendorId);
+            newItems[index].vendors = mappedVendorIds;
+            newItems[index].vendorQuotes = product.vendors.map(v => {
+                const vendorId = typeof v.vendorId === 'object' ? v.vendorId._id : v.vendorId;
+                return {
+                    vendorId,
+                    price: v.price || '',
+                    deliveryTime: '',
+                    availability: Number(v.stock || 0) > 0 ? 'In Stock' : 'Out of Stock',
+                    remarks: '',
+                    probability: 0
+                };
+            });
+        }
         setItems(newItems);
     };
 
@@ -779,13 +948,12 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
                                     <tr key={index} className="group hover:bg-slate-50/50 transition-colors border-b border-slate-100 last:border-0">
                                         <td className="px-6 py-4 text-xs font-bold text-slate-400">{index + 1}</td>
                                         <td className="px-4 py-3">
-                                            <textarea
-                                                rows="3"
+                                            <ProductSearchAutocomplete
                                                 value={item.productName}
-                                                onChange={(e) => updateItem(index, 'productName', e.target.value)}
-                                                className="w-full px-4 py-3 bg-slate-50 border border-transparent rounded-xl focus:border-primary-500 focus:bg-white outline-none text-xs font-bold transition-all resize-none"
-                                                placeholder="Product / service required"
-                                            ></textarea>
+                                                onChange={(val) => updateItem(index, 'productName', val)}
+                                                products={products}
+                                                onSelectProduct={(product) => handleProductSelect(index, product)}
+                                            />
                                         </td>
                                         <td className="px-4 py-3 align-top">
                                             <input
@@ -801,7 +969,7 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
                                                 onChange={(e) => updateItem(index, 'uom', e.target.value)}
                                                 className="w-full px-3 py-2 bg-slate-50 border border-transparent rounded-xl focus:border-primary-500 focus:bg-white outline-none text-xs font-bold transition-all appearance-none"
                                             >
-                                                {['Pcs', 'Nos', 'Kg', 'Meter', 'Set', 'Ltr'].map(u => (
+                                                {['Pcs', 'Nos', 'Kg', 'Meter', 'Mtr', 'Set', 'Ltr', 'Pack', 'Doz'].map(u => (
                                                     <option key={u} value={u}>{u}</option>
                                                 ))}
                                             </select>
