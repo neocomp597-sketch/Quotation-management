@@ -428,6 +428,12 @@ export const notificationService = {
   dismiss: (id) => api.patch(`/notifications/${id}/dismiss`),
 };
 
+export const systemUpdateService = {
+  getAll: () => api.get("/system-updates"),
+  getLatest: () => api.get("/system-updates/latest"),
+  create: (data) => api.post("/system-updates", data),
+};
+
 export const statusService = {
   getAll: (params) => api.get("/statuses", { params }),
   create: (data) => api.post("/statuses", data),

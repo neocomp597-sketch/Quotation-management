@@ -216,10 +216,10 @@ const Enquiries = () => {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div>
                     <h1 className="text-4xl font-black text-slate-900 tracking-tight flex items-center gap-3">
-                        Lead Management
+                        Enquiry Register
                         <span className="text-sm font-bold bg-slate-100 text-slate-500 px-3 py-1 rounded-full">{filteredEnquiries.length}</span>
                     </h1>
-                    <p className="text-slate-500 font-medium mt-1">Track enquiries from lead to conversion</p>
+                    <p className="text-slate-500 font-medium mt-1">Track and manage enquiries from creation to closure</p>
                 </div>
                 <div className="flex gap-3 flex-col sm:flex-row">
                     <button
@@ -236,7 +236,7 @@ const Enquiries = () => {
                         <div className="h-6 w-6 rounded-full bg-white/20 flex items-center justify-center group-hover:rotate-90 transition-transform">
                             <MdAdd size={20} />
                         </div>
-                        New Lead Entry
+                        New Enquiry
                     </button>
                 </div>
             </div>
@@ -361,7 +361,7 @@ const Enquiries = () => {
                             <tr className="bg-slate-50/50">
                                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Enquiry No</th>
                                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 min-w-[180px]">Customer & Date</th>
-                                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Items (Vendors Cited)</th>
+                                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Items / Partners</th>
                                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 min-w-[150px]">Stats</th>
                                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Status</th>
                                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 text-center">Actions</th>
@@ -403,12 +403,15 @@ const Enquiries = () => {
                                                     <div key={i} className="text-xs font-bold text-slate-700 truncate max-w-[200px]">
                                                         • {item.productName} 
                                                         <span className="text-[9px] text-slate-400 ml-1">
-                                                            ({item.finalVendor ? 1 : item.vendors.length} vend)
+                                                        ({item.finalVendor ? 1 : item.vendors.length} vend)
                                                         </span>
                                                     </div>
                                                 ))}
                                                 {e.items.length > 2 && (
                                                     <span className="text-[10px] font-bold text-primary-500">+{e.items.length - 2} more items</span>
+                                                )}
+                                                {Array.isArray(e.partners) && e.partners.length > 0 && (
+                                                    <span className="text-[10px] font-black text-teal-600 uppercase tracking-wider">{e.partners.length} partner{e.partners.length > 1 ? 's' : ''}</span>
                                                 )}
                                             </div>
                                         </td>
@@ -459,7 +462,7 @@ const Enquiries = () => {
                             ) : (
                                 <tr>
                                     <td colSpan="6" className="px-8 py-20 text-center text-slate-400 font-bold">
-                                        No leads found matching your search.
+                                        No enquiries found matching your search.
                                     </td>
                                 </tr>
                             )}
@@ -472,10 +475,10 @@ const Enquiries = () => {
             <Modal
                 isOpen={deleteModal.open}
                 onClose={() => setDeleteModal({ open: false, id: null })}
-                title="Remove Lead Entry"
+                title="Delete Enquiry"
             >
                 <div className="space-y-6">
-                    <p className="text-slate-600 font-medium">Are you sure you want to remove this lead? This action cannot be undone.</p>
+                    <p className="text-slate-600 font-medium">Are you sure you want to delete this enquiry from the register? This action cannot be undone.</p>
                     <div className="flex gap-3">
                         <button
                             onClick={() => setDeleteModal({ open: false, id: null })}
@@ -558,6 +561,42 @@ const Enquiries = () => {
                                         )}
                                     </div>
                                 </div>
+
+                                {Array.isArray(viewModal.data.partners) && viewModal.data.partners.length > 0 && (
+                                    <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
+                                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 pb-3 mb-4 flex items-center gap-2">
+                                            <MdPerson className="text-teal-600" size={16} /> Partner Details
+                                        </h3>
+                                        <div className="space-y-3">
+                                            {viewModal.data.partners.map((partner, idx) => (
+                                                <div key={idx} className="grid grid-cols-1 md:grid-cols-2 gap-3 p-4 bg-slate-50 border border-slate-100 rounded-2xl text-xs">
+                                                    <div>
+                                                        <span className="text-slate-400 block">Partner</span>
+                                                        <span className="text-slate-900 font-bold">{partner.name || 'N/A'}</span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-slate-400 block">Contact Person</span>
+                                                        <span className="text-slate-900 font-bold">{partner.contactPerson || 'N/A'}</span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-slate-400 block">Mobile</span>
+                                                        <span className="text-slate-900 font-bold">{partner.mobile || 'N/A'}</span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-slate-400 block">Email</span>
+                                                        <span className="text-slate-900 font-bold">{partner.email || 'N/A'}</span>
+                                                    </div>
+                                                    {partner.notes && (
+                                                        <div className="md:col-span-2">
+                                                            <span className="text-slate-400 block">Notes</span>
+                                                            <span className="text-slate-900 font-bold">{partner.notes}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
 
                                 {/* Items Card */}
                                 <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">

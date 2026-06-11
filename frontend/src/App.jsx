@@ -35,6 +35,7 @@ import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 
 import FooterPageView from './pages/FooterPageView';
+import SystemUpdates from './pages/SystemUpdates';
 
 function App() {
   return (
@@ -99,6 +100,7 @@ function App() {
             <Route path="/status-master" element={<PermissionRoute adminOnly={true}><Layout><StatusMaster /></Layout></PermissionRoute>} />
             <Route path="/admin/authorization" element={<PermissionRoute permissionKey="admin_authorization"><Layout><Authorization /></Layout></PermissionRoute>} />
             <Route path="/super-admin" element={<PermissionRoute superAdminOnly={true}><Layout><SuperAdmin /></Layout></PermissionRoute>} />
+            <Route path="/system-updates" element={<PermissionRoute><Layout><SystemUpdates /></Layout></PermissionRoute>} />
             <Route path="/info/:slug" element={<Layout><FooterPageView /></Layout>} />
           </Route>
 

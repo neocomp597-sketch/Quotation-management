@@ -1,16 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import Sidebar from './Sidebar';
 import Header from './Header';
-import { Link } from 'react-router-dom';
-import { footerPageService } from '../services/api';
+import { Link, useNavigate } from 'react-router-dom';
+import { footerPageService, systemUpdateService } from '../services/api';
+import Modal from './Modal';
+import { MdCheckCircle, MdNewReleases } from 'react-icons/md';
 
 const Layout = ({ children }) => {
+    const navigate = useNavigate();
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [footerPages, setFooterPages] = useState([
         { slug: 'privacy-policy', label: 'Privacy Policy' },
         { slug: 'terms-of-service', label: 'Terms of Service' },
         { slug: 'help-center', label: 'Help Center' }
     ]);
+    
+    // System Updates check states
+    const [latestUpdate, setLatestUpdate] = useState(null);
+    const [showUpdateModal, setShowUpdateModal] = useState(false);
 
     useEffect(() => {
         const fetchFooterPages = async () => {
@@ -23,8 +30,36 @@ const Layout = ({ children }) => {
                 console.error("Failed to load footer pages", err);
             }
         };
+        const checkSystemUpdates = async () => {
+            try {
+                const res = await systemUpdateService.getLatest();
+                if (res.data) {
+                    const lastSeenVersion = localStorage.getItem('lastSeenSystemVersion');
+                    if (lastSeenVersion !== res.data.version) {
+                        setLatestUpdate(res.data);
+                        setShowUpdateModal(true);
+                    }
+                }
+            } catch (error) {
+                console.error("Failed to check for system updates", error);
+            }
+        };
+        
         fetchFooterPages();
+        checkSystemUpdates();
     }, []);
+
+    const handleDismissUpdate = () => {
+        if (latestUpdate) {
+            localStorage.setItem('lastSeenSystemVersion', latestUpdate.version);
+        }
+        setShowUpdateModal(false);
+    };
+
+    const handleViewAllUpdates = () => {
+        handleDismissUpdate();
+        navigate('/system-updates');
+    };
 
     return (
         <div className="min-h-screen bg-slate-50/50 relative overflow-hidden">
@@ -58,6 +93,66 @@ const Layout = ({ children }) => {
                     </div>
                 </div>
             </footer>
+
+            {/* What's New System Update Modal */}
+            <Modal
+                isOpen={showUpdateModal}
+                onClose={handleDismissUpdate}
+                title="🚀 System Updated!"
+                maxWidth="max-w-xl"
+                footer={(
+                    <>
+                        <button
+                            type="button"
+                            onClick={handleViewAllUpdates}
+                            className="w-full md:w-auto px-5 py-3 rounded-xl bg-white border border-slate-200 text-slate-600 font-black uppercase text-[10px] tracking-widest hover:bg-slate-50 transition-all"
+                        >
+                            View All Releases
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleDismissUpdate}
+                            className="w-full md:w-auto px-5 py-3 rounded-xl bg-primary-600 text-white font-black uppercase text-[10px] tracking-widest hover:bg-primary-700 transition-all shadow-lg shadow-primary-600/20"
+                        >
+                            Got it, thanks!
+                        </button>
+                    </>
+                )}
+            >
+                {latestUpdate && (
+                    <div className="space-y-6">
+                        <div className="flex items-center gap-4 bg-gradient-to-r from-primary-50 to-indigo-50/50 p-4 rounded-2xl border border-primary-100/30">
+                            <div className="w-12 h-12 bg-primary-600 rounded-xl flex items-center justify-center text-white shadow-md shrink-0">
+                                <MdNewReleases size={24} />
+                            </div>
+                            <div>
+                                <h4 className="font-black text-slate-900 text-lg leading-tight">{latestUpdate.title}</h4>
+                                <p className="text-[10px] font-bold text-primary-700 mt-1 uppercase tracking-widest">Version {latestUpdate.version}</p>
+                            </div>
+                        </div>
+
+                        <div>
+                            <p className="text-slate-600 text-sm font-medium leading-relaxed">
+                                {latestUpdate.message}
+                            </p>
+                        </div>
+
+                        {latestUpdate.releaseNotes && latestUpdate.releaseNotes.length > 0 && (
+                            <div className="space-y-3">
+                                <h5 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Release Notes</h5>
+                                <ul className="space-y-2">
+                                    {latestUpdate.releaseNotes.map((note, idx) => (
+                                        <li key={idx} className="flex items-start gap-2.5 text-sm font-bold text-slate-800">
+                                            <MdCheckCircle className="text-emerald-500 mt-0.5 shrink-0" size={16} />
+                                            <span>{note}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </Modal>
         </div>
     );
 };

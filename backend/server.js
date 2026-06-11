@@ -76,6 +76,7 @@ const vendorRoutes = require("./routes/vendorRoutes");
 const voucherRoutes = require("./routes/voucherRoutes");
 const enquiryRoutes = require("./routes/enquiryRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
+const systemUpdateRoutes = require("./routes/systemUpdateRoutes");
 const analyticsRoutes = require("./routes/analyticsRoutes");
 const planningRoutes = require("./routes/planningRoutes");
 const authorizationRoutes = require("./routes/authorizationRoutes");
@@ -104,6 +105,7 @@ app.use("/api/vendors", vendorRoutes);
 app.use("/api/vouchers", voucherRoutes);
 app.use("/api/enquiries", enquiryRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/system-updates", systemUpdateRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/planning", planningRoutes);
 app.use("/api/authorization", authorizationRoutes);
@@ -119,6 +121,16 @@ app.get('/api/trigger-seed', async (req, res) => {
         res.send('Seeded successfully');
     } catch (err) {
         res.status(500).send(err.message);
+    }
+});
+
+app.get('/api/debug-updates', async (req, res) => {
+    try {
+        const SystemUpdate = require('./models/SystemUpdate');
+        const updates = await SystemUpdate.find({}).lean();
+        res.json({ success: true, count: updates.length, updates });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message, stack: err.stack });
     }
 });
 
@@ -312,6 +324,34 @@ app.get('/api/git-revert', (req, res) => {
 const startBackgroundServices = async () => {
   await dbStartupPromise;
   await redisStartupPromise;
+
+  // Seed current platform release notes
+  try {
+    const SystemUpdate = require("./models/models/SystemUpdate" ? "./models/SystemUpdate" : "./models/SystemUpdate");
+    await SystemUpdate.deleteOne({ version: "v2.8.1" });
+    await SystemUpdate.findOneAndUpdate(
+      { version: "v2.9.0" },
+      {
+        version: "v2.9.0",
+        title: "Enquiry Register & Partner Workflow",
+        message: "The enquiry module has been refreshed with a cleaner creation flow, partner tracking, reliable product row selection, and a proper enquiry register.",
+        releaseNotes: [
+          "Added Enquiry Register with view, edit, delete, filtering, and partner count visibility",
+          "Removed extra enquiry reference fields from the create/edit form for faster entry",
+          "Added partner details to enquiries, including company, contact, mobile, email, and notes",
+          "Fixed product dropdown selection so every product row updates correctly, not only the first row",
+          "Added system update release history to the notification bell",
+          "Improved system updates history loading and latest release access"
+        ],
+        deployedBy: "Super Admin",
+        deployedAt: new Date(),
+        isActive: true
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+  } catch (err) {
+    console.error("[Release Seed Error] Failed to seed system update:", err.message);
+  }
 
   // Database Migration for 'Sept' month entries
   try {

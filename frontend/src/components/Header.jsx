@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { MdSearch, MdNotifications, MdLogout, MdMenu, MdSettings, MdCheck } from 'react-icons/md';
 import { useNavigate, Link } from 'react-router-dom';
-import { notificationService } from '../services/api';
+import { notificationService, systemUpdateService } from '../services/api';
 import { toast } from 'react-toastify';
 import { useAuth } from '../context/AuthContext';
 
@@ -11,6 +11,7 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [isNotifOpen, setIsNotifOpen] = useState(false);
     const [notifications, setNotifications] = useState([]);
+    const [systemUpdateNotification, setSystemUpdateNotification] = useState(null);
     const dropdownRef = useRef(null);
     const notifRef = useRef(null);
 
@@ -21,12 +22,32 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
 
     const fetchNotifications = async () => {
         try {
-            const res = await notificationService.getUnread();
-            setNotifications(res.data);
+            const [notificationRes, updateRes] = await Promise.all([
+                notificationService.getUnread(),
+                systemUpdateService.getLatest().catch(() => ({ data: null }))
+            ]);
+            setNotifications(notificationRes.data);
+
+            if (updateRes.data) {
+                const lastSeenVersion = localStorage.getItem('lastSeenSystemVersion');
+                if (lastSeenVersion !== updateRes.data.version) {
+                    setSystemUpdateNotification({
+                        _id: `system-update-${updateRes.data.version}`,
+                        type: 'Release',
+                        title: updateRes.data.title,
+                        message: updateRes.data.message,
+                        version: updateRes.data.version
+                    });
+                } else {
+                    setSystemUpdateNotification(null);
+                }
+            } else {
+                setSystemUpdateNotification(null);
+            }
             
             // Trigger popup toast for overdue & today on mount
-            const overdue = res.data.filter(n => n.type === 'Overdue');
-            const reminder = res.data.filter(n => n.type === 'Reminder');
+            const overdue = notificationRes.data.filter(n => n.type === 'Overdue');
+            const reminder = notificationRes.data.filter(n => n.type === 'Reminder');
             
             if (overdue.length > 0) {
                 toast.error(`You have ${overdue.length} overdue follow-ups!`, { position: 'top-right', autoClose: false });
@@ -66,8 +87,24 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
+    useEffect(() => {
+        if (
+            isNotifOpen &&
+            systemUpdateNotification &&
+            localStorage.getItem('lastSeenSystemVersion') === systemUpdateNotification.version
+        ) {
+            setSystemUpdateNotification(null);
+        }
+    }, [isNotifOpen, systemUpdateNotification]);
+
     const dismissNotification = async (id, e) => {
         e.stopPropagation();
+        if (systemUpdateNotification && id === systemUpdateNotification._id) {
+            localStorage.setItem('lastSeenSystemVersion', systemUpdateNotification.version);
+            setSystemUpdateNotification(null);
+            return;
+        }
+
         try {
             await notificationService.dismiss(id);
             setNotifications(prev => prev.filter(n => n._id !== id));
@@ -77,6 +114,14 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
     };
 
     const handleNotifClick = async (n) => {
+        if (n.type === 'Release') {
+            localStorage.setItem('lastSeenSystemVersion', n.version);
+            setSystemUpdateNotification(null);
+            setIsNotifOpen(false);
+            navigate('/system-updates');
+            return;
+        }
+
         try {
             await notificationService.markAsRead(n._id);
             if (n.type === 'Quotation') {
@@ -95,6 +140,10 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
             console.error('Failed to mark notification as read', error);
         }
     };
+
+    const displayNotifications = systemUpdateNotification
+        ? [systemUpdateNotification, ...notifications]
+        : notifications;
 
     return (
         <header className={`fixed top-0 right-0 h-20 bg-white/80 backdrop-blur-xl border-b border-slate-100 z-40 transition-all duration-300 left-0 ${sidebarOpen ? 'md:left-64' : 'md:left-20'}`}>
@@ -121,7 +170,7 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
                             className="relative p-2.5 rounded-2xl bg-slate-50 text-slate-500 hover:text-primary-600 hover:bg-white hover:ring-1 hover:ring-slate-100 transition-all flex"
                         >
                             <MdNotifications size={22} />
-                            {notifications.length > 0 && (
+                            {displayNotifications.length > 0 && (
                                 <span className="absolute top-1.5 right-1.5 w-3 h-3 bg-rose-500 border-2 border-white rounded-full"></span>
                             )}
                         </button>
@@ -130,12 +179,12 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
                             <div className="absolute top-full right-0 mt-3 w-80 max-h-96 overflow-y-auto bg-white rounded-2xl shadow-2xl border border-slate-100 py-3 animate-in fade-in slide-in-from-top-2 duration-200">
                                 <div className="px-4 pb-2 border-b border-slate-50 mb-2 flex justify-between items-center">
                                     <h4 className="font-black text-slate-900">Notifications</h4>
-                                    <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{notifications.length} Unread</span>
+                                    <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{displayNotifications.length} Unread</span>
                                 </div>
-                                {notifications.length === 0 ? (
+                                {displayNotifications.length === 0 ? (
                                     <div className="p-4 text-center text-sm font-bold text-slate-400">You're all caught up!</div>
                                 ) : (
-                                    notifications.map(n => {
+                                    displayNotifications.map(n => {
                                         let borderClass = 'border-primary-500 bg-primary-50/30';
                                         let textClass = 'text-primary-600';
                                         if (n.type === 'Overdue') {
@@ -147,6 +196,9 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
                                         } else if (n.type === 'Planning') {
                                             borderClass = 'border-amber-500 bg-amber-50/30';
                                             textClass = 'text-amber-600';
+                                        } else if (n.type === 'Release') {
+                                            borderClass = 'border-indigo-500 bg-indigo-50/30';
+                                            textClass = 'text-indigo-600';
                                         }
                                         return (
                                             <div key={n._id} onClick={() => handleNotifClick(n)} className={`p-3 mx-2 mb-1 rounded-xl cursor-pointer hover:bg-slate-50 transition-colors border-l-4 ${borderClass}`}>

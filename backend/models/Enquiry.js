@@ -11,6 +11,13 @@ const EnquirySchema = new mongoose.Schema({
     contactDesignation: { type: String },
     contactMobile: { type: String },
     contactEmail: { type: String },
+    partners: [{
+        name: { type: String },
+        contactPerson: { type: String },
+        mobile: { type: String },
+        email: { type: String },
+        notes: { type: String }
+    }],
     siteAddress: { type: String },
     projectName: { type: String },
     requiredDeliveryDate: { type: Date },

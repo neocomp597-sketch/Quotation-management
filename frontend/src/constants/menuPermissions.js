@@ -27,10 +27,10 @@ export const MENU_PERMISSION_GROUPS = [
     {
         key: 'enquiry',
         label: 'Enquiry',
-        description: 'Leads, enquiries and analytics',
+        description: 'Enquiry register and analytics',
         defaultRoute: '/enquiries',
         children: [
-            { key: 'enquiry_leads', label: 'Leads & Enquiries', description: 'Lead and enquiry records', defaultRoute: '/enquiries' },
+            { key: 'enquiry_leads', label: 'Enquiry Register', description: 'Enquiry records and register access', defaultRoute: '/enquiries' },
             { key: 'enquiry_analytics', label: 'Analytics', description: 'Enquiry analytics dashboard', defaultRoute: '/enquiries/analytics' }
         ]
     },

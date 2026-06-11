@@ -24,7 +24,8 @@ import {
     MdCalendarMonth,
     MdLock,
     MdMap,
-    MdAdminPanelSettings
+    MdAdminPanelSettings,
+    MdNewReleases
 } from 'react-icons/md';
 import { useAuth } from '../context/AuthContext';
 
@@ -76,7 +77,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             key: 'enquiry',
             icon: <MdAssignment size={22} />,
             children: [
-                { key: 'enquiry_leads', name: 'Leads & Enquiries', icon: <MdAssignment size={18} />, path: '/enquiries' },
+                { key: 'enquiry_leads', name: 'Enquiry Register', icon: <MdAssignment size={18} />, path: '/enquiries' },
                 { key: 'enquiry_analytics', name: 'Analytics', icon: <MdAnalytics size={18} />, path: '/enquiries/analytics' },
             ]
         },
@@ -286,8 +287,26 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                     })}
                 </nav>
 
-                {hasAccess('settings_profile') && (
-                    <div className="p-3 border-t border-slate-50 shrink-0 bg-white">
+                <div className="p-3 border-t border-slate-50 shrink-0 bg-white space-y-1">
+                    {isSuperAdmin && (
+                        <NavLink
+                            to="/system-updates"
+                            onClick={handleNavClick}
+                            className={({ isActive }) =>
+                                `flex items-center gap-4 px-4 py-3 rounded-2xl transition-all duration-200 ${isActive
+                                    ? 'bg-primary-600 text-white shadow-xl shadow-primary-600/25 ring-1 ring-white/10'
+                                    : 'text-slate-500 hover:bg-slate-50 hover:text-primary-600 font-semibold'
+                                }`
+                            }
+                        >
+                            <MdNewReleases size={22} className="shrink-0" />
+                            <span className={`font-bold transition-all duration-300 whitespace-nowrap ${!isOpen ? 'md:opacity-0 md:w-0' : 'opacity-100'}`}>
+                                Updates
+                            </span>
+                        </NavLink>
+                    )}
+
+                    {hasAccess('settings_profile') && (
                         <NavLink
                             to="/settings"
                             onClick={handleNavClick}
@@ -303,8 +322,8 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                                 Settings
                             </span>
                         </NavLink>
-                    </div>
-                )}
+                    )}
+                </div>
             </div>
         </>
     );

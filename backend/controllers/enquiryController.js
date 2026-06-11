@@ -133,7 +133,7 @@ exports.getAllEnquiries = async (req, res) => {
     try {
         await ensureIndexDropped();
         const enquiries = await Enquiry.find()
-            .select('enquiryNo enquiryDate followUpDate customerId status probability priority projectName requiredDeliveryDate items createdBy lastActivityDate createdAt updatedAt')
+            .select('enquiryNo enquiryDate followUpDate customerId partners status probability priority projectName requiredDeliveryDate items createdBy lastActivityDate createdAt updatedAt')
             .populate('customerId', 'customerName companyName gstin')
             .populate('createdBy', 'name email')
             .populate('items.vendors', 'name')

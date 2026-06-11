@@ -93,16 +93,19 @@ const CustomerSearchDropdown = ({ customers, selectedCustomerId, onSelect }) => 
     );
 };
 
-// Autocomplete dropdown searching by productCode or productName with Teal accents
-const ProductCodeSearchAutocomplete = ({ value, onChange, products, onSelectProduct }) => {
+// Product dropdown searching by productCode or productName with Teal accents
+const ProductCodeSearchAutocomplete = ({ value, selectedLabel, onChange, products, onSelectProduct }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const anchorRef = useRef(null);
     const dropdownRef = useRef(null);
     const inputRef = useRef(null);
 
+    const selectedProduct = products.find(product => product.productCode === value || product._id === value);
+    const displayValue = selectedLabel || selectedProduct?.productName || value;
+
     const filteredProducts = useMemo(() => {
-        const query = (searchTerm || value || '').toLowerCase();
+        const query = searchTerm.toLowerCase();
         if (!query) return products;
         return products.filter(p =>
             p.productName?.toLowerCase().includes(query) ||
@@ -123,13 +126,14 @@ const ProductCodeSearchAutocomplete = ({ value, onChange, products, onSelectProd
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    const handleTextChange = (e) => {
-        const val = e.target.value;
-        onChange(val);
-        setIsOpen(true);
-    };
+    useEffect(() => {
+        if (isOpen && inputRef.current) {
+            inputRef.current.focus();
+        }
+    }, [isOpen]);
 
     const handleSelect = (product) => {
+        onChange(product.productCode || '');
         onSelectProduct(product);
         setIsOpen(false);
         setSearchTerm('');
@@ -137,25 +141,18 @@ const ProductCodeSearchAutocomplete = ({ value, onChange, products, onSelectProd
 
     return (
         <div ref={anchorRef} className="relative w-full">
-            <div className="relative">
-                <input
-                    type="text"
-                    value={value || ''}
-                    onChange={handleTextChange}
-                    onFocus={() => setIsOpen(true)}
-                    className="w-full pl-3 pr-8 py-2 bg-slate-50 border border-transparent rounded-xl focus:border-teal-500 focus:bg-white outline-none text-xs font-bold transition-all text-slate-800"
-                    placeholder="Search Code..."
-                />
-                <button
-                    type="button"
-                    onClick={() => setIsOpen(!isOpen)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-teal-600 transition-colors"
-                >
-                    <MdSearch size={16} />
-                </button>
+            <div
+                onClick={() => setIsOpen(!isOpen)}
+                className={`w-full min-h-[40px] pl-3 pr-9 py-2 bg-slate-50 border rounded-xl cursor-pointer transition-all flex items-center ${isOpen ? 'border-teal-500 bg-white ring-2 ring-teal-500/10' : 'border-transparent hover:border-slate-200'}`}
+            >
+                <span className={`text-xs font-bold truncate flex-1 ${value ? 'text-slate-900' : 'text-slate-400'}`}>
+                    {displayValue || 'Search Product...'}
+                </span>
+                <MdExpandMore className={`absolute right-2.5 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} size={18} />
             </div>
+
             <PortalDropdown isOpen={isOpen} anchorRef={anchorRef}>
-                <div ref={dropdownRef} className="bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[320px] w-80">
+                <div ref={dropdownRef} className="bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[320px] w-96">
                     <div className="p-3 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2">
                         <div className="relative flex-1">
                             <MdSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
@@ -181,10 +178,14 @@ const ProductCodeSearchAutocomplete = ({ value, onChange, products, onSelectProd
                     <div className="overflow-y-auto max-h-60 divide-y divide-slate-50">
                         {filteredProducts.length > 0 ? (
                             filteredProducts.map(product => (
-                                <div 
-                                    key={product._id} 
-                                    onClick={() => handleSelect(product)} 
-                                    className="px-4 py-2.5 cursor-pointer hover:bg-teal-50 transition-colors text-left"
+                                <button
+                                    type="button"
+                                    key={product._id || product.productCode}
+                                    onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        handleSelect(product);
+                                    }}
+                                    className="w-full px-4 py-2.5 cursor-pointer hover:bg-teal-50 transition-colors text-left"
                                 >
                                     <div className="font-bold text-slate-900 text-xs">
                                         {product.productCode}
@@ -192,7 +193,7 @@ const ProductCodeSearchAutocomplete = ({ value, onChange, products, onSelectProd
                                     <div className="text-[10px] text-slate-500 font-semibold truncate">
                                         {product.productName}
                                     </div>
-                                </div>
+                                </button>
                             ))
                         ) : (
                             <div className="p-6 text-center text-slate-400 text-xs font-semibold">
@@ -205,6 +206,25 @@ const ProductCodeSearchAutocomplete = ({ value, onChange, products, onSelectProd
         </div>
     );
 };
+
+const createItemRow = (overrides = {}) => ({
+    productId: '',
+    productCode: '',
+    productName: '',
+    quantity: 1,
+    price: 0,
+    discountPercent: 0,
+    value: 0,
+    uom: 'Pcs',
+    actionStatus: 'VISIT CUSTOMER',
+    salespersonName: '',
+    agentName: '',
+    vendors: [],
+    vendorQuotes: [],
+    finalVendor: '',
+    ...overrides,
+    rowId: overrides.rowId || `item-${Date.now()}-${Math.random().toString(36).slice(2)}`
+});
 
 const generateNextEnquiryNumber = (existingEnquiries = []) => {
     let maxNum = 0;
@@ -266,6 +286,7 @@ const CreateEnquiry = () => {
         contactDesignation: '',
         contactMobile: '',
         contactEmail: '',
+        partners: [],
         siteAddress: '',
         projectName: '',
         requiredDeliveryDate: '',
@@ -288,24 +309,7 @@ const CreateEnquiry = () => {
     const [newFollowUpNote, setNewFollowUpNote] = useState('');
     const [newFollowUpAction, setNewFollowUpAction] = useState('Call');
 
-    const [items, setItems] = useState([
-        { 
-            productId: '',
-            productCode: '',
-            productName: '', 
-            quantity: 1,
-            price: 0,
-            discountPercent: 0,
-            value: 0,
-            uom: 'Pcs', 
-            actionStatus: 'VISIT CUSTOMER', 
-            salespersonName: '', 
-            agentName: '',
-            vendors: [],
-            vendorQuotes: [],
-            finalVendor: ''
-        }
-    ]);
+    const [items, setItems] = useState([createItemRow()]);
 
     const [vendorModal, setVendorModal] = useState({ isOpen: false, itemIndex: null });
 
@@ -354,6 +358,7 @@ const CreateEnquiry = () => {
                         contactDesignation: e.contactDesignation || '',
                         contactMobile: e.contactMobile || e.customerId?.mobile || '',
                         contactEmail: e.contactEmail || e.customerId?.email || '',
+                        partners: Array.isArray(e.partners) ? e.partners : [],
                         siteAddress: e.siteAddress || '',
                         projectName: e.projectName || '',
                         requiredDeliveryDate: e.requiredDeliveryDate ? new Date(e.requiredDeliveryDate).toISOString().split('T')[0] : '',
@@ -373,7 +378,7 @@ const CreateEnquiry = () => {
                     });
                     setFollowUpLog(e.followUpHistory || []);
                     
-                    const mappedItems = e.items.map(item => ({
+                    const mappedItems = e.items.map(item => createItemRow({
                         ...item,
                         productId: item.productId?._id || item.productId || '',
                         productCode: item.productCode || '',
@@ -451,38 +456,46 @@ const CreateEnquiry = () => {
         }
     };
 
-    const updateItem = (index, field, value) => {
-        const newItems = [...items];
-        newItems[index][field] = value;
+    const updateItem = (rowId, field, value) => {
+        const newItems = items.map(item => (
+            item.rowId === rowId ? { ...item, [field]: value } : item
+        ));
+        const targetIndex = newItems.findIndex(item => item.rowId === rowId);
         
         // Auto-recalculate row level value field
-        if (field === 'quantity' || field === 'price' || field === 'discountPercent') {
-            const qty = Number(newItems[index].quantity) || 0;
-            const price = Number(newItems[index].price) || 0;
-            const disc = Number(newItems[index].discountPercent) || 0;
-            newItems[index].value = Number((qty * price * (1 - disc / 100)).toFixed(2));
+        if (targetIndex !== -1 && (field === 'quantity' || field === 'price' || field === 'discountPercent')) {
+            const qty = Number(newItems[targetIndex].quantity) || 0;
+            const price = Number(newItems[targetIndex].price) || 0;
+            const disc = Number(newItems[targetIndex].discountPercent) || 0;
+            newItems[targetIndex].value = Number((qty * price * (1 - disc / 100)).toFixed(2));
         }
         setItems(newItems);
     };
 
-    const handleProductSelect = (index, product) => {
-        const newItems = [...items];
-        newItems[index].productId = product._id;
-        newItems[index].productCode = product.productCode;
-        newItems[index].productName = product.productName;
-        newItems[index].price = product.basePrice || 0;
-        newItems[index].discountPercent = 0;
-        newItems[index].value = Number(((newItems[index].quantity || 1) * (product.basePrice || 0)).toFixed(2));
+    const handleProductSelect = (rowId, product) => {
+        const newItems = items.map(item => ({ ...item }));
+        let targetIndex = newItems.findIndex(item => item.rowId === rowId);
+        if (targetIndex === -1 && newItems.length === 1) {
+            targetIndex = 0;
+        }
+        if (targetIndex === -1) return;
+
+        newItems[targetIndex].productId = product._id;
+        newItems[targetIndex].productCode = product.productCode;
+        newItems[targetIndex].productName = product.productName;
+        newItems[targetIndex].price = product.basePrice || 0;
+        newItems[targetIndex].discountPercent = 0;
+        newItems[targetIndex].value = Number(((newItems[targetIndex].quantity || 1) * (product.basePrice || 0)).toFixed(2));
 
         const validUoms = ['Pcs', 'Nos', 'Kg', 'Meter', 'Mtr', 'Set', 'Ltr', 'Pack', 'Doz'];
         const productUom = product.uom || 'Pcs';
         const matchedUom = validUoms.find(u => u.toLowerCase() === productUom.toLowerCase());
-        newItems[index].uom = matchedUom || 'Pcs';
+        newItems[targetIndex].uom = matchedUom || 'Pcs';
 
         if (product.vendors && Array.isArray(product.vendors) && product.vendors.length > 0) {
             const mappedVendorIds = product.vendors.map(v => typeof v.vendorId === 'object' ? v.vendorId._id : v.vendorId);
-            newItems[index].vendors = mappedVendorIds;
-            newItems[index].vendorQuotes = product.vendors.map(v => {
+            newItems[targetIndex].vendors = mappedVendorIds;
+            newItems[targetIndex].vendorQuotes = product.vendors.map(v => {
                 const vendorId = typeof v.vendorId === 'object' ? v.vendorId._id : v.vendorId;
                 return {
                     vendorId,
@@ -498,28 +511,39 @@ const CreateEnquiry = () => {
     };
 
     const addItem = () => {
-        setItems([...items, { 
-            productId: '',
-            productCode: '',
-            productName: '', 
-            quantity: 1,
-            price: 0,
-            discountPercent: 0,
-            value: 0,
-            uom: 'Pcs', 
-            actionStatus: 'VISIT CUSTOMER', 
-            salespersonName: '', 
-            agentName: '',
-            vendors: [],
-            vendorQuotes: [],
-            finalVendor: ''
-        }]);
+        setItems([...items, createItemRow()]);
     };
 
     const removeItem = (index) => {
         if (items.length > 1) {
             setItems(items.filter((_, i) => i !== index));
         }
+    };
+
+    const addPartner = () => {
+        setHeader(prev => ({
+            ...prev,
+            partners: [
+                ...(prev.partners || []),
+                { name: '', contactPerson: '', mobile: '', email: '', notes: '' }
+            ]
+        }));
+    };
+
+    const updatePartner = (index, field, value) => {
+        setHeader(prev => ({
+            ...prev,
+            partners: (prev.partners || []).map((partner, i) => (
+                i === index ? { ...partner, [field]: value } : partner
+            ))
+        }));
+    };
+
+    const removePartner = (index) => {
+        setHeader(prev => ({
+            ...prev,
+            partners: (prev.partners || []).filter((_, i) => i !== index)
+        }));
     };
 
     const handleVendorSelection = (itemIndex, vendorIds) => {
@@ -608,6 +632,7 @@ const CreateEnquiry = () => {
 
         const cleanedItems = items.map(item => {
             const cleaned = { ...item };
+            delete cleaned.rowId;
             cleaned.rate = Number(cleaned.price) || 0;
             cleaned.price = Number(cleaned.price) || 0;
             cleaned.quantity = Number(cleaned.quantity) || 1;
@@ -629,6 +654,9 @@ const CreateEnquiry = () => {
         if (cleanedHeader.requiredDeliveryDate === '') {
             delete cleanedHeader.requiredDeliveryDate;
         }
+        cleanedHeader.partners = (cleanedHeader.partners || []).filter(partner =>
+            Object.values(partner).some(value => String(value || '').trim() !== '')
+        );
         
         setLoading(true);
         try {
@@ -694,6 +722,7 @@ const CreateEnquiry = () => {
 
         const cleanedItems = items.map(item => {
             const cleaned = { ...item };
+            delete cleaned.rowId;
             cleaned.rate = Number(cleaned.price) || 0;
             cleaned.price = Number(cleaned.price) || 0;
             cleaned.quantity = Number(cleaned.quantity) || 1;
@@ -715,6 +744,9 @@ const CreateEnquiry = () => {
         if (cleanedHeader.requiredDeliveryDate === '') {
             delete cleanedHeader.requiredDeliveryDate;
         }
+        cleanedHeader.partners = (cleanedHeader.partners || []).filter(partner =>
+            Object.values(partner).some(value => String(value || '').trim() !== '')
+        );
 
         setLoading(true);
         try {
@@ -750,6 +782,7 @@ const CreateEnquiry = () => {
                 contactDesignation: '',
                 contactMobile: '',
                 contactEmail: '',
+                partners: [],
                 siteAddress: '',
                 projectName: '',
                 requiredDeliveryDate: '',
@@ -770,22 +803,7 @@ const CreateEnquiry = () => {
             setFollowUpLog([]);
             setNewFollowUpNote('');
             setNewFollowUpAction('Call');
-            setItems([{
-                productId: '',
-                productCode: '',
-                productName: '',
-                quantity: 1,
-                price: 0,
-                discountPercent: 0,
-                value: 0,
-                uom: 'Pcs',
-                actionStatus: 'VISIT CUSTOMER',
-                salespersonName: '',
-                agentName: '',
-                vendors: [],
-                vendorQuotes: [],
-                finalVendor: ''
-            }]);
+            setItems([createItemRow()]);
         } catch (err) {
             toast.error(err.response?.data?.message || 'Error saving enquiry');
         } finally {
@@ -884,60 +902,6 @@ const CreateEnquiry = () => {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Enquiry Status</label>
-                                <select
-                                    name="status"
-                                    value={header.status}
-                                    onChange={handleHeaderChange}
-                                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold text-slate-700 focus:bg-white focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 transition-all"
-                                >
-                                    {['New', 'Contacted', 'Quotation Pending', 'Quotation Received', 'Negotiation', 'Finalized', 'PO Received', 'Lost'].map(s => (
-                                        <option key={s} value={s}>{s}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Est. Win Prob. (%)</label>
-                                <input
-                                    type="number"
-                                    name="probability"
-                                    min="0"
-                                    max="100"
-                                    value={header.probability}
-                                    onChange={handleHeaderChange}
-                                    placeholder="e.g. 50"
-                                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold focus:bg-white focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 transition-all text-slate-800"
-                                />
-                            </div>
-
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Source / Ref Received From</label>
-                                <input
-                                    type="text"
-                                    name="refReceivedFrom"
-                                    value={header.refReceivedFrom}
-                                    onChange={handleHeaderChange}
-                                    placeholder="Reference Source"
-                                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold focus:bg-white focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 transition-all text-slate-800"
-                                />
-                            </div>
-
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Budget Description</label>
-                                <input
-                                    type="text"
-                                    name="budget"
-                                    value={header.budget}
-                                    onChange={handleHeaderChange}
-                                    placeholder="Optional budget notes"
-                                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold focus:bg-white focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 transition-all text-slate-800"
-                                />
-                            </div>
-                        </div>
-
                         {header.status === 'Lost' && (
                             <div className="space-y-2 animate-in fade-in duration-300">
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Reason for Loss</label>
@@ -952,28 +916,6 @@ const CreateEnquiry = () => {
                             </div>
                         )}
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Technical Specifications</label>
-                                <textarea
-                                    name="technicalSpecifications"
-                                    value={header.technicalSpecifications}
-                                    onChange={handleHeaderChange}
-                                    placeholder="Model, make, dimensions, process notes, or other technical details"
-                                    rows="2"
-                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold resize-none focus:bg-white focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 transition-all text-slate-800"
-                                ></textarea>
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Attachment</label>
-                                <input
-                                    type="file"
-                                    onChange={(e) => setHeader(prev => ({ ...prev, attachmentName: e.target.files?.[0]?.name || '' }))}
-                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold file:mr-4 file:rounded-xl file:border-0 file:bg-teal-50 file:px-4 file:py-2 file:text-xs file:font-black file:text-teal-700 focus:bg-white text-slate-800"
-                                />
-                                {header.attachmentName && <p className="text-xs font-bold text-slate-500 ml-1">Selected: {header.attachmentName}</p>}
-                            </div>
-                        </div>
                     </div>
                 </div>
 
@@ -1073,6 +1015,72 @@ const CreateEnquiry = () => {
                             className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold resize-none focus:bg-white focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 transition-all text-slate-800"
                         ></textarea>
                     </div>
+
+                    <div className="pt-4 border-t border-slate-100 space-y-4">
+                        <div className="flex items-center justify-between gap-4">
+                            <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest text-teal-600">Partner Details</h3>
+                            <button
+                                type="button"
+                                onClick={addPartner}
+                                className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 shadow-md"
+                            >
+                                <MdAdd size={16} /> Add Partner
+                            </button>
+                        </div>
+                        {(header.partners || []).length === 0 ? (
+                            <p className="text-xs font-bold text-slate-400 bg-slate-50 border border-dashed border-slate-200 rounded-2xl p-4 text-center">No partners added.</p>
+                        ) : (
+                            <div className="space-y-3">
+                                {(header.partners || []).map((partner, index) => (
+                                    <div key={index} className="grid grid-cols-1 md:grid-cols-12 gap-3 p-4 bg-slate-50 border border-slate-100 rounded-2xl">
+                                        <input
+                                            type="text"
+                                            value={partner.name || ''}
+                                            onChange={(e) => updatePartner(index, 'name', e.target.value)}
+                                            placeholder="Partner company"
+                                            className="md:col-span-3 px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none text-sm font-bold focus:border-teal-500 text-slate-800"
+                                        />
+                                        <input
+                                            type="text"
+                                            value={partner.contactPerson || ''}
+                                            onChange={(e) => updatePartner(index, 'contactPerson', e.target.value)}
+                                            placeholder="Contact person"
+                                            className="md:col-span-2 px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none text-sm font-bold focus:border-teal-500 text-slate-800"
+                                        />
+                                        <input
+                                            type="tel"
+                                            value={partner.mobile || ''}
+                                            onChange={(e) => updatePartner(index, 'mobile', e.target.value)}
+                                            placeholder="Mobile"
+                                            className="md:col-span-2 px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none text-sm font-bold focus:border-teal-500 text-slate-800"
+                                        />
+                                        <input
+                                            type="email"
+                                            value={partner.email || ''}
+                                            onChange={(e) => updatePartner(index, 'email', e.target.value)}
+                                            placeholder="Email"
+                                            className="md:col-span-2 px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none text-sm font-bold focus:border-teal-500 text-slate-800"
+                                        />
+                                        <input
+                                            type="text"
+                                            value={partner.notes || ''}
+                                            onChange={(e) => updatePartner(index, 'notes', e.target.value)}
+                                            placeholder="Notes"
+                                            className="md:col-span-2 px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none text-sm font-bold focus:border-teal-500 text-slate-800"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => removePartner(index)}
+                                            className="md:col-span-1 h-11 px-3 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all flex items-center justify-center"
+                                            title="Remove Partner"
+                                        >
+                                            <MdDelete size={20} />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {/* 3. Product Details Card (Matching user table style) */}
@@ -1112,21 +1120,22 @@ const CreateEnquiry = () => {
                             </thead>
                             <tbody>
                                 {items.map((item, index) => (
-                                    <tr key={index} className="group hover:bg-slate-50/50 transition-colors border-b border-slate-100 last:border-0">
+                                    <tr key={item.rowId || index} className="group hover:bg-slate-50/50 transition-colors border-b border-slate-100 last:border-0">
                                         <td className="px-6 py-4 text-xs font-bold text-slate-400 text-center align-middle">{index + 1}</td>
                                         <td className="px-4 py-3 align-middle">
                                             <ProductCodeSearchAutocomplete
                                                 value={item.productCode}
-                                                onChange={(val) => updateItem(index, 'productCode', val)}
+                                                selectedLabel={item.productName}
+                                                onChange={(val) => updateItem(item.rowId, 'productCode', val)}
                                                 products={products}
-                                                onSelectProduct={(product) => handleProductSelect(index, product)}
+                                                onSelectProduct={(product) => handleProductSelect(item.rowId, product)}
                                             />
                                         </td>
                                         <td className="px-4 py-3 align-middle">
                                             <input
                                                 type="text"
                                                 value={item.productName}
-                                                onChange={(e) => updateItem(index, 'productName', e.target.value)}
+                                                onChange={(e) => updateItem(item.rowId, 'productName', e.target.value)}
                                                 className="w-full px-3 py-2 bg-slate-50 border border-transparent rounded-xl focus:border-teal-500 focus:bg-white outline-none text-xs font-bold transition-all text-slate-800"
                                                 placeholder="Description..."
                                             />
@@ -1134,7 +1143,7 @@ const CreateEnquiry = () => {
                                         <td className="px-4 py-3 align-middle">
                                             <select
                                                 value={item.uom}
-                                                onChange={(e) => updateItem(index, 'uom', e.target.value)}
+                                                onChange={(e) => updateItem(item.rowId, 'uom', e.target.value)}
                                                 className="w-full px-3 py-2 bg-slate-50 border border-transparent rounded-xl focus:border-teal-500 focus:bg-white outline-none text-xs font-bold transition-all appearance-none text-slate-800"
                                             >
                                                 {['Pcs', 'Nos', 'Kg', 'Meter', 'Mtr', 'Set', 'Ltr', 'Pack', 'Doz'].map(u => (
@@ -1147,7 +1156,7 @@ const CreateEnquiry = () => {
                                                 type="number"
                                                 value={item.quantity}
                                                 min="1"
-                                                onChange={(e) => updateItem(index, 'quantity', e.target.value)}
+                                                onChange={(e) => updateItem(item.rowId, 'quantity', e.target.value)}
                                                 className="w-full px-3 py-2 bg-slate-50 border border-transparent rounded-xl focus:border-teal-500 focus:bg-white outline-none text-xs font-bold transition-all text-right font-mono text-slate-800"
                                             />
                                         </td>
@@ -1156,7 +1165,7 @@ const CreateEnquiry = () => {
                                                 type="number"
                                                 value={item.price}
                                                 min="0"
-                                                onChange={(e) => updateItem(index, 'price', e.target.value)}
+                                                onChange={(e) => updateItem(item.rowId, 'price', e.target.value)}
                                                 className="w-full px-3 py-2 bg-slate-50 border border-transparent rounded-xl focus:border-teal-500 focus:bg-white outline-none text-xs font-bold transition-all text-right font-mono text-slate-800"
                                             />
                                         </td>
@@ -1166,7 +1175,7 @@ const CreateEnquiry = () => {
                                                 value={item.discountPercent}
                                                 min="0"
                                                 max="100"
-                                                onChange={(e) => updateItem(index, 'discountPercent', e.target.value)}
+                                                onChange={(e) => updateItem(item.rowId, 'discountPercent', e.target.value)}
                                                 className="w-full px-3 py-2 bg-slate-50 border border-transparent rounded-xl focus:border-teal-500 focus:bg-white outline-none text-xs font-bold transition-all text-right font-mono text-slate-800"
                                             />
                                         </td>

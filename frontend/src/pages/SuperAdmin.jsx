@@ -7,8 +7,9 @@ import {
     MdRefresh,
     MdAdminPanelSettings,
     MdPeople,
+    MdNewReleases,
 } from 'react-icons/md';
-import { superAdminService } from '../services/api';
+import { superAdminService, systemUpdateService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import Modal from '../components/Modal';
 
@@ -35,6 +36,47 @@ const SuperAdmin = () => {
     const [updatingCompanyId, setUpdatingCompanyId] = useState('');
     const [updatingUserId, setUpdatingUserId] = useState('');
     const [confirmAction, setConfirmAction] = useState(null);
+
+    // Announcement creation states
+    const [version, setVersion] = useState('');
+    const [title, setTitle] = useState('');
+    const [message, setMessage] = useState('');
+    const [releaseNotesText, setReleaseNotesText] = useState('');
+    const [submittingAnnouncement, setSubmittingAnnouncement] = useState(false);
+
+    const handlePublishAnnouncement = async (e) => {
+        e.preventDefault();
+        if (!version || !title || !message) {
+            toast.error('Version, title, and message are required.');
+            return;
+        }
+
+        setSubmittingAnnouncement(true);
+        try {
+            const releaseNotes = releaseNotesText
+                .split('\n')
+                .map(note => note.trim())
+                .filter(note => note.length > 0);
+
+            await systemUpdateService.create({
+                version,
+                title,
+                message,
+                releaseNotes
+            });
+
+            toast.success('System update announcement published successfully!');
+            setVersion('');
+            setTitle('');
+            setMessage('');
+            setReleaseNotesText('');
+        } catch (error) {
+            console.error("Failed to publish system update", error);
+            toast.error(error.response?.data?.message || 'Failed to publish system update');
+        } finally {
+            setSubmittingAnnouncement(false);
+        }
+    };
 
     const activeCompanies = useMemo(
         () => companies.filter((company) => company.isActive && company.status !== 'DISABLED').length,
@@ -281,6 +323,85 @@ const SuperAdmin = () => {
                         </table>
                     </div>
                 )}
+            </div>
+
+            {/* Publish System Update Card */}
+            <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden p-6 md:p-8">
+                <div className="border-b border-slate-100 pb-5 mb-6">
+                    <div className="flex items-center gap-2 text-primary-600 font-black uppercase tracking-widest text-xs">
+                        <MdNewReleases size={18} />
+                        Platform Announcements
+                    </div>
+                    <h2 className="mt-2 text-xl font-black text-slate-900 tracking-tight">Publish System Update</h2>
+                    <p className="text-slate-500 text-sm font-medium">Notify all users across the platform of new features, bug fixes, or system upgrades.</p>
+                </div>
+
+                <form onSubmit={handlePublishAnnouncement} className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="space-y-2">
+                            <label className="text-xs font-black uppercase tracking-wider text-slate-400">Version Tag</label>
+                            <input
+                                type="text"
+                                value={version}
+                                onChange={(e) => setVersion(e.target.value)}
+                                placeholder="e.g. v2.8.2"
+                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-600/20 focus:border-primary-600 focus:bg-white transition-all outline-none text-sm font-semibold text-slate-950"
+                                required
+                            />
+                        </div>
+                        <div className="md:col-span-2 space-y-2">
+                            <label className="text-xs font-black uppercase tracking-wider text-slate-400">Update Title</label>
+                            <input
+                                type="text"
+                                value={title}
+                                onChange={(e) => setTitle(e.target.value)}
+                                placeholder="e.g. Invoicing Engine & Customer Export Improvements"
+                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-600/20 focus:border-primary-600 focus:bg-white transition-all outline-none text-sm font-semibold text-slate-950"
+                                required
+                            />
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-xs font-black uppercase tracking-wider text-slate-400">Summary Message</label>
+                        <textarea
+                            value={message}
+                            onChange={(e) => setMessage(e.target.value)}
+                            placeholder="Briefly describe what this system update achieves..."
+                            rows={3}
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-600/20 focus:border-primary-600 focus:bg-white transition-all outline-none text-sm font-semibold text-slate-950 resize-none"
+                            required
+                        />
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-xs font-black uppercase tracking-wider text-slate-400">What's New / Bullet Points (One change per line)</label>
+                        <textarea
+                            value={releaseNotesText}
+                            onChange={(e) => setReleaseNotesText(e.target.value)}
+                            placeholder="e.g.&#10;✓ Optimised planning dashboard loading speeds&#10;✓ Fixed customer billing state reset bug&#10;✓ Added Territory Master export buttons"
+                            rows={4}
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-600/20 focus:border-primary-600 focus:bg-white transition-all outline-none text-sm font-semibold text-slate-950 font-mono"
+                        />
+                    </div>
+
+                    <div className="flex justify-end">
+                        <button
+                            type="submit"
+                            disabled={submittingAnnouncement}
+                            className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-primary-600 hover:bg-primary-700 text-white font-bold transition-all disabled:opacity-60 shadow-lg shadow-primary-600/20"
+                        >
+                            {submittingAnnouncement ? (
+                                <>
+                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                    Publishing...
+                                </>
+                            ) : (
+                                'Publish Release Updates'
+                            )}
+                        </button>
+                    </div>
+                </form>
             </div>
 
             <Modal
