@@ -4,7 +4,7 @@ const NotificationSchema = new mongoose.Schema({
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     title: { type: String, required: true },
     message: { type: String, required: true },
-    type: { type: String, enum: ['Reminder', 'Alert', 'Overdue'], default: 'Reminder' },
+    type: { type: String, enum: ['Reminder', 'Alert', 'Overdue', 'Quotation', 'Planning'], default: 'Reminder' },
     relatedId: { type: mongoose.Schema.Types.ObjectId, ref: 'Enquiry' }, // e.g., Enquiry ID
     isRead: { type: Boolean, default: false },
     isDismissed: { type: Boolean, default: false },

@@ -230,7 +230,7 @@ const Enquiries = () => {
                         Analytics
                     </button>
                     <button
-                        onClick={() => setEnquiryModal({ open: true, id: null })}
+                        onClick={() => navigate('/enquiries/create')}
                         className="group px-8 py-4 bg-primary-600 text-white rounded-[2rem] font-black uppercase text-[10px] tracking-widest hover:bg-primary-700 transition-all shadow-xl shadow-primary-600/20 active:scale-95 flex items-center gap-3"
                     >
                         <div className="h-6 w-6 rounded-full bg-white/20 flex items-center justify-center group-hover:rotate-90 transition-transform">
@@ -439,7 +439,7 @@ const Enquiries = () => {
                                                     <MdVisibility size={18} />
                                                 </button>
                                                 <button
-                                                    onClick={() => setEnquiryModal({ open: true, id: e._id })}
+                                                    onClick={() => navigate(`/enquiries/edit/${e._id}`)}
                                                     className="p-2 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all"
                                                     title="Edit Enquiry"
                                                 >
@@ -655,17 +655,6 @@ const Enquiries = () => {
                 </Modal>
             )}
 
-            {/* Create/Edit Enquiry Modal */}
-            {enquiryModal.open && (
-                <CreateEnquiry 
-                    id={enquiryModal.id} 
-                    isOpen={enquiryModal.open} 
-                    onClose={() => {
-                        setEnquiryModal({ open: false, id: null });
-                        fetchEnquiries();
-                    }} 
-                />
-            )}
         </div>
     );
 };

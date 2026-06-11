@@ -9,6 +9,7 @@ const { getBestVendorForProduct, sortVendorsByPriority, isVendorActive } = requi
 const { getRedis } = require('../config/redis');
 const { invalidateQuotationCaches } = require('../utils/cacheInvalidation');
 const { getCachedJson, makeCacheKey, setCachedJson } = require('../utils/apiCache');
+const { createCompanyNotifications } = require('../utils/notificationHelper');
 
 const DRAFT_TTL_SECONDS = 24 * 60 * 60;
 const DASHBOARD_TTL_SECONDS = 60;
@@ -441,6 +442,18 @@ const createQuotation = async (req, res) => {
             await QuotationDraft.deleteOne({ userId: req.user.id, draftKey: 'new' });
             await deleteDraftFromRedis(req.user.id, 'new');
         }
+
+        // Trigger notification for all other company users
+        const creatorName = req.user?.name || 'A user';
+        await createCompanyNotifications({
+            companyId: req.user?.companyId,
+            title: 'New Quotation Added',
+            message: `Quotation ${newQuotation.quotationNo} has been created for ${newQuotation.customerName} by ${creatorName} (Grand Total: ₹${newQuotation.grandTotal.toLocaleString()}).`,
+            type: 'Quotation',
+            relatedId: newQuotation._id,
+            excludeUserId: req.user?.id
+        });
+
         res.status(201).json(newQuotation);
     } catch (error) {
         console.error("Create Quotation Error Stack:", error);
@@ -523,11 +536,34 @@ const updateQuotation = async (req, res) => {
             grandTotal: roundedGrandTotal,
             termsTemplateId: termsTemplateId || undefined,
             customTerms,
+            validTill,
+            salespersonName,
+            siteId: siteId || undefined,
+            paymentTerms,
+            subtotal,
+            totalDiscount,
+            gstBreakup,
+            roundOff,
+            grandTotal: roundedGrandTotal,
+            termsTemplateId: termsTemplateId || undefined,
+            customTerms,
             status: status || 'draft',
             territory: customer.territory || null,
         }, { new: true, runValidators: true }).lean();
 
         await clearQuotationDashboardCache();
+
+        // Trigger notification
+        const updaterName = req.user?.name || 'A user';
+        await createCompanyNotifications({
+            companyId: req.user?.companyId,
+            title: 'Quotation Updated',
+            message: `Quotation ${updatedQuotation.quotationNo} for ${updatedQuotation.customerName} has been updated by ${updaterName}.`,
+            type: 'Quotation',
+            relatedId: updatedQuotation._id,
+            excludeUserId: req.user?.id
+        });
+
         res.json(updatedQuotation);
     } catch (error) {
         console.error("Update Quotation Error:", error);
@@ -540,47 +576,97 @@ const updateQuotation = async (req, res) => {
 
 const deleteQuotation = async (req, res) => {
     try {
-        await Quotation.findByIdAndDelete(req.params.id);
+        const { id } = req.params;
+        const quotation = await Quotation.findById(id).lean();
+        if (!quotation) {
+            return res.status(404).json({ message: 'Quotation not found' });
+        }
+        
+        await Quotation.findByIdAndDelete(id);
         await clearQuotationDashboardCache();
+
+        // Trigger notification
+        const performerName = req.user?.name || 'A user';
+        await createCompanyNotifications({
+            companyId: req.user?.companyId,
+            title: 'Quotation Deleted',
+            message: `Quotation ${quotation.quotationNo} for ${quotation.customerName} has been deleted by ${performerName}.`,
+            type: 'Quotation',
+            relatedId: quotation._id,
+            excludeUserId: req.user?.id
+        });
+
         res.json({ message: 'Quotation deleted successfully' });
     } catch (error) {
         console.error("Delete Quotation Error:", error);
-        res.status(500).json({ message: 'Error deleting quotation', error: error.message });
+        res.status(500).json({ message: error.message || 'Error deleting quotation' });
     }
 };
 
 const updateStatus = async (req, res) => {
     try {
+        const { id } = req.params;
         const { status } = req.body;
-        const allowed = ['draft', 'final', 'ordered'];
-        if (!status || !allowed.includes(status)) {
-            return res.status(400).json({ message: `Invalid status. Allowed: ${allowed.join(', ')}` });
+
+        if (!['draft', 'final', 'ordered'].includes(status)) {
+            return res.status(400).json({ message: 'Invalid status' });
         }
-        const quotation = await Quotation.findByIdAndUpdate(
-            req.params.id,
-            { status },
-            { new: true }
-        ).lean();
+
+        const quotation = await Quotation.findById(id);
         if (!quotation) return res.status(404).json({ message: 'Quotation not found' });
+
+        const oldStatus = quotation.status;
+        quotation.status = status;
+        await quotation.save();
         await clearQuotationDashboardCache();
+
+        // Trigger notification
+        const updaterName = req.user?.name || 'A user';
+        await createCompanyNotifications({
+            companyId: req.user?.companyId,
+            title: 'Quotation Status Updated',
+            message: `Quotation ${quotation.quotationNo} status changed from ${oldStatus} to ${status} by ${updaterName}.`,
+            type: 'Quotation',
+            relatedId: quotation._id,
+            excludeUserId: req.user?.id
+        });
+
         res.json(quotation);
     } catch (error) {
         console.error("Update Status Error:", error);
-        res.status(500).json({ message: 'Error updating quotation status' });
+        res.status(500).json({ message: error.message || 'Error updating status' });
     }
 };
 
 const finalizeQuotation = async (req, res) => {
     try {
-        const quotation = await Quotation.findByIdAndUpdate(
-            req.params.id,
-            { status: 'final' },
-            { new: true }
-        ).lean();
+        const { id } = req.params;
+        const quotation = await Quotation.findById(id);
+        if (!quotation) return res.status(404).json({ message: 'Quotation not found' });
+
+        if (quotation.status !== 'draft') {
+            return res.status(400).json({ message: 'Only draft quotations can be finalized' });
+        }
+
+        quotation.status = 'final';
+        await quotation.save();
         await clearQuotationDashboardCache();
+
+        // Trigger notification
+        const updaterName = req.user?.name || 'A user';
+        await createCompanyNotifications({
+            companyId: req.user?.companyId,
+            title: 'Quotation Finalized',
+            message: `Quotation ${quotation.quotationNo} for ${quotation.customerName} has been finalized by ${updaterName}.`,
+            type: 'Quotation',
+            relatedId: quotation._id,
+            excludeUserId: req.user?.id
+        });
+
         res.json(quotation);
     } catch (error) {
-        res.status(500).json({ message: 'Error finalizing quotation' });
+        console.error("Finalize Quotation Error:", error);
+        res.status(500).json({ message: error.message || 'Error finalizing quotation' });
     }
 };
 

@@ -11,4 +11,4 @@ ID: 6a1938093bf3af0bb3f6d4a7, quotationNo: ARM/QTN/2026/0001, companyId: 6a0b44a
 ID: 6a1939133bf3af0bb3f6d4af, quotationNo: ARM/QTN/2026/0002, companyId: 6a0b44ab81a41f89dab23668, status: final
 ID: 6a197a29e8350cea1a849def, quotationNo: ARM/QTN/2026/0011, companyId: 6a0b44ab81a41f89dab23668, status: final
 ID: 6a26fb3906fc9f0c6c0675eb, quotationNo: ARM/QTN/2026/0013, companyId: 6a0b44ab81a41f89dab23668, status: final
-ID: 6a26fbd406fc9f0c6c0675f1, quotationNo: ARM/QTN/2026/0015, companyId: 6a0b44ab81a41f89dab23668, status: final
+ID: 6a26fbd406fc9f0c6c0675f1, quotationNo: ARM/QTN/2026/0015, companyId: 6a0b44ab81a41f89dab23668, status: ordered

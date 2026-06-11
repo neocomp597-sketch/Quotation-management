@@ -7,7 +7,7 @@ exports.getUnreadNotifications = async (req, res) => {
             isDismissed: false, 
             isRead: false 
         })
-            .select('userId title message type isRead isDismissed createdAt')
+            .select('userId title message type relatedId isRead isDismissed createdAt')
             .sort({ createdAt: -1 })
             .lean();
         res.json(notifications);
@@ -19,7 +19,7 @@ exports.getUnreadNotifications = async (req, res) => {
 exports.getAllNotifications = async (req, res) => {
     try {
         const notifications = await Notification.find({ userId: req.user._id, isDismissed: false })
-            .select('userId title message type isRead isDismissed createdAt')
+            .select('userId title message type relatedId isRead isDismissed createdAt')
             .sort({ createdAt: -1 })
             .lean();
         res.json(notifications);

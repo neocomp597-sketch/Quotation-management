@@ -79,7 +79,17 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
     const handleNotifClick = async (n) => {
         try {
             await notificationService.markAsRead(n._id);
-            if (n.relatedId) navigate(`/enquiries/edit/${n.relatedId}`);
+            if (n.type === 'Quotation') {
+                if (n.relatedId) {
+                    navigate(`/quotations/${n.relatedId}`);
+                } else {
+                    navigate('/quotations');
+                }
+            } else if (n.type === 'Planning') {
+                navigate('/planning');
+            } else {
+                if (n.relatedId) navigate(`/enquiries/edit/${n.relatedId}`);
+            }
             setIsNotifOpen(false);
         } catch (error) {
             console.error('Failed to mark notification as read', error);
@@ -125,18 +135,32 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
                                 {notifications.length === 0 ? (
                                     <div className="p-4 text-center text-sm font-bold text-slate-400">You're all caught up!</div>
                                 ) : (
-                                    notifications.map(n => (
-                                        <div key={n._id} onClick={() => handleNotifClick(n)} className={`p-3 mx-2 mb-1 rounded-xl cursor-pointer hover:bg-slate-50 transition-colors border-l-4 ${n.type === 'Overdue' ? 'border-rose-500 bg-rose-50/30' : 'border-primary-500 bg-primary-50/30'}`}>
-                                            <div className="flex justify-between items-start mb-1">
-                                                <span className={`text-[10px] font-black uppercase tracking-widest ${n.type === 'Overdue' ? 'text-rose-600' : 'text-primary-600'}`}>{n.type}</span>
-                                                <button onClick={(e) => dismissNotification(n._id, e)} className="text-slate-400 hover:text-slate-600">
-                                                    <MdCheck size={14} />
-                                                </button>
+                                    notifications.map(n => {
+                                        let borderClass = 'border-primary-500 bg-primary-50/30';
+                                        let textClass = 'text-primary-600';
+                                        if (n.type === 'Overdue') {
+                                            borderClass = 'border-rose-500 bg-rose-50/30';
+                                            textClass = 'text-rose-600';
+                                        } else if (n.type === 'Quotation') {
+                                            borderClass = 'border-emerald-500 bg-emerald-50/30';
+                                            textClass = 'text-emerald-600';
+                                        } else if (n.type === 'Planning') {
+                                            borderClass = 'border-amber-500 bg-amber-50/30';
+                                            textClass = 'text-amber-600';
+                                        }
+                                        return (
+                                            <div key={n._id} onClick={() => handleNotifClick(n)} className={`p-3 mx-2 mb-1 rounded-xl cursor-pointer hover:bg-slate-50 transition-colors border-l-4 ${borderClass}`}>
+                                                <div className="flex justify-between items-start mb-1">
+                                                    <span className={`text-[10px] font-black uppercase tracking-widest ${textClass}`}>{n.type}</span>
+                                                    <button onClick={(e) => dismissNotification(n._id, e)} className="text-slate-400 hover:text-slate-600">
+                                                        <MdCheck size={14} />
+                                                    </button>
+                                                </div>
+                                                <p className="text-xs font-bold text-slate-800">{n.title}</p>
+                                                <p className="text-[10px] font-medium text-slate-600 mt-0.5 leading-snug">{n.message}</p>
                                             </div>
-                                            <p className="text-xs font-bold text-slate-800">{n.title}</p>
-                                            <p className="text-[10px] font-medium text-slate-600 mt-0.5 leading-snug">{n.message}</p>
-                                        </div>
-                                    ))
+                                        );
+                                    })
                                 )}
                             </div>
                         )}

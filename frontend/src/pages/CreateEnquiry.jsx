@@ -6,7 +6,7 @@ import { customerService, enquiryService, vendorService, productService } from '
 import Modal from '../components/Modal';
 import PortalDropdown from '../components/PortalDropdown';
 
-// Reuse CustomerSearchDropdown from CreateQuotation pattern
+// Reuse CustomerSearchDropdown with Teal accents
 const CustomerSearchDropdown = ({ customers, selectedCustomerId, onSelect }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -49,14 +49,14 @@ const CustomerSearchDropdown = ({ customers, selectedCustomerId, onSelect }) => 
     };
 
     return (
-        <div ref={dropdownRef} className="relative">
+        <div ref={dropdownRef} className="relative w-full">
             <div
                 onClick={() => setIsOpen(!isOpen)}
-                className={`w-full pl-12 pr-10 py-3.5 bg-slate-50 border rounded-2xl cursor-pointer transition-all flex items-center ${isOpen ? 'border-primary-500 ring-4 ring-primary-500/10' : 'border-slate-200 hover:border-slate-300'}`}
+                className={`w-full pl-12 pr-10 py-3.5 bg-slate-50 border rounded-2xl cursor-pointer transition-all flex items-center ${isOpen ? 'border-teal-500 ring-4 ring-teal-500/10' : 'border-slate-200 hover:border-slate-300'}`}
             >
                 <MdPerson className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
                 <span className={`text-sm font-bold truncate flex-1 ${selectedCustomer ? 'text-slate-900' : 'text-slate-400'}`}>
-                    {selectedCustomer ? `${selectedCustomer.companyName} (${selectedCustomer.gstin})` : 'Search & Select Customer...'}
+                    {selectedCustomer ? `${selectedCustomer.companyName} (${selectedCustomer.gstin || 'No GSTIN'})` : 'Search & Select Customer...'}
                 </span>
                 <MdExpandMore className={`absolute right-4 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} size={20} />
             </div>
@@ -78,11 +78,14 @@ const CustomerSearchDropdown = ({ customers, selectedCustomerId, onSelect }) => 
                     </div>
                     <div className="max-h-64 overflow-y-auto">
                         {filteredCustomers.map(customer => (
-                            <div key={customer._id} onClick={() => handleSelect(customer)} className="px-4 py-3 cursor-pointer hover:bg-primary-50 border-b border-slate-50 last:border-b-0">
+                            <div key={customer._id} onClick={() => handleSelect(customer)} className="px-4 py-3 cursor-pointer hover:bg-teal-50 border-b border-slate-50 last:border-b-0">
                                 <div className="font-bold text-slate-900 text-sm">{customer.companyName}</div>
-                                <div className="text-[10px] text-slate-500">{customer.customerName} • {customer.gstin}</div>
+                                <div className="text-[10px] text-slate-500">{customer.customerName} • {customer.gstin || 'No GSTIN'}</div>
                             </div>
                         ))}
+                        {filteredCustomers.length === 0 && (
+                            <div className="px-4 py-3 text-sm text-slate-400 text-center font-medium">No customers found</div>
+                        )}
                     </div>
                 </div>
             )}
@@ -90,7 +93,8 @@ const CustomerSearchDropdown = ({ customers, selectedCustomerId, onSelect }) => 
     );
 };
 
-const ProductSearchAutocomplete = ({ value, onChange, products, onSelectProduct }) => {
+// Autocomplete dropdown searching by productCode or productName with Teal accents
+const ProductCodeSearchAutocomplete = ({ value, onChange, products, onSelectProduct }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const anchorRef = useRef(null);
@@ -131,38 +135,27 @@ const ProductSearchAutocomplete = ({ value, onChange, products, onSelectProduct 
         setSearchTerm('');
     };
 
-    const handleSearchButtonClick = (e) => {
-        e.stopPropagation();
-        const nextState = !isOpen;
-        setIsOpen(nextState);
-        if (nextState) {
-            setTimeout(() => {
-                if (inputRef.current) inputRef.current.focus();
-            }, 100);
-        }
-    };
-
     return (
         <div ref={anchorRef} className="relative w-full">
             <div className="relative">
-                <textarea
-                    rows="3"
+                <input
+                    type="text"
                     value={value || ''}
                     onChange={handleTextChange}
                     onFocus={() => setIsOpen(true)}
-                    className="w-full pl-4 pr-10 py-3 bg-slate-50 border border-transparent rounded-xl focus:border-primary-500 focus:bg-white outline-none text-xs font-bold transition-all resize-none"
-                    placeholder="Product / service required"
+                    className="w-full pl-3 pr-8 py-2 bg-slate-50 border border-transparent rounded-xl focus:border-teal-500 focus:bg-white outline-none text-xs font-bold transition-all text-slate-800"
+                    placeholder="Search Code..."
                 />
                 <button
                     type="button"
-                    onClick={handleSearchButtonClick}
-                    className={`absolute right-3 top-3 transition-colors ${isOpen ? 'text-primary-600' : 'text-slate-400 hover:text-primary-600'}`}
+                    onClick={() => setIsOpen(!isOpen)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-teal-600 transition-colors"
                 >
-                    <MdSearch size={18} />
+                    <MdSearch size={16} />
                 </button>
             </div>
             <PortalDropdown isOpen={isOpen} anchorRef={anchorRef}>
-                <div ref={dropdownRef} className="bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[320px]">
+                <div ref={dropdownRef} className="bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[320px] w-80">
                     <div className="p-3 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2">
                         <div className="relative flex-1">
                             <MdSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
@@ -171,8 +164,8 @@ const ProductSearchAutocomplete = ({ value, onChange, products, onSelectProduct 
                                 type="text"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                placeholder="Search product name or code..."
-                                className="w-full pl-10 pr-8 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none"
+                                placeholder="Search code or name..."
+                                className="w-full pl-10 pr-8 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 outline-none"
                             />
                             {searchTerm && (
                                 <button
@@ -184,14 +177,6 @@ const ProductSearchAutocomplete = ({ value, onChange, products, onSelectProduct 
                                 </button>
                             )}
                         </div>
-                        <button
-                            type="button"
-                            onClick={() => setIsOpen(false)}
-                            className="p-1.5 hover:bg-slate-200 active:scale-95 rounded-lg text-slate-400 hover:text-slate-600 transition-all flex items-center justify-center shrink-0"
-                            title="Close dropdown"
-                        >
-                            <MdClose size={18} />
-                        </button>
                     </div>
                     <div className="overflow-y-auto max-h-60 divide-y divide-slate-50">
                         {filteredProducts.length > 0 ? (
@@ -199,27 +184,19 @@ const ProductSearchAutocomplete = ({ value, onChange, products, onSelectProduct 
                                 <div 
                                     key={product._id} 
                                     onClick={() => handleSelect(product)} 
-                                    className="px-4 py-3 cursor-pointer hover:bg-primary-50 transition-colors text-left"
+                                    className="px-4 py-2.5 cursor-pointer hover:bg-teal-50 transition-colors text-left"
                                 >
                                     <div className="font-bold text-slate-900 text-xs">
-                                        {product.productName || 'Unnamed Product'}
+                                        {product.productCode}
                                     </div>
-                                    <div className="text-[10px] text-slate-500 font-semibold uppercase mt-0.5 flex items-center gap-1.5 flex-wrap">
-                                        <span className="text-primary-600 bg-primary-50 px-1.5 py-0.5 rounded text-[9px] font-black">
-                                            {product.productCode}
-                                        </span>
-                                        <span>•</span>
-                                        <span>HSN: {product.hsnCode || 'N/A'}</span>
-                                        <span>•</span>
-                                        <span>GST: {product.gstPercentage}%</span>
-                                        <span>•</span>
-                                        <span>UOM: {product.uom}</span>
+                                    <div className="text-[10px] text-slate-500 font-semibold truncate">
+                                        {product.productName}
                                     </div>
                                 </div>
                             ))
                         ) : (
                             <div className="p-6 text-center text-slate-400 text-xs font-semibold">
-                                No matching products found.
+                                No products found.
                             </div>
                         )}
                     </div>
@@ -258,16 +235,25 @@ const generateNextEnquiryNumber = (existingEnquiries = []) => {
     return '5001';
 };
 
-const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
+const CreateEnquiry = () => {
     const navigate = useNavigate();
-    const params = useParams();
-    const id = propsId || params.id;
+    const { id } = useParams();
     const isEditMode = !!id;
 
     const [customers, setCustomers] = useState([]);
     const [allVendors, setAllVendors] = useState([]);
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(false);
+
+    // New Customer inline registration state
+    const [isNewCustomerModalOpen, setIsNewCustomerModalOpen] = useState(false);
+    const [newCustomerForm, setNewCustomerForm] = useState({
+        companyName: '',
+        customerName: '',
+        email: '',
+        mobile: '',
+        gstin: ''
+    });
 
     const [header, setHeader] = useState({
         enquiryNo: '',
@@ -290,7 +276,12 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
         status: 'New',
         probability: 0,
         remarks: '',
-        closureReason: ''
+        closureReason: '',
+        subtotal: 0,
+        discount: 0,
+        freight: 0,
+        otherCharges: 0,
+        grandTotal: 0
     });
     
     const [followUpLog, setFollowUpLog] = useState([]);
@@ -299,8 +290,13 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
 
     const [items, setItems] = useState([
         { 
+            productId: '',
+            productCode: '',
             productName: '', 
-            quantity: 1, 
+            quantity: 1,
+            price: 0,
+            discountPercent: 0,
+            value: 0,
             uom: 'Pcs', 
             actionStatus: 'VISIT CUSTOMER', 
             salespersonName: '', 
@@ -313,6 +309,7 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
 
     const [vendorModal, setVendorModal] = useState({ isOpen: false, itemIndex: null });
 
+    // Fetch master data
     useEffect(() => {
         const fetchData = async () => {
             try {
@@ -349,7 +346,7 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
                     setHeader({
                         enquiryNo: e.enquiryNo,
                         enquiryDate: new Date(e.enquiryDate).toISOString().split('T')[0],
-                        customerId: e.customerId._id || e.customerId,
+                        customerId: e.customerId?._id || e.customerId,
                         companyName: e.companyName || e.customerId?.companyName || '',
                         contactPerson: e.contactPerson || e.customerId?.customerName || '',
                         refReceivedFrom: e.refReceivedFrom || '',
@@ -367,12 +364,24 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
                         status: e.status || 'New',
                         probability: e.probability || 0,
                         remarks: e.remarks || '',
-                        closureReason: e.closureReason || ''
+                        closureReason: e.closureReason || '',
+                        subtotal: e.subtotal || 0,
+                        discount: e.discount || 0,
+                        freight: e.freight || 0,
+                        otherCharges: e.otherCharges || 0,
+                        grandTotal: e.grandTotal || 0
                     });
                     setFollowUpLog(e.followUpHistory || []);
                     
                     const mappedItems = e.items.map(item => ({
                         ...item,
+                        productId: item.productId?._id || item.productId || '',
+                        productCode: item.productCode || '',
+                        productName: item.productName || '',
+                        quantity: item.quantity || 1,
+                        price: item.price || item.rate || 0,
+                        discountPercent: item.discountPercent || 0,
+                        value: item.value || 0,
                         vendors: item.vendors.map(v => typeof v === 'object' ? v._id : v),
                         vendorQuotes: item.vendorQuotes.map(vq => ({
                             ...vq,
@@ -383,15 +392,14 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
                     setItems(mappedItems);
                 } catch (err) {
                     toast.error('Failed to load enquiry');
-                    if (onClose) onClose();
-                    else navigate('/enquiries');
+                    navigate('/enquiries');
                 } finally {
                     setLoading(false);
                 }
             };
             fetchEnquiry();
         }
-    }, [id, navigate, onClose]);
+    }, [id, navigate]);
 
     const handleHeaderChange = (e) => {
         const { name, value } = e.target;
@@ -417,15 +425,55 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
         }));
     };
 
+    const handleCreateCustomer = async (e) => {
+        e.preventDefault();
+        try {
+            const res = await customerService.create(newCustomerForm);
+            const newCust = res.data?.data || res.data;
+            if (newCust && newCust._id) {
+                setCustomers(prev => [...prev, newCust]);
+                handleCustomerSelect(newCust._id);
+                toast.success('Customer created successfully');
+                setIsNewCustomerModalOpen(false);
+                setNewCustomerForm({
+                    companyName: '',
+                    customerName: '',
+                    email: '',
+                    mobile: '',
+                    gstin: ''
+                });
+            } else {
+                toast.error('Failed to parse created customer');
+            }
+        } catch (err) {
+            console.error(err);
+            toast.error(err.response?.data?.message || 'Error creating customer');
+        }
+    };
+
     const updateItem = (index, field, value) => {
         const newItems = [...items];
         newItems[index][field] = value;
+        
+        // Auto-recalculate row level value field
+        if (field === 'quantity' || field === 'price' || field === 'discountPercent') {
+            const qty = Number(newItems[index].quantity) || 0;
+            const price = Number(newItems[index].price) || 0;
+            const disc = Number(newItems[index].discountPercent) || 0;
+            newItems[index].value = Number((qty * price * (1 - disc / 100)).toFixed(2));
+        }
         setItems(newItems);
     };
 
     const handleProductSelect = (index, product) => {
         const newItems = [...items];
+        newItems[index].productId = product._id;
+        newItems[index].productCode = product.productCode;
         newItems[index].productName = product.productName;
+        newItems[index].price = product.basePrice || 0;
+        newItems[index].discountPercent = 0;
+        newItems[index].value = Number(((newItems[index].quantity || 1) * (product.basePrice || 0)).toFixed(2));
+
         const validUoms = ['Pcs', 'Nos', 'Kg', 'Meter', 'Mtr', 'Set', 'Ltr', 'Pack', 'Doz'];
         const productUom = product.uom || 'Pcs';
         const matchedUom = validUoms.find(u => u.toLowerCase() === productUom.toLowerCase());
@@ -451,8 +499,13 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
 
     const addItem = () => {
         setItems([...items, { 
+            productId: '',
+            productCode: '',
             productName: '', 
-            quantity: 1, 
+            quantity: 1,
+            price: 0,
+            discountPercent: 0,
+            value: 0,
             uom: 'Pcs', 
             actionStatus: 'VISIT CUSTOMER', 
             salespersonName: '', 
@@ -503,13 +556,32 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
         setItems(newItems);
     };
 
+    // Calculate real-time totals via useMemo
+    const calculatedTotals = useMemo(() => {
+        const itemSubtotal = items.reduce((sum, item) => {
+            const qty = Number(item.quantity) || 0;
+            const price = Number(item.price) || 0;
+            const disc = Number(item.discountPercent) || 0;
+            return sum + (qty * price * (1 - disc / 100));
+        }, 0);
+
+        const discount = Number(header.discount) || 0;
+        const freight = Number(header.freight) || 0;
+        const otherCharges = Number(header.otherCharges) || 0;
+        const grandTotal = Math.max(0, itemSubtotal - discount + freight + otherCharges);
+
+        return {
+            subtotal: itemSubtotal,
+            grandTotal: grandTotal
+        };
+    }, [items, header.discount, header.freight, header.otherCharges]);
+
     const handleSubmit = async () => {
         if (!header.customerId) {
             toast.error('Customer is required');
             return;
         }
 
-        // Ensure all items have a Product Name
         const emptyProductIndex = items.findIndex(item => !item.productName || item.productName.trim() === '');
         if (emptyProductIndex !== -1) {
             toast.error(`Product Name is required for all items. Check Item ${emptyProductIndex + 1}`);
@@ -536,6 +608,11 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
 
         const cleanedItems = items.map(item => {
             const cleaned = { ...item };
+            cleaned.rate = Number(cleaned.price) || 0;
+            cleaned.price = Number(cleaned.price) || 0;
+            cleaned.quantity = Number(cleaned.quantity) || 1;
+            cleaned.discountPercent = Number(cleaned.discountPercent) || 0;
+            cleaned.value = Number((cleaned.quantity * cleaned.price * (1 - cleaned.discountPercent / 100)).toFixed(2));
             if (cleaned.finalVendor === '') {
                 delete cleaned.finalVendor;
             }
@@ -555,7 +632,16 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
         
         setLoading(true);
         try {
-            const payload = { ...cleanedHeader, items: cleanedItems, followUpHistory: payloadHistory };
+            const payload = { 
+                ...cleanedHeader, 
+                items: cleanedItems, 
+                followUpHistory: payloadHistory,
+                subtotal: calculatedTotals.subtotal,
+                discount: Number(header.discount) || 0,
+                freight: Number(header.freight) || 0,
+                otherCharges: Number(header.otherCharges) || 0,
+                grandTotal: calculatedTotals.grandTotal
+            };
             if (isEditMode) {
                 await enquiryService.update(id, payload);
                 toast.success('Enquiry updated successfully');
@@ -563,8 +649,7 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
                 await enquiryService.create(payload);
                 toast.success('Enquiry created successfully');
             }
-            if (onClose) onClose();
-            else navigate('/enquiries');
+            navigate('/enquiries');
         } catch (err) {
             toast.error(err.response?.data?.message || 'Error saving enquiry');
         } finally {
@@ -583,7 +668,6 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
             return;
         }
 
-        // Ensure all items have a Product Name
         const emptyProductIndex = items.findIndex(item => !item.productName || item.productName.trim() === '');
         if (emptyProductIndex !== -1) {
             toast.error(`Product Name is required for all items. Check Item ${emptyProductIndex + 1}`);
@@ -610,6 +694,11 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
 
         const cleanedItems = items.map(item => {
             const cleaned = { ...item };
+            cleaned.rate = Number(cleaned.price) || 0;
+            cleaned.price = Number(cleaned.price) || 0;
+            cleaned.quantity = Number(cleaned.quantity) || 1;
+            cleaned.discountPercent = Number(cleaned.discountPercent) || 0;
+            cleaned.value = Number((cleaned.quantity * cleaned.price * (1 - cleaned.discountPercent / 100)).toFixed(2));
             if (cleaned.finalVendor === '') {
                 delete cleaned.finalVendor;
             }
@@ -629,7 +718,16 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
 
         setLoading(true);
         try {
-            const payload = { ...cleanedHeader, items: cleanedItems, followUpHistory: payloadHistory };
+            const payload = { 
+                ...cleanedHeader, 
+                items: cleanedItems, 
+                followUpHistory: payloadHistory,
+                subtotal: calculatedTotals.subtotal,
+                discount: Number(header.discount) || 0,
+                freight: Number(header.freight) || 0,
+                otherCharges: Number(header.otherCharges) || 0,
+                grandTotal: calculatedTotals.grandTotal
+            };
             await enquiryService.create(payload);
             toast.success('Enquiry created successfully');
 
@@ -662,14 +760,24 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
                 status: 'New',
                 probability: 0,
                 remarks: '',
-                closureReason: ''
+                closureReason: '',
+                subtotal: 0,
+                discount: 0,
+                freight: 0,
+                otherCharges: 0,
+                grandTotal: 0
             });
             setFollowUpLog([]);
             setNewFollowUpNote('');
             setNewFollowUpAction('Call');
             setItems([{
+                productId: '',
+                productCode: '',
                 productName: '',
                 quantity: 1,
+                price: 0,
+                discountPercent: 0,
+                value: 0,
                 uom: 'Pcs',
                 actionStatus: 'VISIT CUSTOMER',
                 salespersonName: '',
@@ -687,59 +795,57 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
 
     const selectedCustomer = customers.find(c => c._id === header.customerId);
 
-    const content = (
-        <div className={`space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 ${isOpen ? '' : 'pb-24'}`}>
-            {/* Top Bar - only show if not in modal */}
-            {!isOpen && (
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                        <button onClick={() => navigate(-1)} className="p-3 bg-white hover:bg-slate-50 rounded-2xl shadow-sm border border-slate-100 transition-all text-slate-400 hover:text-primary-600">
-                            <MdArrowBack size={24} />
-                        </button>
-                        <div>
-                            <h1 className="text-3xl font-black text-slate-900 tracking-tight">{isEditMode ? 'Edit Enquiry' : 'Create Enquiry'}</h1>
-                            <p className="text-slate-500 font-medium">Tracking Leads & Progress</p>
-                        </div>
-                    </div>
-                    <button
-                        onClick={handleSubmit}
-                        disabled={loading}
-                        className="px-8 py-3.5 bg-primary-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-primary-700 transition-all shadow-xl shadow-primary-600/20 active:scale-95 flex items-center gap-2"
-                    >
-                        <MdCheckCircle size={18} />
-                        {isEditMode ? 'Update Enquiry' : 'Save Enquiry'}
+    return (
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-24">
+            {/* Top Bar */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                    <button onClick={() => navigate(-1)} className="p-3 bg-white hover:bg-slate-50 rounded-2xl shadow-sm border border-slate-100 transition-all text-slate-400 hover:text-teal-600">
+                        <MdArrowBack size={24} />
                     </button>
+                    <div>
+                        <h1 className="text-3xl font-black text-slate-900 tracking-tight">{isEditMode ? 'Edit Enquiry' : 'Create Enquiry'}</h1>
+                        <p className="text-slate-500 font-medium">Tracking Leads & Progress</p>
+                    </div>
                 </div>
-            )}
+                <button
+                    onClick={handleSubmit}
+                    disabled={loading}
+                    className="px-8 py-3.5 bg-teal-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-teal-700 transition-all shadow-xl shadow-teal-600/20 active:scale-95 flex items-center gap-2"
+                >
+                    <MdCheckCircle size={18} />
+                    {isEditMode ? 'Update Enquiry' : 'Save Enquiry'}
+                </button>
+            </div>
 
-            <div className="grid grid-cols-1 gap-8">
-                {/* Header Information */}
+            <div className="grid grid-cols-1 gap-6">
+                {/* 1. Enquiry Details Card */}
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
                     <div className="p-5 border-b border-slate-100 bg-slate-50/60 flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-xl bg-primary-50 flex items-center justify-center text-primary-600">
+                        <div className="h-10 w-10 rounded-xl bg-teal-50 flex items-center justify-center text-teal-600">
                             <MdBadge size={20} />
                         </div>
                         <div>
-                            <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest">Industrial Enquiry Form</h2>
-                            <p className="text-xs font-semibold text-slate-500 mt-0.5">Capture enquiry, customer, project, and requirement details</p>
+                            <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest text-teal-600">Enquiry Reference Details</h2>
+                            <p className="text-xs font-semibold text-slate-500 mt-0.5">Define reference code, priority status, dates, and specifications</p>
                         </div>
                     </div>
                     <div className="p-5 md:p-6 space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                             <div className="space-y-2">
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Enquiry No.</label>
-                            <div className="relative">
-                                <MdNumbers className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-                                <input
-                                    type="text"
-                                    name="enquiryNo"
-                                    value={header.enquiryNo}
-                                    onChange={handleHeaderChange}
+                                <div className="relative">
+                                    <MdNumbers className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                                    <input
+                                        type="text"
+                                        name="enquiryNo"
+                                        value={header.enquiryNo}
+                                        onChange={handleHeaderChange}
                                         placeholder="Leave blank to auto-generate"
-                                    className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-bold"
-                                />
+                                        className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-teal-500/10 focus:border-teal-500 outline-none text-sm font-bold text-slate-800"
+                                    />
+                                </div>
                             </div>
-                        </div>
 
                             <div className="space-y-2">
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Enquiry Date</label>
@@ -748,115 +854,18 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
                                     name="enquiryDate"
                                     value={header.enquiryDate}
                                     onChange={handleHeaderChange}
-                                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold"
+                                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold focus:bg-white focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 transition-all text-slate-800"
                                 />
                             </div>
 
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Project Name</label>
-                                <input
-                                    type="text"
-                                    name="projectName"
-                                    value={header.projectName}
-                                    onChange={handleHeaderChange}
-                                    placeholder="Project / plant / site"
-                                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold"
-                                />
-                            </div>
-
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Required Delivery Date</label>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Req. Delivery Date</label>
                                 <input
                                     type="date"
                                     name="requiredDeliveryDate"
                                     value={header.requiredDeliveryDate}
                                     onChange={handleHeaderChange}
-                                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                            <div className="space-y-2 lg:col-span-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Company Name <span className="text-rose-500">*</span></label>
-                                <CustomerSearchDropdown
-                                    customers={customers}
-                                    selectedCustomerId={header.customerId}
-                                    onSelect={handleCustomerSelect}
-                                />
-                            </div>
-
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Designation</label>
-                                <input
-                                    type="text"
-                                    name="contactDesignation"
-                                    value={header.contactDesignation}
-                                    onChange={handleHeaderChange}
-                                    placeholder="Purchase manager, owner..."
-                                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Contact Person</label>
-                                <input
-                                    type="text"
-                                    name="contactPerson"
-                                    value={header.contactPerson}
-                                    onChange={handleHeaderChange}
-                                    placeholder="Contact person"
-                                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Mobile No.</label>
-                                <input
-                                    type="tel"
-                                    name="contactMobile"
-                                    value={header.contactMobile}
-                                    onChange={handleHeaderChange}
-                                    placeholder="Mobile number"
-                                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Email</label>
-                                <input
-                                    type="email"
-                                    name="contactEmail"
-                                    value={header.contactEmail}
-                                    onChange={handleHeaderChange}
-                                    placeholder="Email address"
-                                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Address</label>
-                            <textarea
-                                name="siteAddress"
-                                value={header.siteAddress}
-                                onChange={handleHeaderChange}
-                                placeholder={selectedCustomer?.billingAddress ? `${selectedCustomer.billingAddress.line1 || ''} ${selectedCustomer.billingAddress.line2 || ''} ${selectedCustomer.billingAddress.city || ''}`.trim() : 'Site / billing / delivery address'}
-                                rows="3"
-                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold resize-none"
-                            ></textarea>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Budget</label>
-                                <input
-                                    type="text"
-                                    name="budget"
-                                    value={header.budget}
-                                    onChange={handleHeaderChange}
-                                    placeholder="Optional"
-                                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold"
+                                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold focus:bg-white focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 transition-all text-slate-800"
                                 />
                             </div>
 
@@ -866,121 +875,323 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
                                     name="priority"
                                     value={header.priority}
                                     onChange={handleHeaderChange}
-                                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold text-slate-700"
+                                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold text-slate-700 focus:bg-white focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 transition-all"
                                 >
                                     {['Low', 'Medium', 'High', 'Urgent'].map(s => (
                                         <option key={s} value={s}>{s}</option>
                                     ))}
                                 </select>
                             </div>
-
                         </div>
 
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Technical Specifications</label>
-                            <textarea
-                                name="technicalSpecifications"
-                                value={header.technicalSpecifications}
-                                onChange={handleHeaderChange}
-                                placeholder="Model, make, rating, dimensions, process notes, or other specifications"
-                                rows="4"
-                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold resize-none"
-                            ></textarea>
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Enquiry Status</label>
+                                <select
+                                    name="status"
+                                    value={header.status}
+                                    onChange={handleHeaderChange}
+                                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold text-slate-700 focus:bg-white focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 transition-all"
+                                >
+                                    {['New', 'Contacted', 'Quotation Pending', 'Quotation Received', 'Negotiation', 'Finalized', 'PO Received', 'Lost'].map(s => (
+                                        <option key={s} value={s}>{s}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Est. Win Prob. (%)</label>
+                                <input
+                                    type="number"
+                                    name="probability"
+                                    min="0"
+                                    max="100"
+                                    value={header.probability}
+                                    onChange={handleHeaderChange}
+                                    placeholder="e.g. 50"
+                                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold focus:bg-white focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 transition-all text-slate-800"
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Source / Ref Received From</label>
+                                <input
+                                    type="text"
+                                    name="refReceivedFrom"
+                                    value={header.refReceivedFrom}
+                                    onChange={handleHeaderChange}
+                                    placeholder="Reference Source"
+                                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold focus:bg-white focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 transition-all text-slate-800"
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Budget Description</label>
+                                <input
+                                    type="text"
+                                    name="budget"
+                                    value={header.budget}
+                                    onChange={handleHeaderChange}
+                                    placeholder="Optional budget notes"
+                                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold focus:bg-white focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 transition-all text-slate-800"
+                                />
+                            </div>
                         </div>
+
+                        {header.status === 'Lost' && (
+                            <div className="space-y-2 animate-in fade-in duration-300">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Reason for Loss</label>
+                                <textarea
+                                    name="closureReason"
+                                    value={header.closureReason}
+                                    onChange={handleHeaderChange}
+                                    placeholder="Provide details on why this enquiry was lost..."
+                                    rows="2"
+                                    className="w-full px-4 py-3 bg-slate-50 border border-rose-200 rounded-2xl outline-none text-sm font-bold resize-none focus:bg-white focus:border-rose-500 transition-all text-slate-800"
+                                ></textarea>
+                            </div>
+                        )}
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Technical Specifications</label>
+                                <textarea
+                                    name="technicalSpecifications"
+                                    value={header.technicalSpecifications}
+                                    onChange={handleHeaderChange}
+                                    placeholder="Model, make, dimensions, process notes, or other technical details"
+                                    rows="2"
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold resize-none focus:bg-white focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 transition-all text-slate-800"
+                                ></textarea>
+                            </div>
                             <div className="space-y-2">
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Attachment</label>
                                 <input
                                     type="file"
                                     onChange={(e) => setHeader(prev => ({ ...prev, attachmentName: e.target.files?.[0]?.name || '' }))}
-                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold file:mr-4 file:rounded-xl file:border-0 file:bg-primary-50 file:px-4 file:py-2 file:text-xs file:font-black file:text-primary-700"
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold file:mr-4 file:rounded-xl file:border-0 file:bg-teal-50 file:px-4 file:py-2 file:text-xs file:font-black file:text-teal-700 focus:bg-white text-slate-800"
                                 />
                                 {header.attachmentName && <p className="text-xs font-bold text-slate-500 ml-1">Selected: {header.attachmentName}</p>}
                             </div>
-
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Remarks</label>
-                                <textarea
-                                    name="remarks"
-                                    value={header.remarks}
-                                    onChange={handleHeaderChange}
-                                    placeholder="Additional notes about this enquiry"
-                                    rows="3"
-                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold resize-none"
-                                ></textarea>
-                            </div>
                         </div>
-
                     </div>
                 </div>
 
-                {/* Items Table */}
+                {/* 2. Customer Details Card (Matching user layout image) */}
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 space-y-4">
+                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest text-teal-600">Customer Details</h3>
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-end">
+                        {/* Customer Dropdown search */}
+                        <div className="lg:col-span-4 space-y-2">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Customer <span className="text-rose-500">*</span></label>
+                            <CustomerSearchDropdown
+                                customers={customers}
+                                selectedCustomerId={header.customerId}
+                                onSelect={handleCustomerSelect}
+                            />
+                        </div>
+                        {/* Inline blue + New Customer button */}
+                        <div className="lg:col-span-2">
+                            <button
+                                type="button"
+                                onClick={() => setIsNewCustomerModalOpen(true)}
+                                className="w-full py-3.5 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center justify-center whitespace-nowrap gap-1 shadow-md active:scale-95 shrink-0"
+                            >
+                                + New Customer
+                            </button>
+                        </div>
+                        {/* Contact Person */}
+                        <div className="lg:col-span-3 space-y-2">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Contact Person</label>
+                            <input
+                                type="text"
+                                name="contactPerson"
+                                value={header.contactPerson}
+                                onChange={handleHeaderChange}
+                                placeholder="Contact person"
+                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold focus:bg-white focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 transition-all text-slate-800"
+                            />
+                        </div>
+                        {/* Email */}
+                        <div className="lg:col-span-3 space-y-2">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Email</label>
+                            <input
+                                type="email"
+                                name="contactEmail"
+                                value={header.contactEmail}
+                                onChange={handleHeaderChange}
+                                placeholder="Email address"
+                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold focus:bg-white focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 transition-all text-slate-800"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Mobile No.</label>
+                            <input
+                                type="tel"
+                                name="contactMobile"
+                                value={header.contactMobile}
+                                onChange={handleHeaderChange}
+                                placeholder="Mobile number"
+                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold focus:bg-white focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 transition-all text-slate-800"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Designation</label>
+                            <input
+                                type="text"
+                                name="contactDesignation"
+                                value={header.contactDesignation}
+                                onChange={handleHeaderChange}
+                                placeholder="e.g. Procurement Manager"
+                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold focus:bg-white focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 transition-all text-slate-800"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Project Name</label>
+                            <input
+                                type="text"
+                                name="projectName"
+                                value={header.projectName}
+                                onChange={handleHeaderChange}
+                                placeholder="Project Name"
+                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold focus:bg-white focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 transition-all text-slate-800"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="space-y-2 pt-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Delivery / Site Address</label>
+                        <textarea
+                            name="siteAddress"
+                            value={header.siteAddress}
+                            onChange={handleHeaderChange}
+                            placeholder="Complete delivery / site address details"
+                            rows="2"
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold resize-none focus:bg-white focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 transition-all text-slate-800"
+                        ></textarea>
+                    </div>
+                </div>
+
+                {/* 3. Product Details Card (Matching user table style) */}
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
                     <div className="p-6 border-b border-slate-50 bg-slate-50/30 flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded-xl bg-orange-50 flex items-center justify-center text-orange-600">
+                            <div className="h-10 w-10 rounded-xl bg-teal-50 flex items-center justify-center text-teal-600">
                                 <MdOutlineDriveFileRenameOutline size={20} />
                             </div>
-                            <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest">Product / Service Required</h2>
+                            <div>
+                                <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest text-teal-600">Product Details</h2>
+                                <p className="text-xs font-semibold text-slate-500 mt-0.5">Specify products, codes, quantities, price rates, and item discounts</p>
+                            </div>
                         </div>
                         <button
                             onClick={addItem}
-                            className="px-4 py-2 bg-primary-50 text-primary-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-primary-100 transition-all flex items-center gap-2"
+                            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 shadow-md"
                         >
-                            <MdAdd size={16} /> Add Row
+                            <MdAdd size={16} /> Add Product
                         </button>
                     </div>
 
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse">
                             <thead>
-                                <tr className="bg-slate-50/50">
-                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Sr.</th>
-                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 min-w-[360px]">Product / Service Required</th>
-                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 w-28">Quantity</th>
-                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 w-36">Unit</th>
-                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 w-16 text-center">Del</th>
+                                <tr className="bg-slate-50/50 border-b border-slate-100">
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest w-12 text-center">#</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest min-w-[200px]">Item Code</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest min-w-[280px]">Description</th>
+                                    <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest w-24">Unit</th>
+                                    <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest w-28 text-right">Qty</th>
+                                    <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest w-32 text-right">Price (₹)</th>
+                                    <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest w-24 text-right">Disc %</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest w-40 text-right">Value (₹)</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest w-24 text-center">Action</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {items.map((item, index) => (
                                     <tr key={index} className="group hover:bg-slate-50/50 transition-colors border-b border-slate-100 last:border-0">
-                                        <td className="px-6 py-4 text-xs font-bold text-slate-400">{index + 1}</td>
-                                        <td className="px-4 py-3">
-                                            <ProductSearchAutocomplete
-                                                value={item.productName}
-                                                onChange={(val) => updateItem(index, 'productName', val)}
+                                        <td className="px-6 py-4 text-xs font-bold text-slate-400 text-center align-middle">{index + 1}</td>
+                                        <td className="px-4 py-3 align-middle">
+                                            <ProductCodeSearchAutocomplete
+                                                value={item.productCode}
+                                                onChange={(val) => updateItem(index, 'productCode', val)}
                                                 products={products}
                                                 onSelectProduct={(product) => handleProductSelect(index, product)}
                                             />
                                         </td>
-                                        <td className="px-4 py-3 align-top">
+                                        <td className="px-4 py-3 align-middle">
                                             <input
-                                                type="number"
-                                                value={item.quantity}
-                                                onChange={(e) => updateItem(index, 'quantity', e.target.value)}
-                                                className="w-full px-3 py-2 bg-slate-50 border border-transparent rounded-xl focus:border-primary-500 focus:bg-white outline-none text-xs font-bold transition-all"
+                                                type="text"
+                                                value={item.productName}
+                                                onChange={(e) => updateItem(index, 'productName', e.target.value)}
+                                                className="w-full px-3 py-2 bg-slate-50 border border-transparent rounded-xl focus:border-teal-500 focus:bg-white outline-none text-xs font-bold transition-all text-slate-800"
+                                                placeholder="Description..."
                                             />
                                         </td>
-                                        <td className="px-4 py-3 align-top">
+                                        <td className="px-4 py-3 align-middle">
                                             <select
                                                 value={item.uom}
                                                 onChange={(e) => updateItem(index, 'uom', e.target.value)}
-                                                className="w-full px-3 py-2 bg-slate-50 border border-transparent rounded-xl focus:border-primary-500 focus:bg-white outline-none text-xs font-bold transition-all appearance-none"
+                                                className="w-full px-3 py-2 bg-slate-50 border border-transparent rounded-xl focus:border-teal-500 focus:bg-white outline-none text-xs font-bold transition-all appearance-none text-slate-800"
                                             >
                                                 {['Pcs', 'Nos', 'Kg', 'Meter', 'Mtr', 'Set', 'Ltr', 'Pack', 'Doz'].map(u => (
                                                     <option key={u} value={u}>{u}</option>
                                                 ))}
                                             </select>
                                         </td>
-                                        <td className="px-4 py-3 text-center align-top">
-                                            <button
-                                                onClick={() => removeItem(index)}
-                                                className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all outline-none"
-                                            >
-                                                <MdDelete size={18} />
-                                            </button>
+                                        <td className="px-4 py-3 align-middle">
+                                            <input
+                                                type="number"
+                                                value={item.quantity}
+                                                min="1"
+                                                onChange={(e) => updateItem(index, 'quantity', e.target.value)}
+                                                className="w-full px-3 py-2 bg-slate-50 border border-transparent rounded-xl focus:border-teal-500 focus:bg-white outline-none text-xs font-bold transition-all text-right font-mono text-slate-800"
+                                            />
+                                        </td>
+                                        <td className="px-4 py-3 align-middle">
+                                            <input
+                                                type="number"
+                                                value={item.price}
+                                                min="0"
+                                                onChange={(e) => updateItem(index, 'price', e.target.value)}
+                                                className="w-full px-3 py-2 bg-slate-50 border border-transparent rounded-xl focus:border-teal-500 focus:bg-white outline-none text-xs font-bold transition-all text-right font-mono text-slate-800"
+                                            />
+                                        </td>
+                                        <td className="px-4 py-3 align-middle">
+                                            <input
+                                                type="number"
+                                                value={item.discountPercent}
+                                                min="0"
+                                                max="100"
+                                                onChange={(e) => updateItem(index, 'discountPercent', e.target.value)}
+                                                className="w-full px-3 py-2 bg-slate-50 border border-transparent rounded-xl focus:border-teal-500 focus:bg-white outline-none text-xs font-bold transition-all text-right font-mono text-slate-800"
+                                            />
+                                        </td>
+                                        <td className="px-6 py-3 align-middle font-mono text-xs font-bold text-slate-800 text-right">
+                                            ₹{(item.value || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </td>
+                                        <td className="px-6 py-3 text-center align-middle">
+                                            <div className="flex items-center justify-center gap-1">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setVendorModal({ isOpen: true, itemIndex: index })}
+                                                    className="p-1.5 text-teal-600 hover:bg-teal-50 rounded-lg transition-all"
+                                                    title="Compare Vendor Quotes"
+                                                >
+                                                    <MdSearch size={18} />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeItem(index)}
+                                                    className="p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
+                                                    title="Delete Row"
+                                                >
+                                                    <MdDelete size={18} />
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
@@ -989,22 +1200,120 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
                     </div>
                 </div>
 
+                {/* 4. Bottom Calculations & Remarks (Matching layout structure) */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+                    {/* Left side: Freight, Discount, Other Charges + Remarks */}
+                    <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-100 p-6 space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block ml-1">Freight (₹)</label>
+                                <input
+                                    type="number"
+                                    name="freight"
+                                    value={header.freight}
+                                    onChange={handleHeaderChange}
+                                    placeholder="0"
+                                    min="0"
+                                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold focus:bg-white focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 transition-all font-mono text-slate-800"
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block ml-1">Discount (₹)</label>
+                                <input
+                                    type="number"
+                                    name="discount"
+                                    value={header.discount}
+                                    onChange={handleHeaderChange}
+                                    placeholder="0"
+                                    min="0"
+                                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold focus:bg-white focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 transition-all font-mono text-slate-800"
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block ml-1">Other Charges (₹)</label>
+                                <input
+                                    type="number"
+                                    name="otherCharges"
+                                    value={header.otherCharges}
+                                    onChange={handleHeaderChange}
+                                    placeholder="0"
+                                    min="0"
+                                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold focus:bg-white focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 transition-all font-mono text-slate-800"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Remarks</label>
+                            <textarea
+                                name="remarks"
+                                value={header.remarks}
+                                onChange={handleHeaderChange}
+                                placeholder="Write remarks here..."
+                                rows="3"
+                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold resize-none focus:bg-white focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 transition-all text-slate-800"
+                            ></textarea>
+                        </div>
+                    </div>
+
+                    {/* Right side: Summary Calculations (Teal theme matching styling) */}
+                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 space-y-4 shadow-sm">
+                        <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest border-b border-slate-200 pb-3 text-teal-600">Enquiry Value Summary</h3>
+                        
+                        <div className="space-y-3">
+                            <div className="flex justify-between items-center text-xs font-bold text-slate-500">
+                                <span>SUB TOTAL</span>
+                                <span className="font-mono text-slate-800">₹{calculatedTotals.subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            </div>
+                            
+                            {header.discount > 0 && (
+                                <div className="flex justify-between items-center text-xs font-bold text-rose-500">
+                                    <span>OVERALL DISCOUNT (-)</span>
+                                    <span className="font-mono">₹{Number(header.discount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                </div>
+                            )}
+
+                            {header.freight > 0 && (
+                                <div className="flex justify-between items-center text-xs font-bold text-slate-600">
+                                    <span>FREIGHT (+)</span>
+                                    <span className="font-mono text-slate-800 font-bold">₹{Number(header.freight).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                </div>
+                            )}
+
+                            {header.otherCharges > 0 && (
+                                <div className="flex justify-between items-center text-xs font-bold text-slate-600">
+                                    <span>OTHER CHARGES (+)</span>
+                                    <span className="font-mono text-slate-800 font-bold">₹{Number(header.otherCharges).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                </div>
+                            )}
+
+                            <div className="border-t border-slate-200 my-4 pt-4 flex justify-between items-center">
+                                <span className="text-sm font-black text-slate-950">GRAND TOTAL</span>
+                                <span className="text-xl font-black text-teal-600 font-mono">
+                                    ₹{calculatedTotals.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Save/Cancel Action panel */}
                 <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-end gap-3">
                     <button
                         type="button"
                         onClick={handleSubmit}
                         disabled={loading}
-                        className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-primary-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-primary-700 transition-all shadow-xl shadow-primary-600/20 disabled:opacity-60"
+                        className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-teal-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-teal-700 transition-all shadow-xl shadow-teal-600/20 disabled:opacity-60 active:scale-95"
                     >
                         <MdCheckCircle size={18} />
-                        {isEditMode ? 'Save' : 'Save'}
+                        {isEditMode ? 'Update Enquiry' : 'Save Enquiry'}
                     </button>
                     {!isEditMode && (
                         <button
                             type="button"
                             onClick={handleSaveAndNew}
                             disabled={loading}
-                            className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-slate-800 transition-all disabled:opacity-60"
+                            className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-slate-800 transition-all disabled:opacity-60 active:scale-95"
                         >
                             <MdAdd size={18} />
                             Save & New
@@ -1012,15 +1321,14 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
                     )}
                     <button
                         type="button"
-                        onClick={() => onClose ? onClose() : navigate('/enquiries')}
+                        onClick={() => navigate('/enquiries')}
                         disabled={loading}
-                        className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-white border border-slate-200 text-slate-600 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-slate-50 transition-all disabled:opacity-60"
+                        className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-white border border-slate-200 text-slate-600 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-slate-50 transition-all disabled:opacity-60 active:scale-95"
                     >
                         <MdClose size={18} />
                         Cancel
                     </button>
                 </div>
-
             </div>
 
             {/* Vendor Management Modal */}
@@ -1032,11 +1340,11 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
             >
                 {vendorModal.itemIndex !== null && (
                     <div className="space-y-6">
-                        <div className="p-4 bg-primary-50 text-primary-800 rounded-2xl border border-primary-100">
+                        <div className="p-4 bg-teal-50 text-teal-800 rounded-2xl border border-teal-100">
                             <h3 className="font-black text-sm uppercase tracking-wide">
                                 Product: {items[vendorModal.itemIndex].productName || 'Unnamed Product'}
                             </h3>
-                            <p className="text-xs font-medium text-primary-600/80 mt-1">Select vendors and compare their quotations.</p>
+                            <p className="text-xs font-medium text-teal-600/80 mt-1">Select vendors and compare their quotations.</p>
                         </div>
                         
                         <div className="space-y-4">
@@ -1055,11 +1363,11 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
                                                 handleVendorSelection(vendorModal.itemIndex, newVendors);
                                             }}
                                             className={`p-3 rounded-xl border cursor-pointer transition-all flex items-center justify-between
-                                                ${isSelected ? 'bg-primary-50 border-primary-300 shadow-sm ring-1 ring-primary-500/50' : 'bg-white border-slate-200 hover:border-primary-200'}
+                                                ${isSelected ? 'bg-teal-50 border-teal-300 shadow-sm ring-1 ring-teal-500/50' : 'bg-white border-slate-200 hover:border-teal-200'}
                                             `}
                                         >
-                                            <span className={`text-xs font-bold ${isSelected ? 'text-primary-800' : 'text-slate-600'} truncate mr-2`}>{vendor.name}</span>
-                                            <div className={`w-4 h-4 rounded-full flex-shrink-0 flex items-center justify-center border ${isSelected ? 'bg-primary-600 border-primary-600' : 'border-slate-300'}`}>
+                                            <span className={`text-xs font-bold ${isSelected ? 'text-teal-800' : 'text-slate-600'} truncate mr-2`}>{vendor.name}</span>
+                                            <div className={`w-4 h-4 rounded-full flex-shrink-0 flex items-center justify-center border ${isSelected ? 'bg-teal-600 border-teal-600' : 'border-slate-300'}`}>
                                                 {isSelected && <MdCheckCircle size={10} className="text-white" />}
                                             </div>
                                         </div>
@@ -1072,7 +1380,7 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
                             <div className="space-y-4 mt-8 pt-6 border-t border-slate-100">
                                 <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
                                     Vendor Quotations
-                                    <span className="text-[9px] font-bold lowercase text-primary-500 bg-primary-50 px-2 py-0.5 rounded-full normal-case">(Lowest price highlighted)</span>
+                                    <span className="text-[9px] font-bold lowercase text-teal-500 bg-teal-50 px-2 py-0.5 rounded-full normal-case">(Lowest price highlighted)</span>
                                 </h4>
                                 <div className="space-y-4">
                                     {(() => {
@@ -1090,7 +1398,7 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
                                                 <div key={quote.vendorId} className={`border rounded-2xl p-5 ${isCheapest ? 'bg-emerald-50/30 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}>
                                                     <h5 className="font-bold text-slate-800 mb-4 pb-2 border-b border-slate-200/60 flex items-center justify-between">
                                                         <div className="flex items-center gap-2">
-                                                            <span className={`w-2 h-2 rounded-full ${isCheapest ? 'bg-emerald-500' : 'bg-primary-500'}`}></span>
+                                                            <span className={`w-2 h-2 rounded-full ${isCheapest ? 'bg-emerald-500' : 'bg-teal-500'}`}></span>
                                                             {vendor.name}
                                                         </div>
                                                         {isCheapest && <span className="text-[9px] font-black text-emerald-600 bg-emerald-100 px-2 py-1 rounded-md uppercase tracking-wider">Best Price</span>}
@@ -1106,7 +1414,7 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
                                                                     type="number" 
                                                                     value={quote.price || ''} 
                                                                     onChange={(e) => updateVendorQuote(vendorModal.itemIndex, qIndex, 'price', e.target.value)}
-                                                                    className={`w-full pl-7 pr-3 py-2 bg-white border rounded-lg text-xs font-bold outline-none ${isCheapest ? 'border-emerald-300 focus:border-emerald-500' : 'border-slate-200 focus:border-primary-500'}`}
+                                                                    className={`w-full pl-7 pr-3 py-2 bg-white border rounded-lg text-xs font-bold outline-none ${isCheapest ? 'border-emerald-300 focus:border-emerald-500' : 'border-slate-200 focus:border-teal-500'}`}
                                                                     placeholder="Price"
                                                                 />
                                                             </div>
@@ -1117,7 +1425,7 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
                                                                 type="text" 
                                                                 value={quote.deliveryTime || ''} 
                                                                 onChange={(e) => updateVendorQuote(vendorModal.itemIndex, qIndex, 'deliveryTime', e.target.value)}
-                                                                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold focus:border-primary-500 outline-none"
+                                                                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold focus:border-teal-500 outline-none"
                                                                 placeholder="e.g. 2 weeks"
                                                             />
                                                         </div>
@@ -1127,7 +1435,7 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
                                                                 type="text" 
                                                                 value={quote.availability || ''} 
                                                                 onChange={(e) => updateVendorQuote(vendorModal.itemIndex, qIndex, 'availability', e.target.value)}
-                                                                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold focus:border-primary-500 outline-none"
+                                                                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold focus:border-teal-500 outline-none"
                                                                 placeholder="In stock?"
                                                             />
                                                         </div>
@@ -1138,7 +1446,7 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
                                                                 min="0" max="100"
                                                                 value={quote.probability || 0} 
                                                                 onChange={(e) => updateVendorQuote(vendorModal.itemIndex, qIndex, 'probability', e.target.value)}
-                                                                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold focus:border-primary-500 outline-none"
+                                                                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold focus:border-teal-500 outline-none"
                                                                 placeholder="0-100"
                                                             />
                                                         </div>
@@ -1148,7 +1456,7 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
                                                                 type="text" 
                                                                 value={quote.remarks || ''} 
                                                                 onChange={(e) => updateVendorQuote(vendorModal.itemIndex, qIndex, 'remarks', e.target.value)}
-                                                                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold focus:border-primary-500 outline-none"
+                                                                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold focus:border-teal-500 outline-none"
                                                                 placeholder="Notes..."
                                                             />
                                                         </div>
@@ -1172,23 +1480,86 @@ const CreateEnquiry = ({ id: propsId, isOpen, onClose }) => {
                     </div>
                 )}
             </Modal>
+
+            {/* Inline New Customer Creation Modal */}
+            <Modal
+                isOpen={isNewCustomerModalOpen}
+                onClose={() => setIsNewCustomerModalOpen(false)}
+                title="Create New Customer"
+                maxWidth="max-w-md"
+            >
+                <form onSubmit={handleCreateCustomer} className="space-y-4">
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 text-teal-600">Company Name <span className="text-rose-500">*</span></label>
+                        <input
+                            type="text"
+                            required
+                            value={newCustomerForm.companyName}
+                            onChange={(e) => setNewCustomerForm(prev => ({ ...prev, companyName: e.target.value }))}
+                            placeholder="e.g. ACME Corp"
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold focus:bg-white focus:border-teal-500 transition-all text-slate-800"
+                        />
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 text-teal-600">Contact Name <span className="text-rose-500">*</span></label>
+                        <input
+                            type="text"
+                            required
+                            value={newCustomerForm.customerName}
+                            onChange={(e) => setNewCustomerForm(prev => ({ ...prev, customerName: e.target.value }))}
+                            placeholder="e.g. John Doe"
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold focus:bg-white focus:border-teal-500 transition-all text-slate-800"
+                        />
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 text-teal-600">Email</label>
+                        <input
+                            type="email"
+                            value={newCustomerForm.email}
+                            onChange={(e) => setNewCustomerForm(prev => ({ ...prev, email: e.target.value }))}
+                            placeholder="e.g. john@acme.com"
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold focus:bg-white focus:border-teal-500 transition-all text-slate-800"
+                        />
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 text-teal-600">Mobile No.</label>
+                        <input
+                            type="tel"
+                            value={newCustomerForm.mobile}
+                            onChange={(e) => setNewCustomerForm(prev => ({ ...prev, mobile: e.target.value }))}
+                            placeholder="e.g. 9876543210"
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold focus:bg-white focus:border-teal-500 transition-all text-slate-800"
+                        />
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 text-teal-600">GSTIN</label>
+                        <input
+                            type="text"
+                            value={newCustomerForm.gstin}
+                            onChange={(e) => setNewCustomerForm(prev => ({ ...prev, gstin: e.target.value }))}
+                            placeholder="e.g. 27AABCU9603R1ZM"
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold focus:bg-white focus:border-teal-500 transition-all text-slate-800"
+                        />
+                    </div>
+                    <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 mt-6">
+                        <button
+                            type="button"
+                            onClick={() => setIsNewCustomerModalOpen(false)}
+                            className="px-6 py-3 border border-slate-200 text-slate-500 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            className="px-6 py-3 bg-teal-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-teal-700 transition-all shadow-md active:scale-95"
+                        >
+                            Create Customer
+                        </button>
+                    </div>
+                </form>
+            </Modal>
         </div>
     );
-
-    if (isOpen) {
-        return (
-            <Modal
-                isOpen={isOpen}
-                onClose={onClose}
-                title={isEditMode ? 'Edit Enquiry' : 'Create Enquiry'}
-                maxWidth="max-w-[95vw] md:max-w-7xl"
-            >
-                {content}
-            </Modal>
-        );
-    }
-
-    return content;
 };
 
 export default CreateEnquiry;

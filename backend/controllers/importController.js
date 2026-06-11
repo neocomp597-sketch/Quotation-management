@@ -273,6 +273,25 @@ const importProducts = async (req, res) => {
         const worksheet = workbook.Sheets[sheetName];
         const data = XLSX.utils.sheet_to_json(worksheet);
 
+        const headers = XLSX.utils.sheet_to_json(worksheet, { header: 1 })[0] || [];
+        const cleanHeaders = headers.map(h => String(h || '').trim().toLowerCase());
+        
+        const hasProductCode = cleanHeaders.some(h => ['product code', 'productcode', 'code'].includes(h));
+        const hasProductName = cleanHeaders.some(h => ['product name', 'productname', 'name'].includes(h));
+        const hasHsnCode = cleanHeaders.some(h => ['hsn code', 'hsncode', 'hsn'].includes(h));
+        
+        const missingHeaders = [];
+        if (!hasProductCode) missingHeaders.push('Product Code');
+        if (!hasProductName) missingHeaders.push('Product Name');
+        if (!hasHsnCode) missingHeaders.push('HSN Code');
+        
+        if (missingHeaders.length > 0) {
+            return res.status(400).json({
+                message: `Missing required column headers: ${missingHeaders.join(', ')}`,
+                errors: [`The sheet must contain these column headers: ${missingHeaders.join(', ')}`]
+            });
+        }
+
         if (data.length === 0) {
             return res.status(400).json({ message: 'No data found in file' });
         }
@@ -286,128 +305,56 @@ const importProducts = async (req, res) => {
         for (let i = 0; i < data.length; i++) {
             const row = data[i];
             try {
-                // Map columns (case-insensitive)
-                const uomMap = {
-                    1: 'PCS',
-                    2: 'KG',
-                    3: 'LTR',
-                    4: 'BOX',
-                    5: 'MTR'
-                };
-                let rawUom = row['UOM'] || row['uom'] || row['Unit'];
-                let parsedUom = uomMap[rawUom] || rawUom || 'Nos';
+                const productCode = pickFirstNonEmpty(row['Product Code'], row.productCode, row.code, row.Code);
+                const productName = pickFirstNonEmpty(row['Product Name'], row.productName, row.name, row.Name);
+                const hsnCode = pickFirstNonEmpty(row['HSN Code'], row.hsnCode, row.hsn, row.Hsn);
+                const gstPercentage = toSafeNumber(row['GST %'] ?? row['GST Percentage'] ?? row.gstPercentage ?? row.gst, 18);
+                const basePrice = toSafeNumber(row['Base Price'] ?? row.basePrice ?? row.price, 0);
+                const mrp = toSafeNumber(row.MRP ?? row.mrp ?? row['M.R.P.'], 0);
+                const uom = pickFirstNonEmpty(row.UOM ?? row.uom ?? row.Unit ?? row.unit, 'Nos');
+                const productImageUrl = pickFirstNonEmpty(row['Image URL'] ?? row.productImageUrl ?? row.imageUrl ?? row.image, '');
+                const status = pickFirstNonEmpty(row.Status ?? row.status, 'Active');
 
-                const productData = {
-                    productCode: row['Product Code'] || row['productCode'] || row['Code'],
-                    productName: row['Product Name'] || row['productName'] || row['Name'],
-                    hsnCode: row['HSN Code'] || row['hsnCode'] || row['HSN'],
-                    gstPercentage: parseFloat(row['GST %'] || row['gstPercentage'] || row['GST'] || 18),
-                    basePrice: parseFloat(row['Base Price'] || row['basePrice'] || row['Price'] || 0),
-                    mrp: parseFloat(row['MRP'] || row['mrp'] || 0),
-                    uom: String(parsedUom).trim(),
-                    productImageUrl: row['Image URL'] || row['productImageUrl'] || '',
-                    status: row['Status'] || row['status'] || 'Active'
-                };
-
-                const vendorName = row['Vendor Name'] || row['vendorName'] || row['Vendor'];
-                const vendorPriceRaw = row['Vendor Price'] || row['vendorPrice'];
-                const vendorStockRaw = row['Vendor Stock'] || row['vendorStock'];
-                const primaryRaw = row['Is Primary'] || row['isPrimary'] || row['Primary Vendor'];
-                const hasVendorData = Boolean(vendorName || vendorPriceRaw || vendorStockRaw || typeof primaryRaw !== 'undefined');
-
-                // Validate required fields
-                if (!productData.productCode || !productData.productName || !productData.hsnCode) {
+                if (!productCode || !productName || !hsnCode) {
                     throw new Error('Missing required fields: Product Code, Product Name, or HSN Code');
                 }
 
-                let vendorEntry = null;
-                if (hasVendorData) {
-                    if (!vendorName || !String(vendorName).trim()) {
-                        throw new Error('Vendor Name is required when vendor fields are provided');
+                let existing = await Product.findOne({ productCode: buildExactRegex(productCode) });
+                
+                const productData = {
+                    productCode,
+                    productName,
+                    hsnCode,
+                    gstPercentage,
+                    basePrice,
+                    mrp,
+                    uom,
+                    productImageUrl,
+                    status,
+                    companyId: req.user?.companyId
+                };
+
+                const vendorName = pickFirstNonEmpty(row['Vendor Name'] ?? row.vendorName);
+                const vendorPrice = toSafeNumber(row['Vendor Price'] ?? row.vendorPrice);
+                const vendorStock = toSafeNumber(row['Vendor Stock'] ?? row.vendorStock ?? row.stock);
+                const isPrimary = toBoolean(row['Is Primary'] ?? row.isPrimary ?? true);
+
+                if (vendorName) {
+                    const vendorObj = await Vendor.findOne({ vendorName: buildExactRegex(vendorName) });
+                    if (vendorObj) {
+                        productData.vendors = [{
+                            vendorId: vendorObj._id,
+                            price: vendorPrice || basePrice,
+                            stock: vendorStock,
+                            isPrimary
+                        }];
                     }
-
-                    const normalizedVendorName = String(vendorName).trim();
-                    let vendor = await Vendor.findOne({
-                        name: { $regex: `^${escapeRegex(normalizedVendorName)}$`, $options: 'i' }
-                    });
-
-                    if (!vendor) {
-                        const autoCreateVendor = String(req.query.autoCreateVendor || 'true').toLowerCase() !== 'false';
-                        if (!autoCreateVendor) {
-                            throw new Error(`Vendor not found: ${normalizedVendorName}`);
-                        }
-                        vendor = await Vendor.create({ name: normalizedVendorName, isActive: true });
-                    }
-
-                    if (!vendor.isActive) {
-                        throw new Error(`Vendor is inactive: ${vendor.name}`);
-                    }
-
-                    const vendorPrice = parseFloat(vendorPriceRaw || productData.basePrice || 0);
-                    const vendorStock = parseFloat(vendorStockRaw || 0);
-                    const isPrimary = toBoolean(primaryRaw);
-
-                    if (!(vendorPrice > 0)) {
-                        throw new Error('Vendor Price must be greater than zero');
-                    }
-                    if (vendorStock < 0) {
-                        throw new Error('Vendor Stock cannot be negative');
-                    }
-
-                    vendorEntry = {
-                        vendorId: vendor._id,
-                        price: vendorPrice,
-                        stock: vendorStock,
-                        isPrimary,
-                        lastUpdated: new Date()
-                    };
                 }
 
-                // Check if product already exists
-                const existing = await Product.findOne({ productCode: productData.productCode });
                 if (existing) {
-                    const updatePayload = { ...productData };
-                    if (vendorEntry) {
-                        const mergedVendors = (existing.vendors || []).map((entry) => ({
-                            vendorId: entry.vendorId,
-                            price: Number(entry.price),
-                            stock: Number(entry.stock),
-                            isPrimary: Boolean(entry.isPrimary),
-                            lastUpdated: entry.lastUpdated || new Date()
-                        }));
-
-                        const idx = mergedVendors.findIndex(v => String(v.vendorId) === String(vendorEntry.vendorId));
-                        if (idx === -1) {
-                            mergedVendors.push(vendorEntry);
-                        } else {
-                            mergedVendors[idx] = { ...mergedVendors[idx], ...vendorEntry };
-                        }
-
-                        if (vendorEntry.isPrimary) {
-                            const effectiveIndex = idx === -1 ? mergedVendors.length - 1 : idx;
-                            mergedVendors.forEach((v) => {
-                                v.isPrimary = false;
-                            });
-                            mergedVendors[effectiveIndex].isPrimary = true;
-                        }
-                        if (!mergedVendors.some(v => v.isPrimary)) {
-                            mergedVendors[0].isPrimary = true;
-                        }
-
-                        updatePayload.vendors = mergedVendors;
-                        updatePayload.basePrice = deriveBasePriceFromVendors({
-                            vendors: mergedVendors,
-                            basePrice: productData.basePrice
-                        });
-                    }
-                    await Product.findByIdAndUpdate(existing._id, updatePayload, { runValidators: true });
+                    await Product.findByIdAndUpdate(existing._id, productData);
                 } else {
-                    const createPayload = { ...productData };
-                    if (vendorEntry) {
-                        createPayload.vendors = [vendorEntry];
-                        createPayload.basePrice = deriveBasePriceFromVendors(createPayload);
-                    }
-                    await Product.create(createPayload);
+                    await Product.create(productData);
                 }
                 results.success++;
             } catch (err) {
@@ -417,17 +364,36 @@ const importProducts = async (req, res) => {
         }
 
         await invalidateProductCaches();
+
+        if (results.success > 0) {
+            const { createCompanyNotifications } = require('../utils/notificationHelper');
+            await createCompanyNotifications({
+                companyId: req.user?.companyId,
+                title: 'Products Master Imported',
+                message: `Successfully imported/updated ${results.success} products (failed: ${results.failed}).`,
+                type: 'Reminder',
+                excludeUserId: req.user?.id
+            });
+        }
+
+        if (results.success === 0 && results.failed > 0) {
+            return res.status(400).json({
+                message: 'All rows failed to import',
+                errors: results.errors,
+                ...results
+            });
+        }
+
         res.status(200).json({
             message: `Import completed. ${results.success} products imported, ${results.failed} failed.`,
             ...results
         });
     } catch (error) {
         console.error('Import error:', error);
-        res.status(500).json({ message: error.message || 'Error importing products' });
+        res.status(500).json({ message: error.message || 'Error importing products', errors: [error.message] });
     }
 };
 
-// Import Customers from Excel/CSV
 const importCustomers = async (req, res) => {
     try {
         if (!req.file) {
@@ -439,6 +405,20 @@ const importCustomers = async (req, res) => {
         const worksheet = workbook.Sheets[sheetName];
         const data = XLSX.utils.sheet_to_json(worksheet);
 
+        const headers = XLSX.utils.sheet_to_json(worksheet, { header: 1 })[0] || [];
+        const cleanHeaders = headers.map(h => String(h || '').trim().toLowerCase());
+        
+        const hasCustomerName = cleanHeaders.some(h => [
+            'customer name', 'customername', 'name', 'contact person', 'bp name', 'company name', 'companyname', 'company'
+        ].includes(h));
+        
+        if (!hasCustomerName) {
+            return res.status(400).json({
+                message: `Missing required column headers. Customer Name or Company Name is required.`,
+                errors: [`The sheet must contain a column for Customer Name or Company Name.`]
+            });
+        }
+
         if (data.length === 0) {
             return res.status(400).json({ message: 'No data found in file' });
         }
@@ -452,7 +432,6 @@ const importCustomers = async (req, res) => {
         for (let i = 0; i < data.length; i++) {
             const row = data[i];
             try {
-                // Map columns (case-insensitive)
                 const customerData = {
                     externalCode: pickFirstNonEmpty(row['Customer Code'], row.customerCode, row['Code'], row['BP Code']),
                     customerName: pickFirstNonEmpty(
@@ -493,10 +472,10 @@ const importCustomers = async (req, res) => {
                         state: pickFirstNonEmpty(row['Shipping State'], row['State'], row['Ship-to State'], row['BP State']),
                         pincode: pickFirstNonEmpty(row['Shipping Pincode'], row['Pincode'], row['Ship-to Zip Code'], row['Zip Code'])
                     },
+                    companyId: req.user?.companyId,
                     createdBy: req.user ? req.user.id : null
                 };
 
-                // Validate required fields
                 if (!customerData.customerName || !customerData.companyName) {
                     throw new Error('Missing required fields: Customer Name or Company Name');
                 }
@@ -520,13 +499,11 @@ const importCustomers = async (req, res) => {
                 }
 
                 if (existing) {
-                    // Update existing customer
                     await Customer.findByIdAndUpdate(existing._id, {
                         ...customerData,
                         createdBy: req.user?.id || existing.createdBy || null
                     });
                 } else {
-                    // Create new customer
                     await Customer.create(customerData);
                 }
                 results.success++;
@@ -537,13 +514,33 @@ const importCustomers = async (req, res) => {
         }
 
         await invalidateCustomerCaches();
+
+        if (results.success > 0) {
+            const { createCompanyNotifications } = require('../utils/notificationHelper');
+            await createCompanyNotifications({
+                companyId: req.user?.companyId,
+                title: 'Customers Master Imported',
+                message: `Successfully imported/updated ${results.success} customers (failed: ${results.failed}).`,
+                type: 'Reminder',
+                excludeUserId: req.user?.id
+            });
+        }
+
+        if (results.success === 0 && results.failed > 0) {
+            return res.status(400).json({
+                message: 'All rows failed to import',
+                errors: results.errors,
+                ...results
+            });
+        }
+
         res.status(200).json({
             message: `Import completed. ${results.success} customers imported, ${results.failed} failed.`,
             ...results
         });
     } catch (error) {
         console.error('Import error:', error);
-        res.status(500).json({ message: error.message || 'Error importing customers' });
+        res.status(500).json({ message: error.message || 'Error importing customers', errors: [error.message] });
     }
 };
 
@@ -566,6 +563,30 @@ const importPlanning = async (req, res) => {
         }
 
         const selectedFinancialYear = normalizeFinancialYear(cleanCellValue(req.body.financialYear || req.query.financialYear));
+
+        // Pre-validate headers for Planning sheet
+        const headers = XLSX.utils.sheet_to_json(worksheet, { header: 1 })[0] || [];
+        const cleanHeaders = headers.map(h => String(h || '').trim().toLowerCase());
+        
+        const hasMonthYear = cleanHeaders.some(h => ['month & year', 'monthyear', 'month', 'year'].includes(h));
+        const hasCustomer = cleanHeaders.some(h => ['customer code', 'customercode', 'customer name', 'customername', 'company name', 'companyname'].includes(h));
+        const hasProduct = cleanHeaders.some(h => ['product code', 'productcode', 'product name', 'productname'].includes(h));
+        const hasMgr1 = cleanHeaders.some(h => ['mgr 1', 'mgr1', 'mgrcode', 'mgrcode1'].includes(h));
+        const hasStatus = cleanHeaders.some(h => ['status'].includes(h));
+        
+        const missingHeaders = [];
+        if (!hasMonthYear) missingHeaders.push('Month & Year');
+        if (!hasCustomer) missingHeaders.push('Customer Code');
+        if (!hasProduct) missingHeaders.push('Product Code');
+        if (!hasMgr1) missingHeaders.push('MGR 1');
+        if (!hasStatus) missingHeaders.push('Status');
+        
+        if (missingHeaders.length > 0) {
+            return res.status(400).json({
+                message: `Missing required column headers: ${missingHeaders.join(', ')}`,
+                errors: [`The sheet must contain these column headers: ${missingHeaders.join(', ')}`]
+            });
+        }
 
         // PHASE 1: Collect all unique lookups
         const uniqueCustomerCodes = new Set();
@@ -785,13 +806,33 @@ const importPlanning = async (req, res) => {
             }
         }
 
+        // Trigger notification
+        if (results.success > 0) {
+            const { createCompanyNotifications } = require('../utils/notificationHelper');
+            await createCompanyNotifications({
+                companyId: req.user?.companyId,
+                title: 'Planning Entries Imported',
+                message: `Successfully imported ${results.success} planning entries for FY ${selectedFinancialYear} (failed: ${results.failed}).`,
+                type: 'Planning',
+                excludeUserId: req.user?.id
+            });
+        }
+
+        if (results.success === 0 && results.failed > 0) {
+            return res.status(400).json({
+                message: 'All rows failed to import',
+                errors: results.errors,
+                ...results
+            });
+        }
+
         res.status(200).json({
             message: `Import completed. ${results.success} planning entries imported, ${results.failed} failed.`,
             ...results
         });
     } catch (error) {
         console.error('Import error:', error);
-        res.status(500).json({ message: error.message || 'Error importing planning entries' });
+        res.status(500).json({ message: error.message || 'Error importing planning entries', errors: [error.message] });
     }
 };
 

@@ -5,6 +5,7 @@ const { invalidateViaQueueOrNow } = require('../queues/cacheInvalidationQueue');
 const { getTenantId } = require('../middlewares/tenantContext');
 const RolePermission = require('../models/RolePermission');
 const { resolvePermissions } = require('../config/authorization');
+const { createCompanyNotifications } = require('../utils/notificationHelper');
 
 const normalizeFinancialYear = (fy) => {
     if (!fy) return fy;
@@ -328,6 +329,18 @@ exports.createEntry = async (req, res) => {
         });
         await entry.save();
         await invalidateViaQueueOrNow('planning:*');
+
+        // Trigger notification
+        const creatorName = req.user?.name || 'A user';
+        await createCompanyNotifications({
+            companyId: req.user?.companyId,
+            title: 'New Planning Entry',
+            message: `Planning entry for FY ${entry.financialYear} (${entry.monthYear}) has been added for ${entry.customerName} by ${creatorName} (Total: ₹${(entry.totalValue || 0).toLocaleString()}).`,
+            type: 'Planning',
+            relatedId: entry._id,
+            excludeUserId: req.user?.id
+        });
+
         res.status(201).json(entry);
     } catch (err) {
         res.status(400).json({ message: err.message });
@@ -423,6 +436,18 @@ exports.updateEntry = async (req, res) => {
             runValidators: true
         });
         await invalidateViaQueueOrNow('planning:*');
+
+        // Trigger notification
+        const updaterName = req.user?.name || 'A user';
+        await createCompanyNotifications({
+            companyId: req.user?.companyId,
+            title: 'Planning Entry Updated',
+            message: `Planning entry for FY ${updated.financialYear} (${updated.monthYear}) for ${updated.customerName} has been updated by ${updaterName}.`,
+            type: 'Planning',
+            relatedId: updated._id,
+            excludeUserId: req.user?.id
+        });
+
         res.json(updated);
     } catch (err) {
         res.status(400).json({ message: err.message });
@@ -442,6 +467,18 @@ exports.deleteEntry = async (req, res) => {
 
         await Planning.findByIdAndDelete(id);
         await invalidateViaQueueOrNow('planning:*');
+
+        // Trigger notification
+        const performerName = req.user?.name || 'A user';
+        await createCompanyNotifications({
+            companyId: req.user?.companyId,
+            title: 'Planning Entry Deleted',
+            message: `Planning entry for FY ${entry.financialYear} (${entry.monthYear}) for ${entry.customerName} has been deleted by ${performerName}.`,
+            type: 'Planning',
+            relatedId: entry._id,
+            excludeUserId: req.user?.id
+        });
+
         res.json({ message: 'Entry deleted' });
     } catch (err) {
         res.status(500).json({ message: err.message });
