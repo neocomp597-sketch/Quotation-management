@@ -140,7 +140,8 @@ exports.getAllEnquiries = async (req, res) => {
             .populate('items.vendors', 'name')
             .populate('items.vendorQuotes.vendorId', 'name')
             .populate('items.finalVendor', 'name')
-            .sort({ createdAt: -1 })
+            .collation({ locale: 'en', numericOrdering: true })
+            .sort({ enquiryNo: -1 })
             .lean();
         res.json(enquiries);
     } catch (err) {

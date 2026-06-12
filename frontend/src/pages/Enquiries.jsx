@@ -179,7 +179,7 @@ const Enquiries = () => {
     };
 
     const filteredEnquiries = useMemo(() => {
-        return enquiries.filter(e => {
+        const filtered = enquiries.filter(e => {
             // General text match
             const matchesSearch = 
                 e.enquiryNo.toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
@@ -204,6 +204,11 @@ const Enquiries = () => {
                 ) : true;
 
             return matchesSearch && matchesStatus && matchesFollowUp && matchesProb && matchesProduct && matchesVendor;
+        });
+
+        // Sort by enquiryNo descending (e.g., 8 at top, 1 at bottom)
+        return filtered.sort((a, b) => {
+            return String(b.enquiryNo || '').localeCompare(String(a.enquiryNo || ''), undefined, { numeric: true, sensitivity: 'base' });
         });
     }, [enquiries, filters]);
 
