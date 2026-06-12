@@ -136,6 +136,7 @@ exports.getAllEnquiries = async (req, res) => {
             .select('enquiryNo enquiryDate followUpDate customerId partners status probability priority projectName requiredDeliveryDate items createdBy lastActivityDate createdAt updatedAt')
             .populate('customerId', 'customerName companyName gstin')
             .populate('createdBy', 'name email')
+            .populate('items.productId')
             .populate('items.vendors', 'name')
             .populate('items.vendorQuotes.vendorId', 'name')
             .populate('items.finalVendor', 'name')
@@ -153,6 +154,7 @@ exports.getEnquiryById = async (req, res) => {
         const { id } = req.params;
         const enquiry = await Enquiry.findById(id)
             .populate('customerId', 'customerName companyName gstin billingAddress mobile email')
+            .populate('items.productId')
             .populate('items.vendors', 'name')
             .populate('items.vendorQuotes.vendorId', 'name')
             .populate('items.finalVendor', 'name')

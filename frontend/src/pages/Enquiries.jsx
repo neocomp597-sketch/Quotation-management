@@ -125,11 +125,11 @@ const Enquiries = () => {
                 } else if (cleaned.finalVendor === '') {
                     delete cleaned.finalVendor;
                 }
-                cleaned.vendors = (cleaned.vendors || []).map(v => typeof v === 'object' ? v._id : v);
+                cleaned.vendors = (cleaned.vendors || []).map(v => (v && typeof v === 'object') ? v._id : v).filter(Boolean);
                 cleaned.vendorQuotes = (cleaned.vendorQuotes || []).map(vq => ({
                     ...vq,
-                    vendorId: typeof vq.vendorId === 'object' ? vq.vendorId._id : vq.vendorId
-                }));
+                    vendorId: (vq.vendorId && typeof vq.vendorId === 'object') ? vq.vendorId._id : vq.vendorId
+                })).filter(vq => vq.vendorId);
                 return cleaned;
             });
 
@@ -401,7 +401,7 @@ const Enquiries = () => {
                                             <div className="flex flex-col gap-1">
                                                 {e.items.slice(0, 2).map((item, i) => (
                                                     <div key={i} className="text-xs font-bold text-slate-700 truncate max-w-[200px]">
-                                                        • {item.productName} 
+                                                        • {item.productName || item.productId?.productName || 'Unnamed Product'} 
                                                         <span className="text-[9px] text-slate-400 ml-1">
                                                         ({item.finalVendor ? 1 : item.vendors.length} vend)
                                                         </span>
@@ -608,7 +608,7 @@ const Enquiries = () => {
                                             <div key={idx} className="p-4 bg-slate-50 border border-slate-100 rounded-2xl space-y-3">
                                                 <div className="flex justify-between items-start gap-4">
                                                     <div>
-                                                        <h4 className="text-xs font-black text-slate-900">{item.productName}</h4>
+                                                        <h4 className="text-xs font-black text-slate-900">{item.productName || item.productId?.productName || 'Unnamed Product'}</h4>
                                                         <p className="text-[10px] font-bold text-slate-500 mt-1">Qty: {item.quantity} {item.uom}</p>
                                                     </div>
                                                     <ActionStatusPill status={item.actionStatus} />

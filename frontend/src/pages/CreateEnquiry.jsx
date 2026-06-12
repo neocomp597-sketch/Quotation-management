@@ -102,7 +102,7 @@ const ProductCodeSearchAutocomplete = ({ value, selectedLabel, onChange, product
     const inputRef = useRef(null);
 
     const selectedProduct = products.find(product => product.productCode === value || product._id === value);
-    const displayValue = selectedLabel || selectedProduct?.productName || value;
+    const displayValue = selectedLabel || selectedProduct?.productCode || value;
 
     const filteredProducts = useMemo(() => {
         const query = searchTerm.toLowerCase();
@@ -226,6 +226,10 @@ const createItemRow = (overrides = {}) => ({
     rowId: overrides.rowId || `item-${Date.now()}-${Math.random().toString(36).slice(2)}`
 });
 
+const isBlankRow = (item) => {
+    return (!item.productName || item.productName.trim() === '') && (!item.productCode || item.productCode.trim() === '');
+};
+
 const generateNextEnquiryNumber = (existingEnquiries = []) => {
     let maxNum = 0;
     let prefix = '';
@@ -322,11 +326,76 @@ const CreateEnquiry = () => {
                     vendorService.getAll(true),
                     productService.getAll()
                 ]);
+                const fetchedProducts = Array.isArray(prodRes.data) ? prodRes.data : prodRes.data?.data || [];
                 setCustomers(custRes.data);
                 setAllVendors(vendRes.data);
-                setProducts(Array.isArray(prodRes.data) ? prodRes.data : prodRes.data?.data || []);
+                setProducts(fetchedProducts);
 
-                if (!id) {
+                if (id) {
+                    setLoading(true);
+                    try {
+                        const res = await enquiryService.getById(id);
+                        const e = res.data;
+                        setHeader({
+                            enquiryNo: e.enquiryNo,
+                            enquiryDate: new Date(e.enquiryDate).toISOString().split('T')[0],
+                            customerId: e.customerId?._id || e.customerId,
+                            companyName: e.companyName || e.customerId?.companyName || '',
+                            contactPerson: e.contactPerson || e.customerId?.customerName || '',
+                            refReceivedFrom: e.refReceivedFrom || '',
+                            followUpDate: e.followUpDate ? new Date(e.followUpDate).toISOString().split('T')[0] : '',
+                            contactDesignation: e.contactDesignation || '',
+                            contactMobile: e.contactMobile || e.customerId?.mobile || '',
+                            contactEmail: e.contactEmail || e.customerId?.email || '',
+                            partners: Array.isArray(e.partners) ? e.partners : [],
+                            siteAddress: e.siteAddress || '',
+                            projectName: e.projectName || '',
+                            requiredDeliveryDate: e.requiredDeliveryDate ? new Date(e.requiredDeliveryDate).toISOString().split('T')[0] : '',
+                            priority: e.priority || 'Medium',
+                            budget: e.budget || '',
+                            technicalSpecifications: e.technicalSpecifications || '',
+                            attachmentName: e.attachmentName || '',
+                            status: e.status || 'New',
+                            probability: e.probability || 0,
+                            remarks: e.remarks || '',
+                            closureReason: e.closureReason || '',
+                            subtotal: e.subtotal || 0,
+                            discount: e.discount || 0,
+                            freight: e.freight || 0,
+                            otherCharges: e.otherCharges || 0,
+                            grandTotal: e.grandTotal || 0
+                        });
+                        setFollowUpLog(e.followUpHistory || []);
+                        
+                        const mappedItems = e.items.map(item => {
+                            const pId = item.productId?._id || item.productId || '';
+                            const matchedProduct = fetchedProducts.find(p => p._id === pId);
+                            return createItemRow({
+                                ...item,
+                                productId: pId,
+                                productCode: item.productCode || item.productId?.productCode || matchedProduct?.productCode || '',
+                                productName: item.productName || item.productId?.productName || matchedProduct?.productName || '',
+                                quantity: item.quantity || 1,
+                                price: item.price || item.rate || matchedProduct?.basePrice || 0,
+                                discountPercent: item.discountPercent || 0,
+                                value: item.value || 0,
+                                uom: item.uom || matchedProduct?.uom || 'Pcs',
+                                vendors: item.vendors.map(v => (v && typeof v === 'object') ? v._id : v).filter(Boolean),
+                                vendorQuotes: item.vendorQuotes.map(vq => ({
+                                    ...vq,
+                                    vendorId: (vq.vendorId && typeof vq.vendorId === 'object') ? vq.vendorId._id : vq.vendorId
+                                })).filter(vq => vq.vendorId),
+                                finalVendor: (item.finalVendor && typeof item.finalVendor === 'object') ? item.finalVendor._id : item.finalVendor || ''
+                            });
+                        });
+                        setItems(mappedItems);
+                    } catch (err) {
+                        toast.error('Failed to load enquiry');
+                        navigate('/enquiries');
+                    } finally {
+                        setLoading(false);
+                    }
+                } else {
                     try {
                         const enqRes = await enquiryService.getAll();
                         const nextEnqNo = generateNextEnquiryNumber(enqRes.data || []);
@@ -340,70 +409,6 @@ const CreateEnquiry = () => {
             }
         };
         fetchData();
-
-        if (id) {
-            const fetchEnquiry = async () => {
-                setLoading(true);
-                try {
-                    const res = await enquiryService.getById(id);
-                    const e = res.data;
-                    setHeader({
-                        enquiryNo: e.enquiryNo,
-                        enquiryDate: new Date(e.enquiryDate).toISOString().split('T')[0],
-                        customerId: e.customerId?._id || e.customerId,
-                        companyName: e.companyName || e.customerId?.companyName || '',
-                        contactPerson: e.contactPerson || e.customerId?.customerName || '',
-                        refReceivedFrom: e.refReceivedFrom || '',
-                        followUpDate: e.followUpDate ? new Date(e.followUpDate).toISOString().split('T')[0] : '',
-                        contactDesignation: e.contactDesignation || '',
-                        contactMobile: e.contactMobile || e.customerId?.mobile || '',
-                        contactEmail: e.contactEmail || e.customerId?.email || '',
-                        partners: Array.isArray(e.partners) ? e.partners : [],
-                        siteAddress: e.siteAddress || '',
-                        projectName: e.projectName || '',
-                        requiredDeliveryDate: e.requiredDeliveryDate ? new Date(e.requiredDeliveryDate).toISOString().split('T')[0] : '',
-                        priority: e.priority || 'Medium',
-                        budget: e.budget || '',
-                        technicalSpecifications: e.technicalSpecifications || '',
-                        attachmentName: e.attachmentName || '',
-                        status: e.status || 'New',
-                        probability: e.probability || 0,
-                        remarks: e.remarks || '',
-                        closureReason: e.closureReason || '',
-                        subtotal: e.subtotal || 0,
-                        discount: e.discount || 0,
-                        freight: e.freight || 0,
-                        otherCharges: e.otherCharges || 0,
-                        grandTotal: e.grandTotal || 0
-                    });
-                    setFollowUpLog(e.followUpHistory || []);
-                    
-                    const mappedItems = e.items.map(item => createItemRow({
-                        ...item,
-                        productId: item.productId?._id || item.productId || '',
-                        productCode: item.productCode || '',
-                        productName: item.productName || '',
-                        quantity: item.quantity || 1,
-                        price: item.price || item.rate || 0,
-                        discountPercent: item.discountPercent || 0,
-                        value: item.value || 0,
-                        vendors: item.vendors.map(v => typeof v === 'object' ? v._id : v),
-                        vendorQuotes: item.vendorQuotes.map(vq => ({
-                            ...vq,
-                            vendorId: typeof vq.vendorId === 'object' ? vq.vendorId._id : vq.vendorId
-                        })),
-                        finalVendor: typeof item.finalVendor === 'object' ? item.finalVendor?._id : item.finalVendor || ''
-                    }));
-                    setItems(mappedItems);
-                } catch (err) {
-                    toast.error('Failed to load enquiry');
-                    navigate('/enquiries');
-                } finally {
-                    setLoading(false);
-                }
-            };
-            fetchEnquiry();
-        }
     }, [id, navigate]);
 
     const handleHeaderChange = (e) => {
@@ -457,57 +462,60 @@ const CreateEnquiry = () => {
     };
 
     const updateItem = (rowId, field, value) => {
-        const newItems = items.map(item => (
-            item.rowId === rowId ? { ...item, [field]: value } : item
-        ));
-        const targetIndex = newItems.findIndex(item => item.rowId === rowId);
-        
-        // Auto-recalculate row level value field
-        if (targetIndex !== -1 && (field === 'quantity' || field === 'price' || field === 'discountPercent')) {
-            const qty = Number(newItems[targetIndex].quantity) || 0;
-            const price = Number(newItems[targetIndex].price) || 0;
-            const disc = Number(newItems[targetIndex].discountPercent) || 0;
-            newItems[targetIndex].value = Number((qty * price * (1 - disc / 100)).toFixed(2));
-        }
-        setItems(newItems);
+        setItems(prevItems => {
+            const newItems = prevItems.map(item => (
+                item.rowId === rowId ? { ...item, [field]: value } : item
+            ));
+            const targetIndex = newItems.findIndex(item => item.rowId === rowId);
+            if (targetIndex !== -1 && (field === 'quantity' || field === 'price' || field === 'discountPercent')) {
+                const qty = Number(newItems[targetIndex].quantity) || 0;
+                const price = Number(newItems[targetIndex].price) || 0;
+                const disc = Number(newItems[targetIndex].discountPercent) || 0;
+                newItems[targetIndex].value = Number((qty * price * (1 - disc / 100)).toFixed(2));
+            }
+            return newItems;
+        });
     };
 
     const handleProductSelect = (rowId, product) => {
-        const newItems = items.map(item => ({ ...item }));
-        let targetIndex = newItems.findIndex(item => item.rowId === rowId);
-        if (targetIndex === -1 && newItems.length === 1) {
-            targetIndex = 0;
-        }
-        if (targetIndex === -1) return;
+        setItems(prevItems => {
+            const newItems = prevItems.map(item => ({ ...item }));
+            let targetIndex = newItems.findIndex(item => item.rowId === rowId);
+            if (targetIndex === -1 && newItems.length === 1) {
+                targetIndex = 0;
+            }
+            if (targetIndex === -1) return prevItems;
 
-        newItems[targetIndex].productId = product._id;
-        newItems[targetIndex].productCode = product.productCode;
-        newItems[targetIndex].productName = product.productName;
-        newItems[targetIndex].price = product.basePrice || 0;
-        newItems[targetIndex].discountPercent = 0;
-        newItems[targetIndex].value = Number(((newItems[targetIndex].quantity || 1) * (product.basePrice || 0)).toFixed(2));
+            newItems[targetIndex].productId = product._id;
+            newItems[targetIndex].productCode = product.productCode;
+            newItems[targetIndex].productName = product.productName;
+            newItems[targetIndex].price = product.basePrice || 0;
+            newItems[targetIndex].discountPercent = 0;
+            newItems[targetIndex].value = Number(((newItems[targetIndex].quantity || 1) * (product.basePrice || 0)).toFixed(2));
 
-        const validUoms = ['Pcs', 'Nos', 'Kg', 'Meter', 'Mtr', 'Set', 'Ltr', 'Pack', 'Doz'];
-        const productUom = product.uom || 'Pcs';
-        const matchedUom = validUoms.find(u => u.toLowerCase() === productUom.toLowerCase());
-        newItems[targetIndex].uom = matchedUom || 'Pcs';
+            const validUoms = ['Pcs', 'Nos', 'Kg', 'Meter', 'Mtr', 'Set', 'Ltr', 'Pack', 'Doz'];
+            const productUom = product.uom || 'Pcs';
+            const matchedUom = validUoms.find(u => u.toLowerCase() === productUom.toLowerCase());
+            newItems[targetIndex].uom = matchedUom || 'Pcs';
 
-        if (product.vendors && Array.isArray(product.vendors) && product.vendors.length > 0) {
-            const mappedVendorIds = product.vendors.map(v => typeof v.vendorId === 'object' ? v.vendorId._id : v.vendorId);
-            newItems[targetIndex].vendors = mappedVendorIds;
-            newItems[targetIndex].vendorQuotes = product.vendors.map(v => {
-                const vendorId = typeof v.vendorId === 'object' ? v.vendorId._id : v.vendorId;
-                return {
-                    vendorId,
-                    price: v.price || '',
-                    deliveryTime: '',
-                    availability: Number(v.stock || 0) > 0 ? 'In Stock' : 'Out of Stock',
-                    remarks: '',
-                    probability: 0
-                };
-            });
-        }
-        setItems(newItems);
+            if (product.vendors && Array.isArray(product.vendors) && product.vendors.length > 0) {
+                const mappedVendorIds = product.vendors.map(v => (v.vendorId && typeof v.vendorId === 'object') ? v.vendorId._id : v.vendorId).filter(Boolean);
+                newItems[targetIndex].vendors = mappedVendorIds;
+                newItems[targetIndex].vendorQuotes = product.vendors.map(v => {
+                    const vendorId = (v.vendorId && typeof v.vendorId === 'object') ? v.vendorId._id : v.vendorId;
+                    if (!vendorId) return null;
+                    return {
+                        vendorId,
+                        price: v.price || '',
+                        deliveryTime: '',
+                        availability: Number(v.stock || 0) > 0 ? 'In Stock' : 'Out of Stock',
+                        remarks: '',
+                        probability: 0
+                    };
+                }).filter(Boolean);
+            }
+            return newItems;
+        });
     };
 
     const addItem = () => {
@@ -606,7 +614,17 @@ const CreateEnquiry = () => {
             return;
         }
 
-        const emptyProductIndex = items.findIndex(item => !item.productName || item.productName.trim() === '');
+        const filledItems = items.filter(item => !isBlankRow(item));
+
+        if (filledItems.length === 0) {
+            toast.error('At least one product item is required');
+            return;
+        }
+
+        const emptyProductIndex = items.findIndex(item => {
+            if (isBlankRow(item)) return false;
+            return !item.productName || item.productName.trim() === '';
+        });
         if (emptyProductIndex !== -1) {
             toast.error(`Product Name is required for all items. Check Item ${emptyProductIndex + 1}`);
             return;
@@ -614,9 +632,10 @@ const CreateEnquiry = () => {
 
         const finalStages = ['Finalized', 'PO Received', 'Won'];
         if (finalStages.includes(header.status)) {
-            const missingVendorItem = items.findIndex(i => !i.finalVendor);
-            if (missingVendorItem !== -1) {
-                toast.error(`Final Vendor selection is required for all items before saving as ${header.status}. Check Item ${missingVendorItem + 1}`);
+            const missingVendorIndexInFilled = filledItems.findIndex(i => !i.finalVendor);
+            if (missingVendorIndexInFilled !== -1) {
+                const origIndex = items.findIndex(origItem => origItem.rowId === filledItems[missingVendorIndexInFilled].rowId);
+                toast.error(`Final Vendor selection is required for all items before saving as ${header.status}. Check Item ${origIndex + 1}`);
                 return;
             }
         }
@@ -630,7 +649,7 @@ const CreateEnquiry = () => {
             });
         }
 
-        const cleanedItems = items.map(item => {
+        const cleanedItems = filledItems.map(item => {
             const cleaned = { ...item };
             delete cleaned.rowId;
             cleaned.rate = Number(cleaned.price) || 0;
@@ -657,6 +676,12 @@ const CreateEnquiry = () => {
         cleanedHeader.partners = (cleanedHeader.partners || []).filter(partner =>
             Object.values(partner).some(value => String(value || '').trim() !== '')
         );
+
+        const subtotal = cleanedItems.reduce((sum, item) => sum + (item.quantity * item.price * (1 - item.discountPercent / 100)), 0);
+        const discount = Number(header.discount) || 0;
+        const freight = Number(header.freight) || 0;
+        const otherCharges = Number(header.otherCharges) || 0;
+        const grandTotal = Math.max(0, subtotal - discount + freight + otherCharges);
         
         setLoading(true);
         try {
@@ -664,11 +689,11 @@ const CreateEnquiry = () => {
                 ...cleanedHeader, 
                 items: cleanedItems, 
                 followUpHistory: payloadHistory,
-                subtotal: calculatedTotals.subtotal,
-                discount: Number(header.discount) || 0,
-                freight: Number(header.freight) || 0,
-                otherCharges: Number(header.otherCharges) || 0,
-                grandTotal: calculatedTotals.grandTotal
+                subtotal: subtotal,
+                discount: discount,
+                freight: freight,
+                otherCharges: otherCharges,
+                grandTotal: grandTotal
             };
             if (isEditMode) {
                 await enquiryService.update(id, payload);
@@ -696,7 +721,17 @@ const CreateEnquiry = () => {
             return;
         }
 
-        const emptyProductIndex = items.findIndex(item => !item.productName || item.productName.trim() === '');
+        const filledItems = items.filter(item => !isBlankRow(item));
+
+        if (filledItems.length === 0) {
+            toast.error('At least one product item is required');
+            return;
+        }
+
+        const emptyProductIndex = items.findIndex(item => {
+            if (isBlankRow(item)) return false;
+            return !item.productName || item.productName.trim() === '';
+        });
         if (emptyProductIndex !== -1) {
             toast.error(`Product Name is required for all items. Check Item ${emptyProductIndex + 1}`);
             return;
@@ -704,9 +739,10 @@ const CreateEnquiry = () => {
 
         const finalStages = ['Finalized', 'PO Received', 'Won'];
         if (finalStages.includes(header.status)) {
-            const missingVendorItem = items.findIndex(i => !i.finalVendor);
-            if (missingVendorItem !== -1) {
-                toast.error(`Final Vendor selection is required for all items before saving as ${header.status}. Check Item ${missingVendorItem + 1}`);
+            const missingVendorIndexInFilled = filledItems.findIndex(i => !i.finalVendor);
+            if (missingVendorIndexInFilled !== -1) {
+                const origIndex = items.findIndex(origItem => origItem.rowId === filledItems[missingVendorIndexInFilled].rowId);
+                toast.error(`Final Vendor selection is required for all items before saving as ${header.status}. Check Item ${origIndex + 1}`);
                 return;
             }
         }
@@ -720,7 +756,7 @@ const CreateEnquiry = () => {
             });
         }
 
-        const cleanedItems = items.map(item => {
+        const cleanedItems = filledItems.map(item => {
             const cleaned = { ...item };
             delete cleaned.rowId;
             cleaned.rate = Number(cleaned.price) || 0;
@@ -748,17 +784,23 @@ const CreateEnquiry = () => {
             Object.values(partner).some(value => String(value || '').trim() !== '')
         );
 
+        const subtotal = cleanedItems.reduce((sum, item) => sum + (item.quantity * item.price * (1 - item.discountPercent / 100)), 0);
+        const discount = Number(header.discount) || 0;
+        const freight = Number(header.freight) || 0;
+        const otherCharges = Number(header.otherCharges) || 0;
+        const grandTotal = Math.max(0, subtotal - discount + freight + otherCharges);
+
         setLoading(true);
         try {
             const payload = { 
                 ...cleanedHeader, 
                 items: cleanedItems, 
                 followUpHistory: payloadHistory,
-                subtotal: calculatedTotals.subtotal,
-                discount: Number(header.discount) || 0,
-                freight: Number(header.freight) || 0,
-                otherCharges: Number(header.otherCharges) || 0,
-                grandTotal: calculatedTotals.grandTotal
+                subtotal: subtotal,
+                discount: discount,
+                freight: freight,
+                otherCharges: otherCharges,
+                grandTotal: grandTotal
             };
             await enquiryService.create(payload);
             toast.success('Enquiry created successfully');
@@ -1124,8 +1166,8 @@ const CreateEnquiry = () => {
                                         <td className="px-6 py-4 text-xs font-bold text-slate-400 text-center align-middle">{index + 1}</td>
                                         <td className="px-4 py-3 align-middle">
                                             <ProductCodeSearchAutocomplete
-                                                value={item.productCode}
-                                                selectedLabel={item.productName}
+                                                value={item.productId || item.productCode}
+                                                selectedLabel={item.productCode}
                                                 onChange={(val) => updateItem(item.rowId, 'productCode', val)}
                                                 products={products}
                                                 onSelectProduct={(product) => handleProductSelect(item.rowId, product)}

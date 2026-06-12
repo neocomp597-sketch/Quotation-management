@@ -469,7 +469,7 @@ if (require.main === module) {
   process.on("SIGTERM", () => shutdown("SIGTERM"));
 }
 
-// Temporary Debug: Inspect quotations in DB
+// Temporary Debug: Inspect quotations and products in DB
 (async () => {
     try {
         require('fs').writeFileSync(require('path').join(__dirname, 'test_run.txt'), 'Hello at ' + new Date().toISOString());
@@ -479,9 +479,15 @@ if (require.main === module) {
         const output = quotations.map(q => `ID: ${q._id}, quotationNo: ${q.quotationNo}, companyId: ${q.companyId}, status: ${q.status}`).join('\n');
         require('fs').writeFileSync(require('path').join(__dirname, 'debug_output.txt'), `Total quotations: ${quotations.length}\n${output}`);
         console.log("[DEBUG] Written quotations to debug_output.txt");
+
+        const Product = require('./models/Product');
+        const products = await Product.find({}).limit(50).lean();
+        const prodOutput = products.map(p => `ID: ${p._id}, code: ${p.productCode}, name: ${p.productName}, price: ${p.basePrice}`).join('\n');
+        require('fs').writeFileSync(require('path').join(__dirname, 'debug_products.txt'), `Total products: ${products.length}\n${prodOutput}`);
+        console.log("[DEBUG] Written products to debug_products.txt");
     } catch (err) {
         require('fs').writeFileSync(require('path').join(__dirname, 'debug_error.txt'), `Error: ${err.message}\nStack: ${err.stack}`);
-        console.error("[DEBUG] Error writing quotations:", err);
+        console.error("[DEBUG] Error writing quotations/products:", err);
     }
 })();
 
