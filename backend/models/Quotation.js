@@ -53,6 +53,7 @@ const QuotationSchema = new mongoose.Schema({
     status: { type: String, enum: ['draft', 'final', 'ordered'], default: 'draft' },
     territory: { type: mongoose.Schema.Types.ObjectId, ref: 'Territory' },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    clientRequestId: { type: String },
     createdAt: { type: Date, default: Date.now },
 });
 
@@ -63,6 +64,10 @@ QuotationSchema.index({ createdAt: -1 });
 QuotationSchema.index({ status: 1 });
 QuotationSchema.index({ companyId: 1, quotationNo: 1 }, { unique: true });
 QuotationSchema.index({ companyId: 1, quotationNumber: 1 });
+QuotationSchema.index(
+    { companyId: 1, clientRequestId: 1 },
+    { unique: true, partialFilterExpression: { clientRequestId: { $type: 'string' } } }
+);
 QuotationSchema.index({ customerName: 'text' });
 QuotationSchema.index({ territory: 1 });
 

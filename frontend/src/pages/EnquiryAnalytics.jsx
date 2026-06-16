@@ -6,6 +6,7 @@ import {
 } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import { analyticsService, enquiryService } from '../services/api';
+import { formatDate } from '../utils/helpers';
 import * as XLSX from 'xlsx';
 import {
     BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid,
@@ -328,7 +329,7 @@ const EnquiryAnalytics = () => {
                                         </div>
                                         <div className="text-right">
                                             <p className="text-[10px] font-bold text-slate-500">Follow-up</p>
-                                            <p className="font-bold text-slate-900">{new Date(e.followUpDate).toLocaleDateString()}</p>
+                                            <p className="font-bold text-slate-900">{formatDate(e.followUpDate)}</p>
                                             <span className={`text-xs font-black px-2 py-1 rounded mt-1 inline-block ${
                                                 e.probability >= 70 ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'
                                             }`}>
@@ -359,7 +360,7 @@ const EnquiryAnalytics = () => {
                                         </div>
                                         <div className="text-right">
                                             <p className="text-[10px] font-bold text-slate-500">Overdue Since</p>
-                                            <p className="font-bold text-rose-600">{new Date(e.followUpDate).toLocaleDateString()}</p>
+                                            <p className="font-bold text-rose-600">{formatDate(e.followUpDate)}</p>
                                         </div>
                                     </div>
                                 ))
@@ -385,7 +386,7 @@ const EnquiryAnalytics = () => {
                                         </div>
                                         <div className="text-right">
                                             <p className="text-[10px] font-bold text-slate-500">Scheduled</p>
-                                            <p className="font-bold text-blue-600">{new Date(e.followUpDate).toLocaleDateString()}</p>
+                                            <p className="font-bold text-blue-600">{formatDate(e.followUpDate)}</p>
                                         </div>
                                     </div>
                                 ))
@@ -423,7 +424,7 @@ const EnquiryAnalytics = () => {
                                             <td className="py-3 px-3">
                                                 <span className="text-xs font-bold px-2 py-1 rounded bg-slate-100 text-slate-700">{e.status}</span>
                                             </td>
-                                            <td className="py-3 px-3 text-slate-600">{new Date(e.lastActivityDate).toLocaleDateString()}</td>
+                                            <td className="py-3 px-3 text-slate-600">{formatDate(e.lastActivityDate)}</td>
                                         </tr>
                                     ))}
                                 </tbody>

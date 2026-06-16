@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import { MdNewReleases as IconReleases, MdRefresh as IconRefresh, MdCheckCircle as IconCheck, MdPerson as IconPerson, MdCalendarToday as IconCalendar, MdInfo as IconInfo } from 'react-icons/md';
 import { systemUpdateService } from '../services/api';
+import { formatDateTime } from '../utils/helpers';
 
 const SystemUpdates = () => {
     const [updates, setUpdates] = useState([]);
@@ -23,22 +24,6 @@ const SystemUpdates = () => {
     useEffect(() => {
         loadUpdates();
     }, []);
-
-    const formatDate = (dateStr) => {
-        try {
-            const date = new Date(dateStr);
-            return date.toLocaleDateString('en-IN', {
-                day: '2-digit',
-                month: 'short',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: true
-            });
-        } catch (e) {
-            return dateStr;
-        }
-    };
 
     return (
         <div className="space-y-8 max-w-4xl mx-auto">
@@ -100,7 +85,7 @@ const SystemUpdates = () => {
                                     <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs font-semibold text-slate-400">
                                         <span className="flex items-center gap-1.5">
                                             <IconCalendar size={14} className="text-slate-300" />
-                                            {formatDate(update.deployedAt)}
+                                            {formatDateTime(update.deployedAt)}
                                         </span>
                                         <span className="flex items-center gap-1.5">
                                             <IconPerson size={14} className="text-slate-300" />

@@ -1,6 +1,7 @@
 const cron = require('node-cron');
 const Enquiry = require('../models/Enquiry');
 const Notification = require('../models/Notification');
+const Meeting = require('../models/Meeting');
 const { closeBullMq, createWorker, getQueue, getQueueEvents } = require('../config/bullmq');
 
 const checkFollowUps = async () => {
@@ -49,7 +50,8 @@ const checkFollowUps = async () => {
                         message: message,
                         type: type,
                         relatedId: enquiry._id,
-                        dueDate: followUpDate
+                        dueDate: followUpDate,
+                        companyId: enquiry.companyId
                     });
                     console.log(`[Scheduler] Generated ${type} notification for ${enquiry.enquiryNo}`);
                 }
@@ -58,6 +60,98 @@ const checkFollowUps = async () => {
     } catch (err) {
         console.error('[Scheduler Error]', err);
     }
+};
+
+const checkMeetingReminders = async () => {
+    try {
+        console.log('[Scheduler] Checking for meeting reminders...');
+        const now = new Date();
+        const oneDayLimit = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+        const thirtyMinLimit = new Date(now.getTime() + 30 * 60 * 1000);
+
+        // 1-day reminders
+        const meetingsForOneDay = await Meeting.find({
+            isDeleted: { $ne: true },
+            status: { $in: ['Scheduled', 'Confirmed', 'In Progress'] },
+            startDateTime: { $gte: now, $lte: oneDayLimit },
+            'remindersSent.oneDay': false
+        });
+
+        for (const meeting of meetingsForOneDay) {
+            meeting.remindersSent.oneDay = true;
+            await meeting.save();
+            const notifyUserIds = Array.from(new Set([meeting.organizerId, ...meeting.participants].map(id => id.toString())));
+            for (const userId of notifyUserIds) {
+                await Notification.create({
+                    userId,
+                    title: 'Meeting Reminder (1 Day)',
+                    message: `Reminder: Meeting "${meeting.title}" starts in less than 24 hours (on ${new Date(meeting.startDateTime).toLocaleString()}).`,
+                    type: 'MEETING_REMINDER_1_DAY',
+                    dueDate: meeting.startDateTime,
+                    companyId: meeting.companyId
+                });
+            }
+            console.log(`[Scheduler] Sent 1-day reminder for meeting: ${meeting.title}`);
+        }
+
+        // 30-min reminders
+        const meetingsForThirtyMin = await Meeting.find({
+            isDeleted: { $ne: true },
+            status: { $in: ['Scheduled', 'Confirmed', 'In Progress'] },
+            startDateTime: { $gte: now, $lte: thirtyMinLimit },
+            'remindersSent.thirtyMin': false
+        });
+
+        for (const meeting of meetingsForThirtyMin) {
+            meeting.remindersSent.thirtyMin = true;
+            await meeting.save();
+            const notifyUserIds = Array.from(new Set([meeting.organizerId, ...meeting.participants].map(id => id.toString())));
+            for (const userId of notifyUserIds) {
+                await Notification.create({
+                    userId,
+                    title: 'Meeting Reminder (30 Mins)',
+                    message: `Reminder: Meeting "${meeting.title}" starts in less than 30 minutes!`,
+                    type: 'MEETING_REMINDER_30_MIN',
+                    dueDate: meeting.startDateTime,
+                    companyId: meeting.companyId
+                });
+            }
+            console.log(`[Scheduler] Sent 30-min reminder for meeting: ${meeting.title}`);
+        }
+    } catch (err) {
+        console.error('[Scheduler Meeting Reminders Error]', err);
+    }
+};
+
+const autoCompleteMeetings = async () => {
+    try {
+        console.log('[Scheduler] Checking for meetings to auto-complete...');
+        const now = new Date();
+        const pastMeetings = await Meeting.find({
+            isDeleted: { $ne: true },
+            status: { $in: ['Scheduled', 'Confirmed', 'In Progress'] },
+            endDateTime: { $lt: now }
+        });
+
+        for (const meeting of pastMeetings) {
+            meeting.status = 'Completed';
+            meeting.statusHistory.push({
+                status: 'Completed',
+                changedBy: meeting.organizerId,
+                changedAt: now
+            });
+            await meeting.save();
+            console.log(`[Scheduler] Automatically completed past meeting: ${meeting.title}`);
+        }
+    } catch (err) {
+        console.error('[Scheduler Meeting Auto-Complete Error]', err);
+    }
+};
+
+const runScheduledTasks = async () => {
+    await checkFollowUps();
+    await checkMeetingReminders();
+    await autoCompleteMeetings();
 };
 
 const FOLLOW_UP_QUEUE = 'follow-up-notifications';
@@ -87,7 +181,7 @@ const startBullMqScheduler = async () => {
         if (job.name !== FOLLOW_UP_JOB) {
             throw new Error(`Unsupported scheduler job: ${job.name}`);
         }
-        await checkFollowUps();
+        await runScheduledTasks();
     });
     const events = getQueueEvents(FOLLOW_UP_QUEUE);
 
@@ -110,11 +204,11 @@ const startBullMqScheduler = async () => {
 
 const startFallbackScheduler = () => {
     console.warn('[Scheduler] BullMQ unavailable; using in-process cron fallback.');
-    checkFollowUps();
+    runScheduledTasks();
 
     fallbackTask = cron.schedule(FOLLOW_UP_CRON, () => {
         console.log('[Cron] Running scheduled follow-up check');
-        checkFollowUps();
+        runScheduledTasks();
     });
 };
 
@@ -142,3 +236,6 @@ exports.stopScheduler = () => {
 };
 
 exports.checkFollowUps = checkFollowUps;
+exports.checkMeetingReminders = checkMeetingReminders;
+exports.autoCompleteMeetings = autoCompleteMeetings;
+exports.runScheduledTasks = runScheduledTasks;

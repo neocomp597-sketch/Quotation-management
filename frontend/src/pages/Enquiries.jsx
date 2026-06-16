@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { enquiryService } from '../services/api';
 import Modal from '../components/Modal';
 import CreateEnquiry from './CreateEnquiry';
+import { formatDate } from '../utils/helpers';
 
 const StatusPill = ({ status }) => {
     const styles = {
@@ -398,7 +399,7 @@ const Enquiries = () => {
                                                 </div>
                                                 <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-tighter">
                                                     <MdEventAvailable size={14} />
-                                                    {new Date(e.enquiryDate).toLocaleDateString()}
+                                                    {formatDate(e.enquiryDate)}
                                                 </div>
                                             </div>
                                         </td>
@@ -429,7 +430,7 @@ const Enquiries = () => {
                                                 {e.followUpDate && (
                                                     <div className="flex items-center gap-2 text-[10px] font-bold text-slate-600">
                                                         <span className="w-16">Follow-up:</span> 
-                                                        <span className="text-slate-900">{new Date(e.followUpDate).toLocaleDateString()}</span>
+                                                        <span className="text-slate-900">{formatDate(e.followUpDate)}</span>
                                                     </div>
                                                 )}
                                             </div>
@@ -518,7 +519,7 @@ const Enquiries = () => {
                             </div>
                             <div>
                                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Enquiry Date</span>
-                                <span className="text-sm font-black text-slate-900 mt-1 block">{new Date(viewModal.data.enquiryDate).toLocaleDateString()}</span>
+                                <span className="text-sm font-black text-slate-900 mt-1 block">{formatDate(viewModal.data.enquiryDate)}</span>
                             </div>
                             <div>
                                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Outcome Status</span>

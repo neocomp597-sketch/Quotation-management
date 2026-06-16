@@ -3,7 +3,7 @@ const Notification = require('../models/Notification');
 exports.getUnreadNotifications = async (req, res) => {
     try {
         const notifications = await Notification.find({ 
-            userId: req.user._id, 
+            userId: req.user.id || req.user._id, 
             isDismissed: false, 
             isRead: false 
         })
@@ -18,7 +18,7 @@ exports.getUnreadNotifications = async (req, res) => {
 
 exports.getAllNotifications = async (req, res) => {
     try {
-        const notifications = await Notification.find({ userId: req.user._id, isDismissed: false })
+        const notifications = await Notification.find({ userId: req.user.id || req.user._id, isDismissed: false })
             .select('userId title message type relatedId isRead isDismissed createdAt')
             .sort({ createdAt: -1 })
             .lean();

@@ -454,4 +454,53 @@ export const footerPageService = {
   update: (slug, data) => api.put(`/footer-pages/${slug}`, data),
 };
 
+export const payrollService = {
+  // Employee Profiles
+  getEmployees: (params) => api.get("/payroll/employees", { params }),
+  getEmployee: (id) => api.get(`/payroll/employees/${id}`),
+  createEmployee: (data) => api.post("/payroll/employees", data),
+  updateEmployee: (id, data) => api.put(`/payroll/employees/${id}`, data),
+  updateEmployeeStructure: (id, data) => api.put(`/payroll/employees/${id}/structure`, data),
+  deleteEmployee: (id) => api.delete(`/payroll/employees/${id}`),
+
+  // Settings
+  getSettings: () => api.get("/payroll/settings"),
+  updateSettings: (data) => api.put("/payroll/settings", data),
+
+  // Runs
+  getRuns: () => api.get("/payroll/runs"),
+  createRun: (data) => api.post("/payroll/runs", data),
+  getRunDetails: (id) => api.get(`/payroll/runs/${id}`),
+  calculateRun: (id) => api.post(`/payroll/runs/${id}/calculate`),
+  approveRun: (id) => api.post(`/payroll/runs/${id}/approve`),
+  lockRun: (id) => api.post(`/payroll/runs/${id}/lock`),
+  updateEmployeeSummary: (runId, summaryId, data) => api.put(`/payroll/runs/${runId}/employee/${summaryId}`, data),
+  updatePaymentDetails: (runId, summaryId, data) => api.put(`/payroll/runs/${runId}/employee/${summaryId}/payment`, data),
+  getEmployeeSummary: (runId, summaryId) => api.get(`/payroll/runs/${runId}/employee/${summaryId}`),
+
+  // Letters
+  getLetters: () => api.get("/payroll/letters"),
+  getLetter: (id) => api.get(`/payroll/letters/${id}`),
+  createLetter: (data) => api.post("/payroll/letters", data),
+  deleteLetter: (id) => api.delete(`/payroll/letters/${id}`),
+
+  // Reports
+  getReports: (params) => api.get("/payroll/reports", { params }),
+
+  // Audit Logs
+  getAuditLogs: () => api.get("/payroll/audit-logs"),
+};
+
+export const meetingService = {
+  getAll: (params) => api.get("/meetings", { params }),
+  getById: (id) => api.get(`/meetings/${id}`),
+  create: (data) => api.post("/meetings", data),
+  update: (id, data) => api.put(`/meetings/${id}`, data),
+  delete: (id) => api.delete(`/meetings/${id}`),
+  getStats: () => api.get("/meetings/stats"),
+  getUserSummary: () => api.get("/meetings/user-summary"),
+  getMonthlySummary: () => api.get("/meetings/monthly-summary"),
+  getClientHistory: (relatedRecordId) => api.get("/meetings/client-history", { params: { relatedRecordId } }),
+};
+
 export default api;

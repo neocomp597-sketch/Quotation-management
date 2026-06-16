@@ -1,6 +1,6 @@
 import React from 'react';
 import { Page, Text, View, Document, StyleSheet, Image } from '@react-pdf/renderer';
-import { resolveImageUrl } from '../utils/helpers';
+import { formatDate, resolveImageUrl } from '../utils/helpers';
 
 const styles = StyleSheet.create({
     page: { padding: 30, fontFamily: 'Helvetica', fontSize: 9, color: '#000', backgroundColor: '#ffffff' },
@@ -108,7 +108,7 @@ const VoucherPDF = ({ voucher, images = {}, companySettings }) => {
                             </View>
                             <View style={styles.qtnMetaRow}>
                                 <Text style={styles.qtnMetaLabel}>Date</Text>
-                                <Text style={styles.qtnMetaValue}>{new Date(voucher.date).toLocaleDateString('en-GB')}</Text>
+                                <Text style={styles.qtnMetaValue}>{formatDate(voucher.date)}</Text>
                             </View>
                             <View style={[styles.qtnMetaRow, { borderBottomWidth: 0 }]}>
                                 <Text style={styles.qtnMetaLabel}>{partyLabel}</Text>

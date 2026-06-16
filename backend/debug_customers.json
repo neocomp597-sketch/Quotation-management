@@ -18043,5 +18043,11 @@
     "companyName": "test for demo",
     "gstin": "12345678QWS",
     "logoUrl": ""
+  },
+  {
+    "_id": "6a2eeca222cf33cccf910513",
+    "customerName": "mehata sir",
+    "companyName": "fortuna engg.",
+    "gstin": "BYYPD4103QJ1ZS"
   }
 ]

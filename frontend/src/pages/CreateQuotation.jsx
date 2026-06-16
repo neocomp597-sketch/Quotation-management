@@ -36,6 +36,11 @@ const addToOfflineQueue = (payload) => {
 };
 const clearOfflineQueue = () => localStorage.removeItem(OFFLINE_QUEUE_KEY);
 
+const createClientRequestId = () => {
+    if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+    return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+};
+
 
 // Searchable Customer Dropdown Component
 const LIST_PAGE_SIZE = 20;
@@ -248,6 +253,8 @@ const CreateQuotation = () => {
     const lastSavedAt = useSelector((state) => state.quotationDraft.lastSavedAt);
     const draftKey = isEditMode ? `edit-${id}` : 'new';
     const localDraftKey = `quotation-draft:${draftKey}`;
+    const submitLockRef = useRef(false);
+    const clientRequestIdRef = useRef(createClientRequestId());
 
     // Master Data
     const [customers, setCustomers] = useState([]);
@@ -835,7 +842,7 @@ const CreateQuotation = () => {
 
     // Build minimal save payload — strips vendorOptions to reduce size
     const buildSavePayload = useCallback((status) => {
-        return {
+        const payload = {
             ...header,
             items: items.map(item => {
                 const bestVendor = !item.vendorId ? getBestVendor(item.vendorOptions || []) : null;
@@ -876,9 +883,17 @@ const CreateQuotation = () => {
             totalDiscount: totals.itemDiscount + Number(overallDiscount),
             status
         };
-    }, [header, items, selectedTermsTemplateId, termsContent, totals, overallDiscount]);
+
+        if (!isEditMode) {
+            payload.clientRequestId = clientRequestIdRef.current;
+        }
+
+        return payload;
+    }, [header, items, selectedTermsTemplateId, termsContent, totals, overallDiscount, isEditMode]);
 
     const handleSubmit = async (status) => {
+        if (submitLockRef.current) return;
+
         if (!header.customerId) {
             toast.error('Please select a Customer');
             return;
@@ -888,6 +903,7 @@ const CreateQuotation = () => {
             return;
         }
 
+        submitLockRef.current = true;
         setIsSaving(true);
         setSaveSuccess(false);
 
@@ -931,6 +947,7 @@ const CreateQuotation = () => {
                 toast.error(err.response?.data?.message || 'Error saving quotation');
             }
         } finally {
+            submitLockRef.current = false;
             setIsSaving(false);
         }
     };

@@ -32,6 +32,14 @@ const MENU_GROUPS = [
         ]
     },
     {
+        key: 'meetings',
+        label: 'Meetings',
+        description: 'Meeting schedule and appointment management',
+        children: [
+            { key: 'meetings_list', label: 'Meetings List', description: 'Schedule and view meetings' }
+        ]
+    },
+    {
         key: 'quotation',
         label: 'Sales',
         description: 'Quotation and sales invoice screens',
@@ -91,6 +99,19 @@ const MENU_GROUPS = [
             { key: 'admin_authorization', label: 'Authorization', description: 'Role authorization controls' },
             { key: 'admin_salespersons', label: 'Salespersons', description: 'Salesperson user administration' }
         ]
+    },
+    {
+        key: 'payroll',
+        label: 'Payroll',
+        description: 'Manage payroll settings, runs, calculations, and letters',
+        children: [
+            { key: 'payroll_employees', label: 'Employee Profiles', description: 'Manage employee salary profiles and structures' },
+            { key: 'payroll_runs', label: 'Run Payroll', description: 'Create and run monthly payroll batches' },
+            { key: 'payroll_payments', label: 'Payments', description: 'Record payment slips and transaction references' },
+            { key: 'payroll_settings', label: 'Payroll Settings', description: 'Manage payroll month and calculation configuration' },
+            { key: 'payroll_letters', label: 'Letter Management', description: 'Generate offer, appointment, promotion, and relieving letters' },
+            { key: 'payroll_reports', label: 'Payroll Reports', description: 'Access monthly register, deduction logs, and allocation charts' }
+        ]
     }
 ];
 
@@ -130,8 +151,8 @@ const FULL_ACCESS_KEYS = getAllPermissionKeys();
 // Sales: lightweight access - dashboard, enquiry, quotation only
 const DEFAULT_ROLE_PERMISSIONS = {
     admin: buildPermissions(FULL_ACCESS_KEYS),
-    manager: buildPermissions(['dashboard', 'master', 'enquiry', 'quotation', 'sale', 'purchase', 'planning', 'reports', 'settings']),
-    sales: buildPermissions(['dashboard', 'enquiry', 'quotation'])
+    manager: buildPermissions(['dashboard', 'master', 'enquiry', 'quotation', 'meetings', 'sale', 'purchase', 'planning', 'reports', 'settings']),
+    sales: buildPermissions(['dashboard', 'enquiry', 'quotation', 'meetings'])
 };
 
 /**

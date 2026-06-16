@@ -993,7 +993,7 @@ const Reports = () => {
             case 'quotations': {
                 const data = allQuotations.map(q => ({
                     'Quotation No': q.quotationNo,
-                    'Date': new Date(q.createdAt).toLocaleDateString(),
+                    'Date': formatDate(q.createdAt),
                     'Customer': q.customerId?.customerName || q.customerName,
                     'Company': q.customerId?.companyName || 'N/A',
                     'Subtotal': q.subtotal,
@@ -1067,7 +1067,7 @@ const Reports = () => {
                     'Category': f.Category,
                     'Enquiry No': f.enquiryNo,
                     'Customer': f.customerName,
-                    'Follow-up Date': f.followUpDate ? new Date(f.followUpDate).toLocaleDateString() : '',
+                    'Follow-up Date': f.followUpDate ? formatDate(f.followUpDate) : '',
                     'Status': f.status,
                     'Probability': f.probability ? f.probability + '%' : ''
                 }));
@@ -1191,7 +1191,7 @@ const Reports = () => {
                                         <td className="px-6 py-4 text-sm font-black text-slate-900">#{q.quotationNo}</td>
                                         <td className="px-6 py-4 text-sm font-bold text-slate-900">{q.customerId?.customerName || q.customerName}</td>
                                         <td className="px-6 py-4 text-sm font-bold text-slate-500">{q.customerId?.companyName || 'N/A'}</td>
-                                        <td className="px-6 py-4 text-sm font-medium text-slate-400">{new Date(q.createdAt).toLocaleDateString()}</td>
+                                        <td className="px-6 py-4 text-sm font-medium text-slate-400">{formatDate(q.createdAt)}</td>
                                         <td className="px-6 py-4 text-sm font-black text-slate-900">{formatCurrency(q.grandTotal)}</td>
                                         <td className="px-6 py-4">
                                             <span className={`inline-flex px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${q.status === 'ordered' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : q.status === 'final' ? 'bg-primary-50 text-primary-600 border border-primary-100' : 'bg-amber-50 text-amber-600 border border-amber-100'}`}>

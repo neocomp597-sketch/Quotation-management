@@ -35,6 +35,15 @@ export const MENU_PERMISSION_GROUPS = [
         ]
     },
     {
+        key: 'meetings',
+        label: 'Meetings',
+        description: 'Meeting schedule and appointment management',
+        defaultRoute: '/meetings',
+        children: [
+            { key: 'meetings_list', label: 'Meetings List', description: 'Schedule and view meetings', defaultRoute: '/meetings' }
+        ]
+    },
+    {
         key: 'quotation',
         label: 'Sales',
         description: 'Quotation and sales invoice screens',
@@ -100,6 +109,20 @@ export const MENU_PERMISSION_GROUPS = [
         children: [
             { key: 'admin_authorization', label: 'Authorization', description: 'Role authorization controls', defaultRoute: '/admin/authorization' },
             { key: 'admin_salespersons', label: 'Salespersons', description: 'Salesperson user administration', defaultRoute: '/salespersons' }
+        ]
+    },
+    {
+        key: 'payroll',
+        label: 'Payroll',
+        description: 'Manage employee salary profiles, payroll settings, monthly runs, payments, payslips, letters and reports',
+        defaultRoute: '/payroll/dashboard',
+        children: [
+            { key: 'payroll_employees', label: 'Employees', description: 'Employee salary profiles and base structures', defaultRoute: '/payroll/employees' },
+            { key: 'payroll_runs', label: 'Run Payroll', description: 'Run and calculate monthly payroll', defaultRoute: '/payroll/runs' },
+            { key: 'payroll_payments', label: 'Payments', description: 'Record employee payments', defaultRoute: '/payroll/payments' },
+            { key: 'payroll_settings', label: 'Settings', description: 'Manage lock dates and settings', defaultRoute: '/payroll/settings' },
+            { key: 'payroll_letters', label: 'Letters', description: 'Generate offer, appointment, promotion, relieving letters', defaultRoute: '/payroll/letters' },
+            { key: 'payroll_reports', label: 'Reports', description: 'View register, deduction logs, and allocation reports', defaultRoute: '/payroll/reports' }
         ]
     }
 ];

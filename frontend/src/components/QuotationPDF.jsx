@@ -1,6 +1,6 @@
 import React from 'react';
 import { Page, Text, View, Document, StyleSheet, Image, Font } from '@react-pdf/renderer';
-import { resolveImageUrl } from '../utils/helpers';
+import { formatDate, resolveImageUrl } from '../utils/helpers';
 
 const styles = StyleSheet.create({
     page: { padding: 30, fontFamily: 'Helvetica', fontSize: 9, color: '#000', backgroundColor: '#ffffff' },
@@ -204,11 +204,11 @@ const QuotationPDF = ({ quotation, format = 'format1', images = {}, companySetti
                                 </View>
                                 <View style={styles.qtnMetaRow}>
                                     <Text style={styles.qtnMetaLabel}>Date</Text>
-                                    <Text style={styles.qtnMetaValue}>{new Date(quotation.quotationDate).toLocaleDateString('en-GB')}</Text>
+                                    <Text style={styles.qtnMetaValue}>{formatDate(quotation.quotationDate)}</Text>
                                 </View>
                                 <View style={[styles.qtnMetaRow, { borderBottomWidth: 0 }]}>
                                     <Text style={styles.qtnMetaLabel}>Valid Till</Text>
-                                    <Text style={styles.qtnMetaValue}>{new Date(quotation.validTill).toLocaleDateString('en-GB')}</Text>
+                                    <Text style={styles.qtnMetaValue}>{formatDate(quotation.validTill)}</Text>
                                 </View>
                             </View>
                         </View>
@@ -390,13 +390,13 @@ const QuotationPDF = ({ quotation, format = 'format1', images = {}, companySetti
                                 <View style={styles.f2Row}><Text style={styles.f2Key}>State Code</Text><Text style={styles.f2Val}>: {quotation.siteId || quotation.customerId?.shippingAddress ? '27' : '-'}</Text></View>
                                 <View style={styles.f2Row}><Text style={styles.f2Key}>GSTIN No</Text><Text style={styles.f2Val}>: {quotation.customerId?.gstin || '-'}</Text></View>
                                 <View style={styles.f2Row}><Text style={styles.f2Key}>Ack No</Text><Text style={styles.f2Val}>: {quotation.ackNo || '-'}</Text></View>
-                                <View style={styles.f2Row}><Text style={styles.f2Key}>Ack Date</Text><Text style={styles.f2Val}>: {quotation.ackDate ? new Date(quotation.ackDate).toLocaleDateString('en-GB') : '-'}</Text></View>
+                                <View style={styles.f2Row}><Text style={styles.f2Key}>Ack Date</Text><Text style={styles.f2Val}>: {quotation.ackDate ? formatDate(quotation.ackDate) : '-'}</Text></View>
                             </View>
 
                             {/* Col 3: Invoice Info & QR */}
                             <View style={styles.f2ColLast}>
                                 <View style={styles.f2Row}><Text style={[styles.f2Key, { width: 80 }]}>Invoice Number</Text><Text style={styles.f2Val}>: {quotation.quotationNo}</Text></View>
-                                <View style={styles.f2Row}><Text style={[styles.f2Key, { width: 80 }]}>Invoice Date</Text><Text style={styles.f2Val}>: {new Date(quotation.quotationDate).toLocaleDateString('en-GB')}</Text></View>
+                                <View style={styles.f2Row}><Text style={[styles.f2Key, { width: 80 }]}>Invoice Date</Text><Text style={styles.f2Val}>: {formatDate(quotation.quotationDate)}</Text></View>
                                 <View style={styles.f2Row}><Text style={[styles.f2Key, { width: 80 }]}>Customer Code</Text><Text style={styles.f2Val}>: {quotation.customerId?.code || 'CUST-' + (quotation.customerId?._id?.slice(-4).toUpperCase() || '0000')}</Text></View>
                                 <View style={styles.f2Row}><Text style={[styles.f2Key, { width: 80 }]}>Ref No.</Text><Text style={styles.f2Val}>: {quotation.referenceNo || '-'}</Text></View>
                                 <View style={styles.f2Row}><Text style={[styles.f2Key, { width: 80 }]}>Payment Terms</Text><Text style={styles.f2Val}>: {quotation.paymentTerms || 'Advance'}</Text></View>
@@ -483,15 +483,15 @@ const QuotationPDF = ({ quotation, format = 'format1', images = {}, companySetti
                                 <View style={styles.groupTotalSection}>
                                     <View style={styles.groupTotalRow}>
                                         <Text style={styles.groupTotalLabel}>Total Group ({group.name}):</Text>
-                                        <Text style={styles.groupTotalValue}>{group.subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
+                                        <Text style={styles.groupTotalValue}>{(group.subtotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
                                     </View>
                                     <View style={styles.groupTotalRow}>
                                         <Text style={styles.groupTotalLabel}>Total GST ({group.name}):</Text>
-                                        <Text style={styles.groupTotalValue}>{group.gst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
+                                        <Text style={styles.groupTotalValue}>{(group.gst || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
                                     </View>
                                     <View style={styles.groupTotalRow}>
                                         <Text style={styles.groupTotalLabel}>Total (Included GST) ({group.name}):</Text>
-                                        <Text style={styles.groupTotalValue}>{group.total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
+                                        <Text style={styles.groupTotalValue}>{(group.total || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
                                     </View>
                                 </View>
                             )}
@@ -505,19 +505,19 @@ const QuotationPDF = ({ quotation, format = 'format1', images = {}, companySetti
                     <View style={styles.summaryBox}>
                         <View style={styles.summaryRow}>
                             <Text style={styles.summaryLabel}>Total:</Text>
-                            <Text style={styles.summaryValue}>{quotation.subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
+                            <Text style={styles.summaryValue}>{(quotation.subtotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
                         </View>
                         <View style={styles.summaryRow}>
                             <Text style={styles.summaryLabel}>GST:</Text>
-                            <Text style={styles.summaryValue}>{(quotation.gstBreakup.cgst + quotation.gstBreakup.sgst + quotation.gstBreakup.igst).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
+                            <Text style={styles.summaryValue}>{((quotation.gstBreakup?.cgst || 0) + (quotation.gstBreakup?.sgst || 0) + (quotation.gstBreakup?.igst || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
                         </View>
                         <View style={styles.summaryRow}>
                             <Text style={styles.summaryLabel}>Round Off:</Text>
-                            <Text style={styles.summaryValue}>{quotation.roundOff}</Text>
+                            <Text style={styles.summaryValue}>{quotation.roundOff || 0}</Text>
                         </View>
                         <View style={[styles.grandTotalRow, { borderBottomWidth: 0 }]}>
                             <Text style={[styles.summaryLabel, { fontSize: 10 }]}>Grand Total:</Text>
-                            <Text style={{ fontSize: 12, fontWeight: 'bold', width: 80, textAlign: 'right' }}>₹{quotation.grandTotal.toLocaleString('en-IN')}</Text>
+                            <Text style={{ fontSize: 12, fontWeight: 'bold', width: 80, textAlign: 'right' }}>₹{(quotation.grandTotal || 0).toLocaleString('en-IN')}</Text>
                         </View>
                     </View>
                 </View>
@@ -548,7 +548,7 @@ const QuotationPDF = ({ quotation, format = 'format1', images = {}, companySetti
                             {companySettings.authorizedSignatory.designation && ` (${companySettings.authorizedSignatory.designation})`}
                         </Text>
                     )}
-                    <Text style={styles.signatoryDate}>Date: {new Date().toLocaleDateString('en-GB')}</Text>
+                    <Text style={styles.signatoryDate}>Date: {formatDate(new Date())}</Text>
                 </View>
 
                 <Text style={styles.footer}>

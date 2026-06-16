@@ -61,7 +61,7 @@ exports.createStatus = async (req, res) => {
             name,
             color,
             isActive: isActive !== undefined ? isActive : true,
-            createdBy: req.user._id
+            createdBy: req.user.id || req.user._id
         });
         await status.save();
         await invalidateViaQueueOrNow('statuses:*', 'planning:*');

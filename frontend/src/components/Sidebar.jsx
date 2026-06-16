@@ -62,6 +62,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             icon: <MdFolderOpen size={22} />,
             children: [
                 { key: 'master_customers', name: 'Customers', icon: <MdPeople size={18} />, path: '/customers' },
+                { key: 'payroll_employees', name: 'Employees', icon: <MdPeople size={18} />, path: '/payroll/employees' },
                 { key: 'master_vendors', name: 'Vendors', icon: <MdStorefront size={18} />, path: '/vendors' },
                 { key: 'master_products', name: 'Products', icon: <MdInventory size={18} />, path: '/products' },
                 { key: 'master_territories', name: 'Territory Master', icon: <MdMap size={18} />, path: '/territory-master' },
@@ -73,12 +74,35 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
         },
         {
             type: 'group',
+            name: 'Payroll',
+            key: 'payroll',
+            icon: <MdCalendarMonth size={22} />,
+            children: [
+                { key: 'payroll_runs', name: 'Overview', icon: <MdDashboard size={18} />, path: '/payroll/dashboard' },
+                { key: 'payroll_runs', name: 'Run Payroll', icon: <MdReceipt size={18} />, path: '/payroll/runs' },
+                { key: 'payroll_payments', name: 'Payments', icon: <MdReceipt size={18} />, path: '/payroll/payments' },
+                { key: 'payroll_runs', name: 'Payslips', icon: <MdReceipt size={18} />, path: '/payroll/payslips' },
+                { key: 'payroll_letters', name: 'Letters', icon: <MdDescription size={18} />, path: '/payroll/letters' },
+                { key: 'payroll_settings', name: 'Settings', icon: <MdSettings size={18} />, path: '/payroll/settings' }
+            ]
+        },
+        {
+            type: 'group',
             name: 'Enquiry',
             key: 'enquiry',
             icon: <MdAssignment size={22} />,
             children: [
                 { key: 'enquiry_leads', name: 'Enquiry Register', icon: <MdAssignment size={18} />, path: '/enquiries' },
                 { key: 'enquiry_analytics', name: 'Analytics', icon: <MdAnalytics size={18} />, path: '/enquiries/analytics' },
+            ]
+        },
+        {
+            type: 'group',
+            name: 'Meetings',
+            key: 'meetings',
+            icon: <MdCalendarMonth size={22} />,
+            children: [
+                { key: 'meetings_list', name: 'Meetings Register', icon: <MdCalendarMonth size={18} />, path: '/meetings' },
             ]
         },
         {
@@ -118,6 +142,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             icon: <MdBarChart size={22} />,
             children: [
                 { key: 'reports_main', name: 'Reports', icon: <MdBarChart size={18} />, path: '/reports' },
+                { key: 'payroll_reports', name: 'Payroll Reports', icon: <MdBarChart size={18} />, path: '/payroll/reports' },
             ]
         },
         {
@@ -240,8 +265,8 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                                         }
                                     }}
                                     className={`w-full flex items-center gap-4 px-4 py-3 rounded-2xl transition-all duration-200 group relative ${hasActiveChild
-                                            ? 'text-primary-600 bg-primary-50'
-                                            : 'text-slate-500 hover:bg-slate-50 hover:text-primary-600'
+                                        ? 'text-primary-600 bg-primary-50'
+                                        : 'text-slate-500 hover:bg-slate-50 hover:text-primary-600'
                                         }`}
                                 >
                                     <div className="transition-transform duration-300 group-hover:scale-110 shrink-0">

@@ -376,8 +376,20 @@ const createQuotation = async (req, res) => {
             termsTemplateId,
             customTerms,
             status,
+            clientRequestId,
             totalDiscount: requestedTotalDiscount
         } = req.body;
+
+        const normalizedClientRequestId = normalizeReference(clientRequestId);
+        if (normalizedClientRequestId) {
+            const existingQuotation = await Quotation.findOne({
+                companyId: req.user?.companyId,
+                clientRequestId: normalizedClientRequestId,
+            });
+            if (existingQuotation) {
+                return res.status(200).json(existingQuotation);
+            }
+        }
 
         const customer = await Customer.findById(customerId)
             .select('companyName customerName billingAddress territory')
@@ -434,6 +446,7 @@ const createQuotation = async (req, res) => {
             status: status || 'draft',
             territory: customer.territory || null,
             createdBy: req.user ? req.user.id : undefined,
+            clientRequestId: normalizedClientRequestId || undefined,
         });
 
         await newQuotation.save();
@@ -458,6 +471,16 @@ const createQuotation = async (req, res) => {
     } catch (error) {
         console.error("Create Quotation Error Stack:", error);
         if (error.code === 11000) {
+            const duplicateClientRequestId = normalizeReference(req.body?.clientRequestId);
+            if (duplicateClientRequestId) {
+                const existingQuotation = await Quotation.findOne({
+                    companyId: req.user?.companyId,
+                    clientRequestId: duplicateClientRequestId,
+                });
+                if (existingQuotation) {
+                    return res.status(200).json(existingQuotation);
+                }
+            }
             return res.status(400).json({ message: 'Quotation reference number already exists. Please use a unique reference number.' });
         }
         res.status(error.statusCode || 500).json({ message: error.message || 'Error creating quotation' });

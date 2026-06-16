@@ -4,6 +4,7 @@ import { toast } from 'react-toastify';
 import { termsService } from '../services/api';
 import Modal from '../components/Modal';
 import PaginationControls from '../components/PaginationControls';
+import { formatDate } from '../utils/helpers';
 
 const LIST_PAGE_SIZE = 20;
 
@@ -163,7 +164,7 @@ const Terms = () => {
 
                             <div className="flex items-center justify-between mt-auto pt-4 border-t border-slate-50">
                                 <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">
-                                    {new Date(t.createdAt).toLocaleDateString()}
+                                    {formatDate(t.createdAt)}
                                 </span>
                                 <div className="flex gap-2">
                                     <button

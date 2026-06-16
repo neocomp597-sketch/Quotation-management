@@ -5,6 +5,25 @@ import { notificationService, systemUpdateService } from '../services/api';
 import { toast } from 'react-toastify';
 import { useAuth } from '../context/AuthContext';
 
+const formatNotificationType = (type) => {
+    switch (type) {
+        case 'MEETING_CREATED':
+            return 'Meeting Scheduled';
+        case 'MEETING_REMINDER_1_DAY':
+            return 'Meeting in 1 Day';
+        case 'MEETING_REMINDER_30_MIN':
+            return 'Meeting in 30 Mins';
+        case 'MEETING_UPDATED':
+            return 'Meeting Updated';
+        case 'MEETING_CANCELLED':
+            return 'Meeting Cancelled';
+        case 'MEETING_RESCHEDULED':
+            return 'Meeting Rescheduled';
+        default:
+            return type;
+    }
+};
+
 const Header = ({ sidebarOpen, toggleSidebar }) => {
     const navigate = useNavigate();
     const { user, logout } = useAuth();
@@ -68,9 +87,16 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
         const interval = setInterval(() => {
             void fetchNotifications();
         }, 5 * 60 * 1000); // 5 mins
+
+        const handleNotificationUpdate = () => {
+            void fetchNotifications();
+        };
+        window.addEventListener('onNotificationUpdate', handleNotificationUpdate);
+
         return () => {
             clearTimeout(initialFetchTimer);
             clearInterval(interval);
+            window.removeEventListener('onNotificationUpdate', handleNotificationUpdate);
         };
     }, []);
 
@@ -132,6 +158,8 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
                 }
             } else if (n.type === 'Planning') {
                 navigate('/planning');
+            } else if (n.type.startsWith('MEETING_')) {
+                navigate('/meetings');
             } else {
                 if (n.relatedId) navigate(`/enquiries/edit/${n.relatedId}`);
             }
@@ -166,7 +194,13 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
                 <div className="flex items-center gap-3">
                     <div className="relative" ref={notifRef}>
                         <button 
-                            onClick={() => setIsNotifOpen(!isNotifOpen)}
+                            onClick={() => {
+                                const nextState = !isNotifOpen;
+                                setIsNotifOpen(nextState);
+                                if (nextState) {
+                                    void fetchNotifications();
+                                }
+                            }}
                             className="relative p-2.5 rounded-2xl bg-slate-50 text-slate-500 hover:text-primary-600 hover:bg-white hover:ring-1 hover:ring-slate-100 transition-all flex"
                         >
                             <MdNotifications size={22} />
@@ -199,11 +233,14 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
                                         } else if (n.type === 'Release') {
                                             borderClass = 'border-indigo-500 bg-indigo-50/30';
                                             textClass = 'text-indigo-600';
+                                        } else if (n.type.startsWith('MEETING_')) {
+                                            borderClass = 'border-teal-500 bg-teal-50/30';
+                                            textClass = 'text-teal-600';
                                         }
                                         return (
                                             <div key={n._id} onClick={() => handleNotifClick(n)} className={`p-3 mx-2 mb-1 rounded-xl cursor-pointer hover:bg-slate-50 transition-colors border-l-4 ${borderClass}`}>
                                                 <div className="flex justify-between items-start mb-1">
-                                                    <span className={`text-[10px] font-black uppercase tracking-widest ${textClass}`}>{n.type}</span>
+                                                    <span className={`text-[10px] font-black uppercase tracking-widest ${textClass}`}>{formatNotificationType(n.type)}</span>
                                                     <button onClick={(e) => dismissNotification(n._id, e)} className="text-slate-400 hover:text-slate-600">
                                                         <MdCheck size={14} />
                                                     </button>

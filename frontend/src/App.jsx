@@ -17,6 +17,8 @@ import Register from './pages/Register';
 import Enquiries from './pages/Enquiries';
 import CreateEnquiry from './pages/CreateEnquiry';
 import EnquiryAnalytics from './pages/EnquiryAnalytics';
+import Meetings from './pages/Meetings';
+import CreateMeeting from './pages/CreateMeeting';
 import Salespersons from './pages/Salespersons';
 import Settings from './pages/Settings';
 import Attributes from './pages/Attributes';
@@ -36,6 +38,15 @@ import ProtectedRoute from './components/ProtectedRoute';
 
 import FooterPageView from './pages/FooterPageView';
 import SystemUpdates from './pages/SystemUpdates';
+
+import PayrollDashboard from './pages/PayrollDashboard';
+import PayrollEmployees from './pages/PayrollEmployees';
+import PayrollRuns from './pages/PayrollRuns';
+import PayrollPayments from './pages/PayrollPayments';
+import PayrollPayslips from './pages/PayrollPayslips';
+import PayrollLetters from './pages/PayrollLetters';
+import PayrollReports from './pages/PayrollReports';
+import PayrollSettingsPage from './pages/PayrollSettingsPage';
 
 function App() {
   return (
@@ -74,6 +85,9 @@ function App() {
             <Route path="/enquiries/analytics" element={<PermissionRoute permissionKey="enquiry_analytics"><Layout><EnquiryAnalytics /></Layout></PermissionRoute>} />
             <Route path="/enquiries/create" element={<PermissionRoute permissionKey="enquiry_leads"><Layout><CreateEnquiry /></Layout></PermissionRoute>} />
             <Route path="/enquiries/edit/:id" element={<PermissionRoute permissionKey="enquiry_leads"><Layout><CreateEnquiry /></Layout></PermissionRoute>} />
+            <Route path="/meetings" element={<PermissionRoute permissionKey="meetings_list"><Layout><Meetings /></Layout></PermissionRoute>} />
+            <Route path="/meetings/new" element={<PermissionRoute permissionKey="meetings_list"><Layout><CreateMeeting /></Layout></PermissionRoute>} />
+            <Route path="/meetings/:id" element={<PermissionRoute permissionKey="meetings_list"><Layout><CreateMeeting /></Layout></PermissionRoute>} />
             <Route path="/products" element={<PermissionRoute permissionKey="master_products"><Layout><Products /></Layout></PermissionRoute>} />
             <Route path="/invoices" element={<PermissionRoute permissionKey="sale_invoices"><Layout><Vouchers mode="invoice" /></Layout></PermissionRoute>} />
             <Route path="/invoices/new" element={<PermissionRoute permissionKey="sale_invoices"><Layout><CreateVoucher mode="invoice" /></Layout></PermissionRoute>} />
@@ -101,6 +115,17 @@ function App() {
             <Route path="/admin/authorization" element={<PermissionRoute permissionKey="admin_authorization"><Layout><Authorization /></Layout></PermissionRoute>} />
             <Route path="/super-admin" element={<PermissionRoute superAdminOnly={true}><Layout><SuperAdmin /></Layout></PermissionRoute>} />
             <Route path="/system-updates" element={<PermissionRoute><Layout><SystemUpdates /></Layout></PermissionRoute>} />
+
+            {/* Payroll Routes */}
+            <Route path="/payroll/dashboard" element={<PermissionRoute permissionKey="payroll_runs"><Layout><PayrollDashboard /></Layout></PermissionRoute>} />
+            <Route path="/payroll/employees" element={<PermissionRoute permissionKey="payroll_employees"><Layout><PayrollEmployees /></Layout></PermissionRoute>} />
+            <Route path="/payroll/runs" element={<PermissionRoute permissionKey="payroll_runs"><Layout><PayrollRuns /></Layout></PermissionRoute>} />
+            <Route path="/payroll/payments" element={<PermissionRoute permissionKey="payroll_payments"><Layout><PayrollPayments /></Layout></PermissionRoute>} />
+            <Route path="/payroll/payslips" element={<PermissionRoute permissionKey="payroll_runs"><Layout><PayrollPayslips /></Layout></PermissionRoute>} />
+            <Route path="/payroll/letters" element={<PermissionRoute permissionKey="payroll_letters"><Layout><PayrollLetters /></Layout></PermissionRoute>} />
+            <Route path="/payroll/reports" element={<PermissionRoute permissionKey="payroll_reports"><Layout><PayrollReports /></Layout></PermissionRoute>} />
+            <Route path="/payroll/settings" element={<PermissionRoute permissionKey="payroll_settings"><Layout><PayrollSettingsPage /></Layout></PermissionRoute>} />
+
             <Route path="/info/:slug" element={<Layout><FooterPageView /></Layout>} />
           </Route>
 

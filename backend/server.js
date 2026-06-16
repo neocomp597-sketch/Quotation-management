@@ -1,3 +1,4 @@
+require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const bodyParser = require("body-parser");
@@ -6,7 +7,6 @@ const { connectRedis, disconnectRedis } = require("./config/redis");
 const { closeBullMq } = require("./config/bullmq");
 const { startAuthSessionWorker } = require("./queues/authSessionQueue");
 const { startCacheInvalidationWorker } = require("./queues/cacheInvalidationQueue");
-require("dotenv").config();
 
 const app = express();
 
@@ -84,9 +84,11 @@ const statusRoutes = require("./routes/statusRoutes");
 const territoryRoutes = require("./routes/territoryRoutes");
 const footerPageRoutes = require("./routes/footerPageRoutes");
 const superAdminRoutes = require("./routes/superAdminRoutes");
+const payrollRoutes = require("./routes/payrollRoutes");
+const meetingRoutes = require("./routes/meetingRoutes");
 const scheduler = require("./utils/scheduler");
 
-// API Routes
+// API Routes (Reload triggered)
 app.use("/api/quotations", quotationRoutes);
 app.use("/api/customers", customerRoutes);
 app.use("/api/products", productRoutes);
@@ -113,6 +115,8 @@ app.use("/api/statuses", statusRoutes);
 app.use("/api/territories", territoryRoutes);
 app.use("/api/footer-pages", footerPageRoutes);
 app.use("/api/super-admin", superAdminRoutes);
+app.use("/api/payroll", payrollRoutes);
+app.use("/api/meetings", meetingRoutes);
 
 app.get('/api/trigger-seed', async (req, res) => {
     try {
@@ -349,6 +353,28 @@ const startBackgroundServices = async () => {
       },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
+    await SystemUpdate.findOneAndUpdate(
+      { version: "v3.0.0-meetings" },
+      {
+        version: "v3.0.0-meetings",
+        title: "CRM Meetings Module Architecture Plan",
+        message: "The Meetings module plan has been revised with UTC ISO scheduling, reminder tracking, soft deletes, conflict warnings, modular reports, and premium list, calendar, and agenda views.",
+        releaseNotes: [
+          "Store meeting startDateTime and endDateTime directly as UTC ISO Date fields",
+          "Track one-day and thirty-minute reminders with remindersSent flags to prevent duplicate alerts",
+          "Use soft deletes with isDeleted, deletedAt, and deletedBy instead of hard removal",
+          "Add backend conflict detection for organizers and participants, with allowConflict override support",
+          "Capture meeting outcomes for completed meetings and audit all status changes in statusHistory",
+          "Split reporting into stats, user-summary, monthly-summary, and client-history endpoints",
+          "Add notification support for meeting created, updated, cancelled, rescheduled, and reminder events",
+          "Add frontend Meetings list, visual calendar, agenda, reporting dashboard, and create/edit conflict warning flow"
+        ],
+        deployedBy: "Super Admin",
+        deployedAt: new Date("2026-06-16T21:22:39+05:30"),
+        isActive: true
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
   } catch (err) {
     console.error("[Release Seed Error] Failed to seed system update:", err.message);
   }
@@ -491,4 +517,5 @@ if (require.main === module) {
     }
 })();
 
+// Trigger nodemon reload
 module.exports = app;
