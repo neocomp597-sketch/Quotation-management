@@ -122,8 +122,8 @@ const Meetings = () => {
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
 
-    // View toggles: calendar (default), list, reports
-    const [viewMode, setViewMode] = useState('calendar'); 
+    // View toggles: list (default), calendar, reports
+    const [viewMode, setViewMode] = useState('list'); 
     const [calendarMode, setCalendarMode] = useState('month'); // month, week, day, agenda
     const [scopeFilter, setScopeFilter] = useState('all'); // all, mine, team
 
