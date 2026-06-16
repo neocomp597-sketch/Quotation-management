@@ -348,7 +348,7 @@ const startBackgroundServices = async () => {
           "Improved system updates history loading and latest release access"
         ],
         deployedBy: "Super Admin",
-        deployedAt: new Date(),
+        deployedAt: new Date("2026-06-15T12:00:00Z"),
         isActive: true
       },
       { upsert: true, new: true, setDefaultsOnInsert: true }
