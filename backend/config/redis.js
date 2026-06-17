@@ -16,6 +16,13 @@ const getRedisReconnectStrategy = (retries) => {
     return Math.min(retries * 100, 3000);
 };
 
+// BullMQ uses ioredis which crashes the process with an unhandled 'error' event
+// if the retry strategy returns an Error. This strategy never gives up — it just
+// backs off to a maximum delay and keeps retrying silently.
+const getBullMqReconnectStrategy = (retries) => {
+    return Math.min(retries * 200, 10000);
+};
+
 const getBullMqConnectionOptions = () => {
     const url = getRedisUrl();
     if (!url) return null;
@@ -32,7 +39,7 @@ const getBullMqConnectionOptions = () => {
         tls: parsed.protocol === 'rediss:' ? {} : undefined,
         connectTimeout: Number(process.env.REDIS_CONNECT_TIMEOUT_MS || 5000),
         maxRetriesPerRequest: null,
-        retryStrategy: getRedisReconnectStrategy,
+        retryStrategy: getBullMqReconnectStrategy,
     };
 };
 
@@ -52,8 +59,15 @@ const getRedisClient = () => {
         },
     });
 
+    // Rate-limit error logs to avoid flooding the console during Redis outages
+    let lastRedisErrorLog = 0;
+    const REDIS_ERROR_LOG_INTERVAL_MS = 30000;
     client.on('error', (error) => {
-        console.error('Redis error:', error.message);
+        const now = Date.now();
+        if (now - lastRedisErrorLog > REDIS_ERROR_LOG_INTERVAL_MS) {
+            lastRedisErrorLog = now;
+            console.error('Redis error:', error.message);
+        }
     });
 
     return client;

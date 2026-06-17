@@ -64,6 +64,7 @@ const startAuthSessionWorker = async () => {
             console.log('[AuthSessionQueue] Worker ready');
         } catch (error) {
             console.error('[AuthSessionQueue] Worker not ready:', error.message);
+            await worker.close().catch(() => {});
         }
     }
 };

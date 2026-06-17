@@ -5,6 +5,27 @@ const Customer = require('../models/Customer');
 const Enquiry = require('../models/Enquiry');
 const mongoose = require('mongoose');
 
+const getOrganizerDefaultReportTo = async (organizerId, companyId) => {
+    if (!organizerId) return null;
+    const organizer = await User.findOne({ _id: organizerId, companyId }).select('reportsTo').lean();
+    return organizer?.reportsTo || null;
+};
+
+const validateAppointmentReportTo = async (reportTo, companyId) => {
+    if (!reportTo) return null;
+    const senior = await User.findOne({ _id: reportTo, companyId }).select('_id').lean();
+    if (!senior) {
+        throw new Error('Selected report-to senior was not found in this company');
+    }
+    return reportTo;
+};
+
+const getDirectReportIds = async (userId, companyId) => {
+    if (!userId || !companyId) return [];
+    const reports = await User.find({ companyId, reportsTo: userId }).select('_id').lean();
+    return reports.map((user) => user._id);
+};
+
 // Helper to check for overlapping meetings
 const checkOverlaps = async (startDateTime, endDateTime, organizerId, participants = [], excludeMeetingId = null) => {
     const start = new Date(startDateTime);
@@ -45,6 +66,7 @@ exports.createMeeting = async (req, res) => {
             relatedModule,
             relatedRecordId,
             organizerId,
+            reportTo,
             participants = [],
             location,
             agenda,
@@ -68,6 +90,10 @@ exports.createMeeting = async (req, res) => {
             }
         }
 
+        const resolvedReportTo = reportTo
+            ? await validateAppointmentReportTo(reportTo, req.user?.companyId)
+            : await getOrganizerDefaultReportTo(organizerId, req.user?.companyId);
+
         const newMeeting = new Meeting({
             title,
             startDateTime,
@@ -75,6 +101,7 @@ exports.createMeeting = async (req, res) => {
             relatedModule,
             relatedRecordId,
             organizerId,
+            reportTo: resolvedReportTo,
             participants,
             location,
             agenda,
@@ -108,6 +135,9 @@ exports.createMeeting = async (req, res) => {
 
         res.status(201).json(newMeeting);
     } catch (err) {
+        if (/report-to senior/i.test(err.message)) {
+            return res.status(400).json({ message: err.message });
+        }
         console.error('[Meeting Create Error]', err);
         res.status(500).json({ message: err.message });
     }
@@ -116,7 +146,7 @@ exports.createMeeting = async (req, res) => {
 // Get all meetings (tenant isolated)
 exports.getAllMeetings = async (req, res) => {
     try {
-        const { status, organizerId, relatedRecordId, start, end, search } = req.query;
+        const { status, organizerId, relatedRecordId, start, end, search, scope } = req.query;
 
         const query = { isDeleted: { $ne: true } };
 
@@ -125,6 +155,18 @@ exports.getAllMeetings = async (req, res) => {
         }
         if (organizerId) {
             query.organizerId = organizerId;
+        }
+        if (scope === 'team' && req.user?.id) {
+            const directReportIds = await getDirectReportIds(req.user.id, req.user.companyId);
+            query.$or = [
+                { reportTo: req.user.id },
+                { organizerId: { $in: directReportIds } }
+            ];
+        } else if (scope === 'mine' && req.user?.id) {
+            query.$or = [
+                { organizerId: req.user.id },
+                { participants: req.user.id }
+            ];
         }
         if (relatedRecordId) {
             query.relatedRecordId = relatedRecordId;
@@ -140,6 +182,7 @@ exports.getAllMeetings = async (req, res) => {
 
         const meetings = await Meeting.find(query)
             .populate('organizerId', 'name email')
+            .populate('reportTo', 'name email')
             .populate('participants', 'name email')
             .populate({ path: 'relatedRecordId' }) // dynamic populate
             .sort({ startDateTime: 1 })
@@ -157,6 +200,7 @@ exports.getMeetingById = async (req, res) => {
     try {
         const meeting = await Meeting.findOne({ _id: req.params.id, isDeleted: { $ne: true } })
             .populate('organizerId', 'name email')
+            .populate('reportTo', 'name email')
             .populate('participants', 'name email')
             .populate({ path: 'relatedRecordId' })
             .lean();
@@ -188,6 +232,7 @@ exports.updateMeeting = async (req, res) => {
             relatedModule,
             relatedRecordId,
             organizerId,
+            reportTo,
             participants,
             location,
             agenda,
@@ -238,6 +283,11 @@ exports.updateMeeting = async (req, res) => {
         if (relatedModule !== undefined) meeting.relatedModule = relatedModule;
         if (relatedRecordId !== undefined) meeting.relatedRecordId = relatedRecordId;
         if (organizerId !== undefined) meeting.organizerId = organizerId;
+        if (reportTo !== undefined) {
+            meeting.reportTo = await validateAppointmentReportTo(reportTo, req.user?.companyId);
+        } else if (organizerChanged) {
+            meeting.reportTo = await getOrganizerDefaultReportTo(organizerId, req.user?.companyId);
+        }
         if (participants !== undefined) meeting.participants = participants;
         if (location !== undefined) meeting.location = location;
         if (agenda !== undefined) meeting.agenda = agenda;
@@ -266,6 +316,9 @@ exports.updateMeeting = async (req, res) => {
 
         res.json(meeting);
     } catch (err) {
+        if (/report-to senior/i.test(err.message)) {
+            return res.status(400).json({ message: err.message });
+        }
         console.error('[Meeting Update Error]', err);
         res.status(500).json({ message: err.message });
     }
@@ -429,6 +482,7 @@ exports.getMeetingClientHistory = async (req, res) => {
             isDeleted: { $ne: true }
         })
         .populate('organizerId', 'name email')
+        .populate('reportTo', 'name email')
         .populate('participants', 'name email')
         .sort({ startDateTime: -1 })
         .lean();

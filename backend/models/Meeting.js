@@ -12,6 +12,7 @@ const MeetingSchema = new mongoose.Schema({
     },
     relatedRecordId: { type: mongoose.Schema.Types.ObjectId, required: true, refPath: 'relatedModule' },
     organizerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    reportTo: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     participants: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     location: { type: String, trim: true },
     agenda: { type: String, trim: true },
@@ -50,6 +51,7 @@ MeetingSchema.pre('save', function() {
 // Performance optimization indexes
 MeetingSchema.index({ companyId: 1, startDateTime: 1 });
 MeetingSchema.index({ companyId: 1, organizerId: 1 });
+MeetingSchema.index({ companyId: 1, reportTo: 1 });
 MeetingSchema.index({ companyId: 1, status: 1 });
 MeetingSchema.index({ relatedRecordId: 1 });
 

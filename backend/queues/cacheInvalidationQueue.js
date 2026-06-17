@@ -61,6 +61,7 @@ const startCacheInvalidationWorker = async () => {
         console.log('[CacheInvalidationQueue] Worker ready');
     } catch (error) {
         console.error('[CacheInvalidationQueue] Worker not ready:', error.message);
+        await worker.close().catch(() => {});
     }
 };
 

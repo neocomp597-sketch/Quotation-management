@@ -20,7 +20,6 @@ import {
     MdPeople,
     MdClose,
     MdEdit,
-    MdDelete,
     MdOutlineDragIndicator,
     MdExpandMore
 } from 'react-icons/md';
@@ -163,6 +162,7 @@ const Meetings = () => {
     const [formStartTime, setFormStartTime] = useState('10:00');
     const [formEndTime, setFormEndTime] = useState('11:00');
     const [formOrganizerId, setFormOrganizerId] = useState('');
+    const [formReportToId, setFormReportToId] = useState('');
     const [formParticipants, setFormParticipants] = useState([]);
     const [formLocation, setFormLocation] = useState('');
     const [formAgenda, setFormAgenda] = useState('');
@@ -218,7 +218,7 @@ const Meetings = () => {
             const statsRes = await meetingService.getStats();
             setStats(statsRes.data);
         } catch (err) {
-            console.error('Failed to load meetings', err);
+            console.error('Failed to load appointments', err);
         } finally {
             setLoading(false);
         }
@@ -284,17 +284,21 @@ const Meetings = () => {
 
         return meetings.filter(m => {
             const organizerId = m.organizerId?._id || m.organizerId || '';
+            const reportToId = m.reportTo?._id || m.reportTo || '';
+            const organizer = users.find(u => u._id === organizerId);
+            const organizerReportsTo = organizer?.reportsTo?._id || organizer?.reportsTo || '';
             const participantIds = m.participants?.map(p => p._id || p) || [];
             const isMine = organizerId.toString() === currentUserId.toString() || participantIds.includes(currentUserId);
+            const isTeamAppointment = reportToId.toString() === currentUserId.toString() || organizerReportsTo.toString() === currentUserId.toString();
 
             if (scopeFilter === 'mine') {
                 return isMine;
             } else if (scopeFilter === 'team') {
-                return !isMine;
+                return isTeamAppointment;
             }
             return true;
         });
-    }, [meetings, scopeFilter, currentUser]);
+    }, [meetings, scopeFilter, currentUser, users]);
 
     // Search query filter
     const displayedMeetings = useMemo(() => {
@@ -364,6 +368,8 @@ const Meetings = () => {
             
             const currentUserId = currentUser?._id || currentUser?.id;
             setFormOrganizerId(currentUserId || '');
+            const currentUserRecord = users.find(u => u._id === currentUserId);
+            setFormReportToId(currentUserRecord?.reportsTo?._id || currentUserRecord?.reportsTo || '');
             setFormParticipants([]);
             setDrawerOpen(true);
             return;
@@ -388,6 +394,8 @@ const Meetings = () => {
             setFormEndTime(`${pad(end.getHours())}:${pad(end.getMinutes())}`);
             
             setFormOrganizerId(m.organizerId?._id || m.organizerId || '');
+            const fallbackReportTo = m.reportTo || users.find(u => u._id === (m.organizerId?._id || m.organizerId || ''))?.reportsTo;
+            setFormReportToId(fallbackReportTo?._id || fallbackReportTo || '');
             setFormParticipants(m.participants?.map(p => p._id || p) || []);
             setFormLocation(m.location || '');
             setFormAgenda(m.agenda || '');
@@ -397,7 +405,7 @@ const Meetings = () => {
             setFormAuditLog(m.statusHistory || []);
             setDrawerOpen(true);
         } catch (err) {
-            toast.error('Failed to load meeting details');
+            toast.error('Failed to load appointment details');
         } finally {
             setLoading(false);
         }
@@ -426,16 +434,33 @@ const Meetings = () => {
         });
     };
 
-    const handleDelete = async (meetingId) => {
-        if (!window.confirm('Are you sure you want to cancel and delete this meeting?')) return;
-        try {
-            await meetingService.delete(meetingId);
-            toast.success('Meeting cancelled and deleted successfully');
-            window.dispatchEvent(new Event('onNotificationUpdate'));
-            fetchMeetings();
-        } catch (err) {
-            toast.error(err.response?.data?.message || 'Error deleting meeting');
+    const handleOrganizerChange = (userId) => {
+        setFormOrganizerId(userId);
+        const selectedOrganizer = users.find(u => u._id === userId);
+        setFormReportToId(selectedOrganizer?.reportsTo?._id || selectedOrganizer?.reportsTo || '');
+    };
+
+    const getAppointmentReportTo = (appointment) => {
+        const directReportTo = appointment?.reportTo;
+        if (directReportTo?._id || typeof directReportTo === 'string') {
+            return directReportTo;
         }
+
+        const organizerId = appointment?.organizerId?._id || appointment?.organizerId || '';
+        const organizer = users.find(u => u._id === organizerId);
+        return organizer?.reportsTo || null;
+    };
+
+    const getUserNameByRef = (userRef) => {
+        if (!userRef) return '';
+        if (userRef.name) return userRef.name;
+        return users.find(u => u._id === userRef)?.name || '';
+    };
+
+    const getUserEmailByRef = (userRef) => {
+        if (!userRef) return '';
+        if (userRef.email) return userRef.email;
+        return users.find(u => u._id === userRef)?.email || '';
     };
 
     const handleClientHistoryLookup = async (clientId) => {
@@ -449,14 +474,14 @@ const Meetings = () => {
             setClientHistory(res.data || []);
         } catch (err) {
             console.error('Failed to load client history', err);
-            toast.error('Failed to load client meeting history');
+            toast.error('Failed to load client appointment history');
         }
     };
 
-    // Save Drawer Meeting Details (Create / Update)
+    // Save Drawer Appointment Details (Create / Update)
     const handleDrawerSave = async (overrideConflict = false) => {
         if (!formTitle.trim()) {
-            return toast.error('Meeting Title is required');
+            return toast.error('Appointment title is required');
         }
         if (!formRelatedRecordId) {
             return toast.error('Related reference is required');
@@ -479,6 +504,7 @@ const Meetings = () => {
             relatedModule: formRelatedModule,
             relatedRecordId: formRelatedRecordId,
             organizerId: formOrganizerId,
+            reportTo: formReportToId || null,
             participants: formParticipants,
             location: formLocation,
             agenda: formAgenda,
@@ -491,10 +517,10 @@ const Meetings = () => {
         try {
             if (drawerMode === 'create') {
                 await meetingService.create(payload);
-                toast.success('Meeting scheduled successfully');
+                toast.success('Appointment scheduled successfully');
             } else {
                 await meetingService.update(selectedMeetingId, payload);
-                toast.success('Meeting details updated');
+                toast.success('Appointment details updated');
             }
             window.dispatchEvent(new Event('onNotificationUpdate'));
             setDrawerOpen(false);
@@ -507,22 +533,8 @@ const Meetings = () => {
                 setPendingConflictSave(() => () => handleDrawerSave(true));
                 setShowConflictModal(true);
             } else {
-                toast.error(err.response?.data?.message || 'Error saving meeting details');
+                toast.error(err.response?.data?.message || 'Error saving appointment details');
             }
-        }
-    };
-
-    const handleDrawerDelete = async () => {
-        if (!window.confirm('Are you sure you want to cancel and delete this meeting?')) return;
-        try {
-            await meetingService.delete(selectedMeetingId);
-            toast.success('Meeting cancelled and deleted successfully');
-            window.dispatchEvent(new Event('onNotificationUpdate'));
-            setDrawerOpen(false);
-            setSearchParams({});
-            fetchMeetings();
-        } catch (err) {
-            toast.error(err.response?.data?.message || 'Error deleting meeting');
         }
     };
 
@@ -537,16 +549,18 @@ const Meetings = () => {
                 relatedModule: formRelatedModule,
                 relatedRecordId: formRelatedRecordId,
                 organizerId: formOrganizerId,
+                reportTo: formReportToId || null,
+                notes: formNotes,
                 status: 'Completed',
                 outcome: 'Successful',
                 allowConflict: true
             });
-            toast.success('Meeting marked as Completed');
+            toast.success('Appointment marked as Completed');
             window.dispatchEvent(new Event('onNotificationUpdate'));
             setDrawerOpen(false);
             fetchMeetings();
         } catch (err) {
-            toast.error('Failed to complete meeting');
+            toast.error('Failed to complete appointment');
         }
     };
 
@@ -576,6 +590,7 @@ const Meetings = () => {
             relatedModule: original.relatedModule,
             relatedRecordId: original.relatedRecordId?._id || original.relatedRecordId || '',
             organizerId: original.organizerId?._id || original.organizerId || '',
+            reportTo: original.reportTo?._id || original.reportTo || null,
             participants: original.participants?.map(p => p._id || p) || [],
             location: original.location,
             agenda: original.agenda,
@@ -587,7 +602,7 @@ const Meetings = () => {
 
         try {
             await meetingService.update(meetingId, payload);
-            toast.success('Meeting rescheduled');
+            toast.success('Appointment rescheduled');
             window.dispatchEvent(new Event('onNotificationUpdate'));
             fetchMeetings();
         } catch (err) {
@@ -597,7 +612,7 @@ const Meetings = () => {
                 setPendingConflictSave(() => () => handleDrop(e, dateStr, timeStr, true));
                 setShowConflictModal(true);
             } else {
-                toast.error('Failed to reschedule meeting');
+                toast.error('Failed to reschedule appointment');
             }
         }
     };
@@ -964,7 +979,7 @@ const Meetings = () => {
                 ) : (
                     <div className="bg-white rounded-3xl border border-dashed border-slate-200 p-16 text-center shadow-sm">
                         <MdCalendarMonth size={40} className="text-slate-300 mx-auto mb-2" />
-                        <p className="text-xs font-bold text-slate-400">No upcoming meetings listed.</p>
+                        <p className="text-xs font-bold text-slate-400">No upcoming appointments listed.</p>
                     </div>
                 )}
             </div>
@@ -1015,7 +1030,7 @@ const Meetings = () => {
             {/* Header / Banner area */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-black text-slate-900 tracking-tight font-outfit uppercase">Meetings Planner</h1>
+                    <h1 className="text-2xl font-black text-slate-900 tracking-tight font-outfit uppercase">Appointments Planner</h1>
                     <p className="text-slate-500 font-semibold text-xs mt-1">Unified CRM Activity Calendar & Appointments Register</p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -1051,7 +1066,7 @@ const Meetings = () => {
                         onClick={() => handleOpenDrawer('create')}
                         className="px-4 py-2 bg-primary-600 rounded-xl text-xs font-bold text-white hover:bg-primary-700 transition-all shadow-md shadow-primary-600/20 flex items-center gap-2"
                     >
-                        <MdAdd size={18} /> Schedule Meeting
+                        <MdAdd size={18} /> Schedule Appointment
                     </button>
                 </div>
             </div>
@@ -1118,7 +1133,7 @@ const Meetings = () => {
                             scopeFilter === 'mine' ? 'bg-white text-primary-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'
                         }`}
                     >
-                        My Meetings
+                        My Appointments
                     </button>
                     <button
                         onClick={() => setScopeFilter('team')}
@@ -1126,7 +1141,7 @@ const Meetings = () => {
                             scopeFilter === 'team' ? 'bg-white text-primary-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'
                         }`}
                     >
-                        Team Meetings
+                        Team Appointments
                     </button>
                     <button
                         onClick={() => setScopeFilter('all')}
@@ -1134,7 +1149,7 @@ const Meetings = () => {
                             scopeFilter === 'all' ? 'bg-white text-primary-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'
                         }`}
                     >
-                        All Meetings
+                        All Appointments
                     </button>
                 </div>
 
@@ -1271,10 +1286,11 @@ const Meetings = () => {
                             <table className="w-full text-left border-collapse">
                                 <thead>
                                     <tr className="bg-slate-50/50 border-b border-slate-100">
-                                        <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Meeting Title</th>
+                                        <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Appointment Title</th>
                                         <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Date & Time</th>
                                         <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Related Record</th>
                                         <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Organizer</th>
+                                        <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Report To</th>
                                         <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-center">Status</th>
                                         <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">Actions</th>
                                     </tr>
@@ -1284,6 +1300,9 @@ const Meetings = () => {
                                         displayedMeetings.map((m) => {
                                             const start = new Date(m.startDateTime);
                                             const end = new Date(m.endDateTime);
+                                            const reportTo = getAppointmentReportTo(m);
+                                            const reportToName = getUserNameByRef(reportTo);
+                                            const reportToEmail = getUserEmailByRef(reportTo);
                                             let recordName = 'N/A';
                                             if (m.relatedRecordId) {
                                                 recordName = m.relatedRecordId.customerName || m.relatedRecordId.companyName || m.relatedRecordId.enquiryNo || m.relatedRecordId.projectName || '';
@@ -1315,6 +1334,12 @@ const Meetings = () => {
                                                         {m.organizerId?.name}
                                                         <span className="block text-[9px] text-slate-400 font-medium mt-0.5">{m.organizerId?.email}</span>
                                                     </td>
+                                                    <td className="px-6 py-4 text-xs font-bold text-slate-755">
+                                                        {reportToName || '-'}
+                                                        {reportToEmail && (
+                                                            <span className="block text-[9px] text-slate-400 font-medium mt-0.5">{reportToEmail}</span>
+                                                        )}
+                                                    </td>
                                                     <td className="px-6 py-4 text-center">
                                                         <span className={`inline-flex px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${
                                                             m.status === 'Completed' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
@@ -1330,9 +1355,6 @@ const Meetings = () => {
                                                             <button onClick={() => handleOpenDrawer('edit', m._id)} className="px-2.5 py-1 text-[9px] font-black uppercase text-primary-600 bg-primary-50 rounded-xl hover:bg-primary-100 transition-all">
                                                                 Edit
                                                             </button>
-                                                            <button onClick={() => handleDelete(m._id)} className="px-2.5 py-1 text-[9px] font-black uppercase text-rose-600 bg-rose-50 rounded-xl hover:bg-rose-100 transition-all">
-                                                                Delete
-                                                            </button>
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -1340,7 +1362,7 @@ const Meetings = () => {
                                         })
                                     ) : (
                                         <tr>
-                                            <td colSpan="6" className="px-6 py-16 text-center text-slate-400 font-bold">No matching meetings found.</td>
+                                            <td colSpan="7" className="px-6 py-16 text-center text-slate-400 font-bold">No matching appointments found.</td>
                                         </tr>
                                     )}
                                 </tbody>
@@ -1355,7 +1377,7 @@ const Meetings = () => {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {/* User performance */}
                     <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
-                        <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest mb-4">Meetings per User</h3>
+                        <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest mb-4">Appointments per User</h3>
                         <div className="space-y-4">
                             {userSummary.map((item, idx) => {
                                 const percentage = stats.total > 0 ? Math.round((item.total / stats.total) * 100) : 0;
@@ -1415,7 +1437,7 @@ const Meetings = () => {
                                 <table className="w-full text-left border-collapse text-[10px] font-bold text-slate-700">
                                     <thead>
                                         <tr className="bg-slate-50/50">
-                                            <th className="px-4 py-2.5 font-black uppercase text-slate-400">Meeting</th>
+                                            <th className="px-4 py-2.5 font-black uppercase text-slate-400">Appointment</th>
                                             <th className="px-4 py-2.5 font-black uppercase text-slate-400">Date</th>
                                             <th className="px-4 py-2.5 font-black uppercase text-slate-400">Organizer</th>
                                             <th className="px-4 py-2.5 font-black uppercase text-slate-400">Outcome</th>
@@ -1442,11 +1464,11 @@ const Meetings = () => {
                 </div>
             )}
 
-            {/* --- SCHEDULE MEETING MODAL POPUP --- */}
+            {/* --- SCHEDULE APPOINTMENT MODAL POPUP --- */}
             <Modal
                 isOpen={drawerOpen}
                 onClose={() => { setDrawerOpen(false); setSearchParams({}); }}
-                title={drawerMode === 'create' ? 'Schedule Meeting' : drawerMode === 'edit' ? 'Edit Details' : 'Appointment Details'}
+                title={drawerMode === 'create' ? 'Schedule Appointment' : drawerMode === 'edit' ? 'Edit Details' : 'Appointment Details'}
                 maxWidth="max-w-xl"
                 footer={
                     drawerMode === 'view' ? (
@@ -1466,12 +1488,6 @@ const Meetings = () => {
                                     <MdCheckCircle size={14} /> Mark Complete
                                 </button>
                             </div>
-                            <button
-                                onClick={handleDrawerDelete}
-                                className="w-full py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 border border-rose-100/30"
-                            >
-                                <MdDelete size={14} /> Cancel & Delete Meeting
-                            </button>
                         </div>
                     ) : (
                         <div className="flex flex-col gap-2 w-full">
@@ -1496,14 +1512,6 @@ const Meetings = () => {
                                     Cancel
                                 </button>
                             </div>
-                            {drawerMode === 'edit' && (
-                                <button
-                                    onClick={handleDrawerDelete}
-                                    className="w-full py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 border border-rose-100/30"
-                                >
-                                    <MdDelete size={14} /> Cancel & Delete Meeting
-                                </button>
-                            )}
                         </div>
                     )
                 }
@@ -1544,6 +1552,10 @@ const Meetings = () => {
                                     <MdPerson className="text-slate-400" size={16} />
                                     Organizer: <span className="text-slate-800">{users.find(u => u._id === formOrganizerId)?.name}</span>
                                 </p>
+                                <p className="flex items-center gap-2">
+                                    <MdPeople className="text-slate-400" size={16} />
+                                    Report To: <span className="text-slate-800">{users.find(u => u._id === formReportToId)?.name || '-'}</span>
+                                </p>
                                 {formLocation && (
                                     <p className="flex items-center gap-2 md:col-span-2">
                                         <MdLocationOn className="text-slate-400" size={16} />
@@ -1561,7 +1573,7 @@ const Meetings = () => {
 
                             {formNotes && (
                                 <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
-                                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Notes</h4>
+                                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Discussion Notes</h4>
                                     <p className="text-[11px] text-slate-700 leading-relaxed font-medium">{formNotes}</p>
                                 </div>
                             )}
@@ -1661,7 +1673,7 @@ const Meetings = () => {
                                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Organizer</label>
                                     <select
                                         value={formOrganizerId}
-                                        onChange={(e) => setFormOrganizerId(e.target.value)}
+                                        onChange={(e) => handleOrganizerChange(e.target.value)}
                                         className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold"
                                     >
                                         <option value="">Select Organizer</option>
@@ -1670,6 +1682,23 @@ const Meetings = () => {
                                         ))}
                                     </select>
                                 </div>
+                                <div className="space-y-1">
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Report To</label>
+                                    <select
+                                        value={formReportToId}
+                                        onChange={(e) => setFormReportToId(e.target.value)}
+                                        className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold"
+                                    >
+                                        <option value="">No senior selected</option>
+                                        {users.filter(u => u._id !== formOrganizerId).map(u => (
+                                            <option key={u._id} value={u._id}>{u.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* Status */}
+                            <div className="grid grid-cols-1 gap-2">
                                 <div className="space-y-1">
                                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</label>
                                     <select
@@ -1731,14 +1760,14 @@ const Meetings = () => {
                                 />
                             </div>
 
-                            {/* Notes */}
+                            {/* Discussion Notes */}
                             <div className="space-y-1">
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Notes</label>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Discussion Notes</label>
                                 <textarea
                                     value={formNotes}
                                     onChange={(e) => setFormNotes(e.target.value)}
-                                    rows={2}
-                                    placeholder="Summary, next steps..."
+                                    rows={3}
+                                    placeholder="What was discussed, decisions, commitments, next steps..."
                                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 outline-none text-xs font-medium text-slate-900"
                                 />
                             </div>

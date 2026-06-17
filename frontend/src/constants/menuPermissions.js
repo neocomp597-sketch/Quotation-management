@@ -36,11 +36,11 @@ export const MENU_PERMISSION_GROUPS = [
     },
     {
         key: 'meetings',
-        label: 'Meetings',
-        description: 'Meeting schedule and appointment management',
+        label: 'Appointments',
+        description: 'Appointment schedule and activity management',
         defaultRoute: '/meetings',
         children: [
-            { key: 'meetings_list', label: 'Meetings List', description: 'Schedule and view meetings', defaultRoute: '/meetings' }
+            { key: 'meetings_list', label: 'Appointments List', description: 'Schedule and view appointments', defaultRoute: '/meetings' }
         ]
     },
     {

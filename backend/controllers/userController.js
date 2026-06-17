@@ -4,6 +4,24 @@ const { ROLE_OPTIONS } = require('../config/authorization');
 const RolePermission = require('../models/RolePermission');
 const { getTenantId } = require('../middlewares/tenantContext');
 
+const normalizeReportsTo = (reportsTo) => (reportsTo ? reportsTo : null);
+
+const validateReportsTo = async ({ reportsTo, userId, companyId }) => {
+    const normalized = normalizeReportsTo(reportsTo);
+    if (!normalized) return null;
+
+    if (userId && normalized.toString() === userId.toString()) {
+        throw new Error('A user cannot report to themselves');
+    }
+
+    const senior = await User.findOne({ _id: normalized, companyId }).select('_id').lean();
+    if (!senior) {
+        throw new Error('Selected senior was not found in this company');
+    }
+
+    return normalized;
+};
+
 exports.getAllUsers = async (req, res) => {
     try {
         if (!req.user?.companyId) {
@@ -11,7 +29,8 @@ exports.getAllUsers = async (req, res) => {
         }
 
         const users = await User.find({ companyId: req.user.companyId })
-            .select('_id name email role status companyId createdAt')
+            .select('_id name email role reportsTo status companyId createdAt')
+            .populate('reportsTo', 'name email')
             .sort({ createdAt: -1 })
             .lean();
 
@@ -24,7 +43,7 @@ exports.getAllUsers = async (req, res) => {
 
 exports.createUser = async (req, res) => {
     try {
-        const { name, email, password, role = 'sales', status = true } = req.body;
+        const { name, email, password, role = 'sales', status = true, reportsTo } = req.body;
 
         const companyId = req.user?.companyId || getTenantId?.();
         if (!companyId) {
@@ -59,6 +78,8 @@ exports.createUser = async (req, res) => {
             }
         }
 
+        const validatedReportsTo = await validateReportsTo({ reportsTo, companyId });
+
         const salt = await bcrypt.genSalt(10);
         const passwordHash = await bcrypt.hash(password, salt);
         const user = await User.create({
@@ -66,6 +87,7 @@ exports.createUser = async (req, res) => {
             email,
             passwordHash,
             role,
+            reportsTo: validatedReportsTo,
             status,
             companyId,
         });
@@ -75,11 +97,15 @@ exports.createUser = async (req, res) => {
             name: user.name,
             email: user.email,
             role: user.role,
+            reportsTo: user.reportsTo,
             status: user.status,
             companyId: user.companyId,
             createdAt: user.createdAt,
         });
     } catch (error) {
+        if (/report to|senior|themselves/i.test(error.message)) {
+            return res.status(400).json({ message: error.message });
+        }
         console.error('[createUser] Error:', error.message, error.stack);
         res.status(500).json({ message: 'Failed to create user', error: error.message });
     }
@@ -160,6 +186,7 @@ exports.updateUserRole = async (req, res) => {
             name: updatedUser.name,
             email: updatedUser.email,
             role: updatedUser.role,
+            reportsTo: updatedUser.reportsTo,
             status: updatedUser.status,
             createdAt: updatedUser.createdAt
         });
@@ -171,7 +198,7 @@ exports.updateUserRole = async (req, res) => {
 exports.updateUser = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, email, password, role } = req.body;
+        const { name, email, password, role, reportsTo } = req.body;
 
         const user = await User.findOne({ _id: id, companyId: req.user.companyId });
         if (!user) {
@@ -190,6 +217,14 @@ exports.updateUser = async (req, res) => {
         if (password) {
             const salt = await bcrypt.genSalt(10);
             user.passwordHash = await bcrypt.hash(password, salt);
+        }
+
+        if (reportsTo !== undefined) {
+            user.reportsTo = await validateReportsTo({
+                reportsTo,
+                userId: id,
+                companyId: req.user.companyId,
+            });
         }
 
         // Handle role change if provided and different
@@ -226,10 +261,14 @@ exports.updateUser = async (req, res) => {
             name: updatedUser.name,
             email: updatedUser.email,
             role: updatedUser.role,
+            reportsTo: updatedUser.reportsTo,
             status: updatedUser.status,
             createdAt: updatedUser.createdAt
         });
     } catch (error) {
+        if (/report to|senior|themselves/i.test(error.message)) {
+            return res.status(400).json({ message: error.message });
+        }
         console.error('[updateUser] Error:', error.message);
         res.status(500).json({ message: 'Failed to update user', error: error.message });
     }

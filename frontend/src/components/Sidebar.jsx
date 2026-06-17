@@ -98,11 +98,11 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
         },
         {
             type: 'group',
-            name: 'Meetings',
+            name: 'Appointments',
             key: 'meetings',
             icon: <MdCalendarMonth size={22} />,
             children: [
-                { key: 'meetings_list', name: 'Meetings Register', icon: <MdCalendarMonth size={18} />, path: '/meetings' },
+                { key: 'meetings_list', name: 'Appointments Register', icon: <MdCalendarMonth size={18} />, path: '/meetings' },
             ]
         },
         {

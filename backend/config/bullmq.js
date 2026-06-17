@@ -89,8 +89,16 @@ const createWorker = (name, processor, options = {}) => {
     worker.on('failed', (job, error) => {
         console.error(`[BullMQ:${name}] failed job ${job?.name || 'unknown'} (${job?.id || 'unknown'}):`, error.message);
     });
+
+    // Rate-limit worker error logs to avoid flooding the console during Redis outages
+    let lastWorkerErrorLog = 0;
+    const WORKER_ERROR_LOG_INTERVAL_MS = 30000;
     worker.on('error', (error) => {
-        console.error(`[BullMQ:${name}] worker error:`, error.message);
+        const now = Date.now();
+        if (now - lastWorkerErrorLog > WORKER_ERROR_LOG_INTERVAL_MS) {
+            lastWorkerErrorLog = now;
+            console.error(`[BullMQ:${name}] worker error:`, error.message);
+        }
     });
 
     workers.push(worker);

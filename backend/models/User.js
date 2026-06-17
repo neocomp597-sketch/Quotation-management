@@ -9,6 +9,7 @@ const UserSchema = new mongoose.Schema({
     refreshTokenExpiresAt: { type: Date },
     tokenVersion: { type: Number, default: 0 },
     role: { type: String, default: 'sales' },
+    reportsTo: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     status: { type: Boolean, default: true },
     isActive: { type: Boolean, default: true },
     companyId: {

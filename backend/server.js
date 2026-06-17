@@ -14,8 +14,10 @@ const app = express();
 const dbStartupPromise = connectDB();
 const redisStartupPromise = connectRedis().then(() => {
   console.log("Redis connected");
+  return true;
 }).catch(() => {
   console.warn("Redis unavailable at startup; Redis-backed features will retry per request.");
+  return false;
 });
 
 // Middleware
@@ -327,7 +329,7 @@ app.get('/api/git-revert', (req, res) => {
 // Start Scheduler
 const startBackgroundServices = async () => {
   await dbStartupPromise;
-  await redisStartupPromise;
+  const redisReady = await redisStartupPromise;
 
   // Seed current platform release notes
   try {
@@ -351,7 +353,7 @@ const startBackgroundServices = async () => {
         deployedAt: new Date("2026-06-15T12:00:00Z"),
         isActive: true
       },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
+      { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
     );
     await SystemUpdate.findOneAndUpdate(
       { version: "v3.0.0-meetings" },
@@ -373,7 +375,28 @@ const startBackgroundServices = async () => {
         deployedAt: new Date("2026-06-16T21:22:39+05:30"),
         isActive: true
       },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
+      { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
+    );
+    await SystemUpdate.findOneAndUpdate(
+      { version: "v3.1.0-appointments" },
+      {
+        version: "v3.1.0-appointments",
+        title: "Appointments, Discussion Notes & Reporting Visibility",
+        message: "The Meetings module has been renamed to Appointments with discussion notes, Report To visibility, and senior/team appointment tracking.",
+        releaseNotes: [
+          "Renamed the Meetings module and register labels to Appointments",
+          "Added Discussion Notes so users can record what was discussed in each appointment",
+          "Added Report To on users and appointments so senior users can see team appointments",
+          "Added Report To visibility in the appointments register and appointment details",
+          "Removed the visible delete action from the appointments register and appointment popup",
+          "Improved Report To display by falling back to the organizer's assigned senior for older appointments",
+          "Added Redis outage handling so BullMQ startup failures no longer crash the backend"
+        ],
+        deployedBy: "Super Admin",
+        deployedAt: new Date("2026-06-17T21:35:00+05:30"),
+        isActive: true
+      },
+      { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
     );
   } catch (err) {
     console.error("[Release Seed Error] Failed to seed system update:", err.message);
@@ -433,9 +456,14 @@ const startBackgroundServices = async () => {
       // Ignore if index doesn't exist
   }
 
-  await startCacheInvalidationWorker();
-  await startAuthSessionWorker();
-  await scheduler.startScheduler();
+  if (redisReady) {
+    await startCacheInvalidationWorker();
+    await startAuthSessionWorker();
+    await scheduler.startScheduler();
+  } else {
+    console.warn("[Background] Redis unavailable; skipping BullMQ workers and starting scheduler fallback.");
+    await scheduler.startScheduler({ preferFallback: true });
+  }
 };
 
 // Serve Static Files

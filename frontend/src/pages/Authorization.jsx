@@ -46,11 +46,11 @@ const Authorization = () => {
     const [newRoleData, setNewRoleData] = useState({ label: '', description: '' });
     const [creatingRole, setCreatingRole] = useState(false);
     const [showNewUserForm, setShowNewUserForm] = useState(false);
-    const [newUserData, setNewUserData] = useState({ name: '', email: '', password: '', role: 'sales' });
+    const [newUserData, setNewUserData] = useState({ name: '', email: '', password: '', role: 'sales', reportsTo: '' });
     const [creatingUser, setCreatingUser] = useState(false);
     
     const [editingUserId, setEditingUserId] = useState(null);
-    const [editingUserData, setEditingUserData] = useState({ name: '', email: '', password: '', role: '' });
+    const [editingUserData, setEditingUserData] = useState({ name: '', email: '', password: '', role: '', reportsTo: '' });
 
     const [companies, setCompanies] = useState([]);
     const [selectedCompanyId, setSelectedCompanyId] = useState('');
@@ -263,6 +263,7 @@ const Authorization = () => {
                 email: newUserData.email.trim(),
                 password: newUserData.password,
                 role: newUserData.role || 'sales',
+                reportsTo: newUserData.reportsTo || null,
             };
             if (selectedCompanyId) {
                 payload.companyId = selectedCompanyId;
@@ -270,7 +271,7 @@ const Authorization = () => {
             const res = await userService.create(payload);
 
             setUsers((prev) => [res.data, ...prev]);
-            setNewUserData({ name: '', email: '', password: '', role: 'sales' });
+            setNewUserData({ name: '', email: '', password: '', role: 'sales', reportsTo: '' });
             setShowNewUserForm(false);
             toast.success('User created');
         } catch (err) {
@@ -282,12 +283,18 @@ const Authorization = () => {
 
     const handleStartEditUser = (user) => {
         setEditingUserId(user._id);
-        setEditingUserData({ name: user.name, email: user.email, password: '', role: user.role });
+        setEditingUserData({
+            name: user.name,
+            email: user.email,
+            password: '',
+            role: user.role,
+            reportsTo: user.reportsTo?._id || user.reportsTo || ''
+        });
     };
 
     const handleCancelEditUser = () => {
         setEditingUserId(null);
-        setEditingUserData({ name: '', email: '', password: '', role: '' });
+        setEditingUserData({ name: '', email: '', password: '', role: '', reportsTo: '' });
     };
 
     const handleSaveUser = async () => {
@@ -563,7 +570,7 @@ const Authorization = () => {
                     </button>
                 </div>
                 {showNewUserForm && (
-                    <form onSubmit={handleCreateUser} className="p-6 bg-primary-50/20 border-b border-primary-100 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4 items-end">
+                    <form onSubmit={handleCreateUser} className="p-6 bg-primary-50/20 border-b border-primary-100 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4 items-end">
                         <div>
                             <label className="block text-xs font-bold text-primary-600 mb-1.5 ml-1">Name</label>
                             <input
@@ -611,6 +618,19 @@ const Authorization = () => {
                                 ))}
                             </select>
                         </div>
+                        <div>
+                            <label className="block text-xs font-bold text-primary-600 mb-1.5 ml-1">Reports To</label>
+                            <select
+                                value={newUserData.reportsTo}
+                                onChange={(e) => setNewUserData((prev) => ({ ...prev, reportsTo: e.target.value }))}
+                                className="w-full px-4 py-2.5 bg-white border border-primary-100 rounded-lg text-sm font-bold outline-none focus:border-primary-600 transition-colors"
+                            >
+                                <option value="">No senior</option>
+                                {users.map((user) => (
+                                    <option key={user._id} value={user._id}>{user.name}</option>
+                                ))}
+                            </select>
+                        </div>
                         <button
                             type="submit"
                             disabled={creatingUser}
@@ -627,6 +647,7 @@ const Authorization = () => {
                                 <th className="px-6 py-4">Name</th>
                                 <th className="px-6 py-4">Email</th>
                                 <th className="px-6 py-4">Role</th>
+                                <th className="px-6 py-4">Reports To</th>
                                 <th className="px-6 py-4">Status</th>
                                 <th className="px-6 py-4 text-right">Actions</th>
                             </tr>
@@ -678,6 +699,18 @@ const Authorization = () => {
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4">
+                                                <select
+                                                    value={editingUserData.reportsTo}
+                                                    onChange={(e) => setEditingUserData(prev => ({...prev, reportsTo: e.target.value}))}
+                                                    className="w-full px-3 py-1.5 bg-white border border-primary-200 rounded-lg text-xs font-bold outline-none focus:border-primary-500"
+                                                >
+                                                    <option value="">No senior</option>
+                                                    {users.filter(u => u._id !== user._id).map(u => (
+                                                        <option key={u._id} value={u._id}>{u.name}</option>
+                                                    ))}
+                                                </select>
+                                            </td>
+                                            <td className="px-6 py-4">
                                                 {isUpdating ? (
                                                     <span className="text-[10px] font-bold text-primary-400 animate-pulse">Saving...</span>
                                                 ) : (
@@ -716,6 +749,9 @@ const Authorization = () => {
                                                     <option key={r.role} value={r.role}>{r.label}</option>
                                                 ))}
                                             </select>
+                                        </td>
+                                        <td className="px-6 py-4 text-xs text-slate-500 font-semibold">
+                                            {user.reportsTo?.name || users.find(u => u._id === user.reportsTo)?.name || '-'}
                                         </td>
                                         <td className="px-6 py-4">
                                             {isUpdating ? (

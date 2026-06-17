@@ -212,9 +212,14 @@ const startFallbackScheduler = () => {
     });
 };
 
-exports.startScheduler = async () => {
+exports.startScheduler = async (options = {}) => {
     if (process.env.DISABLE_SCHEDULER === 'true' || schedulerStarted) return;
     schedulerStarted = true;
+
+    if (options.preferFallback) {
+        startFallbackScheduler();
+        return;
+    }
 
     try {
         const bullMqStarted = await startBullMqScheduler();
