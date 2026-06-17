@@ -180,6 +180,11 @@ const Meetings = () => {
     const [conflictingMeetings, setConflictingMeetings] = useState([]);
     const [pendingConflictSave, setPendingConflictSave] = useState(null); // stores payload callback
 
+    const previousAppointments = useMemo(
+        () => clientHistory.filter(item => item._id !== selectedMeetingId),
+        [clientHistory, selectedMeetingId]
+    );
+
     // Hours timeline for week/day view (09:00 - 18:00)
     const HOURS = ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00'];
 
@@ -384,6 +389,7 @@ const Meetings = () => {
             setFormRelatedModule(m.relatedModule);
             setFormRelatedRecordId(m.relatedRecordId?._id || m.relatedRecordId || '');
             setFormRelatedRecord(m.relatedRecordId);
+            handleClientHistoryLookup(m.relatedRecordId?._id || m.relatedRecordId || '');
             
             const start = new Date(m.startDateTime);
             const end = new Date(m.endDateTime);
@@ -422,6 +428,13 @@ const Meetings = () => {
         setFormRelatedModule(module);
         setFormRelatedRecordId('');
         setFormRelatedRecord(null);
+        setSelectedClient('');
+        setClientHistory([]);
+    };
+
+    const handleRelatedRecordSelect = (recordId) => {
+        setFormRelatedRecordId(recordId);
+        handleClientHistoryLookup(recordId);
     };
 
     const handleParticipantToggle = (userId) => {
@@ -1628,13 +1641,51 @@ const Meetings = () => {
                                     <RecordSearchDropdown
                                         items={recordList}
                                         selectedId={formRelatedRecordId}
-                                        onSelect={setFormRelatedRecordId}
+                                        onSelect={handleRelatedRecordSelect}
                                         placeholder={`Select ${formRelatedModule}...`}
                                         labelField="label"
                                         subLabelField="subLabel"
                                     />
                                 </div>
                             </div>
+
+                            {formRelatedRecordId && (
+                                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
+                                    <div className="flex items-center justify-between gap-3 mb-2">
+                                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Previous Appointments</h4>
+                                        <span className="text-[9px] font-black text-slate-400 uppercase">{previousAppointments.length} Found</span>
+                                    </div>
+                                    {previousAppointments.length > 0 ? (
+                                        <div className="space-y-2 max-h-36 overflow-y-auto custom-scrollbar">
+                                            {previousAppointments
+                                                .slice(0, 5)
+                                                .map(item => {
+                                                    const start = new Date(item.startDateTime);
+                                                    return (
+                                                        <div key={item._id} className="p-2 bg-white rounded-xl border border-slate-100">
+                                                            <div className="flex items-start justify-between gap-2">
+                                                                <div className="min-w-0">
+                                                                    <p className="text-[11px] font-black text-slate-800 truncate">{item.title}</p>
+                                                                    <p className="text-[9px] font-bold text-slate-400 mt-0.5">
+                                                                        {formatDate(start)} • {start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                                    </p>
+                                                                </div>
+                                                                <span className="shrink-0 text-[8px] font-black uppercase px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
+                                                                    {item.status}
+                                                                </span>
+                                                            </div>
+                                                            {item.notes && (
+                                                                <p className="text-[10px] text-slate-600 font-medium mt-1.5 line-clamp-2">{item.notes}</p>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                        </div>
+                                    ) : (
+                                        <p className="text-[10px] font-bold text-slate-400">No previous appointments found for this record.</p>
+                                    )}
+                                </div>
+                            )}
 
                             {/* Date & times */}
                             <div className="grid grid-cols-3 gap-2">
