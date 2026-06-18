@@ -88,6 +88,7 @@ const footerPageRoutes = require("./routes/footerPageRoutes");
 const superAdminRoutes = require("./routes/superAdminRoutes");
 const payrollRoutes = require("./routes/payrollRoutes");
 const meetingRoutes = require("./routes/meetingRoutes");
+const contactRoutes = require("./routes/contactRoutes");
 const scheduler = require("./utils/scheduler");
 
 // API Routes (Reload triggered)
@@ -119,6 +120,7 @@ app.use("/api/footer-pages", footerPageRoutes);
 app.use("/api/super-admin", superAdminRoutes);
 app.use("/api/payroll", payrollRoutes);
 app.use("/api/meetings", meetingRoutes);
+app.use("/api/contacts", contactRoutes);
 
 app.get('/api/trigger-seed', async (req, res) => {
     try {
@@ -394,6 +396,29 @@ const startBackgroundServices = async () => {
         ],
         deployedBy: "Super Admin",
         deployedAt: new Date("2026-06-17T21:35:00+05:30"),
+        isActive: true
+      },
+      { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
+    );
+    await SystemUpdate.findOneAndUpdate(
+      { version: "v3.2.0-contacts" },
+      {
+        version: "v3.2.0-contacts",
+        title: "Contact Management Module",
+        message: "A new lightweight Contact Management module has been added to manage customers, prospects, vendors and partners with simple CRUD operations and a table view.",
+        releaseNotes: [
+          "Added Contact Management page under Master with full CRUD operations",
+          "Auto-generated Contact IDs (C001, C002...) for each new contact",
+          "Contact form with Name, Company, Email, Phone, Designation, Customer Type, Last Interaction Date, and Notes",
+          "Contact list table with search by name, company, email or phone",
+          "Filter contacts by Customer Type (Customer, Prospect, Vendor, Partner)",
+          "Color-coded Customer Type badges in the contact list",
+          "Export contacts to Excel (.xlsx) with one click",
+          "Added Contacts link in sidebar under Master section",
+          "Added master_contacts permission for role-based access control"
+        ],
+        deployedBy: "Super Admin",
+        deployedAt: new Date("2026-06-18T21:25:00+05:30"),
         isActive: true
       },
       { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }

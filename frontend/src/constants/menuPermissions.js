@@ -16,6 +16,7 @@ export const MENU_PERMISSION_GROUPS = [
         children: [
             { key: 'master_customers', label: 'Customers', description: 'Customer master records', defaultRoute: '/customers' },
             { key: 'master_vendors', label: 'Vendors', description: 'Vendor master records', defaultRoute: '/vendors' },
+            { key: 'master_contacts', label: 'Contacts', description: 'Contact management records', defaultRoute: '/contacts' },
             { key: 'master_products', label: 'Products', description: 'Product master records', defaultRoute: '/products' },
             { key: 'master_mgrs', label: 'MGRs', description: 'MGR master hierarchy', defaultRoute: '/mgrs' },
             { key: 'master_attributes', label: 'Attributes', description: 'Attribute master definitions', defaultRoute: '/attributes' },

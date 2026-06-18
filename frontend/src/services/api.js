@@ -503,4 +503,12 @@ export const meetingService = {
   getClientHistory: (relatedRecordId) => api.get("/meetings/client-history", { params: { relatedRecordId } }),
 };
 
+export const contactService = {
+  getAll: (params = {}) => api.get("/contacts", { params }),
+  getById: (id) => api.get(`/contacts/${id}`),
+  create: (data) => api.post("/contacts", data),
+  update: (id, data) => api.put(`/contacts/${id}`, data),
+  delete: (id) => api.delete(`/contacts/${id}`),
+};
+
 export default api;
