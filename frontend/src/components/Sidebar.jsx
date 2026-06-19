@@ -26,7 +26,13 @@ import {
     MdMap,
     MdAdminPanelSettings,
     MdNewReleases,
-    MdContactPhone
+    MdContactPhone,
+    MdViewKanban,
+    MdTrendingUp,
+    MdFlag,
+    MdTimeline,
+    MdBuildCircle,
+    MdSpeed
 } from 'react-icons/md';
 import { useAuth } from '../context/AuthContext';
 
@@ -66,6 +72,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                 { key: 'payroll_employees', name: 'Employees', icon: <MdPeople size={18} />, path: '/payroll/employees' },
                 { key: 'master_vendors', name: 'Vendors', icon: <MdStorefront size={18} />, path: '/vendors' },
                 { key: 'master_contacts', name: 'Contacts', icon: <MdContactPhone size={18} />, path: '/contacts' },
+                { key: 'sales_deals', name: 'Deals', icon: <MdViewKanban size={18} />, path: '/sales/deals' },
                 { key: 'master_products', name: 'Products', icon: <MdInventory size={18} />, path: '/products' },
                 { key: 'master_territories', name: 'Territory Master', icon: <MdMap size={18} />, path: '/territory-master' },
                 { key: 'master_mgrs', name: 'MGR Master', icon: <MdCategory size={18} />, path: '/mgrs' },
@@ -96,6 +103,19 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             children: [
                 { key: 'enquiry_leads', name: 'Enquiry Register', icon: <MdAssignment size={18} />, path: '/enquiries' },
                 { key: 'enquiry_analytics', name: 'Analytics', icon: <MdAnalytics size={18} />, path: '/enquiries/analytics' },
+            ]
+        },
+        {
+            type: 'group',
+            name: 'Sales Pipeline',
+            key: 'sales_pipeline',
+            icon: <MdViewKanban size={22} />,
+            children: [
+                { key: 'sales_dashboard', name: 'Overview', icon: <MdDashboard size={18} />, path: '/sales/dashboard' },
+                { key: 'sales_pipelines', name: 'Pipelines', icon: <MdBuildCircle size={18} />, path: '/sales/pipelines', adminOnly: true },
+                { key: 'sales_forecasting', name: 'Forecasting', icon: <MdTrendingUp size={18} />, path: '/sales/forecasting' },
+                { key: 'sales_activities', name: 'Activities', icon: <MdTimeline size={18} />, path: '/sales/activities' },
+                { key: 'sales_targets', name: 'Targets', icon: <MdFlag size={18} />, path: '/sales/targets' },
             ]
         },
         {
@@ -145,6 +165,8 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             children: [
                 { key: 'reports_main', name: 'Reports', icon: <MdBarChart size={18} />, path: '/reports' },
                 { key: 'payroll_reports', name: 'Payroll Reports', icon: <MdBarChart size={18} />, path: '/payroll/reports' },
+                { key: 'sales_reports', name: 'Sales Reports', icon: <MdBarChart size={18} />, path: '/sales/reports' },
+                { key: 'sales_analytics', name: 'Sales Analytics', icon: <MdSpeed size={18} />, path: '/sales/analytics' },
             ]
         },
         {

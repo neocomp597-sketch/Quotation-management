@@ -189,7 +189,7 @@ const Authorization = () => {
         const roleObj = roles.find((r) => r.role === roleKey);
         if (!roleObj || roleObj.locked || resettingRoles[roleKey]) return;
 
-        const defaults = buildPermissionsFromEnabledSections(displayGroups, (roleKey === 'admin' ? MENU_PERMISSION_GROUPS.map(g => g.key) : roleKey === 'manager' ? ['dashboard', 'master', 'enquiry', 'quotation', 'sale', 'purchase', 'planning', 'reports', 'settings'] : ['dashboard', 'enquiry', 'quotation']));
+        const defaults = buildPermissionsFromEnabledSections(displayGroups, (roleKey === 'admin' ? MENU_PERMISSION_GROUPS.map(g => g.key) : roleKey === 'manager' ? ['dashboard', 'master', 'enquiry', 'sales_pipeline', 'quotation', 'sale', 'purchase', 'planning', 'reports', 'settings'] : ['dashboard', 'enquiry', 'sales_pipeline', 'quotation']));
         
         setResettingRoles((prev) => ({ ...prev, [roleKey]: true }));
         setStatusByRole((prev) => ({ ...prev, [roleKey]: 'saving' }));

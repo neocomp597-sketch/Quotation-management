@@ -49,6 +49,16 @@ import PayrollLetters from './pages/PayrollLetters';
 import PayrollReports from './pages/PayrollReports';
 import PayrollSettingsPage from './pages/PayrollSettingsPage';
 
+import SalesDashboard from './pages/SalesDashboard';
+import DealBoard from './pages/DealBoard';
+import DealDetail from './pages/DealDetail';
+import SalesPipelines from './pages/SalesPipelines';
+import SalesForecasting from './pages/SalesForecasting';
+import SalesActivities from './pages/SalesActivities';
+import SalesTargets from './pages/SalesTargets';
+import SalesReports from './pages/SalesReports';
+import SalesAnalytics from './pages/SalesAnalytics';
+
 function App() {
   return (
     <AuthProvider>
@@ -117,6 +127,18 @@ function App() {
             <Route path="/admin/authorization" element={<PermissionRoute permissionKey="admin_authorization"><Layout><Authorization /></Layout></PermissionRoute>} />
             <Route path="/super-admin" element={<PermissionRoute superAdminOnly={true}><Layout><SuperAdmin /></Layout></PermissionRoute>} />
             <Route path="/system-updates" element={<PermissionRoute><Layout><SystemUpdates /></Layout></PermissionRoute>} />
+
+            {/* Sales Pipeline Routes */}
+            <Route path="/sales/dashboard" element={<PermissionRoute permissionKey="sales_dashboard"><Layout><SalesDashboard /></Layout></PermissionRoute>} />
+            <Route path="/sales/deals" element={<PermissionRoute permissionKey="sales_deals"><Layout><DealBoard /></Layout></PermissionRoute>} />
+            <Route path="/sales/deals/new" element={<PermissionRoute permissionKey="sales_deals"><Layout><DealDetail /></Layout></PermissionRoute>} />
+            <Route path="/sales/deals/:id" element={<PermissionRoute permissionKey="sales_deals"><Layout><DealDetail /></Layout></PermissionRoute>} />
+            <Route path="/sales/pipelines" element={<PermissionRoute permissionKey="sales_pipelines"><Layout><SalesPipelines /></Layout></PermissionRoute>} />
+            <Route path="/sales/forecasting" element={<PermissionRoute permissionKey="sales_forecasting"><Layout><SalesForecasting /></Layout></PermissionRoute>} />
+            <Route path="/sales/activities" element={<PermissionRoute permissionKey="sales_activities"><Layout><SalesActivities /></Layout></PermissionRoute>} />
+            <Route path="/sales/targets" element={<PermissionRoute permissionKey="sales_targets"><Layout><SalesTargets /></Layout></PermissionRoute>} />
+            <Route path="/sales/reports" element={<PermissionRoute permissionKey="sales_reports"><Layout><SalesReports /></Layout></PermissionRoute>} />
+            <Route path="/sales/analytics" element={<PermissionRoute permissionKey="sales_analytics"><Layout><SalesAnalytics /></Layout></PermissionRoute>} />
 
             {/* Payroll Routes */}
             <Route path="/payroll/dashboard" element={<PermissionRoute permissionKey="payroll_runs"><Layout><PayrollDashboard /></Layout></PermissionRoute>} />

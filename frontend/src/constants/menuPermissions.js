@@ -36,6 +36,22 @@ export const MENU_PERMISSION_GROUPS = [
         ]
     },
     {
+        key: 'sales_pipeline',
+        label: 'Sales Pipeline',
+        description: 'Deal pipeline management, forecasting, targets, and analytics',
+        defaultRoute: '/sales/dashboard',
+        children: [
+            { key: 'sales_dashboard', label: 'Sales Dashboard', description: 'Sales KPI dashboard overview', defaultRoute: '/sales/dashboard' },
+            { key: 'sales_deals', label: 'Deals', description: 'Deal board and deal management', defaultRoute: '/sales/deals' },
+            { key: 'sales_pipelines', label: 'Pipelines', description: 'Pipeline stage configuration', defaultRoute: '/sales/pipelines' },
+            { key: 'sales_forecasting', label: 'Forecasting', description: 'Revenue forecasting and predictions', defaultRoute: '/sales/forecasting' },
+            { key: 'sales_activities', label: 'Activities', description: 'Unified deal activity timeline', defaultRoute: '/sales/activities' },
+            { key: 'sales_targets', label: 'Targets', description: 'Sales target and quota management', defaultRoute: '/sales/targets' },
+            { key: 'sales_reports', label: 'Reports', description: 'Pipeline funnel, win/loss, and revenue reports', defaultRoute: '/sales/reports' },
+            { key: 'sales_analytics', label: 'Analytics', description: 'Pipeline velocity, stuck deals, and salesperson analytics', defaultRoute: '/sales/analytics' }
+        ]
+    },
+    {
         key: 'meetings',
         label: 'Appointments',
         description: 'Appointment schedule and activity management',

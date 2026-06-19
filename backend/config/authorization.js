@@ -32,6 +32,21 @@ const MENU_GROUPS = [
         ]
     },
     {
+        key: 'sales_pipeline',
+        label: 'Sales Pipeline',
+        description: 'Deal pipeline management, forecasting, targets, and analytics',
+        children: [
+            { key: 'sales_dashboard', label: 'Sales Dashboard', description: 'Sales KPI dashboard overview' },
+            { key: 'sales_deals', label: 'Deals', description: 'Deal board and deal management' },
+            { key: 'sales_pipelines', label: 'Pipelines', description: 'Pipeline stage configuration' },
+            { key: 'sales_forecasting', label: 'Forecasting', description: 'Revenue forecasting and predictions' },
+            { key: 'sales_activities', label: 'Activities', description: 'Unified deal activity timeline' },
+            { key: 'sales_targets', label: 'Targets', description: 'Sales target and quota management' },
+            { key: 'sales_reports', label: 'Reports', description: 'Pipeline funnel, win/loss, and revenue reports' },
+            { key: 'sales_analytics', label: 'Analytics', description: 'Pipeline velocity, stuck deals, and salesperson analytics' }
+        ]
+    },
+    {
         key: 'meetings',
         label: 'Meetings',
         description: 'Meeting schedule and appointment management',
@@ -151,8 +166,8 @@ const FULL_ACCESS_KEYS = getAllPermissionKeys();
 // Sales: lightweight access - dashboard, enquiry, quotation only
 const DEFAULT_ROLE_PERMISSIONS = {
     admin: buildPermissions(FULL_ACCESS_KEYS),
-    manager: buildPermissions(['dashboard', 'master', 'enquiry', 'quotation', 'meetings', 'sale', 'purchase', 'planning', 'reports', 'settings']),
-    sales: buildPermissions(['dashboard', 'enquiry', 'quotation', 'meetings'])
+    manager: buildPermissions(['dashboard', 'master', 'enquiry', 'sales_pipeline', 'quotation', 'meetings', 'sale', 'purchase', 'planning', 'reports', 'settings']),
+    sales: buildPermissions(['dashboard', 'enquiry', 'sales_pipeline', 'quotation', 'meetings'])
 };
 
 /**

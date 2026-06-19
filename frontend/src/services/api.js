@@ -511,4 +511,50 @@ export const contactService = {
   delete: (id) => api.delete(`/contacts/${id}`),
 };
 
+export const salesService = {
+  // Pipelines
+  getPipelines: () => api.get("/sales/pipelines"),
+  getPipeline: (id) => api.get(`/sales/pipelines/${id}`),
+  createPipeline: (data) => api.post("/sales/pipelines", data),
+  updatePipeline: (id, data) => api.put(`/sales/pipelines/${id}`, data),
+  deletePipeline: (id) => api.delete(`/sales/pipelines/${id}`),
+  seedPipelines: () => api.post("/sales/pipelines/seed-defaults"),
+
+  // Deals
+  getDeals: (params = {}) => api.get("/sales/deals", { params }),
+  getDealBoard: (pipelineId, params = {}) => api.get(`/sales/deals/board/${pipelineId}`, { params }),
+  getDeal: (id) => api.get(`/sales/deals/${id}`),
+  createDeal: (data) => api.post("/sales/deals", data),
+  updateDeal: (id, data) => api.put(`/sales/deals/${id}`, data),
+  updateDealStage: (id, stageId) => api.patch(`/sales/deals/${id}/stage`, { stageId }),
+  markDealLost: (id, lostReason) => api.patch(`/sales/deals/${id}/lost`, { lostReason }),
+  reopenDeal: (id) => api.patch(`/sales/deals/${id}/reopen`),
+  deleteDeal: (id) => api.delete(`/sales/deals/${id}`),
+  addDealActivity: (id, data) => api.post(`/sales/deals/${id}/activity`, data),
+  getDealActivities: (id) => api.get(`/sales/deals/${id}/activities`),
+
+  // Targets
+  getTargets: (params = {}) => api.get("/sales/targets", { params }),
+  createTarget: (data) => api.post("/sales/targets", data),
+  bulkCreateTargets: (targets) => api.post("/sales/targets/bulk", { targets }),
+  updateTarget: (id, data) => api.put(`/sales/targets/${id}`, data),
+  deleteTarget: (id) => api.delete(`/sales/targets/${id}`),
+
+  // Forecast
+  getForecastDashboard: () => api.get("/sales/forecast/dashboard"),
+  getRevenueForecast: (params = {}) => api.get("/sales/forecast/revenue", { params }),
+  getForecastAccuracy: () => api.get("/sales/forecast/accuracy"),
+  getRevenueTrends: () => api.get("/sales/forecast/trends"),
+  takeSnapshot: () => api.post("/sales/forecast/snapshot"),
+
+  // Analytics
+  getPipelineFunnel: (pipelineId) => api.get(`/sales/analytics/funnel/${pipelineId}`),
+  getStageDropoff: () => api.get("/sales/analytics/dropoff"),
+  getStuckDeals: () => api.get("/sales/analytics/stuck"),
+  getSalespersonAnalytics: () => api.get("/sales/analytics/salesperson"),
+  getPipelineVelocity: () => api.get("/sales/analytics/velocity"),
+  getSourceAnalytics: () => api.get("/sales/analytics/source"),
+  getAllActivities: (params = {}) => api.get("/sales/analytics/activities", { params }),
+};
+
 export default api;

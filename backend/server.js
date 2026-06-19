@@ -89,6 +89,11 @@ const superAdminRoutes = require("./routes/superAdminRoutes");
 const payrollRoutes = require("./routes/payrollRoutes");
 const meetingRoutes = require("./routes/meetingRoutes");
 const contactRoutes = require("./routes/contactRoutes");
+const salesPipelineRoutes = require("./routes/salesPipelineRoutes");
+const dealRoutes = require("./routes/dealRoutes");
+const salesTargetRoutes = require("./routes/salesTargetRoutes");
+const forecastRoutes = require("./routes/forecastRoutes");
+const salesAnalyticsRoutes = require("./routes/salesAnalyticsRoutes");
 const scheduler = require("./utils/scheduler");
 
 // API Routes (Reload triggered)
@@ -121,6 +126,11 @@ app.use("/api/super-admin", superAdminRoutes);
 app.use("/api/payroll", payrollRoutes);
 app.use("/api/meetings", meetingRoutes);
 app.use("/api/contacts", contactRoutes);
+app.use("/api/sales/pipelines", salesPipelineRoutes);
+app.use("/api/sales/deals", dealRoutes);
+app.use("/api/sales/targets", salesTargetRoutes);
+app.use("/api/sales/forecast", forecastRoutes);
+app.use("/api/sales/analytics", salesAnalyticsRoutes);
 
 app.get('/api/trigger-seed', async (req, res) => {
     try {
@@ -419,6 +429,25 @@ const startBackgroundServices = async () => {
         ],
         deployedBy: "Super Admin",
         deployedAt: new Date("2026-06-18T21:25:00+05:30"),
+        isActive: true
+      },
+      { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
+    );
+    await SystemUpdate.findOneAndUpdate(
+      { version: "v3.3.0-deals" },
+      {
+        version: "v3.3.0-deals",
+        title: "Sales Pipeline Customer Dropdown & Modal Enhancements",
+        message: "We have upgraded the Deal creation and edit flow with a searchable customer dropdown, paginated list support, and a larger modal interface for a more spacious user experience.",
+        releaseNotes: [
+          "Changed the New Deal modal width on the Kanban board to max-w-2xl for better layout visibility",
+          "Replaced standard customer select boxes with custom input fields powered by PortalDropdown",
+          "Added search filtering inside customer selection dropdown in both Deal Board and Deal Detail pages",
+          "Fixed backend pagination parsing (custRes.data?.data) to support larger customer directories up to 500+ records",
+          "Refined event bubbling and focus states to ensure smooth dropdown selection without premature closing"
+        ],
+        deployedBy: "Super Admin",
+        deployedAt: new Date("2026-06-19T21:20:00+05:30"),
         isActive: true
       },
       { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
