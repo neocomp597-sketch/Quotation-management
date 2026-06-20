@@ -9,6 +9,7 @@ import { MdAdd, MdClose, MdBusiness, MdPerson, MdCalendarToday, MdAttachMoney, M
 import { useAuth } from '../context/AuthContext';
 import Modal from '../components/Modal';
 import PortalDropdown from '../components/PortalDropdown';
+import SearchableSelect from '../components/SearchableSelect';
 
 const formatCurrency = (val) => {
     if (!val) return '₹0';
@@ -128,10 +129,40 @@ const DealBoard = () => {
     const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false);
     const customerAnchorRef = useRef(null);
 
+    const [sources, setSources] = useState([]);
+
     // Create form state
     const [form, setForm] = useState({
         title: '', customerId: '', value: '', expectedCloseDate: '', source: 'Other', notes: ''
     });
+
+    const handleAddSource = async (name) => {
+        if (!name.trim()) return;
+        try {
+            const res = await salesService.createSource({ name });
+            toast.success('Source added successfully');
+            const sourcesRes = await salesService.getSources();
+            setSources(sourcesRes.data || []);
+            setForm(prev => ({ ...prev, source: res.data.name }));
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Failed to add source');
+        }
+    };
+
+    const handleDeleteSource = async (option) => {
+        if (!window.confirm(`Are you sure you want to delete the source "${option.label}"?`)) return;
+        try {
+            await salesService.deleteSource(option.id);
+            toast.success('Source deleted successfully');
+            const sourcesRes = await salesService.getSources();
+            setSources(sourcesRes.data || []);
+            if (form.source === option.value) {
+                setForm(prev => ({ ...prev, source: 'Other' }));
+            }
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Failed to delete source');
+        }
+    };
 
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
@@ -169,12 +200,14 @@ const DealBoard = () => {
 
     const loadSupport = async () => {
         try {
-            const [custRes, userRes] = await Promise.all([
+            const [custRes, userRes, sourceRes] = await Promise.all([
                 customerService.getAll({ limit: 500 }),
-                userService.getAll()
+                userService.getAll(),
+                salesService.getSources()
             ]);
             setCustomers(custRes.data?.data || custRes.data || []);
             setUsers(Array.isArray(userRes.data) ? userRes.data : userRes.data?.users || []);
+            setSources(sourceRes.data || []);
         } catch (err) {
             console.error('Failed to load support data:', err);
         }
@@ -471,15 +504,14 @@ const DealBoard = () => {
                         </div>
                         <div>
                             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Source</label>
-                            <select
+                            <SearchableSelect
+                                options={sources.map(s => ({ value: s.name, label: s.name, id: s._id }))}
                                 value={form.source}
-                                onChange={e => setForm({ ...form, source: e.target.value })}
-                                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                            >
-                                {['Website', 'Referral', 'Email Campaign', 'Cold Call', 'Social Media', 'Trade Show', 'Partner', 'Other'].map(s => (
-                                    <option key={s} value={s}>{s}</option>
-                                ))}
-                            </select>
+                                onChange={val => setForm({ ...form, source: val })}
+                                placeholder="Select Source"
+                                onAddOption={handleAddSource}
+                                onDeleteOption={handleDeleteSource}
+                            />
                         </div>
                     </div>
                     {createStage && (

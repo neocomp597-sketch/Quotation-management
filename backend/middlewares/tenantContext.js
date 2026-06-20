@@ -7,10 +7,17 @@ const getTenantId = () => {
     return store ? store.companyId : null;
 };
 
-const runWithTenant = (companyId, callback) => tenantStorage.run({ companyId }, callback);
+const isTenantBypassed = () => {
+    const store = tenantStorage.getStore();
+    return store ? Boolean(store.bypassTenant) : false;
+};
+
+const runWithTenant = (companyId, callback, storeData = {}) => 
+    tenantStorage.run({ companyId, ...storeData }, callback);
 
 module.exports = {
     tenantStorage,
     getTenantId,
+    isTenantBypassed,
     runWithTenant
 };

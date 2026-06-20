@@ -127,6 +127,19 @@ const MENU_GROUPS = [
             { key: 'payroll_letters', label: 'Letter Management', description: 'Generate offer, appointment, promotion, and relieving letters' },
             { key: 'payroll_reports', label: 'Payroll Reports', description: 'Access monthly register, deduction logs, and allocation charts' }
         ]
+    },
+    {
+        key: 'csm',
+        label: 'Customer Service',
+        description: 'Manage support tickets, service visits, warranties, AMCs, knowledge base, and feedback',
+        children: [
+            { key: 'csm_dashboard', label: 'CSM Dashboard', description: 'Overview and service analytics' },
+            { key: 'csm_tickets', label: 'Tickets Management', description: 'View, create, and resolve customer support tickets' },
+            { key: 'csm_visits', label: 'Field Service Visits', description: 'Schedule and manage service engineer visits' },
+            { key: 'csm_warranties_amc', label: 'Warranty & AMC', description: 'Manage customer warranty details and AMC contracts' },
+            { key: 'csm_kb', label: 'Knowledge Base', description: 'Manage troubleshooting articles and FAQs' },
+            { key: 'csm_masters', label: 'CSM Masters', description: 'Configure categories, priorities, teams, and SLAs' }
+        ]
     }
 ];
 
@@ -166,8 +179,8 @@ const FULL_ACCESS_KEYS = getAllPermissionKeys();
 // Sales: lightweight access - dashboard, enquiry, quotation only
 const DEFAULT_ROLE_PERMISSIONS = {
     admin: buildPermissions(FULL_ACCESS_KEYS),
-    manager: buildPermissions(['dashboard', 'master', 'enquiry', 'sales_pipeline', 'quotation', 'meetings', 'sale', 'purchase', 'planning', 'reports', 'settings']),
-    sales: buildPermissions(['dashboard', 'enquiry', 'sales_pipeline', 'quotation', 'meetings'])
+    manager: buildPermissions(['dashboard', 'master', 'enquiry', 'sales_pipeline', 'quotation', 'meetings', 'sale', 'purchase', 'planning', 'reports', 'settings', 'csm']),
+    sales: buildPermissions(['dashboard', 'enquiry', 'sales_pipeline', 'quotation', 'meetings', 'csm_tickets', 'csm_kb'])
 };
 
 /**

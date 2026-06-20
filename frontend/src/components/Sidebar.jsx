@@ -70,6 +70,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             children: [
                 { key: 'master_customers', name: 'Customers', icon: <MdPeople size={18} />, path: '/customers' },
                 { key: 'payroll_employees', name: 'Employees', icon: <MdPeople size={18} />, path: '/payroll/employees' },
+                { key: 'payroll_employees', name: 'Payroll Masters', icon: <MdCategory size={18} />, path: '/payroll/masters' },
                 { key: 'master_vendors', name: 'Vendors', icon: <MdStorefront size={18} />, path: '/vendors' },
                 { key: 'master_contacts', name: 'Contacts', icon: <MdContactPhone size={18} />, path: '/contacts' },
                 { key: 'sales_deals', name: 'Deals', icon: <MdViewKanban size={18} />, path: '/sales/deals' },
@@ -155,6 +156,20 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             children: [
                 { key: 'planning_screen', name: 'Planning Screen', icon: <MdCalendarMonth size={18} />, path: '/planning' },
                 { key: 'planning_simulations', name: 'Simulations', icon: <MdAutoGraph size={18} />, path: '/simulations' },
+            ]
+        },
+        {
+            type: 'group',
+            name: 'Customer Service',
+            key: 'csm',
+            icon: <MdBuildCircle size={22} />,
+            children: [
+                { key: 'csm_dashboard', name: 'CSM Dashboard', icon: <MdDashboard size={18} />, path: '/csm/dashboard' },
+                { key: 'csm_tickets', name: 'Tickets Register', icon: <MdAssignment size={18} />, path: '/csm/tickets' },
+                { key: 'csm_visits', name: 'Service Visits', icon: <MdLocalShipping size={18} />, path: '/csm/visits' },
+                { key: 'csm_warranties_amc', name: 'Warranty & AMC', icon: <MdStorefront size={18} />, path: '/csm/warranties-amc' },
+                { key: 'csm_kb', name: 'Knowledge Base', icon: <MdDescription size={18} />, path: '/csm/kb' },
+                { key: 'csm_masters', name: 'CSM Config', icon: <MdSettings size={18} />, path: '/csm/masters' },
             ]
         },
         {

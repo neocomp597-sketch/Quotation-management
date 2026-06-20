@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { payrollService } from '../services/api';
 import { toast } from 'react-toastify';
 import Modal from '../components/Modal';
+import SearchableSelect from '../components/SearchableSelect';
 import { formatDate } from '../utils/helpers';
 import { 
     MdPeople, MdAdd, MdSearch, MdEdit, MdDelete, 
@@ -13,6 +14,8 @@ const PayrollEmployees = () => {
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState('');
     const [loading, setLoading] = useState(true);
+    const [departments, setDepartments] = useState([]);
+    const [designations, setDesignations] = useState([]);
 
     // Modal state
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -51,6 +54,23 @@ const PayrollEmployees = () => {
     useEffect(() => {
         fetchEmployees();
     }, [statusFilter, search]);
+
+    const fetchMasters = async () => {
+        try {
+            const [deptRes, desRes] = await Promise.all([
+                payrollService.getDepartments(),
+                payrollService.getDesignations()
+            ]);
+            setDepartments(deptRes.data || []);
+            setDesignations(desRes.data || []);
+        } catch (error) {
+            console.error('Failed to load department or designation masters', error);
+        }
+    };
+
+    useEffect(() => {
+        fetchMasters();
+    }, []);
 
     const handleOpenAdd = () => {
         setBasicForm({
@@ -356,22 +376,20 @@ const PayrollEmployees = () => {
                                             </div>
                                             <div>
                                                 <label className={labelClass}>Department</label>
-                                                <input
-                                                    type="text"
+                                                <SearchableSelect
+                                                    options={departments.map((d) => d.name)}
                                                     value={basicForm.department}
-                                                    onChange={(e) => setBasicForm({ ...basicForm, department: e.target.value })}
-                                                    className={inputClass}
-                                                    placeholder="e.g. Sales, Accounts"
+                                                    onChange={(val) => setBasicForm({ ...basicForm, department: val })}
+                                                    placeholder="Select Department"
                                                 />
                                             </div>
                                             <div>
                                                 <label className={labelClass}>Designation</label>
-                                                <input
-                                                    type="text"
+                                                <SearchableSelect
+                                                    options={designations.map((d) => d.name)}
                                                     value={basicForm.designation}
-                                                    onChange={(e) => setBasicForm({ ...basicForm, designation: e.target.value })}
-                                                    className={inputClass}
-                                                    placeholder="e.g. Sales Executive"
+                                                    onChange={(val) => setBasicForm({ ...basicForm, designation: val })}
+                                                    placeholder="Select Designation"
                                                 />
                                             </div>
                                             <div>

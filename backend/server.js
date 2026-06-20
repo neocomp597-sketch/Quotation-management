@@ -94,6 +94,7 @@ const dealRoutes = require("./routes/dealRoutes");
 const salesTargetRoutes = require("./routes/salesTargetRoutes");
 const forecastRoutes = require("./routes/forecastRoutes");
 const salesAnalyticsRoutes = require("./routes/salesAnalyticsRoutes");
+const csmRoutes = require("./routes/csmRoutes");
 const scheduler = require("./utils/scheduler");
 
 // API Routes (Reload triggered)
@@ -131,6 +132,7 @@ app.use("/api/sales/deals", dealRoutes);
 app.use("/api/sales/targets", salesTargetRoutes);
 app.use("/api/sales/forecast", forecastRoutes);
 app.use("/api/sales/analytics", salesAnalyticsRoutes);
+app.use("/api/csm", csmRoutes);
 
 app.get('/api/trigger-seed', async (req, res) => {
     try {
@@ -448,6 +450,26 @@ const startBackgroundServices = async () => {
         ],
         deployedBy: "Super Admin",
         deployedAt: new Date("2026-06-19T21:20:00+05:30"),
+        isActive: true
+      },
+      { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
+    );
+    await SystemUpdate.findOneAndUpdate(
+      { version: "v3.4.0-csm" },
+      {
+        version: "v3.4.0-csm",
+        title: "Customer Service Management (CSM) & Dynamic Masters",
+        message: "We have rolled out the Customer Service Management (CSM) module upgrades, database seeding shortcuts, and customizable Deal Source masters.",
+        releaseNotes: [
+          "Dynamic Deal Source Master: manage lead source entries inline with search, add, and delete controls directly inside forms",
+          "CSM Analytics Dashboard: visual glassmorphism cards, live SLA compliance donut charts, and top engineering performance charts",
+          "Maharashtra Power Utility Seed: realistic MSEDCL/MSETCL customer substations, switchgear assets, AMCs, and active tickets",
+          "CSM Knowledge Base Seed: step-by-step guides for SF6 switchgear refill, oil BDV tests, and numerical relay logs",
+          "Unified Modal Architecture: all edit and publication forms follow standardized Modal component formatting",
+          "System Seeding Shortcuts: trigger demo data seeding directly from the notifications bell dropdown or the What's New updates popup"
+        ],
+        deployedBy: "Super Admin",
+        deployedAt: new Date("2026-06-20T23:30:00+05:30"),
         isActive: true
       },
       { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }

@@ -18,6 +18,7 @@ const Customers = () => {
     const [pagination, setPagination] = useState({ page: 1, limit: LIST_PAGE_SIZE, total: 0, pages: 1 });
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingCustomer, setEditingCustomer] = useState(null);
+    const [isSaving, setIsSaving] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [territories, setTerritories] = useState([]);
@@ -162,7 +163,8 @@ const Customers = () => {
     };
 
     const handleSubmit = async (e) => {
-        e.preventDefault();
+        e?.preventDefault?.();
+        if (isSaving) return;
 
         // Validate required fields
         if (!formData.companyName?.trim()) {
@@ -174,6 +176,7 @@ const Customers = () => {
             return;
         }
 
+        setIsSaving(true);
         try {
             const payload = {
                 ...formData,
@@ -191,6 +194,8 @@ const Customers = () => {
         } catch (err) {
             console.error("Error saving customer:", err);
             toast.error(err.response?.data?.message || 'Error saving customer data');
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -550,9 +555,10 @@ const Customers = () => {
                         </button>
                         <button
                             onClick={handleSubmit}
-                            className="bg-primary-600 hover:bg-primary-700 text-white px-10 py-3.5 rounded-2xl font-black transition-all shadow-xl shadow-primary-600/20 uppercase text-[10px] tracking-widest active:scale-95"
+                            disabled={isSaving}
+                            className="bg-primary-600 hover:bg-primary-700 text-white px-10 py-3.5 rounded-2xl font-black transition-all shadow-xl shadow-primary-600/20 uppercase text-[10px] tracking-widest active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100"
                         >
-                            {editingCustomer ? "Commit Changes" : "Register Customer"}
+                            {isSaving ? "Saving..." : editingCustomer ? "Commit Changes" : "Register Customer"}
                         </button>
                     </>
                 }

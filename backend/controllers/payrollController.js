@@ -4,6 +4,8 @@ const PayrollRun = require('../models/PayrollRun');
 const PayrollEmployeeSummary = require('../models/PayrollEmployeeSummary');
 const PayrollLetter = require('../models/PayrollLetter');
 const PayrollAuditLog = require('../models/PayrollAuditLog');
+const Department = require('../models/Department');
+const Designation = require('../models/Designation');
 const mongoose = require('mongoose');
 
 // Helper to write to PayrollAuditLog
@@ -681,5 +683,145 @@ exports.getAuditLogs = async (req, res) => {
         res.json(logs);
     } catch (error) {
         res.status(500).json({ message: 'Failed to load payroll audit logs', error: error.message });
+    }
+};
+
+// ─── DEPARTMENTS ─────────────────────────────────────────────────────────────
+
+exports.getDepartments = async (req, res) => {
+    try {
+        let departments = await Department.find().sort({ name: 1 }).lean();
+        if (departments.length === 0) {
+            const defaults = [
+                { name: 'Sales', description: 'Sales and business development' },
+                { name: 'Accounts', description: 'Finance, accounts, and tax' },
+                { name: 'HR', description: 'Human resources and recruitment' },
+                { name: 'Engineering', description: 'Product development and engineering' },
+                { name: 'Operations', description: 'Operations and logistics' }
+            ];
+            await Department.insertMany(defaults);
+            departments = await Department.find().sort({ name: 1 }).lean();
+        }
+        res.json(departments);
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to load departments', error: error.message });
+    }
+};
+
+exports.createDepartment = async (req, res) => {
+    try {
+        const existing = await Department.findOne({ name: { $regex: new RegExp(`^${req.body.name.trim()}$`, 'i') } }).lean();
+        if (existing) {
+            return res.status(400).json({ message: 'Department with this name already exists' });
+        }
+        const dept = await Department.create(req.body);
+        res.status(201).json(dept);
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to create department', error: error.message });
+    }
+};
+
+exports.updateDepartment = async (req, res) => {
+    try {
+        if (req.body.name) {
+            const existing = await Department.findOne({
+                _id: { $ne: req.params.id },
+                name: { $regex: new RegExp(`^${req.body.name.trim()}$`, 'i') }
+            }).lean();
+            if (existing) {
+                return res.status(400).json({ message: 'Another department with this name already exists' });
+            }
+        }
+        const dept = await Department.findByIdAndUpdate(req.params.id, { $set: req.body }, { new: true });
+        res.json(dept);
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to update department', error: error.message });
+    }
+};
+
+exports.deleteDepartment = async (req, res) => {
+    try {
+        const dept = await Department.findById(req.params.id);
+        if (!dept) {
+            return res.status(404).json({ message: 'Department not found' });
+        }
+        const empCount = await EmployeeProfile.countDocuments({ department: dept.name });
+        if (empCount > 0) {
+            return res.status(400).json({ message: `Cannot delete department because it is currently assigned to ${empCount} employee(s)` });
+        }
+        await Department.findByIdAndDelete(req.params.id);
+        res.json({ message: 'Department deleted successfully' });
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to delete department', error: error.message });
+    }
+};
+
+// ─── DESIGNATIONS ────────────────────────────────────────────────────────────
+
+exports.getDesignations = async (req, res) => {
+    try {
+        let designations = await Designation.find().sort({ name: 1 }).lean();
+        if (designations.length === 0) {
+            const defaults = [
+                { name: 'Sales Executive', description: 'Sales executive role' },
+                { name: 'Sales Manager', description: 'Managing sales team' },
+                { name: 'Accounts Executive', description: 'Finance and billing executive' },
+                { name: 'HR Manager', description: 'Human resources head' },
+                { name: 'Software Engineer', description: 'Developer and engineering role' }
+            ];
+            await Designation.insertMany(defaults);
+            designations = await Designation.find().sort({ name: 1 }).lean();
+        }
+        res.json(designations);
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to load designations', error: error.message });
+    }
+};
+
+exports.createDesignation = async (req, res) => {
+    try {
+        const existing = await Designation.findOne({ name: { $regex: new RegExp(`^${req.body.name.trim()}$`, 'i') } }).lean();
+        if (existing) {
+            return res.status(400).json({ message: 'Designation with this name already exists' });
+        }
+        const des = await Designation.create(req.body);
+        res.status(201).json(des);
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to create designation', error: error.message });
+    }
+};
+
+exports.updateDesignation = async (req, res) => {
+    try {
+        if (req.body.name) {
+            const existing = await Designation.findOne({
+                _id: { $ne: req.params.id },
+                name: { $regex: new RegExp(`^${req.body.name.trim()}$`, 'i') }
+            }).lean();
+            if (existing) {
+                return res.status(400).json({ message: 'Another designation with this name already exists' });
+            }
+        }
+        const des = await Designation.findByIdAndUpdate(req.params.id, { $set: req.body }, { new: true });
+        res.json(des);
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to update designation', error: error.message });
+    }
+};
+
+exports.deleteDesignation = async (req, res) => {
+    try {
+        const des = await Designation.findById(req.params.id);
+        if (!des) {
+            return res.status(404).json({ message: 'Designation not found' });
+        }
+        const empCount = await EmployeeProfile.countDocuments({ designation: des.name });
+        if (empCount > 0) {
+            return res.status(400).json({ message: `Cannot delete designation because it is currently assigned to ${empCount} employee(s)` });
+        }
+        await Designation.findByIdAndDelete(req.params.id);
+        res.json({ message: 'Designation deleted successfully' });
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to delete designation', error: error.message });
     }
 };

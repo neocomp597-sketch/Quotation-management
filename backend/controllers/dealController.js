@@ -2,6 +2,7 @@ const Deal = require('../models/Deal');
 const DealActivity = require('../models/DealActivity');
 const SalesPipeline = require('../models/SalesPipeline');
 const SalesTarget = require('../models/SalesTarget');
+const DealSource = require('../models/DealSource');
 const mongoose = require('mongoose');
 
 // GET /api/sales/deals
@@ -396,3 +397,60 @@ async function updateTargetAchievement(userId, dealValue, companyId) {
         console.error('[Deals] updateTargetAchievement error:', err);
     }
 }
+
+// ─── DEAL SOURCES ────────────────────────────────────────────────────────────
+
+exports.getSources = async (req, res) => {
+    try {
+        let sources = await DealSource.find({ isActive: true }).sort({ name: 1 }).lean();
+        if (sources.length === 0) {
+            const defaults = [
+                { name: 'Website' },
+                { name: 'Referral' },
+                { name: 'Email Campaign' },
+                { name: 'Cold Call' },
+                { name: 'Social Media' },
+                { name: 'Trade Show' },
+                { name: 'Partner' },
+                { name: 'Other' }
+            ];
+            await DealSource.insertMany(defaults);
+            sources = await DealSource.find({ isActive: true }).sort({ name: 1 }).lean();
+        }
+        res.json(sources);
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to load deal sources', error: error.message });
+    }
+};
+
+exports.createSource = async (req, res) => {
+    try {
+        const { name } = req.body;
+        if (!name || !name.trim()) {
+            return res.status(400).json({ message: 'Source name is required' });
+        }
+        const existing = await DealSource.findOne({ name: { $regex: new RegExp(`^${name.trim()}$`, 'i') } }).lean();
+        if (existing) {
+            return res.status(400).json({ message: 'Source already exists' });
+        }
+        const source = await DealSource.create({ name: name.trim() });
+        res.status(201).json(source);
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to create deal source', error: error.message });
+    }
+};
+
+exports.deleteSource = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const source = await DealSource.findById(id);
+        if (!source) {
+            return res.status(404).json({ message: 'Source not found' });
+        }
+        await DealSource.findByIdAndDelete(id);
+        res.json({ message: 'Source deleted successfully' });
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to delete source', error: error.message });
+    }
+};
+

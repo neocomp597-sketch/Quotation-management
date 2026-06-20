@@ -5,6 +5,9 @@ const { protect } = require('../middlewares/authMiddleware');
 
 router.get('/', protect, ctrl.getAllDeals);
 router.get('/board/:pipelineId', protect, ctrl.getDealBoard);
+router.get('/sources', protect, ctrl.getSources);
+router.post('/sources', protect, ctrl.createSource);
+router.delete('/sources/:id', protect, ctrl.deleteSource);
 router.get('/:id', protect, ctrl.getDealById);
 router.post('/', protect, ctrl.createDeal);
 router.put('/:id', protect, ctrl.updateDeal);

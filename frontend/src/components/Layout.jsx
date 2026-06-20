@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import { Link, useNavigate } from 'react-router-dom';
-import { footerPageService, systemUpdateService } from '../services/api';
+import { footerPageService, systemUpdateService, csmService } from '../services/api';
 import Modal from './Modal';
 import { MdCheckCircle, MdNewReleases } from 'react-icons/md';
+import { toast } from 'react-toastify';
 
 const Layout = ({ children }) => {
     const navigate = useNavigate();
@@ -59,6 +60,37 @@ const Layout = ({ children }) => {
     const handleViewAllUpdates = () => {
         handleDismissUpdate();
         navigate('/system-updates');
+    };
+
+    const [seedingMh, setSeedingMh] = useState(false);
+    const [seedingKb, setSeedingKb] = useState(false);
+
+    const handleSeedMh = async () => {
+        setSeedingMh(true);
+        const toastId = toast.loading("Seeding Maharashtra electrical utility installations...");
+        try {
+            await csmService.seedMhData();
+            toast.update(toastId, { render: "Maharashtra utility data seeded successfully!", type: "success", isLoading: false, autoClose: 3000 });
+            window.dispatchEvent(new Event('onCsmDataSeeded'));
+        } catch (err) {
+            toast.update(toastId, { render: err.response?.data?.message || "Error seeding utility data", type: "error", isLoading: false, autoClose: 3000 });
+        } finally {
+            setSeedingMh(false);
+        }
+    };
+
+    const handleSeedKb = async () => {
+        setSeedingKb(true);
+        const toastId = toast.loading("Seeding Knowledge Base troubleshooting guides...");
+        try {
+            await csmService.seedKbData();
+            toast.update(toastId, { render: "Knowledge Base FAQs seeded successfully!", type: "success", isLoading: false, autoClose: 3000 });
+            window.dispatchEvent(new Event('onCsmKbSeeded'));
+        } catch (err) {
+            toast.update(toastId, { render: err.response?.data?.message || "Error seeding KB guides", type: "error", isLoading: false, autoClose: 3000 });
+        } finally {
+            setSeedingKb(false);
+        }
     };
 
     return (
@@ -150,6 +182,29 @@ const Layout = ({ children }) => {
                                 </ul>
                             </div>
                         )}
+
+                        {/* Seeding & Demo Setup */}
+                        <div className="border-t border-slate-100 pt-5 mt-5 space-y-3">
+                            <h5 className="text-[10px] font-black uppercase tracking-widest text-slate-400">System Seeding Shortcuts</h5>
+                            <div className="grid grid-cols-2 gap-4">
+                                <button
+                                    onClick={handleSeedMh}
+                                    disabled={seedingMh}
+                                    className="px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-left hover:bg-slate-100 hover:border-slate-300 transition-all flex flex-col gap-0.5 disabled:opacity-50"
+                                >
+                                    <span className="text-xs font-black text-slate-900">⚡ Seed MH Utility</span>
+                                    <span className="text-[9px] text-slate-400 font-medium">Assets, tickets, & AMCs</span>
+                                </button>
+                                <button
+                                    onClick={handleSeedKb}
+                                    disabled={seedingKb}
+                                    className="px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-left hover:bg-slate-100 hover:border-slate-300 transition-all flex flex-col gap-0.5 disabled:opacity-50"
+                                >
+                                    <span className="text-xs font-black text-slate-900">📚 Seed KB FAQs</span>
+                                    <span className="text-[9px] text-slate-400 font-medium">Substation troubleshooting manuals</span>
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 )}
             </Modal>

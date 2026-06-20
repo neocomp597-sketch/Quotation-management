@@ -18049,5 +18049,49 @@
     "customerName": "mehata sir",
     "companyName": "fortuna engg.",
     "gstin": "BYYPD4103QJ1ZS"
+  },
+  {
+    "_id": "6a36bd8024412eb191869cc2",
+    "customerName": "20062026",
+    "companyName": "Test Customer 20th June 2026",
+    "gstin": "",
+    "logoUrl": "https://biswjczulbtwqufsviha.supabase.co/storage/v1/object/public/images/uploads/7e0cde95-adc4-4f93-b5a9-0ecebee06218-download.png"
+  },
+  {
+    "_id": "6a36bd8e24412eb191869cc3",
+    "customerName": "20062026",
+    "companyName": "Test Customer 20th June 2026",
+    "gstin": "",
+    "logoUrl": "https://biswjczulbtwqufsviha.supabase.co/storage/v1/object/public/images/uploads/7e0cde95-adc4-4f93-b5a9-0ecebee06218-download.png"
+  },
+  {
+    "_id": "6a36d2de10e402211302b994",
+    "customerName": "MSETCL Karjat Substation",
+    "companyName": "Maharashtra State Electricity Transmission Co. Ltd - Karjat",
+    "gstin": "27AAACM1234A1Z0"
+  },
+  {
+    "_id": "6a36d2de10e402211302b995",
+    "customerName": "MSETCL Vikharan Substation",
+    "companyName": "Maharashtra State Electricity Transmission Co. Ltd - Vikharan",
+    "gstin": "27AAACM1234A2Z0"
+  },
+  {
+    "_id": "6a36d2de10e402211302b996",
+    "customerName": "MSEDCL Pimpalgaon Division",
+    "companyName": "Maharashtra State Electricity Distribution Co. Ltd - Pimpalgaon",
+    "gstin": "27AAACM1234A3Z0"
+  },
+  {
+    "_id": "6a36d2de10e402211302b997",
+    "customerName": "Adani Electricity Thane Central",
+    "companyName": "Adani Electricity Ltd - Thane Division (MH)",
+    "gstin": "27AAACA5678B1Z1"
+  },
+  {
+    "_id": "6a36d2de10e402211302b998",
+    "customerName": "Tata Power Trombay Station",
+    "companyName": "Tata Power Ltd - Trombay Station (MH)",
+    "gstin": "27AAACT9012C1Z2"
   }
 ]

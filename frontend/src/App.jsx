@@ -48,6 +48,15 @@ import PayrollPayslips from './pages/PayrollPayslips';
 import PayrollLetters from './pages/PayrollLetters';
 import PayrollReports from './pages/PayrollReports';
 import PayrollSettingsPage from './pages/PayrollSettingsPage';
+import PayrollMasters from './pages/PayrollMasters';
+
+import CSMDashboard from './pages/CSMDashboard';
+import CSMTickets from './pages/CSMTickets';
+import TicketDetail from './pages/TicketDetail';
+import ServiceVisits from './pages/ServiceVisits';
+import WarrantyAMC from './pages/WarrantyAMC';
+import KnowledgeBase from './pages/KnowledgeBase';
+import CSMMasters from './pages/CSMMasters';
 
 import SalesDashboard from './pages/SalesDashboard';
 import DealBoard from './pages/DealBoard';
@@ -149,6 +158,16 @@ function App() {
             <Route path="/payroll/letters" element={<PermissionRoute permissionKey="payroll_letters"><Layout><PayrollLetters /></Layout></PermissionRoute>} />
             <Route path="/payroll/reports" element={<PermissionRoute permissionKey="payroll_reports"><Layout><PayrollReports /></Layout></PermissionRoute>} />
             <Route path="/payroll/settings" element={<PermissionRoute permissionKey="payroll_settings"><Layout><PayrollSettingsPage /></Layout></PermissionRoute>} />
+            <Route path="/payroll/masters" element={<PermissionRoute permissionKey="payroll_employees"><Layout><PayrollMasters /></Layout></PermissionRoute>} />
+
+            {/* CSM Routes */}
+            <Route path="/csm/dashboard" element={<PermissionRoute permissionKey="csm_dashboard"><Layout><CSMDashboard /></Layout></PermissionRoute>} />
+            <Route path="/csm/tickets" element={<PermissionRoute permissionKey="csm_tickets"><Layout><CSMTickets /></Layout></PermissionRoute>} />
+            <Route path="/csm/tickets/:id" element={<PermissionRoute permissionKey="csm_tickets"><Layout><TicketDetail /></Layout></PermissionRoute>} />
+            <Route path="/csm/visits" element={<PermissionRoute permissionKey="csm_visits"><Layout><ServiceVisits /></Layout></PermissionRoute>} />
+            <Route path="/csm/warranties-amc" element={<PermissionRoute permissionKey="csm_warranties_amc"><Layout><WarrantyAMC /></Layout></PermissionRoute>} />
+            <Route path="/csm/kb" element={<PermissionRoute permissionKey="csm_kb"><Layout><KnowledgeBase /></Layout></PermissionRoute>} />
+            <Route path="/csm/masters" element={<PermissionRoute permissionKey="csm_masters"><Layout><CSMMasters /></Layout></PermissionRoute>} />
 
             <Route path="/info/:slug" element={<Layout><FooterPageView /></Layout>} />
           </Route>

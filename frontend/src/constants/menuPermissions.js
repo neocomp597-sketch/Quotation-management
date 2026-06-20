@@ -141,6 +141,20 @@ export const MENU_PERMISSION_GROUPS = [
             { key: 'payroll_letters', label: 'Letters', description: 'Generate offer, appointment, promotion, relieving letters', defaultRoute: '/payroll/letters' },
             { key: 'payroll_reports', label: 'Reports', description: 'View register, deduction logs, and allocation reports', defaultRoute: '/payroll/reports' }
         ]
+    },
+    {
+        key: 'csm',
+        label: 'Customer Service',
+        description: 'Manage support tickets, service visits, warranties, AMCs, knowledge base, and feedback',
+        defaultRoute: '/csm/dashboard',
+        children: [
+            { key: 'csm_dashboard', label: 'CSM Dashboard', description: 'Overview and service analytics', defaultRoute: '/csm/dashboard' },
+            { key: 'csm_tickets', label: 'Tickets Management', description: 'View, create, and resolve customer support tickets', defaultRoute: '/csm/tickets' },
+            { key: 'csm_visits', label: 'Field Service Visits', description: 'Schedule and manage service engineer visits', defaultRoute: '/csm/visits' },
+            { key: 'csm_warranties_amc', label: 'Warranty & AMC', description: 'Manage customer warranty details and AMC contracts', defaultRoute: '/csm/warranties-amc' },
+            { key: 'csm_kb', label: 'Knowledge Base', description: 'Manage troubleshooting articles and FAQs', defaultRoute: '/csm/kb' },
+            { key: 'csm_masters', label: 'CSM Masters', description: 'Configure categories, priorities, teams, and SLAs', defaultRoute: '/csm/masters' }
+        ]
     }
 ];
 

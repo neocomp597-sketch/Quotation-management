@@ -90,7 +90,7 @@ exports.protect = async (req, res, next) => {
                 companyId: resolvedCompanyId
             };
 
-            runWithTenant(req.user.companyId, () => next());
+            runWithTenant(req.user.companyId, () => next(), { bypassTenant: isSuperAdmin });
         } catch (error) {
             if (error?.name === 'TokenExpiredError') {
                 return res.status(401).json({ message: 'Not authorized, token expired' });

@@ -6,7 +6,8 @@ const PayrollEmployeeSummary = require('../models/PayrollEmployeeSummary');
 
 // Middleware: Enforce admin role for general payroll management actions
 const checkAdmin = (req, res, next) => {
-    if (req.user && req.user.role === 'admin') {
+    const { isSuperAdminRole } = require('../middlewares/authMiddleware');
+    if (req.user && (req.user.role === 'admin' || isSuperAdminRole(req.user.role))) {
         return next();
     }
     return res.status(403).json({ message: 'Only admin can manage payroll' });
@@ -80,5 +81,17 @@ router.get('/reports', checkAdmin, payrollController.getReports);
 
 // ─── AUDIT LOGS (Admin only) ────────────────────────────────────────────────
 router.get('/audit-logs', checkAdmin, payrollController.getAuditLogs);
+
+// ─── DEPARTMENTS (Admin only) ────────────────────────────────────────────────
+router.get('/departments', checkAdmin, payrollController.getDepartments);
+router.post('/departments', checkAdmin, payrollController.createDepartment);
+router.put('/departments/:id', checkAdmin, payrollController.updateDepartment);
+router.delete('/departments/:id', checkAdmin, payrollController.deleteDepartment);
+
+// ─── DESIGNATIONS (Admin only) ────────────────────────────────────────────────
+router.get('/designations', checkAdmin, payrollController.getDesignations);
+router.post('/designations', checkAdmin, payrollController.createDesignation);
+router.put('/designations/:id', checkAdmin, payrollController.updateDesignation);
+router.delete('/designations/:id', checkAdmin, payrollController.deleteDesignation);
 
 module.exports = router;

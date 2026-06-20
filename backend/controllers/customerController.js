@@ -15,6 +15,35 @@ const getPagination = (query) => {
 
 const hasListParams = (query) => Boolean(query.page || query.limit || query.search);
 
+const normalizeCustomerName = (value = '') => String(value || '').trim();
+
+const buildExactMatch = (value = '') => new RegExp(`^${escapeRegex(String(value).trim())}$`, 'i');
+
+const getUniqueCustomerName = async (customerName, excludeId) => {
+    const baseName = normalizeCustomerName(customerName);
+    if (!baseName) return baseName;
+
+    const query = { customerName: buildExactMatch(baseName) };
+    if (excludeId) {
+        query._id = { $ne: excludeId };
+    }
+
+    const existing = await Customer.findOne(query).select('_id').lean();
+    if (!existing) return baseName;
+
+    for (let suffix = 2; suffix < 10000; suffix += 1) {
+        const candidate = `${baseName}-${suffix}`;
+        const candidateQuery = { customerName: buildExactMatch(candidate) };
+        if (excludeId) {
+            candidateQuery._id = { $ne: excludeId };
+        }
+        const match = await Customer.findOne(candidateQuery).select('_id').lean();
+        if (!match) return candidate;
+    }
+
+    return `${baseName}-${Date.now().toString(36).toUpperCase()}`;
+};
+
 const buildCustomerQuery = async (req) => {
     const query = {};
     if (req.user && req.user.role !== 'admin') {
@@ -67,6 +96,7 @@ const findDuplicateCustomer = async (payload, excludeId) => {
     if (payload.gstin?.trim()) checks.push({ gstin: payload.gstin.trim().toUpperCase() });
     if (payload.mobile?.trim()) checks.push({ mobile: payload.mobile.trim() });
     if (payload.email?.trim()) checks.push({ email: payload.email.trim().toLowerCase() });
+    if (payload.customerName?.trim()) checks.push({ customerName: buildExactMatch(payload.customerName) });
     if (!checks.length) return null;
 
     const query = { $or: checks };
@@ -88,6 +118,7 @@ const createCustomer = async (req, res) => {
                 duplicate
             });
         }
+        const uniqueCustomerName = await getUniqueCustomerName(customerName);
 
         let assignedTerritory = territory;
         if (!assignedTerritory) {
@@ -97,12 +128,12 @@ const createCustomer = async (req, res) => {
         }
 
         const newCustomer = new Customer({
-            customerName,
-            companyName,
+            customerName: uniqueCustomerName,
+            companyName: companyName?.trim(),
             gstin: gstin?.trim().toUpperCase(),
             billingAddress,
             shippingAddress,
-            mobile,
+            mobile: mobile?.trim(),
             email: email?.trim().toLowerCase(),
             logoUrl,
             defaultDiscount,
@@ -214,6 +245,7 @@ const updateCustomer = async (req, res) => {
                 duplicate
             });
         }
+        const uniqueCustomerName = await getUniqueCustomerName(customerName, req.params.id);
 
         let assignedTerritory = territory;
         if (assignedTerritory === undefined) {
@@ -223,12 +255,12 @@ const updateCustomer = async (req, res) => {
         }
 
         const updatedCustomer = await Customer.findByIdAndUpdate(req.params.id, {
-            customerName,
-            companyName,
+            customerName: uniqueCustomerName,
+            companyName: companyName?.trim(),
             gstin: gstin?.trim().toUpperCase(),
             billingAddress,
             shippingAddress,
-            mobile,
+            mobile: mobile?.trim(),
             email: email?.trim().toLowerCase(),
             logoUrl,
             defaultDiscount,
@@ -318,13 +350,16 @@ const bulkUpdateCustomers = async (req, res) => {
 // Check Duplicate Customer
 const checkDuplicateCustomer = async (req, res) => {
     try {
-        const { gstin, mobile, email, excludeId } = req.query;
-        if (!gstin && !mobile && !email) {
+        const { gstin, mobile, email, customerName, excludeId } = req.query;
+        if (!gstin && !mobile && !email && !customerName) {
             return res.json({ isDuplicate: false });
         }
-        const duplicate = await findDuplicateCustomer({ gstin, mobile, email }, excludeId);
+        const duplicate = await findDuplicateCustomer({ gstin, mobile, email, customerName }, excludeId);
         if (duplicate) {
-            return res.json({ isDuplicate: true, duplicate });
+            const suggestedCustomerName = customerName
+                ? await getUniqueCustomerName(customerName, excludeId)
+                : undefined;
+            return res.json({ isDuplicate: true, duplicate, suggestedCustomerName });
         }
         res.json({ isDuplicate: false });
     } catch (error) {

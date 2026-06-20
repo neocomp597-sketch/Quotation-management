@@ -4,6 +4,7 @@ import { salesService, customerService } from '../services/api';
 import { toast } from 'react-toastify';
 import Modal from '../components/Modal';
 import PortalDropdown from '../components/PortalDropdown';
+import SearchableSelect from '../components/SearchableSelect';
 import {
     MdArrowBack, MdEdit, MdSave, MdClose, MdAdd, MdPhone, MdEmail,
     MdEvent, MdChat, MdAssignment, MdNote, MdDelete, MdReplay, MdBlock,
@@ -21,7 +22,6 @@ const ACTIVITY_COLORS = {
     Task: 'bg-red-100 text-red-700', Note: 'bg-slate-100 text-slate-700'
 };
 
-const SOURCES = ['Website', 'Referral', 'Email Campaign', 'Cold Call', 'Social Media', 'Trade Show', 'Partner', 'Other'];
 const FORECAST_CATS = ['Pipeline', 'Best Case', 'Commit', 'Closed', 'Omitted'];
 
 const formatCurrency = (val) => {
@@ -49,10 +49,40 @@ const DealDetail = () => {
     const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false);
     const customerAnchorRef = useRef(null);
 
+    const [sources, setSources] = useState([]);
+
     const [form, setForm] = useState({
         title: '', customerId: '', value: '', expectedCloseDate: '',
         forecastCategory: 'Pipeline', source: 'Other', tags: '', notes: ''
     });
+
+    const handleAddSource = async (name) => {
+        if (!name.trim()) return;
+        try {
+            const res = await salesService.createSource({ name });
+            toast.success('Source added successfully');
+            const sourcesRes = await salesService.getSources();
+            setSources(sourcesRes.data || []);
+            setForm(prev => ({ ...prev, source: res.data.name }));
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Failed to add source');
+        }
+    };
+
+    const handleDeleteSource = async (option) => {
+        if (!window.confirm(`Are you sure you want to delete the source "${option.label}"?`)) return;
+        try {
+            await salesService.deleteSource(option.id);
+            toast.success('Source deleted successfully');
+            const sourcesRes = await salesService.getSources();
+            setSources(sourcesRes.data || []);
+            if (form.source === option.value) {
+                setForm(prev => ({ ...prev, source: 'Other' }));
+            }
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Failed to delete source');
+        }
+    };
 
     useEffect(() => {
         loadSupport();
@@ -62,12 +92,14 @@ const DealDetail = () => {
 
     const loadSupport = async () => {
         try {
-            const [custRes, pipeRes] = await Promise.all([
+            const [custRes, pipeRes, sourceRes] = await Promise.all([
                 customerService.getAll({ limit: 500 }),
-                salesService.getPipelines()
+                salesService.getPipelines(),
+                salesService.getSources()
             ]);
             setCustomers(custRes.data?.data || custRes.data || []);
             setPipelines(pipeRes.data || []);
+            setSources(sourceRes.data || []);
         } catch (err) {
             console.error('Failed to load support:', err);
         }
@@ -346,10 +378,14 @@ const DealDetail = () => {
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Source</label>
-                                    <select value={form.source} onChange={e => setForm({ ...form, source: e.target.value })}
-                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-                                        {SOURCES.map(s => <option key={s} value={s}>{s}</option>)}
-                                    </select>
+                                    <SearchableSelect
+                                        options={sources.map(s => ({ value: s.name, label: s.name, id: s._id }))}
+                                        value={form.source}
+                                        onChange={val => setForm({ ...form, source: val })}
+                                        placeholder="Select Source"
+                                        onAddOption={handleAddSource}
+                                        onDeleteOption={handleDeleteSource}
+                                    />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Forecast Category</label>

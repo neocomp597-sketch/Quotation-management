@@ -140,6 +140,7 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
     };
 
     const handleNotifClick = async (n) => {
+
         if (n.type === 'Release') {
             localStorage.setItem('lastSeenSystemVersion', n.version);
             setSystemUpdateNotification(null);

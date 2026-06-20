@@ -26,7 +26,6 @@ const DealSchema = new mongoose.Schema({
 
     source: {
         type: String,
-        enum: ['Website', 'Referral', 'Email Campaign', 'Cold Call', 'Social Media', 'Trade Show', 'Partner', 'Other'],
         default: 'Other'
     },
 

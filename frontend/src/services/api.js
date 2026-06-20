@@ -463,6 +463,18 @@ export const payrollService = {
   updateEmployeeStructure: (id, data) => api.put(`/payroll/employees/${id}/structure`, data),
   deleteEmployee: (id) => api.delete(`/payroll/employees/${id}`),
 
+  // Departments
+  getDepartments: () => api.get("/payroll/departments"),
+  createDepartment: (data) => api.post("/payroll/departments", data),
+  updateDepartment: (id, data) => api.put(`/payroll/departments/${id}`, data),
+  deleteDepartment: (id) => api.delete(`/payroll/departments/${id}`),
+
+  // Designations
+  getDesignations: () => api.get("/payroll/designations"),
+  createDesignation: (data) => api.post("/payroll/designations", data),
+  updateDesignation: (id, data) => api.put(`/payroll/designations/${id}`, data),
+  deleteDesignation: (id) => api.delete(`/payroll/designations/${id}`),
+
   // Settings
   getSettings: () => api.get("/payroll/settings"),
   updateSettings: (data) => api.put("/payroll/settings", data),
@@ -512,6 +524,11 @@ export const contactService = {
 };
 
 export const salesService = {
+  // Deal Sources
+  getSources: () => api.get("/sales/deals/sources"),
+  createSource: (data) => api.post("/sales/deals/sources", data),
+  deleteSource: (id) => api.delete(`/sales/deals/sources/${id}`),
+
   // Pipelines
   getPipelines: () => api.get("/sales/pipelines"),
   getPipeline: (id) => api.get(`/sales/pipelines/${id}`),
@@ -555,6 +572,67 @@ export const salesService = {
   getPipelineVelocity: () => api.get("/sales/analytics/velocity"),
   getSourceAnalytics: () => api.get("/sales/analytics/source"),
   getAllActivities: (params = {}) => api.get("/sales/analytics/activities", { params }),
+};
+
+export const csmService = {
+  getStats: () => api.get("/csm/dashboard"),
+  getTickets: (params = {}) => api.get("/csm/tickets", { params }),
+  getTicketById: (id) => api.get(`/csm/tickets/${id}`),
+  createTicket: (data) => api.post("/csm/tickets", data),
+  updateTicket: (id, data) => api.put(`/csm/tickets/${id}`, data),
+  assignTicket: (id, data) => api.patch(`/csm/tickets/${id}/assign`, data),
+  updateTicketStatus: (id, status) => api.patch(`/csm/tickets/${id}/status`, { status }),
+  addComment: (id, data) => api.post(`/csm/tickets/${id}/comments`, data),
+  escalateTicket: (id) => api.patch(`/csm/tickets/${id}/escalate`),
+  submitFeedback: (id, data) => api.post(`/csm/tickets/${id}/feedback`, data),
+
+  getVisits: (params = {}) => api.get("/csm/visits", { params }),
+  getVisitById: (id) => api.get(`/csm/visits/${id}`),
+  createVisit: (data) => api.post("/csm/visits", data),
+  checkInVisit: (id, data) => api.post(`/csm/visits/${id}/check-in`, data),
+  checkOutVisit: (id, data) => api.post(`/csm/visits/${id}/check-out`, data),
+
+  verifyEntitlements: (params = {}) => api.get("/csm/entitlements/verify", { params }),
+  getWarranties: () => api.get("/csm/warranties"),
+  createWarranty: (data) => api.post("/csm/warranties", data),
+  getAmcs: () => api.get("/csm/amcs"),
+  createAmc: (data) => api.post("/csm/amcs", data),
+  getAssets: () => api.get("/csm/assets"),
+  createAsset: (data) => api.post("/csm/assets", data),
+
+  getArticles: (params = {}) => api.get("/csm/kb", { params }),
+  getArticleById: (id) => api.get(`/csm/kb/${id}`),
+  createArticle: (data) => api.post("/csm/kb", data),
+  updateArticle: (id, data) => api.put(`/csm/kb/${id}`, data),
+  deleteArticle: (id) => api.delete(`/csm/kb/${id}`),
+
+  seedMasters: () => api.post("/csm/masters/seed"),
+  seedMhData: () => api.post("/csm/masters/seed-mh"),
+  seedKbData: () => api.post("/csm/masters/seed-kb"),
+  getCategories: () => api.get("/csm/masters/categories"),
+  createCategory: (data) => api.post("/csm/masters/categories", data),
+  updateCategory: (id, data) => api.put(`/csm/masters/categories/${id}`, data),
+  deleteCategory: (id) => api.delete(`/csm/masters/categories/${id}`),
+
+  getTypes: () => api.get("/csm/masters/types"),
+  createType: (data) => api.post("/csm/masters/types", data),
+  updateType: (id, data) => api.put(`/csm/masters/types/${id}`, data),
+  deleteType: (id) => api.delete(`/csm/masters/types/${id}`),
+
+  getPriorities: () => api.get("/csm/masters/priorities"),
+  createPriority: (data) => api.post("/csm/masters/priorities", data),
+  updatePriority: (id, data) => api.put(`/csm/masters/priorities/${id}`, data),
+  deletePriority: (id) => api.delete(`/csm/masters/priorities/${id}`),
+
+  getSlaPolicies: () => api.get("/csm/masters/sla-policies"),
+  createSlaPolicy: (data) => api.post("/csm/masters/sla-policies", data),
+  updateSlaPolicy: (id, data) => api.put(`/csm/masters/sla-policies/${id}`, data),
+  deleteSlaPolicy: (id) => api.delete(`/csm/masters/sla-policies/${id}`),
+
+  getTeams: () => api.get("/csm/masters/teams"),
+  createTeam: (data) => api.post("/csm/masters/teams", data),
+  updateTeam: (id, data) => api.put(`/csm/masters/teams/${id}`, data),
+  deleteTeam: (id) => api.delete(`/csm/masters/teams/${id}`),
 };
 
 export default api;

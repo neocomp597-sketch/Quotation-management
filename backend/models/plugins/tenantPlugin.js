@@ -1,4 +1,4 @@
-const { getTenantId } = require('../../middlewares/tenantContext');
+const { getTenantId, isTenantBypassed } = require('../../middlewares/tenantContext');
 const mongoose = require('mongoose');
 
 const TENANT_QUERY_HOOKS = [
@@ -16,7 +16,7 @@ const TENANT_QUERY_HOOKS = [
     'updateOne',
 ];
 
-const hasBypass = (options = {}) => Boolean(options.bypassTenant);
+const hasBypass = (options = {}) => Boolean(options.bypassTenant) || isTenantBypassed();
 
 const toObjectId = (companyId) => (
     companyId instanceof mongoose.Types.ObjectId
@@ -48,7 +48,7 @@ module.exports = function tenantPlugin(schema, options = {}) {
             const companyId = getTenantId();
             if (companyId) {
                 this.companyId = companyId;
-            } else if (!this.$locals.bypassTenant) {
+            } else if (!this.$locals.bypassTenant && !isTenantBypassed()) {
                 throw new Error(`companyId is required for ${this.constructor.modelName} and no tenant context found`);
             }
         }
