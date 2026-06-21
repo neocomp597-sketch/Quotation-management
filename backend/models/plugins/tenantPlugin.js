@@ -24,8 +24,27 @@ const toObjectId = (companyId) => (
         : new mongoose.Types.ObjectId(companyId)
 );
 
+const hasCompanyId = (obj) => {
+    if (!obj || typeof obj !== 'object') return false;
+    if ('companyId' in obj) return true;
+    if (Array.isArray(obj)) {
+        return obj.some(item => hasCompanyId(item));
+    }
+    for (const key of Object.keys(obj)) {
+        if (key.startsWith('$') && typeof obj[key] === 'object') {
+            if (hasCompanyId(obj[key])) {
+                return true;
+            }
+        }
+    }
+    return false;
+};
+
 const addTenantFilter = (query, companyId) => {
     const currentQuery = query.getQuery();
+    if (hasCompanyId(currentQuery)) {
+        return;
+    }
     query.setQuery({ $and: [currentQuery, { companyId }] });
 };
 

@@ -69,6 +69,12 @@ router.get('/masters/priorities', protect, csmMasterController.priorities.getAll
 router.put('/masters/priorities/:id', protect, csmMasterController.priorities.update);
 router.delete('/masters/priorities/:id', protect, csmMasterController.priorities.delete);
 
+// Sources
+router.post('/masters/sources', protect, csmMasterController.sources.create);
+router.get('/masters/sources', protect, csmMasterController.sources.getAll);
+router.put('/masters/sources/:id', protect, csmMasterController.sources.update);
+router.delete('/masters/sources/:id', protect, csmMasterController.sources.delete);
+
 // SLA Policies
 router.post('/masters/sla-policies', protect, csmMasterController.slaPolicies.create);
 router.get('/masters/sla-policies', protect, csmMasterController.slaPolicies.getAll);

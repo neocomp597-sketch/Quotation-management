@@ -32,7 +32,6 @@ const TicketSchema = new mongoose.Schema({
     priorityId: { type: mongoose.Schema.Types.ObjectId, ref: 'Priority', required: true },
     source: { 
         type: String, 
-        enum: ['Web Portal', 'Email', 'WhatsApp', 'Mobile App', 'Phone Call', 'Sales Team', 'Service Engineer'], 
         default: 'Web Portal' 
     },
     status: { 

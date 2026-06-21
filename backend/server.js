@@ -555,6 +555,14 @@ const startBackgroundServices = async () => {
       // Ignore if index doesn't exist
   }
 
+  try {
+      const Counter = require("./models/Counter");
+      await Counter.collection.dropIndex('type_1_prefix_1_year_1');
+      console.log('[Migration] Dropped old type_1_prefix_1_year_1 index on counters successfully.');
+  } catch (err) {
+      // Ignore if index doesn't exist
+  }
+
   if (redisReady) {
     await startCacheInvalidationWorker();
     await startAuthSessionWorker();
@@ -644,5 +652,5 @@ if (require.main === module) {
     }
 })();
 
-// Trigger nodemon reload
+// Trigger nodemon reload - force reload csm routes
 module.exports = app;

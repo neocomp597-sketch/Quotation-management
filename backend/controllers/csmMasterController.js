@@ -3,6 +3,7 @@ const TicketType = require('../models/TicketType');
 const Priority = require('../models/Priority');
 const SlaPolicy = require('../models/SlaPolicy');
 const ServiceTeam = require('../models/ServiceTeam');
+const TicketSource = require('../models/TicketSource');
 
 // Seed default master configurations
 exports.seedDefaults = async (req, res) => {
@@ -63,6 +64,23 @@ exports.seedDefaults = async (req, res) => {
         const teamExists = await ServiceTeam.findOne({ name: defaultTeam.name, companyId });
         if (!teamExists) {
             await ServiceTeam.create({ ...defaultTeam, companyId });
+        }
+
+        // 5. Default Sources
+        const defaultSources = [
+            { name: 'Web Portal' },
+            { name: 'Email' },
+            { name: 'WhatsApp' },
+            { name: 'Mobile App' },
+            { name: 'Phone Call' },
+            { name: 'Sales Team' },
+            { name: 'Service Engineer' }
+        ];
+        for (const src of defaultSources) {
+            const exists = await TicketSource.findOne({ name: src.name, companyId });
+            if (!exists) {
+                await TicketSource.create({ ...src, companyId });
+            }
         }
 
         res.json({ message: 'CSM defaults seeded successfully' });
@@ -628,3 +646,4 @@ exports.types = createCrudEndpoints(TicketType, 'TicketType');
 exports.priorities = createCrudEndpoints(Priority, 'Priority');
 exports.slaPolicies = createCrudEndpoints(SlaPolicy, 'SlaPolicy');
 exports.serviceTeams = createCrudEndpoints(ServiceTeam, 'ServiceTeam');
+exports.sources = createCrudEndpoints(TicketSource, 'TicketSource');

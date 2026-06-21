@@ -614,6 +614,11 @@ export const csmService = {
   updateCategory: (id, data) => api.put(`/csm/masters/categories/${id}`, data),
   deleteCategory: (id) => api.delete(`/csm/masters/categories/${id}`),
 
+  getSources: () => api.get("/csm/masters/sources"),
+  createSource: (data) => api.post("/csm/masters/sources", data),
+  updateSource: (id, data) => api.put(`/csm/masters/sources/${id}`, data),
+  deleteSource: (id) => api.delete(`/csm/masters/sources/${id}`),
+
   getTypes: () => api.get("/csm/masters/types"),
   createType: (data) => api.post("/csm/masters/types", data),
   updateType: (id, data) => api.put(`/csm/masters/types/${id}`, data),
