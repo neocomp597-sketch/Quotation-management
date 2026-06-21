@@ -144,7 +144,7 @@ const createCustomer = async (req, res) => {
         });
 
         await newCustomer.save();
-        await invalidateCustomerCaches();
+        invalidateCustomerCaches().catch(err => console.error("Cache invalidation error:", err));
         res.status(201).json(newCustomer);
     } catch (error) {
         console.error("Error in createCustomer:", error);
@@ -276,7 +276,7 @@ const updateCustomer = async (req, res) => {
             return res.status(404).json({ message: 'Customer not found' });
         }
 
-        await invalidateCustomerCaches();
+        invalidateCustomerCaches().catch(err => console.error("Cache invalidation error:", err));
         res.json(updatedCustomer);
     } catch (error) {
         console.error("Error in updateCustomer:", error);
@@ -296,7 +296,7 @@ const deleteCustomer = async (req, res) => {
             return res.status(404).json({ message: 'Customer not found' });
         }
 
-        await invalidateCustomerCaches();
+        invalidateCustomerCaches().catch(err => console.error("Cache invalidation error:", err));
         res.json({ message: 'Customer deleted successfully' });
     } catch (error) {
         console.error(error);
@@ -314,7 +314,7 @@ const bulkDeleteCustomers = async (req, res) => {
         }
 
         const result = await Customer.deleteMany({ _id: { $in: ids } });
-        await invalidateCustomerCaches();
+        invalidateCustomerCaches().catch(err => console.error("Cache invalidation error:", err));
 
         res.json({
             message: `${result.deletedCount} customers deleted successfully`,
@@ -343,7 +343,7 @@ const bulkUpdateCustomers = async (req, res) => {
             { _id: { $in: ids } },
             { $set: updateData }
         );
-        await invalidateCustomerCaches();
+        invalidateCustomerCaches().catch(err => console.error("Cache invalidation error:", err));
 
         res.json({
             message: `${result.modifiedCount} customers updated successfully`,

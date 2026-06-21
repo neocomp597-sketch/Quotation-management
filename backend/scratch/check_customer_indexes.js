@@ -1,7 +1,6 @@
 const mongoose = require('mongoose');
 require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
 const Customer = require('../models/Customer');
-const { runWithTenant } = require('../middlewares/tenantContext');
 
 async function run() {
     try {
@@ -9,24 +8,9 @@ async function run() {
         await mongoose.connect(process.env.MONGO_URI);
         console.log('Connected.');
         
-        await runWithTenant(undefined, async () => {
-            try {
-                const newCustomer = new Customer({
-                    customerName: 'Test Customer SuperAdmin',
-                    companyName: 'SuperAdmin Co',
-                    mobile: '1234567890',
-                    email: 'superadmin_test@test.com'
-                });
-                
-                await newCustomer.save();
-                console.log('Successfully saved!');
-                // Cleanup
-                await Customer.deleteOne({ _id: newCustomer._id });
-            } catch (saveErr) {
-                console.error('Save failed with error:', saveErr.message);
-                console.error(saveErr);
-            }
-        }, { bypassTenant: true });
+        // Find the latest saved customer
+        const latest = await Customer.findOne().sort({ createdAt: -1 }).lean();
+        console.log('Latest customer in DB:', JSON.stringify(latest, null, 2));
 
     } catch (err) {
         console.error('Error:', err);

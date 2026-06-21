@@ -10,6 +10,25 @@ const { startCacheInvalidationWorker } = require("./queues/cacheInvalidationQueu
 
 const app = express();
 
+let lastServerError = null;
+global.setLastServerError = (err) => {
+    lastServerError = {
+        message: err?.message || String(err),
+        stack: err?.stack || null,
+        time: new Date().toISOString()
+    };
+};
+
+process.on('unhandledRejection', (reason) => {
+    console.error('Unhandled Rejection:', reason);
+    global.setLastServerError(reason);
+});
+
+process.on('uncaughtException', (error) => {
+    console.error('Uncaught Exception:', error);
+    global.setLastServerError(error);
+});
+
 // Connect to Database
 const dbStartupPromise = connectDB();
 const redisStartupPromise = connectRedis().then(() => {
@@ -272,6 +291,10 @@ app.get('/api/check-db', async (req, res) => {
     } catch (err) {
         res.status(500).send(err.message);
     }
+});
+
+app.get('/api/debug-last-error', (req, res) => {
+    res.json({ success: true, lastServerError });
 });
 
 app.get('/api/debug-quotations', async (req, res) => {
