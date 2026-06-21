@@ -37,7 +37,13 @@ module.exports = function tenantPlugin(schema, options = {}) {
             companyId: {
                 type: mongoose.Schema.Types.ObjectId,
                 ref: 'Company',
-                required,
+                required: function () {
+                    const isBypassed = isTenantBypassed() || this?.$locals?.bypassTenant || this?.options?.bypassTenant;
+                    if (isBypassed) {
+                        return false;
+                    }
+                    return required;
+                },
                 index: true,
             },
         });

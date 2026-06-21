@@ -18051,13 +18051,6 @@
     "gstin": "BYYPD4103QJ1ZS"
   },
   {
-    "_id": "6a36bd8024412eb191869cc2",
-    "customerName": "20062026",
-    "companyName": "Test Customer 20th June 2026",
-    "gstin": "",
-    "logoUrl": "https://biswjczulbtwqufsviha.supabase.co/storage/v1/object/public/images/uploads/7e0cde95-adc4-4f93-b5a9-0ecebee06218-download.png"
-  },
-  {
     "_id": "6a36bd8e24412eb191869cc3",
     "customerName": "20062026",
     "companyName": "Test Customer 20th June 2026",
@@ -18093,5 +18086,19 @@
     "customerName": "Tata Power Trombay Station",
     "companyName": "Tata Power Ltd - Trombay Station (MH)",
     "gstin": "27AAACT9012C1Z2"
+  },
+  {
+    "_id": "6a37b1849f8f6a93ce9d29be",
+    "customerName": "21062026",
+    "companyName": "Test cust 21 06 2026",
+    "gstin": "21062026",
+    "logoUrl": "https://biswjczulbtwqufsviha.supabase.co/storage/v1/object/public/images/uploads/5d43f445-713b-4db8-a75a-f07db11e92c5-37753.jpg"
+  },
+  {
+    "_id": "6a37c036956976c6b0336438",
+    "customerName": "45",
+    "companyName": "ALL IN 1 SERVICES",
+    "gstin": "524",
+    "logoUrl": ""
   }
 ]

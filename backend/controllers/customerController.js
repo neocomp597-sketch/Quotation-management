@@ -120,14 +120,16 @@ const createCustomer = async (req, res) => {
         }
         const uniqueCustomerName = await getUniqueCustomerName(customerName);
 
+        const companyId = req.user?.companyId || req.headers['x-company-id'] || req.body.companyId;
+
         let assignedTerritory = territory;
         if (!assignedTerritory) {
             const { getAutoAssignedTerritory } = require('./territoryController');
-            const companyId = req.user?.companyId || req.headers['x-company-id'] || req.body.companyId;
             assignedTerritory = await getAutoAssignedTerritory(billingAddress, shippingAddress, companyId);
         }
 
         const newCustomer = new Customer({
+            companyId,
             customerName: uniqueCustomerName,
             companyName: companyName?.trim(),
             gstin: gstin?.trim().toUpperCase(),
@@ -145,8 +147,11 @@ const createCustomer = async (req, res) => {
         await invalidateCustomerCaches();
         res.status(201).json(newCustomer);
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Error creating customer' });
+        console.error("Error in createCustomer:", error);
+        res.status(500).json({ 
+            message: `Error creating customer: ${error.message}`,
+            error: error.message
+        });
     }
 };
 
@@ -274,8 +279,11 @@ const updateCustomer = async (req, res) => {
         await invalidateCustomerCaches();
         res.json(updatedCustomer);
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Error updating customer' });
+        console.error("Error in updateCustomer:", error);
+        res.status(500).json({ 
+            message: `Error updating customer: ${error.message}`,
+            error: error.message
+        });
     }
 };
 
