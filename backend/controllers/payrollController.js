@@ -281,6 +281,7 @@ exports.createRun = async (req, res) => {
                 basicDetails: {
                     name: emp.name,
                     email: emp.email,
+                    dob: emp.dob,
                     pan: emp.pan,
                     aadhaar: emp.aadhaar,
                     uan: emp.uan,

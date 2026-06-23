@@ -11,6 +11,7 @@ const PayrollEmployeeSummarySchema = new mongoose.Schema({
     basicDetails: {
         name: String,
         email: String,
+        dob: Date,
         pan: String,
         aadhaar: String,
         uan: String,

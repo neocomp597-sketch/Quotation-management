@@ -31,6 +31,7 @@ const EmployeeProfileSchema = new mongoose.Schema({
     accountNumber: { type: String, trim: true },
     ifscCode: { type: String, uppercase: true, trim: true },
     joiningDate: { type: Date, required: true },
+    dob: { type: Date },
     department: { type: String, trim: true },
     designation: { type: String, trim: true },
     status: { type: String, enum: ['Active', 'Hold', 'Resigned'], default: 'Active' },

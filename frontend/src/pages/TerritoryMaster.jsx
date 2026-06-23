@@ -5,7 +5,7 @@ import {
     MdKeyboardArrowRight, MdInfoOutline 
 } from 'react-icons/md';
 import { toast } from 'react-toastify';
-import { territoryService, userService } from '../services/api';
+import { territoryService, userService, mgrService } from '../services/api';
 import Modal from '../components/Modal';
 
 const TERRITORY_TYPE_OPTIONS = ['Country', 'Zone', 'State', 'City', 'Area', 'Custom'];
@@ -18,6 +18,7 @@ const TerritoryMaster = () => {
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingTerritory, setEditingTerritory] = useState(null);
+    const [mgrsData, setMgrsData] = useState({ mgr1: [], mgr2: [], mgr3: [], mgr4: [], mgr5: [] });
     
     // UI state for tree collapse/expand
     const [expandedNodes, setExpandedNodes] = useState({});
@@ -31,15 +32,25 @@ const TerritoryMaster = () => {
         rules: {
             cities: '',
             pincodes: ''
-        }
+        },
+        mgr1: '',
+        mgr2: '',
+        mgr3: '',
+        mgr4: '',
+        mgr5: ''
     });
 
     const fetchAllData = useCallback(async () => {
         setLoading(true);
         try {
-            const [terrResult, userResult] = await Promise.allSettled([
+            const [terrResult, userResult, m1, m2, m3, m4, m5] = await Promise.allSettled([
                 territoryService.getAll(),
-                userService.getAll()
+                userService.getAll(),
+                mgrService.getAll('MGR1'),
+                mgrService.getAll('MGR2'),
+                mgrService.getAll('MGR3'),
+                mgrService.getAll('MGR4'),
+                mgrService.getAll('MGR5')
             ]);
 
             if (terrResult.status === 'fulfilled') {
@@ -59,6 +70,14 @@ const TerritoryMaster = () => {
                     toastId: USER_LOAD_TOAST_ID
                 });
             }
+
+            setMgrsData({
+                mgr1: m1.status === 'fulfilled' ? m1.value.data.filter(m => m.status === 'Active') : [],
+                mgr2: m2.status === 'fulfilled' ? m2.value.data.filter(m => m.status === 'Active') : [],
+                mgr3: m3.status === 'fulfilled' ? m3.value.data.filter(m => m.status === 'Active') : [],
+                mgr4: m4.status === 'fulfilled' ? m4.value.data.filter(m => m.status === 'Active') : [],
+                mgr5: m5.status === 'fulfilled' ? m5.value.data.filter(m => m.status === 'Active') : []
+            });
         } finally {
             setLoading(false);
         }
@@ -84,7 +103,12 @@ const TerritoryMaster = () => {
                 rules: {
                     cities: (territory.rules?.cities || []).join(', '),
                     pincodes: (territory.rules?.pincodes || []).join(', ')
-                }
+                },
+                mgr1: territory.mgr1?._id || territory.mgr1 || '',
+                mgr2: territory.mgr2?._id || territory.mgr2 || '',
+                mgr3: territory.mgr3?._id || territory.mgr3 || '',
+                mgr4: territory.mgr4?._id || territory.mgr4 || '',
+                mgr5: territory.mgr5?._id || territory.mgr5 || ''
             });
         } else {
             setEditingTerritory(null);
@@ -97,7 +121,12 @@ const TerritoryMaster = () => {
                 rules: {
                     cities: '',
                     pincodes: ''
-                }
+                },
+                mgr1: '',
+                mgr2: '',
+                mgr3: '',
+                mgr4: '',
+                mgr5: ''
             });
         }
         setIsModalOpen(true);
@@ -114,6 +143,11 @@ const TerritoryMaster = () => {
             ...formData,
             parent: formData.parent || null,
             manager: formData.manager || null,
+            mgr1: formData.mgr1 || null,
+            mgr2: formData.mgr2 || null,
+            mgr3: formData.mgr3 || null,
+            mgr4: formData.mgr4 || null,
+            mgr5: formData.mgr5 || null,
             rules: {
                 cities: formData.rules.cities.split(',').map(s => s.trim()).filter(Boolean),
                 pincodes: formData.rules.pincodes.split(',').map(s => s.trim()).filter(Boolean)
@@ -206,7 +240,14 @@ const TerritoryMaster = () => {
                                     </div>
                                     <div>
                                         <div className="flex items-center gap-2">
-                                            <span className="font-bold text-slate-800 text-sm md:text-base">{node.name}</span>
+                                            <span className="font-bold text-slate-800 text-sm md:text-base">
+                                                {node.name}
+                                                {(node.mgr1 || node.mgr2 || node.mgr3 || node.mgr4 || node.mgr5) && (
+                                                    <span className="font-medium text-slate-400 text-xs md:text-sm ml-2.5">
+                                                        + {[node.mgr1?.code || node.mgr1, node.mgr2?.code || node.mgr2, node.mgr3?.code || node.mgr3, node.mgr4?.code || node.mgr4, node.mgr5?.code || node.mgr5].filter(Boolean).join(' + ')}
+                                                    </span>
+                                                )}
+                                            </span>
                                             <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded bg-primary-50 text-primary-700">
                                                 {node.type}
                                             </span>
@@ -423,6 +464,35 @@ const TerritoryMaster = () => {
                                             <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">{u.role}</p>
                                         </div>
                                     </label>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {/* MGR Mappings */}
+                    <div className="border-t border-slate-100 pt-6 space-y-4">
+                        <h4 className="text-xs font-black text-slate-700 uppercase tracking-wider">
+                            Manager Code Mappings (MGR 1 to 5)
+                        </h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
+                            {[1, 2, 3, 4, 5].map(num => {
+                                const mgrKey = `mgr${num}`;
+                                return (
+                                    <div key={mgrKey} className="space-y-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                                            MGR {num}
+                                        </label>
+                                        <select
+                                            value={formData[mgrKey]}
+                                            onChange={(e) => setFormData({ ...formData, [mgrKey]: e.target.value })}
+                                            className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-xs font-bold bg-white"
+                                        >
+                                            <option value="">Select MGR {num}</option>
+                                            {(mgrsData[mgrKey] || []).map(m => (
+                                                <option key={m._id} value={m._id}>{m.code} - {m.description}</option>
+                                            ))}
+                                        </select>
+                                    </div>
                                 );
                             })}
                         </div>

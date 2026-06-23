@@ -24,7 +24,7 @@ const PayrollEmployees = () => {
 
     // Form states
     const [basicForm, setBasicForm] = useState({
-        name: '', email: '', joiningDate: '', department: '', designation: '', status: 'Active',
+        name: '', email: '', dob: '', joiningDate: '', department: '', designation: '', status: 'Active',
         pan: '', aadhaar: '', uan: '', pfNumber: '', esiNumber: '',
         bankName: '', accountNumber: '', ifscCode: ''
     });
@@ -74,7 +74,7 @@ const PayrollEmployees = () => {
 
     const handleOpenAdd = () => {
         setBasicForm({
-            name: '', email: '', joiningDate: new Date().toISOString().substring(0, 10), 
+            name: '', email: '', dob: '', joiningDate: new Date().toISOString().substring(0, 10), 
             department: '', designation: '', status: 'Active',
             pan: '', aadhaar: '', uan: '', pfNumber: '', esiNumber: '',
             bankName: '', accountNumber: '', ifscCode: ''
@@ -88,6 +88,7 @@ const PayrollEmployees = () => {
         setBasicForm({
             name: emp.name || '',
             email: emp.email || '',
+            dob: emp.dob ? new Date(emp.dob).toISOString().substring(0, 10) : '',
             joiningDate: emp.joiningDate ? new Date(emp.joiningDate).toISOString().substring(0, 10) : '',
             department: emp.department || '',
             designation: emp.designation || '',
@@ -362,6 +363,15 @@ const PayrollEmployees = () => {
                                                     onChange={(e) => setBasicForm({ ...basicForm, email: e.target.value })}
                                                     className={inputClass}
                                                     placeholder="rajesh@company.com"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className={labelClass}>Date of Birth</label>
+                                                <input
+                                                    type="date"
+                                                    value={basicForm.dob}
+                                                    onChange={(e) => setBasicForm({ ...basicForm, dob: e.target.value })}
+                                                    className={inputClass}
                                                 />
                                             </div>
                                             <div>

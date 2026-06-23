@@ -50,6 +50,11 @@ const getTerritories = async (req, res) => {
             .populate('parent', 'name type')
             .populate('manager', 'name email')
             .populate('salesReps', 'name email')
+            .populate('mgr1')
+            .populate('mgr2')
+            .populate('mgr3')
+            .populate('mgr4')
+            .populate('mgr5')
             .sort({ name: 1 })
             .lean();
 
@@ -68,7 +73,7 @@ const createTerritory = async (req, res) => {
             return res.status(400).json({ message: "Please configure Company Settings first in the Settings menu before creating territories." });
         }
 
-        const { name, type, parent, manager, salesReps, rules } = req.body;
+        const { name, type, parent, manager, salesReps, rules, mgr1, mgr2, mgr3, mgr4, mgr5 } = req.body;
 
         const newTerritory = new Territory({
             companyId,
@@ -78,6 +83,11 @@ const createTerritory = async (req, res) => {
             manager: manager || null,
             salesReps: salesReps || [],
             rules: rules || { cities: [], pincodes: [] },
+            mgr1: mgr1 || null,
+            mgr2: mgr2 || null,
+            mgr3: mgr3 || null,
+            mgr4: mgr4 || null,
+            mgr5: mgr5 || null,
             createdBy: req.user?.id || null
         });
 
@@ -92,7 +102,7 @@ const createTerritory = async (req, res) => {
 const updateTerritory = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, type, parent, manager, salesReps, rules } = req.body;
+        const { name, type, parent, manager, salesReps, rules, mgr1, mgr2, mgr3, mgr4, mgr5 } = req.body;
 
         const territory = await Territory.findById(id);
         if (!territory) {
@@ -110,6 +120,11 @@ const updateTerritory = async (req, res) => {
         territory.manager = manager !== undefined ? (manager || null) : territory.manager;
         territory.salesReps = salesReps || territory.salesReps;
         territory.rules = rules || territory.rules;
+        territory.mgr1 = mgr1 !== undefined ? (mgr1 || null) : territory.mgr1;
+        territory.mgr2 = mgr2 !== undefined ? (mgr2 || null) : territory.mgr2;
+        territory.mgr3 = mgr3 !== undefined ? (mgr3 || null) : territory.mgr3;
+        territory.mgr4 = mgr4 !== undefined ? (mgr4 || null) : territory.mgr4;
+        territory.mgr5 = mgr5 !== undefined ? (mgr5 || null) : territory.mgr5;
 
         await territory.save();
         res.json(territory);

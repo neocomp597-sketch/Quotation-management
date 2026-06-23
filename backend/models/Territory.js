@@ -11,6 +11,11 @@ const TerritorySchema = new mongoose.Schema({
     },
     parent: { type: mongoose.Schema.Types.ObjectId, ref: 'Territory', default: null, index: true },
     manager: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    mgr1: { type: mongoose.Schema.Types.ObjectId, ref: 'MGR' },
+    mgr2: { type: mongoose.Schema.Types.ObjectId, ref: 'MGR' },
+    mgr3: { type: mongoose.Schema.Types.ObjectId, ref: 'MGR' },
+    mgr4: { type: mongoose.Schema.Types.ObjectId, ref: 'MGR' },
+    mgr5: { type: mongoose.Schema.Types.ObjectId, ref: 'MGR' },
     salesReps: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     rules: {
         cities: [{ type: String }],
