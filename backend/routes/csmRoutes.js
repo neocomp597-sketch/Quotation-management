@@ -8,9 +8,11 @@ const serviceVisitController = require('../controllers/serviceVisitController');
 const warrantyAmcController = require('../controllers/warrantyAmcController');
 const kbController = require('../controllers/kbController');
 const csmMasterController = require('../controllers/csmMasterController');
+const customerContactController = require('../controllers/customerContactController');
 
 // ─── CSM DASHBOARD ──────────────────────────────────────────────────────────
 router.get('/dashboard', protect, csmDashboardController.getStats);
+router.get('/reports', protect, csmDashboardController.getReportData);
 
 // ─── TICKET MANAGEMENT ──────────────────────────────────────────────────────
 router.post('/tickets', protect, ticketController.createTicket);
@@ -22,6 +24,12 @@ router.patch('/tickets/:id/status', protect, ticketController.updateStatus);
 router.post('/tickets/:id/comments', protect, ticketController.addComment);
 router.patch('/tickets/:id/escalate', protect, ticketController.escalateTicket);
 router.post('/tickets/:id/feedback', protect, ticketController.submitFeedback);
+
+// Customer contacts for ticket auto-fill
+router.post('/customer-contacts', protect, customerContactController.create);
+router.get('/customer-contacts', protect, customerContactController.getAll);
+router.put('/customer-contacts/:id', protect, customerContactController.update);
+router.delete('/customer-contacts/:id', protect, customerContactController.delete);
 
 // ─── SERVICE VISITS ─────────────────────────────────────────────────────────
 router.post('/visits', protect, serviceVisitController.createVisit);
@@ -74,6 +82,12 @@ router.post('/masters/sources', protect, csmMasterController.sources.create);
 router.get('/masters/sources', protect, csmMasterController.sources.getAll);
 router.put('/masters/sources/:id', protect, csmMasterController.sources.update);
 router.delete('/masters/sources/:id', protect, csmMasterController.sources.delete);
+
+// Designations
+router.post('/masters/designations', protect, csmMasterController.designations.create);
+router.get('/masters/designations', protect, csmMasterController.designations.getAll);
+router.put('/masters/designations/:id', protect, csmMasterController.designations.update);
+router.delete('/masters/designations/:id', protect, csmMasterController.designations.delete);
 
 // SLA Policies
 router.post('/masters/sla-policies', protect, csmMasterController.slaPolicies.create);

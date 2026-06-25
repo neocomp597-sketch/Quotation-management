@@ -22,7 +22,7 @@ const getPagination = (query) => {
     return { page, limit, skip: (page - 1) * limit };
 };
 
-const hasListParams = (query) => Boolean(query.page || query.limit || query.search || query.mgr1 || query.mgr2 || query.mgr3 || query.mgr4 || query.mgr5);
+const hasListParams = (query) => Boolean(query.page || query.limit || query.search || query.mgr1 || query.mgr2 || query.mgr3 || query.mgr4 || query.mgr5 || query.catalogType);
 
 const buildProductQuery = (queryParams = {}) => {
     const query = {};
@@ -43,6 +43,14 @@ const buildProductQuery = (queryParams = {}) => {
             query[key] = queryParams[key];
         }
     });
+
+    if (queryParams.catalogType) {
+        if (queryParams.catalogType === 'Product') {
+            query.catalogType = { $in: ['Product', null] };
+        } else {
+            query.catalogType = queryParams.catalogType;
+        }
+    }
 
     return query;
 };
@@ -162,7 +170,8 @@ const buildProductResponse = (productDoc) => {
 
 const fetchProductByIdWithRelations = (id) => {
     return Product.findById(id)
-        .select('productCode productName categoryId hsnCode gstPercentage basePrice mrp uom productImageUrl status mgr1 mgr2 mgr3 mgr4 mgr5 attributes vendors createdAt updatedAt')
+        .select('productCode productName categoryId hsnCode gstPercentage basePrice mrp uom productImageUrl status mgr1 mgr2 mgr3 mgr4 mgr5 attributes vendors catalogType subscriptionDetails rentalDetails inventory pricing createdAt updatedAt')
+        .populate('categoryId', 'name status')
         .populate('mgr1', 'code description status')
         .populate('mgr2', 'code description status')
         .populate('mgr3', 'code description status')
@@ -193,14 +202,19 @@ const createProduct = async (req, res) => {
             mgr4,
             mgr5,
             attributes,
-            vendors
+            vendors,
+            catalogType,
+            subscriptionDetails,
+            rentalDetails,
+            inventory,
+            pricing
         } = req.body;
 
         if (!productCode || !productName || !hsnCode) {
             return res.status(400).json({ message: 'Product code, name and HSN code are required' });
         }
 
-        if (Object.prototype.hasOwnProperty.call(req.body, 'vendors') && Array.isArray(vendors) && vendors.length === 0) {
+        if (catalogType === 'Product' && Object.prototype.hasOwnProperty.call(req.body, 'vendors') && Array.isArray(vendors) && vendors.length === 0) {
             return res.status(400).json({ message: 'At least one vendor is required when vendor mapping is provided' });
         }
 
@@ -224,6 +238,11 @@ const createProduct = async (req, res) => {
             mgr5: mgr5 || undefined,
             attributes: attributes || [],
             vendors: preparedVendors,
+            catalogType: catalogType || 'Product',
+            subscriptionDetails,
+            rentalDetails,
+            inventory,
+            pricing
         });
 
         if (preparedVendors.length) {
@@ -247,14 +266,15 @@ const getAllProducts = async (req, res) => {
         const query = buildProductQuery(req.query);
         const cacheKey = listParams
             ? makeCacheKey('products:list', req)
-            : PRODUCTS_CACHE_KEY;
+            : makeCacheKey('products:all', req);
         const { redis, value: cachedProducts } = await getCachedJson(cacheKey);
         if (cachedProducts) {
             return res.json(cachedProducts);
         }
 
         let productsQuery = Product.find(query)
-            .select('productCode productName hsnCode gstPercentage basePrice mrp uom productImageUrl status mgr1 mgr2 mgr3 mgr4 mgr5 attributes vendors updatedAt')
+            .select('productCode productName categoryId hsnCode gstPercentage basePrice mrp uom productImageUrl status mgr1 mgr2 mgr3 mgr4 mgr5 attributes vendors catalogType subscriptionDetails rentalDetails inventory pricing updatedAt')
+            .populate('categoryId', 'name status')
             .populate('mgr1', 'code description status')
             .populate('mgr2', 'code description status')
             .populate('mgr3', 'code description status')
@@ -366,7 +386,12 @@ const updateProduct = async (req, res) => {
             mgr4,
             mgr5,
             attributes,
-            vendors
+            vendors,
+            catalogType,
+            subscriptionDetails,
+            rentalDetails,
+            inventory,
+            pricing
         } = req.body;
 
         const updateData = {
@@ -386,6 +411,11 @@ const updateProduct = async (req, res) => {
             mgr4: mgr4 || undefined,
             mgr5: mgr5 || undefined,
             attributes: attributes || [],
+            catalogType,
+            subscriptionDetails,
+            rentalDetails,
+            inventory,
+            pricing,
             updatedAt: new Date()
         };
 
@@ -403,7 +433,8 @@ const updateProduct = async (req, res) => {
             updateData,
             { new: true, runValidators: true }
         )
-            .select('productCode productName categoryId hsnCode gstPercentage basePrice mrp uom productImageUrl status mgr1 mgr2 mgr3 mgr4 mgr5 attributes vendors createdAt updatedAt')
+            .select('productCode productName categoryId hsnCode gstPercentage basePrice mrp uom productImageUrl status mgr1 mgr2 mgr3 mgr4 mgr5 attributes vendors catalogType subscriptionDetails rentalDetails inventory pricing createdAt updatedAt')
+            .populate('categoryId', 'name status')
             .populate('mgr1', 'code description status')
             .populate('mgr2', 'code description status')
             .populate('mgr3', 'code description status')

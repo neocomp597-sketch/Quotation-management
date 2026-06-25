@@ -29,6 +29,7 @@ const TicketDetail = () => {
     // Operations states
     const [commentText, setCommentText] = useState('');
     const [selectedStatus, setSelectedStatus] = useState('');
+    const [isFirstCallResolved, setIsFirstCallResolved] = useState(false);
     
     // Feedback Stars State
     const [feedbackRating, setFeedbackRating] = useState(5);
@@ -45,6 +46,7 @@ const TicketDetail = () => {
             const ticketData = res.data;
             setTicket(ticketData);
             setSelectedStatus(ticketData.status);
+            setIsFirstCallResolved(ticketData.isFirstCallResolved || false);
             setAssignTeam(ticketData.assignedTeamId?._id || '');
             setAssignEngineer(ticketData.assignedEngineerId?._id || '');
 
@@ -95,9 +97,9 @@ const TicketDetail = () => {
         }
     };
 
-    const handleStatusChange = async (status) => {
+    const handleStatusChange = async (status, fcr = false) => {
         try {
-            await csmService.updateTicketStatus(id, status);
+            await csmService.updateTicketStatus(id, status, fcr);
             toast.success(`Status updated to ${status}`);
             fetchTicketDetails();
         } catch (error) {
@@ -280,7 +282,7 @@ const TicketDetail = () => {
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Update Status</label>
                                 <select
                                     value={selectedStatus}
-                                    onChange={(e) => handleStatusChange(e.target.value)}
+                                    onChange={(e) => setSelectedStatus(e.target.value)}
                                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold"
                                 >
                                     <option value="Open">Open</option>
@@ -292,6 +294,30 @@ const TicketDetail = () => {
                                     <option value="Cancelled">Cancelled</option>
                                 </select>
                             </div>
+                            
+                            {selectedStatus === 'Resolved' && (
+                                <div className="flex items-center gap-2 py-2 px-3 bg-teal-50/60 rounded-xl border border-teal-100/80 animate-fade-in">
+                                    <input
+                                        type="checkbox"
+                                        id="fcr-checkbox"
+                                        checked={isFirstCallResolved}
+                                        onChange={(e) => setIsFirstCallResolved(e.target.checked)}
+                                        className="h-4 w-4 rounded text-teal-600 focus:ring-teal-500 border-slate-300 cursor-pointer"
+                                    />
+                                    <label htmlFor="fcr-checkbox" className="text-xs font-bold text-teal-800 cursor-pointer select-none">
+                                        First Call Resolved (FCR)
+                                    </label>
+                                </div>
+                            )}
+
+                            {(selectedStatus !== ticket.status || (selectedStatus === 'Resolved' && isFirstCallResolved !== ticket.isFirstCallResolved)) && (
+                                <button
+                                    onClick={() => handleStatusChange(selectedStatus, isFirstCallResolved)}
+                                    className="w-full py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md animate-pulse"
+                                >
+                                    Save Status
+                                </button>
+                            )}
                             <button
                                 onClick={handleEscalate}
                                 className="w-full flex items-center justify-center gap-2 py-3 bg-rose-50 hover:bg-rose-100/50 text-rose-600 border border-rose-200 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"

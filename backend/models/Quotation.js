@@ -50,7 +50,7 @@ const QuotationSchema = new mongoose.Schema({
     ackNo: { type: String },
     ackDate: { type: Date },
     irnNo: { type: String },
-    status: { type: String, enum: ['draft', 'final', 'ordered'], default: 'draft' },
+    status: { type: String, enum: ['draft', 'final', 'ordered', 'pending_approval'], default: 'draft' },
     territory: { type: mongoose.Schema.Types.ObjectId, ref: 'Territory' },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     clientRequestId: { type: String },

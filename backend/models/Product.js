@@ -14,7 +14,7 @@ const ProductVendorSchema = new mongoose.Schema(
 
 const ProductSchema = new mongoose.Schema({
     productCode: { type: String, required: true },
-        productName: { type: String, required: true },
+    productName: { type: String, required: true },
     categoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'Category' },
     hsnCode: { type: String, required: true },
     gstPercentage: { type: Number, required: true },
@@ -22,7 +22,7 @@ const ProductSchema = new mongoose.Schema({
     mrp: { type: Number, required: true },
     uom: { type: String, required: true },
     productImageUrl: { type: String },
-    status: { type: String, enum: ['Active', 'Inactive'], default: 'Active' },
+    status: { type: String, enum: ['Active', 'Inactive', 'Discontinued'], default: 'Active' },
     mgr1: { type: mongoose.Schema.Types.ObjectId, ref: 'MGR' },
     mgr2: { type: mongoose.Schema.Types.ObjectId, ref: 'MGR' },
     mgr3: { type: mongoose.Schema.Types.ObjectId, ref: 'MGR' },
@@ -30,6 +30,39 @@ const ProductSchema = new mongoose.Schema({
     mgr5: { type: mongoose.Schema.Types.ObjectId, ref: 'MGR' },
     attributes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Attribute' }],
     vendors: { type: [ProductVendorSchema], default: [] },
+
+    // Catalog Sub-Types Extensions
+    catalogType: {
+        type: String,
+        enum: ['Product', 'Service', 'Subscription', 'Bundle', 'Addon', 'Consumable', 'Digital', 'Rental'],
+        default: 'Product',
+        index: true
+    },
+    subscriptionDetails: {
+        billingCycle: { type: String, enum: ['Monthly', 'Quarterly', 'Yearly', 'UsageBased'] },
+        setupFee: { type: Number, default: 0 },
+        renewalPrice: { type: Number }
+    },
+    rentalDetails: {
+        minLeaseTerm: { type: Number, default: 1 }, // in days
+        securityDeposit: { type: Number, default: 0 },
+        baseRatePerDay: { type: Number, default: 0 },
+        baseRatePerMonth: { type: Number, default: 0 }
+    },
+    inventory: {
+        currentStock: { type: Number, default: 0 },
+        reservedStock: { type: Number, default: 0 },
+        availableStock: { type: Number, default: 0 },
+        warehouse: { type: String, default: 'Main Warehouse' }
+    },
+    pricing: {
+        baseCost: { type: Number, default: 0 }, // For margin analysis (Cost Price)
+        minPrice: { type: Number, default: 0 },
+        maxPrice: { type: Number, default: 0 },
+        marginPercent: { type: Number, default: 0 },
+        currency: { type: String, default: 'INR' }
+    },
+
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
 });

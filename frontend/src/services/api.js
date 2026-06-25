@@ -172,6 +172,11 @@ export const customerService = {
   checkDuplicate: (params) => api.get("/customers/check-duplicate", { params }),
 };
 
+export const categoryService = {
+  getAll: () => api.get("/categories"),
+  create: (data) => api.post("/categories", data),
+};
+
 export const productService = {
   getAll: (params) => api.get("/products", { params }),
   getVendors: (id, availableOnly = false) =>
@@ -581,7 +586,8 @@ export const csmService = {
   createTicket: (data) => api.post("/csm/tickets", data),
   updateTicket: (id, data) => api.put(`/csm/tickets/${id}`, data),
   assignTicket: (id, data) => api.patch(`/csm/tickets/${id}/assign`, data),
-  updateTicketStatus: (id, status) => api.patch(`/csm/tickets/${id}/status`, { status }),
+  updateTicketStatus: (id, status, isFirstCallResolved) => api.patch(`/csm/tickets/${id}/status`, { status, isFirstCallResolved }),
+  getReportData: (params = {}) => api.get("/csm/reports", { params }),
   addComment: (id, data) => api.post(`/csm/tickets/${id}/comments`, data),
   escalateTicket: (id) => api.patch(`/csm/tickets/${id}/escalate`),
   submitFeedback: (id, data) => api.post(`/csm/tickets/${id}/feedback`, data),
@@ -629,15 +635,94 @@ export const csmService = {
   updatePriority: (id, data) => api.put(`/csm/masters/priorities/${id}`, data),
   deletePriority: (id) => api.delete(`/csm/masters/priorities/${id}`),
 
+  getDesignations: () => api.get("/csm/masters/designations"),
+  createDesignation: (data) => api.post("/csm/masters/designations", data),
+  updateDesignation: (id, data) => api.put(`/csm/masters/designations/${id}`, data),
+  deleteDesignation: (id) => api.delete(`/csm/masters/designations/${id}`),
+
+  getCustomerContacts: (params = {}) => api.get("/csm/customer-contacts", { params }),
+  createCustomerContact: (data) => api.post("/csm/customer-contacts", data),
+  updateCustomerContact: (id, data) => api.put(`/csm/customer-contacts/${id}`, data),
+  deleteCustomerContact: (id) => api.delete(`/csm/customer-contacts/${id}`),
+
   getSlaPolicies: () => api.get("/csm/masters/sla-policies"),
   createSlaPolicy: (data) => api.post("/csm/masters/sla-policies", data),
   updateSlaPolicy: (id, data) => api.put(`/csm/masters/sla-policies/${id}`, data),
   deleteSlaPolicy: (id) => api.delete(`/csm/masters/sla-policies/${id}`),
 
-  getTeams: () => api.get("/csm/masters/teams"),
+   getTeams: () => api.get("/csm/masters/teams"),
   createTeam: (data) => api.post("/csm/masters/teams", data),
   updateTeam: (id, data) => api.put(`/csm/masters/teams/${id}`, data),
   deleteTeam: (id) => api.delete(`/csm/masters/teams/${id}`),
+};
+
+export const cpqService = {
+  // Price Books
+  getPriceBooks: () => api.get("/cpq/price-books"),
+  getPriceBook: (id) => api.get(`/cpq/price-books/${id}`),
+  createPriceBook: (data) => api.post("/cpq/price-books", data),
+  updatePriceBook: (id, data) => api.put(`/cpq/price-books/${id}`, data),
+  deletePriceBook: (id) => api.delete(`/cpq/price-books/${id}`),
+  
+  // Price Book Items
+  addItemToPriceBook: (data) => api.post("/cpq/price-books/items", data),
+  getItemsInPriceBook: (priceBookId) => api.get(`/cpq/price-books/${priceBookId}/items`),
+  removeItemFromPriceBook: (itemId) => api.delete(`/cpq/price-books/items/${itemId}`),
+  
+  // Pricing Rules
+  getPricingRules: () => api.get("/cpq/pricing-rules"),
+  createPricingRule: (data) => api.post("/cpq/pricing-rules", data),
+  updatePricingRule: (id, data) => api.put(`/cpq/pricing-rules/${id}`, data),
+  deletePricingRule: (id) => api.delete(`/cpq/pricing-rules/${id}`),
+
+  // Discount Policies
+  getDiscountPolicies: () => api.get("/cpq/discounts"),
+  createDiscountPolicy: (data) => api.post("/cpq/discounts", data),
+  updateDiscountPolicy: (id, data) => api.put(`/cpq/discounts/${id}`, data),
+  deleteDiscountPolicy: (id) => api.delete(`/cpq/discounts/${id}`),
+
+  // Promotions
+  getPromotions: () => api.get("/cpq/promotions"),
+  createPromotion: (data) => api.post("/cpq/promotions", data),
+  updatePromotion: (id, data) => api.put(`/cpq/promotions/${id}`, data),
+  deletePromotion: (id) => api.delete(`/cpq/promotions/${id}`),
+
+  // Currencies
+  getCurrencies: () => api.get("/cpq/currencies"),
+  createCurrency: (data) => api.post("/cpq/currencies", data),
+
+  // Subscriptions
+  getSubscriptions: () => api.get("/cpq/subscriptions"),
+  createSubscription: (data) => api.post("/cpq/subscriptions", data),
+
+  // Configurator options templates
+  getConfigTemplate: (productId) => api.get(`/cpq/config-templates/${productId}`),
+  saveConfigTemplate: (data) => api.post("/cpq/config-templates", data),
+
+  // Sandbox Simulator
+  simulateQuote: (data) => api.post("/cpq/simulate", data),
+
+  // Competitor log
+  getCompetitors: () => api.get("/cpq/competitors"),
+  createCompetitorPrice: (data) => api.post("/cpq/competitors", data),
+
+  // Audit Logs
+  getAuditLogs: () => api.get("/cpq/audit-logs"),
+
+  // Contracts
+  getContracts: () => api.get("/cpq/contracts"),
+  createContract: (data) => api.post("/cpq/contracts", data),
+  updateContract: (id, data) => api.put(`/cpq/contracts/${id}`, data),
+  deleteContract: (id) => api.delete(`/cpq/contracts/${id}`),
+};
+
+export const orderService = {
+  create: (data) => api.post("/orders", data),
+  getAll: () => api.get("/orders"),
+  getById: (id) => api.get(`/orders/${id}`),
+  update: (id, data) => api.put(`/orders/${id}`, data),
+  delete: (id) => api.delete(`/orders/${id}`),
+  convertToInvoice: (id) => api.post(`/orders/${id}/invoice`),
 };
 
 export default api;

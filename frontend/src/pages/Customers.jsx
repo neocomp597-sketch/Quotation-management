@@ -6,11 +6,13 @@ import Modal from '../components/Modal';
 import ImportModal from '../components/ImportModal';
 import PaginationControls from '../components/PaginationControls';
 import { resolveImageUrl } from '../utils/helpers';
+import CustomerPricingDashboard from './CustomerPricingDashboard';
 
 const LIST_PAGE_SIZE = 20;
 
 const Customers = () => {
     const [customers, setCustomers] = useState([]);
+    const [activeProfileTab, setActiveProfileTab] = useState('details');
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -806,26 +808,26 @@ const Customers = () => {
             {/* View Customer Details Modal */}
             <Modal
                 isOpen={!!viewCustomer}
-                onClose={() => setViewCustomer(null)}
+                onClose={() => { setViewCustomer(null); setActiveProfileTab('details'); }}
                 title="Customer Profile"
-                maxWidth="max-w-2xl"
+                maxWidth={activeProfileTab === 'pricing' ? 'max-w-4xl' : 'max-w-2xl'}
             >
                 {viewCustomer && (
-                    <div className="p-6 space-y-8">
+                    <div className="p-6 space-y-6">
                         {/* Header Profile */}
-                        <div className="flex flex-col items-center justify-center text-center space-y-3 pb-8 border-b border-slate-100">
-                            <div className="h-24 w-24 bg-white rounded-2xl border border-slate-100 p-2 shadow-sm">
+                        <div className="flex flex-col items-center justify-center text-center space-y-3 pb-6 border-b border-slate-100">
+                            <div className="h-20 w-20 bg-white rounded-2xl border border-slate-100 p-2 shadow-sm">
                                 {viewCustomer.logoUrl ? (
                                     <img src={resolveImageUrl(viewCustomer.logoUrl)} alt="Logo" className="w-full h-full object-contain" />
                                 ) : (
-                                    <div className="w-full h-full bg-primary-50 rounded-xl flex items-center justify-center text-primary-600 font-black text-3xl">
+                                    <div className="w-full h-full bg-primary-50 rounded-xl flex items-center justify-center text-primary-600 font-black text-2xl">
                                         {viewCustomer.companyName?.substring(0, 1)}
                                     </div>
                                 )}
                             </div>
                             <div>
-                                <h3 className="text-xl font-black text-slate-900">{viewCustomer.companyName}</h3>
-                                <p className="text-sm font-bold text-slate-400">{viewCustomer.customerName}</p>
+                                <h3 className="text-lg font-black text-slate-900">{viewCustomer.companyName}</h3>
+                                <p className="text-xs font-bold text-slate-400">{viewCustomer.customerName}</p>
                             </div>
                             <div className="flex gap-2">
                                 <span className="px-3 py-1 bg-primary-50 text-primary-700 text-[10px] font-black uppercase tracking-widest rounded-lg border border-primary-100">
@@ -834,54 +836,86 @@ const Customers = () => {
                             </div>
                         </div>
 
-                        {/* Details Grid */}
-                        <div className="grid grid-cols-2 gap-8">
-                            <div>
-                                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Contact Information</h4>
-                                <div className="space-y-4">
-                                    <div className="flex items-start gap-3">
-                                        <div className="p-2 bg-slate-50 text-slate-400 rounded-lg"><MdPhone /></div>
-                                        <div>
-                                            <div className="text-xs font-bold text-slate-400">Mobile</div>
-                                            <div className="text-sm font-bold text-slate-900">{viewCustomer.mobile || '-'}</div>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-start gap-3">
-                                        <div className="p-2 bg-slate-50 text-slate-400 rounded-lg"><MdEmail /></div>
-                                        <div>
-                                            <div className="text-xs font-bold text-slate-400">Email</div>
-                                            <div className="text-sm font-bold text-slate-900">{viewCustomer.email || '-'}</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                        {/* Tab Switcher */}
+                        <div className="flex border-b border-slate-100">
+                            <button
+                                onClick={() => setActiveProfileTab('details')}
+                                className={`flex-1 py-3 text-xs font-black uppercase tracking-widest transition-all border-b-2 ${
+                                    activeProfileTab === 'details'
+                                        ? 'border-primary-600 text-primary-600'
+                                        : 'border-transparent text-slate-400 hover:text-slate-600'
+                                }`}
+                            >
+                                Contact & Premises
+                            </button>
+                            <button
+                                onClick={() => setActiveProfileTab('pricing')}
+                                className={`flex-1 py-3 text-xs font-black uppercase tracking-widest transition-all border-b-2 ${
+                                    activeProfileTab === 'pricing'
+                                        ? 'border-primary-600 text-primary-600'
+                                        : 'border-transparent text-slate-400 hover:text-slate-600'
+                                }`}
+                            >
+                                Pricing & Agreements
+                            </button>
+                        </div>
 
-                            <div>
-                                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Billing Address</h4>
-                                <div className="flex items-start gap-3">
-                                    <div className="p-2 bg-slate-50 text-slate-400 rounded-lg"><MdLocationOn /></div>
+                        {activeProfileTab === 'details' ? (
+                            <div className="space-y-6 pt-2">
+                                {/* Details Grid */}
+                                <div className="grid grid-cols-2 gap-8 text-left">
                                     <div>
-                                        <div className="text-sm font-bold text-slate-900 leading-relaxed">
-                                            {viewCustomer.billingAddress?.line1} <br />
-                                            {viewCustomer.billingAddress?.city}, {viewCustomer.billingAddress?.state} <br />
-                                            {viewCustomer.billingAddress?.pincode}
+                                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Contact Information</h4>
+                                        <div className="space-y-4">
+                                            <div className="flex items-start gap-3">
+                                                <div className="p-2 bg-slate-50 text-slate-400 rounded-lg"><MdPhone /></div>
+                                                <div>
+                                                    <div className="text-xs font-bold text-slate-400">Mobile</div>
+                                                    <div className="text-sm font-bold text-slate-900">{viewCustomer.mobile || '-'}</div>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-start gap-3">
+                                                <div className="p-2 bg-slate-50 text-slate-400 rounded-lg"><MdEmail /></div>
+                                                <div>
+                                                    <div className="text-xs font-bold text-slate-400">Email</div>
+                                                    <div className="text-sm font-bold text-slate-900">{viewCustomer.email || '-'}</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Billing Address</h4>
+                                        <div className="flex items-start gap-3">
+                                            <div className="p-2 bg-slate-50 text-slate-400 rounded-lg"><MdLocationOn /></div>
+                                            <div>
+                                                <div className="text-sm font-bold text-slate-900 leading-relaxed">
+                                                    {viewCustomer.billingAddress?.line1} <br />
+                                                    {viewCustomer.billingAddress?.city}, {viewCustomer.billingAddress?.state} <br />
+                                                    {viewCustomer.billingAddress?.pincode}
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                        </div>
 
-                        {/* Footer Extras */}
-                        <div className="pt-6 border-t border-slate-100 grid grid-cols-2 gap-4">
-                            <div>
-                                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Default Discount</div>
-                                <div className="text-lg font-black text-slate-900">{viewCustomer.defaultDiscount}%</div>
+                                {/* Footer Extras */}
+                                <div className="pt-6 border-t border-slate-100 grid grid-cols-2 gap-4 text-left">
+                                    <div>
+                                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Default Discount</div>
+                                        <div className="text-lg font-black text-slate-900">{viewCustomer.defaultDiscount}%</div>
+                                    </div>
+                                    <div>
+                                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Credit Limit</div>
+                                        <div className="text-lg font-black text-slate-900">₹{viewCustomer.creditLimit?.toLocaleString() || '0'}</div>
+                                    </div>
+                                </div>
                             </div>
-                            <div>
-                                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Credit Limit</div>
-                                <div className="text-lg font-black text-slate-900">₹{viewCustomer.creditLimit?.toLocaleString() || '0'}</div>
+                        ) : (
+                            <div className="pt-2">
+                                <CustomerPricingDashboard customerId={viewCustomer._id} inlineMode={true} />
                             </div>
-                        </div>
+                        )}
                     </div>
                 )}
             </Modal>

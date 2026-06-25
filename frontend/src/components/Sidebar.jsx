@@ -32,7 +32,8 @@ import {
     MdFlag,
     MdTimeline,
     MdBuildCircle,
-    MdSpeed
+    MdSpeed,
+    MdPayments
 } from 'react-icons/md';
 import { useAuth } from '../context/AuthContext';
 
@@ -130,12 +131,30 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
         },
         {
             type: 'group',
-            name: 'Sales',
+            name: 'Catalog & Price Masters',
+            key: 'cpq_masters',
+            icon: <MdFolderOpen size={22} />,
+            children: [
+                { key: 'sales_price_management', name: 'Price Books', icon: <MdDescription size={18} />, path: '/sales/price-management/price-books' },
+                { key: 'sales_price_management', name: 'Pricing Rules', icon: <MdAssignment size={18} />, path: '/sales/price-management/pricing-rules' },
+                { key: 'sales_price_management', name: 'Discount Policies', icon: <MdReceipt size={18} />, path: '/sales/price-management/discounts' },
+                { key: 'sales_price_management', name: 'Promotions', icon: <MdNewReleases size={18} />, path: '/sales/price-management/promotions' },
+                { key: 'sales_price_management', name: 'Currency Rates', icon: <MdTrendingUp size={18} />, path: '/sales/price-management/currencies' },
+            ]
+        },
+        {
+            type: 'group',
+            name: 'Sales & CPQ',
             key: 'quotation',
             icon: <MdRequestQuote size={22} />,
             children: [
+                { key: 'sales_cpq', name: 'Guided Selling', icon: <MdPeople size={18} />, path: '/sales/cpq/guided-selling' },
+                { key: 'sales_cpq', name: 'Configurator', icon: <MdBuildCircle size={18} />, path: '/sales/cpq/configurator' },
+                { key: 'sales_cpq', name: 'Quote Simulator', icon: <MdSpeed size={18} />, path: '/sales/cpq/simulator' },
                 { key: 'quotation_list', name: 'Quotations', icon: <MdDescription size={18} />, path: '/quotations' },
-                { key: 'sale_invoices', name: 'Create Invoice', icon: <MdReceipt size={18} />, path: '/invoices' },
+                { key: 'sales_approvals', name: 'Approvals', icon: <MdLock size={18} />, path: '/sales/approvals' },
+                { key: 'sales_contracts', name: 'Contracts', icon: <MdAssignment size={18} />, path: '/sales/contracts' },
+                { key: 'sales_orders', name: 'Orders', icon: <MdShoppingCart size={18} />, path: '/sales/orders' },
             ]
         },
 
@@ -170,6 +189,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                 { key: 'csm_warranties_amc', name: 'Warranty & AMC', icon: <MdStorefront size={18} />, path: '/csm/warranties-amc' },
                 { key: 'csm_kb', name: 'Knowledge Base', icon: <MdDescription size={18} />, path: '/csm/kb' },
                 { key: 'csm_masters', name: 'CSM Config', icon: <MdSettings size={18} />, path: '/csm/masters' },
+                { key: 'csm_reports', name: 'Service Reports', icon: <MdAnalytics size={18} />, path: '/csm/reports' },
             ]
         },
         {
@@ -182,6 +202,9 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                 { key: 'payroll_reports', name: 'Payroll Reports', icon: <MdBarChart size={18} />, path: '/payroll/reports' },
                 { key: 'sales_reports', name: 'Sales Reports', icon: <MdBarChart size={18} />, path: '/sales/reports' },
                 { key: 'sales_analytics', name: 'Sales Analytics', icon: <MdSpeed size={18} />, path: '/sales/analytics' },
+                { key: 'sales_revenue_analytics', name: 'Revenue Analytics', icon: <MdAnalytics size={18} />, path: '/sales/revenue-analytics' },
+                { key: 'sales_competitors', name: 'Competitor Intel', icon: <MdFlag size={18} />, path: '/sales/competitors' },
+                { key: 'sales_ai_pricing', name: 'AI Pricing Insights', icon: <MdAutoGraph size={18} />, path: '/sales/ai-pricing' },
             ]
         },
         {

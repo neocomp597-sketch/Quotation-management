@@ -19,7 +19,10 @@ const TicketCommentSchema = new mongoose.Schema({
 const TicketSchema = new mongoose.Schema({
     ticketNo: { type: String, required: true },
     customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', required: true },
+    contactId: { type: mongoose.Schema.Types.ObjectId, ref: 'CustomerContact' },
     contactName: { type: String, default: '' },
+    contactDesignationId: { type: mongoose.Schema.Types.ObjectId, ref: 'Designation' },
+    contactDesignation: { type: String, default: '' },
     contactPhone: { type: String, default: '' },
     contactEmail: { type: String, default: '' },
     productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
@@ -51,6 +54,7 @@ const TicketSchema = new mongoose.Schema({
         response: { type: Boolean, default: false },
         resolution: { type: Boolean, default: false }
     },
+    isFirstCallResolved: { type: Boolean, default: false },
     timeline: { type: [TicketTimelineSchema], default: [] },
     comments: { type: [TicketCommentSchema], default: [] },
     feedback: {

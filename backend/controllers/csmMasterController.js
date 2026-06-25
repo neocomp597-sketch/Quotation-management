@@ -4,6 +4,7 @@ const Priority = require('../models/Priority');
 const SlaPolicy = require('../models/SlaPolicy');
 const ServiceTeam = require('../models/ServiceTeam');
 const TicketSource = require('../models/TicketSource');
+const Designation = require('../models/Designation');
 
 // Seed default master configurations
 exports.seedDefaults = async (req, res) => {
@@ -83,6 +84,22 @@ exports.seedDefaults = async (req, res) => {
             }
         }
 
+        // 6. Customer contact designations
+        const defaultDesignations = [
+            { name: 'Executive Engineer', description: 'Senior engineering contact at customer site' },
+            { name: 'Assistant Engineer', description: 'Assistant engineering contact at customer site' },
+            { name: 'Junior Engineer', description: 'Junior engineering contact at customer site' },
+            { name: 'Substation Operator', description: 'Operations contact for substation equipment' },
+            { name: 'Maintenance Engineer', description: 'Maintenance and breakdown support contact' },
+            { name: 'Supervisor', description: 'Site supervision contact' }
+        ];
+        for (const des of defaultDesignations) {
+            const exists = await Designation.findOne({ name: des.name, companyId });
+            if (!exists) {
+                await Designation.create({ ...des, companyId });
+            }
+        }
+
         res.json({ message: 'CSM defaults seeded successfully' });
     } catch (error) {
         console.error('Seed CSM defaults error:', error);
@@ -105,6 +122,7 @@ exports.seedMhData = async (req, res) => {
         const Asset = require('../models/Asset');
         const Warranty = require('../models/Warranty');
         const AMC = require('../models/AMC');
+        const CustomerContact = require('../models/CustomerContact');
 
         // 1. Ensure categories exist
         const categoriesData = [
@@ -196,6 +214,52 @@ exports.seedMhData = async (req, res) => {
                 dbCust = await Customer.create({ ...c, companyId });
             }
             customers.push(dbCust);
+        }
+
+        const designationNames = [
+            'Executive Engineer',
+            'Assistant Engineer',
+            'Junior Engineer',
+            'Substation Operator',
+            'Maintenance Engineer',
+            'Supervisor'
+        ];
+        const designationMap = {};
+        for (const name of designationNames) {
+            let designation = await Designation.findOne({ name, companyId });
+            if (!designation) {
+                designation = await Designation.create({ name, companyId });
+            }
+            designationMap[name] = designation;
+        }
+
+        const pimpalgaon = customers.find(c => c.customerName === 'MSEDCL Pimpalgaon Division');
+        if (pimpalgaon) {
+            const contactsData = [
+                { contactName: 'Ramesh Patil', designation: 'Junior Engineer', mobileNo: '98XXXXXX21', email: 'ramesh.patil@mahadiscom.in', isPrimary: true },
+                { contactName: 'Suresh Jadhav', designation: 'Assistant Engineer', mobileNo: '98XXXXXX22', email: 'suresh.jadhav@mahadiscom.in' },
+                { contactName: 'Mahesh Gaikwad', designation: 'Substation Operator', mobileNo: '98XXXXXX23', email: 'mahesh.g@mahadiscom.in' },
+                { contactName: 'Vikrant Deshmukh', designation: 'Executive Engineer', mobileNo: '98XXXXXX24', email: 'vikrant.d@mahadiscom.in' }
+            ];
+
+            for (const contact of contactsData) {
+                const exists = await CustomerContact.findOne({
+                    customerId: pimpalgaon._id,
+                    contactName: contact.contactName,
+                    companyId
+                });
+                if (!exists) {
+                    await CustomerContact.create({
+                        customerId: pimpalgaon._id,
+                        contactName: contact.contactName,
+                        designationId: designationMap[contact.designation]?._id,
+                        mobileNo: contact.mobileNo,
+                        email: contact.email,
+                        isPrimary: Boolean(contact.isPrimary),
+                        companyId
+                    });
+                }
+            }
         }
 
         // 7. Ensure service engineers exist
@@ -326,6 +390,7 @@ exports.seedMhData = async (req, res) => {
             firstResponseAt: new Date(yesterday.getTime() + 15 * 60 * 1000),
             resolvedAt: new Date(startOfToday.getTime() + 2 * 60 * 60 * 1000), // Resolved today
             isSlaBreached: { response: false, resolution: false },
+            isFirstCallResolved: true,
             timeline: [
                 { activityType: 'Ticket Created', description: 'Registered via WhatsApp bot.', createdAt: yesterday },
                 { activityType: 'Engineer Assigned', description: 'Assigned to Amit Shinde.', createdAt: new Date(yesterday.getTime() + 10 * 60 * 1000) },
@@ -410,6 +475,7 @@ exports.seedMhData = async (req, res) => {
             firstResponseAt: new Date(threeDaysAgo.getTime() + 2 * 60 * 60 * 1000),
             resolvedAt: new Date(threeDaysAgo.getTime() + 18 * 60 * 60 * 1000),
             isSlaBreached: { response: false, resolution: false },
+            isFirstCallResolved: false,
             timeline: [
                 { activityType: 'Ticket Created', description: 'Created.', createdAt: threeDaysAgo },
                 { activityType: 'Resolved', description: 'Revised invoice sent over email.', createdAt: new Date(threeDaysAgo.getTime() + 18 * 60 * 60 * 1000) }
@@ -443,6 +509,7 @@ exports.seedMhData = async (req, res) => {
             resolvedAt: new Date(fiveDaysAgo.getTime() + 8 * 60 * 60 * 1000),
             closedAt: new Date(fiveDaysAgo.getTime() + 9 * 60 * 60 * 1000),
             isSlaBreached: { response: false, resolution: false },
+            isFirstCallResolved: true,
             timeline: [
                 { activityType: 'Ticket Created', description: 'Created.', createdAt: fiveDaysAgo },
                 { activityType: 'Closed', description: 'Feeder charged. Relay functioning normal.', performedBy: engineers[2]._id, createdAt: new Date(fiveDaysAgo.getTime() + 9 * 60 * 60 * 1000) }
@@ -647,3 +714,4 @@ exports.priorities = createCrudEndpoints(Priority, 'Priority');
 exports.slaPolicies = createCrudEndpoints(SlaPolicy, 'SlaPolicy');
 exports.serviceTeams = createCrudEndpoints(ServiceTeam, 'ServiceTeam');
 exports.sources = createCrudEndpoints(TicketSource, 'TicketSource');
+exports.designations = createCrudEndpoints(Designation, 'Designation');

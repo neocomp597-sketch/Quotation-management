@@ -38,9 +38,19 @@ const CSMTickets = () => {
     const [products, setProducts] = useState([]);
     const [invoices, setInvoices] = useState([]);
     const [sources, setSources] = useState([]);
+    const [designations, setDesignations] = useState([]);
+    const [customerContacts, setCustomerContacts] = useState([]);
     
     // Modal & Form State
     const [showModal, setShowModal] = useState(false);
+    const [showContactModal, setShowContactModal] = useState(false);
+    const [contactFormData, setContactFormData] = useState({
+        contactName: '',
+        designationId: '',
+        mobileNo: '',
+        email: '',
+        isPrimary: false
+    });
 
     // Mini Master Modal State
     const [activeMiniMaster, setActiveMiniMaster] = useState(null);
@@ -62,7 +72,10 @@ const CSMTickets = () => {
     });
     const [formData, setFormData] = useState({
         customerId: '',
+        contactId: '',
         contactName: '',
+        contactDesignationId: '',
+        contactDesignation: '',
         contactPhone: '',
         contactEmail: '',
         priorityId: '',
@@ -96,20 +109,45 @@ const CSMTickets = () => {
 
     const loadCreationData = async () => {
         try {
-            const [custRes, priRes, catRes, typRes, prodRes, srcRes] = await Promise.all([
+            const [custRes, priRes, catRes, typRes, prodRes, srcRes, desRes] = await Promise.allSettled([
                 customerService.getAll({ limit: 500 }),
                 csmService.getPriorities(),
                 csmService.getCategories(),
                 csmService.getTypes(),
                 productService.getAll({ limit: 500 }),
-                csmService.getSources()
+                csmService.getSources(),
+                csmService.getDesignations()
             ]);
-            setCustomers(custRes.data?.data || custRes.data || []);
-            setPriorities(priRes.data || []);
-            setCategories(catRes.data || []);
-            setTypes(typRes.data || []);
-            setProducts(prodRes.data?.data || prodRes.data || []);
-            setSources(srcRes.data || []);
+
+            const valueOf = (result) => result.status === 'fulfilled' ? result.value : null;
+            const customersRes = valueOf(custRes);
+            const prioritiesRes = valueOf(priRes);
+            const categoriesRes = valueOf(catRes);
+            const typesRes = valueOf(typRes);
+            const productsRes = valueOf(prodRes);
+            const sourcesRes = valueOf(srcRes);
+            const designationsRes = valueOf(desRes);
+
+            setCustomers(customersRes?.data?.data || customersRes?.data || []);
+            setPriorities(prioritiesRes?.data || []);
+            setCategories(categoriesRes?.data || []);
+            setTypes(typesRes?.data || []);
+            setProducts(productsRes?.data?.data || productsRes?.data || []);
+            setSources(sourcesRes?.data || []);
+            setDesignations(designationsRes?.data || []);
+
+            const failed = [custRes, priRes, catRes, typRes, prodRes, srcRes, desRes].some(result => result.status === 'rejected');
+            if (failed) {
+                console.error('One or more ticket form dropdowns failed to load', {
+                    customers: custRes.status,
+                    priorities: priRes.status,
+                    categories: catRes.status,
+                    types: typRes.status,
+                    products: prodRes.status,
+                    sources: srcRes.status,
+                    designations: desRes.status
+                });
+            }
         } catch (error) {
             console.error('Error preloading ticket forms:', error);
         }
@@ -131,10 +169,44 @@ const CSMTickets = () => {
             voucherService.getAll({ customerId: formData.customerId, voucherType: 'Invoice' })
                 .then(res => setInvoices(res.data?.data || res.data || []))
                 .catch(err => console.error('Error fetching customer invoices:', err));
+            csmService.getCustomerContacts({ customerId: formData.customerId })
+                .then(res => setCustomerContacts(res.data || []))
+                .catch(err => {
+                    console.error('Error fetching customer contacts:', err);
+                    setCustomerContacts([]);
+                });
         } else {
             setInvoices([]);
+            setCustomerContacts([]);
         }
     }, [formData.customerId]);
+
+    const handleCustomerChange = (customerId) => {
+        setFormData(prev => ({
+            ...prev,
+            customerId,
+            contactId: '',
+            contactName: '',
+            contactDesignationId: '',
+            contactDesignation: '',
+            contactPhone: '',
+            contactEmail: '',
+            invoiceId: ''
+        }));
+    };
+
+    const handleContactSelect = (contactId) => {
+        const contact = customerContacts.find(c => c._id === contactId);
+        setFormData(prev => ({
+            ...prev,
+            contactId,
+            contactName: contact?.contactName || '',
+            contactDesignationId: contact?.designationId?._id || '',
+            contactDesignation: contact?.designationId?.name || '',
+            contactPhone: contact?.mobileNo || '',
+            contactEmail: contact?.email || ''
+        }));
+    };
 
     const handleSearchSubmit = (e) => {
         e.preventDefault();
@@ -194,6 +266,16 @@ const CSMTickets = () => {
                 const res = await csmService.getPriorities();
                 setPriorities(res.data || []);
                 setFormData(prev => ({ ...prev, priorityId: prev.priorityId === id ? '' : prev.priorityId }));
+            } else if (activeMiniMaster === 'designation') {
+                await csmService.deleteDesignation(id);
+                toast.success('Designation deleted');
+                const res = await csmService.getDesignations();
+                setDesignations(res.data || []);
+                setFormData(prev => ({
+                    ...prev,
+                    contactDesignationId: prev.contactDesignationId === id ? '' : prev.contactDesignationId,
+                    contactDesignation: prev.contactDesignationId === id ? '' : prev.contactDesignation
+                }));
             }
         } catch (error) {
             toast.error(error.response?.data?.message || 'Failed to delete');
@@ -245,6 +327,14 @@ const CSMTickets = () => {
                 toast.success('Priority updated');
                 const res = await csmService.getPriorities();
                 setPriorities(res.data || []);
+            } else if (activeMiniMaster === 'designation') {
+                await csmService.updateDesignation(id, {
+                    name: editingItemFormData.name,
+                    description: editingItemFormData.description
+                });
+                toast.success('Designation updated');
+                const res = await csmService.getDesignations();
+                setDesignations(res.data || []);
             }
             setEditingItemId(null);
         } catch (error) {
@@ -261,8 +351,51 @@ const CSMTickets = () => {
             setFormData(prev => ({ ...prev, typeId: item._id }));
         } else if (activeMiniMaster === 'priority') {
             setFormData(prev => ({ ...prev, priorityId: item._id }));
+        } else if (activeMiniMaster === 'designation') {
+            setFormData(prev => ({
+                ...prev,
+                contactDesignationId: item._id,
+                contactDesignation: item.name
+            }));
         }
         setActiveMiniMaster(null);
+    };
+
+    const handleCreateCustomerContact = async (e) => {
+        e.preventDefault();
+        if (!formData.customerId) {
+            toast.error('Select a customer first');
+            return;
+        }
+
+        try {
+            const res = await csmService.createCustomerContact({
+                customerId: formData.customerId,
+                ...contactFormData
+            });
+            const contactsRes = await csmService.getCustomerContacts({ customerId: formData.customerId });
+            setCustomerContacts(contactsRes.data || []);
+            setFormData(prev => ({
+                ...prev,
+                contactId: res.data._id,
+                contactName: res.data.contactName || '',
+                contactDesignationId: res.data.designationId?._id || '',
+                contactDesignation: res.data.designationId?.name || '',
+                contactPhone: res.data.mobileNo || '',
+                contactEmail: res.data.email || ''
+            }));
+            setShowContactModal(false);
+            setContactFormData({
+                contactName: '',
+                designationId: '',
+                mobileNo: '',
+                email: '',
+                isPrimary: false
+            });
+            toast.success('Customer contact added');
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Failed to add customer contact');
+        }
     };
 
     const handleCreateMiniMaster = async (e) => {
@@ -304,6 +437,19 @@ const CSMTickets = () => {
                 const priRes = await csmService.getPriorities();
                 setPriorities(priRes.data || []);
                 setFormData(prev => ({ ...prev, priorityId: res.data._id }));
+            } else if (activeMiniMaster === 'designation') {
+                res = await csmService.createDesignation({
+                    name: miniMasterFormData.name,
+                    description: miniMasterFormData.description
+                });
+                toast.success('Designation added!');
+                const desRes = await csmService.getDesignations();
+                setDesignations(desRes.data || []);
+                setFormData(prev => ({
+                    ...prev,
+                    contactDesignationId: res.data._id,
+                    contactDesignation: res.data.name
+                }));
             }
             setActiveMiniMaster(null);
         } catch (error) {
@@ -329,7 +475,10 @@ const CSMTickets = () => {
                     onClick={() => {
                         setFormData({
                             customerId: '',
+                            contactId: '',
                             contactName: '',
+                            contactDesignationId: '',
+                            contactDesignation: '',
                             contactPhone: '',
                             contactEmail: '',
                             priorityId: '',
@@ -341,6 +490,7 @@ const CSMTickets = () => {
                             description: '',
                             source: 'Web Portal'
                         });
+                        setCustomerContacts([]);
                         setShowModal(true);
                     }}
                     className="flex items-center gap-2 px-6 py-4 bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-[10px] tracking-widest rounded-2xl transition-all shadow-lg shadow-primary-600/20 active:scale-95 self-start md:self-auto"
@@ -491,7 +641,7 @@ const CSMTickets = () => {
                             <select
                                 required
                                 value={formData.customerId}
-                                onChange={(e) => setFormData({ ...formData, customerId: e.target.value })}
+                                onChange={(e) => handleCustomerChange(e.target.value)}
                                 className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
                             >
                                 <option value="">Select Customer</option>
@@ -542,13 +692,60 @@ const CSMTickets = () => {
                             </select>
                         </div>
                         <div>
-                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Contact Person Name</label>
-                            <input
-                                type="text"
-                                value={formData.contactName}
-                                onChange={(e) => setFormData({ ...formData, contactName: e.target.value })}
+                            <div className="flex justify-between items-center mb-1">
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Contact Person Name</label>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowContactModal(true)}
+                                    disabled={!formData.customerId}
+                                    className="text-[10px] font-black uppercase text-primary-600 hover:text-primary-700 tracking-wider flex items-center gap-0.5 disabled:text-slate-300"
+                                >
+                                    + Quick Add
+                                </button>
+                            </div>
+                            <select
+                                value={formData.contactId}
+                                onChange={(e) => handleContactSelect(e.target.value)}
+                                disabled={!formData.customerId}
                                 className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
-                            />
+                            >
+                                <option value="">{formData.customerId ? 'Select Contact Person' : 'Select Customer First'}</option>
+                                {customerContacts.map(c => (
+                                    <option key={c._id} value={c._id}>
+                                        {c.contactName}{c.isPrimary ? ' (Primary)' : ''}
+                                    </option>
+                                ))}
+                            </select>
+                            {formData.customerId && customerContacts.length === 0 && (
+                                <p className="text-[10px] font-bold text-amber-600 mt-1">No contacts saved for this customer yet.</p>
+                            )}
+                        </div>
+                        <div>
+                            <div className="flex justify-between items-center mb-1">
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Designation</label>
+                                <button 
+                                    type="button" 
+                                    onClick={() => handleOpenMiniMaster('designation')}
+                                    className="text-[10px] font-black uppercase text-primary-600 hover:text-primary-700 tracking-wider flex items-center gap-0.5"
+                                >
+                                    + Quick Add
+                                </button>
+                            </div>
+                            <select
+                                value={formData.contactDesignationId}
+                                onChange={(e) => {
+                                    const designation = designations.find(d => d._id === e.target.value);
+                                    setFormData({
+                                        ...formData,
+                                        contactDesignationId: e.target.value,
+                                        contactDesignation: designation?.name || ''
+                                    });
+                                }}
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
+                            >
+                                <option value="">Select Designation</option>
+                                {designations.map(d => <option key={d._id} value={d._id}>{d.name}</option>)}
+                            </select>
                         </div>
                         <div>
                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Contact Phone</label>
@@ -556,7 +753,8 @@ const CSMTickets = () => {
                                 type="text"
                                 value={formData.contactPhone}
                                 onChange={(e) => setFormData({ ...formData, contactPhone: e.target.value })}
-                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold bg-slate-50"
+                                readOnly={Boolean(formData.contactId)}
                             />
                         </div>
                         <div>
@@ -565,7 +763,8 @@ const CSMTickets = () => {
                                 type="email"
                                 value={formData.contactEmail}
                                 onChange={(e) => setFormData({ ...formData, contactEmail: e.target.value })}
-                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold bg-slate-50"
+                                readOnly={Boolean(formData.contactId)}
                             />
                         </div>
                         <div>
@@ -661,7 +860,85 @@ const CSMTickets = () => {
                         </div>
                     </div>
                 </form>
-            </Modal>            {/* Mini Master Modal */}
+            </Modal>
+
+            <Modal
+                isOpen={showContactModal}
+                onClose={() => setShowContactModal(false)}
+                title="Add Customer Contact"
+                maxWidth="max-w-md"
+                footer={
+                    <>
+                        <button
+                            type="button"
+                            onClick={() => setShowContactModal(false)}
+                            className="w-full md:w-auto px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            form="customer-contact-form"
+                            className="w-full md:w-auto px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-primary-600/20"
+                        >
+                            Save Contact
+                        </button>
+                    </>
+                }
+            >
+                <form id="customer-contact-form" onSubmit={handleCreateCustomerContact} className="space-y-4">
+                    <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Contact Person Name *</label>
+                        <input
+                            type="text"
+                            required
+                            value={contactFormData.contactName}
+                            onChange={(e) => setContactFormData({ ...contactFormData, contactName: e.target.value })}
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Designation</label>
+                        <select
+                            value={contactFormData.designationId}
+                            onChange={(e) => setContactFormData({ ...contactFormData, designationId: e.target.value })}
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
+                        >
+                            <option value="">Select Designation</option>
+                            {designations.map(d => <option key={d._id} value={d._id}>{d.name}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Mobile Number</label>
+                        <input
+                            type="text"
+                            value={contactFormData.mobileNo}
+                            onChange={(e) => setContactFormData({ ...contactFormData, mobileNo: e.target.value })}
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Email Address</label>
+                        <input
+                            type="email"
+                            value={contactFormData.email}
+                            onChange={(e) => setContactFormData({ ...contactFormData, email: e.target.value })}
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
+                        />
+                    </div>
+                    <label className="flex items-center gap-2 text-xs font-bold text-slate-600">
+                        <input
+                            type="checkbox"
+                            checked={contactFormData.isPrimary}
+                            onChange={(e) => setContactFormData({ ...contactFormData, isPrimary: e.target.checked })}
+                            className="h-4 w-4 rounded border-slate-300 text-primary-600"
+                        />
+                        Mark as primary contact
+                    </label>
+                </form>
+            </Modal>
+
+            {/* Mini Master Modal */}
             <Modal
                 isOpen={activeMiniMaster !== null}
                 onClose={() => setActiveMiniMaster(null)}
@@ -701,7 +978,7 @@ const CSMTickets = () => {
                                 onChange={(e) => setMiniMasterFormData({ ...miniMasterFormData, name: e.target.value })}
                                 className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold bg-white"
                             />
-                            {(activeMiniMaster === 'category' || activeMiniMaster === 'type') && (
+                            {(activeMiniMaster === 'category' || activeMiniMaster === 'type' || activeMiniMaster === 'designation') && (
                                 <input
                                     type="text"
                                     placeholder="Description"
@@ -767,6 +1044,7 @@ const CSMTickets = () => {
                             else if (activeMiniMaster === 'category') itemsList = categories;
                             else if (activeMiniMaster === 'type') itemsList = types;
                             else if (activeMiniMaster === 'priority') itemsList = priorities;
+                            else if (activeMiniMaster === 'designation') itemsList = designations;
 
                             const filtered = miniMasterSearch.trim() 
                                 ? itemsList.filter(item => item.name?.toLowerCase().includes(miniMasterSearch.toLowerCase()))
@@ -789,7 +1067,7 @@ const CSMTickets = () => {
                                                     onChange={(e) => setEditingItemFormData({ ...editingItemFormData, name: e.target.value })}
                                                     className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold"
                                                 />
-                                                {(activeMiniMaster === 'category' || activeMiniMaster === 'type') && (
+                                                {(activeMiniMaster === 'category' || activeMiniMaster === 'type' || activeMiniMaster === 'designation') && (
                                                     <input
                                                         type="text"
                                                         value={editingItemFormData.description}
@@ -851,7 +1129,7 @@ const CSMTickets = () => {
                                                     {activeMiniMaster === 'priority' && (
                                                         <p className="text-[10px] text-slate-400 font-bold uppercase mt-0.5">Response: {item.responseSlaHours}h | Resolution: {item.resolutionSlaHours}h</p>
                                                     )}
-                                                    {(activeMiniMaster === 'category' || activeMiniMaster === 'type') && item.description && (
+                                                    {(activeMiniMaster === 'category' || activeMiniMaster === 'type' || activeMiniMaster === 'designation') && item.description && (
                                                         <p className="text-[11px] text-slate-400 font-semibold truncate mt-0.5">{item.description}</p>
                                                     )}
                                                 </div>

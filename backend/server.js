@@ -89,6 +89,7 @@ const path = require("path");
 const userRoutes = require("./routes/userRoutes");
 const authRoutes = require("./routes/authRoutes");
 const importRoutes = require("./routes/importRoutes");
+const categoryRoutes = require("./routes/categoryRoutes");
 const companySettingsRoutes = require("./routes/companySettingsRoutes");
 const mgrRoutes = require("./routes/mgrRoutes");
 const attributeRoutes = require("./routes/attributeRoutes");
@@ -114,6 +115,8 @@ const salesTargetRoutes = require("./routes/salesTargetRoutes");
 const forecastRoutes = require("./routes/forecastRoutes");
 const salesAnalyticsRoutes = require("./routes/salesAnalyticsRoutes");
 const csmRoutes = require("./routes/csmRoutes");
+const cpqRoutes = require("./routes/cpqRoutes");
+const orderRoutes = require("./routes/orderRoutes");
 const scheduler = require("./utils/scheduler");
 
 // API Routes (Reload triggered)
@@ -125,6 +128,7 @@ app.use("/api/upload", uploadRoutes);
 app.use("/api/salespersons", salespersonRoutes);
 app.use("/api/sites", siteRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/categories", categoryRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/import", importRoutes);
 app.use("/api/company-settings", companySettingsRoutes);
@@ -152,6 +156,8 @@ app.use("/api/sales/targets", salesTargetRoutes);
 app.use("/api/sales/forecast", forecastRoutes);
 app.use("/api/sales/analytics", salesAnalyticsRoutes);
 app.use("/api/csm", csmRoutes);
+app.use("/api/cpq", cpqRoutes);
+app.use("/api/orders", orderRoutes);
 
 app.get('/api/trigger-seed', async (req, res) => {
     try {

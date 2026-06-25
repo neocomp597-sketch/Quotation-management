@@ -287,7 +287,7 @@ const resolveVendorForItem = (product, requestedVendorId) => {
     return { selectedVendor: bestVendor, isAutoSelected: true };
 };
 
-const normalizeQuotationItems = async (items, fallbackSiteId) => {
+const normalizeQuotationItems = async (items, fallbackSiteId, customerId = null, dealId = null, promoCode = null, targetCurrency = 'INR') => {
     if (!Array.isArray(items) || items.length === 0) {
         throw asBadRequest('At least one quotation item is required');
     }
@@ -299,7 +299,7 @@ const normalizeQuotationItems = async (items, fallbackSiteId) => {
             }
 
             const product = await Product.findById(item.productId)
-                .select('productCode productName hsnCode gstPercentage uom productImageUrl basePrice vendors')
+                .select('productCode productName hsnCode gstPercentage uom productImageUrl basePrice vendors pricing')
                 .populate('vendors.vendorId', 'name isActive')
                 .lean();
             if (!product) {
@@ -314,11 +314,52 @@ const normalizeQuotationItems = async (items, fallbackSiteId) => {
                 throw asBadRequest(`Quantity must be greater than 0 for product ${product.productCode}`);
             }
 
+            // Call Acczite CPQ Pricing Engine
+            let enginePrice = product.basePrice;
+            let priceSource = 'Standard Product Price';
+            let calculatedCost = product.pricing?.baseCost || 0;
+            
+            try {
+                const calcResult = await calculateProductPrice({
+                    productId: product._id,
+                    customerId,
+                    quantity,
+                    dealId,
+                    siteId: item.siteId || fallbackSiteId,
+                    promoCode,
+                    targetCurrency
+                });
+                enginePrice = calcResult.unitPrice;
+                priceSource = calcResult.priceSource;
+                calculatedCost = calcResult.costPrice;
+            } catch (pricingErr) {
+                console.error("Pricing Engine error:", pricingErr.message);
+            }
+
+            // Option Modifiers if present
+            let modifierPrice = 0;
+            let modifierCost = 0;
+            if (item.selectedOptions) {
+                const ProductConfigTemplate = require('../models/ProductConfigTemplate');
+                const template = await ProductConfigTemplate.findOne({ productId: product._id }).lean();
+                if (template) {
+                    Object.entries(item.selectedOptions).forEach(([groupName, val]) => {
+                        const group = template.optionGroups.find(g => g.groupName === groupName);
+                        if (group) {
+                            const option = group.options.find(o => o.label === val);
+                            if (option) {
+                                modifierPrice += option.priceModifier || 0;
+                                modifierCost += option.costModifier || 0;
+                            }
+                        }
+                    });
+                }
+            }
+
             const unitPrice = Number(
                 item.unitPrice ??
                 item.rate ??
-                selectedVendor?.price ??
-                product.basePrice
+                (enginePrice + modifierPrice)
             );
 
             if (!(unitPrice > 0)) {
@@ -348,7 +389,8 @@ const normalizeQuotationItems = async (items, fallbackSiteId) => {
                     hsnCode: item.productSnapshot?.hsnCode || product.hsnCode,
                     gstPercentage,
                     uom: item.productSnapshot?.uom || product.uom,
-                    productImageUrl: item.productSnapshot?.productImageUrl || product.productImageUrl
+                    productImageUrl: item.productSnapshot?.productImageUrl || product.productImageUrl,
+                    baseCost: calculatedCost + modifierCost
                 },
                 quantity,
                 unitPrice,
@@ -358,6 +400,8 @@ const normalizeQuotationItems = async (items, fallbackSiteId) => {
                 taxableAmount: calculations.taxableAmount,
                 gstAmount: calculations.gstAmount,
                 lineTotal: calculations.lineTotal,
+                priceSource,
+                selectedOptions: item.selectedOptions || {}
             };
         })
     );
@@ -396,7 +440,37 @@ const createQuotation = async (req, res) => {
             .lean();
         if (!customer) return res.status(404).json({ message: 'Customer not found' });
 
-        const normalizedItems = await normalizeQuotationItems(items, siteId);
+        const normalizedItems = await normalizeQuotationItems(
+            items,
+            siteId,
+            customerId,
+            req.body.dealId || null,
+            req.body.promoCode || null,
+            req.body.currency || 'INR'
+        );
+
+        // Margin Protection Engine
+        let requiresApproval = false;
+        let minMargin = 100;
+        normalizedItems.forEach(item => {
+            const cost = item.productSnapshot?.baseCost || 0;
+            const rate = item.rate || item.unitPrice || 0;
+            if (rate > 0) {
+                const margin = ((rate - cost) / rate) * 100;
+                if (margin < minMargin) minMargin = margin;
+            }
+        });
+
+        if (minMargin < 0) {
+            return res.status(400).json({ message: "Margin is negative. Quote creation blocked by Margin Protection Engine." });
+        } else if (minMargin < 10) {
+            requiresApproval = true;
+        }
+
+        let finalStatus = status || 'draft';
+        if (requiresApproval && finalStatus !== 'draft') {
+            finalStatus = 'pending_approval';
+        }
 
         const year = new Date().getFullYear();
         const creatorId = req.user ? req.user.id : undefined;
@@ -443,7 +517,7 @@ const createQuotation = async (req, res) => {
             grandTotal: roundedGrandTotal,
             termsTemplateId: termsTemplateId || undefined,
             customTerms,
-            status: status || 'draft',
+            status: finalStatus,
             territory: customer.territory || null,
             createdBy: req.user ? req.user.id : undefined,
             clientRequestId: normalizedClientRequestId || undefined,
@@ -509,6 +583,19 @@ const updateQuotation = async (req, res) => {
             .lean();
         if (!customer) return res.status(404).json({ message: 'Customer not found' });
 
+        // Quotation Versioning: save snapshot if updating non-draft quote
+        const existingQuote = await Quotation.findById(id).lean();
+        if (existingQuote && existingQuote.status !== 'draft') {
+            const versionCount = await QuotationVersion.countDocuments({ quotationId: id });
+            await QuotationVersion.create({
+                quotationId: id,
+                versionNumber: versionCount + 1,
+                snapshot: existingQuote,
+                createdBy: req.user?.id || existingQuote.createdBy,
+                changeSummary: req.body.changeSummary || 'Revision update'
+            });
+        }
+
         const refUpdates = {};
         const requestedQuotationNo = normalizeReference(req.body.quotationNo);
         const requestedQuotationNumber = normalizeReference(req.body.quotationNumber);
@@ -529,7 +616,38 @@ const updateQuotation = async (req, res) => {
             });
         }
 
-        const normalizedItems = await normalizeQuotationItems(items, siteId);
+        const normalizedItems = await normalizeQuotationItems(
+            items,
+            siteId,
+            customerId,
+            req.body.dealId || null,
+            req.body.promoCode || null,
+            req.body.currency || 'INR'
+        );
+
+        // Margin Protection Engine
+        let requiresApproval = false;
+        let minMargin = 100;
+        normalizedItems.forEach(item => {
+            const cost = item.productSnapshot?.baseCost || 0;
+            const rate = item.rate || item.unitPrice || 0;
+            if (rate > 0) {
+                const margin = ((rate - cost) / rate) * 100;
+                if (margin < minMargin) minMargin = margin;
+            }
+        });
+
+        if (minMargin < 0) {
+            return res.status(400).json({ message: "Margin is negative. Quote update blocked by Margin Protection Engine." });
+        } else if (minMargin < 10) {
+            requiresApproval = true;
+        }
+
+        let finalStatus = status || 'draft';
+        if (requiresApproval && finalStatus !== 'draft') {
+            finalStatus = 'pending_approval';
+        }
+
         const customerState = customer.billingAddress?.state || '';
 
         const itemDiscountTotal = calculateTotalDiscount(normalizedItems);
@@ -559,18 +677,7 @@ const updateQuotation = async (req, res) => {
             grandTotal: roundedGrandTotal,
             termsTemplateId: termsTemplateId || undefined,
             customTerms,
-            validTill,
-            salespersonName,
-            siteId: siteId || undefined,
-            paymentTerms,
-            subtotal,
-            totalDiscount,
-            gstBreakup,
-            roundOff,
-            grandTotal: roundedGrandTotal,
-            termsTemplateId: termsTemplateId || undefined,
-            customTerms,
-            status: status || 'draft',
+            status: finalStatus,
             territory: customer.territory || null,
         }, { new: true, runValidators: true }).lean();
 

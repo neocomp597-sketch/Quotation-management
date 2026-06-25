@@ -3,6 +3,7 @@ const Counter = require('../models/Counter');
 const Priority = require('../models/Priority');
 const Customer = require('../models/Customer');
 const User = require('../models/User');
+const CustomerContact = require('../models/CustomerContact');
 
 const generateTicketNumber = async (companyId) => {
     const year = new Date().getFullYear();
@@ -30,15 +31,34 @@ exports.createTicket = async (req, res) => {
         const now = new Date();
         const responseDue = new Date(now.getTime() + priority.responseSlaHours * 60 * 60 * 1000);
         const resolutionDue = new Date(now.getTime() + priority.resolutionSlaHours * 60 * 60 * 1000);
+        const ticketBody = { ...req.body };
+
+        if (ticketBody.contactId) {
+            const contact = await CustomerContact.findOne({
+                _id: ticketBody.contactId,
+                customerId: ticketBody.customerId,
+                companyId
+            }).populate('designationId', 'name').lean();
+
+            if (!contact) {
+                return res.status(400).json({ message: 'Invalid contact person selected' });
+            }
+
+            ticketBody.contactName = contact.contactName || '';
+            ticketBody.contactDesignationId = contact.designationId?._id || null;
+            ticketBody.contactDesignation = contact.designationId?.name || '';
+            ticketBody.contactPhone = contact.mobileNo || '';
+            ticketBody.contactEmail = contact.email || '';
+        }
 
         const timelineEntry = {
             activityType: 'Created',
-            description: `Ticket created via ${req.body.source || 'Web Portal'}`,
+            description: `Ticket created via ${ticketBody.source || 'Web Portal'}`,
             performedBy: req.user?.id
         };
 
         const ticketData = {
-            ...req.body,
+            ...ticketBody,
             ticketNo,
             companyId,
             slaResponseDue: responseDue,
@@ -81,6 +101,7 @@ exports.getTickets = async (req, res) => {
         const [tickets, total] = await Promise.all([
             Ticket.find(filter)
                 .populate('customerId', 'customerName companyName email mobile')
+                .populate('contactDesignationId', 'name')
                 .populate('categoryId', 'name')
                 .populate('typeId', 'name')
                 .populate('priorityId', 'name color')
@@ -112,6 +133,8 @@ exports.getTicketById = async (req, res) => {
     try {
         const ticket = await Ticket.findOne({ _id: req.params.id, companyId: req.user?.companyId })
             .populate('customerId')
+            .populate('contactId')
+            .populate('contactDesignationId')
             .populate('productId')
             .populate('assetId')
             .populate('invoiceId')
@@ -187,7 +210,7 @@ exports.assignTicket = async (req, res) => {
 
 exports.updateStatus = async (req, res) => {
     try {
-        const { status } = req.body;
+        const { status, isFirstCallResolved } = req.body;
         const companyId = req.user?.companyId;
 
         const ticket = await Ticket.findOne({ _id: req.params.id, companyId });
@@ -211,6 +234,9 @@ exports.updateStatus = async (req, res) => {
             ticket.resolvedAt = now;
             if (ticket.slaResolutionDue && now > ticket.slaResolutionDue) {
                 ticket.isSlaBreached.resolution = true;
+            }
+            if (typeof isFirstCallResolved !== 'undefined') {
+                ticket.isFirstCallResolved = isFirstCallResolved === true || isFirstCallResolved === 'true';
             }
         } else if (status === 'Closed') {
             ticket.closedAt = now;

@@ -57,6 +57,7 @@ import ServiceVisits from './pages/ServiceVisits';
 import WarrantyAMC from './pages/WarrantyAMC';
 import KnowledgeBase from './pages/KnowledgeBase';
 import CSMMasters from './pages/CSMMasters';
+import CSMReports from './pages/CSMReports';
 
 import SalesDashboard from './pages/SalesDashboard';
 import DealBoard from './pages/DealBoard';
@@ -67,6 +68,20 @@ import SalesActivities from './pages/SalesActivities';
 import SalesTargets from './pages/SalesTargets';
 import SalesReports from './pages/SalesReports';
 import SalesAnalytics from './pages/SalesAnalytics';
+
+// CPQ Pages
+import CatalogSubmodule from './pages/CatalogSubmodule';
+import PriceManagement from './pages/PriceManagement';
+import GuidedSelling from './pages/GuidedSelling';
+import CPQConfigurator from './pages/CPQConfigurator';
+import QuoteSimulator from './pages/QuoteSimulator';
+import Approvals from './pages/Approvals';
+import Contracts from './pages/Contracts';
+import Orders from './pages/Orders';
+import RevenueAnalytics from './pages/RevenueAnalytics';
+import CompetitorIntel from './pages/CompetitorIntel';
+import AIPricingInsights from './pages/AIPricingInsights';
+import CustomerPricingDashboard from './pages/CustomerPricingDashboard';
 
 function App() {
   return (
@@ -109,7 +124,7 @@ function App() {
             <Route path="/meetings" element={<PermissionRoute permissionKey="meetings_list"><Layout><Meetings /></Layout></PermissionRoute>} />
             <Route path="/meetings/new" element={<PermissionRoute permissionKey="meetings_list"><Layout><CreateMeeting /></Layout></PermissionRoute>} />
             <Route path="/meetings/:id" element={<PermissionRoute permissionKey="meetings_list"><Layout><CreateMeeting /></Layout></PermissionRoute>} />
-            <Route path="/products" element={<PermissionRoute permissionKey="master_products"><Layout><Products /></Layout></PermissionRoute>} />
+            <Route path="/products" element={<PermissionRoute permissionKey="master_products"><Layout><Products initialTab="products" /></Layout></PermissionRoute>} />
             <Route path="/invoices" element={<PermissionRoute permissionKey="sale_invoices"><Layout><Vouchers mode="invoice" /></Layout></PermissionRoute>} />
             <Route path="/invoices/new" element={<PermissionRoute permissionKey="sale_invoices"><Layout><CreateVoucher mode="invoice" /></Layout></PermissionRoute>} />
             <Route path="/invoices/view/:id" element={<PermissionRoute permissionKey="sale_invoices"><Layout><CreateVoucher mode="invoice" isViewOnly={true} /></Layout></PermissionRoute>} />
@@ -149,6 +164,30 @@ function App() {
             <Route path="/sales/reports" element={<PermissionRoute permissionKey="sales_reports"><Layout><SalesReports /></Layout></PermissionRoute>} />
             <Route path="/sales/analytics" element={<PermissionRoute permissionKey="sales_analytics"><Layout><SalesAnalytics /></Layout></PermissionRoute>} />
 
+            {/* Sales & CPQ Routes */}
+            <Route path="/sales/catalog/products" element={<PermissionRoute permissionKey="sales_catalog"><Layout><Products initialTab="products" /></Layout></PermissionRoute>} />
+            <Route path="/sales/catalog/services" element={<PermissionRoute permissionKey="sales_catalog"><Layout><Products initialTab="services" /></Layout></PermissionRoute>} />
+            <Route path="/sales/catalog/bundles" element={<PermissionRoute permissionKey="sales_catalog"><Layout><Products initialTab="bundles" /></Layout></PermissionRoute>} />
+            <Route path="/sales/catalog/subscriptions" element={<PermissionRoute permissionKey="sales_catalog"><Layout><Products initialTab="subscriptions" /></Layout></PermissionRoute>} />
+            
+            <Route path="/sales/price-management/price-books" element={<PermissionRoute permissionKey="sales_price_management"><Layout><PriceManagement mode="price-books" /></Layout></PermissionRoute>} />
+            <Route path="/sales/price-management/pricing-rules" element={<PermissionRoute permissionKey="sales_price_management"><Layout><PriceManagement mode="pricing-rules" /></Layout></PermissionRoute>} />
+            <Route path="/sales/price-management/discounts" element={<PermissionRoute permissionKey="sales_price_management"><Layout><PriceManagement mode="discounts" /></Layout></PermissionRoute>} />
+            <Route path="/sales/price-management/promotions" element={<PermissionRoute permissionKey="sales_price_management"><Layout><PriceManagement mode="promotions" /></Layout></PermissionRoute>} />
+            <Route path="/sales/price-management/currencies" element={<PermissionRoute permissionKey="sales_price_management"><Layout><PriceManagement mode="currencies" /></Layout></PermissionRoute>} />
+            
+            <Route path="/sales/cpq/guided-selling" element={<PermissionRoute permissionKey="sales_cpq"><Layout><GuidedSelling /></Layout></PermissionRoute>} />
+            <Route path="/sales/cpq/configurator" element={<PermissionRoute permissionKey="sales_cpq"><Layout><CPQConfigurator /></Layout></PermissionRoute>} />
+            <Route path="/sales/cpq/simulator" element={<PermissionRoute permissionKey="sales_cpq"><Layout><QuoteSimulator /></Layout></PermissionRoute>} />
+            
+            <Route path="/sales/approvals" element={<PermissionRoute permissionKey="sales_approvals"><Layout><Approvals /></Layout></PermissionRoute>} />
+            <Route path="/sales/contracts" element={<PermissionRoute permissionKey="sales_contracts"><Layout><Contracts /></Layout></PermissionRoute>} />
+            <Route path="/sales/orders" element={<PermissionRoute permissionKey="sales_orders"><Layout><Orders /></Layout></PermissionRoute>} />
+            <Route path="/sales/revenue-analytics" element={<PermissionRoute permissionKey="sales_revenue_analytics"><Layout><RevenueAnalytics /></Layout></PermissionRoute>} />
+            <Route path="/sales/competitors" element={<PermissionRoute permissionKey="sales_competitors"><Layout><CompetitorIntel /></Layout></PermissionRoute>} />
+            <Route path="/sales/ai-pricing" element={<PermissionRoute permissionKey="sales_ai_pricing"><Layout><AIPricingInsights /></Layout></PermissionRoute>} />
+            <Route path="/sales/customer-pricing" element={<PermissionRoute permissionKey="master_customers"><Layout><CustomerPricingDashboard /></Layout></PermissionRoute>} />
+
             {/* Payroll Routes */}
             <Route path="/payroll/dashboard" element={<PermissionRoute permissionKey="payroll_runs"><Layout><PayrollDashboard /></Layout></PermissionRoute>} />
             <Route path="/payroll/employees" element={<PermissionRoute permissionKey="payroll_employees"><Layout><PayrollEmployees /></Layout></PermissionRoute>} />
@@ -168,6 +207,7 @@ function App() {
             <Route path="/csm/warranties-amc" element={<PermissionRoute permissionKey="csm_warranties_amc"><Layout><WarrantyAMC /></Layout></PermissionRoute>} />
             <Route path="/csm/kb" element={<PermissionRoute permissionKey="csm_kb"><Layout><KnowledgeBase /></Layout></PermissionRoute>} />
             <Route path="/csm/masters" element={<PermissionRoute permissionKey="csm_masters"><Layout><CSMMasters /></Layout></PermissionRoute>} />
+            <Route path="/csm/reports" element={<PermissionRoute permissionKey="csm_dashboard"><Layout><CSMReports /></Layout></PermissionRoute>} />
 
             <Route path="/info/:slug" element={<Layout><FooterPageView /></Layout>} />
           </Route>

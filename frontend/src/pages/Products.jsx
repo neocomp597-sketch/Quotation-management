@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { MdAdd, MdSearch, MdEdit, MdDelete, MdInventory, MdCategory, MdQrCode, MdPayments, MdProductionQuantityLimits, MdCloudUpload, MdVisibility, MdFileUpload, MdCheckBox, MdCheckBoxOutlineBlank, MdDeleteSweep, MdSync, MdImage } from 'react-icons/md';
 import { toast } from 'react-toastify';
-import { productService, uploadService, importService, mgrService, attributeService, productAttributeService, vendorService } from '../services/api';
+import { productService, uploadService, importService, mgrService, attributeService, productAttributeService, vendorService, categoryService } from '../services/api';
 
 import Modal from '../components/Modal';
 import ImportModal from '../components/ImportModal';
@@ -17,9 +17,11 @@ const emptyVendorRow = () => ({
     isPrimary: false
 });
 
-const Products = () => {
+const Products = ({ initialTab = 'products' }) => {
+    const [activeTab, setActiveTab] = useState(initialTab);
     const [products, setProducts] = useState([]);
     const [vendors, setVendors] = useState([]);
+    const [categories, setCategories] = useState([]);
     const [mgrsData, setMgrsData] = useState({ mgr1: [], mgr2: [], mgr3: [], mgr4: [], mgr5: [] });
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -34,6 +36,18 @@ const Products = () => {
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [isAttrImportModalOpen, setIsAttrImportModalOpen] = useState(false);
 
+    // Inline Mini Masters states
+    const [isCatModalOpen, setIsCatModalOpen] = useState(false);
+    const [newCatData, setNewCatData] = useState({ name: '', description: '' });
+
+    const [isVenModalOpen, setIsVenModalOpen] = useState(false);
+    const [newVenData, setNewVenData] = useState({ name: '', active: true });
+
+    const [isMgrModalOpen, setIsMgrModalOpen] = useState(false);
+    const [newMgrData, setNewMgrData] = useState({ type: 'MGR1', code: '', description: '', status: 'Active' });
+
+    const [isAttrModalOpen, setIsAttrModalOpen] = useState(false);
+    const [newAttrData, setNewAttrData] = useState({ code: '', description: '', status: 'Active' });
 
     // MGR Filters
     const [mgrFilters, setMgrFilters] = useState({
@@ -54,8 +68,6 @@ const Products = () => {
     const [customAttributes, setCustomAttributes] = useState([]);
     const [allProductAttributes, setAllProductAttributes] = useState({});
 
-
-
     const [formData, setFormData] = useState({
         productName: '',
         productCode: '',
@@ -73,12 +85,17 @@ const Products = () => {
         mgr4: '',
         mgr5: '',
         attributes: [],
-        vendors: [emptyVendorRow()]
+        vendors: [emptyVendorRow()],
+        catalogType: 'Product',
+        subscriptionDetails: { billingCycle: 'Monthly', setupFee: 0, renewalPrice: 0 },
+        rentalDetails: { minLeaseTerm: 1, securityDeposit: 0, baseRatePerDay: 0, baseRatePerMonth: 0 },
+        pricing: { baseCost: 0, minPrice: 0, maxPrice: 0, marginPercent: 0, currency: 'INR' }
     });
 
     useEffect(() => {
         fetchMGRs();
         fetchVendors();
+        fetchCategories();
         fetchAllAttributes();
     }, []);
 
@@ -93,12 +110,11 @@ const Products = () => {
 
     useEffect(() => {
         setPage(1);
-    }, [mgrFilters.mgr1, mgrFilters.mgr2, mgrFilters.mgr3, mgrFilters.mgr4, mgrFilters.mgr5]);
+    }, [activeTab, mgrFilters.mgr1, mgrFilters.mgr2, mgrFilters.mgr3, mgrFilters.mgr4, mgrFilters.mgr5]);
 
     useEffect(() => {
         fetchProducts();
-    }, [page, debouncedSearch, mgrFilters.mgr1, mgrFilters.mgr2, mgrFilters.mgr3, mgrFilters.mgr4, mgrFilters.mgr5]);
-
+    }, [activeTab, page, debouncedSearch, mgrFilters.mgr1, mgrFilters.mgr2, mgrFilters.mgr3, mgrFilters.mgr4, mgrFilters.mgr5]);
 
     useEffect(() => {
         if (mgrFilters.mgr3) {
@@ -108,6 +124,15 @@ const Products = () => {
             setAttributeFilters({});
         }
     }, [mgrFilters.mgr3]);
+
+    const fetchCategories = async () => {
+        try {
+            const res = await categoryService.getAll();
+            setCategories(res.data || []);
+        } catch (err) {
+            console.error("Error fetching categories:", err);
+        }
+    };
 
     const fetchMGRs = async () => {
         try {
@@ -171,7 +196,6 @@ const Products = () => {
         }
     };
 
-
     const fetchCustomAttributes = async (productCode) => {
         if (!productCode) {
             setCustomAttributes([]);
@@ -188,10 +212,19 @@ const Products = () => {
     const fetchProducts = async () => {
         setLoading(true);
         try {
+            const catalogTypeMap = {
+                products: 'Product',
+                services: 'Service',
+                bundles: 'Bundle',
+                subscriptions: 'Subscription'
+            };
+            const typeParam = catalogTypeMap[activeTab] || 'Product';
+
             const res = await productService.getAll({
                 page,
                 limit: LIST_PAGE_SIZE,
                 search: debouncedSearch || undefined,
+                catalogType: typeParam,
                 ...Object.fromEntries(Object.entries(mgrFilters).filter(([, value]) => value)),
             });
             const payload = res.data;
@@ -205,35 +238,6 @@ const Products = () => {
         } catch (err) {
             console.error("Error fetching products:", err);
         } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleOpenModal = (product = null) => {
-        if (product) {
-            setEditingProduct(product);
-            setFormData({
-                ...product,
-                attributes: product.attributes ? product.attributes.map(a => a._id || a) : [],
-                vendors: product.vendors && product.vendors.length
-                    ? product.vendors.map(v => ({
-                        vendorId: v.vendorId?._id || v.vendorId || '',
-                        price: v.price ?? '',
-                        stock: v.stock ?? 0,
-                        isPrimary: Boolean(v.isPrimary)
-                    }))
-                    : [emptyVendorRow()]
-            });
-            if (product.mgr3) {
-                fetchAvailableAttributes(product.mgr3._id || product.mgr3);
-            }
-            if (product.productCode) {
-                fetchCustomAttributes(product.productCode);
-            }
-        } else {
-            setEditingProduct(null);
-            setCustomAttributes([]);
-
             setFormData({
                 productName: '',
                 productCode: '',

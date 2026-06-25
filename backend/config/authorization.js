@@ -57,10 +57,18 @@ const MENU_GROUPS = [
     {
         key: 'quotation',
         label: 'Sales',
-        description: 'Quotation and sales invoice screens',
+        description: 'Catalog, Price Books, CPQ Engine, Quotations, Approvals, Contracts, and Orders',
         children: [
+            { key: 'sales_catalog', label: 'Catalog Management', description: 'Manage Products, Services, Subscriptions, and Bundles' },
+            { key: 'sales_price_management', label: 'Price Management', description: 'Manage Price Books, Pricing Rules, Discount Policies, and Currency Rates' },
+            { key: 'sales_cpq', label: 'CPQ Engine', description: 'Access Guided Selling, configurators, and simulators' },
             { key: 'quotation_list', label: 'Quotations', description: 'Quotation list and creation screens' },
-            { key: 'sale_invoices', label: 'Create Invoice', description: 'Sales outward invoice screens' }
+            { key: 'sales_approvals', label: 'Approvals Workflow', description: 'Review low-margin and price-override approvals' },
+            { key: 'sales_contracts', label: 'Contracts Agreements', description: 'Manage locked price contracts for customers' },
+            { key: 'sales_orders', label: 'Sales Orders', description: 'Access Sales Order conversion and invoice logs' },
+            { key: 'sales_revenue_analytics', label: 'Revenue Analytics', description: 'Analytics dashboards for margins and price books' },
+            { key: 'sales_competitors', label: 'Competitor Intelligence', description: 'Track competitor pricing and differentials' },
+            { key: 'sales_ai_pricing', label: 'AI Pricing Insights', description: 'AI-driven win rates and margin suggestions' }
         ]
     },
     {
