@@ -127,6 +127,17 @@ const PriceManagement = ({ mode = 'price-books' }) => {
         e.preventDefault();
         try {
             if (activeTab === 'price-books') {
+                const nameTrimmed = formData.name?.trim().toLowerCase();
+                const typeSelected = formData.type || 'Standard';
+                if (!nameTrimmed) {
+                    toast.error("Price Book name is required");
+                    return;
+                }
+                const isDuplicate = priceBooks.some(pb => pb.name?.trim().toLowerCase() === nameTrimmed && pb.type === typeSelected);
+                if (isDuplicate) {
+                    toast.error(`A Price Book with the name "${formData.name.trim()}" and type "${typeSelected}" already exists.`);
+                    return;
+                }
                 await cpqService.createPriceBook(formData);
                 toast.success("Price Book created successfully");
             } else if (activeTab === 'pricing-rules') {

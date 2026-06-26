@@ -34,6 +34,18 @@ async function logChange(req, action, entityType, entityId, oldValue, newValue, 
 // --- PRICE BOOKS CONTROLLERS ---
 exports.createPriceBook = async (req, res) => {
     try {
+        const name = req.body.name?.trim();
+        const type = req.body.type || 'Standard';
+        if (!name) {
+            return res.status(400).json({ message: 'Price Book name is required' });
+        }
+        const existing = await PriceBook.findOne({
+            name: { $regex: new RegExp("^" + name.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + "$", "i") },
+            type
+        });
+        if (existing) {
+            return res.status(400).json({ message: `A Price Book with the name "${name}" and type "${type}" already exists.` });
+        }
         const pb = new PriceBook(req.body);
         const saved = await pb.save();
         await logChange(req, 'CREATE_PRICE_BOOK', 'PriceBook', saved._id, null, saved);
@@ -64,6 +76,28 @@ exports.getPriceBookById = async (req, res) => {
 
 exports.updatePriceBook = async (req, res) => {
     try {
+        const { name, type } = req.body;
+        if (name !== undefined || type !== undefined) {
+            const pbToUpdate = await PriceBook.findById(req.params.id).lean();
+            if (!pbToUpdate) return res.status(404).json({ message: 'Price Book not found' });
+            
+            const checkName = name !== undefined ? name.trim() : pbToUpdate.name;
+            const checkType = type !== undefined ? type : pbToUpdate.type;
+            
+            if (!checkName) {
+                return res.status(400).json({ message: 'Price Book name is required' });
+            }
+
+            const existing = await PriceBook.findOne({
+                _id: { $ne: req.params.id },
+                name: { $regex: new RegExp("^" + checkName.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + "$", "i") },
+                type: checkType
+            });
+            if (existing) {
+                return res.status(400).json({ message: `A Price Book with the name "${checkName}" and type "${checkType}" already exists.` });
+            }
+        }
+
         const old = await PriceBook.findById(req.params.id).lean();
         const updated = await PriceBook.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true }).lean();
         if (!updated) return res.status(404).json({ message: 'Price Book not found' });

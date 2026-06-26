@@ -83,7 +83,7 @@ export const resolveImageUrl = (url) => {
   if (trimmedUrl.startsWith("http")) return trimmedUrl;
 
   // For local development, assuming backend on 4003
-  const base = import.meta.env.VITE_BACKEND_URL || "http://localhost:4003";
+  const base = import.meta.env.VITE_BACKEND_URL || (import.meta.env.PROD ? "" : "http://localhost:4003");
   let cleanUrl = trimmedUrl.replace(/\\/g, "/"); // Fix windows backslashes
 
   // If it's just a filename (no slashes), prepend /uploads/
@@ -113,7 +113,7 @@ export const fetchPdfImageBase64 = async (url) => {
     // If it's a local path (starts with /), prepend the backend URL
     let fetchUrl = url.trim();
     if (fetchUrl.startsWith("/")) {
-      const base = import.meta.env.VITE_BACKEND_URL || "http://localhost:4003";
+      const base = import.meta.env.VITE_BACKEND_URL || (import.meta.env.PROD ? "" : "http://localhost:4003");
       fetchUrl = `${base}${fetchUrl}`;
     }
 

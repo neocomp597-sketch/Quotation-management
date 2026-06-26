@@ -70,7 +70,7 @@ export const setAccessToken = (token) => {
 export const getAccessToken = () => accessToken;
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:4003/api",
+  baseURL: import.meta.env.VITE_API_URL || (import.meta.env.PROD ? "/api" : "http://localhost:4003/api"),
   timeout: 15000,
   headers: {
     "Content-Type": "application/json",

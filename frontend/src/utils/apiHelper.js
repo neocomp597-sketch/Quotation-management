@@ -1,7 +1,7 @@
 import { getAccessToken } from "../services/api";
 
 const api = {
-  baseUrl: import.meta.env.VITE_API_URL || "http://localhost:4003/api", // Update for production
+  baseUrl: import.meta.env.VITE_API_URL || (import.meta.env.PROD ? "/api" : "http://localhost:4003/api"), // Update for production
 
   getHeaders: () => {
     const token = getAccessToken();

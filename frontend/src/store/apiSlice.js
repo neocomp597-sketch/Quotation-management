@@ -2,7 +2,7 @@ import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { getAccessToken, refreshAccessToken } from '../services/api';
 
 const rawBaseQuery = fetchBaseQuery({
-  baseUrl: import.meta.env.VITE_API_URL || 'http://localhost:4003/api',
+  baseUrl: import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:4003/api'),
   credentials: 'include',
   prepareHeaders: (headers) => {
     const token = getAccessToken();
