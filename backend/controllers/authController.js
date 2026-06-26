@@ -77,37 +77,48 @@ const createRefreshToken = (user, deviceId) => jwt.sign(
     { expiresIn: `${REFRESH_TOKEN_DAYS}d` }
 );
 
-const setRefreshCookie = (res, token) => {
+const isSecure = (req) => {
+    if (!req) return false;
+    return req.secure || 
+           req.headers['x-forwarded-proto'] === 'https' || 
+           req.headers['x-forwarded-ssl'] === 'on' ||
+           process.env.NODE_ENV === 'production';
+};
+
+const setRefreshCookie = (res, token, req) => {
+    const secure = isSecure(req);
     res.cookie(REFRESH_COOKIE_NAME, token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+        secure,
+        sameSite: secure ? 'none' : 'lax',
         maxAge: REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000,
         path: '/api/auth',
     });
 };
 
-const setDeviceCookie = (res, deviceId) => {
+const setDeviceCookie = (res, deviceId, req) => {
+    const secure = isSecure(req);
     res.cookie(DEVICE_COOKIE_NAME, deviceId, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+        secure,
+        sameSite: secure ? 'none' : 'lax',
         maxAge: REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000,
         path: '/api/auth',
     });
 };
 
-const clearRefreshCookie = (res) => {
+const clearRefreshCookie = (res, req) => {
+    const secure = isSecure(req);
     res.clearCookie(REFRESH_COOKIE_NAME, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+        secure,
+        sameSite: secure ? 'none' : 'lax',
         path: '/api/auth',
     });
     res.clearCookie(DEVICE_COOKIE_NAME, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+        secure,
+        sameSite: secure ? 'none' : 'lax',
         path: '/api/auth',
     });
 };
@@ -219,8 +230,8 @@ const issueSession = async (user, res, req, deviceId = getDeviceId(req)) => {
 
     await storeRefreshSession(user, deviceId, refreshToken);
 
-    setDeviceCookie(res, deviceId);
-    setRefreshCookie(res, refreshToken);
+    setDeviceCookie(res, deviceId, req);
+    setRefreshCookie(res, refreshToken, req);
     return { accessToken, deviceId, user: normalizeUser(user) };
 };
 
@@ -311,28 +322,28 @@ exports.refresh = async (req, res) => {
             user.tokenVersion !== decoded.tokenVersion ||
             (user.refreshTokenExpiresAt && user.refreshTokenExpiresAt < new Date())
         ) {
-            clearRefreshCookie(res);
+            clearRefreshCookie(res, req);
             return res.status(401).json({ message: 'Refresh token invalid' });
         }
 
         const blockedReason = await ensureLoginAllowed(user);
         if (blockedReason) {
-            clearRefreshCookie(res);
+            clearRefreshCookie(res, req);
             return res.status(403).json({ message: blockedReason });
         }
 
         // Keep refresh idempotent. A page reload can trigger overlapping refresh
         // requests; rotating the refresh token here lets the later request treat
         // the earlier token as stolen and clear the cookie.
-        setDeviceCookie(res, deviceId);
-        setRefreshCookie(res, refreshToken);
+        setDeviceCookie(res, deviceId, req);
+        setRefreshCookie(res, refreshToken, req);
         res.json({
             accessToken: createAccessToken(user),
             deviceId,
             user: normalizeUser(user),
         });
     } catch (error) {
-        clearRefreshCookie(res);
+        clearRefreshCookie(res, req);
         res.status(401).json({ message: 'Refresh token invalid' });
     }
 };
@@ -362,10 +373,10 @@ exports.logout = async (req, res) => {
         }
 
         await blacklistAccessToken(req);
-        clearRefreshCookie(res);
+        clearRefreshCookie(res, req);
         res.json({ message: 'Logged out successfully' });
     } catch (error) {
-        clearRefreshCookie(res);
+        clearRefreshCookie(res, req);
         res.json({ message: 'Logged out successfully' });
     }
 };
@@ -380,10 +391,10 @@ exports.logoutAll = async (req, res) => {
             });
         }
 
-        clearRefreshCookie(res);
+        clearRefreshCookie(res, req);
         res.json({ message: 'Logged out from all devices successfully' });
     } catch (error) {
-        clearRefreshCookie(res);
+        clearRefreshCookie(res, req);
         res.status(500).json({ message: 'Error logging out from all devices' });
     }
 };
