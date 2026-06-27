@@ -6,6 +6,7 @@ import { MdAdd, MdSearch, MdFilterList, MdArrowForward, MdEdit, MdDelete } from 
 import PaginationControls from '../components/PaginationControls';
 import PortalDropdown from '../components/PortalDropdown';
 import Modal from '../components/Modal';
+import SearchableSelect from '../components/SearchableSelect';
 
 const statusStyles = {
     'Open': 'bg-emerald-50 text-emerald-600 border-emerald-200',
@@ -40,6 +41,9 @@ const CSMTickets = () => {
     const [sources, setSources] = useState([]);
     const [designations, setDesignations] = useState([]);
     const [customerContacts, setCustomerContacts] = useState([]);
+    const [assets, setAssets] = useState([]);
+    const [assetSummary, setAssetSummary] = useState(null);
+    const [showAllProducts, setShowAllProducts] = useState(false);
     
     // Modal & Form State
     const [showModal, setShowModal] = useState(false);
@@ -82,6 +86,7 @@ const CSMTickets = () => {
         categoryId: '',
         typeId: '',
         productId: '',
+        assetId: '',
         invoiceId: '',
         issueTitle: '',
         description: '',
@@ -109,14 +114,15 @@ const CSMTickets = () => {
 
     const loadCreationData = async () => {
         try {
-            const [custRes, priRes, catRes, typRes, prodRes, srcRes, desRes] = await Promise.allSettled([
+            const [custRes, priRes, catRes, typRes, prodRes, srcRes, desRes, assetRes] = await Promise.allSettled([
                 customerService.getAll({ limit: 500 }),
                 csmService.getPriorities(),
                 csmService.getCategories(),
                 csmService.getTypes(),
                 productService.getAll({ limit: 500 }),
                 csmService.getSources(),
-                csmService.getDesignations()
+                csmService.getDesignations(),
+                csmService.getAssets()
             ]);
 
             const valueOf = (result) => result.status === 'fulfilled' ? result.value : null;
@@ -127,16 +133,25 @@ const CSMTickets = () => {
             const productsRes = valueOf(prodRes);
             const sourcesRes = valueOf(srcRes);
             const designationsRes = valueOf(desRes);
+            const assetsRes = valueOf(assetRes);
 
             setCustomers(customersRes?.data?.data || customersRes?.data || []);
-            setPriorities(prioritiesRes?.data || []);
+            
+            const prioritiesData = prioritiesRes?.data || [];
+            setPriorities(prioritiesData);
+            const lowPriority = prioritiesData.find(p => p.name?.toLowerCase() === 'low');
+            if (lowPriority && !formData.priorityId) {
+                setFormData(prev => ({ ...prev, priorityId: lowPriority._id }));
+            }
+
             setCategories(categoriesRes?.data || []);
             setTypes(typesRes?.data || []);
             setProducts(productsRes?.data?.data || productsRes?.data || []);
             setSources(sourcesRes?.data || []);
             setDesignations(designationsRes?.data || []);
+            setAssets(assetsRes?.data || []);
 
-            const failed = [custRes, priRes, catRes, typRes, prodRes, srcRes, desRes].some(result => result.status === 'rejected');
+            const failed = [custRes, priRes, catRes, typRes, prodRes, srcRes, desRes, assetRes].some(result => result.status === 'rejected');
             if (failed) {
                 console.error('One or more ticket form dropdowns failed to load', {
                     customers: custRes.status,
@@ -145,7 +160,8 @@ const CSMTickets = () => {
                     types: typRes.status,
                     products: prodRes.status,
                     sources: srcRes.status,
-                    designations: desRes.status
+                    designations: desRes.status,
+                    assets: assetRes.status
                 });
             }
         } catch (error) {
@@ -191,11 +207,92 @@ const CSMTickets = () => {
             contactDesignation: '',
             contactPhone: '',
             contactEmail: '',
-            invoiceId: ''
+            invoiceId: '',
+            productId: '',
+            assetId: ''
         }));
+        setAssetSummary(null);
+        setShowAllProducts(false);
+    };
+
+    const handleSerialChange = (assetId) => {
+        if (!assetId) {
+            setFormData(prev => ({
+                ...prev,
+                assetId: '',
+            }));
+            setAssetSummary(null);
+            return;
+        }
+
+        const selectedAsset = assets.find(a => a._id === assetId);
+        if (!selectedAsset) return;
+
+        setFormData(prev => ({
+            ...prev,
+            assetId,
+            customerId: selectedAsset.customerId?._id || prev.customerId,
+            productId: selectedAsset.productId?._id || prev.productId
+        }));
+
+        // Fetch asset summary
+        csmService.getAssetSummary({ assetId })
+            .then(res => {
+                setAssetSummary(res.data);
+                // Priority rule: if warranty and AMC are both expired, suggest Medium
+                const hasCoverage = res.data.warranty?.status === 'Active' || res.data.amc?.status === 'Active';
+                if (!hasCoverage) {
+                    const medPriority = priorities.find(p => p.name?.toLowerCase() === 'medium');
+                    if (medPriority) {
+                        setFormData(prev => ({ ...prev, priorityId: medPriority._id }));
+                    }
+                }
+            })
+            .catch(err => {
+                console.error('Error fetching asset summary:', err);
+                setAssetSummary(null);
+            });
+    };
+
+    const handleProductChange = (productId) => {
+        setFormData(prev => ({
+            ...prev,
+            productId,
+            assetId: '' // Clear asset when product changes
+        }));
+        setAssetSummary(null);
+    };
+
+    const handleSubjectChange = (subjectVal) => {
+        setFormData(prev => {
+            const nextData = { ...prev, issueTitle: subjectVal };
+            const subjectLower = subjectVal.toLowerCase();
+            const highPriorityKeywords = ['crashed', 'down', 'not working', 'critical', 'stopped', 'broken', 'failure', 'error 500', 'out of service'];
+            
+            const hasHighKeyword = highPriorityKeywords.some(kw => subjectLower.includes(kw));
+            if (hasHighKeyword) {
+                const highPriority = priorities.find(p => p.name?.toLowerCase() === 'high' || p.name?.toLowerCase() === 'critical');
+                if (highPriority) {
+                    nextData.priorityId = highPriority._id;
+                }
+            }
+            return nextData;
+        });
     };
 
     const handleContactSelect = (contactId) => {
+        if (!contactId) {
+            setFormData(prev => ({
+                ...prev,
+                contactId: '',
+                contactName: '',
+                contactDesignationId: '',
+                contactDesignation: '',
+                contactPhone: '',
+                contactEmail: ''
+            }));
+            return;
+        }
         const contact = customerContacts.find(c => c._id === contactId);
         setFormData(prev => ({
             ...prev,
@@ -208,14 +305,38 @@ const CSMTickets = () => {
         }));
     };
 
-    const handleSearchSubmit = (e) => {
-        e.preventDefault();
-        setPage(1);
-        fetchTickets();
-    };
-
     const handleCreateTicket = async (e) => {
         e.preventDefault();
+
+        // Validation checks
+        if (!formData.customerId) {
+            toast.error('Customer is required');
+            return;
+        }
+        if (!formData.productId) {
+            toast.error('Product is required');
+            return;
+        }
+        if (!formData.contactId) {
+            toast.error('Contact Person is required');
+            return;
+        }
+        if (!formData.issueTitle.trim()) {
+            toast.error('Subject is required');
+            return;
+        }
+        if (!formData.priorityId) {
+            toast.error('Priority is required');
+            return;
+        }
+
+        // Serial validation: if customer has assets for this product, force choosing a serial number
+        const matchingAssets = assets.filter(a => a.customerId?._id === formData.customerId && a.productId?._id === formData.productId);
+        if (matchingAssets.length > 0 && !formData.assetId) {
+            toast.error('Please select a Serial Number for this serialized product.');
+            return;
+        }
+
         try {
             await csmService.createTicket(formData);
             toast.success('Support ticket generated successfully!');
@@ -224,6 +345,12 @@ const CSMTickets = () => {
         } catch (error) {
             toast.error(error.response?.data?.message || 'Error generating ticket');
         }
+    };
+
+    const handleSearchSubmit = (e) => {
+        e.preventDefault();
+        setPage(1);
+        fetchTickets();
     };
 
     const handleOpenMiniMaster = (type) => {
@@ -473,6 +600,7 @@ const CSMTickets = () => {
                 </div>
                 <button
                     onClick={() => {
+                        const lowPriority = priorities.find(p => p.name?.toLowerCase() === 'low');
                         setFormData({
                             customerId: '',
                             contactId: '',
@@ -481,16 +609,19 @@ const CSMTickets = () => {
                             contactDesignation: '',
                             contactPhone: '',
                             contactEmail: '',
-                            priorityId: '',
+                            priorityId: lowPriority ? lowPriority._id : '',
                             categoryId: '',
                             typeId: '',
                             productId: '',
+                            assetId: '',
                             invoiceId: '',
                             issueTitle: '',
                             description: '',
                             source: 'Web Portal'
                         });
                         setCustomerContacts([]);
+                        setAssetSummary(null);
+                        setShowAllProducts(false);
                         setShowModal(true);
                     }}
                     className="flex items-center gap-2 px-6 py-4 bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-[10px] tracking-widest rounded-2xl transition-all shadow-lg shadow-primary-600/20 active:scale-95 self-start md:self-auto"
@@ -638,27 +769,133 @@ const CSMTickets = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Customer *</label>
-                            <select
-                                required
+                            <SearchableSelect
+                                options={customers.map(c => ({
+                                    value: c._id,
+                                    label: c.companyName && c.companyName !== c.customerName 
+                                        ? `${c.companyName} (${c.customerName})` 
+                                        : c.companyName || c.customerName
+                                }))}
                                 value={formData.customerId}
-                                onChange={(e) => handleCustomerChange(e.target.value)}
-                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
-                            >
-                                <option value="">Select Customer</option>
-                                {customers.map(c => <option key={c._id} value={c._id}>{c.customerName}</option>)}
-                            </select>
+                                onChange={handleCustomerChange}
+                                placeholder="Search & Select Customer..."
+                            />
                         </div>
                         <div>
-                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Link Product</label>
-                            <select
-                                value={formData.productId}
-                                onChange={(e) => setFormData({ ...formData, productId: e.target.value })}
-                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
-                            >
-                                <option value="">No Product Linked</option>
-                                {products.map(p => <option key={p._id} value={p._id}>{p.productName} ({p.productCode})</option>)}
-                            </select>
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Product Serial Number</label>
+                            <SearchableSelect
+                                options={
+                                    (() => {
+                                        let filteredAssets = assets;
+                                        if (formData.customerId) {
+                                            filteredAssets = filteredAssets.filter(a => a.customerId?._id === formData.customerId);
+                                        }
+                                        if (formData.productId) {
+                                            filteredAssets = filteredAssets.filter(a => a.productId?._id === formData.productId);
+                                        }
+                                        return filteredAssets.map(a => ({
+                                            value: a._id,
+                                            label: `${a.serialNumber} (${a.productId?.productName || 'Unknown Product'})`
+                                        }));
+                                    })()
+                                }
+                                value={formData.assetId}
+                                onChange={handleSerialChange}
+                                placeholder="Search & Select Serial Number..."
+                            />
                         </div>
+                        <div className="md:col-span-2">
+                            <div className="flex justify-between items-center mb-1">
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Link Product *</label>
+                                {formData.customerId && assets.some(a => a.customerId?._id === formData.customerId) && (
+                                    <label className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={showAllProducts}
+                                            onChange={(e) => setShowAllProducts(e.target.checked)}
+                                            className="rounded border-slate-300 text-primary-600 focus:ring-primary-500 h-3.5 w-3.5"
+                                        />
+                                        Show All Products
+                                    </label>
+                                )}
+                            </div>
+                            <SearchableSelect
+                                options={
+                                    (() => {
+                                        const customerHasAssets = formData.customerId && assets.some(a => a.customerId?._id === formData.customerId);
+                                        const filteredProds = (formData.customerId && customerHasAssets && !showAllProducts)
+                                            ? products.filter(p => assets.some(a => a.customerId?._id === formData.customerId && a.productId?._id === p._id))
+                                            : products;
+                                        return filteredProds.map(p => ({
+                                            value: p._id,
+                                            label: `${p.productName} (${p.productCode})`
+                                        }));
+                                    })()
+                                }
+                                value={formData.productId}
+                                onChange={handleProductChange}
+                                placeholder="Search & Select Product..."
+                            />
+                        </div>
+
+                        {/* Asset Lookup Card */}
+                        {assetSummary && (
+                            <div className="md:col-span-2 p-5 bg-gradient-to-br from-slate-50 to-slate-100/50 border border-slate-200 rounded-3xl space-y-3 shadow-sm animate-fade-in">
+                                <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                                    <span className="text-xs font-black uppercase tracking-wider text-slate-700">🔎 Asset Information Lookup</span>
+                                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
+                                        assetSummary.warranty?.status === 'Active' || assetSummary.amc?.status === 'Active'
+                                            ? 'bg-teal-50 text-teal-600 border-teal-200'
+                                            : 'bg-rose-50 text-rose-500 border-rose-200'
+                                    }`}>
+                                        {assetSummary.warranty?.status === 'Active' || assetSummary.amc?.status === 'Active' ? 'Covered' : 'Out of Warranty/AMC'}
+                                    </span>
+                                </div>
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-xs font-semibold text-slate-600">
+                                    <div>
+                                        <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Customer</span>
+                                        <span className="text-slate-900">{assetSummary.asset?.customerId?.companyName || assetSummary.asset?.customerId?.customerName}</span>
+                                    </div>
+                                    <div>
+                                        <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Product</span>
+                                        <span className="text-slate-900">{assetSummary.asset?.productId?.productName}</span>
+                                    </div>
+                                    <div>
+                                        <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Serial Number</span>
+                                        <span className="text-slate-900 font-mono">{assetSummary.asset?.serialNumber}</span>
+                                    </div>
+                                    <div>
+                                        <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Installation Date</span>
+                                        <span className="text-slate-900">{assetSummary.asset?.installationDate ? new Date(assetSummary.asset.installationDate).toLocaleDateString() : 'N/A'}</span>
+                                    </div>
+                                    <div>
+                                        <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Warranty Status</span>
+                                        <span className={assetSummary.warranty?.status === 'Active' ? 'text-teal-600 font-bold' : 'text-slate-500'}>
+                                            {assetSummary.warranty?.status === 'Active' ? `✅ Active (Expires ${new Date(assetSummary.warranty.expiryDate).toLocaleDateString()})` : '❌ Inactive / Expired'}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">AMC Status</span>
+                                        <span className={assetSummary.amc?.status === 'Active' ? 'text-teal-600 font-bold' : 'text-slate-500'}>
+                                            {assetSummary.amc?.status === 'Active' ? `✅ Active (${assetSummary.amc.contractNo})` : '❌ Inactive / Expired'}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Last Service Date</span>
+                                        <span className="text-slate-900">{assetSummary.lastServiceDate ? new Date(assetSummary.lastServiceDate).toLocaleDateString() : 'No service record'}</span>
+                                    </div>
+                                    <div>
+                                        <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Open Tickets</span>
+                                        <span className="text-amber-600 font-bold">{assetSummary.ticketCounts?.open || 0}</span>
+                                    </div>
+                                    <div>
+                                        <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Closed Tickets</span>
+                                        <span className="text-slate-500">{assetSummary.ticketCounts?.closed || 0}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         <div>
                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Link Invoice</label>
                             <select
@@ -693,7 +930,7 @@ const CSMTickets = () => {
                         </div>
                         <div>
                             <div className="flex justify-between items-center mb-1">
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Contact Person Name</label>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Contact Person Name *</label>
                                 <button
                                     type="button"
                                     onClick={() => setShowContactModal(true)}
@@ -703,19 +940,15 @@ const CSMTickets = () => {
                                     + Quick Add
                                 </button>
                             </div>
-                            <select
+                            <SearchableSelect
+                                options={customerContacts.map(c => ({
+                                    value: c._id,
+                                    label: `${c.contactName}${c.isPrimary ? ' (Primary)' : ''}`
+                                }))}
                                 value={formData.contactId}
-                                onChange={(e) => handleContactSelect(e.target.value)}
-                                disabled={!formData.customerId}
-                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
-                            >
-                                <option value="">{formData.customerId ? 'Select Contact Person' : 'Select Customer First'}</option>
-                                {customerContacts.map(c => (
-                                    <option key={c._id} value={c._id}>
-                                        {c.contactName}{c.isPrimary ? ' (Primary)' : ''}
-                                    </option>
-                                ))}
-                            </select>
+                                onChange={handleContactSelect}
+                                placeholder={formData.customerId ? "Search & Select Contact..." : "Select Customer First"}
+                            />
                             {formData.customerId && customerContacts.length === 0 && (
                                 <p className="text-[10px] font-bold text-amber-600 mt-1">No contacts saved for this customer yet.</p>
                             )}
@@ -733,6 +966,7 @@ const CSMTickets = () => {
                             </div>
                             <select
                                 value={formData.contactDesignationId}
+                                disabled={Boolean(formData.contactId)}
                                 onChange={(e) => {
                                     const designation = designations.find(d => d._id === e.target.value);
                                     setFormData({
@@ -741,7 +975,7 @@ const CSMTickets = () => {
                                         contactDesignation: designation?.name || ''
                                     });
                                 }}
-                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold disabled:bg-slate-50 disabled:text-slate-400"
                             >
                                 <option value="">Select Designation</option>
                                 {designations.map(d => <option key={d._id} value={d._id}>{d.name}</option>)}
@@ -753,8 +987,8 @@ const CSMTickets = () => {
                                 type="text"
                                 value={formData.contactPhone}
                                 onChange={(e) => setFormData({ ...formData, contactPhone: e.target.value })}
-                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold bg-slate-50"
-                                readOnly={Boolean(formData.contactId)}
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold bg-slate-50 disabled:opacity-75"
+                                disabled={Boolean(formData.contactId)}
                             />
                         </div>
                         <div>
@@ -763,8 +997,8 @@ const CSMTickets = () => {
                                 type="email"
                                 value={formData.contactEmail}
                                 onChange={(e) => setFormData({ ...formData, contactEmail: e.target.value })}
-                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold bg-slate-50"
-                                readOnly={Boolean(formData.contactId)}
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold bg-slate-50 disabled:opacity-75"
+                                disabled={Boolean(formData.contactId)}
                             />
                         </div>
                         <div>
@@ -846,7 +1080,7 @@ const CSMTickets = () => {
                                 type="text"
                                 required
                                 value={formData.issueTitle}
-                                onChange={(e) => setFormData({ ...formData, issueTitle: e.target.value })}
+                                onChange={(e) => handleSubjectChange(e.target.value)}
                                 className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
                             />
                         </div>

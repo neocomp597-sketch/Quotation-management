@@ -128,7 +128,10 @@ exports.createAsset = async (req, res) => {
 
 exports.getAssets = async (req, res) => {
     try {
-        const docs = await Asset.find({ companyId: req.user?.companyId })
+        const filter = { companyId: req.user?.companyId };
+        if (req.query.customerId) filter.customerId = req.query.customerId;
+        if (req.query.productId) filter.productId = req.query.productId;
+        const docs = await Asset.find(filter)
             .populate('customerId', 'customerName companyName')
             .populate('productId', 'productName productCode')
             .sort({ createdAt: -1 })
@@ -138,3 +141,97 @@ exports.getAssets = async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 };
+
+exports.getAssetSummary = async (req, res) => {
+    try {
+        const { assetId, serialNumber } = req.query;
+        const companyId = req.user?.companyId;
+
+        const Ticket = require('../models/Ticket');
+        const ServiceVisit = require('../models/ServiceVisit');
+
+        const query = { companyId };
+        if (assetId) {
+            query._id = assetId;
+        } else if (serialNumber) {
+            query.serialNumber = serialNumber;
+        } else {
+            return res.status(400).json({ message: 'assetId or serialNumber is required' });
+        }
+
+        const asset = await Asset.findOne(query)
+            .populate('customerId', 'customerName companyName gstin billingAddress mobile email')
+            .populate('productId', 'productName productCode basePrice mrp catalogType')
+            .lean();
+
+        if (!asset) {
+            return res.status(404).json({ message: 'Asset not found' });
+        }
+
+        const now = new Date();
+        
+        // 1. Warranty Coverage
+        const warranty = await Warranty.findOne({
+            customerId: asset.customerId._id,
+            productId: asset.productId._id,
+            serialNumber: asset.serialNumber,
+            companyId
+        }).lean();
+
+        // 2. AMC Coverage
+        const amc = await AMC.findOne({
+            customerId: asset.customerId._id,
+            status: 'Active',
+            companyId,
+            startDate: { $lte: now },
+            endDate: { $gte: now }
+        }).lean();
+
+        // 3. Ticket counts for this asset
+        const openTicketsCount = await Ticket.countDocuments({
+            assetId: asset._id,
+            status: { $in: ['Open', 'Assigned', 'In Progress', 'Pending Customer', 'Escalated'] },
+            companyId
+        });
+
+        const closedTicketsCount = await Ticket.countDocuments({
+            assetId: asset._id,
+            status: { $in: ['Resolved', 'Closed'] },
+            companyId
+        });
+
+        // 4. Last Service Date (derived from recent completed visit)
+        const tickets = await Ticket.find({ assetId: asset._id, companyId }).select('_id').lean();
+        const ticketIds = tickets.map(t => t._id);
+        
+        let lastServiceDate = null;
+        if (ticketIds.length > 0) {
+            const lastVisit = await ServiceVisit.findOne({
+                ticketId: { $in: ticketIds },
+                status: 'Completed',
+                companyId
+            })
+            .sort({ scheduledDate: -1 })
+            .select('scheduledDate')
+            .lean();
+            if (lastVisit) {
+                lastServiceDate = lastVisit.scheduledDate;
+            }
+        }
+
+        res.json({
+            asset,
+            warranty,
+            amc,
+            lastServiceDate,
+            ticketCounts: {
+                open: openTicketsCount,
+                closed: closedTicketsCount
+            }
+        });
+    } catch (error) {
+        console.error('getAssetSummary error:', error);
+        res.status(500).json({ message: error.message || 'Error fetching asset summary' });
+    }
+};
+

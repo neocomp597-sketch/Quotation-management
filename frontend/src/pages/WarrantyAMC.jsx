@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { csmService, customerService, productService } from '../services/api';
+import { csmService, customerService, productService, importService } from '../services/api';
 import { toast } from 'react-toastify';
 import { 
     MdSecurity, MdAssignmentTurnedIn, MdCheckCircle, 
-    MdAdd, MdSearch, MdInfoOutline, MdWarning 
+    MdAdd, MdSearch, MdInfoOutline, MdWarning,
+    MdPublish, MdFileDownload
 } from 'react-icons/md';
 
 const WarrantyAMC = () => {
@@ -17,6 +18,10 @@ const WarrantyAMC = () => {
     const [verifyProd, setVerifyProd] = useState('');
     const [entitlementRes, setEntitlementRes] = useState(null);
     const [verifying, setVerifying] = useState(false);
+
+    // Import Summary Modal states
+    const [importResult, setImportResult] = useState(null);
+    const [showImportResultModal, setShowImportResultModal] = useState(false);
 
     // List dependencies for forms
     const [customers, setCustomers] = useState([]);
@@ -122,10 +127,84 @@ const WarrantyAMC = () => {
         }
     };
 
+    const handleDownloadTemplate = async (type) => {
+        try {
+            let blobRes;
+            if (type === 'warranty') {
+                blobRes = await importService.getWarrantyTemplate();
+            } else {
+                blobRes = await importService.getAmcTemplate();
+            }
+            const url = window.URL.createObjectURL(new Blob([blobRes.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `${type}_import_template.xlsx`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            toast.success(`${type === 'warranty' ? 'Warranty' : 'AMC'} template downloaded successfully!`);
+        } catch (error) {
+            console.error('Error downloading template:', error);
+            toast.error('Failed to download Excel template.');
+        }
+    };
+
+    const handleImportFile = async (e, type) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        setLoading(true);
+        try {
+            let res;
+            if (type === 'warranty') {
+                res = await importService.importWarranties(file);
+            } else {
+                res = await importService.importAmcs(file);
+            }
+
+            setImportResult({
+                type,
+                imported: res.data.imported || 0,
+                updated: res.data.updated || 0,
+                skipped: res.data.skipped || 0,
+                failed: res.data.failed || 0,
+                errors: res.data.errors || []
+            });
+            setShowImportResultModal(true);
+
+            // Reload tables
+            fetchLists();
+
+            if (res.data.success) {
+                toast.success('Import completed successfully!');
+            } else {
+                toast.warning('Import completed with some errors. Please check the summary report.');
+            }
+        } catch (error) {
+            console.error('Import error:', error);
+            toast.error(error.response?.data?.message || 'Error occurred during import');
+        } finally {
+            setLoading(false);
+            e.target.value = ''; // Reset file input
+        }
+    };
+
+    const downloadErrorReport = () => {
+        if (!importResult || !importResult.errors || importResult.errors.length === 0) return;
+        const blobContent = `Import Error Report for ${importResult.type === 'warranty' ? 'Warranties' : 'AMCs'}\nGenerated on: ${new Date().toLocaleString()}\n\nFailed rows details:\n` + importResult.errors.join('\n');
+        const url = window.URL.createObjectURL(new Blob([blobContent], { type: 'text/plain' }));
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `${importResult.type}_import_errors.txt`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     return (
         <div className="p-6 space-y-6 max-w-7xl mx-auto animate-fade-in-up">
             {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-black tracking-tight text-slate-900 font-outfit uppercase">
                         Entitlements & Contracts
@@ -134,27 +213,91 @@ const WarrantyAMC = () => {
                         Manage customer warranties, product serial numbers, and annual maintenance contracts.
                     </p>
                 </div>
-                <button
-                    onClick={() => {
-                        setFormData({
-                            customerId: '',
-                            productId: '',
-                            purchaseDate: '',
-                            expiryDate: '',
-                            serialNumber: '',
-                            contractNo: '',
-                            startDate: '',
-                            endDate: '',
-                            visitsAllowed: 4,
-                            amount: ''
-                        });
-                        setShowModal(true);
-                    }}
-                    className="flex items-center gap-2 px-6 py-4 bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-[10px] tracking-widest rounded-2xl transition-all shadow-lg active:scale-95 self-start md:self-auto"
-                >
-                    <MdAdd size={18} />
-                    {activeSection === 'warranties' ? 'Add Warranty' : 'Add AMC Contract'}
-                </button>
+                <div className="flex flex-wrap items-center gap-2">
+                    {/* Add Buttons */}
+                    <button
+                        onClick={() => {
+                            setFormData({
+                                customerId: '',
+                                productId: '',
+                                purchaseDate: '',
+                                expiryDate: '',
+                                serialNumber: '',
+                                contractNo: '',
+                                startDate: '',
+                                endDate: '',
+                                visitsAllowed: 4,
+                                amount: ''
+                            });
+                            setActiveSection('warranties');
+                            setShowModal(true);
+                        }}
+                        className="flex items-center gap-1.5 px-4 py-3 bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-[10px] tracking-widest rounded-xl transition-all shadow-md active:scale-95"
+                    >
+                        <MdAdd size={16} />
+                        Add Warranty
+                    </button>
+                    <button
+                        onClick={() => {
+                            setFormData({
+                                customerId: '',
+                                productId: '',
+                                purchaseDate: '',
+                                expiryDate: '',
+                                serialNumber: '',
+                                contractNo: '',
+                                startDate: '',
+                                endDate: '',
+                                visitsAllowed: 4,
+                                amount: ''
+                            });
+                            setActiveSection('amc');
+                            setShowModal(true);
+                        }}
+                        className="flex items-center gap-1.5 px-4 py-3 bg-teal-600 hover:bg-teal-700 text-white font-black uppercase text-[10px] tracking-widest rounded-xl transition-all shadow-md active:scale-95"
+                    >
+                        <MdAdd size={16} />
+                        Add AMC
+                    </button>
+
+                    {/* Import Buttons */}
+                    <label className="flex items-center gap-1.5 px-4 py-3 bg-slate-800 hover:bg-slate-950 text-white font-black uppercase text-[10px] tracking-widest rounded-xl transition-all shadow-md cursor-pointer active:scale-95">
+                        <MdPublish size={16} />
+                        Import Warranty
+                        <input
+                            type="file"
+                            accept=".xlsx, .xls, .csv"
+                            onChange={(e) => handleImportFile(e, 'warranty')}
+                            className="hidden"
+                        />
+                    </label>
+                    <label className="flex items-center gap-1.5 px-4 py-3 bg-slate-800 hover:bg-slate-950 text-white font-black uppercase text-[10px] tracking-widest rounded-xl transition-all shadow-md cursor-pointer active:scale-95">
+                        <MdPublish size={16} />
+                        Import AMC
+                        <input
+                            type="file"
+                            accept=".xlsx, .xls, .csv"
+                            onChange={(e) => handleImportFile(e, 'amc')}
+                            className="hidden"
+                        />
+                    </label>
+
+                    {/* Download Template Buttons */}
+                    <button
+                        onClick={() => handleDownloadTemplate('warranty')}
+                        className="flex items-center gap-1.5 px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-black uppercase text-[10px] tracking-widest rounded-xl transition-all border border-slate-200"
+                    >
+                        <MdFileDownload size={16} />
+                        Warranty Template
+                    </button>
+                    <button
+                        onClick={() => handleDownloadTemplate('amc')}
+                        className="flex items-center gap-1.5 px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-black uppercase text-[10px] tracking-widest rounded-xl transition-all border border-slate-200"
+                    >
+                        <MdFileDownload size={16} />
+                        AMC Template
+                    </button>
+                </div>
             </div>
 
             {/* Verification Tool */}
@@ -483,6 +626,68 @@ const WarrantyAMC = () => {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Import Summary Modal */}
+            {showImportResultModal && importResult && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-[2rem] shadow-2xl border border-slate-100 max-w-md w-full overflow-hidden animate-scale-in">
+                        <div className="px-6 py-5 border-b border-slate-50 bg-slate-50 flex items-center justify-between">
+                            <h3 className="font-outfit font-black text-lg text-slate-900 uppercase">
+                                📊 Upload Summary
+                            </h3>
+                            <button onClick={() => setShowImportResultModal(false)} className="text-slate-400 hover:text-slate-600 font-bold">✕</button>
+                        </div>
+                        <div className="p-6 space-y-6">
+                            <p className="text-sm font-semibold text-slate-600">
+                                Import results for <span className="text-slate-900 font-bold uppercase">{importResult.type === 'warranty' ? 'Warranties' : 'AMCs'}</span>:
+                            </p>
+                            
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl text-center">
+                                    <span className="block text-[10px] font-black uppercase text-emerald-500 tracking-wider">Imported</span>
+                                    <span className="text-2xl font-black text-emerald-600">{importResult.imported}</span>
+                                </div>
+                                <div className="p-4 bg-blue-50 border border-blue-100 rounded-2xl text-center">
+                                    <span className="block text-[10px] font-black uppercase text-blue-500 tracking-wider">Updated</span>
+                                    <span className="text-2xl font-black text-blue-600">{importResult.updated}</span>
+                                </div>
+                                <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl text-center">
+                                    <span className="block text-[10px] font-black uppercase text-slate-400 tracking-wider">Skipped</span>
+                                    <span className="text-2xl font-black text-slate-500">{importResult.skipped}</span>
+                                </div>
+                                <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl text-center">
+                                    <span className="block text-[10px] font-black uppercase text-rose-500 tracking-wider">Failed</span>
+                                    <span className="text-2xl font-black text-rose-600">{importResult.failed}</span>
+                                </div>
+                            </div>
+
+                            {importResult.failed > 0 && (
+                                <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl space-y-3">
+                                    <p className="text-xs font-bold text-rose-700">
+                                        ⚠️ The import encountered {importResult.failed} errors. You can download the error log report to debug rows.
+                                    </p>
+                                    <button
+                                        onClick={downloadErrorReport}
+                                        className="w-full py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md flex items-center justify-center gap-1.5"
+                                    >
+                                        <MdFileDownload size={16} />
+                                        Download Error Report
+                                    </button>
+                                </div>
+                            )}
+
+                            <div className="pt-4 border-t border-slate-50">
+                                <button
+                                    onClick={() => setShowImportResultModal(false)}
+                                    className="w-full py-3.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg"
+                                >
+                                    Close Summary
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}

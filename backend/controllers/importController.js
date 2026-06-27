@@ -1203,6 +1203,310 @@ const getAttributeMasterTemplate = async (req, res) => {
     }
 };
 
+const parseDateValue = (val) => {
+    if (!val) return null;
+    if (typeof val === 'number' && Number.isFinite(val)) {
+        return excelSerialDateToDate(val);
+    }
+    const d = new Date(val);
+    if (isNaN(d.getTime())) return null;
+    return d;
+};
+
+const importWarranties = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ message: 'No file uploaded' });
+        }
+
+        const Asset = require('../models/Asset');
+        const Warranty = require('../models/Warranty');
+        const Product = require('../models/Product');
+
+        const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const data = XLSX.utils.sheet_to_json(worksheet);
+
+        if (data.length === 0) {
+            return res.status(400).json({ message: 'No data found in file' });
+        }
+
+        const results = {
+            imported: 0,
+            updated: 0,
+            skipped: 0,
+            failed: 0,
+            errors: []
+        };
+
+        const companyId = req.user?.companyId;
+
+        for (let i = 0; i < data.length; i++) {
+            const row = data[i];
+            try {
+                const customerLookup = cleanCellValue(row['Customer Code'] || row['Customer Name'] || row.customerId || row.customer);
+                const productLookup = cleanCellValue(row['Product Code'] || row['Product Name'] || row.productId || row.product);
+                const serialNumber = cleanCellValue(row['Serial Number'] || row.serialNumber || row.serial);
+                const purchaseDateVal = row['Purchase Date'] || row.purchaseDate;
+                const expiryDateVal = row['Expiry Date'] || row.expiryDate;
+                const status = cleanCellValue(row.Status || row.status || 'Active');
+
+                if (!customerLookup || !productLookup || !serialNumber || !purchaseDateVal || !expiryDateVal) {
+                    throw new Error('Missing required fields: Customer Code/Name, Product Code/Name, Serial Number, Purchase Date, or Expiry Date');
+                }
+
+                // 1. Resolve Customer
+                const customer = await findCustomerByLookup(customerLookup);
+                if (!customer) {
+                    throw new Error(`Customer not found for: "${customerLookup}"`);
+                }
+
+                // 2. Resolve Product
+                const exactProd = buildExactRegex(productLookup);
+                const product = await Product.findOne({
+                    companyId,
+                    $or: [
+                        { productCode: exactProd },
+                        { productName: exactProd }
+                    ]
+                });
+                if (!product) {
+                    throw new Error(`Product not found for: "${productLookup}"`);
+                }
+
+                const purchaseDate = parseDateValue(purchaseDateVal);
+                const expiryDate = parseDateValue(expiryDateVal);
+                if (!purchaseDate) throw new Error(`Invalid Purchase Date: "${purchaseDateVal}"`);
+                if (!expiryDate) throw new Error(`Invalid Expiry Date: "${expiryDateVal}"`);
+
+                // 3. Asset Handling (duplicate serial number -> reuse/update)
+                let asset = await Asset.findOne({ companyId, serialNumber: buildExactRegex(serialNumber) });
+                if (asset) {
+                    // Update asset relations if they changed
+                    asset.customerId = customer._id;
+                    asset.productId = product._id;
+                    asset.installationDate = purchaseDate;
+                    await asset.save();
+                } else {
+                    asset = await Asset.create({
+                        companyId,
+                        customerId: customer._id,
+                        productId: product._id,
+                        serialNumber,
+                        installationDate: purchaseDate
+                    });
+                }
+
+                // 4. Warranty Handling (duplicate serial number -> update warranty)
+                let warranty = await Warranty.findOne({ companyId, serialNumber: buildExactRegex(serialNumber) });
+                if (warranty) {
+                    warranty.customerId = customer._id;
+                    warranty.productId = product._id;
+                    warranty.assetId = asset._id;
+                    warranty.purchaseDate = purchaseDate;
+                    warranty.expiryDate = expiryDate;
+                    warranty.status = status;
+                    await warranty.save();
+                    results.updated++;
+                } else {
+                    await Warranty.create({
+                        companyId,
+                        customerId: customer._id,
+                        productId: product._id,
+                        assetId: asset._id,
+                        serialNumber,
+                        purchaseDate,
+                        expiryDate,
+                        status
+                    });
+                    results.imported++;
+                }
+            } catch (err) {
+                results.failed++;
+                results.errors.push(`Row ${i + 2}: ${err.message}`);
+            }
+        }
+
+        res.json({
+            success: results.failed === 0,
+            ...results
+        });
+    } catch (error) {
+        console.error('Import warranties error:', error);
+        res.status(500).json({ message: error.message || 'Error importing warranties', errors: [error.message] });
+    }
+};
+
+const importAmcs = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ message: 'No file uploaded' });
+        }
+
+        const AMC = require('../models/AMC');
+
+        const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const data = XLSX.utils.sheet_to_json(worksheet);
+
+        if (data.length === 0) {
+            return res.status(400).json({ message: 'No data found in file' });
+        }
+
+        const results = {
+            imported: 0,
+            updated: 0,
+            skipped: 0,
+            failed: 0,
+            errors: []
+        };
+
+        const companyId = req.user?.companyId;
+
+        for (let i = 0; i < data.length; i++) {
+            const row = data[i];
+            try {
+                const customerLookup = cleanCellValue(row['Customer Code'] || row['Customer Name'] || row.customerId || row.customer);
+                const contractNo = cleanCellValue(row['Contract Number'] || row['Contract No'] || row.contractNo || row.contractNumber);
+                const startDateVal = row['Start Date'] || row.startDate;
+                const endDateVal = row['End Date'] || row.endDate;
+                const visitsAllowed = toSafeNumber(row['Allowed Visits'] || row['Visits Allowed'] || row.visitsAllowed, 4);
+                const amount = toSafeNumber(row['Amount'] || row.amount || row.price, 0);
+                const status = cleanCellValue(row.Status || row.status || 'Active');
+
+                if (!customerLookup || !contractNo || !startDateVal || !endDateVal) {
+                    throw new Error('Missing required fields: Customer Code/Name, Contract Number, Start Date, or End Date');
+                }
+
+                // 1. Resolve Customer
+                const customer = await findCustomerByLookup(customerLookup);
+                if (!customer) {
+                    throw new Error(`Customer not found for: "${customerLookup}"`);
+                }
+
+                const startDate = parseDateValue(startDateVal);
+                const endDate = parseDateValue(endDateVal);
+                if (!startDate) throw new Error(`Invalid Start Date: "${startDateVal}"`);
+                if (!endDate) throw new Error(`Invalid End Date: "${endDateVal}"`);
+
+                // 2. AMC Handling (duplicate contract No -> update existing)
+                let amc = await AMC.findOne({ companyId, contractNo: buildExactRegex(contractNo) });
+                if (amc) {
+                    amc.customerId = customer._id;
+                    amc.startDate = startDate;
+                    amc.endDate = endDate;
+                    amc.visitsAllowed = visitsAllowed;
+                    amc.amount = amount;
+                    amc.status = status;
+                    await amc.save();
+                    results.updated++;
+                } else {
+                    await AMC.create({
+                        companyId,
+                        customerId: customer._id,
+                        contractNo,
+                        startDate,
+                        endDate,
+                        visitsAllowed,
+                        visitsUsed: 0,
+                        amount,
+                        status
+                    });
+                    results.imported++;
+                }
+            } catch (err) {
+                results.failed++;
+                results.errors.push(`Row ${i + 2}: ${err.message}`);
+            }
+        }
+
+        res.json({
+            success: results.failed === 0,
+            ...results
+        });
+    } catch (error) {
+        console.error('Import amcs error:', error);
+        res.status(500).json({ message: error.message || 'Error importing AMCs', errors: [error.message] });
+    }
+};
+
+const getWarrantyTemplate = async (req, res) => {
+    try {
+        const Customer = require('../models/Customer');
+        const Product = require('../models/Product');
+        const [customer, product] = await Promise.all([
+            Customer.findOne().sort({ createdAt: 1 }),
+            Product.findOne().sort({ createdAt: 1 })
+        ]);
+
+        const templateData = [
+            {
+                'Customer Code': customer?.externalCode || customer?.customerName || 'CUST001',
+                'Product Code': product?.productCode || 'PROD001',
+                'Serial Number': 'SN-GEN-908123',
+                'Purchase Date': '2025-04-01',
+                'Expiry Date': '2027-03-31',
+                'Status': 'Active'
+            }
+        ];
+
+        const worksheet = XLSX.utils.json_to_sheet(templateData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Warranties');
+
+        worksheet['!cols'] = [
+            { wch: 18 }, { wch: 15 }, { wch: 18 }, { wch: 15 }, { wch: 15 }, { wch: 10 }
+        ];
+
+        const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename=warranty_import_template.xlsx');
+        res.send(buffer);
+    } catch (error) {
+        console.error('Template error:', error);
+        res.status(500).json({ message: 'Error generating template' });
+    }
+};
+
+const getAmcTemplate = async (req, res) => {
+    try {
+        const Customer = require('../models/Customer');
+        const customer = await Customer.findOne().sort({ createdAt: 1 });
+
+        const templateData = [
+            {
+                'Customer Code': customer?.externalCode || customer?.customerName || 'CUST001',
+                'Contract Number': 'AMC-2025-9012',
+                'Start Date': '2025-04-01',
+                'End Date': '2026-03-31',
+                'Allowed Visits': 4,
+                'Amount': 15000,
+                'Status': 'Active'
+            }
+        ];
+
+        const worksheet = XLSX.utils.json_to_sheet(templateData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'AMCs');
+
+        worksheet['!cols'] = [
+            { wch: 18 }, { wch: 18 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 12 }, { wch: 10 }
+        ];
+
+        const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename=amc_import_template.xlsx');
+        res.send(buffer);
+    } catch (error) {
+        console.error('Template error:', error);
+        res.status(500).json({ message: 'Error generating template' });
+    }
+};
+
 module.exports = {
     importProducts,
     importCustomers,
@@ -1213,6 +1517,9 @@ module.exports = {
     getCustomerTemplate,
     getPlanningTemplate,
     getAttributeTemplate,
-    getAttributeMasterTemplate
+    getAttributeMasterTemplate,
+    importWarranties,
+    importAmcs,
+    getWarrantyTemplate,
+    getAmcTemplate
 };
-

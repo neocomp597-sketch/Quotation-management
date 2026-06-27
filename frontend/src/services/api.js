@@ -364,6 +364,28 @@ export const importService = {
       responseType: "blob",
       params: financialYear ? { financialYear } : undefined,
     }),
+  importWarranties: (file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return api.post("/import/warranties", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+  },
+  importAmcs: (file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return api.post("/import/amcs", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+  },
+  getWarrantyTemplate: () =>
+    api.get("/import/template/warranties", { responseType: "blob" }),
+  getAmcTemplate: () =>
+    api.get("/import/template/amcs", { responseType: "blob" }),
 };
 
 export const attributeService = {
@@ -603,8 +625,9 @@ export const csmService = {
   createWarranty: (data) => api.post("/csm/warranties", data),
   getAmcs: () => api.get("/csm/amcs"),
   createAmc: (data) => api.post("/csm/amcs", data),
-  getAssets: () => api.get("/csm/assets"),
+  getAssets: (params = {}) => api.get("/csm/assets", { params }),
   createAsset: (data) => api.post("/csm/assets", data),
+  getAssetSummary: (params = {}) => api.get("/csm/assets/summary", { params }),
 
   getArticles: (params = {}) => api.get("/csm/kb", { params }),
   getArticleById: (id) => api.get(`/csm/kb/${id}`),
