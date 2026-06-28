@@ -46,7 +46,7 @@ const getUniqueCustomerName = async (customerName, excludeId) => {
 
 const buildCustomerQuery = async (req) => {
     const query = {};
-    if (req.user && req.user.role !== 'admin') {
+    if (req.user && req.user.role !== 'admin' && req.user.role !== 'manager') {
         const Territory = require('../models/Territory');
         const userTerritories = await Territory.find({
             $or: [

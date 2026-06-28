@@ -844,7 +844,7 @@ module.exports = {
     getAllQuotations: async (req, res) => {
         try {
             let query = {};
-            if (req.user && req.user.role !== 'admin') {
+            if (req.user && req.user.role !== 'admin' && req.user.role !== 'manager') {
                 const Territory = require('../models/Territory');
                 const userTerritories = await Territory.find({
                     $or: [
@@ -962,7 +962,7 @@ module.exports = {
     getReports: async (req, res) => {
         try {
             let query = {};
-            if (req.user && req.user.role !== 'admin') {
+            if (req.user && req.user.role !== 'admin' && req.user.role !== 'manager') {
                 const Territory = require('../models/Territory');
                 const userTerritories = await Territory.find({
                     $or: [
@@ -979,7 +979,7 @@ module.exports = {
                 ];
             }
 
-            const cacheScope = req.user?.role === 'admin'
+            const cacheScope = (req.user?.role === 'admin' || req.user?.role === 'manager')
                 ? `tenant:${req.user?.companyId || 'unknown'}:admin`
                 : `tenant:${req.user?.companyId || 'unknown'}:user:${req.user?.id || 'anonymous'}`;
             const cacheKey = `dashboard:quotations:${cacheScope}`;
