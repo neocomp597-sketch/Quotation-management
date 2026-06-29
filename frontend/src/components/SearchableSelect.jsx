@@ -9,6 +9,7 @@ const SearchableSelect = ({
     noResultsText = 'No options found',
     className = '',
     inputClass = '',
+    menuClass = '',
     onAddOption, // Callback: async (name) => { ... }
     onDeleteOption, // Callback: async (option) => { ... }
 }) => {
@@ -83,7 +84,7 @@ const SearchableSelect = ({
                 onClick={() => setIsOpen(!isOpen)}
                 className={inputClass || defaultInputClass}
             >
-                <span className={selectedLabel ? 'text-slate-900' : 'text-slate-400 font-normal'}>
+                <span className={`${selectedLabel ? 'text-slate-900' : 'text-slate-400 font-normal'} min-w-0 flex-1 truncate`}>
                     {selectedLabel || placeholder}
                 </span>
                 <MdKeyboardArrowDown 
@@ -93,7 +94,7 @@ const SearchableSelect = ({
             </button>
 
             {isOpen && (
-                <div className="absolute z-[9999] left-0 right-0 mt-1.5 bg-white border border-slate-200 rounded-2xl shadow-2xl p-2 animate-scale-in max-h-72 flex flex-col">
+                <div className={`absolute z-[9999] left-0 right-0 mt-1.5 bg-white border border-slate-200 rounded-2xl shadow-2xl p-2 animate-scale-in max-h-72 flex flex-col overflow-hidden ${menuClass}`}>
                     {!showInlineAdd ? (
                         <>
                             {/* Search Field */}

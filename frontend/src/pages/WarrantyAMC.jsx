@@ -1,11 +1,13 @@
-import React, { useEffect, useState } from 'react';
-import { csmService, customerService, productService, importService } from '../services/api';
+import React, { useEffect, useMemo, useState } from 'react';
+import { csmService, customerService, productService, importService, voucherService } from '../services/api';
 import { toast } from 'react-toastify';
 import { 
     MdSecurity, MdAssignmentTurnedIn, MdCheckCircle, 
     MdAdd, MdSearch, MdInfoOutline, MdWarning,
     MdPublish, MdFileDownload
 } from 'react-icons/md';
+import Modal from '../components/Modal';
+import SearchableSelect from '../components/SearchableSelect';
 
 const WarrantyAMC = () => {
     const [activeSection, setActiveSection] = useState('warranties');
@@ -15,9 +17,14 @@ const WarrantyAMC = () => {
     
     // Entitlements Verification Checker state
     const [verifyCust, setVerifyCust] = useState('');
+    const [verifyInvoice, setVerifyInvoice] = useState('');
     const [verifyProd, setVerifyProd] = useState('');
     const [entitlementRes, setEntitlementRes] = useState(null);
+    const [coverageDetails, setCoverageDetails] = useState(null);
     const [verifying, setVerifying] = useState(false);
+    const [customerInvoices, setCustomerInvoices] = useState([]);
+    const [loadingInvoices, setLoadingInvoices] = useState(false);
+    const [scheduledVisits, setScheduledVisits] = useState([]);
 
     // Import Summary Modal states
     const [importResult, setImportResult] = useState(null);
@@ -80,16 +87,124 @@ const WarrantyAMC = () => {
         loadFormDependencies();
     }, []);
 
+    useEffect(() => {
+        const loadCustomerInvoiceFlow = async () => {
+            setVerifyInvoice('');
+            setVerifyProd('');
+            setEntitlementRes(null);
+            setCoverageDetails(null);
+            setCustomerInvoices([]);
+            setScheduledVisits([]);
+
+            if (!verifyCust) return;
+
+            setLoadingInvoices(true);
+            try {
+                const [invoiceRes, visitRes] = await Promise.all([
+                    voucherService.getAll({ scope: 'invoice', customerId: verifyCust }),
+                    csmService.getVisits({ status: 'Scheduled' }).catch(() => ({ data: [] }))
+                ]);
+
+                setCustomerInvoices(invoiceRes.data || []);
+
+                const visitsForCustomer = (visitRes.data || []).filter((visit) => {
+                    const customer = visit.ticketId?.customerId;
+                    const customerId = typeof customer === 'string' ? customer : customer?._id;
+                    return customerId === verifyCust;
+                });
+                setScheduledVisits(visitsForCustomer);
+            } catch (error) {
+                console.error('Error loading customer invoices:', error);
+                toast.error('Failed to load invoices for selected customer');
+            } finally {
+                setLoadingInvoices(false);
+            }
+        };
+
+        loadCustomerInvoiceFlow();
+    }, [verifyCust]);
+
+    useEffect(() => {
+        setVerifyProd('');
+        setEntitlementRes(null);
+        setCoverageDetails(null);
+    }, [verifyInvoice]);
+
+    const selectedInvoice = useMemo(() => (
+        customerInvoices.find(invoice => invoice._id === verifyInvoice)
+    ), [customerInvoices, verifyInvoice]);
+
+    const customerOptions = useMemo(() => (
+        customers.map(customer => {
+            const companyName = customer.companyName || '';
+            const customerName = customer.customerName || '';
+            return {
+                value: customer._id,
+                label: companyName && customerName ? `${companyName} (${customerName})` : companyName || customerName || 'Unnamed Customer'
+            };
+        })
+    ), [customers]);
+
+    const invoiceOptions = useMemo(() => (
+        customerInvoices.map(invoice => ({
+            value: invoice._id,
+            label: `${invoice.voucherNumber || 'Invoice'} - ${invoice.date ? new Date(invoice.date).toLocaleDateString() : 'No date'} - Rs ${Number(invoice.grandTotal || 0).toLocaleString('en-IN')}`
+        }))
+    ), [customerInvoices]);
+
+    const invoiceProductOptions = useMemo(() => {
+        const seenProducts = new Set();
+        return (selectedInvoice?.items || [])
+            .filter(item => item.productId)
+            .filter(item => {
+                const id = String(item.productId);
+                if (seenProducts.has(id)) return false;
+                seenProducts.add(id);
+                return true;
+            })
+            .map(item => ({
+                value: String(item.productId),
+                label: `${item.productName || 'Product'}${item.qty ? ` - Qty ${item.qty}` : ''}`
+            }));
+    }, [selectedInvoice]);
+
+    const selectedInvoiceItem = useMemo(() => (
+        (selectedInvoice?.items || []).find(item => String(item.productId) === verifyProd)
+    ), [selectedInvoice, verifyProd]);
+
     const handleVerify = async (e) => {
         e.preventDefault();
-        if (!verifyCust || !verifyProd) return;
+        if (!verifyCust || !verifyInvoice || !verifyProd) {
+            toast.info('Select customer, invoice, and product first');
+            return;
+        }
         setVerifying(true);
         try {
-            const res = await csmService.verifyEntitlements({
-                customerId: verifyCust,
-                productId: verifyProd
+            const [res, warrantiesRes, amcsRes] = await Promise.all([
+                csmService.verifyEntitlements({
+                    customerId: verifyCust,
+                    productId: verifyProd
+                }),
+                csmService.getWarranties().catch(() => ({ data: [] })),
+                csmService.getAmcs().catch(() => ({ data: [] }))
+            ]);
+
+            const matchingWarranty = (warrantiesRes.data || []).find((warranty) => {
+                const customerId = warranty.customerId?._id || warranty.customerId;
+                const productId = warranty.productId?._id || warranty.productId;
+                return customerId === verifyCust && productId === verifyProd;
             });
+
+            const matchingAmc = (amcsRes.data || []).find((amc) => {
+                const customerId = amc.customerId?._id || amc.customerId;
+                return customerId === verifyCust;
+            });
+
             setEntitlementRes(res.data);
+            setCoverageDetails({
+                warranty: matchingWarranty || null,
+                amc: matchingAmc || null
+            });
         } catch (error) {
             toast.error('Entitlements validation failed');
         } finally {
@@ -305,34 +420,46 @@ const WarrantyAMC = () => {
                 <div className="lg:col-span-2 space-y-3">
                     <span className="text-[10px] font-black uppercase tracking-widest text-teal-600">Entitlements Sandbox</span>
                     <h3 className="text-lg font-black text-slate-900 font-outfit uppercase -mt-1">Verify Service Eligibility</h3>
-                    <form onSubmit={handleVerify} className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+                    <form onSubmit={handleVerify} className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
                         <div>
                             <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Customer</label>
-                            <select
-                                required
+                            <SearchableSelect
                                 value={verifyCust}
-                                onChange={e => setVerifyCust(e.target.value)}
-                                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold"
-                            >
-                                <option value="">Select Customer</option>
-                                {customers.map(c => <option key={c._id} value={c._id}>{c.customerName}</option>)}
-                            </select>
+                                onChange={setVerifyCust}
+                                options={customerOptions}
+                                placeholder="Select Customer"
+                                noResultsText="No customers found"
+                                inputClass="w-full flex items-center justify-between px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold bg-white text-left"
+                                menuClass="max-h-56"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Invoice</label>
+                            <SearchableSelect
+                                value={verifyInvoice}
+                                onChange={setVerifyInvoice}
+                                options={invoiceOptions}
+                                placeholder={loadingInvoices ? 'Loading invoices...' : 'Select Invoice'}
+                                noResultsText={verifyCust ? 'No invoices found' : 'Select customer first'}
+                                inputClass={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold bg-white text-left ${!verifyCust ? 'opacity-60 pointer-events-none' : ''}`}
+                                menuClass="max-h-56"
+                            />
                         </div>
                         <div>
                             <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Product</label>
-                            <select
-                                required
+                            <SearchableSelect
                                 value={verifyProd}
-                                onChange={e => setVerifyProd(e.target.value)}
-                                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold"
-                            >
-                                <option value="">Select Product</option>
-                                {products.map(p => <option key={p._id} value={p._id}>{p.productName}</option>)}
-                            </select>
+                                onChange={setVerifyProd}
+                                options={invoiceProductOptions}
+                                placeholder="Select Product"
+                                noResultsText={verifyInvoice ? 'No products found on invoice' : 'Select invoice first'}
+                                inputClass={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold bg-white text-left ${!verifyInvoice ? 'opacity-60 pointer-events-none' : ''}`}
+                                menuClass="max-h-56"
+                            />
                         </div>
                         <button
                             type="submit"
-                            disabled={verifying}
+                            disabled={verifying || !verifyCust || !verifyInvoice || !verifyProd}
                             className="py-3 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md"
                         >
                             {verifying ? 'Checking...' : 'Check Coverage'}
@@ -341,7 +468,7 @@ const WarrantyAMC = () => {
                 </div>
                 <div className="lg:col-span-1 border-t lg:border-t-0 lg:border-l border-slate-100 pt-4 lg:pt-0 lg:pl-6">
                     {entitlementRes ? (
-                        <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2 text-xs font-bold">
+                        <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3 text-xs font-bold">
                             <div className="flex items-center gap-1.5">
                                 {entitlementRes.recommendedBillingType === 'Paid' ? (
                                     <MdWarning className="text-red-500" size={18} />
@@ -353,17 +480,82 @@ const WarrantyAMC = () => {
                             <div className="px-3 py-1.5 text-center text-white bg-slate-900 rounded-lg text-[10px] font-black uppercase tracking-widest">
                                 {entitlementRes.recommendedBillingType}
                             </div>
-                            {entitlementRes.warranty.isActive && (
-                                <p className="text-[10px] text-teal-600">Active Warranty expires: {new Date(entitlementRes.warranty.expiryDate).toLocaleDateString()}</p>
-                            )}
-                            {entitlementRes.amc.isActive && (
-                                <p className="text-[10px] text-primary-600">Active AMC contract: {entitlementRes.amc.contractNo} ({entitlementRes.amc.remainingVisits} remaining visits)</p>
-                            )}
+
+                            <div className="grid grid-cols-1 gap-2">
+                                <div className="p-3 rounded-xl bg-white border border-slate-100">
+                                    <p className="text-[9px] text-slate-400 uppercase tracking-widest mb-1">Invoice & Product</p>
+                                    <p className="text-[10px] text-slate-700">Invoice: {selectedInvoice?.voucherNumber || '-'}</p>
+                                    <p className="text-[10px] text-slate-700">Product: {selectedInvoiceItem?.productName || 'Selected product'}</p>
+                                    {selectedInvoiceItem?.qty && (
+                                        <p className="text-[10px] text-slate-500">Invoice Qty: {selectedInvoiceItem.qty}</p>
+                                    )}
+                                </div>
+
+                                <div className="p-3 rounded-xl bg-white border border-slate-100">
+                                    <p className="text-[9px] text-slate-400 uppercase tracking-widest mb-1">Warranty</p>
+                                    {coverageDetails?.warranty ? (
+                                        <>
+                                            <p className={`text-[10px] ${entitlementRes.warranty.isActive ? 'text-teal-600' : 'text-rose-500'}`}>
+                                                {entitlementRes.warranty.isActive ? 'Active' : coverageDetails.warranty.status || 'Not Active'}
+                                            </p>
+                                            <p className="text-[10px] text-slate-500">
+                                                Expiry: {coverageDetails.warranty.expiryDate ? new Date(coverageDetails.warranty.expiryDate).toLocaleDateString() : '-'}
+                                            </p>
+                                            <p className="text-[10px] text-slate-500">Serial: {coverageDetails.warranty.serialNumber || '-'}</p>
+                                        </>
+                                    ) : (
+                                        <p className="text-[10px] text-slate-500">No warranty registered for this invoice product.</p>
+                                    )}
+                                </div>
+
+                                <div className="p-3 rounded-xl bg-white border border-slate-100">
+                                    <p className="text-[9px] text-slate-400 uppercase tracking-widest mb-1">AMC / Maintenance Contract</p>
+                                    {coverageDetails?.amc ? (
+                                        <>
+                                            <p className={`text-[10px] ${entitlementRes.amc.isActive ? 'text-primary-600' : 'text-rose-500'}`}>
+                                                {entitlementRes.amc.isActive ? `Active - ${entitlementRes.amc.remainingVisits} visits remaining` : coverageDetails.amc.status || 'Not Active'}
+                                            </p>
+                                            <p className="text-[10px] text-slate-500">Contract: {coverageDetails.amc.contractNo || '-'}</p>
+                                            <p className="text-[10px] text-slate-500">
+                                                Validity: {coverageDetails.amc.startDate ? new Date(coverageDetails.amc.startDate).toLocaleDateString() : '-'} to {coverageDetails.amc.endDate ? new Date(coverageDetails.amc.endDate).toLocaleDateString() : '-'}
+                                            </p>
+                                        </>
+                                    ) : (
+                                        <p className="text-[10px] text-slate-500">No AMC contract found for this customer.</p>
+                                    )}
+                                </div>
+
+                                <div className="p-3 rounded-xl bg-white border border-slate-100">
+                                    <p className="text-[9px] text-slate-400 uppercase tracking-widest mb-1">Scheduled Maintenance</p>
+                                    {scheduledVisits.length > 0 ? (
+                                        <div className="space-y-1">
+                                            {scheduledVisits.slice(0, 3).map((visit) => (
+                                                <p key={visit._id} className="text-[10px] text-primary-600">
+                                                    {visit.visitNo} - {visit.scheduledDate ? new Date(visit.scheduledDate).toLocaleDateString() : 'Date pending'}
+                                                    {visit.engineerId?.name ? ` - ${visit.engineerId.name}` : ''}
+                                                </p>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <p className="text-[10px] text-slate-500">No scheduled maintenance visits for this customer.</p>
+                                    )}
+                                </div>
+                            </div>
                         </div>
                     ) : (
                         <div className="text-center py-6 text-slate-400 text-xs font-semibold flex flex-col items-center justify-center">
                             <MdInfoOutline size={24} className="mb-1 text-slate-300" />
-                            Run coverage checks in sandbox to review invoice validity.
+                            Select a customer, invoice, and invoice product to review coverage.
+                            {scheduledVisits.length > 0 && (
+                                <div className="mt-3 w-full p-3 rounded-xl bg-primary-50 border border-primary-100 text-left">
+                                    <p className="text-[10px] text-primary-700 font-black uppercase tracking-widest mb-1">Scheduled maintenance</p>
+                                    {scheduledVisits.slice(0, 3).map((visit) => (
+                                        <p key={visit._id} className="text-[10px] text-primary-600 font-bold">
+                                            {visit.visitNo} - {visit.scheduledDate ? new Date(visit.scheduledDate).toLocaleDateString() : 'Date pending'}
+                                        </p>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
@@ -480,216 +672,210 @@ const WarrantyAMC = () => {
             </div>
 
             {/* Modal Add */}
-            {showModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-                    <div className="bg-white rounded-[2rem] shadow-2xl border border-slate-100 max-w-md w-full overflow-hidden animate-scale-in">
-                        <div className="px-6 py-5 border-b border-slate-50 bg-slate-50 flex items-center justify-between">
-                            <h3 className="font-outfit font-black text-lg text-slate-900 uppercase">
-                                {activeSection === 'warranties' ? 'Register Product Warranty' : 'Create AMC Contract'}
-                            </h3>
-                            <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 font-bold">✕</button>
-                        </div>
-                        <form onSubmit={handleCreate} className="p-6 space-y-4">
+            <Modal
+                isOpen={showModal}
+                onClose={() => setShowModal(false)}
+                title={activeSection === 'warranties' ? 'Register Product Warranty' : 'Create AMC Contract'}
+                maxWidth="max-w-md"
+                footer={
+                    <>
+                        <button
+                            type="button"
+                            onClick={() => setShowModal(false)}
+                            className="flex-1 w-full py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            form="warranty-amc-form"
+                            className="flex-1 w-full py-3.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg"
+                        >
+                            Register
+                        </button>
+                    </>
+                }
+            >
+                <form id="warranty-amc-form" onSubmit={handleCreate} className="space-y-4">
+                    <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Customer *</label>
+                        <select
+                            required
+                            value={formData.customerId}
+                            onChange={e => setFormData({ ...formData, customerId: e.target.value })}
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
+                        >
+                            <option value="">Select Customer</option>
+                            {customers.map(c => <option key={c._id} value={c._id}>{c.customerName}</option>)}
+                        </select>
+                    </div>
+
+                    {activeSection === 'warranties' ? (
+                        <>
                             <div>
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Customer *</label>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Product *</label>
                                 <select
                                     required
-                                    value={formData.customerId}
-                                    onChange={e => setFormData({ ...formData, customerId: e.target.value })}
+                                    value={formData.productId}
+                                    onChange={e => setFormData({ ...formData, productId: e.target.value })}
                                     className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
                                 >
-                                    <option value="">Select Customer</option>
-                                    {customers.map(c => <option key={c._id} value={c._id}>{c.customerName}</option>)}
+                                    <option value="">Select Product</option>
+                                    {products.map(p => <option key={p._id} value={p._id}>{p.productName}</option>)}
                                 </select>
                             </div>
-
-                            {activeSection === 'warranties' ? (
-                                <>
-                                    <div>
-                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Product *</label>
-                                        <select
-                                            required
-                                            value={formData.productId}
-                                            onChange={e => setFormData({ ...formData, productId: e.target.value })}
-                                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
-                                        >
-                                            <option value="">Select Product</option>
-                                            {products.map(p => <option key={p._id} value={p._id}>{p.productName}</option>)}
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Serial Number *</label>
-                                        <input
-                                            type="text"
-                                            required
-                                            value={formData.serialNumber}
-                                            onChange={e => setFormData({ ...formData, serialNumber: e.target.value })}
-                                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
-                                        />
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div>
-                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Purchase Date *</label>
-                                            <input
-                                                type="date"
-                                                required
-                                                value={formData.purchaseDate}
-                                                onChange={e => setFormData({ ...formData, purchaseDate: e.target.value })}
-                                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Expiry Date *</label>
-                                            <input
-                                                type="date"
-                                                required
-                                                value={formData.expiryDate}
-                                                onChange={e => setFormData({ ...formData, expiryDate: e.target.value })}
-                                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
-                                            />
-                                        </div>
-                                    </div>
-                                </>
-                            ) : (
-                                <>
-                                    <div>
-                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Contract Number *</label>
-                                        <input
-                                            type="text"
-                                            required
-                                            value={formData.contractNo}
-                                            onChange={e => setFormData({ ...formData, contractNo: e.target.value })}
-                                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
-                                        />
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div>
-                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Start Date *</label>
-                                            <input
-                                                type="date"
-                                                required
-                                                value={formData.startDate}
-                                                onChange={e => setFormData({ ...formData, startDate: e.target.value })}
-                                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">End Date *</label>
-                                            <input
-                                                type="date"
-                                                required
-                                                value={formData.endDate}
-                                                onChange={e => setFormData({ ...formData, endDate: e.target.value })}
-                                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div>
-                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Allowed Visits *</label>
-                                            <input
-                                                type="number"
-                                                required
-                                                min="1"
-                                                value={formData.visitsAllowed}
-                                                onChange={e => setFormData({ ...formData, visitsAllowed: e.target.value })}
-                                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Contract Price *</label>
-                                            <input
-                                                type="number"
-                                                required
-                                                min="0"
-                                                value={formData.amount}
-                                                onChange={e => setFormData({ ...formData, amount: e.target.value })}
-                                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
-                                            />
-                                        </div>
-                                    </div>
-                                </>
-                            )}
-                            <div className="flex gap-3 pt-4 border-t border-slate-50">
-                                <button
-                                    type="button"
-                                    onClick={() => setShowModal(false)}
-                                    className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    className="flex-1 py-3.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg"
-                                >
-                                    Register
-                                </button>
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Serial Number *</label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={formData.serialNumber}
+                                    onChange={e => setFormData({ ...formData, serialNumber: e.target.value })}
+                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
+                                />
                             </div>
-                        </form>
-                    </div>
-                </div>
-            )}
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Purchase Date *</label>
+                                    <input
+                                        type="date"
+                                        required
+                                        value={formData.purchaseDate}
+                                        onChange={e => setFormData({ ...formData, purchaseDate: e.target.value })}
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Expiry Date *</label>
+                                    <input
+                                        type="date"
+                                        required
+                                        value={formData.expiryDate}
+                                        onChange={e => setFormData({ ...formData, expiryDate: e.target.value })}
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
+                                    />
+                                </div>
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Contract Number *</label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={formData.contractNo}
+                                    onChange={e => setFormData({ ...formData, contractNo: e.target.value })}
+                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Start Date *</label>
+                                    <input
+                                        type="date"
+                                        required
+                                        value={formData.startDate}
+                                        onChange={e => setFormData({ ...formData, startDate: e.target.value })}
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">End Date *</label>
+                                    <input
+                                        type="date"
+                                        required
+                                        value={formData.endDate}
+                                        onChange={e => setFormData({ ...formData, endDate: e.target.value })}
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
+                                    />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Allowed Visits *</label>
+                                    <input
+                                        type="number"
+                                        required
+                                        min="1"
+                                        value={formData.visitsAllowed}
+                                        onChange={e => setFormData({ ...formData, visitsAllowed: e.target.value })}
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Contract Price *</label>
+                                    <input
+                                        type="number"
+                                        required
+                                        min="0"
+                                        value={formData.amount}
+                                        onChange={e => setFormData({ ...formData, amount: e.target.value })}
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
+                                    />
+                                </div>
+                            </div>
+                        </>
+                    )}
+                </form>
+            </Modal>
 
             {/* Import Summary Modal */}
             {showImportResultModal && importResult && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-                    <div className="bg-white rounded-[2rem] shadow-2xl border border-slate-100 max-w-md w-full overflow-hidden animate-scale-in">
-                        <div className="px-6 py-5 border-b border-slate-50 bg-slate-50 flex items-center justify-between">
-                            <h3 className="font-outfit font-black text-lg text-slate-900 uppercase">
-                                📊 Upload Summary
-                            </h3>
-                            <button onClick={() => setShowImportResultModal(false)} className="text-slate-400 hover:text-slate-600 font-bold">✕</button>
-                        </div>
-                        <div className="p-6 space-y-6">
-                            <p className="text-sm font-semibold text-slate-600">
-                                Import results for <span className="text-slate-900 font-bold uppercase">{importResult.type === 'warranty' ? 'Warranties' : 'AMCs'}</span>:
-                            </p>
-                            
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl text-center">
-                                    <span className="block text-[10px] font-black uppercase text-emerald-500 tracking-wider">Imported</span>
-                                    <span className="text-2xl font-black text-emerald-600">{importResult.imported}</span>
-                                </div>
-                                <div className="p-4 bg-blue-50 border border-blue-100 rounded-2xl text-center">
-                                    <span className="block text-[10px] font-black uppercase text-blue-500 tracking-wider">Updated</span>
-                                    <span className="text-2xl font-black text-blue-600">{importResult.updated}</span>
-                                </div>
-                                <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl text-center">
-                                    <span className="block text-[10px] font-black uppercase text-slate-400 tracking-wider">Skipped</span>
-                                    <span className="text-2xl font-black text-slate-500">{importResult.skipped}</span>
-                                </div>
-                                <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl text-center">
-                                    <span className="block text-[10px] font-black uppercase text-rose-500 tracking-wider">Failed</span>
-                                    <span className="text-2xl font-black text-rose-600">{importResult.failed}</span>
-                                </div>
+                <Modal
+                    isOpen={showImportResultModal}
+                    onClose={() => setShowImportResultModal(false)}
+                    title="📊 Upload Summary"
+                    maxWidth="max-w-md"
+                    footer={
+                        <button
+                            onClick={() => setShowImportResultModal(false)}
+                            className="w-full py-3.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg"
+                        >
+                            Close Summary
+                        </button>
+                    }
+                >
+                    <div className="space-y-6">
+                        <p className="text-sm font-semibold text-slate-600">
+                            Import results for <span className="text-slate-900 font-bold uppercase">{importResult.type === 'warranty' ? 'Warranties' : 'AMCs'}</span>:
+                        </p>
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl text-center">
+                                <span className="block text-[10px] font-black uppercase text-emerald-500 tracking-wider">Imported</span>
+                                <span className="text-2xl font-black text-emerald-600">{importResult.imported}</span>
                             </div>
+                            <div className="p-4 bg-blue-50 border border-blue-100 rounded-2xl text-center">
+                                <span className="block text-[10px] font-black uppercase text-blue-500 tracking-wider">Updated</span>
+                                <span className="text-2xl font-black text-blue-600">{importResult.updated}</span>
+                            </div>
+                            <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl text-center">
+                                <span className="block text-[10px] font-black uppercase text-slate-400 tracking-wider">Skipped</span>
+                                <span className="text-2xl font-black text-slate-500">{importResult.skipped}</span>
+                            </div>
+                            <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl text-center">
+                                <span className="block text-[10px] font-black uppercase text-rose-500 tracking-wider">Failed</span>
+                                <span className="text-2xl font-black text-rose-600">{importResult.failed}</span>
+                            </div>
+                        </div>
 
-                            {importResult.failed > 0 && (
-                                <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl space-y-3">
-                                    <p className="text-xs font-bold text-rose-700">
-                                        ⚠️ The import encountered {importResult.failed} errors. You can download the error log report to debug rows.
-                                    </p>
-                                    <button
-                                        onClick={downloadErrorReport}
-                                        className="w-full py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md flex items-center justify-center gap-1.5"
-                                    >
-                                        <MdFileDownload size={16} />
-                                        Download Error Report
-                                    </button>
-                                </div>
-                            )}
-
-                            <div className="pt-4 border-t border-slate-50">
+                        {importResult.failed > 0 && (
+                            <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl space-y-3">
+                                <p className="text-xs font-bold text-rose-700">
+                                    ⚠️ The import encountered {importResult.failed} errors. You can download the error log report to debug rows.
+                                </p>
                                 <button
-                                    onClick={() => setShowImportResultModal(false)}
-                                    className="w-full py-3.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg"
+                                    onClick={downloadErrorReport}
+                                    className="w-full py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md flex items-center justify-center gap-1.5"
                                 >
-                                    Close Summary
+                                    <MdFileDownload size={16} />
+                                    Download Error Report
                                 </button>
                             </div>
-                        </div>
+                        )}
                     </div>
-                </div>
+                </Modal>
             )}
         </div>
     );

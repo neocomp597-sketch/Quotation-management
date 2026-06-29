@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { MdSearch, MdNotifications, MdLogout, MdMenu, MdSettings, MdCheck } from 'react-icons/md';
 import { useNavigate, Link } from 'react-router-dom';
 import { notificationService, systemUpdateService } from '../services/api';
@@ -24,15 +24,80 @@ const formatNotificationType = (type) => {
     }
 };
 
+const searchablePages = [
+    { label: 'Dashboard', path: '/dashboard', permissionKey: 'dashboard_overview', keywords: ['home', 'overview'] },
+    { label: 'Customers', path: '/customers', permissionKey: 'master_customers', keywords: ['customer master'] },
+    { label: 'Vendors', path: '/vendors', permissionKey: 'master_vendors', keywords: ['vendor master'] },
+    { label: 'Contacts', path: '/contacts', permissionKey: 'master_contacts', keywords: ['contact master'] },
+    { label: 'Enquiries', path: '/enquiries', permissionKey: 'enquiry_leads', keywords: ['leads', 'enquiry register'] },
+    { label: 'Meetings', path: '/meetings', permissionKey: 'meetings_list', keywords: ['appointments', 'appointment register'] },
+    { label: 'Products', path: '/products', permissionKey: 'master_products', keywords: ['items', 'catalog'] },
+    { label: 'Invoices', path: '/invoices', permissionKey: 'sale_invoices', keywords: ['invoice', 'sales invoice', 'billing', 'bills'] },
+    { label: 'GRN', path: '/grn', permissionKey: 'purchase_grn', keywords: ['material received', 'purchase', 'goods received'] },
+    { label: 'MGR Master', path: '/mgrs', permissionKey: 'master_mgrs', keywords: ['mgr'] },
+    { label: 'Attributes', path: '/attributes', permissionKey: 'master_attributes', keywords: ['product attributes'] },
+    { label: 'Planning', path: '/planning', permissionKey: 'planning_screen', keywords: ['planning screen'] },
+    { label: 'Simulations', path: '/simulations', permissionKey: 'planning_simulations', keywords: ['simulation'] },
+    { label: 'Reports', path: '/reports', permissionKey: 'reports_main', keywords: ['report'] },
+    { label: 'Quotations', path: '/quotations', permissionKey: 'quotation_list', keywords: ['quotes', 'quote'] },
+    { label: 'Terms & Conditions', path: '/terms', permissionKey: 'master_terms', keywords: ['terms', 'conditions'] },
+    { label: 'Territory Master', path: '/territory-master', permissionKey: 'master_territories', keywords: ['territory'] },
+    { label: 'Settings', path: '/settings', permissionKey: 'settings_profile', keywords: ['profile'] },
+    { label: 'Authorization', path: '/admin/authorization', permissionKey: 'admin_authorization', keywords: ['permissions', 'roles'] },
+    { label: 'Salespersons', path: '/salespersons', permissionKey: 'admin_salespersons', adminOnly: true, keywords: ['sales person'] },
+    { label: 'Sales Dashboard', path: '/sales/dashboard', permissionKey: 'sales_dashboard', keywords: ['sales overview'] },
+    { label: 'Deals', path: '/sales/deals', permissionKey: 'sales_deals', keywords: ['deal board', 'pipeline deals'] },
+    { label: 'Sales Pipelines', path: '/sales/pipelines', permissionKey: 'sales_pipelines', adminOnly: true, keywords: ['pipeline'] },
+    { label: 'Forecasting', path: '/sales/forecasting', permissionKey: 'sales_forecasting', keywords: ['forecast'] },
+    { label: 'Sales Activities', path: '/sales/activities', permissionKey: 'sales_activities', keywords: ['activities'] },
+    { label: 'Sales Targets', path: '/sales/targets', permissionKey: 'sales_targets', keywords: ['targets'] },
+    { label: 'Price Books', path: '/sales/price-management/price-books', permissionKey: 'sales_price_management', keywords: ['price book'] },
+    { label: 'Pricing Rules', path: '/sales/price-management/pricing-rules', permissionKey: 'sales_price_management', keywords: ['pricing rule'] },
+    { label: 'Discount Policies', path: '/sales/price-management/discounts', permissionKey: 'sales_price_management', keywords: ['discounts'] },
+    { label: 'Promotions', path: '/sales/price-management/promotions', permissionKey: 'sales_price_management', keywords: ['promotion'] },
+    { label: 'Currency Rates', path: '/sales/price-management/currencies', permissionKey: 'sales_price_management', keywords: ['currency'] },
+    { label: 'Guided Selling', path: '/sales/cpq/guided-selling', permissionKey: 'sales_cpq', keywords: ['cpq guided'] },
+    { label: 'Configurator', path: '/sales/cpq/configurator', permissionKey: 'sales_cpq', keywords: ['cpq configurator'] },
+    { label: 'Quote Simulator', path: '/sales/cpq/simulator', permissionKey: 'sales_cpq', keywords: ['quote simulator'] },
+    { label: 'Approvals', path: '/sales/approvals', permissionKey: 'sales_approvals', keywords: ['approval'] },
+    { label: 'Contracts', path: '/sales/contracts', permissionKey: 'sales_contracts', keywords: ['contract'] },
+    { label: 'Orders', path: '/sales/orders', permissionKey: 'sales_orders', keywords: ['sales orders'] },
+    { label: 'Revenue Analytics', path: '/sales/revenue-analytics', permissionKey: 'sales_revenue_analytics', keywords: ['revenue'] },
+    { label: 'Competitor Intel', path: '/sales/competitors', permissionKey: 'sales_competitors', keywords: ['competitors'] },
+    { label: 'AI Pricing Insights', path: '/sales/ai-pricing', permissionKey: 'sales_ai_pricing', keywords: ['ai pricing'] },
+    { label: 'Payroll Dashboard', path: '/payroll/dashboard', permissionKey: 'payroll_runs', keywords: ['payroll overview'] },
+    { label: 'Employees', path: '/payroll/employees', permissionKey: 'payroll_employees', keywords: ['payroll employees'] },
+    { label: 'Run Payroll', path: '/payroll/runs', permissionKey: 'payroll_runs', keywords: ['payroll run'] },
+    { label: 'Payroll Payments', path: '/payroll/payments', permissionKey: 'payroll_payments', keywords: ['salary payments'] },
+    { label: 'Payslips', path: '/payroll/payslips', permissionKey: 'payroll_runs', keywords: ['pay slips'] },
+    { label: 'Payroll Letters', path: '/payroll/letters', permissionKey: 'payroll_letters', keywords: ['offer letters'] },
+    { label: 'Payroll Reports', path: '/payroll/reports', permissionKey: 'payroll_reports', keywords: ['salary reports'] },
+    { label: 'Payroll Settings', path: '/payroll/settings', permissionKey: 'payroll_settings', keywords: ['payroll config'] },
+    { label: 'CSM Dashboard', path: '/csm/dashboard', permissionKey: 'csm_dashboard', keywords: ['service dashboard'] },
+    { label: 'Tickets', path: '/csm/tickets', permissionKey: 'csm_tickets', keywords: ['tickets register', 'service tickets'] },
+    { label: 'Service Visits', path: '/csm/visits', permissionKey: 'csm_visits', keywords: ['visits'] },
+    { label: 'Warranty & AMC', path: '/csm/warranties-amc', permissionKey: 'csm_warranties_amc', keywords: ['warranty', 'amc'] },
+    { label: 'Knowledge Base', path: '/csm/kb', permissionKey: 'csm_kb', keywords: ['kb'] },
+    { label: 'CSM Config', path: '/csm/masters', permissionKey: 'csm_masters', keywords: ['csm masters'] },
+    { label: 'Service Reports', path: '/csm/reports', permissionKey: 'csm_dashboard', keywords: ['csm reports'] },
+    { label: 'Super Admin', path: '/super-admin', superAdminOnly: true, keywords: ['platform admin'] },
+    { label: 'System Updates', path: '/system-updates', superAdminOnly: true, keywords: ['updates', 'release notes'] },
+];
+
+const normalizeSearchText = (value) => value.trim().toLowerCase();
+
 const Header = ({ sidebarOpen, toggleSidebar }) => {
     const navigate = useNavigate();
-    const { user, logout } = useAuth();
+    const { user, logout, isAdmin, isSuperAdmin, hasAccess } = useAuth();
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [isNotifOpen, setIsNotifOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [notifications, setNotifications] = useState([]);
     const [systemUpdateNotification, setSystemUpdateNotification] = useState(null);
     const dropdownRef = useRef(null);
     const notifRef = useRef(null);
+    const searchRef = useRef(null);
 
     const handleLogout = () => {
         logout();
@@ -108,6 +173,9 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
             if (notifRef.current && !notifRef.current.contains(event.target)) {
                 setIsNotifOpen(false);
             }
+            if (searchRef.current && !searchRef.current.contains(event.target)) {
+                setIsSearchOpen(false);
+            }
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -174,6 +242,55 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
         ? [systemUpdateNotification, ...notifications]
         : notifications;
 
+    const allowedSearchPages = useMemo(() => (
+        searchablePages.filter((page) => {
+            if (page.superAdminOnly) return isSuperAdmin;
+            if (page.adminOnly && !(isAdmin || isSuperAdmin)) return false;
+            return page.permissionKey ? hasAccess(page.permissionKey) : true;
+        })
+    ), [hasAccess, isAdmin, isSuperAdmin]);
+
+    const searchMatches = useMemo(() => {
+        const query = normalizeSearchText(searchQuery);
+        if (!query) return [];
+
+        return allowedSearchPages
+            .map((page) => {
+                const terms = [page.label, page.path, ...(page.keywords || [])].map(normalizeSearchText);
+                const exactMatch = terms.some((term) => term === query || term === `${query}s` || `${term}s` === query);
+                const startsWithMatch = terms.some((term) => term.startsWith(query));
+                const includesMatch = terms.some((term) => term.includes(query));
+
+                if (exactMatch) return { ...page, score: 3 };
+                if (startsWithMatch) return { ...page, score: 2 };
+                if (includesMatch) return { ...page, score: 1 };
+                return null;
+            })
+            .filter(Boolean)
+            .sort((a, b) => b.score - a.score || a.label.localeCompare(b.label))
+            .slice(0, 6);
+    }, [allowedSearchPages, searchQuery]);
+
+    const goToSearchMatch = (page) => {
+        if (!page) return;
+        navigate(page.path);
+        setSearchQuery('');
+        setIsSearchOpen(false);
+    };
+
+    const handleSearchSubmit = (event) => {
+        event.preventDefault();
+        const query = normalizeSearchText(searchQuery);
+        if (!query) return;
+
+        const match = searchMatches[0];
+        if (match) {
+            goToSearchMatch(match);
+        } else {
+            toast.info('No matching page found');
+        }
+    };
+
     return (
         <header className={`fixed top-0 right-0 h-20 bg-white/80 backdrop-blur-xl border-b border-slate-100 z-40 transition-all duration-300 left-0 ${sidebarOpen ? 'md:left-64' : 'md:left-20'}`}>
             <div className="h-full px-6 flex items-center justify-between gap-4">
@@ -182,14 +299,40 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
                         <MdMenu size={24} />
                     </button>
 
-                    <div className="relative w-full max-w-lg hidden sm:block group">
+                    <form ref={searchRef} onSubmit={handleSearchSubmit} className="relative w-full max-w-lg hidden sm:block group">
                         <MdSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary-600 transition-colors" size={20} />
                         <input
                             type="text"
                             placeholder="Find quotes, customers, products..."
+                            value={searchQuery}
+                            onChange={(event) => {
+                                setSearchQuery(event.target.value);
+                                setIsSearchOpen(true);
+                            }}
+                            onFocus={() => setIsSearchOpen(true)}
                             className="w-full pl-12 pr-4 py-2.5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-primary-600/20 focus:bg-white transition-all outline-none text-sm font-semibold text-slate-900 placeholder:text-slate-400"
                         />
-                    </div>
+                        {isSearchOpen && searchQuery.trim() && (
+                            <div className="absolute left-0 right-0 top-full mt-3 bg-white border border-slate-100 shadow-2xl rounded-2xl overflow-hidden py-2 animate-in fade-in slide-in-from-top-2 duration-150">
+                                {searchMatches.length > 0 ? (
+                                    searchMatches.map((page) => (
+                                        <button
+                                            key={page.path}
+                                            type="button"
+                                            onMouseDown={(event) => event.preventDefault()}
+                                            onClick={() => goToSearchMatch(page)}
+                                            className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-slate-50 transition-colors"
+                                        >
+                                            <span className="text-sm font-black text-slate-800">{page.label}</span>
+                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{page.path}</span>
+                                        </button>
+                                    ))
+                                ) : (
+                                    <div className="px-4 py-3 text-sm font-bold text-slate-400">No matching page found</div>
+                                )}
+                            </div>
+                        )}
+                    </form>
                 </div>
 
                 <div className="flex items-center gap-3">

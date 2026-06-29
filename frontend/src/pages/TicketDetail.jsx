@@ -7,6 +7,7 @@ import {
     MdFeedback, MdArrowBack, MdSave, 
     MdWarning, MdCheckCircleOutline, MdChat 
 } from 'react-icons/md';
+import Modal from '../components/Modal';
 
 const TicketDetail = () => {
     const { id } = useParams();
@@ -552,57 +553,55 @@ const TicketDetail = () => {
             </div>
 
             {/* Visit Modal */}
-            {showVisitModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-                    <div className="bg-white rounded-[2rem] shadow-2xl border border-slate-100 max-w-md w-full overflow-hidden animate-scale-in">
-                        <div className="px-6 py-5 border-b border-slate-50 bg-slate-50 flex items-center justify-between">
-                            <h3 className="font-outfit font-black text-lg text-slate-900 uppercase">
-                                Schedule Visit
-                            </h3>
-                            <button onClick={() => setShowVisitModal(false)} className="text-slate-400 hover:text-slate-600 font-bold">✕</button>
-                        </div>
-                        <form onSubmit={handleScheduleVisit} className="p-6 space-y-4">
-                            <div>
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Appointment Date & Time *</label>
-                                <input
-                                    type="datetime-local"
-                                    required
-                                    value={visitDate}
-                                    onChange={(e) => setVisitDate(e.target.value)}
-                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Assign Service Engineer *</label>
-                                <select
-                                    required
-                                    value={visitEngineer}
-                                    onChange={(e) => setVisitEngineer(e.target.value)}
-                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
-                                >
-                                    <option value="">Select Engineer</option>
-                                    {engineers.map(u => <option key={u._id} value={u._id}>{u.name}</option>)}
-                                </select>
-                            </div>
-                            <div className="flex gap-3 pt-4 border-t border-slate-50">
-                                <button
-                                    type="button"
-                                    onClick={() => setShowVisitModal(false)}
-                                    className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    className="flex-1 py-3.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg"
-                                >
-                                    Schedule
-                                </button>
-                            </div>
-                        </form>
+            <Modal
+                isOpen={showVisitModal}
+                onClose={() => setShowVisitModal(false)}
+                title="Schedule Visit"
+                maxWidth="max-w-md"
+                footer={
+                    <>
+                        <button
+                            type="button"
+                            onClick={() => setShowVisitModal(false)}
+                            className="flex-1 w-full py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            form="schedule-visit-form"
+                            className="flex-1 w-full py-3.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg"
+                        >
+                            Schedule
+                        </button>
+                    </>
+                }
+            >
+                <form id="schedule-visit-form" onSubmit={handleScheduleVisit} className="space-y-4">
+                    <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Appointment Date & Time *</label>
+                        <input
+                            type="datetime-local"
+                            required
+                            value={visitDate}
+                            onChange={(e) => setVisitDate(e.target.value)}
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
+                        />
                     </div>
-                </div>
-            )}
+                    <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Assign Service Engineer *</label>
+                        <select
+                            required
+                            value={visitEngineer}
+                            onChange={(e) => setVisitEngineer(e.target.value)}
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
+                        >
+                            <option value="">Select Engineer</option>
+                            {engineers.map(u => <option key={u._id} value={u._id}>{u.name}</option>)}
+                        </select>
+                    </div>
+                </form>
+            </Modal>
         </div>
     );
 };

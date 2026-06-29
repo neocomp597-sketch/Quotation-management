@@ -44,6 +44,7 @@ const CSMTickets = () => {
     const [assets, setAssets] = useState([]);
     const [assetSummary, setAssetSummary] = useState(null);
     const [showAllProducts, setShowAllProducts] = useState(false);
+    const [generatedSerial, setGeneratedSerial] = useState('');
     
     // Modal & Form State
     const [showModal, setShowModal] = useState(false);
@@ -197,7 +198,60 @@ const CSMTickets = () => {
         }
     }, [formData.customerId]);
 
+    // Fetch assets dynamically when customer or product changes to auto-select serial number
+    useEffect(() => {
+        if (formData.customerId && formData.productId) {
+            csmService.getAssets({ customerId: formData.customerId, productId: formData.productId })
+                .then(res => {
+                    const fetchedAssets = res.data || [];
+                    setAssets(prev => {
+                        const existingIds = new Set(prev.map(a => a._id));
+                        const newAssets = fetchedAssets.filter(a => !existingIds.has(a._id));
+                        return [...prev, ...newAssets];
+                    });
+                    
+                    if (fetchedAssets.length > 0) {
+                        const firstAsset = fetchedAssets[0];
+                        setFormData(prev => {
+                            if (!prev.assetId) {
+                                return { ...prev, assetId: firstAsset._id };
+                            }
+                            return prev;
+                        });
+                        setGeneratedSerial('');
+                        
+                        csmService.getAssetSummary({ assetId: firstAsset._id })
+                            .then(summaryRes => {
+                                setAssetSummary(summaryRes.data);
+                                const hasCoverage = summaryRes.data.warranty?.status === 'Active' || summaryRes.data.amc?.status === 'Active';
+                                if (!hasCoverage) {
+                                    const medPriority = priorities.find(p => p.name?.toLowerCase() === 'medium');
+                                    if (medPriority) {
+                                        setFormData(prev => ({ ...prev, priorityId: medPriority._id }));
+                                    }
+                                }
+                            })
+                            .catch(err => console.error('Error fetching asset summary:', err));
+                    } else {
+                        // Generate a serial number if no assets exist
+                        setFormData(prev => {
+                            if (!prev.assetId && !generatedSerial) {
+                                const selectedProd = products.find(p => p._id === formData.productId);
+                                const prodCode = selectedProd?.productCode || 'PROD';
+                                const randomNum = Math.floor(1000 + Math.random() * 9000);
+                                const tempSN = `SN-${prodCode.replace(/\s+/g, '')}-${randomNum}`;
+                                setGeneratedSerial(tempSN);
+                            }
+                            return prev;
+                        });
+                    }
+                })
+                .catch(err => console.error('Error fetching assets dynamically:', err));
+        }
+    }, [formData.customerId, formData.productId, priorities, products, generatedSerial]);
+
     const handleCustomerChange = (customerId) => {
+        const selectedCust = customers.find(c => c._id === customerId);
         setFormData(prev => ({
             ...prev,
             customerId,
@@ -205,14 +259,15 @@ const CSMTickets = () => {
             contactName: '',
             contactDesignationId: '',
             contactDesignation: '',
-            contactPhone: '',
-            contactEmail: '',
+            contactPhone: selectedCust ? (selectedCust.mobile || '') : '',
+            contactEmail: selectedCust ? (selectedCust.email || '') : '',
             invoiceId: '',
             productId: '',
             assetId: ''
         }));
         setAssetSummary(null);
         setShowAllProducts(false);
+        setGeneratedSerial('');
     };
 
     const handleSerialChange = (assetId) => {
@@ -255,12 +310,57 @@ const CSMTickets = () => {
     };
 
     const handleProductChange = (productId) => {
+        if (!productId) {
+            setFormData(prev => ({
+                ...prev,
+                productId: '',
+                assetId: ''
+            }));
+            setAssetSummary(null);
+            setGeneratedSerial('');
+            return;
+        }
+
+        // Find if there is any matching asset for this product & customer
+        const matchingAssets = assets.filter(a => 
+            a.customerId?._id === formData.customerId && 
+            a.productId?._id === productId
+        );
+        
+        const autoAssetId = matchingAssets.length > 0 ? matchingAssets[0]._id : '';
+        
         setFormData(prev => ({
             ...prev,
             productId,
-            assetId: '' // Clear asset when product changes
+            assetId: autoAssetId
         }));
-        setAssetSummary(null);
+        
+        if (autoAssetId) {
+            setGeneratedSerial('');
+            // Fetch asset summary
+            csmService.getAssetSummary({ assetId: autoAssetId })
+                .then(res => {
+                    setAssetSummary(res.data);
+                    const hasCoverage = res.data.warranty?.status === 'Active' || res.data.amc?.status === 'Active';
+                    if (!hasCoverage) {
+                        const medPriority = priorities.find(p => p.name?.toLowerCase() === 'medium');
+                        if (medPriority) {
+                            setFormData(prev => ({ ...prev, priorityId: medPriority._id }));
+                        }
+                    }
+                })
+                .catch(err => {
+                    console.error('Error fetching asset summary:', err);
+                    setAssetSummary(null);
+                });
+        } else {
+            setAssetSummary(null);
+            const selectedProd = products.find(p => p._id === productId);
+            const prodCode = selectedProd?.productCode || 'PROD';
+            const randomNum = Math.floor(1000 + Math.random() * 9000);
+            const tempSN = `SN-${prodCode.replace(/\s+/g, '')}-${randomNum}`;
+            setGeneratedSerial(tempSN);
+        }
     };
 
     const handleSubjectChange = (subjectVal) => {
@@ -330,14 +430,27 @@ const CSMTickets = () => {
             return;
         }
 
-        // Serial validation: if customer has assets for this product, force choosing a serial number
-        const matchingAssets = assets.filter(a => a.customerId?._id === formData.customerId && a.productId?._id === formData.productId);
-        if (matchingAssets.length > 0 && !formData.assetId) {
-            toast.error('Please select a Serial Number for this serialized product.');
-            return;
+        let assetIdToSubmit = formData.assetId;
+
+        // If no assetId exists but we have a generatedSerial, create the asset first!
+        if (!assetIdToSubmit && generatedSerial) {
+            try {
+                const assetRes = await csmService.createAsset({
+                    customerId: formData.customerId,
+                    productId: formData.productId,
+                    serialNumber: generatedSerial,
+                    location: 'Auto Generated'
+                });
+                assetIdToSubmit = assetRes.data._id;
+                setAssets(prev => [...prev, assetRes.data]);
+            } catch (err) {
+                console.error('Error creating dynamic asset:', err);
+                toast.error('Failed to register auto-generated serial number.');
+                return;
+            }
         }
 
-        const cleanedFormData = { ...formData };
+        const cleanedFormData = { ...formData, assetId: assetIdToSubmit };
         const optionalObjectIdFields = ['contactId', 'contactDesignationId', 'productId', 'assetId', 'invoiceId'];
         optionalObjectIdFields.forEach(field => {
             if (cleanedFormData[field] === '') {
@@ -350,6 +463,7 @@ const CSMTickets = () => {
             toast.success('Support ticket generated successfully!');
             setShowModal(false);
             fetchTickets();
+            setGeneratedSerial('');
         } catch (error) {
             toast.error(error.response?.data?.message || 'Error generating ticket');
         }
@@ -788,31 +902,56 @@ const CSMTickets = () => {
                                 onChange={handleCustomerChange}
                                 placeholder="Search & Select Customer..."
                             />
+                            {(() => {
+                                const selectedCust = customers.find(c => c._id === formData.customerId);
+                                if (!selectedCust) return null;
+                                return (
+                                    <div className="mt-3 p-3.5 bg-slate-50/50 border border-slate-100 rounded-2xl space-y-1.5 text-xs animate-fade-in">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-slate-400 font-bold uppercase text-[9px] tracking-wider">GSTIN</span>
+                                            <span className="text-slate-700 font-mono font-bold">{selectedCust.gstin || 'N/A'}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-slate-400 font-bold uppercase text-[9px] tracking-wider">Phone</span>
+                                            <span className="text-slate-700 font-bold">{selectedCust.mobile || 'N/A'}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-slate-400 font-bold uppercase text-[9px] tracking-wider">Email</span>
+                                            <span className="text-slate-700 font-bold break-all">{selectedCust.email || 'N/A'}</span>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
                         </div>
                         <div>
-                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Product Serial Number</label>
-                            <SearchableSelect
-                                options={
-                                    (() => {
-                                        let filteredAssets = assets;
-                                        if (formData.customerId) {
-                                            filteredAssets = filteredAssets.filter(a => a.customerId?._id === formData.customerId);
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                                Link Invoice {formData.customerId ? `(${invoices.length})` : ''}
+                            </label>
+                            <select
+                                value={formData.invoiceId}
+                                disabled={!formData.customerId}
+                                onChange={(e) => {
+                                    const nextInvoiceId = e.target.value;
+                                    setFormData(prev => {
+                                        const nextData = { ...prev, invoiceId: nextInvoiceId };
+                                        if (nextInvoiceId) {
+                                            const selectedInvoice = invoices.find(i => i._id === nextInvoiceId);
+                                            const invoiceProductIds = selectedInvoice ? selectedInvoice.items.map(item => item.productId?.toString()).filter(Boolean) : [];
+                                            if (prev.productId && !invoiceProductIds.includes(prev.productId.toString())) {
+                                                nextData.productId = '';
+                                                nextData.assetId = '';
+                                            }
                                         }
-                                        if (formData.productId) {
-                                            filteredAssets = filteredAssets.filter(a => a.productId?._id === formData.productId);
-                                        }
-                                        return filteredAssets.map(a => ({
-                                            value: a._id,
-                                            label: `${a.serialNumber} (${a.productId?.productName || 'Unknown Product'})`
-                                        }));
-                                    })()
-                                }
-                                value={formData.assetId}
-                                onChange={handleSerialChange}
-                                placeholder="Search & Select Serial Number..."
-                            />
+                                        return nextData;
+                                    });
+                                }}
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold disabled:bg-slate-50 disabled:text-slate-400"
+                            >
+                                <option value="">{formData.customerId ? `Select Invoice (${invoices.length} available)` : 'Select Customer First'}</option>
+                                {invoices.map(i => <option key={i._id} value={i._id}>{i.voucherNumber} ({new Date(i.date).toLocaleDateString()})</option>)}
+                            </select>
                         </div>
-                        <div className="md:col-span-2">
+                        <div>
                             <div className="flex justify-between items-center mb-1">
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Link Product *</label>
                                 {formData.customerId && assets.some(a => a.customerId?._id === formData.customerId) && (
@@ -830,19 +969,50 @@ const CSMTickets = () => {
                             <SearchableSelect
                                 options={
                                     (() => {
-                                        const customerHasAssets = formData.customerId && assets.some(a => a.customerId?._id === formData.customerId);
-                                        const filteredProds = (formData.customerId && customerHasAssets && !showAllProducts)
-                                            ? products.filter(p => assets.some(a => a.customerId?._id === formData.customerId && a.productId?._id === p._id))
-                                            : products;
-                                        return filteredProds.map(p => ({
-                                            value: p._id,
-                                            label: `${p.productName} (${p.productCode})`
-                                        }));
+                                        if (formData.invoiceId) {
+                                            const selectedInvoice = invoices.find(i => i._id === formData.invoiceId);
+                                            if (selectedInvoice) {
+                                                return selectedInvoice.items.map(item => ({
+                                                    value: item.productId?.toString() || item._id?.toString(),
+                                                    label: item.productName
+                                                }));
+                                            }
+                                            return [];
+                                        } else {
+                                            const customerHasAssets = formData.customerId && assets.some(a => a.customerId?._id === formData.customerId);
+                                            const filteredProds = (formData.customerId && customerHasAssets && !showAllProducts)
+                                                ? products.filter(p => assets.some(a => a.customerId?._id === formData.customerId && a.productId?._id === p._id))
+                                                : products;
+                                            return filteredProds.map(p => ({
+                                                value: p._id,
+                                                label: `${p.productName} (${p.productCode})`
+                                            }));
+                                        }
                                     })()
                                 }
                                 value={formData.productId}
                                 onChange={handleProductChange}
                                 placeholder="Search & Select Product..."
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Product Serial Number</label>
+                            <input
+                                type="text"
+                                readOnly
+                                value={
+                                    (() => {
+                                        const selectedAsset = assets.find(a => a._id === formData.assetId);
+                                        if (selectedAsset) return selectedAsset.serialNumber;
+                                        if (assetSummary && assetSummary.asset && assetSummary.asset._id === formData.assetId) {
+                                            return assetSummary.asset.serialNumber;
+                                        }
+                                        if (generatedSerial) return `${generatedSerial} (Auto-Generated)`;
+                                        return formData.productId ? (formData.assetId ? 'Loading...' : 'No Serial Number Found') : 'Select Product First';
+                                    })()
+                                }
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold bg-slate-50 text-slate-500 cursor-not-allowed"
+                                placeholder="Auto-populated Serial Number"
                             />
                         </div>
 
@@ -903,19 +1073,6 @@ const CSMTickets = () => {
                                 </div>
                             </div>
                         )}
-
-                        <div>
-                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Link Invoice</label>
-                            <select
-                                value={formData.invoiceId}
-                                disabled={!formData.customerId}
-                                onChange={(e) => setFormData({ ...formData, invoiceId: e.target.value })}
-                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold disabled:bg-slate-50 disabled:text-slate-400"
-                            >
-                                <option value="">{formData.customerId ? 'Select Invoice' : 'Select Customer First'}</option>
-                                {invoices.map(i => <option key={i._id} value={i._id}>{i.voucherNumber} ({new Date(i.date).toLocaleDateString()})</option>)}
-                            </select>
-                        </div>
                         <div>
                             <div className="flex justify-between items-center mb-1">
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Ticket Source</label>

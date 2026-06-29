@@ -60,10 +60,14 @@ const adjustProductStock = async (voucherData, direction) => {
 // Get all vouchers
 exports.getVouchers = async (req, res) => {
     try {
-        const { scope, type } = req.query;
+        const { scope, type, voucherType, customerId } = req.query;
         const filter = {};
-        if (type) {
-            filter.voucherType = type;
+        if (customerId) {
+            filter.customerId = customerId;
+        }
+        const finalType = type || voucherType;
+        if (finalType) {
+            filter.voucherType = finalType;
         } else if (scope === 'invoice') {
             filter.voucherType = 'Invoice';
         } else if (scope === 'grn') {

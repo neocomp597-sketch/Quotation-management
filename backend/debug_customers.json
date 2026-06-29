@@ -18107,5 +18107,12 @@
     "companyName": "Test 22 Jun 2026",
     "gstin": "22062026",
     "logoUrl": "https://biswjczulbtwqufsviha.supabase.co/storage/v1/object/public/images/uploads/afca23bf-51a3-45f5-aa41-52182864b6a5-38399.jpg"
+  },
+  {
+    "_id": "6a4288617748fc13165fd8a6",
+    "customerName": "E1007",
+    "companyName": "SUYASH PVT.LMTD",
+    "gstin": "45SFDG512546",
+    "logoUrl": ""
   }
 ]
