@@ -337,8 +337,16 @@ const CSMTickets = () => {
             return;
         }
 
+        const cleanedFormData = { ...formData };
+        const optionalObjectIdFields = ['contactId', 'contactDesignationId', 'productId', 'assetId', 'invoiceId'];
+        optionalObjectIdFields.forEach(field => {
+            if (cleanedFormData[field] === '') {
+                cleanedFormData[field] = null;
+            }
+        });
+
         try {
-            await csmService.createTicket(formData);
+            await csmService.createTicket(cleanedFormData);
             toast.success('Support ticket generated successfully!');
             setShowModal(false);
             fetchTickets();

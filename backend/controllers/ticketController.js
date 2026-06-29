@@ -33,6 +33,14 @@ exports.createTicket = async (req, res) => {
         const resolutionDue = new Date(now.getTime() + priority.resolutionSlaHours * 60 * 60 * 1000);
         const ticketBody = { ...req.body };
 
+        // Clean empty string values for optional ObjectId fields to avoid Cast to ObjectId errors
+        const optionalObjectIdFields = ['contactId', 'contactDesignationId', 'productId', 'assetId', 'invoiceId', 'assignedTeamId', 'assignedEngineerId'];
+        for (const field of optionalObjectIdFields) {
+            if (ticketBody[field] === '') {
+                ticketBody[field] = null;
+            }
+        }
+
         if (ticketBody.contactId) {
             const contact = await CustomerContact.findOne({
                 _id: ticketBody.contactId,
@@ -159,9 +167,16 @@ exports.getTicketById = async (req, res) => {
 
 exports.updateTicket = async (req, res) => {
     try {
+        const ticketBody = { ...req.body };
+        const optionalObjectIdFields = ['contactId', 'contactDesignationId', 'productId', 'assetId', 'invoiceId', 'assignedTeamId', 'assignedEngineerId'];
+        for (const field of optionalObjectIdFields) {
+            if (ticketBody[field] === '') {
+                ticketBody[field] = null;
+            }
+        }
         const ticket = await Ticket.findOneAndUpdate(
             { _id: req.params.id, companyId: req.user?.companyId },
-            req.body,
+            ticketBody,
             { new: true, runValidators: true }
         );
         if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
