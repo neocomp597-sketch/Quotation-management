@@ -616,7 +616,7 @@ const WarrantyAMC = () => {
                                     {warranties.map((w) => (
                                         <tr key={w._id} className="hover:bg-slate-50/50 transition-colors">
                                             <td className="px-6 py-4 font-black text-slate-900">{w.serialNumber || 'N/A'}</td>
-                                            <td className="px-6 py-4 text-slate-900">{w.customerId?.customerName}</td>
+                                            <td className="px-6 py-4 text-slate-900">{w.customerId?.companyName || w.customerId?.customerName}</td>
                                             <td className="px-6 py-4 text-slate-500">{w.productId?.productName}</td>
                                             <td className="px-6 py-4 text-slate-400">{new Date(w.purchaseDate).toLocaleDateString()}</td>
                                             <td className="px-6 py-4 text-slate-400">{new Date(w.expiryDate).toLocaleDateString()}</td>
@@ -653,7 +653,7 @@ const WarrantyAMC = () => {
                                     {amcs.map((a) => (
                                         <tr key={a._id} className="hover:bg-slate-50/50 transition-colors">
                                             <td className="px-6 py-4 font-black text-slate-900">{a.contractNo}</td>
-                                            <td className="px-6 py-4 text-slate-900">{a.customerId?.customerName}</td>
+                                            <td className="px-6 py-4 text-slate-900">{a.customerId?.companyName || a.customerId?.customerName}</td>
                                             <td className="px-6 py-4 text-slate-400">{new Date(a.startDate).toLocaleDateString()} - {new Date(a.endDate).toLocaleDateString()}</td>
                                             <td className="px-6 py-4 text-slate-500">{a.visitsAllowed} Allowed / {a.visitsUsed} Used</td>
                                             <td className="px-6 py-4 font-black text-teal-600">₹{a.amount || 0}</td>
@@ -706,7 +706,7 @@ const WarrantyAMC = () => {
                             className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
                         >
                             <option value="">Select Customer</option>
-                            {customers.map(c => <option key={c._id} value={c._id}>{c.customerName}</option>)}
+                            {customers.map(c => <option key={c._id} value={c._id}>{c.companyName || c.customerName}</option>)}
                         </select>
                     </div>
 
