@@ -6,6 +6,7 @@ import { voucherService, vendorService, productService, customerService } from '
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import VoucherPDF from '../components/VoucherPDF';
 import PortalDropdown from '../components/PortalDropdown';
+import Modal from '../components/Modal';
 
 const CreateVoucher = ({ mode = 'grn', isViewOnly = false }) => {
     const navigate = useNavigate();
@@ -599,72 +600,78 @@ const CreateVoucher = ({ mode = 'grn', isViewOnly = false }) => {
             </div>
 
             {/* Success Actions Modal */}
-            {showSuccessModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-                    <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl space-y-6 text-center animate-in fade-in zoom-in duration-200">
-                        <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <MdSave size={40} />
-                        </div>
-                        <div>
-                            <h3 className="text-2xl font-black text-slate-900 tracking-tight">Voucher Saved!</h3>
-                            <p className="text-slate-500 font-medium mt-2 leading-relaxed">Your voucher has been successfully recorded and inventory is updated.</p>
-                        </div>
-                        
-                        <div className="space-y-3 pt-4 border-t border-slate-100">
-                            <PDFDownloadLink document={<VoucherPDF voucher={voucherData} companySettings={companySettings} />} fileName={`Voucher-${voucherData.voucherNumber.replace(/\//g, '-')}.pdf`}>
-                                {({ loading: pdfLoading }) => (
-                                    <button
-                                        disabled={pdfLoading}
-                                        className="w-full flex items-center justify-center gap-2 py-3.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-900 rounded-xl font-bold transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50"
-                                    >
-                                        <MdPrint size={20} className="text-slate-500" /> {pdfLoading ? 'Preparing PDF...' : 'Print Voucher'}
-                                    </button>
-                                )}
-                            </PDFDownloadLink>
-                            
-                            {!isEditMode && savedVoucherId && savedVoucherId !== 'new' && (
+            <Modal
+                isOpen={showSuccessModal}
+                onClose={() => setShowSuccessModal(false)}
+                hideHeader={true}
+                maxWidth="max-w-sm"
+            >
+                <div className="text-center space-y-6 py-2">
+                    <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
+                        <MdSave size={40} />
+                    </div>
+                    <div>
+                        <h3 className="text-2xl font-black text-slate-900 tracking-tight">Voucher Saved!</h3>
+                        <p className="text-slate-500 font-medium mt-2 leading-relaxed">Your voucher has been successfully recorded and inventory is updated.</p>
+                    </div>
+                    
+                    <div className="space-y-3 pt-4 border-t border-slate-100">
+                        <PDFDownloadLink document={<VoucherPDF voucher={voucherData} companySettings={companySettings} />} fileName={`Voucher-${voucherData.voucherNumber.replace(/\//g, '-')}.pdf`}>
+                            {({ loading: pdfLoading }) => (
                                 <button
-                                    onClick={() => {
-                                        setShowSuccessModal(false);
-                                        navigate(`${basePath}/${savedVoucherId}`);
-                                    }}
-                                    className="w-full flex items-center justify-center gap-2 py-3.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-900 rounded-xl font-bold transition-all hover:scale-[1.02] active:scale-95"
+                                    disabled={pdfLoading}
+                                    className="w-full flex items-center justify-center gap-2 py-3.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-900 rounded-xl font-bold transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50"
                                 >
-                                    <MdEdit size={20} className="text-amber-500" /> Edit Current Voucher
+                                    <MdPrint size={20} className="text-slate-500" /> {pdfLoading ? 'Preparing PDF...' : 'Print Voucher'}
                                 </button>
                             )}
+                        </PDFDownloadLink>
+                        
+                        {!isEditMode && savedVoucherId && savedVoucherId !== 'new' && (
                             <button
                                 onClick={() => {
-                                    setVoucherData({
-                                        voucherType: isInvoiceMode ? 'Invoice' : 'Purchase',
-                                        voucherNumber: `${isInvoiceMode ? 'INV' : 'GRN'}-${Date.now()}`,
-                                        date: new Date().toISOString().split('T')[0],
-                                        vendorId: '',
-                                        vendorName: '',
-                                        customerId: '',
-                                        customerName: '',
-                                        contactNumber: '',
-                                        referenceVoucherId: '',
-                                        items: [
-                                            { id: Date.now(), srNumber: 1, productId: '', productName: '', qty: 0, uom: 'Pcs', price: 0, amount: 0, taxPercentage: 5, taxAmount: 0 }
-                                        ]
-                                    });
                                     setShowSuccessModal(false);
+                                    navigate(`${basePath}/${savedVoucherId}`);
                                 }}
-                                className="w-full flex items-center justify-center gap-2 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-lg shadow-emerald-600/20 transition-all hover:scale-[1.02] active:scale-95"
+                                className="w-full flex items-center justify-center gap-2 py-3.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-900 rounded-xl font-bold transition-all hover:scale-[1.02] active:scale-95"
                             >
-                                <MdAdd size={20} /> Create New
+                                <MdEdit size={20} className="text-amber-500" /> Edit Current Voucher
                             </button>
-                            <button
-                                onClick={() => navigate(basePath)}
-                                className="w-full flex items-center justify-center gap-2 pt-2 text-slate-400 hover:text-slate-900 font-bold transition-colors"
-                            >
-                                Go to {isInvoiceMode ? 'Invoices' : 'GRN'} List
-                            </button>
-                        </div>
+                        )}
+                        <button
+                            onClick={() => {
+                                setVoucherData({
+                                    voucherType: isInvoiceMode ? 'Invoice' : 'Purchase',
+                                    voucherNumber: `${isInvoiceMode ? 'INV' : 'GRN'}-${Date.now()}`,
+                                    date: new Date().toISOString().split('T')[0],
+                                    vendorId: '',
+                                    vendorName: '',
+                                    customerId: '',
+                                    customerName: '',
+                                    contactNumber: '',
+                                    referenceVoucherId: '',
+                                    items: [
+                                        { id: Date.now(), srNumber: 1, productId: '', productName: '', qty: 0, uom: 'Pcs', price: 0, amount: 0, taxPercentage: 5, taxAmount: 0 }
+                                    ]
+                                });
+                                setShowSuccessModal(false);
+                            }}
+                            className="w-full flex items-center justify-center gap-2 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-lg shadow-emerald-600/20 transition-all hover:scale-[1.02] active:scale-95"
+                        >
+                            <MdAdd size={20} /> Create New
+                        </button>
+                        <button
+                            onClick={() => {
+                                setShowSuccessModal(false);
+                                navigate(basePath);
+                            }}
+                            className="w-full flex items-center justify-center gap-2 pt-2 text-slate-400 hover:text-slate-900 font-bold transition-colors"
+                        >
+                            Go to {isInvoiceMode ? 'Invoices' : 'GRN'} List
+                        </button>
                     </div>
                 </div>
-            )}
+            </Modal>
         </div>
     );
 };

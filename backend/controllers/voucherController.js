@@ -128,6 +128,117 @@ exports.createVoucher = async (req, res) => {
             if (!voucherData.customerName) {
                 return res.status(400).json({ message: 'Customer Name is required for invoices' });
             }
+
+            // Assign / generate Serial Numbers for invoice products
+            const Asset = require('../models/Asset');
+            for (const item of voucherData.items || []) {
+                if (!item.productId) continue;
+
+                const product = await Product.findById(item.productId).lean();
+                if (!product) continue;
+
+                // Skip non-physical items like Services or Subscriptions
+                if (['Service', 'Subscription'].includes(product.catalogType)) {
+                    continue;
+                }
+
+                const qty = Number(item.qty || 0);
+                if (qty <= 0) continue;
+
+                // Retrieve oldest available stock serials
+                const existingAssets = await Asset.find({
+                    companyId: req.user?.companyId,
+                    productId: item.productId,
+                    status: 'IN_STOCK'
+                })
+                .sort({ createdAt: 1 })
+                .limit(qty);
+
+                const assignedSerials = [];
+
+                for (const asset of existingAssets) {
+                    await Asset.findByIdAndUpdate(asset._id, {
+                        customerId: voucherData.customerId,
+                        status: 'SOLD',
+                        invoiceNumber: voucherData.voucherNumber,
+                        invoiceDate: voucherData.date,
+                        saleDate: voucherData.date,
+                        assignedAt: new Date(),
+                        createdBy: req.user?.id,
+                        warrantyStart: voucherData.date,
+                        warrantyEnd: new Date(new Date(voucherData.date).setFullYear(new Date(voucherData.date).getFullYear() + 1))
+                    });
+
+                    assignedSerials.push({
+                        serialNumber: asset.serialNumber,
+                        assetId: asset._id
+                    });
+                }
+
+                const remaining = qty - existingAssets.length;
+                if (remaining > 0) {
+                    // Generate new serial numbers
+                    let prefix = 'SN';
+                    const prodCode = product.productCode;
+                    const prodName = product.productName;
+                    if (prodCode) {
+                        prefix = prodCode.replace(/[^A-Za-z0-9]/g, '').slice(0, 2).toUpperCase();
+                    }
+                    if (prefix.length < 2 && prodName) {
+                        prefix = prodName.replace(/[^A-Za-z0-9]/g, '').slice(0, 2).toUpperCase();
+                    }
+                    if (prefix.length < 2) {
+                        prefix = 'DH';
+                    }
+
+                    const regex = new RegExp(`^${prefix}\\d+$`);
+                    const latestAsset = await Asset.findOne({
+                        companyId: req.user?.companyId,
+                        serialNumber: regex
+                    })
+                    .sort({ serialNumber: -1 })
+                    .lean();
+
+                    let startIndex = 1;
+                    if (latestAsset) {
+                        const numPart = latestAsset.serialNumber.slice(prefix.length);
+                        const parsed = parseInt(numPart, 10);
+                        if (!isNaN(parsed)) {
+                            startIndex = parsed + 1;
+                        }
+                    }
+
+                    for (let i = 0; i < remaining; i++) {
+                        const serialNumber = `${prefix}${String(startIndex + i).padStart(3, '0')}`;
+                        const wStart = voucherData.date;
+                        const wEnd = new Date(wStart);
+                        wEnd.setFullYear(wEnd.getFullYear() + 1);
+
+                        const newAsset = await Asset.create({
+                            companyId: req.user?.companyId,
+                            customerId: voucherData.customerId,
+                            productId: item.productId,
+                            serialNumber,
+                            status: 'SOLD',
+                            invoiceNumber: voucherData.voucherNumber,
+                            invoiceDate: voucherData.date,
+                            saleDate: voucherData.date,
+                            assignedAt: new Date(),
+                            createdBy: req.user?.id,
+                            warrantyStart: wStart,
+                            warrantyEnd: wEnd,
+                            installationDate: wStart
+                        });
+
+                        assignedSerials.push({
+                            serialNumber: newAsset.serialNumber,
+                            assetId: newAsset._id
+                        });
+                    }
+                }
+
+                item.serialNumbers = assignedSerials;
+            }
         } else if (voucherData.voucherType === 'Purchase') {
             delete voucherData.customerId;
             delete voucherData.customerName;
@@ -147,6 +258,16 @@ exports.createVoucher = async (req, res) => {
         
         const newVoucher = new Voucher(voucherData);
         await newVoucher.save();
+
+        // Update assigned assets with the saved invoice's ObjectId
+        if (voucherData.voucherType === 'Invoice') {
+            const Asset = require('../models/Asset');
+            for (const item of newVoucher.items || []) {
+                for (const sn of item.serialNumbers || []) {
+                    await Asset.findByIdAndUpdate(sn.assetId, { invoiceId: newVoucher._id });
+                }
+            }
+        }
 
         await adjustProductStock(voucherData, isInvoiceType(voucherData.voucherType) ? 'out' : 'in');
 

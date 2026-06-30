@@ -1248,18 +1248,29 @@ const CSMTickets = () => {
                             <div className="md:col-span-2 p-5 bg-gradient-to-br from-slate-50 to-slate-100/50 border border-slate-200 rounded-3xl space-y-3 shadow-sm animate-fade-in">
                                 <div className="flex items-center justify-between border-b border-slate-200 pb-2">
                                     <span className="text-xs font-black uppercase tracking-wider text-slate-700">🔎 Asset Information Lookup</span>
-                                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
-                                        assetSummary.warranty?.status === 'Active' || assetSummary.amc?.status === 'Active'
-                                            ? 'bg-teal-50 text-teal-600 border-teal-200'
-                                            : 'bg-rose-50 text-rose-500 border-rose-200'
-                                    }`}>
-                                        {assetSummary.warranty?.status === 'Active' || assetSummary.amc?.status === 'Active' ? 'Covered' : 'Out of Warranty/AMC'}
-                                    </span>
+                                    <div className="flex gap-2">
+                                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
+                                            assetSummary.asset?.status === 'SOLD'
+                                                ? 'bg-blue-50 text-blue-600 border-blue-200'
+                                                : assetSummary.asset?.status === 'IN_STOCK'
+                                                ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
+                                                : 'bg-slate-50 text-slate-600 border-slate-200'
+                                        }`}>
+                                            Status: {assetSummary.asset?.status || 'IN_STOCK'}
+                                        </span>
+                                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
+                                            assetSummary.warranty?.status === 'Active' || assetSummary.amc?.status === 'Active'
+                                                ? 'bg-teal-50 text-teal-600 border-teal-200'
+                                                : 'bg-rose-50 text-rose-500 border-rose-200'
+                                        }`}>
+                                            {assetSummary.warranty?.status === 'Active' || assetSummary.amc?.status === 'Active' ? 'Covered' : 'Out of Warranty/AMC'}
+                                        </span>
+                                    </div>
                                 </div>
                                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-xs font-semibold text-slate-600">
                                     <div>
                                         <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Customer</span>
-                                        <span className="text-slate-900">{assetSummary.asset?.customerId?.companyName || assetSummary.asset?.customerId?.customerName}</span>
+                                        <span className="text-slate-900">{assetSummary.asset?.customerId?.companyName || assetSummary.asset?.customerId?.customerName || 'Stock (Unsold)'}</span>
                                     </div>
                                     <div>
                                         <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Product</span>
@@ -1268,6 +1279,18 @@ const CSMTickets = () => {
                                     <div>
                                         <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Serial Number</span>
                                         <span className="text-slate-900 font-mono">{assetSummary.asset?.serialNumber}</span>
+                                    </div>
+                                    <div>
+                                        <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Invoice Number</span>
+                                        <span className="text-slate-900">{assetSummary.asset?.invoiceNumber || 'N/A'}</span>
+                                    </div>
+                                    <div>
+                                        <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Date of Sale</span>
+                                        <span className="text-slate-900">
+                                            {assetSummary.asset?.saleDate || assetSummary.asset?.invoiceDate
+                                                ? new Date(assetSummary.asset.saleDate || assetSummary.asset.invoiceDate).toLocaleDateString('en-IN')
+                                                : 'N/A'}
+                                        </span>
                                     </div>
                                     <div>
                                         <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Installation Date</span>

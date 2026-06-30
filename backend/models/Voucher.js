@@ -10,7 +10,13 @@ const voucherItemSchema = new mongoose.Schema({
     price: { type: Number, required: true, min: 0 },
     amount: { type: Number, required: true, min: 0 },
     taxPercentage: { type: Number, required: true, min: 0 },
-    taxAmount: { type: Number, required: true, min: 0 }
+    taxAmount: { type: Number, required: true, min: 0 },
+    serialNumbers: [
+        {
+            serialNumber: { type: String, required: true },
+            assetId: { type: mongoose.Schema.Types.ObjectId, ref: 'Asset', required: true }
+        }
+    ]
 });
 
 const voucherSchema = new mongoose.Schema({

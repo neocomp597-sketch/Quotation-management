@@ -19,7 +19,8 @@ const MENU_GROUPS = [
             { key: 'master_attributes', label: 'Attributes', description: 'Attribute master definitions' },
             { key: 'master_statuses', label: 'Status Master', description: 'Status master definitions for planning' },
             { key: 'master_terms', label: 'Terms', description: 'Terms and conditions master' },
-            { key: 'master_territories', label: 'Territories', description: 'Territory master management' }
+            { key: 'master_territories', label: 'Territories', description: 'Territory master management' },
+            { key: 'master_serials', label: 'Serial No. Master', description: 'Serial number and asset master record management' }
         ]
     },
     {

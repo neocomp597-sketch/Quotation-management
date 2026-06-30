@@ -22,7 +22,8 @@ export const MENU_PERMISSION_GROUPS = [
             { key: 'master_attributes', label: 'Attributes', description: 'Attribute master definitions', defaultRoute: '/attributes' },
             { key: 'master_statuses', label: 'Status Master', description: 'Status master definitions for planning', defaultRoute: '/status-master' },
             { key: 'master_terms', label: 'Terms', description: 'Terms and conditions master', defaultRoute: '/terms' },
-            { key: 'master_territories', label: 'Territories', description: 'Territory master management', defaultRoute: '/territory-master' }
+            { key: 'master_territories', label: 'Territories', description: 'Territory master management', defaultRoute: '/territory-master' },
+            { key: 'master_serials', label: 'Serial No. Master', description: 'Serial number and asset master record management', defaultRoute: '/serial-no-master' }
         ]
     },
     {

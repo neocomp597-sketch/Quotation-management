@@ -42,6 +42,7 @@ const searchablePages = [
     { label: 'Quotations', path: '/quotations', permissionKey: 'quotation_list', keywords: ['quotes', 'quote'] },
     { label: 'Terms & Conditions', path: '/terms', permissionKey: 'master_terms', keywords: ['terms', 'conditions'] },
     { label: 'Territory Master', path: '/territory-master', permissionKey: 'master_territories', keywords: ['territory'] },
+    { label: 'Serial No. Master', path: '/serial-no-master', permissionKey: 'master_serials', keywords: ['serial number', 'assets', 'stock serials'] },
     { label: 'Settings', path: '/settings', permissionKey: 'settings_profile', keywords: ['profile'] },
     { label: 'Authorization', path: '/admin/authorization', permissionKey: 'admin_authorization', keywords: ['permissions', 'roles'] },
     { label: 'Salespersons', path: '/salespersons', permissionKey: 'admin_salespersons', adminOnly: true, keywords: ['sales person'] },

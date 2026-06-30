@@ -33,7 +33,8 @@ import {
     MdTimeline,
     MdBuildCircle,
     MdSpeed,
-    MdPayments
+    MdPayments,
+    MdTag
 } from 'react-icons/md';
 import { useAuth } from '../context/AuthContext';
 
@@ -81,6 +82,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                 { key: 'master_attributes', name: 'Attributes', icon: <MdAssignment size={18} />, path: '/attributes' },
                 { key: 'master_terms', name: 'Terms & Conditions', icon: <MdDescription size={18} />, path: '/terms' },
                 { key: 'master_statuses', name: 'Status Master', icon: <MdBarChart size={18} />, path: '/status-master', adminOnly: true },
+                { key: 'master_serials', name: 'Serial No. Master', icon: <MdTag size={18} />, path: '/serial-no-master' },
             ]
         },
         {

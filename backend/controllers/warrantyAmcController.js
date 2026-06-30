@@ -171,21 +171,35 @@ exports.getAssetSummary = async (req, res) => {
         const now = new Date();
         
         // 1. Warranty Coverage
-        const warranty = await Warranty.findOne({
-            customerId: asset.customerId._id,
-            productId: asset.productId._id,
-            serialNumber: asset.serialNumber,
-            companyId
-        }).lean();
+        let warranty = null;
+        if (asset.customerId) {
+            warranty = await Warranty.findOne({
+                customerId: asset.customerId._id,
+                productId: asset.productId._id,
+                serialNumber: asset.serialNumber,
+                companyId
+            }).lean();
+        }
+
+        if (!warranty && asset.warrantyEnd) {
+            warranty = {
+                status: new Date(asset.warrantyEnd) > now ? 'Active' : 'Expired',
+                expiryDate: asset.warrantyEnd,
+                startDate: asset.warrantyStart
+            };
+        }
 
         // 2. AMC Coverage
-        const amc = await AMC.findOne({
-            customerId: asset.customerId._id,
-            status: 'Active',
-            companyId,
-            startDate: { $lte: now },
-            endDate: { $gte: now }
-        }).lean();
+        let amc = null;
+        if (asset.customerId) {
+            amc = await AMC.findOne({
+                customerId: asset.customerId._id,
+                status: 'Active',
+                companyId,
+                startDate: { $lte: now },
+                endDate: { $gte: now }
+            }).lean();
+        }
 
         // 3. Ticket counts for this asset
         const openTicketsCount = await Ticket.countDocuments({
