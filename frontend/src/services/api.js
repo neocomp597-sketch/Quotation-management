@@ -386,6 +386,17 @@ export const importService = {
     api.get("/import/template/warranties", { responseType: "blob" }),
   getAmcTemplate: () =>
     api.get("/import/template/amcs", { responseType: "blob" }),
+  importTickets: (file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return api.post("/import/tickets", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+  },
+  getTicketTemplate: () =>
+    api.get("/import/template/tickets", { responseType: "blob" }),
 };
 
 export const attributeService = {

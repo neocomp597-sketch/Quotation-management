@@ -1507,6 +1507,271 @@ const getAmcTemplate = async (req, res) => {
     }
 };
 
+const generateTicketNumberForImport = async (companyId) => {
+    const Counter = require('../models/Counter');
+    const year = new Date().getFullYear();
+    const prefix = 'CSM';
+    const counter = await Counter.findOneAndUpdate(
+        { type: 'ticket', companyId: companyId || null, prefix, year },
+        { $inc: { seq: 1 } },
+        { new: true, upsert: true, setDefaultsOnInsert: true }
+    );
+    const seqStr = counter.seq.toString().padStart(4, '0');
+    return `${prefix}-${year}-${seqStr}`;
+};
+
+const importTickets = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ message: 'No file uploaded' });
+        }
+
+        const Ticket = require('../models/Ticket');
+        const TicketCategory = require('../models/TicketCategory');
+        const TicketType = require('../models/TicketType');
+        const Priority = require('../models/Priority');
+        const Asset = require('../models/Asset');
+        const Product = require('../models/Product');
+
+        const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const data = XLSX.utils.sheet_to_json(worksheet);
+
+        if (data.length === 0) {
+            return res.status(400).json({ message: 'No data found in file' });
+        }
+
+        const results = {
+            imported: 0,
+            updated: 0,
+            skipped: 0,
+            failed: 0,
+            errors: []
+        };
+
+        const companyId = req.user?.companyId;
+
+        // Pre-fetch/create default categories, types, priorities to speed things up
+        const defaultCategory = await TicketCategory.findOne({ companyId }) || await TicketCategory.create({ companyId, name: 'General', description: 'General Tickets' });
+        const defaultType = await TicketType.findOne({ companyId }) || await TicketType.create({ companyId, name: 'Incident', description: 'Incident Reports' });
+        const defaultPriority = await Priority.findOne({ companyId }) || await Priority.create({ companyId, name: 'Medium', responseSlaHours: 4, resolutionSlaHours: 24, color: '#3b82f6' });
+
+        for (let i = 0; i < data.length; i++) {
+            const row = data[i];
+            try {
+                const ticketNoInput = cleanCellValue(row['Ticket No'] || row['Ticket Number'] || row.ticketNo || row.ticketNumber);
+                const customerLookup = cleanCellValue(row['Customer Code'] || row['Customer Name'] || row.customerId || row.customer);
+                const productLookup = cleanCellValue(row['Product Code'] || row['Product Name'] || row.productId || row.product);
+                const serialNumber = cleanCellValue(row['Product Serial No.'] || row['Product Serial No'] || row['Serial Number'] || row.serialNumber || row.serial);
+                const issueTitle = cleanCellValue(row['Issue Title'] || row.issueTitle || row.title || row.subject || row['Subject']);
+                const description = cleanCellValue(row['Description'] || row.description || '');
+                const priorityName = cleanCellValue(row['Priority'] || row.priority);
+                const categoryName = cleanCellValue(row['Category'] || row.category);
+                const typeName = cleanCellValue(row['Ticket Type'] || row['Type'] || row.type);
+                const status = cleanCellValue(row['Status'] || row.status || 'Open');
+                const issueDateVal = row['Issue Date'] || row['Created At'] || row.issueDate || row.createdAt;
+
+                if (!customerLookup || !issueTitle) {
+                    throw new Error('Missing required fields: Customer Code/Name or Issue Title');
+                }
+
+                // 1. Resolve Customer
+                const customer = await findCustomerByLookup(customerLookup);
+                if (!customer) {
+                    throw new Error(`Customer not found for: "${customerLookup}"`);
+                }
+
+                // 2. Resolve Product (optional)
+                let product = null;
+                if (productLookup) {
+                    const exactProd = buildExactRegex(productLookup);
+                    product = await Product.findOne({
+                        companyId,
+                        $or: [
+                            { productCode: exactProd },
+                            { productName: exactProd }
+                        ]
+                    });
+                    if (!product) {
+                        throw new Error(`Product not found for: "${productLookup}"`);
+                    }
+                }
+
+                // 3. Resolve or Create Asset (optional)
+                let asset = null;
+                if (serialNumber) {
+                    const exactSerial = buildExactRegex(serialNumber);
+                    asset = await Asset.findOne({ companyId, serialNumber: exactSerial });
+                    if (!asset) {
+                        // Create asset dynamically
+                        if (!product) {
+                            throw new Error(`Product Code/Name is required to register new Serial Number: "${serialNumber}"`);
+                        }
+                        asset = await Asset.create({
+                            companyId,
+                            customerId: customer._id,
+                            productId: product._id,
+                            serialNumber,
+                            installationDate: parseDateValue(issueDateVal) || new Date()
+                        });
+                    } else {
+                        // If product/customer are not specified, autofill from the existing asset
+                        if (!product) {
+                            product = await Product.findById(asset.productId);
+                        }
+                    }
+                }
+
+                // 4. Resolve Priority
+                let priorityObj = defaultPriority;
+                if (priorityName) {
+                    priorityObj = await Priority.findOne({ companyId, name: buildExactRegex(priorityName) });
+                    if (!priorityObj) {
+                        priorityObj = await Priority.create({
+                            companyId,
+                            name: priorityName,
+                            responseSlaHours: 4,
+                            resolutionSlaHours: 24,
+                            color: '#3b82f6'
+                        });
+                    }
+                }
+
+                // 5. Resolve Category
+                let categoryObj = defaultCategory;
+                if (categoryName) {
+                    categoryObj = await TicketCategory.findOne({ companyId, name: buildExactRegex(categoryName) });
+                    if (!categoryObj) {
+                        categoryObj = await TicketCategory.create({
+                            companyId,
+                            name: categoryName,
+                            description: `Created during tickets import`
+                        });
+                    }
+                }
+
+                // 6. Resolve Type
+                let typeObj = defaultType;
+                if (typeName) {
+                    typeObj = await TicketType.findOne({ companyId, name: buildExactRegex(typeName) });
+                    if (!typeObj) {
+                        typeObj = await TicketType.create({
+                            companyId,
+                            name: typeName,
+                            description: `Created during tickets import`
+                        });
+                    }
+                }
+
+                // 7. Resolve Issue Date
+                const createdAt = parseDateValue(issueDateVal) || new Date();
+
+                // Calculate SLAs
+                const responseDue = new Date(createdAt.getTime() + priorityObj.responseSlaHours * 60 * 60 * 1000);
+                const resolutionDue = new Date(createdAt.getTime() + priorityObj.resolutionSlaHours * 60 * 60 * 1000);
+
+                // 8. Generate Ticket No
+                let ticketNo = ticketNoInput;
+                if (!ticketNo) {
+                    ticketNo = await generateTicketNumberForImport(companyId);
+                } else {
+                    // Check if ticket number is unique for this company
+                    const existingTicket = await Ticket.findOne({ companyId, ticketNo: buildExactRegex(ticketNo) });
+                    if (existingTicket) {
+                        throw new Error(`Ticket No "${ticketNo}" already exists`);
+                    }
+                }
+
+                // Create the ticket
+                const ticketData = {
+                    companyId,
+                    ticketNo,
+                    customerId: customer._id,
+                    productId: product ? product._id : null,
+                    assetId: asset ? asset._id : null,
+                    issueTitle,
+                    description,
+                    categoryId: categoryObj._id,
+                    typeId: typeObj._id,
+                    priorityId: priorityObj._id,
+                    status,
+                    source: 'Excel Import',
+                    createdAt,
+                    updatedAt: createdAt,
+                    slaResponseDue: responseDue,
+                    slaResolutionDue: resolutionDue,
+                    timeline: [{
+                        activityType: 'Created',
+                        description: 'Ticket imported from Excel',
+                        performedBy: req.user?.id,
+                        createdAt
+                    }]
+                };
+
+                await Ticket.create(ticketData);
+                results.imported++;
+            } catch (err) {
+                results.failed++;
+                results.errors.push(`Row ${i + 2}: ${err.message}`);
+            }
+        }
+
+        res.json({
+            success: results.failed === 0,
+            ...results
+        });
+    } catch (error) {
+        console.error('Import tickets error:', error);
+        res.status(500).json({ message: error.message || 'Error importing tickets', errors: [error.message] });
+    }
+};
+
+const getTicketTemplate = async (req, res) => {
+    try {
+        const Customer = require('../models/Customer');
+        const Product = require('../models/Product');
+        const [customer, product] = await Promise.all([
+            Customer.findOne().sort({ createdAt: 1 }),
+            Product.findOne().sort({ createdAt: 1 })
+        ]);
+
+        const templateData = [
+            {
+                'Ticket No': 'CSM-2026-0001',
+                'Customer Code': customer?.externalCode || customer?.customerName || 'CUST001',
+                'Product Code': product?.productCode || 'PROD001',
+                'Product Serial No.': 'SN-GEN-908123',
+                'Issue Title': 'Hose leakage at joint',
+                'Description': 'Customer reported heavy leakage in the Brass Hose Connector after 10 days of use.',
+                'Priority': 'Medium',
+                'Category': 'Hardware',
+                'Ticket Type': 'Complaint',
+                'Status': 'Open',
+                'Issue Date': '2026-06-30'
+            }
+        ];
+
+        const worksheet = XLSX.utils.json_to_sheet(templateData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Tickets');
+
+        worksheet['!cols'] = [
+            { wch: 15 }, { wch: 18 }, { wch: 15 }, { wch: 20 }, { wch: 25 }, { wch: 45 },
+            { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 10 }, { wch: 12 }
+        ];
+
+        const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename=ticket_import_template.xlsx');
+        res.send(buffer);
+    } catch (error) {
+        console.error('Template error:', error);
+        res.status(500).json({ message: 'Error generating template' });
+    }
+};
+
 module.exports = {
     importProducts,
     importCustomers,
@@ -1521,5 +1786,7 @@ module.exports = {
     importWarranties,
     importAmcs,
     getWarrantyTemplate,
-    getAmcTemplate
+    getAmcTemplate,
+    importTickets,
+    getTicketTemplate
 };

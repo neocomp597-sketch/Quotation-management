@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { csmService, customerService, productService, voucherService, userService } from '../services/api';
+import { csmService, customerService, productService, voucherService, userService, importService } from '../services/api';
 import { toast } from 'react-toastify';
-import { MdAdd, MdSearch, MdFilterList, MdArrowForward, MdEdit, MdDelete } from 'react-icons/md';
+import { MdAdd, MdSearch, MdFilterList, MdArrowForward, MdEdit, MdDelete, MdPublish, MdFileDownload, MdWarning, MdInfoOutline } from 'react-icons/md';
+import * as XLSX from 'xlsx';
 import PaginationControls from '../components/PaginationControls';
 import PortalDropdown from '../components/PortalDropdown';
 import Modal from '../components/Modal';
@@ -46,6 +47,10 @@ const CSMTickets = () => {
     const [showAllProducts, setShowAllProducts] = useState(false);
     const [generatedSerial, setGeneratedSerial] = useState('');
     
+    // Import tracking states
+    const [importResult, setImportResult] = useState(null);
+    const [showImportResultModal, setShowImportResultModal] = useState(false);
+
     // Modal & Form State
     const [showModal, setShowModal] = useState(false);
     const [showContactModal, setShowContactModal] = useState(false);
@@ -91,7 +96,8 @@ const CSMTickets = () => {
         invoiceId: '',
         issueTitle: '',
         description: '',
-        source: 'Web Portal'
+        source: 'Web Portal',
+        serialNumber: ''
     });
 
     const fetchTickets = async () => {
@@ -214,7 +220,7 @@ const CSMTickets = () => {
                         const firstAsset = fetchedAssets[0];
                         setFormData(prev => {
                             if (!prev.assetId) {
-                                return { ...prev, assetId: firstAsset._id };
+                                return { ...prev, assetId: firstAsset._id, serialNumber: firstAsset.serialNumber || '' };
                             }
                             return prev;
                         });
@@ -241,6 +247,7 @@ const CSMTickets = () => {
                                 const randomNum = Math.floor(1000 + Math.random() * 9000);
                                 const tempSN = `SN-${prodCode.replace(/\s+/g, '')}-${randomNum}`;
                                 setGeneratedSerial(tempSN);
+                                return { ...prev, serialNumber: tempSN };
                             }
                             return prev;
                         });
@@ -263,7 +270,8 @@ const CSMTickets = () => {
             contactEmail: selectedCust ? (selectedCust.email || '') : '',
             invoiceId: '',
             productId: '',
-            assetId: ''
+            assetId: '',
+            serialNumber: ''
         }));
         setAssetSummary(null);
         setShowAllProducts(false);
@@ -275,6 +283,7 @@ const CSMTickets = () => {
             setFormData(prev => ({
                 ...prev,
                 assetId: '',
+                serialNumber: ''
             }));
             setAssetSummary(null);
             return;
@@ -287,7 +296,8 @@ const CSMTickets = () => {
             ...prev,
             assetId,
             customerId: selectedAsset.customerId?._id || prev.customerId,
-            productId: selectedAsset.productId?._id || prev.productId
+            productId: selectedAsset.productId?._id || prev.productId,
+            serialNumber: selectedAsset.serialNumber || ''
         }));
 
         // Fetch asset summary
@@ -314,7 +324,8 @@ const CSMTickets = () => {
             setFormData(prev => ({
                 ...prev,
                 productId: '',
-                assetId: ''
+                assetId: '',
+                serialNumber: ''
             }));
             setAssetSummary(null);
             setGeneratedSerial('');
@@ -327,18 +338,19 @@ const CSMTickets = () => {
             a.productId?._id === productId
         );
         
-        const autoAssetId = matchingAssets.length > 0 ? matchingAssets[0]._id : '';
+        const autoAsset = matchingAssets.length > 0 ? matchingAssets[0] : null;
         
         setFormData(prev => ({
             ...prev,
             productId,
-            assetId: autoAssetId
+            assetId: autoAsset ? autoAsset._id : '',
+            serialNumber: autoAsset ? autoAsset.serialNumber : ''
         }));
         
-        if (autoAssetId) {
+        if (autoAsset) {
             setGeneratedSerial('');
             // Fetch asset summary
-            csmService.getAssetSummary({ assetId: autoAssetId })
+            csmService.getAssetSummary({ assetId: autoAsset._id })
                 .then(res => {
                     setAssetSummary(res.data);
                     const hasCoverage = res.data.warranty?.status === 'Active' || res.data.amc?.status === 'Active';
@@ -360,6 +372,7 @@ const CSMTickets = () => {
             const randomNum = Math.floor(1000 + Math.random() * 9000);
             const tempSN = `SN-${prodCode.replace(/\s+/g, '')}-${randomNum}`;
             setGeneratedSerial(tempSN);
+            setFormData(prev => ({ ...prev, serialNumber: tempSN }));
         }
     };
 
@@ -473,6 +486,185 @@ const CSMTickets = () => {
         e.preventDefault();
         setPage(1);
         fetchTickets();
+    };
+
+    const handleSerialNoLookup = async (serialNo) => {
+        const cleanSN = String(serialNo || '').trim();
+        if (!cleanSN) return;
+        
+        try {
+            const res = await csmService.getAssetSummary({ serialNumber: cleanSN });
+            if (res.data && res.data.asset) {
+                const asset = res.data.asset;
+                setAssetSummary(res.data);
+                setGeneratedSerial('');
+                
+                // Fetch invoices and contacts for this customer
+                const invoiceRes = await voucherService.getAll({ customerId: asset.customerId?._id, voucherType: 'Invoice' });
+                setInvoices(invoiceRes.data?.data || invoiceRes.data || []);
+                
+                const contactsRes = await csmService.getCustomerContacts({ customerId: asset.customerId?._id });
+                setCustomerContacts(contactsRes.data || []);
+                
+                // Autofill
+                setFormData(prev => {
+                    const nextData = {
+                        ...prev,
+                        customerId: asset.customerId?._id || '',
+                        productId: asset.productId?._id || '',
+                        assetId: asset._id || '',
+                        serialNumber: asset.serialNumber || cleanSN
+                    };
+                    
+                    // Autofill contact if we have contacts and primary exists
+                    if (contactsRes.data && contactsRes.data.length > 0) {
+                        const primaryContact = contactsRes.data.find(c => c.isPrimary) || contactsRes.data[0];
+                        if (primaryContact) {
+                            nextData.contactId = primaryContact._id;
+                            nextData.contactName = primaryContact.contactName || '';
+                            nextData.contactDesignationId = primaryContact.designationId?._id || '';
+                            nextData.contactDesignation = primaryContact.designationId?.name || '';
+                            nextData.contactPhone = primaryContact.mobileNo || '';
+                            nextData.contactEmail = primaryContact.email || '';
+                        }
+                    }
+                    
+                    return nextData;
+                });
+                
+                toast.success(`Asset found! Auto-filled details for Serial No: ${cleanSN}`);
+                
+                // Check coverage & adjust priority
+                const hasCoverage = res.data.warranty?.status === 'Active' || res.data.amc?.status === 'Active';
+                if (!hasCoverage) {
+                    const medPriority = priorities.find(p => p.name?.toLowerCase() === 'medium');
+                    if (medPriority) {
+                        setFormData(prev => ({ ...prev, priorityId: medPriority._id }));
+                    }
+                }
+            } else {
+                toast.info('No matching registered asset/serial number found. You can enter details manually.');
+            }
+        } catch (err) {
+            console.error('Error looking up serial number:', err);
+            toast.error('Failed to lookup serial number');
+        }
+    };
+
+    const exportToExcel = async () => {
+        setLoading(true);
+        try {
+            const res = await csmService.getTickets({
+                limit: 10000,
+                search,
+                status: filterStatus,
+                priorityId: filterPriority
+            });
+            
+            const exportTickets = res.data?.data || [];
+            if (!exportTickets.length) {
+                toast.info('No tickets found to export');
+                return;
+            }
+
+            const exportData = exportTickets.map((t) => ({
+                'Ticket No': t.ticketNo || '',
+                'Customer Name': t.customerId?.companyName || t.customerId?.customerName || '',
+                'Customer Email': t.customerId?.email || '',
+                'Customer Phone': t.customerId?.mobile || '',
+                'Contact Person': t.contactName || '',
+                'Contact Phone': t.contactPhone || '',
+                'Contact Email': t.contactEmail || '',
+                'Product Name': t.productId?.productName || '',
+                'Product Code': t.productId?.productCode || '',
+                'Serial No': t.assetId?.serialNumber || '',
+                'Subject': t.issueTitle || '',
+                'Description': t.description || '',
+                'Priority': t.priorityId?.name || '',
+                'Category': t.categoryId?.name || '',
+                'Type': t.typeId?.name || '',
+                'Status': t.status || '',
+                'Source': t.source || '',
+                'Issue Date': t.createdAt ? new Date(t.createdAt).toLocaleDateString('en-IN') : '',
+                'Resolved Date': t.resolvedAt ? new Date(t.resolvedAt).toLocaleDateString('en-IN') : '',
+                'Assigned Engineer': t.assignedEngineerId?.name || 'Unassigned'
+            }));
+
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Tickets');
+            XLSX.writeFile(wb, `Support_Tickets_${new Date().toISOString().slice(0, 10)}.xlsx`);
+            toast.success('Export completed successfully');
+        } catch (err) {
+            console.error('Export tickets error:', err);
+            toast.error('Failed to export tickets');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleDownloadTemplate = async () => {
+        try {
+            const blobRes = await importService.getTicketTemplate();
+            const url = window.URL.createObjectURL(new Blob([blobRes.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `ticket_import_template.xlsx`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            toast.success('Ticket template downloaded successfully!');
+        } catch (error) {
+            console.error('Error downloading template:', error);
+            toast.error('Failed to download Excel template.');
+        }
+    };
+
+    const handleImportFile = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        setLoading(true);
+        try {
+            const res = await importService.importTickets(file);
+            
+            setImportResult({
+                type: 'ticket',
+                imported: res.data.imported || 0,
+                updated: res.data.updated || 0,
+                skipped: res.data.skipped || 0,
+                failed: res.data.failed || 0,
+                errors: res.data.errors || []
+            });
+            setShowImportResultModal(true);
+
+            // Reload tickets
+            fetchTickets();
+
+            if (res.data.success) {
+                toast.success('Import completed successfully!');
+            } else {
+                toast.warning('Import completed with some errors. Please check the summary report.');
+            }
+        } catch (error) {
+            console.error('Import error:', error);
+            toast.error(error.response?.data?.message || 'Error occurred during import');
+        } finally {
+            setLoading(false);
+            e.target.value = ''; // Reset file input
+        }
+    };
+
+    const downloadErrorReport = () => {
+        if (!importResult || !importResult.errors || importResult.errors.length === 0) return;
+        const blobContent = `Import Error Report for Tickets\nGenerated on: ${new Date().toLocaleString()}\n\nFailed rows details:\n` + importResult.errors.join('\n');
+        const url = window.URL.createObjectURL(new Blob([blobContent], { type: 'text/plain' }));
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `ticket_import_errors.txt`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     };
 
     const handleOpenMiniMaster = (type) => {
@@ -720,37 +912,68 @@ const CSMTickets = () => {
                         Create, track, and manage customer service cases.
                     </p>
                 </div>
-                <button
-                    onClick={() => {
-                        const lowPriority = priorities.find(p => p.name?.toLowerCase() === 'low');
-                        setFormData({
-                            customerId: '',
-                            contactId: '',
-                            contactName: '',
-                            contactDesignationId: '',
-                            contactDesignation: '',
-                            contactPhone: '',
-                            contactEmail: '',
-                            priorityId: lowPriority ? lowPriority._id : '',
-                            categoryId: '',
-                            typeId: '',
-                            productId: '',
-                            assetId: '',
-                            invoiceId: '',
-                            issueTitle: '',
-                            description: '',
-                            source: 'Web Portal'
-                        });
-                        setCustomerContacts([]);
-                        setAssetSummary(null);
-                        setShowAllProducts(false);
-                        setShowModal(true);
-                    }}
-                    className="flex items-center gap-2 px-6 py-4 bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-[10px] tracking-widest rounded-2xl transition-all shadow-lg shadow-primary-600/20 active:scale-95 self-start md:self-auto"
-                >
-                    <MdAdd size={18} />
-                    New Ticket
-                </button>
+                <div className="flex flex-wrap items-center gap-3">
+                    <button
+                        onClick={() => {
+                            const lowPriority = priorities.find(p => p.name?.toLowerCase() === 'low');
+                            setFormData({
+                                customerId: '',
+                                contactId: '',
+                                contactName: '',
+                                contactDesignationId: '',
+                                contactDesignation: '',
+                                contactPhone: '',
+                                contactEmail: '',
+                                priorityId: lowPriority ? lowPriority._id : '',
+                                categoryId: '',
+                                typeId: '',
+                                productId: '',
+                                assetId: '',
+                                invoiceId: '',
+                                issueTitle: '',
+                                description: '',
+                                source: 'Web Portal',
+                                serialNumber: ''
+                            });
+                            setCustomerContacts([]);
+                            setAssetSummary(null);
+                            setShowAllProducts(false);
+                            setGeneratedSerial('');
+                            setShowModal(true);
+                        }}
+                        className="flex items-center gap-2 px-6 py-4 bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-[10px] tracking-widest rounded-2xl transition-all shadow-lg shadow-primary-600/20 active:scale-95 self-start md:self-auto"
+                    >
+                        <MdAdd size={18} />
+                        New Ticket
+                    </button>
+
+                    <button
+                        onClick={exportToExcel}
+                        className="flex items-center gap-2 px-5 py-4 bg-white hover:bg-slate-50 text-slate-700 font-black uppercase text-[10px] tracking-widest rounded-2xl transition-all border border-slate-200 shadow-sm active:scale-95"
+                    >
+                        <MdFileDownload size={18} />
+                        Export
+                    </button>
+
+                    <label className="flex items-center gap-2 px-5 py-4 bg-slate-800 hover:bg-slate-900 text-white font-black uppercase text-[10px] tracking-widest rounded-2xl transition-all shadow-md cursor-pointer active:scale-95">
+                        <MdPublish size={18} />
+                        Import
+                        <input
+                            type="file"
+                            accept=".xlsx, .xls, .csv"
+                            onChange={handleImportFile}
+                            className="hidden"
+                        />
+                    </label>
+
+                    <button
+                        onClick={handleDownloadTemplate}
+                        className="flex items-center gap-2 px-5 py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-black uppercase text-[10px] tracking-widest rounded-2xl transition-all border border-slate-200 active:scale-95"
+                    >
+                        <MdFileDownload size={18} />
+                        Template
+                    </button>
+                </div>
             </div>
 
             {/* Filters Toolbar */}
@@ -996,24 +1219,28 @@ const CSMTickets = () => {
                             />
                         </div>
                         <div>
-                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Product Serial Number</label>
-                            <input
-                                type="text"
-                                readOnly
-                                value={
-                                    (() => {
-                                        const selectedAsset = assets.find(a => a._id === formData.assetId);
-                                        if (selectedAsset) return selectedAsset.serialNumber;
-                                        if (assetSummary && assetSummary.asset && assetSummary.asset._id === formData.assetId) {
-                                            return assetSummary.asset.serialNumber;
-                                        }
-                                        if (generatedSerial) return `${generatedSerial} (Auto-Generated)`;
-                                        return formData.productId ? (formData.assetId ? 'Loading...' : 'No Serial Number Found') : 'Select Product First';
-                                    })()
-                                }
-                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold bg-slate-50 text-slate-500 cursor-not-allowed"
-                                placeholder="Auto-populated Serial Number"
-                            />
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Product Serial No.</label>
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    value={formData.serialNumber || ''}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        setFormData(prev => ({ ...prev, serialNumber: val }));
+                                    }}
+                                    onBlur={() => handleSerialNoLookup(formData.serialNumber)}
+                                    className="w-full pl-4 pr-12 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
+                                    placeholder="Enter or scan Product Serial No."
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => handleSerialNoLookup(formData.serialNumber)}
+                                    className="absolute right-2 top-1.5 p-1.5 hover:bg-slate-100 text-slate-500 rounded-lg transition-all"
+                                    title="Lookup Serial Number"
+                                >
+                                    <MdSearch size={20} />
+                                </button>
+                            </div>
                         </div>
 
                         {/* Asset Lookup Card */}
@@ -1565,6 +1792,66 @@ const CSMTickets = () => {
                         })()}
                     </div>
                 </div>
+            </Modal>
+
+            {/* Import Summary Modal */}
+            <Modal
+                isOpen={showImportResultModal}
+                onClose={() => setShowImportResultModal(false)}
+                title="Import Tickets Summary"
+                maxWidth="max-w-md"
+                footer={
+                    <div className="flex gap-2 w-full justify-end">
+                        {importResult?.errors?.length > 0 && (
+                            <button
+                                type="button"
+                                onClick={downloadErrorReport}
+                                className="px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                            >
+                                Download Error Report
+                            </button>
+                        )}
+                        <button
+                            type="button"
+                            onClick={() => setShowImportResultModal(false)}
+                            className="px-6 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                        >
+                            Close
+                        </button>
+                    </div>
+                }
+            >
+                {importResult && (
+                    <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-3 text-center">
+                            <div className="p-3 bg-teal-50 border border-teal-100 rounded-2xl">
+                                <span className="block text-[10px] font-black uppercase tracking-widest text-teal-600">Imported</span>
+                                <span className="text-xl font-black text-teal-800">{importResult.imported}</span>
+                            </div>
+                            <div className="p-3 bg-rose-50 border border-rose-100 rounded-2xl">
+                                <span className="block text-[10px] font-black uppercase tracking-widest text-rose-500">Failed</span>
+                                <span className="text-xl font-black text-rose-800">{importResult.failed}</span>
+                            </div>
+                        </div>
+
+                        {importResult.errors?.length > 0 && (
+                            <div className="p-4 bg-amber-50/50 border border-amber-100 rounded-2xl space-y-2">
+                                <div className="flex items-center gap-1.5 text-amber-800 text-xs font-bold">
+                                    <MdWarning size={16} />
+                                    <span>Some rows failed to import:</span>
+                                </div>
+                                <div className="max-h-40 overflow-y-auto text-[11px] font-semibold text-slate-600 space-y-1 custom-scrollbar">
+                                    {importResult.errors.slice(0, 10).map((err, idx) => (
+                                        <p key={idx} className="leading-relaxed">• {err}</p>
+                                    ))}
+                                    {importResult.errors.length > 10 && (
+                                        <p className="text-slate-400 italic">And {importResult.errors.length - 10} more errors...</p>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
             </Modal>
         </div>
     );
