@@ -16,6 +16,7 @@ router.get('/reports', protect, csmDashboardController.getReportData);
 
 // ─── TICKET MANAGEMENT ──────────────────────────────────────────────────────
 router.post('/tickets', protect, ticketController.createTicket);
+router.get('/tickets/customers', protect, ticketController.getTicketCustomers);
 router.get('/tickets', protect, ticketController.getTickets);
 router.get('/tickets/:id', protect, ticketController.getTicketById);
 router.put('/tickets/:id', protect, ticketController.updateTicket);

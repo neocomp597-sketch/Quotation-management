@@ -71,6 +71,8 @@ const CSMTickets = () => {
     const [filterStatus, setFilterStatus] = useState('');
     const [filterPriority, setFilterPriority] = useState('');
     const [filterInvoiceType, setFilterInvoiceType] = useState('');
+    const [filterCustomer, setFilterCustomer] = useState('');
+    const [ticketCustomers, setTicketCustomers] = useState([]);
 
     // Masters lists for creation
     const [customers, setCustomers] = useState([]);
@@ -94,12 +96,16 @@ const CSMTickets = () => {
     // Modal & Form State
     const [showModal, setShowModal] = useState(false);
     const [showManualModal, setShowManualModal] = useState(false);
+    const [isManualCustomerText, setIsManualCustomerText] = useState(false);
+    const [isManualProductText, setIsManualProductText] = useState(false);
     const [manualFormData, setManualFormData] = useState({
+        customerId: '',
         customerName: '',
         invoiceNo: '',
         invoiceDate: '',
         serialNumber: '',
         productId: '',
+        customProductName: '',
         source: 'Phone',
         contactName: '',
         contactPhone: '',
@@ -183,6 +189,9 @@ const CSMTickets = () => {
                 status: filterStatus,
                 priorityId: filterPriority
             };
+            if (filterCustomer) {
+                queryParams.customerId = filterCustomer;
+            }
             if (filterInvoiceType === 'manual') {
                 queryParams.isManual = 'true';
             } else if (filterInvoiceType === 'standard') {
@@ -195,6 +204,15 @@ const CSMTickets = () => {
             toast.error('Failed to load tickets');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchTicketCustomers = async () => {
+        try {
+            const res = await csmService.getTicketCustomers();
+            setTicketCustomers(res.data || []);
+        } catch (error) {
+            console.error('Failed to load ticket customers:', error);
         }
     };
 
@@ -257,7 +275,11 @@ const CSMTickets = () => {
 
     useEffect(() => {
         fetchTickets();
-    }, [page, filterStatus, filterPriority, filterInvoiceType]);
+    }, [page, filterStatus, filterPriority, filterInvoiceType, filterCustomer]);
+
+    useEffect(() => {
+        fetchTicketCustomers();
+    }, []);
 
     useEffect(() => {
         if (showModal || showManualModal) {
@@ -355,6 +377,36 @@ const CSMTickets = () => {
         setAssetSummary(null);
         setShowAllProducts(false);
         setGeneratedSerial('');
+    };
+
+    const handleManualCustomerChange = async (customerId) => {
+        const selectedCust = customers.find(c => c._id === customerId);
+        setManualFormData(prev => ({
+            ...prev,
+            customerId,
+            customerName: selectedCust ? (selectedCust.companyName || selectedCust.customerName || '') : '',
+            contactName: '',
+            contactPhone: selectedCust ? (selectedCust.mobile || '') : '',
+            contactEmail: selectedCust ? (selectedCust.email || '') : ''
+        }));
+        
+        if (customerId) {
+            try {
+                const contactsRes = await csmService.getCustomerContacts({ customerId });
+                const contacts = contactsRes.data || [];
+                const primaryContact = contacts.find(c => c.isPrimary) || contacts[0];
+                if (primaryContact) {
+                    setManualFormData(prev => ({
+                        ...prev,
+                        contactName: primaryContact.contactName || '',
+                        contactPhone: primaryContact.mobileNo || '',
+                        contactEmail: primaryContact.email || ''
+                    }));
+                }
+            } catch (err) {
+                console.error('Error fetching contacts for manual customer:', err);
+            }
+        }
     };
 
     const handleSerialChange = (assetId) => {
@@ -555,6 +607,7 @@ const CSMTickets = () => {
             toast.success('Support ticket generated successfully!');
             setShowModal(false);
             fetchTickets();
+            fetchTicketCustomers();
             setGeneratedSerial('');
         } catch (error) {
             toast.error(error.response?.data?.message || 'Error generating ticket');
@@ -587,30 +640,34 @@ const CSMTickets = () => {
         try {
             // 1. Resolve Customer
             let customerId = '';
-            const normCustName = manualFormData.customerName.trim();
-            if (!normCustName) {
-                toast.error('Customer Name is required');
-                setLoading(false);
-                return;
-            }
-
-            const existingCust = customers.find(c => 
-                (c.customerName || '').toLowerCase() === normCustName.toLowerCase() || 
-                (c.companyName || '').toLowerCase() === normCustName.toLowerCase()
-            );
-
-            if (existingCust) {
-                customerId = existingCust._id;
+            if (!isManualCustomerText && manualFormData.customerId) {
+                customerId = manualFormData.customerId;
             } else {
-                // Create customer on the fly
-                const newCustRes = await customerService.create({
-                    customerName: normCustName,
-                    companyName: normCustName,
-                    mobile: manualFormData.contactPhone,
-                    email: manualFormData.contactEmail
-                });
-                customerId = newCustRes.data._id;
-                setCustomers(prev => [...prev, newCustRes.data]);
+                const normCustName = manualFormData.customerName.trim();
+                if (!normCustName) {
+                    toast.error('Customer Name is required');
+                    setLoading(false);
+                    return;
+                }
+
+                const existingCust = customers.find(c => 
+                    (c.customerName || '').toLowerCase() === normCustName.toLowerCase() || 
+                    (c.companyName || '').toLowerCase() === normCustName.toLowerCase()
+                );
+
+                if (existingCust) {
+                    customerId = existingCust._id;
+                } else {
+                    // Create customer on the fly
+                    const newCustRes = await customerService.create({
+                        customerName: normCustName,
+                        companyName: normCustName,
+                        mobile: manualFormData.contactPhone,
+                        email: manualFormData.contactEmail
+                    });
+                    customerId = newCustRes.data._id;
+                    setCustomers(prev => [...prev, newCustRes.data]);
+                }
             }
 
             // 2. Resolve Category
@@ -650,7 +707,7 @@ const CSMTickets = () => {
             }
 
             // 5. Resolve Product (optional)
-            let productId = manualFormData.productId || null;
+            let productId = (!isManualProductText && manualFormData.productId) ? manualFormData.productId : null;
 
             // 6. Resolve Asset (optional)
             let assetId = null;
@@ -702,7 +759,9 @@ const CSMTickets = () => {
                 isManual: true,
                 manualInvoiceNo: manualFormData.invoiceNo,
                 manualInvoiceDate: manualFormData.invoiceDate || null,
-                manualProductName: manualFormData.productId ? (products.find(p => p._id === manualFormData.productId)?.productName || '') : ''
+                manualProductName: (!isManualProductText && manualFormData.productId)
+                    ? (products.find(p => p._id === manualFormData.productId)?.productName || '')
+                    : (manualFormData.customProductName || '')
             };
 
             const ticketRes = await csmService.createTicket(ticketPayload);
@@ -720,14 +779,17 @@ const CSMTickets = () => {
             toast.success('Manual Support ticket registered successfully!');
             setShowManualModal(false);
             fetchTickets();
+            fetchTicketCustomers();
             
             // Reset form
             setManualFormData({
+                customerId: '',
                 customerName: '',
                 invoiceNo: '',
                 invoiceDate: '',
                 serialNumber: '',
                 productId: '',
+                customProductName: '',
                 source: 'Phone',
                 contactName: '',
                 contactPhone: '',
@@ -738,6 +800,8 @@ const CSMTickets = () => {
                 issueTitle: '',
                 description: ''
             });
+            setIsManualCustomerText(false);
+            setIsManualProductText(false);
             setManualImages({
                 front: null,
                 back: null,
@@ -917,6 +981,7 @@ const CSMTickets = () => {
 
             // Reload tickets
             fetchTickets();
+            fetchTicketCustomers();
 
             if (res.data.success) {
                 toast.success('Import completed successfully!');
@@ -1061,20 +1126,32 @@ const CSMTickets = () => {
     };
 
     const handleSelectMiniMasterItem = (item) => {
-        if (activeMiniMaster === 'source') {
-            setFormData(prev => ({ ...prev, source: item.name }));
-        } else if (activeMiniMaster === 'category') {
-            setFormData(prev => ({ ...prev, categoryId: item._id }));
-        } else if (activeMiniMaster === 'type') {
-            setFormData(prev => ({ ...prev, typeId: item._id }));
-        } else if (activeMiniMaster === 'priority') {
-            setFormData(prev => ({ ...prev, priorityId: item._id }));
-        } else if (activeMiniMaster === 'designation') {
-            setFormData(prev => ({
-                ...prev,
-                contactDesignationId: item._id,
-                contactDesignation: item.name
-            }));
+        if (showManualModal) {
+            if (activeMiniMaster === 'source') {
+                setManualFormData(prev => ({ ...prev, source: item.name }));
+            } else if (activeMiniMaster === 'category') {
+                setManualFormData(prev => ({ ...prev, category: item.name }));
+            } else if (activeMiniMaster === 'type') {
+                setManualFormData(prev => ({ ...prev, type: item.name }));
+            } else if (activeMiniMaster === 'priority') {
+                setManualFormData(prev => ({ ...prev, priority: item.name }));
+            }
+        } else {
+            if (activeMiniMaster === 'source') {
+                setFormData(prev => ({ ...prev, source: item.name }));
+            } else if (activeMiniMaster === 'category') {
+                setFormData(prev => ({ ...prev, categoryId: item._id }));
+            } else if (activeMiniMaster === 'type') {
+                setFormData(prev => ({ ...prev, typeId: item._id }));
+            } else if (activeMiniMaster === 'priority') {
+                setFormData(prev => ({ ...prev, priorityId: item._id }));
+            } else if (activeMiniMaster === 'designation') {
+                setFormData(prev => ({
+                    ...prev,
+                    contactDesignationId: item._id,
+                    contactDesignation: item.name
+                }));
+            }
         }
         setActiveMiniMaster(null);
     };
@@ -1125,7 +1202,11 @@ const CSMTickets = () => {
                 toast.success('Ticket source added!');
                 const srcRes = await csmService.getSources();
                 setSources(srcRes.data || []);
-                setFormData(prev => ({ ...prev, source: miniMasterFormData.name }));
+                if (showManualModal) {
+                    setManualFormData(prev => ({ ...prev, source: miniMasterFormData.name }));
+                } else {
+                    setFormData(prev => ({ ...prev, source: miniMasterFormData.name }));
+                }
             } else if (activeMiniMaster === 'category') {
                 res = await csmService.createCategory({
                     name: miniMasterFormData.name,
@@ -1134,7 +1215,11 @@ const CSMTickets = () => {
                 toast.success('Category added!');
                 const catRes = await csmService.getCategories();
                 setCategories(catRes.data || []);
-                setFormData(prev => ({ ...prev, categoryId: res.data._id }));
+                if (showManualModal) {
+                    setManualFormData(prev => ({ ...prev, category: res.data.name }));
+                } else {
+                    setFormData(prev => ({ ...prev, categoryId: res.data._id }));
+                }
             } else if (activeMiniMaster === 'type') {
                 res = await csmService.createType({
                     name: miniMasterFormData.name,
@@ -1143,7 +1228,11 @@ const CSMTickets = () => {
                 toast.success('Ticket type added!');
                 const typRes = await csmService.getTypes();
                 setTypes(typRes.data || []);
-                setFormData(prev => ({ ...prev, typeId: res.data._id }));
+                if (showManualModal) {
+                    setManualFormData(prev => ({ ...prev, type: res.data.name }));
+                } else {
+                    setFormData(prev => ({ ...prev, typeId: res.data._id }));
+                }
             } else if (activeMiniMaster === 'priority') {
                 res = await csmService.createPriority({
                     name: miniMasterFormData.name,
@@ -1154,7 +1243,11 @@ const CSMTickets = () => {
                 toast.success('Priority tier added!');
                 const priRes = await csmService.getPriorities();
                 setPriorities(priRes.data || []);
-                setFormData(prev => ({ ...prev, priorityId: res.data._id }));
+                if (showManualModal) {
+                    setManualFormData(prev => ({ ...prev, priority: res.data.name }));
+                } else {
+                    setFormData(prev => ({ ...prev, priorityId: res.data._id }));
+                }
             } else if (activeMiniMaster === 'designation') {
                 res = await csmService.createDesignation({
                     name: miniMasterFormData.name,
@@ -1254,7 +1347,7 @@ const CSMTickets = () => {
             </div>
 
             {/* Filters Toolbar */}
-            <div className="glass shadow-premium rounded-[2rem] p-6 bg-white border border-slate-100 flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between">
+            <div className="glass shadow-premium rounded-[2rem] p-6 bg-white border border-slate-100 flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between relative z-20">
                 <form onSubmit={handleSearchSubmit} className="flex-1 max-w-md relative">
                     <input
                         type="text"
@@ -1266,6 +1359,23 @@ const CSMTickets = () => {
                     <MdSearch className="absolute left-4 top-3.5 text-slate-400" size={20} />
                 </form>
                 <div className="flex flex-wrap items-center gap-3">
+                    {/* Customer Filter */}
+                    <div className="flex items-center gap-2 bg-slate-50 border border-slate-100 rounded-2xl px-4 py-1">
+                        <MdFilterList className="text-slate-400" />
+                        <span className="text-xs font-black uppercase tracking-wider text-slate-400">Customer</span>
+                        <SearchableSelect
+                            options={ticketCustomers.map(c => ({
+                                value: c._id,
+                                label: c.companyName || c.customerName
+                            }))}
+                            value={filterCustomer}
+                            onChange={(val) => { setFilterCustomer(val); setPage(1); }}
+                            placeholder="All Customers"
+                            inputClass="bg-transparent border-none outline-none text-xs font-bold text-slate-700 cursor-pointer flex items-center gap-1 max-w-[180px] truncate"
+                            menuClass="w-64"
+                        />
+                    </div>
+
                     {/* Invoice Type Filter */}
                     <div className="flex items-center gap-2 bg-slate-50 border border-slate-100 rounded-2xl px-4 py-1.5">
                         <MdFilterList className="text-slate-400" />
@@ -2181,15 +2291,41 @@ const CSMTickets = () => {
                         
                         {/* Customer Name */}
                         <div>
-                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Customer Name *</label>
-                            <input
-                                type="text"
-                                required
-                                placeholder="Enter customer name"
-                                value={manualFormData.customerName}
-                                onChange={(e) => setManualFormData({ ...manualFormData, customerName: e.target.value })}
-                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500"
-                            />
+                            <div className="flex justify-between items-center mb-1.5">
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Customer Name *</label>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setIsManualCustomerText(!isManualCustomerText);
+                                        setManualFormData(prev => ({ ...prev, customerId: '', customerName: '' }));
+                                    }}
+                                    className="text-[10px] font-black uppercase text-primary-600 hover:text-primary-700 tracking-wider flex items-center gap-0.5"
+                                >
+                                    {isManualCustomerText ? 'Select Existing' : '+ Enter Manually'}
+                                </button>
+                            </div>
+                            {isManualCustomerText ? (
+                                <input
+                                    type="text"
+                                    required
+                                    placeholder="Enter customer name"
+                                    value={manualFormData.customerName}
+                                    onChange={(e) => setManualFormData({ ...manualFormData, customerName: e.target.value })}
+                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                />
+                            ) : (
+                                <SearchableSelect
+                                    options={customers.map(c => ({
+                                        value: c._id,
+                                        label: c.companyName && c.companyName !== c.customerName 
+                                            ? `${c.companyName} (${c.customerName})` 
+                                            : c.companyName || c.customerName
+                                    }))}
+                                    value={manualFormData.customerId}
+                                    onChange={handleManualCustomerChange}
+                                    placeholder="Search & Select Customer..."
+                                />
+                            )}
                         </div>
 
                         {/* Invoice No */}
@@ -2229,31 +2365,59 @@ const CSMTickets = () => {
 
                         {/* Product Link (Search Product) */}
                         <div>
-                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Product Name</label>
-                            <SearchableSelect
-                                options={products.map(p => ({
-                                    value: p._id,
-                                    label: `${p.productName} (${p.productCode})`
-                                }))}
-                                value={manualFormData.productId}
-                                onChange={(val) => setManualFormData({ ...manualFormData, productId: val })}
-                                placeholder="Search & Select Product..."
-                            />
+                            <div className="flex justify-between items-center mb-1.5">
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Product Name</label>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setIsManualProductText(!isManualProductText);
+                                        setManualFormData(prev => ({ ...prev, productId: '', customProductName: '' }));
+                                    }}
+                                    className="text-[10px] font-black uppercase text-primary-600 hover:text-primary-700 tracking-wider flex items-center gap-0.5"
+                                >
+                                    {isManualProductText ? 'Select Product' : '+ Enter Manually'}
+                                </button>
+                            </div>
+                            {isManualProductText ? (
+                                <input
+                                    type="text"
+                                    placeholder="Enter custom product name"
+                                    value={manualFormData.customProductName}
+                                    onChange={(e) => setManualFormData({ ...manualFormData, customProductName: e.target.value })}
+                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                />
+                            ) : (
+                                <SearchableSelect
+                                    options={products.map(p => ({
+                                        value: p._id,
+                                        label: `${p.productName} (${p.productCode})`
+                                    }))}
+                                    value={manualFormData.productId}
+                                    onChange={(val) => setManualFormData({ ...manualFormData, productId: val })}
+                                    placeholder="Search & Select Product..."
+                                />
+                            )}
                         </div>
 
                         {/* Ticket Source */}
                         <div>
-                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Ticket Source</label>
+                            <div className="flex justify-between items-center mb-1.5">
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Ticket Source</label>
+                                <button 
+                                    type="button" 
+                                    onClick={() => handleOpenMiniMaster('source')}
+                                    className="text-[10px] font-black uppercase text-primary-600 hover:text-primary-700 tracking-wider flex items-center gap-0.5"
+                                >
+                                    + Quick Add
+                                </button>
+                            </div>
                             <select
                                 value={manualFormData.source}
                                 onChange={(e) => setManualFormData({ ...manualFormData, source: e.target.value })}
                                 className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500"
                             >
-                                <option value="Phone">Phone</option>
-                                <option value="Email">Email</option>
-                                <option value="Website">Website</option>
-                                <option value="Walk In">Walk In</option>
-                                <option value="WhatsApp">WhatsApp</option>
+                                <option value="">Select Source</option>
+                                {sources.map(s => <option key={s._id} value={s.name}>{s.name}</option>)}
                             </select>
                         </div>
 
@@ -2292,47 +2456,67 @@ const CSMTickets = () => {
 
                         {/* Priority */}
                         <div>
-                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Priority</label>
+                            <div className="flex justify-between items-center mb-1.5">
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Priority</label>
+                                <button 
+                                    type="button" 
+                                    onClick={() => handleOpenMiniMaster('priority')}
+                                    className="text-[10px] font-black uppercase text-primary-600 hover:text-primary-700 tracking-wider flex items-center gap-0.5"
+                                >
+                                    + Quick Add
+                                </button>
+                            </div>
                             <select
                                 value={manualFormData.priority}
                                 onChange={(e) => setManualFormData({ ...manualFormData, priority: e.target.value })}
                                 className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500"
                             >
-                                <option value="Low">Low</option>
-                                <option value="Medium">Medium</option>
-                                <option value="High">High</option>
-                                <option value="Critical">Critical</option>
+                                <option value="">Select Priority</option>
+                                {priorities.map(p => <option key={p._id} value={p.name}>{p.name}</option>)}
                             </select>
                         </div>
 
                         {/* Category */}
                         <div>
-                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Category</label>
+                            <div className="flex justify-between items-center mb-1.5">
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Category</label>
+                                <button 
+                                    type="button" 
+                                    onClick={() => handleOpenMiniMaster('category')}
+                                    className="text-[10px] font-black uppercase text-primary-600 hover:text-primary-700 tracking-wider flex items-center gap-0.5"
+                                >
+                                    + Quick Add
+                                </button>
+                            </div>
                             <select
                                 value={manualFormData.category}
                                 onChange={(e) => setManualFormData({ ...manualFormData, category: e.target.value })}
                                 className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500"
                             >
-                                <option value="Installation">Installation</option>
-                                <option value="Repair">Repair</option>
-                                <option value="Warranty">Warranty</option>
-                                <option value="Complaint">Complaint</option>
-                                <option value="Maintenance">Maintenance</option>
+                                <option value="">Select Category</option>
+                                {categories.map(c => <option key={c._id} value={c.name}>{c.name}</option>)}
                             </select>
                         </div>
 
                         {/* Ticket Type */}
                         <div>
-                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Ticket Type</label>
+                            <div className="flex justify-between items-center mb-1.5">
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Ticket Type</label>
+                                <button 
+                                    type="button" 
+                                    onClick={() => handleOpenMiniMaster('type')}
+                                    className="text-[10px] font-black uppercase text-primary-600 hover:text-primary-700 tracking-wider flex items-center gap-0.5"
+                                >
+                                    + Quick Add
+                                </button>
+                            </div>
                             <select
                                 value={manualFormData.type}
                                 onChange={(e) => setManualFormData({ ...manualFormData, type: e.target.value })}
                                 className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500"
                             >
-                                <option value="Service">Service</option>
-                                <option value="Complaint">Complaint</option>
-                                <option value="Support">Support</option>
-                                <option value="Replacement">Replacement</option>
+                                <option value="">Select Type</option>
+                                {types.map(t => <option key={t._id} value={t.name}>{t.name}</option>)}
                             </select>
                         </div>
 

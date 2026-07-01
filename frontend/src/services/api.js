@@ -614,6 +614,7 @@ export const salesService = {
 
 export const csmService = {
   getStats: () => api.get("/csm/dashboard"),
+  getTicketCustomers: () => api.get("/csm/tickets/customers"),
   getTickets: (params = {}) => api.get("/csm/tickets", { params }),
   getTicketById: (id) => api.get(`/csm/tickets/${id}`),
   createTicket: (data) => api.post("/csm/tickets", data),

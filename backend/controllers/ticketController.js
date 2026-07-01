@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Ticket = require('../models/Ticket');
 const Counter = require('../models/Counter');
 const Priority = require('../models/Priority');
@@ -170,6 +171,12 @@ exports.getTickets = async (req, res) => {
 
 exports.getTicketById = async (req, res) => {
     try {
+        if (req.params.id === 'customers') {
+            return exports.getTicketCustomers(req, res);
+        }
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+            return res.status(400).json({ message: 'Invalid ticket ID format' });
+        }
         const ticket = await Ticket.findOne({ _id: req.params.id, companyId: req.user?.companyId })
             .populate('customerId')
             .populate('contactId')
@@ -383,5 +390,22 @@ exports.submitFeedback = async (req, res) => {
     } catch (error) {
         console.error('Submit feedback error:', error);
         res.status(500).json({ message: error.message || 'Error submitting feedback' });
+    }
+};
+
+exports.getTicketCustomers = async (req, res) => {
+    try {
+        const companyId = req.user?.companyId;
+        const uniqueCustomerIds = await Ticket.find({ companyId }).distinct('customerId');
+        
+        const customers = await Customer.find({ 
+            _id: { $in: uniqueCustomerIds },
+            companyId 
+        }).select('customerName companyName email mobile').lean();
+        
+        res.json(customers);
+    } catch (error) {
+        console.error('Get ticket customers error:', error);
+        res.status(500).json({ message: error.message || 'Error fetching ticket customers' });
     }
 };

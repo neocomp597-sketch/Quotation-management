@@ -94,7 +94,10 @@ const SearchableSelect = ({
             </button>
 
             {isOpen && (
-                <div className={`absolute z-[9999] left-0 right-0 mt-1.5 bg-white border border-slate-200 rounded-2xl shadow-2xl p-2 animate-scale-in max-h-72 flex flex-col overflow-hidden ${menuClass}`}>
+                <div 
+                    style={{ backgroundColor: '#ffffff', opacity: 1, zIndex: 99999 }}
+                    className={`absolute left-0 right-0 mt-1.5 bg-white border border-slate-200 rounded-2xl shadow-2xl p-2 animate-scale-in max-h-72 flex flex-col overflow-hidden ${menuClass}`}
+                >
                     {!showInlineAdd ? (
                         <>
                             {/* Search Field */}
