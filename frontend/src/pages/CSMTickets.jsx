@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { csmService, customerService, productService, voucherService, userService, importService } from '../services/api';
+import { csmService, customerService, productService, voucherService, userService, importService, uploadService } from '../services/api';
 import { toast } from 'react-toastify';
-import { MdAdd, MdSearch, MdFilterList, MdArrowForward, MdEdit, MdDelete, MdPublish, MdFileDownload, MdWarning, MdInfoOutline } from 'react-icons/md';
+import { MdAdd, MdSearch, MdFilterList, MdArrowForward, MdEdit, MdDelete, MdPublish, MdFileDownload, MdWarning, MdInfoOutline, MdPhotoCamera, MdCloudUpload } from 'react-icons/md';
 import * as XLSX from 'xlsx';
 import PaginationControls from '../components/PaginationControls';
 import PortalDropdown from '../components/PortalDropdown';
@@ -20,6 +20,45 @@ const statusStyles = {
     'Cancelled': 'bg-rose-50/50 text-rose-400 border-rose-100'
 };
 
+const getManualImagesForTicket = (ticket) => {
+    const images = {
+        front: null,
+        back: null,
+        left: null,
+        right: null,
+        invoice: null,
+        other: []
+    };
+    
+    const desc = ticket.description || '';
+    const frontMatch = desc.match(/• FRONT:\s*(https?:\/\/\S+)/i);
+    const backMatch = desc.match(/• BACK:\s*(https?:\/\/\S+)/i);
+    const leftMatch = desc.match(/• LEFT:\s*(https?:\/\/\S+)/i);
+    const rightMatch = desc.match(/• RIGHT:\s*(https?:\/\/\S+)/i);
+    const invoiceMatch = desc.match(/• INVOICE:\s*(https?:\/\/\S+)/i);
+    
+    if (frontMatch) images.front = frontMatch[1];
+    if (backMatch) images.back = backMatch[1];
+    if (leftMatch) images.left = leftMatch[1];
+    if (rightMatch) images.right = rightMatch[1];
+    if (invoiceMatch) images.invoice = invoiceMatch[1];
+    
+    if (ticket.comments && ticket.comments.length > 0) {
+        ticket.comments.forEach(c => {
+            if (c.attachments && c.attachments.length > 0) {
+                c.attachments.forEach(url => {
+                    const allUrls = [images.front, images.back, images.left, images.right, images.invoice].filter(Boolean);
+                    if (!allUrls.includes(url)) {
+                        images.other.push(url);
+                    }
+                });
+            }
+        });
+    }
+    
+    return images;
+};
+
 const CSMTickets = () => {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
@@ -31,6 +70,7 @@ const CSMTickets = () => {
     const [search, setSearch] = useState('');
     const [filterStatus, setFilterStatus] = useState('');
     const [filterPriority, setFilterPriority] = useState('');
+    const [filterInvoiceType, setFilterInvoiceType] = useState('');
 
     // Masters lists for creation
     const [customers, setCustomers] = useState([]);
@@ -53,6 +93,39 @@ const CSMTickets = () => {
 
     // Modal & Form State
     const [showModal, setShowModal] = useState(false);
+    const [showManualModal, setShowManualModal] = useState(false);
+    const [manualFormData, setManualFormData] = useState({
+        customerName: '',
+        invoiceNo: '',
+        invoiceDate: '',
+        serialNumber: '',
+        productId: '',
+        source: 'Phone',
+        contactName: '',
+        contactPhone: '',
+        contactEmail: '',
+        priority: 'Medium',
+        category: 'Repair',
+        type: 'Service',
+        issueTitle: '',
+        description: ''
+    });
+    const [manualImages, setManualImages] = useState({
+        front: null,
+        back: null,
+        left: null,
+        right: null,
+        invoice: null
+    });
+    const [uploadingImage, setUploadingImage] = useState({
+        front: false,
+        back: false,
+        left: false,
+        right: false,
+        invoice: false
+    });
+    const [selectedManualTicket, setSelectedManualTicket] = useState(null);
+    const [showManualViewModal, setShowManualViewModal] = useState(false);
     const [showContactModal, setShowContactModal] = useState(false);
     const [contactFormData, setContactFormData] = useState({
         contactName: '',
@@ -103,13 +176,19 @@ const CSMTickets = () => {
     const fetchTickets = async () => {
         setLoading(true);
         try {
-            const res = await csmService.getTickets({
+            const queryParams = {
                 page,
                 limit: 10,
                 search,
                 status: filterStatus,
                 priorityId: filterPriority
-            });
+            };
+            if (filterInvoiceType === 'manual') {
+                queryParams.isManual = 'true';
+            } else if (filterInvoiceType === 'standard') {
+                queryParams.isManual = 'false';
+            }
+            const res = await csmService.getTickets(queryParams);
             setTickets(res.data?.data || []);
             setTotalPages(res.data?.pagination?.pages || 1);
         } catch (error) {
@@ -178,13 +257,13 @@ const CSMTickets = () => {
 
     useEffect(() => {
         fetchTickets();
-    }, [page, filterStatus, filterPriority]);
+    }, [page, filterStatus, filterPriority, filterInvoiceType]);
 
     useEffect(() => {
-        if (showModal) {
+        if (showModal || showManualModal) {
             loadCreationData();
         }
-    }, [showModal]);
+    }, [showModal, showManualModal]);
 
     // Fetch customer invoices when customer is selected in creation form
     useEffect(() => {
@@ -480,6 +559,204 @@ const CSMTickets = () => {
         } catch (error) {
             toast.error(error.response?.data?.message || 'Error generating ticket');
         }
+    };
+
+    const handleImageUpload = async (key, file) => {
+        if (!file) return;
+        setUploadingImage(prev => ({ ...prev, [key]: true }));
+        try {
+            const res = await uploadService.uploadImage(file);
+            const url = res.data.imageUrl || res.data.url || res.data.path;
+            if (url) {
+                setManualImages(prev => ({ ...prev, [key]: url }));
+                toast.success(`${key.charAt(0).toUpperCase() + key.slice(1)} image uploaded successfully`);
+            } else {
+                toast.error('Failed to get uploaded image URL');
+            }
+        } catch (error) {
+            console.error('Upload error:', error);
+            toast.error(error.response?.data?.message || 'Failed to upload image');
+        } finally {
+            setUploadingImage(prev => ({ ...prev, [key]: false }));
+        }
+    };
+
+    const handleCreateManualTicket = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        try {
+            // 1. Resolve Customer
+            let customerId = '';
+            const normCustName = manualFormData.customerName.trim();
+            if (!normCustName) {
+                toast.error('Customer Name is required');
+                setLoading(false);
+                return;
+            }
+
+            const existingCust = customers.find(c => 
+                (c.customerName || '').toLowerCase() === normCustName.toLowerCase() || 
+                (c.companyName || '').toLowerCase() === normCustName.toLowerCase()
+            );
+
+            if (existingCust) {
+                customerId = existingCust._id;
+            } else {
+                // Create customer on the fly
+                const newCustRes = await customerService.create({
+                    customerName: normCustName,
+                    companyName: normCustName,
+                    mobile: manualFormData.contactPhone,
+                    email: manualFormData.contactEmail
+                });
+                customerId = newCustRes.data._id;
+                setCustomers(prev => [...prev, newCustRes.data]);
+            }
+
+            // 2. Resolve Category
+            let categoryId = '';
+            const selectedCatName = manualFormData.category;
+            const matchedCat = categories.find(c => c.name.toLowerCase() === selectedCatName.toLowerCase());
+            if (matchedCat) {
+                categoryId = matchedCat._id;
+            } else {
+                const newCatRes = await csmService.createCategory({ name: selectedCatName });
+                categoryId = newCatRes.data._id;
+                setCategories(prev => [...prev, newCatRes.data]);
+            }
+
+            // 3. Resolve Priority
+            let priorityId = '';
+            const selectedPriName = manualFormData.priority;
+            const matchedPri = priorities.find(p => p.name.toLowerCase() === selectedPriName.toLowerCase());
+            if (matchedPri) {
+                priorityId = matchedPri._id;
+            } else {
+                const newPriRes = await csmService.createPriority({ name: selectedPriName });
+                priorityId = newPriRes.data._id;
+                setPriorities(prev => [...prev, newPriRes.data]);
+            }
+
+            // 4. Resolve Type
+            let typeId = '';
+            const selectedTypeName = manualFormData.type;
+            const matchedType = types.find(t => t.name.toLowerCase() === selectedTypeName.toLowerCase());
+            if (matchedType) {
+                typeId = matchedType._id;
+            } else {
+                const newTypeRes = await csmService.createType({ name: selectedTypeName });
+                typeId = newTypeRes.data._id;
+                setTypes(prev => [...prev, newTypeRes.data]);
+            }
+
+            // 5. Resolve Product (optional)
+            let productId = manualFormData.productId || null;
+
+            // 6. Resolve Asset (optional)
+            let assetId = null;
+            const cleanSerial = (manualFormData.serialNumber || '').trim();
+            if (cleanSerial) {
+                const existingAsset = assets.find(a => (a.serialNumber || '').toLowerCase() === cleanSerial.toLowerCase());
+                if (existingAsset) {
+                    assetId = existingAsset._id;
+                } else if (productId) {
+                    const newAssetRes = await csmService.createAsset({
+                        customerId,
+                        productId,
+                        serialNumber: cleanSerial,
+                        location: 'Manual Register'
+                    });
+                    assetId = newAssetRes.data._id;
+                    setAssets(prev => [...prev, newAssetRes.data]);
+                }
+            }
+
+            // 7. Construct description with uploads
+            const imageUrls = Object.entries(manualImages)
+                .filter(([_, url]) => url !== null)
+                .map(([key, url]) => ({ label: key, url }));
+                
+            let description = manualFormData.description || '';
+            if (imageUrls.length > 0) {
+                description += '\n\n--- Uploaded Images ---';
+                imageUrls.forEach(img => {
+                    description += `\n• ${img.label.toUpperCase()}: ${img.url}`;
+                });
+            }
+
+            // 8. Create Ticket
+            const ticketPayload = {
+                customerId,
+                contactName: manualFormData.contactName,
+                contactPhone: manualFormData.contactPhone,
+                contactEmail: manualFormData.contactEmail,
+                source: manualFormData.source,
+                priorityId,
+                categoryId,
+                typeId,
+                productId,
+                assetId,
+                issueTitle: manualFormData.issueTitle,
+                description,
+                invoiceId: null,
+                isManual: true,
+                manualInvoiceNo: manualFormData.invoiceNo,
+                manualInvoiceDate: manualFormData.invoiceDate || null,
+                manualProductName: manualFormData.productId ? (products.find(p => p._id === manualFormData.productId)?.productName || '') : ''
+            };
+
+            const ticketRes = await csmService.createTicket(ticketPayload);
+            const ticketId = ticketRes.data._id;
+
+            // 9. If there are uploaded files, add them as comment attachments
+            const allUploadedUrls = Object.values(manualImages).filter(Boolean);
+            if (allUploadedUrls.length > 0) {
+                await csmService.addComment(ticketId, {
+                    text: 'Manual ticket attachments: Device and/or Invoice images uploaded during registration.',
+                    attachments: allUploadedUrls
+                });
+            }
+
+            toast.success('Manual Support ticket registered successfully!');
+            setShowManualModal(false);
+            fetchTickets();
+            
+            // Reset form
+            setManualFormData({
+                customerName: '',
+                invoiceNo: '',
+                invoiceDate: '',
+                serialNumber: '',
+                productId: '',
+                source: 'Phone',
+                contactName: '',
+                contactPhone: '',
+                contactEmail: '',
+                priority: 'Medium',
+                category: 'Repair',
+                type: 'Service',
+                issueTitle: '',
+                description: ''
+            });
+            setManualImages({
+                front: null,
+                back: null,
+                left: null,
+                right: null,
+                invoice: null
+            });
+
+        } catch (error) {
+            console.error('Error registering manual ticket:', error);
+            toast.error(error.response?.data?.message || 'Failed to register manual ticket');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleOpenManualViewModal = (ticket) => {
+        setSelectedManualTicket(ticket);
+        setShowManualViewModal(true);
     };
 
     const handleSearchSubmit = (e) => {
@@ -989,6 +1266,22 @@ const CSMTickets = () => {
                     <MdSearch className="absolute left-4 top-3.5 text-slate-400" size={20} />
                 </form>
                 <div className="flex flex-wrap items-center gap-3">
+                    {/* Invoice Type Filter */}
+                    <div className="flex items-center gap-2 bg-slate-50 border border-slate-100 rounded-2xl px-4 py-1.5">
+                        <MdFilterList className="text-slate-400" />
+                        <span className="text-xs font-black uppercase tracking-wider text-slate-400">Ticket Type</span>
+                        <select
+                            value={filterInvoiceType}
+                            onChange={(e) => { setFilterInvoiceType(e.target.value); setPage(1); }}
+                            className="bg-transparent border-none focus:outline-none text-xs font-bold text-slate-700 cursor-pointer"
+                        >
+                            <option value="">All Tickets</option>
+                            <option value="standard">System Tickets</option>
+                            <option value="manual">Manual Tickets</option>
+                        </select>
+                    </div>
+
+                    {/* Status Filter */}
                     <div className="flex items-center gap-2 bg-slate-50 border border-slate-100 rounded-2xl px-4 py-1.5">
                         <MdFilterList className="text-slate-400" />
                         <span className="text-xs font-black uppercase tracking-wider text-slate-400">Status</span>
@@ -1038,41 +1331,61 @@ const CSMTickets = () => {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-50 text-sm font-semibold text-slate-700">
-                                    {tickets.map((t) => (
-                                        <tr key={t._id} className="hover:bg-slate-50/50 transition-colors">
-                                            <td className="px-6 py-4 font-black text-slate-900">{t.ticketNo}</td>
-                                            <td className="px-6 py-4">
-                                                <p className="font-bold text-slate-900">{t.customerId?.customerName || 'N/A'}</p>
-                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">{t.contactName || t.contactPhone || 'No Contact'}</p>
-                                            </td>
-                                            <td className="px-6 py-4 max-w-xs truncate">{t.issueTitle}</td>
-                                            <td className="px-6 py-4">
-                                                <span 
-                                                    className="px-3 py-1 rounded-full text-xs font-bold text-white shadow-sm"
-                                                    style={{ backgroundColor: t.priorityId?.color || '#64748b' }}
-                                                >
-                                                    {t.priorityId?.name || 'Medium'}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <span className={`px-3 py-1 rounded-full text-[10px] font-black border uppercase tracking-wider ${statusStyles[t.status] || 'bg-slate-50 text-slate-500 border-slate-200'}`}>
-                                                    {t.status}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 text-slate-500">{t.assignedEngineerId?.name || 'Unassigned'}</td>
-                                            <td className="px-6 py-4">
-                                                <div className="flex justify-center">
-                                                    <button
-                                                        onClick={() => navigate(`/csm/tickets/${t._id}`)}
-                                                        className="flex items-center gap-1.5 px-4 py-2 hover:bg-primary-50 text-primary-600 rounded-xl transition-all hover:scale-105 active:scale-95"
+                                    {tickets.map((t) => {
+                                        const isManual = t.isManual || !!t.manualInvoiceNo || (t.description && t.description.includes('--- Uploaded Images ---'));
+                                        return (
+                                            <tr key={t._id} className="hover:bg-slate-50/50 transition-colors">
+                                                <td className="px-6 py-4 font-black text-slate-900">
+                                                    <div>{t.ticketNo}</div>
+                                                    <span className={`inline-block mt-1 text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-wider ${
+                                                        isManual 
+                                                            ? 'bg-amber-100 text-amber-800 border border-amber-200' 
+                                                            : 'bg-blue-100 text-blue-800 border border-blue-200'
+                                                    }`}>
+                                                        {isManual ? 'Manual' : 'System'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <p className="font-bold text-slate-900">{t.customerId?.customerName || 'N/A'}</p>
+                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">{t.contactName || t.contactPhone || 'No Contact'}</p>
+                                                </td>
+                                                <td className="px-6 py-4 max-w-xs truncate">{t.issueTitle}</td>
+                                                <td className="px-6 py-4">
+                                                    <span 
+                                                        className="px-3 py-1 rounded-full text-xs font-bold text-white shadow-sm"
+                                                        style={{ backgroundColor: t.priorityId?.color || '#64748b' }}
                                                     >
-                                                        Details
-                                                        <MdArrowForward />
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
+                                                        {t.priorityId?.name || 'Medium'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span className={`px-3 py-1 rounded-full text-[10px] font-black border uppercase tracking-wider ${statusStyles[t.status] || 'bg-slate-50 text-slate-500 border-slate-200'}`}>
+                                                        {t.status}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 text-slate-500">{t.assignedEngineerId?.name || 'Unassigned'}</td>
+                                                <td className="px-6 py-4">
+                                                    <div className="flex justify-center items-center gap-2">
+                                                        {isManual && (
+                                                            <button
+                                                                onClick={() => handleOpenManualViewModal(t)}
+                                                                className="flex items-center gap-1 px-3.5 py-2 bg-teal-50 hover:bg-teal-100 text-teal-700 rounded-xl text-xs font-bold transition-all hover:scale-105 active:scale-95 shadow-sm"
+                                                            >
+                                                                View
+                                                            </button>
+                                                        )}
+                                                        <button
+                                                            onClick={() => navigate(`/csm/tickets/${t._id}`)}
+                                                            className="flex items-center gap-1.5 px-4 py-2 hover:bg-primary-50 text-primary-600 rounded-xl transition-all hover:scale-105 active:scale-95"
+                                                        >
+                                                            Details
+                                                            <MdArrowForward />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
                                 </tbody>
                             </table>
                         </div>
@@ -1093,6 +1406,16 @@ const CSMTickets = () => {
                 maxWidth="max-w-2xl"
                 footer={
                     <>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setShowModal(false);
+                                setShowManualModal(true);
+                            }}
+                            className="w-full md:w-auto md:mr-auto px-6 py-3.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 shadow-lg shadow-slate-800/10"
+                        >
+                            Manual Register
+                        </button>
                         <button
                             type="button"
                             onClick={() => setShowModal(false)}
@@ -1815,6 +2138,470 @@ const CSMTickets = () => {
                         })()}
                     </div>
                 </div>
+            </Modal>
+
+            {/* Manual Registration Modal */}
+            <Modal
+                isOpen={showManualModal}
+                onClose={() => setShowManualModal(false)}
+                title="Manual Ticket Registration"
+                maxWidth="max-w-4xl"
+                footer={
+                    <>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setShowManualModal(false);
+                                setShowModal(true);
+                            }}
+                            className="w-full md:w-auto md:mr-auto px-6 py-3.5 border border-primary-600 text-primary-600 hover:bg-primary-50 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95"
+                        >
+                            Standard Register
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setShowManualModal(false)}
+                            className="w-full md:w-auto px-6 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            form="manual-ticket-form"
+                            disabled={loading}
+                            className="w-full md:w-auto px-6 py-3.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-primary-600/10 disabled:opacity-50"
+                        >
+                            {loading ? 'Registering...' : 'Raise Ticket'}
+                        </button>
+                    </>
+                }
+            >
+                <form id="manual-ticket-form" onSubmit={handleCreateManualTicket} className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                        
+                        {/* Customer Name */}
+                        <div>
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Customer Name *</label>
+                            <input
+                                type="text"
+                                required
+                                placeholder="Enter customer name"
+                                value={manualFormData.customerName}
+                                onChange={(e) => setManualFormData({ ...manualFormData, customerName: e.target.value })}
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500"
+                            />
+                        </div>
+
+                        {/* Invoice No */}
+                        <div>
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Invoice No</label>
+                            <input
+                                type="text"
+                                placeholder="Invoice Number"
+                                value={manualFormData.invoiceNo}
+                                onChange={(e) => setManualFormData({ ...manualFormData, invoiceNo: e.target.value })}
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500"
+                            />
+                        </div>
+
+                        {/* Invoice Date */}
+                        <div>
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Invoice Date</label>
+                            <input
+                                type="date"
+                                value={manualFormData.invoiceDate}
+                                onChange={(e) => setManualFormData({ ...manualFormData, invoiceDate: e.target.value })}
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500"
+                            />
+                        </div>
+
+                        {/* Product Serial No. */}
+                        <div>
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Product Serial No.</label>
+                            <input
+                                type="text"
+                                placeholder="Serial Number"
+                                value={manualFormData.serialNumber}
+                                onChange={(e) => setManualFormData({ ...manualFormData, serialNumber: e.target.value })}
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500"
+                            />
+                        </div>
+
+                        {/* Product Link (Search Product) */}
+                        <div>
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Product Name</label>
+                            <SearchableSelect
+                                options={products.map(p => ({
+                                    value: p._id,
+                                    label: `${p.productName} (${p.productCode})`
+                                }))}
+                                value={manualFormData.productId}
+                                onChange={(val) => setManualFormData({ ...manualFormData, productId: val })}
+                                placeholder="Search & Select Product..."
+                            />
+                        </div>
+
+                        {/* Ticket Source */}
+                        <div>
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Ticket Source</label>
+                            <select
+                                value={manualFormData.source}
+                                onChange={(e) => setManualFormData({ ...manualFormData, source: e.target.value })}
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500"
+                            >
+                                <option value="Phone">Phone</option>
+                                <option value="Email">Email</option>
+                                <option value="Website">Website</option>
+                                <option value="Walk In">Walk In</option>
+                                <option value="WhatsApp">WhatsApp</option>
+                            </select>
+                        </div>
+
+                        {/* Contact Person Name */}
+                        <div>
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Contact Person Name</label>
+                            <input
+                                type="text"
+                                value={manualFormData.contactName}
+                                onChange={(e) => setManualFormData({ ...manualFormData, contactName: e.target.value })}
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500"
+                            />
+                        </div>
+
+                        {/* Contact Phone */}
+                        <div>
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Contact Phone</label>
+                            <input
+                                type="text"
+                                value={manualFormData.contactPhone}
+                                onChange={(e) => setManualFormData({ ...manualFormData, contactPhone: e.target.value })}
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500"
+                            />
+                        </div>
+
+                        {/* Contact Email */}
+                        <div>
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Contact Email</label>
+                            <input
+                                type="email"
+                                value={manualFormData.contactEmail}
+                                onChange={(e) => setManualFormData({ ...manualFormData, contactEmail: e.target.value })}
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500"
+                            />
+                        </div>
+
+                        {/* Priority */}
+                        <div>
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Priority</label>
+                            <select
+                                value={manualFormData.priority}
+                                onChange={(e) => setManualFormData({ ...manualFormData, priority: e.target.value })}
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500"
+                            >
+                                <option value="Low">Low</option>
+                                <option value="Medium">Medium</option>
+                                <option value="High">High</option>
+                                <option value="Critical">Critical</option>
+                            </select>
+                        </div>
+
+                        {/* Category */}
+                        <div>
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Category</label>
+                            <select
+                                value={manualFormData.category}
+                                onChange={(e) => setManualFormData({ ...manualFormData, category: e.target.value })}
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500"
+                            >
+                                <option value="Installation">Installation</option>
+                                <option value="Repair">Repair</option>
+                                <option value="Warranty">Warranty</option>
+                                <option value="Complaint">Complaint</option>
+                                <option value="Maintenance">Maintenance</option>
+                            </select>
+                        </div>
+
+                        {/* Ticket Type */}
+                        <div>
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Ticket Type</label>
+                            <select
+                                value={manualFormData.type}
+                                onChange={(e) => setManualFormData({ ...manualFormData, type: e.target.value })}
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500"
+                            >
+                                <option value="Service">Service</option>
+                                <option value="Complaint">Complaint</option>
+                                <option value="Support">Support</option>
+                                <option value="Replacement">Replacement</option>
+                            </select>
+                        </div>
+
+                        {/* Subject */}
+                        <div className="md:col-span-2 lg:col-span-3">
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Subject *</label>
+                            <input
+                                type="text"
+                                required
+                                placeholder="Enter Ticket Subject"
+                                value={manualFormData.issueTitle}
+                                onChange={(e) => setManualFormData({ ...manualFormData, issueTitle: e.target.value })}
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500"
+                            />
+                        </div>
+
+                        {/* Description */}
+                        <div className="md:col-span-2 lg:col-span-3">
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Description / Notes</label>
+                            <textarea
+                                placeholder="Write complete issue..."
+                                value={manualFormData.description}
+                                onChange={(e) => setManualFormData({ ...manualFormData, description: e.target.value })}
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold h-24 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                            />
+                        </div>
+
+                    </div>
+
+                    {/* Image Upload Grid */}
+                    <div className="border-t border-slate-100 pt-6 space-y-6">
+                        {/* Device Images */}
+                        <div className="space-y-3">
+                            <h4 className="text-xs font-black uppercase tracking-wider text-slate-700">Device / Product Images</h4>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                                {['front', 'back', 'left', 'right'].map((key) => {
+                                    const hasImage = !!manualImages[key];
+                                    const isUploading = uploadingImage[key];
+                                    return (
+                                        <div
+                                            key={key}
+                                            onClick={() => !isUploading && document.getElementById(`upload-${key}`).click()}
+                                            className={`relative aspect-[4/3] sm:h-36 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all ${
+                                                hasImage 
+                                                    ? 'border-teal-500 bg-teal-50/20' 
+                                                    : 'border-slate-300 bg-slate-50/50 hover:border-primary-500 hover:bg-slate-50'
+                                            }`}
+                                        >
+                                            <input
+                                                type="file"
+                                                id={`upload-${key}`}
+                                                accept="image/*"
+                                                className="hidden"
+                                                onChange={(e) => handleImageUpload(key, e.target.files[0])}
+                                            />
+                                            {isUploading ? (
+                                                <div className="flex flex-col items-center gap-1.5 text-slate-400">
+                                                    <div className="w-6 h-6 border-2 border-slate-300 border-t-primary-600 rounded-full animate-spin"></div>
+                                                    <span className="text-[10px] font-bold uppercase tracking-wider">Uploading...</span>
+                                                </div>
+                                            ) : hasImage ? (
+                                                <div className="absolute inset-0 p-1.5 flex flex-col items-center justify-center">
+                                                    <img
+                                                        src={manualImages[key]}
+                                                        alt={`${key} preview`}
+                                                        className="w-full h-full object-cover rounded-xl"
+                                                    />
+                                                    <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 rounded-xl flex items-center justify-center text-white transition-opacity">
+                                                        <span className="text-[9px] font-black uppercase tracking-widest">Change Photo</span>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="text-center p-3 text-slate-400 space-y-1">
+                                                    <MdPhotoCamera size={24} className="mx-auto text-slate-400" />
+                                                    <p className="text-xs font-bold text-slate-700 capitalize">{key} Image</p>
+                                                    <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-tight">Click to upload</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Invoice Image */}
+                        <div className="space-y-3">
+                            <h4 className="text-xs font-black uppercase tracking-wider text-slate-700">Invoice Image</h4>
+                            <div className="max-w-xs">
+                                <div
+                                    onClick={() => !uploadingImage.invoice && document.getElementById('upload-invoice').click()}
+                                    className={`relative aspect-[4/3] h-36 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all ${
+                                        manualImages.invoice 
+                                            ? 'border-teal-500 bg-teal-50/20' 
+                                            : 'border-slate-300 bg-slate-50/50 hover:border-primary-500 hover:bg-slate-50'
+                                    }`}
+                                >
+                                    <input
+                                        type="file"
+                                        id="upload-invoice"
+                                        accept="image/*"
+                                        className="hidden"
+                                        onChange={(e) => handleImageUpload('invoice', e.target.files[0])}
+                                    />
+                                    {uploadingImage.invoice ? (
+                                        <div className="flex flex-col items-center gap-1.5 text-slate-400">
+                                            <div className="w-6 h-6 border-2 border-slate-300 border-t-primary-600 rounded-full animate-spin"></div>
+                                            <span className="text-[10px] font-bold uppercase tracking-wider">Uploading...</span>
+                                        </div>
+                                    ) : manualImages.invoice ? (
+                                        <div className="absolute inset-0 p-1.5 flex flex-col items-center justify-center">
+                                            <img
+                                                src={manualImages.invoice}
+                                                alt="invoice preview"
+                                                className="w-full h-full object-cover rounded-xl"
+                                            />
+                                            <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 rounded-xl flex items-center justify-center text-white transition-opacity">
+                                                <span className="text-[9px] font-black uppercase tracking-widest">Change Photo</span>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="text-center p-3 text-slate-400 space-y-1">
+                                            <MdCloudUpload size={24} className="mx-auto text-slate-400" />
+                                            <p className="text-xs font-bold text-slate-700">Upload Invoice</p>
+                                            <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-tight">Click to upload</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </Modal>
+
+            {/* View Manual Ticket Modal */}
+            <Modal
+                isOpen={showManualViewModal}
+                onClose={() => {
+                    setShowManualViewModal(false);
+                    setSelectedManualTicket(null);
+                }}
+                title={`Manual Ticket Details - ${selectedManualTicket?.ticketNo || ''}`}
+                maxWidth="max-w-4xl"
+                footer={
+                    <div className="flex gap-2 justify-end w-full">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setShowManualViewModal(false);
+                                if (selectedManualTicket) {
+                                    navigate(`/csm/tickets/${selectedManualTicket._id}`);
+                                }
+                            }}
+                            className="px-6 py-3.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md active:scale-95"
+                        >
+                            Open Timeline & Actions
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setShowManualViewModal(false);
+                                setSelectedManualTicket(null);
+                            }}
+                            className="px-6 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                        >
+                            Close
+                        </button>
+                    </div>
+                }
+            >
+                {selectedManualTicket && (() => {
+                    const images = getManualImagesForTicket(selectedManualTicket);
+                    const hasPhotos = images.front || images.back || images.left || images.right || images.invoice || images.other.length > 0;
+                    
+                    return (
+                        <div className="space-y-6">
+                            {/* Summary Cards */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {/* Customer Info */}
+                                <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl space-y-2">
+                                    <span className="block text-[9px] font-black text-slate-400 uppercase tracking-widest">Customer Details</span>
+                                    <p className="text-sm font-bold text-slate-800">{selectedManualTicket.customerId?.companyName || selectedManualTicket.customerId?.customerName || 'N/A'}</p>
+                                    <div className="text-xs space-y-1 text-slate-500 font-semibold">
+                                        <p>Contact: {selectedManualTicket.contactName || 'N/A'}</p>
+                                        <p>Phone: {selectedManualTicket.contactPhone || 'N/A'}</p>
+                                        <p>Email: {selectedManualTicket.contactEmail || 'N/A'}</p>
+                                    </div>
+                                </div>
+
+                                {/* Invoice Info */}
+                                <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl space-y-2">
+                                    <span className="block text-[9px] font-black text-slate-400 uppercase tracking-widest">Invoice Details</span>
+                                    <p className="text-sm font-bold text-slate-800">
+                                        No: {selectedManualTicket.manualInvoiceNo || 'N/A'}
+                                    </p>
+                                    {selectedManualTicket.manualInvoiceDate && (
+                                        <p className="text-xs text-slate-500 font-semibold">
+                                            Date: {new Date(selectedManualTicket.manualInvoiceDate).toLocaleDateString()}
+                                        </p>
+                                    )}
+                                </div>
+
+                                {/* Product Info */}
+                                <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl space-y-2">
+                                    <span className="block text-[9px] font-black text-slate-400 uppercase tracking-widest">Product Details</span>
+                                    <p className="text-sm font-bold text-slate-800">{selectedManualTicket.manualProductName || selectedManualTicket.productId?.productName || 'N/A'}</p>
+                                    {selectedManualTicket.assetId?.serialNumber && (
+                                        <p className="text-xs text-slate-500 font-semibold">
+                                            Serial No: <span className="font-mono">{selectedManualTicket.assetId.serialNumber}</span>
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Ticket Details */}
+                            <div className="p-5 border border-slate-100 rounded-2xl space-y-3 bg-white">
+                                <div className="flex flex-wrap items-center gap-3">
+                                    <span className="px-3 py-1 rounded-full text-xs font-bold text-white" style={{ backgroundColor: selectedManualTicket.priorityId?.color || '#64748b' }}>
+                                        {selectedManualTicket.priorityId?.name || 'Medium'}
+                                    </span>
+                                    <span className="px-3 py-1 rounded-full text-[10px] font-black border uppercase tracking-wider bg-slate-50 text-slate-500 border-slate-200">
+                                        {selectedManualTicket.status}
+                                    </span>
+                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100">
+                                        Source: {selectedManualTicket.source}
+                                    </span>
+                                </div>
+                                <h4 className="text-lg font-bold text-slate-900 border-b border-slate-50 pb-2">{selectedManualTicket.issueTitle}</h4>
+                                <div className="text-sm text-slate-600 font-semibold whitespace-pre-wrap leading-relaxed">
+                                    {(selectedManualTicket.description || '').split('--- Uploaded Images ---')[0].trim() || 'No description provided.'}
+                                </div>
+                            </div>
+
+                            {/* Images Grid */}
+                            {hasPhotos && (
+                                <div className="space-y-3">
+                                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-700 border-b border-slate-100 pb-2">Device & Invoice Images</h4>
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-4">
+                                        {['front', 'back', 'left', 'right', 'invoice'].map((key) => {
+                                            const url = images[key];
+                                            if (!url) return null;
+                                            return (
+                                                <div key={key} className="space-y-1.5">
+                                                    <span className="block text-[8px] font-black text-slate-400 uppercase tracking-widest capitalize">{key} view</span>
+                                                    <a href={url} target="_blank" rel="noopener noreferrer" className="block relative aspect-[4/3] rounded-2xl overflow-hidden border border-slate-200 hover:scale-105 transition-transform active:scale-95 group shadow-sm bg-slate-50">
+                                                        <img src={url} alt={`${key} view`} className="w-full h-full object-cover" />
+                                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-[9px] font-black uppercase tracking-widest transition-opacity">
+                                                            View Full Size
+                                                        </div>
+                                                    </a>
+                                                </div>
+                                            );
+                                        })}
+                                        {images.other.map((url, index) => (
+                                            <div key={index} className="space-y-1.5">
+                                                <span className="block text-[8px] font-black text-slate-400 uppercase tracking-widest">Attachment {index + 1}</span>
+                                                <a href={url} target="_blank" rel="noopener noreferrer" className="block relative aspect-[4/3] rounded-2xl overflow-hidden border border-slate-200 hover:scale-105 transition-transform active:scale-95 group shadow-sm bg-slate-50">
+                                                    <img src={url} alt={`attachment-${index}`} className="w-full h-full object-cover" />
+                                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-[9px] font-black uppercase tracking-widest transition-opacity">
+                                                        View Full Size
+                                                    </div>
+                                                </a>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    );
+                })()}
             </Modal>
 
             {/* Import Summary Modal */}

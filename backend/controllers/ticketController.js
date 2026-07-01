@@ -91,15 +91,44 @@ exports.getTickets = async (req, res) => {
         if (req.query.status) filter.status = req.query.status;
         if (req.query.priorityId) filter.priorityId = req.query.priorityId;
         if (req.query.assignedEngineerId) filter.assignedEngineerId = req.query.assignedEngineerId;
+        
+        const andConditions = [];
+
+        if (req.query.isManual === 'true') {
+            andConditions.push({
+                $or: [
+                    { isManual: true },
+                    { manualInvoiceNo: { $exists: true, $ne: '' } },
+                    { description: /--- Uploaded Images ---/ }
+                ]
+            });
+        } else if (req.query.isManual === 'false') {
+            andConditions.push({
+                isManual: { $ne: true },
+                manualInvoiceNo: { $in: [null, ''] },
+                $or: [
+                    { description: { $exists: false } },
+                    { description: null },
+                    { description: '' },
+                    { description: { $not: /--- Uploaded Images ---/ } }
+                ]
+            });
+        }
 
         const search = String(req.query.search || '').trim();
         if (search) {
             const regex = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
-            filter.$or = [
-                { ticketNo: regex },
-                { issueTitle: regex },
-                { contactName: regex }
-            ];
+            andConditions.push({
+                $or: [
+                    { ticketNo: regex },
+                    { issueTitle: regex },
+                    { contactName: regex }
+                ]
+            });
+        }
+
+        if (andConditions.length > 0) {
+            filter.$and = andConditions;
         }
 
         const page = Math.max(1, Number(req.query.page || 1));
@@ -115,6 +144,8 @@ exports.getTickets = async (req, res) => {
                 .populate('priorityId', 'name color')
                 .populate('assignedTeamId', 'name')
                 .populate('assignedEngineerId', 'name email')
+                .populate('productId', 'productName productCode')
+                .populate('assetId', 'serialNumber')
                 .sort({ createdAt: -1 })
                 .skip(skip)
                 .limit(limit)

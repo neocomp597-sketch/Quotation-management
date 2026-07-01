@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>New Register</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+font-family:'Poppins',sans-serif;
+}
+
+body{
+
+background:#f4f6fb;
+padding:40px;
+
+}
+
+.container{
+
+max-width:1300px;
+margin:auto;
+background:#fff;
+padding:35px;
+border-radius:15px;
+box-shadow:0 15px 35px rgba(0,0,0,.08);
+
+}
+
+.title{
+
+font-size:32px;
+font-weight:700;
+margin-bottom:35px;
+color:#222;
+
+}
+
+.grid{
+
+display:grid;
+grid-template-columns:repeat(3,1fr);
+gap:25px;
+
+}
+
+.form-group{
+
+display:flex;
+flex-direction:column;
+
+}
+
+label{
+
+font-size:14px;
+font-weight:600;
+margin-bottom:8px;
+color:#555;
+
+}
+
+input,
+select,
+textarea{
+
+padding:13px 15px;
+border:1px solid #d6d6d6;
+border-radius:8px;
+font-size:15px;
+outline:none;
+transition:.3s;
+
+}
+
+input:focus,
+select:focus,
+textarea:focus{
+
+border-color:#2563eb;
+box-shadow:0 0 0 3px rgba(37,99,235,.15);
+
+}
+
+textarea{
+
+resize:none;
+height:120px;
+
+}
+
+.full{
+
+grid-column:1/-1;
+
+}
+
+.two{
+
+grid-column:span 2;
+
+}
+
+.upload-section{
+
+margin-top:35px;
+
+}
+
+.upload-title{
+
+font-size:20px;
+font-weight:600;
+margin-bottom:20px;
+
+}
+
+.upload-grid{
+
+display:grid;
+grid-template-columns:repeat(4,1fr);
+gap:25px;
+
+}
+
+.upload-box{
+
+border:2px dashed #b8c1d4;
+border-radius:12px;
+height:180px;
+display:flex;
+flex-direction:column;
+justify-content:center;
+align-items:center;
+cursor:pointer;
+transition:.3s;
+background:#fafbff;
+
+}
+
+.upload-box:hover{
+
+border-color:#2563eb;
+background:#f2f7ff;
+
+}
+
+.upload-box i{
+
+font-size:40px;
+margin-bottom:10px;
+color:#2563eb;
+
+}
+
+.upload-box p{
+
+font-weight:600;
+font-size:15px;
+
+}
+
+.upload-box span{
+
+font-size:13px;
+color:#777;
+margin-top:8px;
+
+}
+
+.buttons{
+
+display:flex;
+justify-content:flex-end;
+gap:15px;
+margin-top:45px;
+
+}
+
+.cancel{
+
+background:#fff;
+border:1px solid #d0d0d0;
+padding:13px 35px;
+border-radius:8px;
+cursor:pointer;
+font-size:15px;
+font-weight:600;
+
+}
+
+.cancel:hover{
+
+background:#f2f2f2;
+
+}
+
+.submit{
+
+background:#2563eb;
+color:white;
+border:none;
+padding:13px 40px;
+border-radius:8px;
+cursor:pointer;
+font-size:15px;
+font-weight:600;
+
+}
+
+.submit:hover{
+
+background:#1748b3;
+
+}
+
+@media(max-width:1000px){
+
+.grid{
+
+grid-template-columns:repeat(2,1fr);
+
+}
+
+.upload-grid{
+
+grid-template-columns:repeat(2,1fr);
+
+}
+
+}
+
+@media(max-width:700px){
+
+.grid{
+
+grid-template-columns:1fr;
+
+}
+
+.upload-grid{
+
+grid-template-columns:1fr;
+
+}
+
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+<div class="title">
+New Register
+</div>
+
+<div class="grid">
+
+<div class="form-group">
+<label>Customer Name</label>
+<input type="text" placeholder="Enter customer name">
+</div>
+
+<div class="form-group">
+<label>Invoice No</label>
+<input type="text" placeholder="Invoice Number">
+</div>
+
+<div class="form-group">
+<label>Invoice Date</label>
+<input type="date">
+</div>
+
+<div class="form-group">
+<label>Product Serial No.</label>
+<input type="text" placeholder="Serial Number">
+</div>
+
+<div class="form-group">
+<label>Product Name</label>
+<input type="text" placeholder="Search Product">
+</div>
+
+<div class="form-group">
+<label>Ticket Source</label>
+<select>
+<option>Phone</option>
+<option>Email</option>
+<option>Website</option>
+<option>Walk In</option>
+<option>WhatsApp</option>
+</select>
+</div>
+
+<div class="form-group">
+<label>Contact Person Name</label>
+<input type="text">
+</div>
+
+<div class="form-group">
+<label>Contact Phone</label>
+<input type="text">
+</div>
+
+<div class="form-group">
+<label>Contact Email</label>
+<input type="email">
+</div>
+
+<div class="form-group">
+<label>Priority</label>
+<select>
+<option>Low</option>
+<option selected>Medium</option>
+<option>High</option>
+<option>Critical</option>
+</select>
+</div>
+
+<div class="form-group">
+<label>Category</label>
+<select>
+<option>Installation</option>
+<option>Repair</option>
+<option>Warranty</option>
+<option>Complaint</option>
+<option>Maintenance</option>
+</select>
+</div>
+
+<div class="form-group">
+<label>Ticket Type</label>
+<select>
+<option>Service</option>
+<option>Complaint</option>
+<option>Support</option>
+<option>Replacement</option>
+</select>
+</div>
+
+<div class="form-group full">
+<label>Subject</label>
+<input type="text" placeholder="Enter Ticket Subject">
+</div>
+
+<div class="form-group full">
+<label>Description / Notes</label>
+<textarea placeholder="Write complete issue..."></textarea>
+</div>
+
+</div>
+
+<div class="upload-section">
+
+<div class="upload-title">
+Device / Product Images
+</div>
+
+<div class="upload-grid">
+
+<div class="upload-box">
+📷
+<p>Front Image</p>
+<span>Click to Upload</span>
+</div>
+
+<div class="upload-box">
+📷
+<p>Back Image</p>
+<span>Click to Upload</span>
+</div>
+
+<div class="upload-box">
+📷
+<p>Left Image</p>
+<span>Click to Upload</span>
+</div>
+
+<div class="upload-box">
+📷
+<p>Right Image</p>
+<span>Click to Upload</span>
+</div>
+
+</div>
+
+<br>
+
+<div class="upload-title">
+Invoice Image
+</div>
+
+<div style="width:250px">
+
+<div class="upload-box">
+📄
+<p>Upload Invoice</p>
+<span>Click to Upload</span>
+</div>
+
+</div>
+
+</div>
+
+<div class="buttons">
+
+<button class="cancel">
+Cancel
+</button>
+
+<button class="submit">
+Raise Ticket
+</button>
+
+</div>
+
+</div>
+
+</body>
+</html>
