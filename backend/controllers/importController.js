@@ -278,17 +278,11 @@ const importProducts = async (req, res) => {
         
         const hasProductCode = cleanHeaders.some(h => ['product code', 'productcode', 'code'].includes(h));
         const hasProductName = cleanHeaders.some(h => ['product name', 'productname', 'name'].includes(h));
-        const hasHsnCode = cleanHeaders.some(h => ['hsn code', 'hsncode', 'hsn'].includes(h));
         
-        const missingHeaders = [];
-        if (!hasProductCode) missingHeaders.push('Product Code');
-        if (!hasProductName) missingHeaders.push('Product Name');
-        if (!hasHsnCode) missingHeaders.push('HSN Code');
-        
-        if (missingHeaders.length > 0) {
+        if (!hasProductCode && !hasProductName) {
             return res.status(400).json({
-                message: `Missing required column headers: ${missingHeaders.join(', ')}`,
-                errors: [`The sheet must contain these column headers: ${missingHeaders.join(', ')}`]
+                message: `Missing required column headers: The sheet must contain at least 'Product Code' or 'Product Name'.`,
+                errors: [`The sheet must contain at least 'Product Code' or 'Product Name' column.`]
             });
         }
 
@@ -297,7 +291,9 @@ const importProducts = async (req, res) => {
         }
 
         const results = {
-            success: 0,
+            created: 0,
+            updated: 0,
+            skipped: 0,
             failed: 0,
             errors: []
         };
@@ -305,21 +301,37 @@ const importProducts = async (req, res) => {
         for (let i = 0; i < data.length; i++) {
             const row = data[i];
             try {
-                const productCode = pickFirstNonEmpty(row['Product Code'], row.productCode, row.code, row.Code);
-                const productName = pickFirstNonEmpty(row['Product Name'], row.productName, row.name, row.Name);
-                const hsnCode = pickFirstNonEmpty(row['HSN Code'], row.hsnCode, row.hsn, row.Hsn);
+                let productCode = pickFirstNonEmpty(row['Product Code'], row.productCode, row.code, row.Code);
+                let productName = pickFirstNonEmpty(row['Product Name'], row.productName, row.name, row.Name);
+                const hsnCode = pickFirstNonEmpty(row['HSN Code'], row.hsnCode, row.hsn, row.Hsn) || 'N/A';
                 const gstPercentage = toSafeNumber(row['GST %'] ?? row['GST Percentage'] ?? row.gstPercentage ?? row.gst, 18);
                 const basePrice = toSafeNumber(row['Base Price'] ?? row.basePrice ?? row.price, 0);
-                const mrp = toSafeNumber(row.MRP ?? row.mrp ?? row['M.R.P.'], 0);
+                const mrp = toSafeNumber(row.MRP ?? row.mrp ?? row['M.R.P.'], basePrice);
                 const uom = pickFirstNonEmpty(row.UOM ?? row.uom ?? row.Unit ?? row.unit, 'Nos');
                 const productImageUrl = pickFirstNonEmpty(row['Image URL'] ?? row.productImageUrl ?? row.imageUrl ?? row.image, '');
                 const status = pickFirstNonEmpty(row.Status ?? row.status, 'Active');
 
-                if (!productCode || !productName || !hsnCode) {
-                    throw new Error('Missing required fields: Product Code, Product Name, or HSN Code');
+                if (!productName && productCode) {
+                    productName = productCode;
                 }
 
-                let existing = await Product.findOne({ productCode: buildExactRegex(productCode) });
+                if (!productCode) {
+                    if (productName) {
+                        productCode = productName.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 30);
+                    } else {
+                        results.skipped++;
+                        continue;
+                    }
+                }
+
+                let existing = null;
+                if (productCode) {
+                    existing = await Product.findOne({ productCode: buildExactRegex(productCode) });
+                }
+                
+                if (!existing && productName) {
+                    existing = await Product.findOne({ productName: buildExactRegex(productName) });
+                }
                 
                 const productData = {
                     productCode,
@@ -353,10 +365,11 @@ const importProducts = async (req, res) => {
 
                 if (existing) {
                     await Product.findByIdAndUpdate(existing._id, productData);
+                    results.updated++;
                 } else {
                     await Product.create(productData);
+                    results.created++;
                 }
-                results.success++;
             } catch (err) {
                 results.failed++;
                 results.errors.push(`Row ${i + 2}: ${err.message}`);
@@ -365,27 +378,31 @@ const importProducts = async (req, res) => {
 
         await invalidateProductCaches();
 
-        if (results.success > 0) {
+        const successCount = results.created + results.updated;
+
+        if (successCount > 0) {
             const { createCompanyNotifications } = require('../utils/notificationHelper');
             await createCompanyNotifications({
                 companyId: req.user?.companyId,
                 title: 'Products Master Imported',
-                message: `Successfully imported/updated ${results.success} products (failed: ${results.failed}).`,
+                message: `Successfully imported/updated ${successCount} products (created: ${results.created}, updated: ${results.updated}, skipped: ${results.skipped}, failed: ${results.failed}).`,
                 type: 'Reminder',
                 excludeUserId: req.user?.id
             });
         }
 
-        if (results.success === 0 && results.failed > 0) {
+        if (successCount === 0 && results.failed > 0) {
             return res.status(400).json({
                 message: 'All rows failed to import',
                 errors: results.errors,
+                success: 0,
                 ...results
             });
         }
 
         res.status(200).json({
-            message: `Import completed. ${results.success} products imported, ${results.failed} failed.`,
+            message: `Import completed. Created: ${results.created}, Updated: ${results.updated}, Skipped: ${results.skipped}, Failed: ${results.failed}.`,
+            success: successCount,
             ...results
         });
     } catch (error) {
@@ -424,7 +441,9 @@ const importCustomers = async (req, res) => {
         }
 
         const results = {
-            success: 0,
+            created: 0,
+            updated: 0,
+            skipped: 0,
             failed: 0,
             errors: []
         };
@@ -503,10 +522,11 @@ const importCustomers = async (req, res) => {
                         ...customerData,
                         createdBy: req.user?.id || existing.createdBy || null
                     });
+                    results.updated++;
                 } else {
                     await Customer.create(customerData);
+                    results.created++;
                 }
-                results.success++;
             } catch (err) {
                 results.failed++;
                 results.errors.push(`Row ${i + 2}: ${err.message}`);
@@ -515,27 +535,31 @@ const importCustomers = async (req, res) => {
 
         await invalidateCustomerCaches();
 
-        if (results.success > 0) {
+        const successCount = results.created + results.updated;
+
+        if (successCount > 0) {
             const { createCompanyNotifications } = require('../utils/notificationHelper');
             await createCompanyNotifications({
                 companyId: req.user?.companyId,
                 title: 'Customers Master Imported',
-                message: `Successfully imported/updated ${results.success} customers (failed: ${results.failed}).`,
+                message: `Successfully imported/updated ${successCount} customers (created: ${results.created}, updated: ${results.updated}, skipped: ${results.skipped}, failed: ${results.failed}).`,
                 type: 'Reminder',
                 excludeUserId: req.user?.id
             });
         }
 
-        if (results.success === 0 && results.failed > 0) {
+        if (successCount === 0 && results.failed > 0) {
             return res.status(400).json({
                 message: 'All rows failed to import',
                 errors: results.errors,
+                success: 0,
                 ...results
             });
         }
 
         res.status(200).json({
-            message: `Import completed. ${results.success} customers imported, ${results.failed} failed.`,
+            message: `Import completed. Created: ${results.created}, Updated: ${results.updated}, Skipped: ${results.skipped}, Failed: ${results.failed}.`,
+            success: successCount,
             ...results
         });
     } catch (error) {
@@ -628,59 +652,92 @@ const importPlanning = async (req, res) => {
             loadPlanningMgrs(mgr2Lookups, 'MGR2')
         ]);
 
-        // Check for missing codes
-        const missingCustomerCodes = customerLookups.filter(code => !customerMap.has(normalizeKey(code)));
-        const missingProductCodes = productLookups.filter(code => !productMap.has(normalizeKey(code)));
-        const missingMgr1Codes = mgr1Lookups.filter(code => !mgr1Map.has(normalizeKey(code)));
-        const missingMgr2Codes = mgr2Lookups.filter(code => !mgr2Map.has(normalizeKey(code)));
-
-        if (missingCustomerCodes.length > 0 || missingProductCodes.length > 0 || missingMgr1Codes.length > 0 || missingMgr2Codes.length > 0) {
-            const uploadDir = path.join(__dirname, '..', 'uploads');
-            if (!fs.existsSync(uploadDir)) {
-                fs.mkdirSync(uploadDir, { recursive: true });
+        // Dynamically create missing master records on the fly
+        if (missingCustomerCodes.length > 0) {
+            for (const code of missingCustomerCodes) {
+                const newCustomer = new Customer({
+                    companyId: req.user?.companyId,
+                    customerName: code,
+                    companyName: code,
+                    externalCode: code,
+                    createdBy: req.user?.id || null
+                });
+                await newCustomer.save();
+                customerMap.set(normalizeKey(code), newCustomer);
             }
+        }
 
-            if (missingCustomerCodes.length > 0) {
-                const custFilePath = path.join(uploadDir, 'missing_customer_codes.txt');
-                fs.writeFileSync(custFilePath, missingCustomerCodes.join('\n'), 'utf8');
+        if (missingProductCodes.length > 0) {
+            for (const code of missingProductCodes) {
+                const newProduct = new Product({
+                    companyId: req.user?.companyId,
+                    productCode: code,
+                    productName: code,
+                    hsnCode: 'N/A',
+                    gstPercentage: 18,
+                    basePrice: 0,
+                    mrp: 0,
+                    uom: 'Nos',
+                    status: 'Active'
+                });
+                await newProduct.save();
+                productMap.set(normalizeKey(code), newProduct);
             }
+        }
 
-            if (missingProductCodes.length > 0) {
-                const prodFilePath = path.join(uploadDir, 'missing_product_codes.txt');
-                fs.writeFileSync(prodFilePath, missingProductCodes.join('\n'), 'utf8');
+        if (missingMgr1Codes.length > 0) {
+            for (const code of missingMgr1Codes) {
+                const newMgr = new MGR({
+                    companyId: req.user?.companyId,
+                    code,
+                    mgrType: 'MGR1',
+                    description: code,
+                    status: 'Active'
+                });
+                await newMgr.save();
+                mgr1Map.set(normalizeKey(code), newMgr);
             }
+        }
 
-            if (missingMgr1Codes.length > 0) {
-                const mgr1FilePath = path.join(uploadDir, 'missing_mgr1_codes.txt');
-                fs.writeFileSync(mgr1FilePath, missingMgr1Codes.join('\n'), 'utf8');
+        if (missingMgr2Codes.length > 0) {
+            for (const code of missingMgr2Codes) {
+                const newMgr = new MGR({
+                    companyId: req.user?.companyId,
+                    code,
+                    mgrType: 'MGR2',
+                    description: code,
+                    status: 'Active'
+                });
+                await newMgr.save();
+                mgr2Map.set(normalizeKey(code), newMgr);
             }
-
-            if (missingMgr2Codes.length > 0) {
-                const mgr2FilePath = path.join(uploadDir, 'missing_mgr2_codes.txt');
-                fs.writeFileSync(mgr2FilePath, missingMgr2Codes.join('\n'), 'utf8');
-            }
-
-            return res.status(400).json({
-                message: 'Validation failed. Missing codes found.',
-                missingCustomerCodes,
-                missingProductCodes,
-                missingMgr1Codes,
-                missingMgr2Codes
-            });
         }
 
         // PHASE 3: Parse and prepare bulk operations
         const results = {
-            success: 0,
+            created: 0,
+            updated: 0,
+            skipped: 0,
             failed: 0,
             errors: [],
             processed: 0,
-            total: data.length
+            total: data.length,
+            success: 0
         };
 
         const bulkOps = [];
         const BATCH_SIZE = 1000;
 
+        const executeBatch = async () => {
+            if (bulkOps.length === 0) return;
+            const writeResult = await Planning.bulkWrite(bulkOps, { ordered: false });
+            results.created += writeResult?.upsertedCount || 0;
+            results.updated += writeResult?.modifiedCount || 0;
+            const matched = writeResult?.matchedCount || 0;
+            const modified = writeResult?.modifiedCount || 0;
+            results.skipped += (matched - modified);
+            bulkOps.length = 0;
+        };
 
         for (let i = 0; i < data.length; i++) {
             const row = data[i];
@@ -726,7 +783,6 @@ const importPlanning = async (req, res) => {
 
                 const monthInfo = resolvePlanningMonthInfo(financialYear, rawMonthYear);
 
-                // Use cached lookups
                 const customer = customerMap.get(normalizeKey(customerLookup));
                 if (!customer) {
                     throw new Error(`Customer code not found: ${customerLookup}`);
@@ -747,64 +803,48 @@ const importPlanning = async (req, res) => {
                     throw new Error(`MGR 2 not found: ${mgrCode2Input}`);
                 }
 
-                const planningData = {
-                    financialYear,
-                    monthYear: monthInfo.monthYear,
-                    month: monthInfo.month,
-                    customerId: customer._id,
-                    customerName: customer.companyName || customer.customerName,
-                    productId: product._id,
-                    productName: product.productName,
-                    qty,
-                    value,
-                    totalValue: qty * value,
-                    mgrCode: mgr1.code,
-                    mgrCode2: mgr2?.code || '',
-                    status,
-                    createdBy: req.user?.id || null
-                };
-
-                // Use updateOne with upsert for bulk operation
                 bulkOps.push({
                     updateOne: {
                         filter: {
-                            financialYear,
-                            monthYear: monthInfo.monthYear,
+                            companyId: req.user?.companyId,
                             customerId: customer._id,
                             productId: product._id,
-                            mgrCode: mgr1.code,
-                            mgrCode2: mgr2?.code || '',
-                            status
+                            monthYear: monthInfo.monthYear,
+                            mgrCode: mgr1.code
                         },
                         update: {
-                            $set: planningData
+                            $set: {
+                                financialYear,
+                                customerName: customer.companyName || customer.customerName,
+                                productName: product.productName,
+                                qty,
+                                value,
+                                totalValue: qty * value,
+                                mgrCode2: mgr2?.code || '',
+                                status
+                            },
+                            $setOnInsert: {
+                                createdBy: req.user?.id || null
+                            }
                         },
                         upsert: true
                     }
                 });
 
-                results.success++;
-
-                // Execute bulk operations in batches
                 if (bulkOps.length >= BATCH_SIZE || i === data.length - 1) {
-                    if (bulkOps.length > 0) {
-                        await Planning.bulkWrite(bulkOps, { ordered: false });
-                        bulkOps.length = 0;
-                    }
+                    await executeBatch();
                 }
             } catch (err) {
                 results.failed++;
                 results.errors.push(`Row ${i + 2}: ${err.message}`);
                 
-                // Still track in bulk to maintain consistency
-                if (bulkOps.length >= BATCH_SIZE) {
-                    if (bulkOps.length > 0) {
-                        await Planning.bulkWrite(bulkOps, { ordered: false });
-                        bulkOps.length = 0;
-                    }
+                if (bulkOps.length >= BATCH_SIZE || i === data.length - 1) {
+                    await executeBatch();
                 }
             }
         }
+
+        results.success = results.created + results.updated;
 
         // Trigger notification
         if (results.success > 0) {
@@ -812,7 +852,7 @@ const importPlanning = async (req, res) => {
             await createCompanyNotifications({
                 companyId: req.user?.companyId,
                 title: 'Planning Entries Imported',
-                message: `Successfully imported ${results.success} planning entries for FY ${selectedFinancialYear} (failed: ${results.failed}).`,
+                message: `Successfully imported/updated ${results.success} planning entries (created: ${results.created}, updated: ${results.updated}, skipped: ${results.skipped}, failed: ${results.failed}).`,
                 type: 'Planning',
                 excludeUserId: req.user?.id
             });
@@ -822,12 +862,13 @@ const importPlanning = async (req, res) => {
             return res.status(400).json({
                 message: 'All rows failed to import',
                 errors: results.errors,
+                success: 0,
                 ...results
             });
         }
 
         res.status(200).json({
-            message: `Import completed. ${results.success} planning entries imported, ${results.failed} failed.`,
+            message: `Import completed. Created: ${results.created}, Updated: ${results.updated}, Skipped: ${results.skipped}, Failed: ${results.failed}.`,
             ...results
         });
     } catch (error) {

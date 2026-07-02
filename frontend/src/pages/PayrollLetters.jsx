@@ -1,97 +1,229 @@
 import React, { useState, useEffect } from 'react';
 import { payrollService, companySettingsService } from '../services/api';
 import { toast } from 'react-toastify';
-import { pdf, Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
 import Modal from '../components/Modal';
 import { MdDescription, MdAdd, MdSave, MdDelete, MdPictureAsPdf } from 'react-icons/md';
 import { formatDate } from '../utils/helpers';
 
-// Simple PDF Letter Template
-const LetterPdfTemplate = ({ letter, companySettings }) => {
-    const styles = StyleSheet.create({
-        page: { padding: 50, fontFamily: 'Helvetica', fontSize: 10, lineHeight: 1.6, color: '#334155' },
-        header: { borderBottomWidth: 1, borderBottomColor: '#0f766e', paddingBottom: 15, marginBottom: 25, alignItems: 'center' },
-        companyName: { fontSize: 18, fontWeight: 'bold', color: '#0f766e', textTransform: 'uppercase' },
-        companyAddr: { fontSize: 8, color: '#64748b', marginTop: 2 },
-        dateText: { alignSelf: 'flex-end', fontSize: 9, color: '#64748b', marginBottom: 20 },
-        recipientSection: { marginBottom: 20 },
-        toLabel: { fontSize: 9, color: '#64748b' },
-        nameText: { fontSize: 10, fontWeight: 'bold', color: '#0f172a', marginTop: 2 },
-        emailText: { fontSize: 9, color: '#64748b' },
-        subjectText: { fontSize: 11, fontWeight: 'bold', color: '#0f172a', marginVertical: 15, textDecoration: 'underline' },
-        body: { fontSize: 10, color: '#334155', textAlign: 'justify', marginBottom: 30 },
-        signOff: { marginTop: 40 },
-        companySign: { fontSize: 10, fontWeight: 'bold', color: '#0f172a' },
-        signSpace: { height: 40 },
-        signTitle: { fontSize: 9, color: '#64748b', borderTopWidth: 1, borderTopColor: '#cbd5e1', paddingTop: 5, width: 150 }
-    });
-
-    const getAddressString = () => {
-        if (!companySettings?.address) return '';
-        const addr = companySettings.address;
-        return [addr.line1, addr.line2, addr.city, addr.state, addr.pincode].filter(Boolean).join(', ');
-    };
-
-    const getSubject = () => {
-        switch (letter.type) {
-            case 'offer': return 'SUBJECT: OFFER OF EMPLOYMENT';
-            case 'appointment': return 'SUBJECT: APPOINTMENT LETTER';
-            case 'increment': return 'SUBJECT: SALARY REVISION / INCREMENT LETTER';
-            case 'promotion': return 'SUBJECT: PROMOTION & ROLE REVISION LETTER';
-            case 'salary_certificate': return 'SUBJECT: SALARY CERTIFICATE';
-            case 'experience': return 'SUBJECT: EXPERIENCE CERTIFICATE';
-            case 'relieving': return 'SUBJECT: RELIEVING ORDER';
-            default: return 'HR CORRESPONDENCE';
-        }
-    };
-
-    // Replace newlines with spacing in React PDF
-    const renderParagraphs = (text) => {
-        return text.split('\n\n').map((para, i) => (
-            <Text key={i} style={{ marginBottom: 10 }}>{para}</Text>
-        ));
-    };
-
-    return (
-        <Document>
-            <Page size="A4" style={styles.page}>
-                <View style={styles.header}>
-                    <Text style={styles.companyName}>{companySettings?.companyName || 'ARCRM Co.'}</Text>
-                    <Text style={styles.companyAddr}>{getAddressString()}</Text>
-                </View>
-                
-                <Text style={styles.dateText}>Date: {formatDate(new Date())}</Text>
-
-                <View style={styles.recipientSection}>
-                    <Text style={styles.toLabel}>To,</Text>
-                    <Text style={styles.nameText}>{letter.recipientName}</Text>
-                    {letter.recipientEmail && <Text style={styles.emailText}>{letter.recipientEmail}</Text>}
-                </View>
-
-                <Text style={styles.subjectText}>{getSubject()}</Text>
-
-                <View style={styles.body}>
-                    {renderParagraphs(letter.content)}
-                </View>
-
-                <View style={styles.signOff}>
-                    <Text style={styles.companySign}>For {companySettings?.companyName || 'ARCRM Co.'}</Text>
-                    <View style={styles.signSpace} />
-                    <Text style={styles.signTitle}>Authorized Signatory</Text>
-                </View>
-            </Page>
-        </Document>
-    );
+const TEMPLATE_CONTENTS = {
+    offer: "Dear {name},\n\nWe are pleased to offer you employment with {company} for the position of {designation}. This offer is made based on the information provided by you during the selection process and is subject to successful completion of all joining formalities and background verification, wherever applicable.\n\nYour proposed monthly gross compensation will be INR {salary}. Your expected date of joining will be {joining_date}, unless otherwise agreed in writing by the company.\n\nDetailed terms of employment, reporting structure, policies, and other conditions will be shared at the time of joining or appointment. Please sign and return a copy of this letter as confirmation of your acceptance of the offer.\n\nWe look forward to welcoming you and wish you a successful association with us.",
+    appointment: "Dear {name},\n\nWith reference to your application and subsequent discussions, we are pleased to appoint you as {designation} with {company}, effective from {joining_date}.\n\nYour monthly gross compensation will be INR {salary}, subject to applicable statutory deductions and company policies. You will be required to comply with all rules, procedures, confidentiality obligations, and employment conditions communicated by the company from time to time.\n\nYour appointment is subject to satisfactory verification of credentials and completion of joining documentation. Please sign and return a copy of this letter to confirm your acceptance of the appointment terms.\n\nWe welcome you to the organization and look forward to a productive and professional association.",
+    increment: "Dear {name},\n\nWe are pleased to inform you that, following the recent review process, your monthly gross compensation has been revised to INR {salary}, effective from {joining_date}.\n\nThis revision recognizes your contribution to the organization and your continued commitment to your responsibilities. All other terms and conditions of your employment remain unchanged unless communicated separately in writing.\n\nWe appreciate your efforts and look forward to your continued performance and growth with {company}.",
+    promotion: "Dear {name},\n\nWe are pleased to inform you that you have been promoted to the position of {new_designation}, effective from {joining_date}.\n\nConsequent to this promotion, your monthly gross compensation has been revised to INR {salary}. Your responsibilities, reporting structure, and performance expectations will be aligned with your revised role and communicated by your reporting manager or HR.\n\nAll other terms and conditions of your employment remain unchanged unless communicated separately in writing. We congratulate you on this achievement and wish you continued success in your new role.",
+    salary_certificate: "TO WHOMSOEVER IT MAY CONCERN\n\nThis is to certify that {name} is employed with {company} as {designation}. As per our employment records, the employee has been associated with the company since {joining_date}.\n\nAs per the current payroll records, the employee's monthly gross salary is INR {salary}.\n\nThis certificate is issued at the request of the employee for official verification and documentation purposes. It does not constitute any financial guarantee or undertaking on behalf of the company.",
+    experience: "TO WHOMSOEVER IT MAY CONCERN\n\nThis is to certify that {name} was employed with {company} as {designation} from {joining_date} to {relieving_date}.\n\nDuring the period of employment, the employee carried out assigned responsibilities in a professional manner and maintained satisfactory conduct. The employee was relieved from services after completion of the applicable separation formalities.\n\nWe thank {name} for the services rendered to the organization and wish them success in future endeavors.",
+    relieving: "Dear {name},\n\nThis is to confirm that your resignation has been accepted and you are relieved from your duties as {designation} with effect from the close of business hours on {relieving_date}.\n\nAs per company records, you have completed the required handover and separation formalities, subject to any pending obligations that may be communicated separately. Your full and final settlement, if applicable, will be processed in accordance with company policy and statutory requirements.\n\nWe appreciate your contribution during your tenure with {company} and wish you success in your future endeavors."
 };
 
-const TEMPLATE_CONTENTS = {
-    offer: "Dear {name},\n\nWe are pleased to offer you the position of {designation} with our company. Your starting monthly salary will be ₹{salary} per month.\n\nWe expect you to join on {joining_date}. Please review and sign a copy of this letter as confirmation of your acceptance.",
-    appointment: "Dear {name},\n\nWith reference to your interview, we are pleased to appoint you as {designation} starting from {joining_date}. You will be on probation for a period of six months.\n\nYour monthly gross package will be ₹{salary} per month. All details regarding role responsibilities are attached.",
-    increment: "Dear {name},\n\nBased on your performance review, we are pleased to inform you that your monthly gross salary has been revised to ₹{salary} per month, effective from {joining_date}.\n\nWe appreciate your contribution and look forward to your continued success.",
-    promotion: "Dear {name},\n\nWe are delighted to promote you to the designation of {new_designation} starting from {joining_date}. Your revised monthly gross package will be ₹{salary}.\n\nAll other terms of your contract remain unchanged. Congratulations on your promotion!",
-    salary_certificate: "To Whom It May Concern,\n\nThis is to certify that {name} is employed with us as {designation}. Their monthly gross salary is ₹{salary} per month.\n\nThis certificate is issued at the request of the employee for verification purposes.",
-    experience: "To Whom It May Concern,\n\nThis is to certify that {name} was employed with us as {designation} from {joining_date} to {relieving_date}.\n\nDuring their tenure, we found them to be diligent, hard-working, and sincere in their duties. We wish them all success in future endeavors.",
-    relieving: "Dear {name},\n\nWe acknowledge your resignation. You are hereby relieved of your duties as {designation} effective from {relieving_date}.\n\nYour full and final settlement has been completed. We thank you for your service."
+const formatSalary = (salary) => {
+    const numericSalary = parseFloat(salary);
+    return Number.isFinite(numericSalary) ? numericSalary.toLocaleString('en-IN') : '[Salary]';
+};
+
+const compileTemplate = (template, values, companySettings) => {
+    return template
+        .replace(/{name}/g, values.recipientName || '[Name]')
+        .replace(/{designation}/g, values.designation || '[Designation]')
+        .replace(/{new_designation}/g, values.newDesignation || '[New Designation]')
+        .replace(/{company}/g, companySettings?.companyName || 'the company')
+        .replace(/{salary}/g, values.salary ? formatSalary(values.salary) : '[Salary]')
+        .replace(/{joining_date}/g, values.joiningDate ? formatDate(values.joiningDate) : '[Joining Date]')
+        .replace(/{relieving_date}/g, values.relievingDate ? formatDate(values.relievingDate) : '[Relieving Date]');
+};
+
+const getPrintableContent = (letter, companySettings) => {
+    const metadata = letter.metadata || {};
+    if (TEMPLATE_CONTENTS[letter.type]) {
+        return compileTemplate(TEMPLATE_CONTENTS[letter.type], {
+            recipientName: letter.recipientName,
+            designation: metadata.designation,
+            newDesignation: metadata.newDesignation,
+            salary: metadata.salary,
+            joiningDate: metadata.joiningDate,
+            relievingDate: metadata.relievingDate
+        }, companySettings);
+    }
+
+    const shouldRefreshContent = TEMPLATE_CONTENTS[letter.type] && (
+        !letter.content ||
+        letter.content.includes('â‚¹') ||
+        letter.content.includes('our company') ||
+        letter.content.includes('Your full and final settlement has been processed and completed')
+    );
+
+    if (!shouldRefreshContent) {
+        return letter.content;
+    }
+
+    return compileTemplate(TEMPLATE_CONTENTS[letter.type], {
+        recipientName: letter.recipientName,
+        designation: metadata.designation,
+        newDesignation: metadata.newDesignation,
+        salary: metadata.salary,
+        joiningDate: metadata.joiningDate,
+        relievingDate: metadata.relievingDate
+    }, companySettings);
+};
+
+const getAddressString = (companySettings) => {
+    if (!companySettings?.address) return '';
+    const addr = companySettings.address;
+    return [addr.line1, addr.line2, addr.city, addr.state, addr.pincode].filter(Boolean).join(', ');
+};
+
+const escapeHtml = (value = '') => String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+const toParagraphs = (text) => text
+    .split('\n\n')
+    .map((paragraph) => `<p>${escapeHtml(paragraph).replace(/\n/g, '<br />')}</p>`)
+    .join('');
+
+const getLetterTitle = (type) => ({
+    offer: 'Offer of Employment',
+    appointment: 'Appointment Letter',
+    increment: 'Salary Revision Letter',
+    promotion: 'Promotion and Role Revision Letter',
+    salary_certificate: 'Salary Certificate',
+    experience: 'Experience Certificate',
+    relieving: 'Relieving Letter'
+}[type] || 'HR Letter');
+
+const getLetterReference = (letter) => {
+    const date = letter.createdAt ? new Date(letter.createdAt) : new Date();
+    const stamp = [
+        date.getFullYear(),
+        String(date.getMonth() + 1).padStart(2, '0'),
+        String(date.getDate()).padStart(2, '0')
+    ].join('');
+    return `HR/${String(letter.type || 'LETTER').replace(/_/g, '-').toUpperCase()}/${stamp}`;
+};
+
+const buildDetailsTable = (letter) => {
+    const metadata = letter.metadata || {};
+    const rows = [];
+
+    if (metadata.designation) rows.push(['Designation', metadata.designation]);
+    if (metadata.newDesignation && letter.type === 'promotion') rows.push(['Promoted Role', metadata.newDesignation]);
+    if (metadata.joiningDate) rows.push([letter.type === 'increment' || letter.type === 'promotion' ? 'Effective Date' : 'Joining Date', formatDate(metadata.joiningDate)]);
+    if (metadata.relievingDate) rows.push(['Relieving Date', formatDate(metadata.relievingDate)]);
+    if (metadata.salary && ['offer', 'appointment', 'increment', 'promotion', 'salary_certificate'].includes(letter.type)) {
+        rows.push(['Monthly Gross Compensation', `INR ${formatSalary(metadata.salary)}`]);
+    }
+
+    if (!rows.length) return '';
+
+    return `
+        <table class="details-table">
+            <tbody>
+                ${rows.map(([label, value]) => `
+                    <tr>
+                        <th>${escapeHtml(label)}</th>
+                        <td>${escapeHtml(value)}</td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    `;
+};
+
+const buildProfessionalLetterHtml = (letter, companySettings) => {
+    const companyName = companySettings?.companyName || 'Company Name';
+    const address = getAddressString(companySettings);
+    const content = getPrintableContent(letter, companySettings);
+    const title = getLetterTitle(letter.type);
+    const needsAcknowledgment = ['offer', 'appointment', 'increment', 'promotion'].includes(letter.type);
+    const footerContact = [
+        companySettings?.contactEmail && `Email: ${companySettings.contactEmail}`,
+        companySettings?.website && `Web: ${companySettings.website}`
+    ].filter(Boolean).join(' | ');
+
+    return `<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>${escapeHtml(title)}</title>
+    <style>
+        @page { size: A4; margin: 0; }
+        * { box-sizing: border-box; }
+        body { margin: 0; background: #e5e7eb; color: #111827; font-family: Arial, Helvetica, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .page { width: 210mm; min-height: 297mm; margin: 0 auto; background: #fff; position: relative; padding: 22mm 20mm 19mm; }
+        .brand-rule { height: 5px; background: #0f766e; position: absolute; left: 0; top: 0; right: 0; }
+        .header { display: flex; justify-content: space-between; gap: 24px; border-bottom: 1px solid #cbd5e1; padding-bottom: 14px; margin-bottom: 22px; }
+        .company-name { font-size: 20px; line-height: 1.2; font-weight: 800; letter-spacing: .4px; color: #0f766e; text-transform: uppercase; }
+        .company-address { margin-top: 6px; max-width: 380px; font-size: 11px; line-height: 1.45; color: #475569; }
+        .company-contact { min-width: 190px; text-align: right; font-size: 11px; line-height: 1.55; color: #475569; }
+        .meta-row { display: flex; justify-content: space-between; margin-bottom: 24px; font-size: 12px; color: #334155; }
+        .recipient { margin-bottom: 18px; font-size: 12px; line-height: 1.55; }
+        .recipient strong { display: block; font-size: 13px; color: #0f172a; }
+        .title { text-align: center; font-size: 15px; font-weight: 800; text-transform: uppercase; letter-spacing: .7px; color: #0f172a; margin: 22px 0 18px; text-decoration: underline; text-underline-offset: 4px; }
+        .details-table { width: 100%; border-collapse: collapse; margin: 0 0 20px; font-size: 12px; }
+        .details-table th, .details-table td { border: 1px solid #cbd5e1; padding: 8px 10px; vertical-align: top; }
+        .details-table th { width: 34%; text-align: left; background: #f8fafc; color: #334155; font-weight: 700; }
+        .body { font-size: 12.5px; line-height: 1.75; text-align: justify; }
+        .body p { margin: 0 0 12px; }
+        .closing { margin-top: 28px; font-size: 12.5px; line-height: 1.7; }
+        .signature-row { display: flex; justify-content: space-between; gap: 40px; margin-top: 42px; }
+        .signature { width: 235px; font-size: 12px; color: #0f172a; }
+        .signature-space { height: 54px; }
+        .signature-line { border-top: 1px solid #94a3b8; padding-top: 7px; font-weight: 700; }
+        .signature small { display: block; margin-top: 3px; color: #64748b; font-weight: 400; }
+        .footer { position: absolute; left: 20mm; right: 20mm; bottom: 9mm; border-top: 1px solid #e2e8f0; padding-top: 7px; font-size: 9px; line-height: 1.45; color: #64748b; text-align: center; }
+        @media print { body { background: #fff; } .page { width: auto; min-height: 297mm; margin: 0; box-shadow: none; } }
+    </style>
+</head>
+<body>
+    <main class="page">
+        <div class="brand-rule"></div>
+        <header class="header">
+            <div>
+                <div class="company-name">${escapeHtml(companyName)}</div>
+                ${address ? `<div class="company-address">${escapeHtml(address)}</div>` : ''}
+            </div>
+            <div class="company-contact">
+                ${companySettings?.contactEmail ? `<div>${escapeHtml(companySettings.contactEmail)}</div>` : ''}
+                ${companySettings?.website ? `<div>${escapeHtml(companySettings.website)}</div>` : ''}
+            </div>
+        </header>
+        <section class="meta-row">
+            <div><strong>Ref:</strong> ${escapeHtml(getLetterReference(letter))}</div>
+            <div><strong>Date:</strong> ${escapeHtml(formatDate(new Date()))}</div>
+        </section>
+        <section class="recipient">
+            <div>To,</div>
+            <strong>${escapeHtml(letter.recipientName || '')}</strong>
+            ${letter.recipientEmail ? `<div>${escapeHtml(letter.recipientEmail)}</div>` : ''}
+        </section>
+        <h1 class="title">${escapeHtml(title)}</h1>
+        ${buildDetailsTable(letter)}
+        <section class="body">${toParagraphs(content)}</section>
+        <section class="closing">
+            <div>Yours sincerely,</div>
+            <div>For <strong>${escapeHtml(companyName)}</strong></div>
+        </section>
+        <section class="signature-row">
+            <div class="signature">
+                <div class="signature-space"></div>
+                <div class="signature-line">Authorized Signatory<small>Human Resources Department</small></div>
+            </div>
+            ${needsAcknowledgment ? `
+                <div class="signature">
+                    <div class="signature-space"></div>
+                    <div class="signature-line">Employee Acknowledgment<small>Signature and date</small></div>
+                </div>
+            ` : ''}
+        </section>
+        <footer class="footer">
+            This letter is issued on the basis of company records and is valid only when signed by an authorized representative.
+            ${footerContact ? `<br />${escapeHtml(footerContact)}` : ''}
+        </footer>
+    </main>
+</body>
+</html>`;
 };
 
 const PayrollLetters = () => {
@@ -180,15 +312,8 @@ const PayrollLetters = () => {
         const updatedForm = { ...letterForm, [name]: value };
         
         // Auto compile content if type or specific variables change
-        let compiled = TEMPLATE_CONTENTS[updatedForm.type] || '';
-        compiled = compiled
-            .replace(/{name}/g, updatedForm.recipientName || '[Name]')
-            .replace(/{designation}/g, updatedForm.designation || '[Designation]')
-            .replace(/{new_designation}/g, updatedForm.newDesignation || '[New Designation]')
-            .replace(/{company}/g, companySettings?.companyName || 'our company')
-            .replace(/{salary}/g, updatedForm.salary ? parseFloat(updatedForm.salary).toLocaleString('en-IN') : '[Salary]')
-            .replace(/{joining_date}/g, updatedForm.joiningDate ? formatDate(updatedForm.joiningDate) : '[Joining Date]')
-            .replace(/{relieving_date}/g, updatedForm.relievingDate ? formatDate(updatedForm.relievingDate) : '[Relieving Date]');
+        const template = TEMPLATE_CONTENTS[updatedForm.type] || '';
+        const compiled = compileTemplate(template, updatedForm, companySettings);
 
         updatedForm.content = compiled;
         setLetterForm(updatedForm);

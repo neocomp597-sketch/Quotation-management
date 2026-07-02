@@ -238,28 +238,8 @@ const Products = ({ initialTab = 'products' }) => {
         } catch (err) {
             console.error("Error fetching products:", err);
         } finally {
-            setFormData({
-                productName: '',
-                productCode: '',
-                categoryId: '',
-                hsnCode: '',
-                gstPercentage: 18,
-                basePrice: 0,
-                mrp: 0,
-                uom: 'Nos',
-                productImageUrl: '',
-                status: 'Active',
-                mgr1: '',
-                mgr2: '',
-                mgr3: '',
-                mgr4: '',
-                mgr5: '',
-                attributes: [],
-                vendors: [emptyVendorRow()]
-            });
-            setAvailableAttributes([]);
+            setLoading(false);
         }
-        setIsModalOpen(true);
     };
 
     const handleFormChange = (e) => {

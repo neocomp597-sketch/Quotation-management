@@ -374,15 +374,18 @@ const PlanningScreen = () => {
   const fetchMasters = useCallback(async () => {
     try {
       const [custRes, prodRes, mgrRes, mgr2Res, statusRes] = await Promise.all([
-        customerService.getAll(),
-        productService.getAll(),
+        customerService.getAll({ limit: 50 }),
+        productService.getAll({ limit: 50 }),
         mgrService.getAll("MGR1"),
         mgrService.getAll("MGR2"),
         statusService.getAll(),
       ]);
 
-      setCustomers(custRes.data);
-      setProducts(prodRes.data);
+      const custData = Array.isArray(custRes.data) ? custRes.data : custRes.data.data || [];
+      const prodData = Array.isArray(prodRes.data) ? prodRes.data : prodRes.data.data || [];
+
+      setCustomers(custData);
+      setProducts(prodData);
       setMgrList(
         dedupeMgrOptions(
           mgrRes.data.filter((mgr) => mgr.status === "Active"),
@@ -408,6 +411,42 @@ const PlanningScreen = () => {
   useEffect(() => {
     fetchMasters();
   }, [fetchMasters]);
+
+  // Debounced search for customers
+  useEffect(() => {
+    if (!showCustomerDropdown) return;
+    const timer = setTimeout(async () => {
+      try {
+        const res = await customerService.getAll({
+          limit: 50,
+          search: customerSearch.trim() || undefined,
+        });
+        const data = Array.isArray(res.data) ? res.data : res.data.data || [];
+        setCustomers(data);
+      } catch (err) {
+        console.error("Error searching customers:", err);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [customerSearch, showCustomerDropdown]);
+
+  // Debounced search for products
+  useEffect(() => {
+    if (!showProductDropdown) return;
+    const timer = setTimeout(async () => {
+      try {
+        const res = await productService.getAll({
+          limit: 50,
+          search: productSearch.trim() || undefined,
+        });
+        const data = Array.isArray(res.data) ? res.data : res.data.data || [];
+        setProducts(data);
+      } catch (err) {
+        console.error("Error searching products:", err);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [productSearch, showProductDropdown]);
 
   // Reset pagination when filters change
   useEffect(() => {
@@ -473,43 +512,12 @@ const PlanningScreen = () => {
   }, [financialYear]);
 
   const filteredCustomers = useMemo(() => {
-    if (!customerSearch) {
-      return customers.slice(0, 10);
-    }
-
-    return customers
-      .filter(
-        (customer) =>
-          (customer.externalCode || "")
-            .toLowerCase()
-            .includes(customerSearch.toLowerCase()) ||
-          (customer.companyName || "")
-            .toLowerCase()
-            .includes(customerSearch.toLowerCase()) ||
-          (customer.customerName || "")
-            .toLowerCase()
-            .includes(customerSearch.toLowerCase()),
-      )
-      .slice(0, 10);
-  }, [customers, customerSearch]);
+    return (customers || []).slice(0, 10);
+  }, [customers]);
 
   const filteredProducts = useMemo(() => {
-    if (!productSearch) {
-      return products.slice(0, 10);
-    }
-
-    return products
-      .filter(
-        (product) =>
-          (product.productName || "")
-            .toLowerCase()
-            .includes(productSearch.toLowerCase()) ||
-          (product.productCode || "")
-            .toLowerCase()
-            .includes(productSearch.toLowerCase()),
-      )
-      .slice(0, 10);
-  }, [products, productSearch]);
+    return (products || []).slice(0, 10);
+  }, [products]);
 
   const filteredEntries = useMemo(() => {
     // The entries are already filtered by the backend

@@ -89,6 +89,9 @@ const ImportModal = ({ isOpen, onClose, title, onImport, onDownloadTemplate, typ
                 message: response.data.message,
                 successCount: response.data.success,
                 failedCount: response.data.failed,
+                createdCount: response.data.created,
+                updatedCount: response.data.updated,
+                skippedCount: response.data.skipped,
                 errors: response.data.errors || []
             });
             setFile(null);
@@ -291,7 +294,7 @@ const ImportModal = ({ isOpen, onClose, title, onImport, onDownloadTemplate, typ
                         {result.success && result.failedCount === 0 && (
                             <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-start gap-3">
                                 <MdCheckCircle className="text-emerald-600 shrink-0 mt-0.5" size={20} />
-                                <div>
+                                <div className="flex-1">
                                     <p className="font-bold text-emerald-900 text-sm">Import Successful</p>
                                     <p className="text-xs text-emerald-700 mt-1">{result.message || `Successfully imported ${result.successCount} items.`}</p>
                                 </div>
@@ -302,11 +305,29 @@ const ImportModal = ({ isOpen, onClose, title, onImport, onDownloadTemplate, typ
                         {result.success && result.failedCount > 0 && (
                             <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3">
                                 <MdError className="text-amber-600 shrink-0 mt-0.5" size={20} />
-                                <div>
+                                <div className="flex-1">
                                     <p className="font-bold text-amber-900 text-sm">Import Completed with Warnings</p>
                                     <p className="text-xs text-amber-700 mt-1">
                                         Imported {result.successCount} items successfully, but {result.failedCount} items failed to import.
                                     </p>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Summary breakdown pills */}
+                        {result.success && (result.createdCount !== undefined || result.updatedCount !== undefined || result.skippedCount !== undefined) && (
+                            <div className="grid grid-cols-3 gap-3">
+                                <div className="bg-emerald-50/50 border border-emerald-100 rounded-2xl p-3 text-center shadow-sm">
+                                    <span className="block text-[10px] font-bold text-emerald-500 uppercase tracking-widest mb-0.5">Created</span>
+                                    <span className="text-xl font-black text-emerald-750">{result.createdCount ?? 0}</span>
+                                </div>
+                                <div className="bg-blue-50/50 border border-blue-100 rounded-2xl p-3 text-center shadow-sm">
+                                    <span className="block text-[10px] font-bold text-blue-500 uppercase tracking-widest mb-0.5">Updated</span>
+                                    <span className="text-xl font-black text-blue-750">{result.updatedCount ?? 0}</span>
+                                </div>
+                                <div className="bg-slate-50 border border-slate-100 rounded-2xl p-3 text-center shadow-sm">
+                                    <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Skipped</span>
+                                    <span className="text-xl font-black text-slate-700">{result.skippedCount ?? 0}</span>
                                 </div>
                             </div>
                         )}
