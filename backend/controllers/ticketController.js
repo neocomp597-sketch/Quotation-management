@@ -474,3 +474,25 @@ exports.getTicketCustomers = async (req, res) => {
         res.status(500).json({ message: error.message || 'Error fetching ticket customers' });
     }
 };
+
+exports.debugAutoAssign = async (req, res) => {
+    try {
+        const companyId = req.user?.companyId;
+        const Territory = require('../models/Territory');
+        const Salesperson = require('../models/Salesperson');
+        const Ticket = require('../models/Ticket');
+        
+        const territories = await Territory.find({ companyId }).lean();
+        const salespeople = await Salesperson.find().lean();
+        const tickets = await Ticket.find({ companyId }).sort({ createdAt: -1 }).limit(10).lean();
+        
+        res.json({
+            companyId,
+            territories,
+            salespeople,
+            tickets
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
