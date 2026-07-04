@@ -71,11 +71,15 @@ exports.createTicket = async (req, res) => {
         const Territory = require('../models/Territory');
         const Salesperson = require('../models/Salesperson');
         
+        console.log(`[DEBUG Auto-Assign] Starting lookup for pincode: "${cleanPincode}" under companyId: "${companyId}"`);
+        
         // 1. Match pincode to Territory
         const territory = await Territory.findOne({
             companyId,
             'rules.pincodes': cleanPincode
         }).lean();
+        
+        console.log('[DEBUG Auto-Assign] Matched Territory:', territory ? `${territory.name} (${territory._id})` : 'NONE');
         
         if (territory) {
             // 2. Find Salesperson assigned to this territory
@@ -83,6 +87,8 @@ exports.createTicket = async (req, res) => {
                 territoryId: territory._id,
                 status: 'Active'
             }).lean();
+            
+            console.log('[DEBUG Auto-Assign] Matched Salesperson:', salesperson ? `${salesperson.name} (${salesperson._id})` : 'NONE');
             
             if (salesperson) {
                 assignedSalespersonId = salesperson._id;
@@ -257,16 +263,23 @@ exports.updateTicket = async (req, res) => {
 
             const Territory = require('../models/Territory');
             const Salesperson = require('../models/Salesperson');
+            console.log(`[DEBUG Auto-Assign Update] Starting lookup for pincode: "${ticketBody.pincode}" under companyId: "${companyId}"`);
+            
             const territory = await Territory.findOne({
                 companyId,
                 'rules.pincodes': ticketBody.pincode
             }).lean();
+
+            console.log('[DEBUG Auto-Assign Update] Matched Territory:', territory ? `${territory.name} (${territory._id})` : 'NONE');
 
             if (territory) {
                 const salesperson = await Salesperson.findOne({
                     territoryId: territory._id,
                     status: 'Active'
                 }).lean();
+                
+                console.log('[DEBUG Auto-Assign Update] Matched Salesperson:', salesperson ? `${salesperson.name} (${salesperson._id})` : 'NONE');
+                
                 if (salesperson) {
                     ticketBody.assignedSalespersonId = salesperson._id;
                 } else {
