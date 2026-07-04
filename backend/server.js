@@ -503,6 +503,26 @@ const startBackgroundServices = async () => {
       },
       { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
     );
+    await SystemUpdate.findOneAndUpdate(
+      { version: "v3.5.0-csm-autoassign" },
+      {
+        version: "v3.5.0-csm-autoassign",
+        title: "Pincode Validation & Territory Sales Rep Auto-Assignment",
+        message: "We have added mandatory pincode verification during ticket registration, and implemented Territory-based automatic sales representative assignment.",
+        releaseNotes: [
+          "Mandatory Pincode: Ensured Pincode is a required field on support tickets and manual ticket creation",
+          "Customer Auto-Fill: Selected customers automatically pre-populate the pincode field from their billing address",
+          "Territory Master Mapping: Assigned active salespeople to specific territories inside the Salesperson Master",
+          "Automatic Salesperson Routing: Tickets are automatically assigned to the designated sales representative based on their registered pincode",
+          "Assignee Dashboard View: Displayed the auto-assigned sales rep profile directly on the ticket list, details, and Assign Case section",
+          "Export Masters: Exported Customer and Product Masters directly to Excel (.xlsx) from the catalog headers"
+        ],
+        deployedBy: "Super Admin",
+        deployedAt: new Date("2026-07-04T20:15:00Z"),
+        isActive: true
+      },
+      { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
+    );
   } catch (err) {
     console.error("[Release Seed Error] Failed to seed system update:", err.message);
   }
