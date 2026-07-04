@@ -477,17 +477,21 @@ exports.getTicketCustomers = async (req, res) => {
 
 exports.debugAutoAssign = async (req, res) => {
     try {
-        const companyId = req.user?.companyId;
+        const companyId = req.user?.companyId || req.query.companyId;
         const Territory = require('../models/Territory');
         const Salesperson = require('../models/Salesperson');
         const Ticket = require('../models/Ticket');
         
-        const territories = await Territory.find({ companyId }).lean();
+        const filter = companyId ? { companyId } : {};
+        const territories = await Territory.find(filter).lean();
         const salespeople = await Salesperson.find().lean();
-        const tickets = await Ticket.find({ companyId }).sort({ createdAt: -1 }).limit(10).lean();
+        const tickets = await Ticket.find(filter).sort({ createdAt: -1 }).limit(10).lean();
         
         res.json({
-            companyId,
+            companyId: companyId || 'All',
+            territoriesCount: territories.length,
+            salespeopleCount: salespeople.length,
+            ticketsCount: tickets.length,
             territories,
             salespeople,
             tickets
