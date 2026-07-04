@@ -35,12 +35,18 @@ exports.createTicket = async (req, res) => {
         const ticketBody = { ...req.body };
 
         // Clean empty string values for optional ObjectId fields to avoid Cast to ObjectId errors
-        const optionalObjectIdFields = ['contactId', 'contactDesignationId', 'productId', 'assetId', 'invoiceId', 'assignedTeamId', 'assignedEngineerId'];
+        const optionalObjectIdFields = ['contactId', 'contactDesignationId', 'productId', 'assetId', 'invoiceId', 'assignedTeamId', 'assignedEngineerId', 'assignedSalespersonId'];
         for (const field of optionalObjectIdFields) {
             if (ticketBody[field] === '') {
                 ticketBody[field] = null;
             }
         }
+
+        // Validate pincode is present and not empty
+        if (!ticketBody.pincode || !String(ticketBody.pincode).trim()) {
+            return res.status(400).json({ message: 'Pincode is a mandatory field' });
+        }
+        const cleanPincode = String(ticketBody.pincode).trim();
 
         if (ticketBody.contactId) {
             const contact = await CustomerContact.findOne({
@@ -60,9 +66,33 @@ exports.createTicket = async (req, res) => {
             ticketBody.contactEmail = contact.email || '';
         }
 
+        // Auto-Assignment Logic: Pincode > Territory > Salesperson
+        let assignedSalespersonId = null;
+        const Territory = require('../models/Territory');
+        const Salesperson = require('../models/Salesperson');
+        
+        // 1. Match pincode to Territory
+        const territory = await Territory.findOne({
+            companyId,
+            'rules.pincodes': cleanPincode
+        }).lean();
+        
+        if (territory) {
+            // 2. Find Salesperson assigned to this territory
+            const salesperson = await Salesperson.findOne({
+                companyId,
+                territoryId: territory._id,
+                status: 'Active'
+            }).lean();
+            
+            if (salesperson) {
+                assignedSalespersonId = salesperson._id;
+            }
+        }
+
         const timelineEntry = {
             activityType: 'Created',
-            description: `Ticket created via ${ticketBody.source || 'Web Portal'}`,
+            description: `Ticket created via ${ticketBody.source || 'Web Portal'}` + (assignedSalespersonId ? ' & Auto-assigned to Salesperson' : ''),
             performedBy: req.user?.id
         };
 
@@ -70,6 +100,8 @@ exports.createTicket = async (req, res) => {
             ...ticketBody,
             ticketNo,
             companyId,
+            pincode: cleanPincode,
+            assignedSalespersonId,
             slaResponseDue: responseDue,
             slaResolutionDue: resolutionDue,
             timeline: [timelineEntry]
@@ -147,6 +179,7 @@ exports.getTickets = async (req, res) => {
                 .populate('assignedEngineerId', 'name email')
                 .populate('productId', 'productName productCode')
                 .populate('assetId', 'serialNumber')
+                .populate('assignedSalespersonId', 'name email mobile')
                 .sort({ createdAt: -1 })
                 .skip(skip)
                 .limit(limit)
@@ -189,6 +222,7 @@ exports.getTicketById = async (req, res) => {
             .populate('priorityId')
             .populate('assignedTeamId')
             .populate('assignedEngineerId', 'name email role')
+            .populate('assignedSalespersonId')
             .populate('timeline.performedBy', 'name email role')
             .lean();
 
@@ -206,14 +240,47 @@ exports.getTicketById = async (req, res) => {
 exports.updateTicket = async (req, res) => {
     try {
         const ticketBody = { ...req.body };
-        const optionalObjectIdFields = ['contactId', 'contactDesignationId', 'productId', 'assetId', 'invoiceId', 'assignedTeamId', 'assignedEngineerId'];
+        const companyId = req.user?.companyId;
+
+        const optionalObjectIdFields = ['contactId', 'contactDesignationId', 'productId', 'assetId', 'invoiceId', 'assignedTeamId', 'assignedEngineerId', 'assignedSalespersonId'];
         for (const field of optionalObjectIdFields) {
             if (ticketBody[field] === '') {
                 ticketBody[field] = null;
             }
         }
+
+        // Validate pincode if provided and run auto-assignment
+        if (ticketBody.pincode !== undefined) {
+            if (!ticketBody.pincode || !String(ticketBody.pincode).trim()) {
+                return res.status(400).json({ message: 'Pincode is a mandatory field' });
+            }
+            ticketBody.pincode = String(ticketBody.pincode).trim();
+
+            const Territory = require('../models/Territory');
+            const Salesperson = require('../models/Salesperson');
+            const territory = await Territory.findOne({
+                companyId,
+                'rules.pincodes': ticketBody.pincode
+            }).lean();
+
+            if (territory) {
+                const salesperson = await Salesperson.findOne({
+                    companyId,
+                    territoryId: territory._id,
+                    status: 'Active'
+                }).lean();
+                if (salesperson) {
+                    ticketBody.assignedSalespersonId = salesperson._id;
+                } else {
+                    ticketBody.assignedSalespersonId = null;
+                }
+            } else {
+                ticketBody.assignedSalespersonId = null;
+            }
+        }
+
         const ticket = await Ticket.findOneAndUpdate(
-            { _id: req.params.id, companyId: req.user?.companyId },
+            { _id: req.params.id, companyId },
             ticketBody,
             { new: true, runValidators: true }
         );

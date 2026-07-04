@@ -207,14 +207,18 @@ const TicketDetail = () => {
                                 <p className="text-xs text-slate-400">{ticket.customerId?.companyName}</p>
                             </div>
                             
-                            <div className="grid grid-cols-2 gap-2 pt-2">
+                            <div className="grid grid-cols-3 gap-2 pt-2">
                                 <div>
                                     <span className="block text-[10px] font-black uppercase tracking-widest text-slate-400">Contact</span>
-                                    <span>{ticket.contactName || '-'}</span>
+                                    <span className="truncate block">{ticket.contactName || '-'}</span>
                                 </div>
                                 <div>
                                     <span className="block text-[10px] font-black uppercase tracking-widest text-slate-400">Phone</span>
-                                    <span>{ticket.contactPhone || '-'}</span>
+                                    <span className="truncate block">{ticket.contactPhone || '-'}</span>
+                                </div>
+                                <div>
+                                    <span className="block text-[10px] font-black uppercase tracking-widest text-slate-400">Pincode</span>
+                                    <span className="truncate block">{ticket.pincode || '-'}</span>
                                 </div>
                             </div>
 
@@ -242,6 +246,17 @@ const TicketDetail = () => {
                                 <span className="block text-[10px] font-black uppercase tracking-widest text-slate-400">Description</span>
                                 <p className="text-xs text-slate-500 font-medium whitespace-pre-wrap leading-relaxed">{ticket.description || 'No description provided'}</p>
                             </div>
+
+                            {ticket.assignedSalespersonId && (
+                                <div className="p-4 rounded-2xl bg-primary-50 border border-primary-100 space-y-1.5 mt-3">
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-primary-500 block">👤 Auto-assigned Sales Rep</span>
+                                    <p className="text-sm font-black text-primary-900">{ticket.assignedSalespersonId.name}</p>
+                                    <div className="text-xs text-slate-600 font-semibold space-y-0.5">
+                                        {ticket.assignedSalespersonId.email && <p>✉️ {ticket.assignedSalespersonId.email}</p>}
+                                        {ticket.assignedSalespersonId.mobile && <p>📞 {ticket.assignedSalespersonId.mobile}</p>}
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         {/* Entitlement Status Box */}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { MdAdd, MdSearch, MdEdit, MdDelete, MdPerson, MdEmail, MdPhone, MdLocationOn, MdBusiness, MdCloudUpload, MdVisibility, MdFileUpload, MdCheckBox, MdCheckBoxOutlineBlank, MdDeleteSweep } from 'react-icons/md';
+import { MdAdd, MdSearch, MdEdit, MdDelete, MdPerson, MdEmail, MdPhone, MdLocationOn, MdBusiness, MdCloudUpload, MdVisibility, MdFileUpload, MdCheckBox, MdCheckBoxOutlineBlank, MdDeleteSweep, MdFileDownload } from 'react-icons/md';
 import { toast } from 'react-toastify';
+import * as XLSX from 'xlsx';
 import { customerService, uploadService, importService, territoryService } from '../services/api';
 import Modal from '../components/Modal';
 import ImportModal from '../components/ImportModal';
@@ -250,16 +251,65 @@ const Customers = () => {
         }
     };
 
+    const exportToExcel = async () => {
+        setLoading(true);
+        try {
+            const res = await customerService.getAll({
+                limit: 10000,
+                search: debouncedSearch || undefined,
+                territory: selectedTerritory || undefined,
+            });
+            const exportCustomers = Array.isArray(res.data) ? res.data : res.data?.data || [];
+            if (!exportCustomers.length) {
+                toast.info('No customers found to export');
+                return;
+            }
+
+            const exportData = exportCustomers.map((c) => ({
+                'Company Trade Name': c.companyName || '',
+                'Customer Code': c.customerName || '',
+                'Mobile': c.mobile || '',
+                'Email': c.email || '',
+                'GSTIN': c.gstin || '',
+                'Billing Address': c.billingAddress?.line1 || '',
+                'City': c.billingAddress?.city || '',
+                'State': c.billingAddress?.state || '',
+                'Pincode': c.billingAddress?.pincode || '',
+                'Default Discount (%)': c.defaultDiscount || 0,
+                'Territory': c.territory?.name || 'Unassigned',
+                'Notes': c.notes || ''
+            }));
+
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Customers');
+            XLSX.writeFile(wb, `Customers_Master_${new Date().toISOString().slice(0, 10)}.xlsx`);
+            toast.success('Export completed successfully');
+        } catch (err) {
+            console.error('Export customers error:', err);
+            toast.error('Failed to export customers');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const filteredCustomers = customers;
 
     return (
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-black text-slate-900 tracking-tight">Customer Master</h1>
+                    <h1 className="text-3xl font-black text-slate-900 tracking-tight font-outfit uppercase">Customer Master</h1>
                     <p className="text-slate-500 font-medium">Manage your distributor and retail partners.</p>
                 </div>
                 <div className="flex gap-3">
+                    <button
+                        onClick={exportToExcel}
+                        className="flex items-center justify-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-5 py-3 rounded-2xl font-bold transition-all shadow-sm uppercase text-xs tracking-widest active:scale-95"
+                    >
+                        <MdFileDownload size={20} />
+                        <span>Export</span>
+                    </button>
                     <button
                         onClick={() => setIsImportModalOpen(true)}
                         className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-emerald-600/20 uppercase text-xs tracking-widest active:scale-95"

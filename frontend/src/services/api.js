@@ -227,6 +227,7 @@ export const termsService = {
 export const salespersonService = {
   getAll: (params) => api.get("/salespersons", { params }),
   create: (data) => api.post("/salespersons", data),
+  update: (id, data) => api.put(`/salespersons/${id}`, data),
   delete: (id) => api.delete(`/salespersons/${id}`),
 };
 

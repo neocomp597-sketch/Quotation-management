@@ -5,6 +5,7 @@ const SalespersonSchema = new mongoose.Schema({
     email: { type: String },
     mobile: { type: String },
     status: { type: String, enum: ['Active', 'Inactive'], default: 'Active' },
+    territoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'Territory', default: null },
     createdAt: { type: Date, default: Date.now },
 });
 

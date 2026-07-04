@@ -110,6 +110,7 @@ const CSMTickets = () => {
         contactName: '',
         contactPhone: '',
         contactEmail: '',
+        pincode: '',
         priority: 'Medium',
         category: 'Repair',
         type: 'Service',
@@ -167,6 +168,7 @@ const CSMTickets = () => {
         contactDesignation: '',
         contactPhone: '',
         contactEmail: '',
+        pincode: '',
         priorityId: '',
         categoryId: '',
         typeId: '',
@@ -369,6 +371,7 @@ const CSMTickets = () => {
             contactDesignation: '',
             contactPhone: selectedCust ? (selectedCust.mobile || '') : '',
             contactEmail: selectedCust ? (selectedCust.email || '') : '',
+            pincode: selectedCust?.billingAddress?.pincode || '',
             invoiceId: '',
             productId: '',
             assetId: '',
@@ -387,7 +390,8 @@ const CSMTickets = () => {
             customerName: selectedCust ? (selectedCust.companyName || selectedCust.customerName || '') : '',
             contactName: '',
             contactPhone: selectedCust ? (selectedCust.mobile || '') : '',
-            contactEmail: selectedCust ? (selectedCust.email || '') : ''
+            contactEmail: selectedCust ? (selectedCust.email || '') : '',
+            pincode: selectedCust?.billingAddress?.pincode || ''
         }));
         
         if (customerId) {
@@ -573,6 +577,10 @@ const CSMTickets = () => {
             toast.error('Priority is required');
             return;
         }
+        if (!formData.pincode || !formData.pincode.trim()) {
+            toast.error('Pincode is required');
+            return;
+        }
 
         let assetIdToSubmit = formData.assetId;
 
@@ -636,6 +644,10 @@ const CSMTickets = () => {
 
     const handleCreateManualTicket = async (e) => {
         e.preventDefault();
+        if (!manualFormData.pincode || !manualFormData.pincode.trim()) {
+            toast.error('Pincode is required');
+            return;
+        }
         setLoading(true);
         try {
             // 1. Resolve Customer
@@ -747,6 +759,7 @@ const CSMTickets = () => {
                 contactName: manualFormData.contactName,
                 contactPhone: manualFormData.contactPhone,
                 contactEmail: manualFormData.contactEmail,
+                pincode: manualFormData.pincode,
                 source: manualFormData.source,
                 priorityId,
                 categoryId,
@@ -1457,7 +1470,10 @@ const CSMTickets = () => {
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <p className="font-bold text-slate-900">{t.customerId?.customerName || 'N/A'}</p>
-                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">{t.contactName || t.contactPhone || 'No Contact'}</p>
+                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">
+                                                        {t.contactName || t.contactPhone || 'No Contact'}
+                                                        {t.pincode ? ` | Pin: ${t.pincode}` : ''}
+                                                    </p>
                                                 </td>
                                                 <td className="px-6 py-4 max-w-xs truncate">{t.issueTitle}</td>
                                                 <td className="px-6 py-4">
@@ -1473,7 +1489,14 @@ const CSMTickets = () => {
                                                         {t.status}
                                                     </span>
                                                 </td>
-                                                <td className="px-6 py-4 text-slate-500">{t.assignedEngineerId?.name || 'Unassigned'}</td>
+                                                <td className="px-6 py-4 text-slate-500">
+                                                    <div>{t.assignedEngineerId?.name || 'Unassigned'}</div>
+                                                    {t.assignedSalespersonId && (
+                                                        <div className="text-[10px] text-primary-600 font-black uppercase tracking-tight mt-1">
+                                                            Sales rep: {t.assignedSalespersonId.name}
+                                                        </div>
+                                                    )}
+                                                </td>
                                                 <td className="px-6 py-4">
                                                     <div className="flex justify-center items-center gap-2">
                                                         {isManual && (
@@ -1606,6 +1629,17 @@ const CSMTickets = () => {
                                 <option value="">{formData.customerId ? `Select Invoice (${invoices.length} available)` : 'Select Customer First'}</option>
                                 {invoices.map(i => <option key={i._id} value={i._id}>{i.voucherNumber} ({new Date(i.date).toLocaleDateString()})</option>)}
                             </select>
+                        </div>
+                        <div>
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Pincode *</label>
+                            <input
+                                type="text"
+                                required
+                                value={formData.pincode || ''}
+                                onChange={(e) => setFormData({ ...formData, pincode: e.target.value })}
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
+                                placeholder="Enter Pincode"
+                            />
                         </div>
                         <div>
                             <div className="flex justify-between items-center mb-1">
@@ -2326,6 +2360,19 @@ const CSMTickets = () => {
                                     placeholder="Search & Select Customer..."
                                 />
                             )}
+                        </div>
+
+                        {/* Pincode */}
+                        <div>
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Pincode *</label>
+                            <input
+                                type="text"
+                                required
+                                placeholder="Enter Pincode"
+                                value={manualFormData.pincode || ''}
+                                onChange={(e) => setManualFormData({ ...manualFormData, pincode: e.target.value })}
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500"
+                            />
                         </div>
 
                         {/* Invoice No */}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { MdAdd, MdSearch, MdEdit, MdDelete, MdInventory, MdCategory, MdQrCode, MdPayments, MdProductionQuantityLimits, MdCloudUpload, MdVisibility, MdFileUpload, MdCheckBox, MdCheckBoxOutlineBlank, MdDeleteSweep, MdSync, MdImage } from 'react-icons/md';
+import { MdAdd, MdSearch, MdEdit, MdDelete, MdInventory, MdCategory, MdQrCode, MdPayments, MdProductionQuantityLimits, MdCloudUpload, MdVisibility, MdFileUpload, MdCheckBox, MdCheckBoxOutlineBlank, MdDeleteSweep, MdSync, MdImage, MdFileDownload } from 'react-icons/md';
 import { toast } from 'react-toastify';
+import * as XLSX from 'xlsx';
 import { productService, uploadService, importService, mgrService, attributeService, productAttributeService, vendorService, categoryService } from '../services/api';
 
 import Modal from '../components/Modal';
@@ -599,14 +600,83 @@ const Products = ({ initialTab = 'products' }) => {
         setSearchTerm('');
     };
 
+    const exportToExcel = async () => {
+        setLoading(true);
+        try {
+            const catalogTypeMap = {
+                products: 'Product',
+                services: 'Service',
+                bundles: 'Bundle',
+                subscriptions: 'Subscription'
+            };
+            const typeParam = catalogTypeMap[activeTab] || 'Product';
+
+            const res = await productService.getAll({
+                limit: 10000,
+                search: debouncedSearch || undefined,
+                catalogType: typeParam,
+                ...Object.fromEntries(Object.entries(mgrFilters).filter(([, value]) => value)),
+            });
+            
+            const exportProducts = Array.isArray(res.data) ? res.data : res.data?.data || [];
+            if (!exportProducts.length) {
+                toast.info('No products found to export');
+                return;
+            }
+
+            const exportData = exportProducts.map((p) => {
+                const standardAttributes = (p.attributes || []).map(a => `${a.code}:${a.description}`).join(', ');
+                const customAttrs = allProductAttributes[p.productCode] || [];
+                const customAttributesStr = customAttrs.map(ca => `${ca.attributeCode}:${ca.attributeValue}`).join(', ');
+                
+                return {
+                    'Product Name': p.productName || '',
+                    'Product Code': p.productCode || '',
+                    'Category': p.categoryId?.name || '',
+                    'HSN Code': p.hsnCode || '',
+                    'GST (%)': p.gstPercentage || 0,
+                    'Base Price': p.basePrice || 0,
+                    'MRP': p.mrp || 0,
+                    'UOM': p.uom || '',
+                    'Status': p.status || '',
+                    'MGR 1': p.mgr1?.code || '',
+                    'MGR 2': p.mgr2?.code || '',
+                    'MGR 3': p.mgr3?.code || '',
+                    'MGR 4': p.mgr4?.code || '',
+                    'MGR 5': p.mgr5?.code || '',
+                    'Standard Attributes': standardAttributes,
+                    'Custom Attributes': customAttributesStr
+                };
+            });
+
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Products');
+            XLSX.writeFile(wb, `${typeParam}_Catalog_${new Date().toISOString().slice(0, 10)}.xlsx`);
+            toast.success('Export completed successfully');
+        } catch (err) {
+            console.error('Export products error:', err);
+            toast.error('Failed to export products');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-black text-slate-900 tracking-tight">Product Catalog</h1>
+                    <h1 className="text-3xl font-black text-slate-900 tracking-tight font-outfit uppercase">Product Catalog</h1>
                     <p className="text-slate-500 font-medium">All products at one place.</p>
                 </div>
                 <div className="flex gap-3">
+                    <button
+                        onClick={exportToExcel}
+                        className="flex items-center justify-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-5 py-3 rounded-2xl font-bold transition-all shadow-sm uppercase text-xs tracking-widest active:scale-95"
+                    >
+                        <MdFileDownload size={20} />
+                        <span>Export</span>
+                    </button>
                     <button
                         onClick={() => setIsImportModalOpen(true)}
                         className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-emerald-600/20 uppercase text-xs tracking-widest active:scale-95"
