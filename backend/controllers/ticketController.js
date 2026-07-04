@@ -80,7 +80,6 @@ exports.createTicket = async (req, res) => {
         if (territory) {
             // 2. Find Salesperson assigned to this territory
             const salesperson = await Salesperson.findOne({
-                companyId,
                 territoryId: territory._id,
                 status: 'Active'
             }).lean();
@@ -265,7 +264,6 @@ exports.updateTicket = async (req, res) => {
 
             if (territory) {
                 const salesperson = await Salesperson.findOne({
-                    companyId,
                     territoryId: territory._id,
                     status: 'Active'
                 }).lean();

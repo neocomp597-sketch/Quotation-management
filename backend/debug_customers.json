@@ -18123,8 +18123,8 @@
   },
   {
     "_id": "6a452cc90b84adefb67ed9a0",
-    "customerName": "45",
-    "companyName": "45",
+    "customerName": "4502",
+    "companyName": "Ram shrivastav",
     "gstin": ""
   },
   {
@@ -18143,6 +18143,12 @@
     "_id": "6a4676ba1acd5af24e34e7af",
     "customerName": "Ram desai",
     "companyName": "SURYA AGENCY",
+    "gstin": ""
+  },
+  {
+    "_id": "6a47291372b73c5fae7d7fd3",
+    "customerName": "rohit dixit",
+    "companyName": "ROHIT DIXIT",
     "gstin": ""
   }
 ]
