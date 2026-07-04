@@ -350,6 +350,18 @@ const TicketDetail = () => {
                             Assign case
                         </h3>
                         <div className="space-y-3">
+                            {ticket.assignedSalespersonId && (
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Sales Representative</label>
+                                    <div className="px-4 py-3.5 bg-primary-50/50 border border-primary-100/60 rounded-xl text-xs font-bold text-primary-900 flex items-center gap-2">
+                                        <span>👤</span>
+                                        <div>
+                                            <p className="font-black">{ticket.assignedSalespersonId.name}</p>
+                                            {ticket.assignedSalespersonId.mobile && <p className="text-[10px] text-slate-500 font-semibold">{ticket.assignedSalespersonId.mobile}</p>}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                             <div>
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Service Team</label>
                                 <select
