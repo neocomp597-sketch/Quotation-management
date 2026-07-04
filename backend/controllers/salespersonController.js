@@ -112,10 +112,14 @@ const updateSalesperson = async (req, res) => {
 
         let salesperson = await Salesperson.findById(id);
         if (!salesperson && mongoose.Types.ObjectId.isValid(id)) {
-            // Check if there is a salesperson with the same email or name
-            salesperson = await Salesperson.findOne({
-                $or: [{ email }, { name }]
-            });
+            // Check if there is a salesperson with the same email or name case-insensitively
+            const emailFilter = email ? { email: { $regex: new RegExp(`^${email}$`, 'i') } } : null;
+            const nameFilter = name ? { name: { $regex: new RegExp(`^${name}$`, 'i') } } : null;
+            const orConditions = [emailFilter, nameFilter].filter(Boolean);
+            
+            if (orConditions.length > 0) {
+                salesperson = await Salesperson.findOne({ $or: orConditions });
+            }
         }
 
         if (salesperson) {
