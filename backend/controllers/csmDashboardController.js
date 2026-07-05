@@ -101,7 +101,7 @@ exports.getStats = async (req, res) => {
             },
             {
                 $lookup: {
-                    from: 'users',
+                    from: 'engineers',
                     localField: '_id',
                     foreignField: '_id',
                     as: 'engineer'
@@ -275,8 +275,9 @@ exports.getReportData = async (req, res) => {
         }));
 
         // 8. Service Engineer Productivity
-        // Let's query all users that are engineers or assigned to tickets
-        const engineers = await User.find({ companyId }).select('name email role').lean();
+        // Let's query all engineers from the Engineer Master
+        const Engineer = require('../models/Engineer');
+        const engineers = await Engineer.find({ companyId }).select('name email').lean();
         const engineerMap = {};
         engineers.forEach(eng => {
             engineerMap[eng._id.toString()] = {

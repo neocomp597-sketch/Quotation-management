@@ -5,6 +5,7 @@ const SlaPolicy = require('../models/SlaPolicy');
 const ServiceTeam = require('../models/ServiceTeam');
 const TicketSource = require('../models/TicketSource');
 const Designation = require('../models/Designation');
+const Engineer = require('../models/Engineer');
 
 // Seed default master configurations
 exports.seedDefaults = async (req, res) => {
@@ -262,28 +263,39 @@ exports.seedMhData = async (req, res) => {
             }
         }
 
-        // 7. Ensure service engineers exist
+        // 7. Ensure MH territory exists for assignment
+        const Territory = require('../models/Territory');
+        const stateTerritory = await Territory.findOneAndUpdate(
+            { name: 'Maharashtra Zone', companyId },
+            { 
+                name: 'Maharashtra Zone', 
+                type: 'zone',
+                rules: { pincodes: ['410101', '425405', '422209', '400607', '400074'] } 
+            },
+            { upsert: true, new: true }
+        );
+
+        // 8. Ensure service engineers exist in Engineer Master
         const engineersData = [
-            { name: 'Rahul Patil', email: 'rahul.patil@jagjeet.com' },
-            { name: 'Vikram Deshmukh', email: 'vikram.deshmukh@jagjeet.com' },
-            { name: 'Amit Shinde', email: 'amit.shinde@jagjeet.com' }
+            { name: 'Rahul Patil', email: 'rahul.patil@jagjeet.com', mobile: '9823012345', pincodes: ['422209', '400607'], territoryId: stateTerritory._id },
+            { name: 'Vikram Deshmukh', email: 'vikram.deshmukh@jagjeet.com', mobile: '9823012346', pincodes: ['410101', '400074'], territoryId: stateTerritory._id },
+            { name: 'Amit Shinde', email: 'amit.shinde@jagjeet.com', mobile: '9823012347', pincodes: ['425405'], territoryId: stateTerritory._id }
         ];
+        
+        // Clear existing engineers first to avoid duplicates
+        await Engineer.deleteMany({ companyId });
+        
         const engineers = [];
         for (const eng of engineersData) {
-            let dbEng = await User.findOne({ email: eng.email });
-            if (!dbEng) {
-                // Generate a random password hash for security placeholder
-                const bcrypt = require('bcryptjs');
-                const salt = await bcrypt.genSalt(10);
-                const passwordHash = await bcrypt.hash('123456', salt);
-                dbEng = await User.create({
-                    name: eng.name,
-                    email: eng.email,
-                    passwordHash,
-                    role: 'sales', // sales roles act as standard team members/engineers
-                    companyId
-                });
-            }
+            let dbEng = await Engineer.create({
+                name: eng.name,
+                email: eng.email,
+                mobile: eng.mobile,
+                status: 'Active',
+                territoryId: eng.territoryId,
+                pincodes: eng.pincodes,
+                companyId
+            });
             engineers.push(dbEng);
         }
 
@@ -715,3 +727,58 @@ exports.slaPolicies = createCrudEndpoints(SlaPolicy, 'SlaPolicy');
 exports.serviceTeams = createCrudEndpoints(ServiceTeam, 'ServiceTeam');
 exports.sources = createCrudEndpoints(TicketSource, 'TicketSource');
 exports.designations = createCrudEndpoints(Designation, 'Designation');
+
+exports.engineers = {
+    create: async (req, res) => {
+        try {
+            const doc = await Engineer.create({ ...req.body, companyId: req.user?.companyId });
+            res.status(201).json(doc);
+        } catch (error) {
+            res.status(400).json({ message: 'Error creating Engineer: ' + error.message });
+        }
+    },
+    getAll: async (req, res) => {
+        try {
+            const docs = await Engineer.find({ companyId: req.user?.companyId })
+                .populate('territoryId', 'name')
+                .sort({ createdAt: -1 })
+                .lean();
+            res.json(docs);
+        } catch (error) {
+            res.status(500).json({ message: 'Error fetching Engineers: ' + error.message });
+        }
+    },
+    getById: async (req, res) => {
+        try {
+            const doc = await Engineer.findOne({ _id: req.params.id, companyId: req.user?.companyId })
+                .populate('territoryId', 'name')
+                .lean();
+            if (!doc) return res.status(404).json({ message: 'Engineer not found' });
+            res.json(doc);
+        } catch (error) {
+            res.status(500).json({ message: 'Error fetching Engineer: ' + error.message });
+        }
+    },
+    update: async (req, res) => {
+        try {
+            const doc = await Engineer.findOneAndUpdate(
+                { _id: req.params.id, companyId: req.user?.companyId },
+                req.body,
+                { new: true, runValidators: true }
+            );
+            if (!doc) return res.status(404).json({ message: 'Engineer not found' });
+            res.json(doc);
+        } catch (error) {
+            res.status(400).json({ message: 'Error updating Engineer: ' + error.message });
+        }
+    },
+    delete: async (req, res) => {
+        try {
+            const doc = await Engineer.findOneAndDelete({ _id: req.params.id, companyId: req.user?.companyId });
+            if (!doc) return res.status(404).json({ message: 'Engineer not found' });
+            res.json({ message: 'Engineer deleted successfully' });
+        } catch (error) {
+            res.status(500).json({ message: 'Error deleting Engineer: ' + error.message });
+        }
+    }
+};

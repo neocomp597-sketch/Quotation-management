@@ -1,28 +1,63 @@
 import React, { useEffect, useState } from 'react';
-import { csmService } from '../services/api';
+import { useLocation } from 'react-router-dom';
+import { csmService, territoryService } from '../services/api';
 import { toast } from 'react-toastify';
 import { 
     MdCategory, MdSettings, MdPriorityHigh, 
     MdAssignmentTurnedIn, MdPeople, MdAdd, 
-    MdDelete, MdEdit, MdCloudDownload 
+    MdDelete, MdEdit, MdCloudDownload, MdBuild
 } from 'react-icons/md';
+import Modal from '../components/Modal';
 
 const CSMMasters = () => {
-    const [activeTab, setActiveTab] = useState('categories');
+    const location = useLocation();
+    const queryParams = new URLSearchParams(location.search);
+    const defaultTab = queryParams.get('tab') || 'categories';
+    const [activeTab, setActiveTab] = useState(defaultTab);
+
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        const tab = params.get('tab');
+        if (tab) {
+            setActiveTab(tab);
+        }
+    }, [location.search]);
     const [loading, setLoading] = useState(false);
     const [items, setItems] = useState([]);
+    const [territories, setTerritories] = useState([]);
     
     // Form states
     const [showModal, setShowModal] = useState(false);
     const [editId, setEditId] = useState(null);
-    const [formData, setFormData] = useState({ name: '', description: '', responseSlaHours: '', resolutionSlaHours: '', color: '#64748b' });
+    const [formData, setFormData] = useState({ 
+        name: '', 
+        description: '', 
+        responseSlaHours: '', 
+        resolutionSlaHours: '', 
+        color: '#64748b',
+        email: '',
+        mobile: '',
+        status: 'Active',
+        territoryId: '',
+        pincodes: ''
+    });
     
     const tabs = [
         { id: 'categories', label: 'Categories', icon: <MdCategory size={20} /> },
         { id: 'types', label: 'Ticket Types', icon: <MdSettings size={20} /> },
         { id: 'priorities', label: 'Priorities', icon: <MdPriorityHigh size={20} /> },
-        { id: 'teams', label: 'Service Teams', icon: <MdPeople size={20} /> }
+        { id: 'teams', label: 'Service Teams', icon: <MdPeople size={20} /> },
+        { id: 'engineers', label: 'Engineers Master', icon: <MdBuild size={20} /> }
     ];
+
+    const fetchTerritories = async () => {
+        try {
+            const res = await territoryService.getAll();
+            setTerritories(res.data || []);
+        } catch (e) {
+            console.error('Fetch territories error:', e);
+        }
+    };
 
     const fetchItems = async () => {
         setLoading(true);
@@ -32,6 +67,7 @@ const CSMMasters = () => {
             else if (activeTab === 'types') res = await csmService.getTypes();
             else if (activeTab === 'priorities') res = await csmService.getPriorities();
             else if (activeTab === 'teams') res = await csmService.getTeams();
+            else if (activeTab === 'engineers') res = await csmService.getEngineers();
             
             setItems(res.data || []);
         } catch (error) {
@@ -44,6 +80,9 @@ const CSMMasters = () => {
 
     useEffect(() => {
         fetchItems();
+        if (activeTab === 'engineers') {
+            fetchTerritories();
+        }
     }, [activeTab]);
 
     const handleSeed = async () => {
@@ -67,11 +106,27 @@ const CSMMasters = () => {
                 description: item.description || '',
                 responseSlaHours: item.responseSlaHours || '',
                 resolutionSlaHours: item.resolutionSlaHours || '',
-                color: item.color || '#64748b'
+                color: item.color || '#64748b',
+                email: item.email || '',
+                mobile: item.mobile || '',
+                status: item.status || 'Active',
+                territoryId: item.territoryId?._id || item.territoryId || '',
+                pincodes: item.pincodes ? item.pincodes.join(', ') : ''
             });
         } else {
             setEditId(null);
-            setFormData({ name: '', description: '', responseSlaHours: '', resolutionSlaHours: '', color: '#64748b' });
+            setFormData({ 
+                name: '', 
+                description: '', 
+                responseSlaHours: '', 
+                resolutionSlaHours: '', 
+                color: '#64748b',
+                email: '',
+                mobile: '',
+                status: 'Active',
+                territoryId: '',
+                pincodes: ''
+            });
         }
         setShowModal(true);
     };
@@ -91,6 +146,17 @@ const CSMMasters = () => {
             } else if (activeTab === 'teams') {
                 if (editId) await csmService.updateTeam(editId, formData);
                 else await csmService.createTeam(formData);
+            } else if (activeTab === 'engineers') {
+                const payload = {
+                    name: formData.name,
+                    email: formData.email,
+                    mobile: formData.mobile,
+                    status: formData.status,
+                    territoryId: formData.territoryId || null,
+                    pincodes: formData.pincodes.split(',').map(p => p.trim()).filter(Boolean)
+                };
+                if (editId) await csmService.updateEngineer(editId, payload);
+                else await csmService.createEngineer(payload);
             }
             toast.success('Saved successfully');
             setShowModal(false);
@@ -107,6 +173,7 @@ const CSMMasters = () => {
             else if (activeTab === 'types') await csmService.deleteType(id);
             else if (activeTab === 'priorities') await csmService.deletePriority(id);
             else if (activeTab === 'teams') await csmService.deleteTeam(id);
+            else if (activeTab === 'engineers') await csmService.deleteEngineer(id);
             toast.success('Deleted successfully');
             fetchItems();
         } catch (error) {
@@ -180,12 +247,24 @@ const CSMMasters = () => {
                             <thead>
                                 <tr className="bg-slate-50 text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100">
                                     <th className="px-6 py-4">Name</th>
-                                    <th className="px-6 py-4">Description</th>
-                                    {activeTab === 'priorities' && (
+                                    {activeTab === 'engineers' ? (
                                         <>
-                                            <th className="px-6 py-4">Response SLA</th>
-                                            <th className="px-6 py-4">Resolution SLA</th>
-                                            <th className="px-6 py-4">Color Tag</th>
+                                            <th className="px-6 py-4">Email</th>
+                                            <th className="px-6 py-4">Mobile</th>
+                                            <th className="px-6 py-4">Territory</th>
+                                            <th className="px-6 py-4">Direct Pincodes</th>
+                                            <th className="px-6 py-4">Status</th>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <th className="px-6 py-4">Description</th>
+                                            {activeTab === 'priorities' && (
+                                                <>
+                                                    <th className="px-6 py-4">Response SLA</th>
+                                                    <th className="px-6 py-4">Resolution SLA</th>
+                                                    <th className="px-6 py-4">Color Tag</th>
+                                                </>
+                                            )}
                                         </>
                                     )}
                                     <th className="px-6 py-4 text-center">Actions</th>
@@ -195,19 +274,37 @@ const CSMMasters = () => {
                                 {items.map((item) => (
                                     <tr key={item._id} className="hover:bg-slate-50/50 transition-colors">
                                         <td className="px-6 py-4 font-black text-slate-900">{item.name}</td>
-                                        <td className="px-6 py-4 text-slate-500 max-w-sm truncate">{item.description || '-'}</td>
-                                        {activeTab === 'priorities' && (
+                                        {activeTab === 'engineers' ? (
                                             <>
-                                                <td className="px-6 py-4">{item.responseSlaHours} hrs</td>
-                                                <td className="px-6 py-4">{item.resolutionSlaHours} hrs</td>
+                                                <td className="px-6 py-4 text-slate-500">{item.email || '-'}</td>
+                                                <td className="px-6 py-4 text-slate-500">{item.mobile || '-'}</td>
+                                                <td className="px-6 py-4 text-slate-900 font-bold">{item.territoryId?.name || '-'}</td>
+                                                <td className="px-6 py-4 max-w-xs truncate text-slate-500">
+                                                    {item.pincodes && item.pincodes.length > 0 ? item.pincodes.join(', ') : '-'}
+                                                </td>
                                                 <td className="px-6 py-4">
-                                                    <span 
-                                                        className="px-3 py-1 rounded-full text-xs font-bold text-white shadow-sm"
-                                                        style={{ backgroundColor: item.color }}
-                                                    >
-                                                        {item.color}
+                                                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${item.status === 'Active' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
+                                                        {item.status}
                                                     </span>
                                                 </td>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <td className="px-6 py-4 text-slate-500 max-w-sm truncate">{item.description || '-'}</td>
+                                                {activeTab === 'priorities' && (
+                                                    <>
+                                                        <td className="px-6 py-4">{item.responseSlaHours} hrs</td>
+                                                        <td className="px-6 py-4">{item.resolutionSlaHours} hrs</td>
+                                                        <td className="px-6 py-4">
+                                                            <span 
+                                                                className="px-3 py-1 rounded-full text-xs font-bold text-white shadow-sm"
+                                                                style={{ backgroundColor: item.color }}
+                                                            >
+                                                                {item.color}
+                                                            </span>
+                                                        </td>
+                                                    </>
+                                                )}
                                             </>
                                         )}
                                         <td className="px-6 py-4">
@@ -235,94 +332,160 @@ const CSMMasters = () => {
             </div>
 
             {/* Modal */}
-            {showModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-                    <div className="bg-white rounded-[2rem] shadow-2xl border border-slate-100 max-w-md w-full overflow-hidden animate-scale-in">
-                        <div className="px-6 py-5 border-b border-slate-50 bg-slate-50 flex items-center justify-between">
-                            <h3 className="font-outfit font-black text-lg text-slate-900 uppercase">
-                                {editId ? 'Edit Configuration' : 'Create Configuration'}
-                            </h3>
-                            <button 
-                                onClick={() => setShowModal(false)}
-                                className="text-slate-400 hover:text-slate-600 font-bold"
-                            >
-                                ✕
-                            </button>
+            <Modal
+                isOpen={showModal}
+                onClose={() => setShowModal(false)}
+                title={editId ? (activeTab === 'engineers' ? 'Edit Engineer' : 'Edit Configuration') : (activeTab === 'engineers' ? 'Create Engineer' : 'Create Configuration')}
+                maxWidth="max-w-md"
+                footer={
+                    <>
+                        <button
+                            type="button"
+                            onClick={() => setShowModal(false)}
+                            className="px-6 py-2.5 text-slate-500 font-black hover:text-slate-900 transition-all uppercase text-[10px] tracking-widest"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleSubmit}
+                            className="bg-primary-600 hover:bg-primary-700 text-white px-8 py-3 rounded-2xl font-black transition-all shadow-xl shadow-primary-600/20 uppercase text-[10px] tracking-widest"
+                        >
+                            Save
+                        </button>
+                    </>
+                }
+            >
+                <form onSubmit={handleSubmit} className="space-y-4 py-2">
+                    <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Name *</label>
+                        <input
+                            type="text"
+                            required
+                            value={formData.name}
+                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-bold transition-all"
+                        />
+                    </div>
+                    {activeTab !== 'engineers' && (
+                        <div>
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Description</label>
+                            <textarea
+                                value={formData.description}
+                                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-semibold h-24"
+                            />
                         </div>
-                        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                            <div>
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Name *</label>
+                    )}
+                    {activeTab === 'engineers' && (
+                        <>
+                            <div className="space-y-1">
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Email</label>
+                                <input
+                                    type="email"
+                                    value={formData.email}
+                                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-semibold"
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Mobile</label>
                                 <input
                                     type="text"
+                                    value={formData.mobile}
+                                    onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-semibold"
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Territory</label>
+                                <select
+                                    value={formData.territoryId}
+                                    onChange={(e) => setFormData({ ...formData, territoryId: e.target.value })}
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-semibold cursor-pointer"
+                                >
+                                    <option value="">-- No Assigned Territory --</option>
+                                    {territories.map(t => (
+                                        <option key={t._id} value={t._id}>{t.name}</option>
+                                    ))}
+                                </select>
+                                {(() => {
+                                    const selectedTerritory = territories.find(t => t._id === formData.territoryId);
+                                    if (selectedTerritory && selectedTerritory.rules?.pincodes?.length > 0) {
+                                        return (
+                                            <div className="mt-1.5 px-3 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs text-slate-500 font-semibold flex flex-col gap-0.5 animate-fade-in">
+                                                <span className="text-[8px] font-black uppercase tracking-wider text-slate-400">Territory Pincodes (Auto-Covered)</span>
+                                                <p className="text-slate-700">{selectedTerritory.rules.pincodes.join(', ')}</p>
+                                            </div>
+                                        );
+                                    }
+                                    return null;
+                                })()}
+                            </div>
+                            <div className="space-y-1">
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Additional Direct Pincodes (Optional)</label>
+                                <input
+                                    type="text"
+                                    value={formData.pincodes}
+                                    onChange={(e) => setFormData({ ...formData, pincodes: e.target.value })}
+                                    placeholder="e.g. 400074, 422209"
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-semibold"
+                                />
+                                <p className="text-[9px] text-slate-400 font-semibold leading-normal mt-1 pl-1">
+                                    Only specify extra pincodes here if they are outside the selected territory.
+                                </p>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Status</label>
+                                <select
+                                    value={formData.status}
+                                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-semibold cursor-pointer"
+                                >
+                                    <option value="Active">Active</option>
+                                    <option value="Inactive">Inactive</option>
+                                </select>
+                            </div>
+                        </>
+                    )}
+                    {activeTab === 'priorities' && (
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Response SLA (Hrs) *</label>
+                                <input
+                                    type="number"
                                     required
-                                    value={formData.name}
-                                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-semibold"
+                                    min="1"
+                                    value={formData.responseSlaHours}
+                                    onChange={(e) => setFormData({ ...formData, responseSlaHours: e.target.value })}
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-semibold"
                                 />
                             </div>
-                            <div>
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Description</label>
-                                <textarea
-                                    value={formData.description}
-                                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-semibold h-24"
+                            <div className="space-y-1">
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Resolution SLA (Hrs) *</label>
+                                <input
+                                    type="number"
+                                    required
+                                    min="1"
+                                    value={formData.resolutionSlaHours}
+                                    onChange={(e) => setFormData({ ...formData, resolutionSlaHours: e.target.value })}
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-semibold"
                                 />
                             </div>
-                            {activeTab === 'priorities' && (
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Response SLA (Hrs) *</label>
-                                        <input
-                                            type="number"
-                                            required
-                                            min="1"
-                                            value={formData.responseSlaHours}
-                                            onChange={(e) => setFormData({ ...formData, responseSlaHours: e.target.value })}
-                                            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-semibold"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Resolution SLA (Hrs) *</label>
-                                        <input
-                                            type="number"
-                                            required
-                                            min="1"
-                                            value={formData.resolutionSlaHours}
-                                            onChange={(e) => setFormData({ ...formData, resolutionSlaHours: e.target.value })}
-                                            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-semibold"
-                                        />
-                                    </div>
-                                    <div className="col-span-2">
-                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Color Tag *</label>
-                                        <input
-                                            type="color"
-                                            required
-                                            value={formData.color}
-                                            onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                                            className="w-full h-12 p-1 rounded-xl border border-slate-200 cursor-pointer"
-                                        />
-                                    </div>
-                                </div>
-                            )}
-                            <div className="flex gap-3 pt-4 border-t border-slate-50">
-                                <button
-                                    type="button"
-                                    onClick={() => setShowModal(false)}
-                                    className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    className="flex-1 py-3.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-primary-600/10"
-                                >
-                                    Save
-                                </button>
+                            <div className="col-span-2 space-y-1">
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Color Tag *</label>
+                                <input
+                                    type="color"
+                                    required
+                                    value={formData.color}
+                                    onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                                    className="w-full h-12 p-1 rounded-xl border border-slate-200 cursor-pointer"
+                                />
                             </div>
-                        </form>
-                    </div>
-                </div>
-            )}
+                        </div>
+                    )}
+                </form>
+            </Modal>
         </div>
     );
 };

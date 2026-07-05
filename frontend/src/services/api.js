@@ -690,6 +690,11 @@ export const csmService = {
   createTeam: (data) => api.post("/csm/masters/teams", data),
   updateTeam: (id, data) => api.put(`/csm/masters/teams/${id}`, data),
   deleteTeam: (id) => api.delete(`/csm/masters/teams/${id}`),
+
+  getEngineers: () => api.get("/csm/masters/engineers"),
+  createEngineer: (data) => api.post("/csm/masters/engineers", data),
+  updateEngineer: (id, data) => api.put(`/csm/masters/engineers/${id}`, data),
+  deleteEngineer: (id) => api.delete(`/csm/masters/engineers/${id}`),
 };
 
 export const cpqService = {

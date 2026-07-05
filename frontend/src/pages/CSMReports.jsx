@@ -85,11 +85,11 @@ const CSMReports = () => {
             const [priRes, catRes, engRes] = await Promise.all([
                 csmService.getPriorities(),
                 csmService.getCategories(),
-                userService.getAll({ limit: 500 })
+                csmService.getEngineers()
             ]);
             setPriorities(priRes.data || []);
             setCategories(catRes.data || []);
-            setEngineers(engRes.data?.data || engRes.data || []);
+            setEngineers(engRes.data || []);
         } catch (error) {
             console.error('Error loading report dropdown options:', error);
         }

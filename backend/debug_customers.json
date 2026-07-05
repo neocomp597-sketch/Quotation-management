@@ -18135,7 +18135,7 @@
   },
   {
     "_id": "6a4546395b1100def1885661",
-    "customerName": "rajshri jadhav",
+    "customerName": "DF1002",
     "companyName": "rajshri jadhav",
     "gstin": ""
   },
@@ -18150,5 +18150,12 @@
     "customerName": "rohit dixit",
     "companyName": "ROHIT DIXIT",
     "gstin": ""
+  },
+  {
+    "_id": "6a4a5448b0cb0208a95593c8",
+    "customerName": "SC210654",
+    "companyName": "RAMAN AUTO INDUSTRY",
+    "gstin": "27NCBCQ7403OLKJ",
+    "logoUrl": ""
   }
 ]

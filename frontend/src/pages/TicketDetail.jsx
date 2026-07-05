@@ -69,12 +69,12 @@ const TicketDetail = () => {
 
     const loadAssignees = async () => {
         try {
-            const [teamRes, userRes] = await Promise.all([
+            const [teamRes, engRes] = await Promise.all([
                 csmService.getTeams(),
-                userService.getAll({ limit: 500 })
+                csmService.getEngineers()
             ]);
             setTeams(teamRes.data || []);
-            setEngineers(userRes.data?.data || userRes.data || []);
+            setEngineers(engRes.data || []);
         } catch (error) {
             console.error('Error loading assignments:', error);
         }
@@ -249,7 +249,7 @@ const TicketDetail = () => {
 
                             {ticket.assignedSalespersonId && (
                                 <div className="p-4 rounded-2xl bg-primary-50 border border-primary-100 space-y-1.5 mt-3">
-                                    <span className="text-[10px] font-black uppercase tracking-widest text-primary-500 block">👤 Auto-assigned Sales Rep</span>
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-primary-500 block">👤 Assigned Sales Rep</span>
                                     <p className="text-sm font-black text-primary-900">{ticket.assignedSalespersonId.name}</p>
                                     <div className="text-xs text-slate-600 font-semibold space-y-0.5">
                                         {ticket.assignedSalespersonId.email && <p>✉️ {ticket.assignedSalespersonId.email}</p>}
@@ -257,9 +257,22 @@ const TicketDetail = () => {
                                     </div>
                                 </div>
                             )}
-                        </div>
 
-                        {/* Entitlement Status Box */}
+                            {ticket.assignedEngineerId && (
+                                <div className="p-4 rounded-2xl bg-teal-50 border border-teal-100 space-y-1.5 mt-3">
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-teal-600 block">🛠️ Assigned Service Engineer</span>
+                                    <p className="text-sm font-black text-teal-900">{ticket.assignedEngineerId.name}</p>
+                                    <div className="text-xs text-slate-600 font-semibold space-y-0.5">
+                                        {ticket.assignedEngineerId.email && <p>✉️ {ticket.assignedEngineerId.email}</p>}
+                                        {ticket.assignedEngineerId.mobile && <p>📞 {ticket.assignedEngineerId.mobile}</p>}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Entitlement Status Box */}
+
                         {entitlements && (
                             <div className="mt-4 p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
                                 <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block">Entitlements Check</span>
@@ -286,9 +299,9 @@ const TicketDetail = () => {
                                 </div>
                             </div>
                         )}
-                    </div>
 
-                    {/* Quick State Management & Escalation */}
+
+
                     <div className="glass shadow-premium rounded-[2rem] p-6 bg-white border border-slate-100 space-y-4">
                         <h3 className="font-outfit font-black text-sm text-slate-900 uppercase tracking-widest border-b border-slate-50 pb-2">
                             Actions & Escalation
@@ -358,6 +371,19 @@ const TicketDetail = () => {
                                         <div>
                                             <p className="font-black">{ticket.assignedSalespersonId.name}</p>
                                             {ticket.assignedSalespersonId.mobile && <p className="text-[10px] text-slate-500 font-semibold">{ticket.assignedSalespersonId.mobile}</p>}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {ticket.assignedEngineerId && (
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Assigned Engineer</label>
+                                    <div className="px-4 py-3.5 bg-teal-50/50 border border-teal-100/60 rounded-xl text-xs font-bold text-teal-900 flex items-center gap-2">
+                                        <span>🛠️</span>
+                                        <div>
+                                            <p className="font-black">{ticket.assignedEngineerId.name}</p>
+                                            {ticket.assignedEngineerId.mobile && <p className="text-[10px] text-slate-500 font-semibold">{ticket.assignedEngineerId.mobile}</p>}
                                         </div>
                                     </div>
                                 </div>

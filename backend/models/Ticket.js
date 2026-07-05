@@ -49,7 +49,7 @@ const TicketSchema = new mongoose.Schema({
         default: 'Open' 
     },
     assignedTeamId: { type: mongoose.Schema.Types.ObjectId, ref: 'ServiceTeam' },
-    assignedEngineerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    assignedEngineerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Engineer' },
     slaResponseDue: { type: Date },
     slaResolutionDue: { type: Date },
     firstResponseAt: { type: Date },

@@ -3,21 +3,30 @@ import { payrollService, companySettingsService } from '../services/api';
 import { toast } from 'react-toastify';
 import Modal from '../components/Modal';
 import { MdDescription, MdAdd, MdSave, MdDelete, MdPictureAsPdf } from 'react-icons/md';
-import { formatDate } from '../utils/helpers';
+import { formatDate, resolveImageUrl } from '../utils/helpers';
 
 const TEMPLATE_CONTENTS = {
-    offer: "Dear {name},\n\nWe are pleased to offer you employment with {company} for the position of {designation}. This offer is made based on the information provided by you during the selection process and is subject to successful completion of all joining formalities and background verification, wherever applicable.\n\nYour proposed monthly gross compensation will be INR {salary}. Your expected date of joining will be {joining_date}, unless otherwise agreed in writing by the company.\n\nDetailed terms of employment, reporting structure, policies, and other conditions will be shared at the time of joining or appointment. Please sign and return a copy of this letter as confirmation of your acceptance of the offer.\n\nWe look forward to welcoming you and wish you a successful association with us.",
-    appointment: "Dear {name},\n\nWith reference to your application and subsequent discussions, we are pleased to appoint you as {designation} with {company}, effective from {joining_date}.\n\nYour monthly gross compensation will be INR {salary}, subject to applicable statutory deductions and company policies. You will be required to comply with all rules, procedures, confidentiality obligations, and employment conditions communicated by the company from time to time.\n\nYour appointment is subject to satisfactory verification of credentials and completion of joining documentation. Please sign and return a copy of this letter to confirm your acceptance of the appointment terms.\n\nWe welcome you to the organization and look forward to a productive and professional association.",
-    increment: "Dear {name},\n\nWe are pleased to inform you that, following the recent review process, your monthly gross compensation has been revised to INR {salary}, effective from {joining_date}.\n\nThis revision recognizes your contribution to the organization and your continued commitment to your responsibilities. All other terms and conditions of your employment remain unchanged unless communicated separately in writing.\n\nWe appreciate your efforts and look forward to your continued performance and growth with {company}.",
-    promotion: "Dear {name},\n\nWe are pleased to inform you that you have been promoted to the position of {new_designation}, effective from {joining_date}.\n\nConsequent to this promotion, your monthly gross compensation has been revised to INR {salary}. Your responsibilities, reporting structure, and performance expectations will be aligned with your revised role and communicated by your reporting manager or HR.\n\nAll other terms and conditions of your employment remain unchanged unless communicated separately in writing. We congratulate you on this achievement and wish you continued success in your new role.",
-    salary_certificate: "TO WHOMSOEVER IT MAY CONCERN\n\nThis is to certify that {name} is employed with {company} as {designation}. As per our employment records, the employee has been associated with the company since {joining_date}.\n\nAs per the current payroll records, the employee's monthly gross salary is INR {salary}.\n\nThis certificate is issued at the request of the employee for official verification and documentation purposes. It does not constitute any financial guarantee or undertaking on behalf of the company.",
-    experience: "TO WHOMSOEVER IT MAY CONCERN\n\nThis is to certify that {name} was employed with {company} as {designation} from {joining_date} to {relieving_date}.\n\nDuring the period of employment, the employee carried out assigned responsibilities in a professional manner and maintained satisfactory conduct. The employee was relieved from services after completion of the applicable separation formalities.\n\nWe thank {name} for the services rendered to the organization and wish them success in future endeavors.",
-    relieving: "Dear {name},\n\nThis is to confirm that your resignation has been accepted and you are relieved from your duties as {designation} with effect from the close of business hours on {relieving_date}.\n\nAs per company records, you have completed the required handover and separation formalities, subject to any pending obligations that may be communicated separately. Your full and final settlement, if applicable, will be processed in accordance with company policy and statutory requirements.\n\nWe appreciate your contribution during your tenure with {company} and wish you success in your future endeavors."
+    offer: "Dear {name},\n\nCongratulations! We are pleased to offer you the position of {designation} at {company}. Your experience and skills impressed us, and we are excited about the value you will bring to our organization.\n\nKindly review the terms and salary details below. We look forward to welcoming you to the {company} family.",
+    appointment: "Dear {name},\n\nWe are pleased to appoint you as {designation} at {company}, effective from {joining_date}. This appointment is subject to the terms and conditions outlined below.\n\nWe welcome you to our team and look forward to a successful and productive professional journey together.",
+    increment: "Dear {name},\n\nWe are pleased to inform you that, after reviewing your performance, dedication, professional excellence, and contribution towards the growth of {company}, the Management has approved a revision to your compensation.\n\nYour hard work, commitment, and willingness to take ownership have been greatly appreciated. We believe this salary revision reflects our confidence in your abilities and our expectation that you will continue contributing towards the organization's success.",
+    promotion: "Dear {name},\n\nWe are pleased to inform you that, in recognition of your exceptional performance, dedication, and leadership, you have been promoted to the position of {new_designation}, effective from {joining_date}.\n\nConsequent to this promotion, your monthly gross compensation has been revised to INR {salary}. We are confident that you will excel in your new role and continue to drive success for {company}.",
+    salary_certificate: "TO WHOMSOEVER IT MAY CONCERN\n\nThis is to certify that {name} is employed with {company} as {designation}. As per our employment records, the employee has been associated with the company since {joining_date}.\n\nAs per the current payroll records, the employee's monthly gross salary is INR {salary}.\n\nThis certificate is issued at the request of the employee for official verification and documentation purposes.",
+    experience: "TO WHOMSOEVER IT MAY CONCERN\n\nThis is to certify that {name} was employed with {company} as {designation} from {joining_date} to {relieving_date}.\n\nDuring the period of employment, the employee carried out assigned responsibilities in a professional manner and maintained satisfactory conduct. We thank them for their service and wish them success in future endeavors.",
+    relieving: "Dear {name},\n\nThis is to confirm that your resignation has been accepted and you are relieved from your duties as {designation} with effect from the close of business hours on {relieving_date}.\n\nAs per company records, you have completed the required handover and separation formalities. We appreciate your contribution during your tenure with {company} and wish you success in your future endeavors."
 };
 
 const formatSalary = (salary) => {
     const numericSalary = parseFloat(salary);
     return Number.isFinite(numericSalary) ? numericSalary.toLocaleString('en-IN') : '[Salary]';
+};
+
+const getCompanyPrefix = (companyName) => {
+    if (!companyName) return 'RR';
+    const words = companyName.split(/\s+/).filter(Boolean);
+    if (words.length >= 2) {
+        return words.map(w => w[0]).join('').toUpperCase();
+    }
+    return companyName.substring(0, 3).toUpperCase();
 };
 
 const compileTemplate = (template, values, companySettings) => {
@@ -27,8 +36,14 @@ const compileTemplate = (template, values, companySettings) => {
         .replace(/{new_designation}/g, values.newDesignation || '[New Designation]')
         .replace(/{company}/g, companySettings?.companyName || 'the company')
         .replace(/{salary}/g, values.salary ? formatSalary(values.salary) : '[Salary]')
+        .replace(/{current_salary}/g, values.currentSalary ? formatSalary(values.currentSalary) : '[Current Salary]')
         .replace(/{joining_date}/g, values.joiningDate ? formatDate(values.joiningDate) : '[Joining Date]')
-        .replace(/{relieving_date}/g, values.relievingDate ? formatDate(values.relievingDate) : '[Relieving Date]');
+        .replace(/{relieving_date}/g, values.relievingDate ? formatDate(values.relievingDate) : '[Relieving Date]')
+        .replace(/{employee_id}/g, values.employeeIdCode || '[Employee ID]')
+        .replace(/{department}/g, values.department || '[Department]')
+        .replace(/{employment_type}/g, values.employmentType || '[Employment Type]')
+        .replace(/{reporting_manager}/g, values.reportingManager || '[Reporting Manager]')
+        .replace(/{work_location}/g, values.workLocation || '[Work Location]');
 };
 
 const getPrintableContent = (letter, companySettings) => {
@@ -40,7 +55,13 @@ const getPrintableContent = (letter, companySettings) => {
             newDesignation: metadata.newDesignation,
             salary: metadata.salary,
             joiningDate: metadata.joiningDate,
-            relievingDate: metadata.relievingDate
+            relievingDate: metadata.relievingDate,
+            employeeIdCode: metadata.employeeIdCode,
+            department: metadata.department,
+            employmentType: metadata.employmentType,
+            reportingManager: metadata.reportingManager,
+            workLocation: metadata.workLocation,
+            currentSalary: metadata.currentSalary
         }, companySettings);
     }
 
@@ -61,7 +82,13 @@ const getPrintableContent = (letter, companySettings) => {
         newDesignation: metadata.newDesignation,
         salary: metadata.salary,
         joiningDate: metadata.joiningDate,
-        relievingDate: metadata.relievingDate
+        relievingDate: metadata.relievingDate,
+        employeeIdCode: metadata.employeeIdCode,
+        department: metadata.department,
+        employmentType: metadata.employmentType,
+        reportingManager: metadata.reportingManager,
+        workLocation: metadata.workLocation,
+        currentSalary: metadata.currentSalary
     }, companySettings);
 };
 
@@ -93,54 +120,330 @@ const getLetterTitle = (type) => ({
     relieving: 'Relieving Letter'
 }[type] || 'HR Letter');
 
-const getLetterReference = (letter) => {
-    const date = letter.createdAt ? new Date(letter.createdAt) : new Date();
-    const stamp = [
-        date.getFullYear(),
-        String(date.getMonth() + 1).padStart(2, '0'),
-        String(date.getDate()).padStart(2, '0')
-    ].join('');
-    return `HR/${String(letter.type || 'LETTER').replace(/_/g, '-').toUpperCase()}/${stamp}`;
-};
-
-const buildDetailsTable = (letter) => {
-    const metadata = letter.metadata || {};
-    const rows = [];
-
-    if (metadata.designation) rows.push(['Designation', metadata.designation]);
-    if (metadata.newDesignation && letter.type === 'promotion') rows.push(['Promoted Role', metadata.newDesignation]);
-    if (metadata.joiningDate) rows.push([letter.type === 'increment' || letter.type === 'promotion' ? 'Effective Date' : 'Joining Date', formatDate(metadata.joiningDate)]);
-    if (metadata.relievingDate) rows.push(['Relieving Date', formatDate(metadata.relievingDate)]);
-    if (metadata.salary && ['offer', 'appointment', 'increment', 'promotion', 'salary_certificate'].includes(letter.type)) {
-        rows.push(['Monthly Gross Compensation', `INR ${formatSalary(metadata.salary)}`]);
-    }
-
-    if (!rows.length) return '';
-
-    return `
-        <table class="details-table">
-            <tbody>
-                ${rows.map(([label, value]) => `
-                    <tr>
-                        <th>${escapeHtml(label)}</th>
-                        <td>${escapeHtml(value)}</td>
-                    </tr>
-                `).join('')}
-            </tbody>
-        </table>
-    `;
-};
-
 const buildProfessionalLetterHtml = (letter, companySettings) => {
-    const companyName = companySettings?.companyName || 'Company Name';
-    const address = getAddressString(companySettings);
+    const companyName = companySettings?.companyName || 'OUR COMPANY';
+    
+    // Address components
+    const address = companySettings?.address || {};
+    const companyAddressString = [address.line1, address.line2, address.city, address.state, address.pincode].filter(Boolean).join(', ') || '';
+    
+    const companyEmail = companySettings?.email || '';
+    let companyWebsite = companySettings?.website || '';
+    if (companyWebsite) {
+        try {
+            let cleanUrl = companyWebsite.trim();
+            if (!/^https?:\/\//i.test(cleanUrl)) {
+                cleanUrl = 'http://' + cleanUrl;
+            }
+            const parsed = new URL(cleanUrl);
+            if (parsed.hostname.includes('google.com') && parsed.searchParams.get('q')) {
+                companyWebsite = parsed.searchParams.get('q');
+            } else {
+                companyWebsite = parsed.hostname.replace(/^www\./i, '');
+            }
+        } catch (e) {
+            companyWebsite = companyWebsite.split('?')[0].replace(/^www\./i, '');
+        }
+    }
+    const companyTagline = companySettings?.tagline || '';
+
     const content = getPrintableContent(letter, companySettings);
     const title = getLetterTitle(letter.type);
-    const needsAcknowledgment = ['offer', 'appointment', 'increment', 'promotion'].includes(letter.type);
-    const footerContact = [
-        companySettings?.contactEmail && `Email: ${companySettings.contactEmail}`,
-        companySettings?.website && `Web: ${companySettings.website}`
-    ].filter(Boolean).join(' | ');
+    
+    const metadata = letter.metadata || {};
+    const designation = metadata.designation || '[Designation]';
+    const newDesignation = metadata.newDesignation || '[New Designation]';
+    const salary = metadata.salary || '';
+    const currentSalary = metadata.currentSalary || '';
+    const joiningDate = metadata.joiningDate || '';
+    const relievingDate = metadata.relievingDate || '';
+    const employeeIdCode = metadata.employeeIdCode || 'EMP001';
+    const department = metadata.department || 'Development';
+    const employmentType = metadata.employmentType || 'Full-Time';
+    const reportingManager = metadata.reportingManager || 'Development Head';
+    const workLocation = metadata.workLocation || 'Nashik';
+
+    const prefix = getCompanyPrefix(companyName);
+    const stamp = letter.createdAt ? new Date(letter.createdAt) : new Date();
+    const formattedStamp = [
+        stamp.getFullYear(),
+        String(stamp.getMonth() + 1).padStart(2, '0'),
+        String(stamp.getDate()).padStart(2, '0')
+    ].join('');
+    
+    let referenceNumber = '';
+    if (letter.type === 'offer') {
+        referenceNumber = `${prefix}/OFFER/${stamp.getFullYear()}/${formattedStamp.slice(-4)}`;
+    } else if (letter.type === 'increment') {
+        referenceNumber = `${prefix}/HR/INC/${stamp.getFullYear()}/${formattedStamp.slice(-4)}`;
+    } else {
+        referenceNumber = `${prefix}/HR/${letter.type?.toUpperCase().replace(/_/g, '-')}/${formattedStamp}`;
+    }
+
+    const isOfferOrAppt = ['offer', 'appointment'].includes(letter.type);
+    const isIncOrProm = ['increment', 'promotion'].includes(letter.type);
+    const isSalaryCert = letter.type === 'salary_certificate';
+    const isRelieving = letter.type === 'relieving';
+
+    const letterheadHtml = `
+        <div class="header-letterhead">
+            <div class="logo-area">
+                ${companySettings?.logoUrl ? `
+                    <img src="${escapeHtml(resolveImageUrl(companySettings.logoUrl))}" alt="Logo" style="height: 48px; max-width: 200px; object-fit: contain; display: block;" />
+                ` : `
+                    <h2 style="font-size: 26px; font-weight: 800; color: #1e3a8a; margin: 0; font-family: 'Poppins', sans-serif; letter-spacing: -0.5px;">${escapeHtml(companyName)}</h2>
+                `}
+                ${companyTagline ? `<p style="font-size: 10px; color: #6b7280; margin-top: 2px; font-weight: 500;">${escapeHtml(companyTagline)}</p>` : ''}
+            </div>
+            <div class="company-info-area">
+                <strong style="color: #111827; font-size: 13px; font-weight: 700;">${escapeHtml(companyName)}</strong><br />
+                ${companyAddressString ? `${escapeHtml(companyAddressString)}<br />` : ''}
+                ${companyEmail ? `Email: ${escapeHtml(companyEmail)}` : ''} ${companyWebsite ? ` | Web: ${escapeHtml(companyWebsite)}` : ''}
+            </div>
+        </div>
+    `;
+
+    let templateHtml = '';
+
+    if (isOfferOrAppt) {
+        templateHtml = `
+            <div class="top-bar"></div>
+            <div class="content-wrapper">
+                ${letterheadHtml}
+                
+                <div class="title-offer">
+                    <h1>${escapeHtml(title.toUpperCase())}</h1>
+                    <div class="subtitle">We are delighted to welcome you to our organization</div>
+                </div>
+
+                <div class="reference-offer">
+                    <div class="ref-box">
+                        <label>Issue Date</label>
+                        <strong>${escapeHtml(formatDate(letter.createdAt || new Date()))}</strong>
+                    </div>
+                    <div class="ref-box">
+                        <label>Reference Number</label>
+                        <strong>${escapeHtml(referenceNumber)}</strong>
+                    </div>
+                </div>
+
+                <div class="card-offer">
+                    <div class="card-header">Candidate Information</div>
+                    <div class="details-grid">
+                        <div class="label-col">Candidate Name</div>
+                        <div>${escapeHtml(letter.recipientName)}</div>
+                        <div class="label-col">Email Address</div>
+                        <div>${escapeHtml(letter.recipientEmail || '-')}</div>
+                        <div class="label-col">Position</div>
+                        <div>${escapeHtml(designation)}</div>
+                        <div class="label-col">Department</div>
+                        <div>${escapeHtml(department)}</div>
+                        <div class="label-col">Employment Type</div>
+                        <div>${escapeHtml(employmentType)}</div>
+                        <div class="label-col">Joining Date</div>
+                        <div>${escapeHtml(formatDate(joiningDate))}</div>
+                        <div class="label-col">Reporting Manager</div>
+                        <div>${escapeHtml(reportingManager)}</div>
+                        <div class="label-col">Work Location</div>
+                        <div>${escapeHtml(workLocation)}</div>
+                    </div>
+                </div>
+
+                <div class="content-body text-justify">
+                    ${toParagraphs(content)}
+                </div>
+
+                ${salary ? `
+                <div class="salary-offer">
+                    <h3>Monthly Gross Salary</h3>
+                    <h1>₹${formatSalary(salary)}</h1>
+                    <p>Effective from your joining date</p>
+                </div>
+                ` : ''}
+
+                <div class="terms-offer">
+                    <h3>Employment Terms</h3>
+                    <ul>
+                        <li>Your employment is subject to successful document verification.</li>
+                        <li>You will initially be on probation as per company policy.</li>
+                        <li>All company policies, confidentiality, and code of conduct must be followed.</li>
+                        <li>Your compensation is subject to statutory deductions.</li>
+                        <li>This offer is valid for seven days from the issue date.</li>
+                    </ul>
+                </div>
+
+                <div class="acceptance-offer">
+                    Kindly sign and return this offer letter as a token of your acceptance. We look forward to welcoming you to our team.
+                </div>
+
+                <div class="footer-signatures">
+                    <div class="sign-block">
+                        <div class="sign-line">Authorized Signatory</div>
+                    </div>
+                    <div class="sign-block">
+                        <div class="sign-line">Candidate Signature</div>
+                    </div>
+                </div>
+            </div>
+            <div class="bottom-copyright">
+                © ${new Date().getFullYear()} ${escapeHtml(companyName)} | This document is confidential and intended solely for the addressed recipient.
+            </div>
+        `;
+    } else if (isIncOrProm) {
+        templateHtml = `
+            <div class="content-wrapper">
+                ${letterheadHtml}
+
+                <div class="top-row-inc">
+                    <div>
+                        <b>Letter Date</b><br>
+                        ${escapeHtml(formatDate(letter.createdAt || new Date()))}
+                    </div>
+                    <div>
+                        <b>Reference No.</b><br>
+                        ${escapeHtml(referenceNumber)}
+                    </div>
+                </div>
+
+                <div class="employee-grid-inc">
+                    <b>Employee Name</b>
+                    <span>${escapeHtml(letter.recipientName)}</span>
+                    <b>Employee ID</b>
+                    <span>${escapeHtml(employeeIdCode)}</span>
+                    <b>Designation</b>
+                    <span>${escapeHtml(designation)}</span>
+                    <b>Department</b>
+                    <span>${escapeHtml(department)}</span>
+                </div>
+
+                <div class="subject-inc">
+                    Subject : ${escapeHtml(title)}
+                </div>
+
+                <div class="content-body text-justify">
+                    ${toParagraphs(content)}
+                </div>
+
+                ${salary ? `
+                <div class="salary-box-inc">
+                    <table>
+                        <tr>
+                            <th>Salary Revision Details</th>
+                            <th>Information</th>
+                        </tr>
+                        ${currentSalary ? `
+                        <tr>
+                            <td>Current Gross Salary</td>
+                            <td>₹${formatSalary(currentSalary)}</td>
+                        </tr>
+                        ` : ''}
+                        <tr>
+                            <td>Revised Gross Salary</td>
+                            <td class="highlight-green">₹${formatSalary(salary)}</td>
+                        </tr>
+                        <tr>
+                            <td>Effective From</td>
+                            <td>${escapeHtml(formatDate(joiningDate))}</td>
+                        </tr>
+                    </table>
+                </div>
+                ` : ''}
+
+                <div class="conditions-inc">
+                    <h3>Terms & Conditions</h3>
+                    <ul>
+                        <li>This revised salary shall be effective from the above-mentioned date.</li>
+                        <li>All existing employment terms and company policies remain unchanged.</li>
+                        <li>This letter forms a part of your employment records.</li>
+                        <li>The contents of this document are confidential.</li>
+                        <li>The revised salary will be reflected in your payroll from the effective date.</li>
+                    </ul>
+                </div>
+
+                <div class="note-inc">
+                    <strong>Congratulations!</strong><br>
+                    The Management appreciates your sincere efforts and wishes you continued success in your career with us.
+                </div>
+
+                <div class="footer-signatures">
+                    <div class="sign-block">
+                        <div class="sign-line">Authorized Signatory</div>
+                    </div>
+                    <div class="sign-block">
+                        <div class="sign-line">Employee Acceptance</div>
+                    </div>
+                </div>
+            </div>
+            <div class="bottom-copyright">
+                © ${new Date().getFullYear()} ${escapeHtml(companyName)} | Confidential Document
+            </div>
+        `;
+    } else {
+        templateHtml = `
+            <div class="content-wrapper">
+                ${letterheadHtml}
+
+                <div class="top-row-inc">
+                    <div>
+                        <b>Date</b><br>
+                        ${escapeHtml(formatDate(letter.createdAt || new Date()))}
+                    </div>
+                    <div>
+                        <b>Reference No.</b><br>
+                        ${escapeHtml(referenceNumber)}
+                    </div>
+                </div>
+
+                <div class="employee-grid-inc">
+                    <b>Employee Name</b>
+                    <span>${escapeHtml(letter.recipientName)}</span>
+                    <b>Employee ID</b>
+                    <span>${escapeHtml(employeeIdCode)}</span>
+                    <b>Designation</b>
+                    <span>${escapeHtml(designation)}</span>
+                    <b>Department</b>
+                    <span>${escapeHtml(department)}</span>
+                </div>
+
+                <div class="subject-inc">
+                    ${escapeHtml(title.toUpperCase())}
+                </div>
+
+                <div class="content-body text-justify">
+                    ${toParagraphs(content)}
+                </div>
+
+                ${isSalaryCert && salary ? `
+                <div class="salary-box-inc">
+                    <table>
+                        <tr>
+                            <th>Salary Details</th>
+                            <th>Monthly Gross Compensation</th>
+                        </tr>
+                        <tr>
+                            <td>Current Salary</td>
+                            <td class="highlight-green">₹${formatSalary(salary)}</td>
+                        </tr>
+                    </table>
+                </div>
+                ` : ''}
+
+                <div class="footer-signatures" style="margin-top: 45px;">
+                    <div class="sign-block">
+                        <div class="sign-line">Authorized Signatory</div>
+                    </div>
+                    ${isRelieving ? `
+                    <div class="sign-block">
+                        <div class="sign-line">Employee Acknowledgment</div>
+                    </div>
+                    ` : ''}
+                </div>
+            </div>
+            <div class="bottom-copyright">
+                © ${new Date().getFullYear()} ${escapeHtml(companyName)} | Official Verification Record
+            </div>
+        `;
+    }
 
     return `<!doctype html>
 <html>
@@ -148,80 +451,370 @@ const buildProfessionalLetterHtml = (letter, companySettings) => {
     <meta charset="utf-8" />
     <title>${escapeHtml(title)}</title>
     <style>
-        @page { size: A4; margin: 0; }
-        * { box-sizing: border-box; }
-        body { margin: 0; background: #e5e7eb; color: #111827; font-family: Arial, Helvetica, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-        .page { width: 210mm; min-height: 297mm; margin: 0 auto; background: #fff; position: relative; padding: 22mm 20mm 19mm; }
-        .brand-rule { height: 5px; background: #0f766e; position: absolute; left: 0; top: 0; right: 0; }
-        .header { display: flex; justify-content: space-between; gap: 24px; border-bottom: 1px solid #cbd5e1; padding-bottom: 14px; margin-bottom: 22px; }
-        .company-name { font-size: 20px; line-height: 1.2; font-weight: 800; letter-spacing: .4px; color: #0f766e; text-transform: uppercase; }
-        .company-address { margin-top: 6px; max-width: 380px; font-size: 11px; line-height: 1.45; color: #475569; }
-        .company-contact { min-width: 190px; text-align: right; font-size: 11px; line-height: 1.55; color: #475569; }
-        .meta-row { display: flex; justify-content: space-between; margin-bottom: 24px; font-size: 12px; color: #334155; }
-        .recipient { margin-bottom: 18px; font-size: 12px; line-height: 1.55; }
-        .recipient strong { display: block; font-size: 13px; color: #0f172a; }
-        .title { text-align: center; font-size: 15px; font-weight: 800; text-transform: uppercase; letter-spacing: .7px; color: #0f172a; margin: 22px 0 18px; text-decoration: underline; text-underline-offset: 4px; }
-        .details-table { width: 100%; border-collapse: collapse; margin: 0 0 20px; font-size: 12px; }
-        .details-table th, .details-table td { border: 1px solid #cbd5e1; padding: 8px 10px; vertical-align: top; }
-        .details-table th { width: 34%; text-align: left; background: #f8fafc; color: #334155; font-weight: 700; }
-        .body { font-size: 12.5px; line-height: 1.75; text-align: justify; }
-        .body p { margin: 0 0 12px; }
-        .closing { margin-top: 28px; font-size: 12.5px; line-height: 1.7; }
-        .signature-row { display: flex; justify-content: space-between; gap: 40px; margin-top: 42px; }
-        .signature { width: 235px; font-size: 12px; color: #0f172a; }
-        .signature-space { height: 54px; }
-        .signature-line { border-top: 1px solid #94a3b8; padding-top: 7px; font-weight: 700; }
-        .signature small { display: block; margin-top: 3px; color: #64748b; font-weight: 400; }
-        .footer { position: absolute; left: 20mm; right: 20mm; bottom: 9mm; border-top: 1px solid #e2e8f0; padding-top: 7px; font-size: 9px; line-height: 1.45; color: #64748b; text-align: center; }
-        @media print { body { background: #fff; } .page { width: auto; min-height: 297mm; margin: 0; box-shadow: none; } }
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        @page {
+            size: A4 portrait;
+            margin: 0;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body, html {
+            background: #fff;
+            width: 210mm;
+            height: 297mm;
+            overflow: hidden;
+            font-family: 'Poppins', 'Inter', Arial, sans-serif;
+            color: #111827;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        
+        .page-container {
+            width: 210mm;
+            height: 297mm;
+            margin: 0 auto;
+            background: #fff;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            overflow: hidden;
+        }
+        
+        .content-wrapper {
+            padding: 20mm 20mm 15mm 20mm;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            overflow: hidden;
+        }
+        
+        .header-letterhead {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #1e3a8a;
+            padding-bottom: 12px;
+            margin-bottom: 18px;
+        }
+        
+        .header-letterhead .logo-area {
+            flex-grow: 1;
+        }
+        
+        .header-letterhead .company-info-area {
+            text-align: right;
+            font-size: 11px;
+            color: #4b5563;
+            line-height: 1.45;
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .top-bar {
+            height: 6px;
+            background: linear-gradient(90deg, #2563eb, #1d4ed8, #3b82f6);
+        }
+        
+        .title-offer {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        .title-offer h1 {
+            font-size: 24px;
+            color: #111827;
+            letter-spacing: 0.5px;
+            font-weight: 700;
+        }
+        .title-offer .subtitle {
+            margin-top: 4px;
+            color: #6b7280;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .reference-offer {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+        }
+        .reference-offer .ref-box {
+            background: #f8fafc;
+            padding: 10px 15px;
+            border-radius: 8px;
+            width: 48%;
+            border: 1px solid #dbeafe;
+        }
+        .reference-offer .ref-box label {
+            display: block;
+            font-size: 10px;
+            color: #6b7280;
+            margin-bottom: 2px;
+            text-transform: uppercase;
+            font-weight: 750;
+            letter-spacing: 0.5px;
+        }
+        .reference-offer .ref-box strong {
+            font-size: 13px;
+            color: #1e3a8a;
+        }
+        
+        .card-offer {
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid #e5e7eb;
+            margin-bottom: 15px;
+        }
+        .card-offer .card-header {
+            background: #2563eb;
+            color: #fff;
+            padding: 10px 18px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .card-offer .details-grid {
+            display: grid;
+            grid-template-columns: 180px auto;
+            padding: 10px 18px;
+            font-size: 12px;
+        }
+        .card-offer .details-grid div {
+            padding: 6px 0;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        .card-offer .details-grid div:nth-last-child(-n+2) {
+            border-bottom: none;
+        }
+        .card-offer .details-grid .label-col {
+            font-weight: 600;
+            color: #374151;
+        }
+        
+        .salary-offer {
+            background: #eff6ff;
+            border: 2px dashed #3b82f6;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            text-align: center;
+        }
+        .salary-offer h3 {
+            color: #1d4ed8;
+            margin-bottom: 4px;
+            font-size: 14px;
+        }
+        .salary-offer h1 {
+            font-size: 30px;
+            color: #16a34a;
+            font-weight: 700;
+        }
+        .salary-offer p {
+            font-size: 12px;
+            color: #4b5563;
+            margin-top: 2px;
+        }
+        
+        .terms-offer {
+            background: #fdfdfd;
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid #f3f4f6;
+            margin-top: 15px;
+        }
+        .terms-offer h3 {
+            margin-bottom: 10px;
+            color: #1d4ed8;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .terms-offer ul {
+            padding-left: 18px;
+            font-size: 12px;
+        }
+        .terms-offer li {
+            margin-bottom: 6px;
+            line-height: 1.5;
+            color: #4b5563;
+        }
+        
+        .acceptance-offer {
+            margin-top: 15px;
+            padding: 12px 18px;
+            background: #fff8e1;
+            border-left: 5px solid orange;
+            line-height: 1.5;
+            font-size: 12px;
+            color: #4b5563;
+            border-radius: 0 8px 8px 0;
+        }
+        
+        .top-row-inc {
+            display: flex;
+            justify-content: space-between;
+            margin: 15px 0;
+            font-size: 13px;
+            color: #4b5563;
+        }
+        
+        .employee-grid-inc {
+            display: grid;
+            grid-template-columns: 150px auto;
+            row-gap: 8px;
+            margin-bottom: 18px;
+            font-size: 13px;
+            background: #f8fafc;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+        }
+        .employee-grid-inc b {
+            color: #4b5563;
+        }
+        .employee-grid-inc span {
+            color: #111827;
+            font-weight: 600;
+        }
+        
+        .subject-inc {
+            background: #f3f6ff;
+            border-left: 5px solid #1e3a8a;
+            padding: 12px 18px;
+            margin-bottom: 18px;
+            font-size: 14px;
+            font-weight: 700;
+            color: #1e3a8a;
+            border-radius: 0 6px 6px 0;
+        }
+        
+        .salary-box-inc {
+            background: #fafafa;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            overflow: hidden;
+            margin: 18px 0;
+        }
+        .salary-box-inc table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .salary-box-inc th {
+            background: #1e3a8a;
+            color: #fff;
+            padding: 10px 12px;
+            font-size: 13px;
+            text-align: left;
+        }
+        .salary-box-inc td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #eee;
+            font-size: 13px;
+        }
+        .salary-box-inc tr:last-child td {
+            border-bottom: none;
+        }
+        .salary-box-inc .highlight-green {
+            font-size: 18px;
+            font-weight: bold;
+            color: #0b8d4d;
+        }
+        
+        .conditions-inc {
+            margin-top: 15px;
+        }
+        .conditions-inc h3 {
+            color: #1e3a8a;
+            margin-bottom: 10px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .conditions-inc ul {
+            padding-left: 18px;
+            font-size: 12px;
+        }
+        .conditions-inc li {
+            margin-bottom: 6px;
+            line-height: 1.5;
+            color: #4b5563;
+        }
+        
+        .note-inc {
+            margin-top: 20px;
+            padding: 12px;
+            background: #fff8e8;
+            border-left: 4px solid orange;
+            font-size: 12px;
+            color: #555;
+            border-radius: 0 6px 6px 0;
+        }
+        
+        .content-body {
+            font-size: 13px;
+            line-height: 1.6;
+            color: #374151;
+            margin-bottom: 15px;
+            font-family: 'Inter', sans-serif;
+        }
+        .content-body p {
+            margin-bottom: 10px;
+        }
+        .text-justify {
+            text-align: justify;
+        }
+        
+        .footer-signatures {
+            margin-top: 30px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .sign-block {
+            width: 200px;
+            text-align: center;
+        }
+        .sign-line {
+            border-top: 1px solid #000;
+            margin-top: 35px;
+            padding-top: 6px;
+            font-weight: 700;
+            font-size: 12px;
+        }
+        
+        .bottom-copyright {
+            background: #1f2937;
+            color: #9ca3af;
+            text-align: center;
+            padding: 10px;
+            font-size: 11px;
+            margin-top: auto;
+            width: 100%;
+        }
+        
+        @media print {
+            body, html {
+                background: #fff;
+                width: 210mm;
+                height: 297mm;
+                overflow: hidden;
+            }
+            .page-container {
+                margin: 0;
+                box-shadow: none;
+                width: 210mm;
+                height: 297mm;
+                overflow: hidden;
+            }
+        }
     </style>
 </head>
 <body>
-    <main class="page">
-        <div class="brand-rule"></div>
-        <header class="header">
-            <div>
-                <div class="company-name">${escapeHtml(companyName)}</div>
-                ${address ? `<div class="company-address">${escapeHtml(address)}</div>` : ''}
-            </div>
-            <div class="company-contact">
-                ${companySettings?.contactEmail ? `<div>${escapeHtml(companySettings.contactEmail)}</div>` : ''}
-                ${companySettings?.website ? `<div>${escapeHtml(companySettings.website)}</div>` : ''}
-            </div>
-        </header>
-        <section class="meta-row">
-            <div><strong>Ref:</strong> ${escapeHtml(getLetterReference(letter))}</div>
-            <div><strong>Date:</strong> ${escapeHtml(formatDate(new Date()))}</div>
-        </section>
-        <section class="recipient">
-            <div>To,</div>
-            <strong>${escapeHtml(letter.recipientName || '')}</strong>
-            ${letter.recipientEmail ? `<div>${escapeHtml(letter.recipientEmail)}</div>` : ''}
-        </section>
-        <h1 class="title">${escapeHtml(title)}</h1>
-        ${buildDetailsTable(letter)}
-        <section class="body">${toParagraphs(content)}</section>
-        <section class="closing">
-            <div>Yours sincerely,</div>
-            <div>For <strong>${escapeHtml(companyName)}</strong></div>
-        </section>
-        <section class="signature-row">
-            <div class="signature">
-                <div class="signature-space"></div>
-                <div class="signature-line">Authorized Signatory<small>Human Resources Department</small></div>
-            </div>
-            ${needsAcknowledgment ? `
-                <div class="signature">
-                    <div class="signature-space"></div>
-                    <div class="signature-line">Employee Acknowledgment<small>Signature and date</small></div>
-                </div>
-            ` : ''}
-        </section>
-        <footer class="footer">
-            This letter is issued on the basis of company records and is valid only when signed by an authorized representative.
-            ${footerContact ? `<br />${escapeHtml(footerContact)}` : ''}
-        </footer>
-    </main>
+    <div class="page-container">
+        ${templateHtml}
+    </div>
 </body>
 </html>`;
 };
@@ -252,6 +845,12 @@ const PayrollLetters = () => {
         relievingDate: '',
         salary: '',
         newDesignation: '',
+        employeeIdCode: '',
+        department: '',
+        employmentType: 'Full-Time',
+        reportingManager: 'Development Head',
+        workLocation: 'Nashik',
+        currentSalary: '',
         content: ''
     });
 
@@ -284,7 +883,17 @@ const PayrollLetters = () => {
     const handleEmployeeSelect = (e) => {
         const empId = e.target.value;
         if (!empId) {
-            setLetterForm({ ...letterForm, employeeId: '', recipientName: '', recipientEmail: '', designation: '', salary: '' });
+            setLetterForm({
+                ...letterForm,
+                employeeId: '',
+                recipientName: '',
+                recipientEmail: '',
+                designation: '',
+                salary: '',
+                employeeIdCode: '',
+                department: '',
+                currentSalary: ''
+            });
             return;
         }
 
@@ -295,6 +904,8 @@ const PayrollLetters = () => {
                 return earnings.includes(curr) ? acc + (emp.salaryStructure[curr] || 0) : acc;
             }, 0);
 
+            const code = 'EMP' + emp._id.slice(-4).toUpperCase();
+
             setLetterForm({
                 ...letterForm,
                 employeeId: empId,
@@ -302,7 +913,10 @@ const PayrollLetters = () => {
                 recipientEmail: emp.email || '',
                 designation: emp.designation || '',
                 joiningDate: emp.joiningDate ? new Date(emp.joiningDate).toISOString().substring(0, 10) : '',
-                salary: gross || ''
+                salary: gross || '',
+                employeeIdCode: code,
+                department: emp.department || '',
+                currentSalary: gross || ''
             });
         }
     };
@@ -338,7 +952,13 @@ const PayrollLetters = () => {
                     joiningDate: letterForm.joiningDate,
                     relievingDate: letterForm.relievingDate,
                     salary: letterForm.salary,
-                    newDesignation: letterForm.newDesignation
+                    newDesignation: letterForm.newDesignation,
+                    employeeIdCode: letterForm.employeeIdCode,
+                    department: letterForm.department,
+                    employmentType: letterForm.employmentType,
+                    reportingManager: letterForm.reportingManager,
+                    workLocation: letterForm.workLocation,
+                    currentSalary: letterForm.currentSalary
                 }
             });
             toast.success('Letter generated and archived!');
@@ -368,25 +988,37 @@ const PayrollLetters = () => {
         });
     };
 
-    const handlePrintLetter = async (letter) => {
+    const handlePrintLetter = (letter) => {
         try {
             setPdfGeneratingId(letter._id);
-            const blob = await pdf(
-                <LetterPdfTemplate 
-                    letter={letter} 
-                    companySettings={companySettings} 
-                />
-            ).toBlob();
-            
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `Letter-${letter.recipientName.replace(/\s+/g, '_')}-${letter.type}.pdf`;
-            link.click();
-            URL.revokeObjectURL(url);
+            const htmlContent = buildProfessionalLetterHtml(letter, companySettings);
+            const printWindow = window.open('', '_blank');
+            if (printWindow) {
+                printWindow.document.write(htmlContent);
+                printWindow.document.close();
+                
+                printWindow.onload = () => {
+                    printWindow.focus();
+                    printWindow.print();
+                };
+                
+                // Fallback for immediate print trigger
+                setTimeout(() => {
+                    if (printWindow) {
+                        try {
+                            printWindow.focus();
+                            printWindow.print();
+                        } catch (e) {
+                            console.error(e);
+                        }
+                    }
+                }, 800);
+            } else {
+                toast.error('Pop-up blocker is active. Please allow pop-ups to print letters.');
+            }
         } catch (error) {
-            console.error('Failed to generate letter PDF', error);
-            toast.error('Failed to print letter PDF');
+            console.error('Failed to print letter HTML', error);
+            toast.error('Failed to print letter');
         } finally {
             setPdfGeneratingId(null);
         }
@@ -408,6 +1040,8 @@ const PayrollLetters = () => {
                         setLetterForm({
                             employeeId: '', type: 'offer', recipientName: '', recipientEmail: '',
                             designation: '', joiningDate: '', relievingDate: '', salary: '', newDesignation: '',
+                            employeeIdCode: '', department: '', employmentType: 'Full-Time',
+                            reportingManager: 'Development Head', workLocation: 'Nashik', currentSalary: '',
                             content: TEMPLATE_CONTENTS.offer
                         });
                         setIsCreateOpen(true);
@@ -490,7 +1124,7 @@ const PayrollLetters = () => {
                 maxWidth="max-w-4xl"
             >
                             <form onSubmit={handleCreateLetter} className="space-y-6">
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                                     <div>
                                         <label className={labelClass}>Link Existing Employee</label>
                                         <select
@@ -531,6 +1165,16 @@ const PayrollLetters = () => {
                                             placeholder="e.g. Ramesh Sharma"
                                         />
                                     </div>
+                                    <div>
+                                        <label className={labelClass}>Employee ID Code</label>
+                                        <input
+                                            type="text"
+                                            value={letterForm.employeeIdCode}
+                                            onChange={(e) => handleFormChange('employeeIdCode', e.target.value)}
+                                            className={inputClass}
+                                            placeholder="e.g. EMP001"
+                                        />
+                                    </div>
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -542,6 +1186,16 @@ const PayrollLetters = () => {
                                             onChange={(e) => handleFormChange('recipientEmail', e.target.value)}
                                             className={inputClass}
                                             placeholder="ramesh@company.com"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className={labelClass}>Department</label>
+                                        <input
+                                            type="text"
+                                            value={letterForm.department}
+                                            onChange={(e) => handleFormChange('department', e.target.value)}
+                                            className={inputClass}
+                                            placeholder="e.g. Development"
                                         />
                                     </div>
                                     <div>
@@ -564,18 +1218,42 @@ const PayrollLetters = () => {
                                             placeholder="e.g. Senior Associate"
                                         />
                                     </div>
-                                    <div>
-                                        <label className={labelClass}>Monthly Gross (Salary)</label>
-                                        <input
-                                            type="number"
-                                            value={letterForm.salary}
-                                            onChange={(e) => handleFormChange('salary', e.target.value)}
-                                            className={inputClass}
-                                        />
-                                    </div>
                                 </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                    <div>
+                                        <label className={labelClass}>Employment Type</label>
+                                        <select
+                                            value={letterForm.employmentType}
+                                            onChange={(e) => handleFormChange('employmentType', e.target.value)}
+                                            className={inputClass}
+                                        >
+                                            <option value="Full-Time">Full-Time</option>
+                                            <option value="Part-Time">Part-Time</option>
+                                            <option value="Internship">Internship</option>
+                                            <option value="Contract">Contract</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className={labelClass}>Reporting Manager</label>
+                                        <input
+                                            type="text"
+                                            value={letterForm.reportingManager}
+                                            onChange={(e) => handleFormChange('reportingManager', e.target.value)}
+                                            className={inputClass}
+                                            placeholder="e.g. Development Head"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className={labelClass}>Work Location</label>
+                                        <input
+                                            type="text"
+                                            value={letterForm.workLocation}
+                                            onChange={(e) => handleFormChange('workLocation', e.target.value)}
+                                            className={inputClass}
+                                            placeholder="e.g. Nashik"
+                                        />
+                                    </div>
                                     <div>
                                         <label className={labelClass}>Date of Joining / Revision Date</label>
                                         <input
@@ -585,6 +1263,9 @@ const PayrollLetters = () => {
                                             className={inputClass}
                                         />
                                     </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <div>
                                         <label className={labelClass}>Relieving Date</label>
                                         <input
@@ -592,6 +1273,26 @@ const PayrollLetters = () => {
                                             value={letterForm.relievingDate}
                                             onChange={(e) => handleFormChange('relievingDate', e.target.value)}
                                             className={inputClass}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className={labelClass}>Current Gross (Salary)</label>
+                                        <input
+                                            type="number"
+                                            value={letterForm.currentSalary}
+                                            onChange={(e) => handleFormChange('currentSalary', e.target.value)}
+                                            className={inputClass}
+                                            placeholder="e.g. 25000"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className={labelClass}>Proposed Monthly Gross (Salary)</label>
+                                        <input
+                                            type="number"
+                                            value={letterForm.salary}
+                                            onChange={(e) => handleFormChange('salary', e.target.value)}
+                                            className={inputClass}
+                                            placeholder="e.g. 28873"
                                         />
                                     </div>
                                 </div>

@@ -104,4 +104,10 @@ router.get('/masters/teams', protect, csmMasterController.serviceTeams.getAll);
 router.put('/masters/teams/:id', protect, csmMasterController.serviceTeams.update);
 router.delete('/masters/teams/:id', protect, csmMasterController.serviceTeams.delete);
 
+// Engineers
+router.post('/masters/engineers', protect, csmMasterController.engineers.create);
+router.get('/masters/engineers', protect, csmMasterController.engineers.getAll);
+router.put('/masters/engineers/:id', protect, csmMasterController.engineers.update);
+router.delete('/masters/engineers/:id', protect, csmMasterController.engineers.delete);
+
 module.exports = router;

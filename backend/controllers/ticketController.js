@@ -66,38 +66,50 @@ exports.createTicket = async (req, res) => {
             ticketBody.contactEmail = contact.email || '';
         }
 
-        // Auto-Assignment Logic: Pincode > Territory > Salesperson
-        let assignedSalespersonId = null;
+        // Auto-Assignment Logic: Pincode > Engineer OR Pincode > Territory > Engineer
+        let assignedEngineerId = null;
         const Territory = require('../models/Territory');
-        const Salesperson = require('../models/Salesperson');
+        const Engineer = require('../models/Engineer');
         
-        console.log(`[DEBUG Auto-Assign] Starting lookup for pincode: "${cleanPincode}" under companyId: "${companyId}"`);
+        console.log(`[DEBUG Auto-Assign Engineer] Starting lookup for pincode: "${cleanPincode}" under companyId: "${companyId}"`);
         
-        // 1. Match pincode to Territory
-        const territory = await Territory.findOne({
+        // 1. Try direct matching: find active engineer who has this pincode directly assigned
+        let matchedEngineer = await Engineer.findOne({
             companyId,
-            'rules.pincodes': cleanPincode
+            pincodes: cleanPincode,
+            status: 'Active'
         }).lean();
         
-        console.log('[DEBUG Auto-Assign] Matched Territory:', territory ? `${territory.name} (${territory._id})` : 'NONE');
-        
-        if (territory) {
-            // 2. Find Salesperson assigned to this territory
-            const salesperson = await Salesperson.findOne({
-                territoryId: territory._id,
-                status: 'Active'
+        if (matchedEngineer) {
+            console.log(`[DEBUG Auto-Assign Engineer] Matched Engineer directly: "${matchedEngineer.name}" (${matchedEngineer._id})`);
+            assignedEngineerId = matchedEngineer._id;
+        } else {
+            // 2. Fallback matching: find territory that matches pincode, then active engineer assigned to that territory
+            const territory = await Territory.findOne({
+                companyId,
+                'rules.pincodes': cleanPincode
             }).lean();
             
-            console.log('[DEBUG Auto-Assign] Matched Salesperson:', salesperson ? `${salesperson.name} (${salesperson._id})` : 'NONE');
+            console.log('[DEBUG Auto-Assign Engineer] Matched Territory:', territory ? `${territory.name} (${territory._id})` : 'NONE');
             
-            if (salesperson) {
-                assignedSalespersonId = salesperson._id;
+            if (territory) {
+                matchedEngineer = await Engineer.findOne({
+                    companyId,
+                    territoryId: territory._id,
+                    status: 'Active'
+                }).lean();
+                
+                console.log('[DEBUG Auto-Assign Engineer] Matched Engineer by Territory:', matchedEngineer ? `${matchedEngineer.name} (${matchedEngineer._id})` : 'NONE');
+                
+                if (matchedEngineer) {
+                    assignedEngineerId = matchedEngineer._id;
+                }
             }
         }
 
         const timelineEntry = {
             activityType: 'Created',
-            description: `Ticket created via ${ticketBody.source || 'Web Portal'}` + (assignedSalespersonId ? ' & Auto-assigned to Salesperson' : ''),
+            description: `Ticket created via ${ticketBody.source || 'Web Portal'}` + (assignedEngineerId ? ' & Auto-assigned to Engineer' : ''),
             performedBy: req.user?.id
         };
 
@@ -106,7 +118,9 @@ exports.createTicket = async (req, res) => {
             ticketNo,
             companyId,
             pincode: cleanPincode,
-            assignedSalespersonId,
+            assignedSalespersonId: null, // Stop salesperson auto-assignment
+            assignedEngineerId,
+            status: ticketBody.status || (assignedEngineerId ? 'Assigned' : 'Open'),
             slaResponseDue: responseDue,
             slaResolutionDue: resolutionDue,
             timeline: [timelineEntry]
@@ -181,7 +195,7 @@ exports.getTickets = async (req, res) => {
                 .populate('typeId', 'name')
                 .populate('priorityId', 'name color')
                 .populate('assignedTeamId', 'name')
-                .populate('assignedEngineerId', 'name email')
+                .populate('assignedEngineerId', 'name email mobile')
                 .populate('productId', 'productName productCode')
                 .populate('assetId', 'serialNumber')
                 .populate('assignedSalespersonId', 'name email mobile')
@@ -226,7 +240,7 @@ exports.getTicketById = async (req, res) => {
             .populate('typeId')
             .populate('priorityId')
             .populate('assignedTeamId')
-            .populate('assignedEngineerId', 'name email role')
+            .populate('assignedEngineerId', 'name email mobile status')
             .populate('assignedSalespersonId')
             .populate('timeline.performedBy', 'name email role')
             .lean();
@@ -262,32 +276,50 @@ exports.updateTicket = async (req, res) => {
             ticketBody.pincode = String(ticketBody.pincode).trim();
 
             const Territory = require('../models/Territory');
-            const Salesperson = require('../models/Salesperson');
+            const Engineer = require('../models/Engineer');
             console.log(`[DEBUG Auto-Assign Update] Starting lookup for pincode: "${ticketBody.pincode}" under companyId: "${companyId}"`);
             
-            const territory = await Territory.findOne({
+            let assignedEngineerId = null;
+            
+            // 1. Direct match
+            let matchedEngineer = await Engineer.findOne({
                 companyId,
-                'rules.pincodes': ticketBody.pincode
+                pincodes: ticketBody.pincode,
+                status: 'Active'
             }).lean();
-
-            console.log('[DEBUG Auto-Assign Update] Matched Territory:', territory ? `${territory.name} (${territory._id})` : 'NONE');
-
-            if (territory) {
-                const salesperson = await Salesperson.findOne({
-                    territoryId: territory._id,
-                    status: 'Active'
-                }).lean();
-                
-                console.log('[DEBUG Auto-Assign Update] Matched Salesperson:', salesperson ? `${salesperson.name} (${salesperson._id})` : 'NONE');
-                
-                if (salesperson) {
-                    ticketBody.assignedSalespersonId = salesperson._id;
-                } else {
-                    ticketBody.assignedSalespersonId = null;
-                }
+            
+            if (matchedEngineer) {
+                console.log(`[DEBUG Auto-Assign Update] Matched Engineer directly: "${matchedEngineer.name}" (${matchedEngineer._id})`);
+                assignedEngineerId = matchedEngineer._id;
             } else {
-                ticketBody.assignedSalespersonId = null;
+                // 2. Fallback match to territory
+                const territory = await Territory.findOne({
+                    companyId,
+                    'rules.pincodes': ticketBody.pincode
+                }).lean();
+
+                console.log('[DEBUG Auto-Assign Update] Matched Territory:', territory ? `${territory.name} (${territory._id})` : 'NONE');
+
+                if (territory) {
+                    matchedEngineer = await Engineer.findOne({
+                        companyId,
+                        territoryId: territory._id,
+                        status: 'Active'
+                    }).lean();
+                    
+                    console.log('[DEBUG Auto-Assign Update] Matched Engineer by Territory:', matchedEngineer ? `${matchedEngineer.name} (${matchedEngineer._id})` : 'NONE');
+                    
+                    if (matchedEngineer) {
+                        assignedEngineerId = matchedEngineer._id;
+                    }
+                }
             }
+            
+            ticketBody.assignedEngineerId = assignedEngineerId;
+            if (assignedEngineerId) {
+                ticketBody.status = 'Assigned';
+            }
+            ticketBody.assignedSalespersonId = null; // Salesperson is not auto-assigned
         }
 
         const ticket = await Ticket.findOneAndUpdate(
@@ -319,7 +351,8 @@ exports.assignTicket = async (req, res) => {
 
         let desc = 'Ticket reassigned';
         if (assignedEngineerId) {
-            const eng = await User.findById(assignedEngineerId).select('name').lean();
+            const Engineer = require('../models/Engineer');
+            const eng = await Engineer.findById(assignedEngineerId).select('name').lean();
             desc = `Ticket assigned to engineer: ${eng?.name || 'Unknown'}`;
         } else if (assignedTeamId) {
             desc = `Ticket assigned to team`;
