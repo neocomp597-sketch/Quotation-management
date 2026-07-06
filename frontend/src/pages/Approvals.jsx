@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { quotationService } from '../services/api';
 import { toast } from 'react-toastify';
 import { MdCheck, MdClose, MdLockOpen, MdLock } from 'react-icons/md';
+import { useSubmitGuard } from '../hooks/useSubmitGuard';
 
 const Approvals = () => {
     const [pendingQuotes, setPendingQuotes] = useState([]);
@@ -24,7 +25,7 @@ const Approvals = () => {
         }
     };
 
-    const handleApprove = async (id, quotationNo) => {
+    const { isSubmitting: isApproving, execute: handleApprove } = useSubmitGuard(async (id, quotationNo) => {
         try {
             await quotationService.updateStatus(id, 'final');
             toast.success(`Quotation ${quotationNo} has been approved and finalized!`);
@@ -32,9 +33,9 @@ const Approvals = () => {
         } catch (err) {
             toast.error("Failed to approve quotation");
         }
-    };
+    });
 
-    const handleReject = async (id, quotationNo) => {
+    const { isSubmitting: isRejecting, execute: handleReject } = useSubmitGuard(async (id, quotationNo) => {
         try {
             await quotationService.updateStatus(id, 'draft');
             toast.info(`Quotation ${quotationNo} rejected and returned to draft.`);
@@ -42,7 +43,7 @@ const Approvals = () => {
         } catch (err) {
             toast.error("Failed to reject quotation");
         }
-    };
+    });
 
     return (
         <div className="space-y-6">
@@ -89,20 +90,22 @@ const Approvals = () => {
                                     </div>
                                 </div>
 
-                                <div className="flex gap-2 w-full md:w-auto border-t md:border-none pt-4 md:pt-0">
+                                 <div className="flex gap-2 w-full md:w-auto border-t md:border-none pt-4 md:pt-0">
                                     <button
                                         onClick={() => handleReject(quote._id, quote.quotationNo)}
-                                        className="flex-1 md:flex-none flex items-center justify-center gap-1 border border-slate-200 hover:bg-slate-50 text-slate-500 font-bold text-xs uppercase tracking-wider px-5 py-2.5 rounded-xl transition-all"
+                                        disabled={isApproving || isRejecting}
+                                        className="flex-1 md:flex-none flex items-center justify-center gap-1 border border-slate-200 hover:bg-slate-50 text-slate-500 font-bold text-xs uppercase tracking-wider px-5 py-2.5 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         <MdClose size={18} />
-                                        Reject
+                                        {isRejecting ? 'Rejecting...' : 'Reject'}
                                     </button>
                                     <button
                                         onClick={() => handleApprove(quote._id, quote.quotationNo)}
-                                        className="flex-1 md:flex-none flex items-center justify-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider px-5 py-2.5 rounded-xl transition-all shadow-lg shadow-emerald-600/10"
+                                        disabled={isApproving || isRejecting}
+                                        className="flex-1 md:flex-none flex items-center justify-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider px-5 py-2.5 rounded-xl transition-all shadow-lg shadow-emerald-600/10 disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         <MdCheck size={18} />
-                                        Approve Override
+                                        {isApproving ? 'Approving...' : 'Approve Override'}
                                     </button>
                                 </div>
                             </div>

@@ -907,18 +907,28 @@ const CreateQuotation = () => {
 
         try {
             if (isEditMode) {
-                await quotationService.update(id, quotationData);
+                const res = await quotationService.update(id, quotationData);
                 setSaveSuccess(true);
-                toast.success('Quotation updated successfully!');
+                const savedStatus = res.data?.status || res.data?.data?.status;
+                if (savedStatus === 'pending_approval') {
+                    toast.warning('Quotation updated and submitted for approval.');
+                } else {
+                    toast.success('Quotation updated successfully!');
+                }
             } else {
-                await quotationService.create(quotationData);
+                const res = await quotationService.create(quotationData);
                 // Clean up drafts on success
                 localStorage.removeItem(localDraftKey);
                 dispatch(clearQuotationDraft());
                 await quotationService.deleteDraft(draftKey).catch(() => {});
                 clearOfflineQueue();
                 setSaveSuccess(true);
-                toast.success('Quotation created successfully!');
+                const savedStatus = res.data?.status || res.data?.data?.status;
+                if (savedStatus === 'pending_approval') {
+                    toast.warning('Quotation created and submitted for approval.');
+                } else {
+                    toast.success('Quotation created successfully!');
+                }
             }
             const duration = performance.now() - startTime;
             console.info(`[Observability] Quotation save completed in ${duration.toFixed(2)}ms`);

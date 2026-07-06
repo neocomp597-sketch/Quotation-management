@@ -449,6 +449,19 @@ const createQuotation = async (req, res) => {
             req.body.currency || 'INR'
         );
 
+        const customerState = customer.billingAddress?.state || '';
+        const itemDiscountTotal = calculateTotalDiscount(normalizedItems);
+        const totalDiscount = typeof requestedTotalDiscount !== 'undefined'
+            ? Number(requestedTotalDiscount)
+            : itemDiscountTotal;
+        const additionalDiscount = Math.max(0, totalDiscount - itemDiscountTotal);
+
+        const subtotal = calculateSubtotal(normalizedItems);
+        const gstBreakup = calculateGST(normalizedItems, customerState);
+        const tempGrandTotal = Math.max(0, calculateGrandTotal(normalizedItems) - additionalDiscount);
+        const roundedGrandTotal = Math.round(tempGrandTotal);
+        const roundOff = Number((roundedGrandTotal - tempGrandTotal).toFixed(2));
+
         // Margin Protection Engine
         let requiresApproval = false;
         let minMargin = 100;
@@ -467,9 +480,21 @@ const createQuotation = async (req, res) => {
             requiresApproval = true;
         }
 
+        // High-Value Threshold Check (> ₹10 Lakhs)
+        if (roundedGrandTotal > 1000000) {
+            requiresApproval = true;
+        }
+
+        const userRole = String(req.user?.role || '').toLowerCase();
+        const isApprover = ['admin', 'manager', 'super_admin', 'superadmin'].includes(userRole);
+
         let finalStatus = status || 'draft';
         if (requiresApproval && finalStatus !== 'draft') {
-            finalStatus = 'pending_approval';
+            if (isApprover) {
+                finalStatus = 'final';
+            } else {
+                finalStatus = 'pending_approval';
+            }
         }
 
         const year = new Date().getFullYear();
@@ -484,19 +509,6 @@ const createQuotation = async (req, res) => {
             quotationNo,
             quotationNumber: quotationNo,
         });
-
-        const customerState = customer.billingAddress?.state || '';
-        const itemDiscountTotal = calculateTotalDiscount(normalizedItems);
-        const totalDiscount = typeof requestedTotalDiscount !== 'undefined'
-            ? Number(requestedTotalDiscount)
-            : itemDiscountTotal;
-        const additionalDiscount = Math.max(0, totalDiscount - itemDiscountTotal);
-
-        const subtotal = calculateSubtotal(normalizedItems);
-        const gstBreakup = calculateGST(normalizedItems, customerState);
-        const tempGrandTotal = Math.max(0, calculateGrandTotal(normalizedItems) - additionalDiscount);
-        const roundedGrandTotal = Math.round(tempGrandTotal);
-        const roundOff = Number((roundedGrandTotal - tempGrandTotal).toFixed(2));
 
         const newQuotation = new Quotation({
             quotationNo,
@@ -625,6 +637,20 @@ const updateQuotation = async (req, res) => {
             req.body.currency || 'INR'
         );
 
+        const customerState = customer.billingAddress?.state || '';
+
+        const itemDiscountTotal = calculateTotalDiscount(normalizedItems);
+        const totalDiscount = typeof requestedTotalDiscount !== 'undefined'
+            ? Number(requestedTotalDiscount)
+            : itemDiscountTotal;
+        const additionalDiscount = Math.max(0, totalDiscount - itemDiscountTotal);
+
+        const subtotal = calculateSubtotal(normalizedItems);
+        const gstBreakup = calculateGST(normalizedItems, customerState);
+        const tempGrandTotal = Math.max(0, calculateGrandTotal(normalizedItems) - additionalDiscount);
+        const roundedGrandTotal = Math.round(tempGrandTotal);
+        const roundOff = Number((roundedGrandTotal - tempGrandTotal).toFixed(2));
+
         // Margin Protection Engine
         let requiresApproval = false;
         let minMargin = 100;
@@ -643,24 +669,22 @@ const updateQuotation = async (req, res) => {
             requiresApproval = true;
         }
 
-        let finalStatus = status || 'draft';
-        if (requiresApproval && finalStatus !== 'draft') {
-            finalStatus = 'pending_approval';
+        // High-Value Threshold Check (> ₹10 Lakhs)
+        if (roundedGrandTotal > 1000000) {
+            requiresApproval = true;
         }
 
-        const customerState = customer.billingAddress?.state || '';
+        const userRole = String(req.user?.role || '').toLowerCase();
+        const isApprover = ['admin', 'manager', 'super_admin', 'superadmin'].includes(userRole);
 
-        const itemDiscountTotal = calculateTotalDiscount(normalizedItems);
-        const totalDiscount = typeof requestedTotalDiscount !== 'undefined'
-            ? Number(requestedTotalDiscount)
-            : itemDiscountTotal;
-        const additionalDiscount = Math.max(0, totalDiscount - itemDiscountTotal);
-
-        const subtotal = calculateSubtotal(normalizedItems);
-        const gstBreakup = calculateGST(normalizedItems, customerState);
-        const tempGrandTotal = Math.max(0, calculateGrandTotal(normalizedItems) - additionalDiscount);
-        const roundedGrandTotal = Math.round(tempGrandTotal);
-        const roundOff = Number((roundedGrandTotal - tempGrandTotal).toFixed(2));
+        let finalStatus = status || 'draft';
+        if (requiresApproval && finalStatus !== 'draft') {
+            if (isApprover) {
+                finalStatus = 'final';
+            } else {
+                finalStatus = 'pending_approval';
+            }
+        }
 
         const updatedQuotation = await Quotation.findByIdAndUpdate(id, {
             ...refUpdates,
@@ -746,6 +770,17 @@ const updateStatus = async (req, res) => {
         if (!quotation) return res.status(404).json({ message: 'Quotation not found' });
 
         const oldStatus = quotation.status;
+
+        // If quotation is pending approval, check if current user is manager or admin
+        const userRole = String(req.user?.role || '').toLowerCase();
+        const isApprover = ['admin', 'manager', 'super_admin', 'superadmin'].includes(userRole);
+
+        if (oldStatus === 'pending_approval') {
+            if (!isApprover) {
+                return res.status(403).json({ message: 'Only a Manager or Admin can approve/reject quotations requiring clearance.' });
+            }
+        }
+
         quotation.status = status;
         await quotation.save();
         await clearQuotationDashboardCache();
@@ -778,16 +813,52 @@ const finalizeQuotation = async (req, res) => {
             return res.status(400).json({ message: 'Only draft quotations can be finalized' });
         }
 
-        quotation.status = 'final';
+        // Run validation checks
+        let requiresApproval = false;
+        let minMargin = 100;
+        quotation.items.forEach(item => {
+            const cost = item.productSnapshot?.baseCost || 0;
+            const rate = item.rate || item.unitPrice || 0;
+            if (rate > 0) {
+                const margin = ((rate - cost) / rate) * 100;
+                if (margin < minMargin) minMargin = margin;
+            }
+        });
+
+        if (minMargin < 0) {
+            return res.status(400).json({ message: "Margin is negative. Quote finalization blocked." });
+        } else if (minMargin < 10) {
+            requiresApproval = true;
+        }
+
+        if (quotation.grandTotal > 1000000) {
+            requiresApproval = true;
+        }
+
+        const userRole = String(req.user?.role || '').toLowerCase();
+        const isApprover = ['admin', 'manager', 'super_admin', 'superadmin'].includes(userRole);
+
+        let targetStatus = 'final';
+        let messageText = `Quotation ${quotation.quotationNo} for ${quotation.customerName} has been finalized by ${req.user?.name || 'a user'}.`;
+        
+        if (requiresApproval) {
+            if (isApprover) {
+                targetStatus = 'final';
+            } else {
+                targetStatus = 'pending_approval';
+                messageText = `Quotation ${quotation.quotationNo} for ${quotation.customerName} has been submitted for approval by ${req.user?.name || 'a user'} as it is high-value or low-margin.`;
+            }
+        }
+
+        quotation.status = targetStatus;
         await quotation.save();
         await clearQuotationDashboardCache();
 
         // Trigger notification
-        const updaterName = req.user?.name || 'A user';
         await createCompanyNotifications({
             companyId: req.user?.companyId,
-            title: 'Quotation Finalized',
-            message: `Quotation ${quotation.quotationNo} for ${quotation.customerName} has been finalized by ${updaterName}.`,
+            title: targetStatus === 'pending_approval' ? 'Quotation Pending Approval' : 'Quotation Finalized',
+            message: messageText,
             type: 'Quotation',
             relatedId: quotation._id,
             excludeUserId: req.user?.id
