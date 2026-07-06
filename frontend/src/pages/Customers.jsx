@@ -8,6 +8,7 @@ import ImportModal from '../components/ImportModal';
 import PaginationControls from '../components/PaginationControls';
 import { resolveImageUrl } from '../utils/helpers';
 import CustomerPricingDashboard from './CustomerPricingDashboard';
+import { useSubmitGuard } from '../hooks/useSubmitGuard';
 
 const LIST_PAGE_SIZE = 20;
 
@@ -21,7 +22,6 @@ const Customers = () => {
     const [pagination, setPagination] = useState({ page: 1, limit: LIST_PAGE_SIZE, total: 0, pages: 1 });
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingCustomer, setEditingCustomer] = useState(null);
-    const [isSaving, setIsSaving] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [territories, setTerritories] = useState([]);
@@ -165,9 +165,8 @@ const Customers = () => {
         }
     };
 
-    const handleSubmit = async (e) => {
+    const { isSubmitting: isSaving, execute: handleSubmit } = useSubmitGuard(async (e) => {
         e?.preventDefault?.();
-        if (isSaving) return;
 
         // Validate required fields
         if (!formData.companyName?.trim()) {
@@ -179,7 +178,6 @@ const Customers = () => {
             return;
         }
 
-        setIsSaving(true);
         try {
             const payload = {
                 ...formData,
@@ -197,10 +195,8 @@ const Customers = () => {
         } catch (err) {
             console.error("Error saving customer:", err);
             toast.error(err.response?.data?.message || 'Error saving customer data');
-        } finally {
-            setIsSaving(false);
         }
-    };
+    });
 
     const handleDelete = async (id) => {
         if (window.confirm("Are you sure you want to delete this customer?")) {

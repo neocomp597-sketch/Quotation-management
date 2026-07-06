@@ -93,11 +93,18 @@ exports.createTicket = async (req, res) => {
             console.log('[DEBUG Auto-Assign Engineer] Matched Territory:', territory ? `${territory.name} (${territory._id})` : 'NONE');
             
             if (territory) {
-                matchedEngineer = await Engineer.findOne({
-                    companyId,
-                    territoryId: territory._id,
-                    status: 'Active'
-                }).lean();
+                if (territory.engineerId) {
+                    matchedEngineer = await Engineer.findOne({
+                        _id: territory.engineerId,
+                        status: 'Active'
+                    }).lean();
+                } else {
+                    matchedEngineer = await Engineer.findOne({
+                        companyId,
+                        territoryId: territory._id,
+                        status: 'Active'
+                    }).lean();
+                }
                 
                 console.log('[DEBUG Auto-Assign Engineer] Matched Engineer by Territory:', matchedEngineer ? `${matchedEngineer.name} (${matchedEngineer._id})` : 'NONE');
                 

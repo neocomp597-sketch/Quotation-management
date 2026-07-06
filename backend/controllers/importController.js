@@ -448,6 +448,30 @@ const importCustomers = async (req, res) => {
             errors: []
         };
 
+        const companyId = req.user?.companyId;
+
+        // Fetch all existing customers of the company for in-memory matching
+        const existingCustomers = await Customer.find({ companyId }).lean();
+        
+        const externalCodeMap = new Map();
+        const gstinMap = new Map();
+        const nameMap = new Map();
+
+        existingCustomers.forEach(cust => {
+            if (cust.externalCode) {
+                externalCodeMap.set(cust.externalCode.trim().toLowerCase(), cust);
+            }
+            if (cust.gstin) {
+                gstinMap.set(cust.gstin.trim().toLowerCase(), cust);
+            }
+            if (cust.companyName && cust.customerName) {
+                const key = `${cust.companyName.trim().toLowerCase()}|${cust.customerName.trim().toLowerCase()}`;
+                nameMap.set(key, cust);
+            }
+        });
+
+        const bulkOps = [];
+
         for (let i = 0; i < data.length; i++) {
             const row = data[i];
             try {
@@ -491,7 +515,7 @@ const importCustomers = async (req, res) => {
                         state: pickFirstNonEmpty(row['Shipping State'], row['State'], row['Ship-to State'], row['BP State']),
                         pincode: pickFirstNonEmpty(row['Shipping Pincode'], row['Pincode'], row['Ship-to Zip Code'], row['Zip Code'])
                     },
-                    companyId: req.user?.companyId,
+                    companyId: companyId,
                     createdBy: req.user ? req.user.id : null
                 };
 
@@ -499,38 +523,50 @@ const importCustomers = async (req, res) => {
                     throw new Error('Missing required fields: Customer Name or Company Name');
                 }
 
+                // Check for matches in memory
                 let existing = null;
                 if (customerData.externalCode) {
-                    existing = await Customer.findOne({
-                        externalCode: buildExactRegex(customerData.externalCode)
-                    });
+                    existing = externalCodeMap.get(customerData.externalCode.trim().toLowerCase());
                 }
 
                 if (!existing && customerData.gstin) {
-                    existing = await Customer.findOne({ gstin: customerData.gstin });
+                    existing = gstinMap.get(customerData.gstin.trim().toLowerCase());
                 }
 
-                if (!existing) {
-                    existing = await Customer.findOne({
-                        companyName: customerData.companyName,
-                        customerName: customerData.customerName
-                    });
+                if (!existing && customerData.companyName && customerData.customerName) {
+                    const key = `${customerData.companyName.trim().toLowerCase()}|${customerData.customerName.trim().toLowerCase()}`;
+                    existing = nameMap.get(key);
                 }
 
                 if (existing) {
-                    await Customer.findByIdAndUpdate(existing._id, {
-                        ...customerData,
-                        createdBy: req.user?.id || existing.createdBy || null
+                    bulkOps.push({
+                        updateOne: {
+                            filter: { _id: existing._id },
+                            update: {
+                                $set: {
+                                    ...customerData,
+                                    createdBy: req.user?.id || existing.createdBy || null
+                                }
+                            }
+                        }
                     });
                     results.updated++;
                 } else {
-                    await Customer.create(customerData);
+                    bulkOps.push({
+                        insertOne: {
+                            document: customerData
+                        }
+                    });
                     results.created++;
                 }
             } catch (err) {
                 results.failed++;
                 results.errors.push(`Row ${i + 2}: ${err.message}`);
             }
+        }
+
+        if (bulkOps.length > 0) {
+            await Customer.bulkWrite(bulkOps, { ordered: false });
         }
 
         await invalidateCustomerCaches();

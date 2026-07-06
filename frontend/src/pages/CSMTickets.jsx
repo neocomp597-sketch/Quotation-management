@@ -8,6 +8,7 @@ import PaginationControls from '../components/PaginationControls';
 import PortalDropdown from '../components/PortalDropdown';
 import Modal from '../components/Modal';
 import SearchableSelect from '../components/SearchableSelect';
+import { useSubmitGuard } from '../hooks/useSubmitGuard';
 
 const statusStyles = {
     'Open': 'bg-emerald-50 text-emerald-600 border-emerald-200',
@@ -553,7 +554,7 @@ const CSMTickets = () => {
         }));
     };
 
-    const handleCreateTicket = async (e) => {
+    const { isSubmitting: isSavingTicket, execute: handleCreateTicket } = useSubmitGuard(async (e) => {
         e.preventDefault();
 
         // Validation checks
@@ -620,7 +621,7 @@ const CSMTickets = () => {
         } catch (error) {
             toast.error(error.response?.data?.message || 'Error generating ticket');
         }
-    };
+    });
 
     const handleImageUpload = async (key, file) => {
         if (!file) return;
@@ -642,13 +643,12 @@ const CSMTickets = () => {
         }
     };
 
-    const handleCreateManualTicket = async (e) => {
+    const { isSubmitting: isSavingManualTicket, execute: handleCreateManualTicket } = useSubmitGuard(async (e) => {
         e.preventDefault();
         if (!manualFormData.pincode || !manualFormData.pincode.trim()) {
             toast.error('Pincode is required');
             return;
         }
-        setLoading(true);
         try {
             // 1. Resolve Customer
             let customerId = '';
@@ -658,7 +658,6 @@ const CSMTickets = () => {
                 const normCustName = manualFormData.customerName.trim();
                 if (!normCustName) {
                     toast.error('Customer Name is required');
-                    setLoading(false);
                     return;
                 }
 
@@ -826,10 +825,8 @@ const CSMTickets = () => {
         } catch (error) {
             console.error('Error registering manual ticket:', error);
             toast.error(error.response?.data?.message || 'Failed to register manual ticket');
-        } finally {
-            setLoading(false);
         }
-    };
+    });
 
     const handleOpenManualViewModal = (ticket) => {
         setSelectedManualTicket(ticket);
@@ -1559,9 +1556,10 @@ const CSMTickets = () => {
                         <button
                             type="submit"
                             form="create-ticket-form"
-                            className="w-full md:w-auto px-6 py-3.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-primary-600/10"
+                            disabled={isSavingTicket}
+                            className="w-full md:w-auto px-6 py-3.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-primary-600/10 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            Raise Ticket
+                            {isSavingTicket ? 'Raising...' : 'Raise Ticket'}
                         </button>
                     </>
                 }
@@ -2312,10 +2310,10 @@ const CSMTickets = () => {
                         <button
                             type="submit"
                             form="manual-ticket-form"
-                            disabled={loading}
-                            className="w-full md:w-auto px-6 py-3.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-primary-600/10 disabled:opacity-50"
+                            disabled={isSavingManualTicket}
+                            className="w-full md:w-auto px-6 py-3.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-primary-600/10 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            {loading ? 'Registering...' : 'Raise Ticket'}
+                            {isSavingManualTicket ? 'Registering...' : 'Raise Ticket'}
                         </button>
                     </>
                 }

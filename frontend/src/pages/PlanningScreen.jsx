@@ -30,6 +30,7 @@ import ImportModal from "../components/ImportModal";
 import PortalDropdown from "../components/PortalDropdown";
 import { formatToLakhs, formatToIndian } from "../utils/formatters";
 import { useAuth } from "../context/AuthContext";
+import { useSubmitGuard } from "../hooks/useSubmitGuard";
 
 // Financial year months (Apr-Mar)
 const FY_MONTHS = [
@@ -1063,7 +1064,7 @@ const PlanningScreen = () => {
     );
   }, [statusOptions, statusSearch]);
 
-  const handleSaveEntry = async () => {
+  const { isSubmitting: isSavingEntry, execute: handleSaveEntry } = useSubmitGuard(async () => {
     // Validate entry month selection
     if (!newRow.monthYear) {
       toast.error("⚠️ Please select a Month for the entry");
@@ -1127,7 +1128,7 @@ const PlanningScreen = () => {
         (editingId ? "Failed to update entry" : "Failed to add entry"),
       );
     }
-  };
+  });
 
   const handleEditEntry = (entry) => {
     setEditingId(entry._id);
@@ -2024,10 +2025,20 @@ const PlanningScreen = () => {
                       <div className="flex items-center gap-2">
                         <button
                           onClick={handleSaveEntry}
-                          className={`flex-1 inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-white text-xs font-bold transition-colors ${editingId ? "bg-blue-600 hover:bg-blue-700" : "bg-emerald-600 hover:bg-emerald-700"}`}
+                          disabled={isSavingEntry}
+                          className={`flex-1 inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-white text-xs font-bold transition-colors ${isSavingEntry ? "bg-slate-400 cursor-not-allowed" : (editingId ? "bg-blue-600 hover:bg-blue-700" : "bg-emerald-600 hover:bg-emerald-700")}`}
                         >
-                          <MdSave size={16} />
-                          {editingId ? "Update" : "Save"}
+                          {isSavingEntry ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                              Saving...
+                            </>
+                          ) : (
+                            <>
+                              <MdSave size={16} />
+                              {editingId ? "Update" : "Save"}
+                            </>
+                          )}
                         </button>
                         {editingId && (
                           <button

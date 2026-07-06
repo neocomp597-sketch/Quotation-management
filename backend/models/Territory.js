@@ -17,6 +17,7 @@ const TerritorySchema = new mongoose.Schema({
     mgr4: { type: mongoose.Schema.Types.ObjectId, ref: 'MGR' },
     mgr5: { type: mongoose.Schema.Types.ObjectId, ref: 'MGR' },
     salesReps: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    engineerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Engineer', default: null },
     rules: {
         cities: [{ type: String }],
         pincodes: [{ type: String }]

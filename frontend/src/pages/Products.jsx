@@ -8,6 +8,7 @@ import Modal from '../components/Modal';
 import ImportModal from '../components/ImportModal';
 import PaginationControls from '../components/PaginationControls';
 import { resolveImageUrl, getPlaceholderImage } from '../utils/helpers';
+import { useSubmitGuard } from '../hooks/useSubmitGuard';
 
 const LIST_PAGE_SIZE = 20;
 
@@ -307,7 +308,7 @@ const Products = ({ initialTab = 'products' }) => {
         }
     };
 
-    const handleSubmit = async (e) => {
+    const { isSubmitting: isSaving, execute: handleSubmit } = useSubmitGuard(async (e) => {
         e.preventDefault();
 
         // Validate required fields
@@ -413,7 +414,7 @@ const Products = ({ initialTab = 'products' }) => {
             console.error("Error saving product:", err);
             toast.error(err.response?.data?.message || 'Error saving product data');
         }
-    };
+    });
 
     const handleDelete = async (id) => {
         if (window.confirm("Are you sure you want to delete this product?")) {
@@ -1159,9 +1160,10 @@ const Products = ({ initialTab = 'products' }) => {
                         </button>
                         <button
                             onClick={handleSubmit}
-                            className="bg-primary-600 hover:bg-primary-700 text-white px-10 py-3.5 rounded-2xl font-black transition-all shadow-xl shadow-primary-600/20 uppercase text-[10px] tracking-widest active:scale-95"
+                            disabled={isSaving}
+                            className="bg-primary-600 hover:bg-primary-700 text-white px-10 py-3.5 rounded-2xl font-black transition-all shadow-xl shadow-primary-600/20 uppercase text-[10px] tracking-widest active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100"
                         >
-                            {editingProduct ? "Update Product" : "Enlist Product"}
+                            {isSaving ? "Saving..." : editingProduct ? "Update Product" : "Enlist Product"}
                         </button>
                     </>
                 }

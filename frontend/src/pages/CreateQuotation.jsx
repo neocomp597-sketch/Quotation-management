@@ -7,6 +7,7 @@ import { customerService, productService, quotationService, termsService, salesp
 import { calculateLineItem, resolveImageUrl, getPlaceholderImage } from '../utils/helpers';
 import Modal from '../components/Modal';
 import { clearQuotationDraft, setAutosaveStatus, setQuotationDraft } from '../store/quotationDraftSlice';
+import { useSubmitGuard } from '../hooks/useSubmitGuard';
 
 // Skeleton loader for product rows
 const SkeletonRow = () => (
@@ -253,7 +254,6 @@ const CreateQuotation = () => {
     const lastSavedAt = useSelector((state) => state.quotationDraft.lastSavedAt);
     const draftKey = isEditMode ? `edit-${id}` : 'new';
     const localDraftKey = `quotation-draft:${draftKey}`;
-    const submitLockRef = useRef(false);
     const clientRequestIdRef = useRef(createClientRequestId());
 
     // Master Data
@@ -265,7 +265,6 @@ const CreateQuotation = () => {
     const [sites, setSites] = useState([]);
 
     // UI State
-    const [isSaving, setIsSaving] = useState(false);
     const [saveSuccess, setSaveSuccess] = useState(false);
     const [, setLoading] = useState(false);
     const [isProductModalOpen, setIsProductModalOpen] = useState(false);
@@ -891,9 +890,7 @@ const CreateQuotation = () => {
         return payload;
     }, [header, items, selectedTermsTemplateId, termsContent, totals, overallDiscount, isEditMode]);
 
-    const handleSubmit = async (status) => {
-        if (submitLockRef.current) return;
-
+    const { isSubmitting: isSaving, execute: handleSubmit } = useSubmitGuard(async (status) => {
         if (!header.customerId) {
             toast.error('Please select a Customer');
             return;
@@ -903,8 +900,6 @@ const CreateQuotation = () => {
             return;
         }
 
-        submitLockRef.current = true;
-        setIsSaving(true);
         setSaveSuccess(false);
 
         const quotationData = buildSavePayload(status);
@@ -946,11 +941,8 @@ const CreateQuotation = () => {
             } else {
                 toast.error(err.response?.data?.message || 'Error saving quotation');
             }
-        } finally {
-            submitLockRef.current = false;
-            setIsSaving(false);
         }
-    };
+    });
 
     // Retry offline queue when back online
     useEffect(() => {

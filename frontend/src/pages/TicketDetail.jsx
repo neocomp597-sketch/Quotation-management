@@ -8,6 +8,7 @@ import {
     MdWarning, MdCheckCircleOutline, MdChat 
 } from 'react-icons/md';
 import Modal from '../components/Modal';
+import { useSubmitGuard } from '../hooks/useSubmitGuard';
 
 const TicketDetail = () => {
     const { id } = useParams();
@@ -85,7 +86,7 @@ const TicketDetail = () => {
         loadAssignees();
     }, [id]);
 
-    const handleAssign = async () => {
+    const { isSubmitting: isAssigning, execute: handleAssign } = useSubmitGuard(async () => {
         try {
             await csmService.assignTicket(id, {
                 assignedTeamId: assignTeam || null,
@@ -96,7 +97,7 @@ const TicketDetail = () => {
         } catch (error) {
             toast.error('Assignment failed');
         }
-    };
+    });
 
     const handleStatusChange = async (status, fcr = false) => {
         try {
@@ -145,7 +146,7 @@ const TicketDetail = () => {
         }
     };
 
-    const handleScheduleVisit = async (e) => {
+    const { isSubmitting: isSchedulingVisit, execute: handleScheduleVisit } = useSubmitGuard(async (e) => {
         e.preventDefault();
         try {
             await csmService.createVisit({
@@ -158,9 +159,9 @@ const TicketDetail = () => {
             setShowVisitModal(false);
             fetchTicketDetails();
         } catch (error) {
-            toast.error('Scheduling failed');
+            toast.error('Scheduling visit failed');
         }
-    };
+    });
 
     if (loading || !ticket) {
         return (
@@ -412,10 +413,11 @@ const TicketDetail = () => {
                             </div>
                             <button
                                 onClick={handleAssign}
-                                className="w-full flex items-center justify-center gap-2 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md"
+                                disabled={isAssigning}
+                                className="w-full flex items-center justify-center gap-2 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 <MdSave size={16} />
-                                Update Assignee
+                                {isAssigning ? 'Updating...' : 'Update Assignee'}
                             </button>
                         </div>
                     </div>
@@ -623,9 +625,10 @@ const TicketDetail = () => {
                         <button
                             type="submit"
                             form="schedule-visit-form"
-                            className="flex-1 w-full py-3.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg"
+                            disabled={isSchedulingVisit}
+                            className="flex-1 w-full py-3.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            Schedule
+                            {isSchedulingVisit ? 'Scheduling...' : 'Schedule'}
                         </button>
                     </>
                 }

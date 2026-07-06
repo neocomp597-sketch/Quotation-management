@@ -50,6 +50,7 @@ const getTerritories = async (req, res) => {
             .populate('parent', 'name type')
             .populate('manager', 'name email')
             .populate('salesReps', 'name email')
+            .populate('engineerId')
             .populate('mgr1')
             .populate('mgr2')
             .populate('mgr3')
@@ -73,7 +74,7 @@ const createTerritory = async (req, res) => {
             return res.status(400).json({ message: "Please configure Company Settings first in the Settings menu before creating territories." });
         }
 
-        const { name, type, parent, manager, salesReps, rules, mgr1, mgr2, mgr3, mgr4, mgr5 } = req.body;
+        const { name, type, parent, manager, salesReps, rules, mgr1, mgr2, mgr3, mgr4, mgr5, engineerId } = req.body;
 
         const newTerritory = new Territory({
             companyId,
@@ -82,6 +83,7 @@ const createTerritory = async (req, res) => {
             parent: parent || null,
             manager: manager || null,
             salesReps: salesReps || [],
+            engineerId: engineerId || null,
             rules: rules || { cities: [], pincodes: [] },
             mgr1: mgr1 || null,
             mgr2: mgr2 || null,
@@ -102,7 +104,7 @@ const createTerritory = async (req, res) => {
 const updateTerritory = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, type, parent, manager, salesReps, rules, mgr1, mgr2, mgr3, mgr4, mgr5 } = req.body;
+        const { name, type, parent, manager, salesReps, rules, mgr1, mgr2, mgr3, mgr4, mgr5, engineerId } = req.body;
 
         const territory = await Territory.findById(id);
         if (!territory) {
@@ -119,6 +121,7 @@ const updateTerritory = async (req, res) => {
         territory.parent = parent !== undefined ? (parent || null) : territory.parent;
         territory.manager = manager !== undefined ? (manager || null) : territory.manager;
         territory.salesReps = salesReps || territory.salesReps;
+        territory.engineerId = engineerId !== undefined ? (engineerId || null) : territory.engineerId;
         territory.rules = rules || territory.rules;
         territory.mgr1 = mgr1 !== undefined ? (mgr1 || null) : territory.mgr1;
         territory.mgr2 = mgr2 !== undefined ? (mgr2 || null) : territory.mgr2;

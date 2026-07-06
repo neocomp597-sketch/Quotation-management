@@ -2,6 +2,7 @@ const Planning = require('../models/Planning');
 const MGR = require('../models/MGR');
 const { getCachedJson, makeCacheKey, setCachedJson } = require('../utils/apiCache');
 const { invalidateViaQueueOrNow } = require('../queues/cacheInvalidationQueue');
+const { acquireLock, releaseLock } = require('../utils/lockManager');
 const { getTenantId } = require('../middlewares/tenantContext');
 const RolePermission = require('../models/RolePermission');
 const { resolvePermissions } = require('../config/authorization');
@@ -322,26 +323,36 @@ exports.createEntry = async (req, res) => {
             return res.status(403).json({ message: 'You do not have permission to add entries in previous financial years.' });
         }
 
-        const entry = new Planning({
-            ...normalizedBody,
-            totalValue: (normalizedBody.qty || 0) * (normalizedBody.value || 0),
-            createdBy: req.user?.id
-        });
-        await entry.save();
-        await invalidateViaQueueOrNow('planning:*');
+        const lockKey = `lock:planning:create:${req.user?.id || 'anon'}:${normalizedBody.financialYear}:${normalizedBody.monthYear}:${normalizedBody.customerId}:${normalizedBody.productId}:${normalizedBody.qty}:${normalizedBody.value}:${normalizedBody.status}`;
+        const lockAcquired = await acquireLock(lockKey);
+        if (!lockAcquired) {
+            return res.status(409).json({ message: 'Duplicate planning entry submission in progress. Please wait a moment.' });
+        }
 
-        // Trigger notification
-        const creatorName = req.user?.name || 'A user';
-        await createCompanyNotifications({
-            companyId: req.user?.companyId,
-            title: 'New Planning Entry',
-            message: `Planning entry for FY ${entry.financialYear} (${entry.monthYear}) has been added for ${entry.customerName} by ${creatorName} (Total: ₹${(entry.totalValue || 0).toLocaleString()}).`,
-            type: 'Planning',
-            relatedId: entry._id,
-            excludeUserId: req.user?.id
-        });
+        try {
+            const entry = new Planning({
+                ...normalizedBody,
+                totalValue: (normalizedBody.qty || 0) * (normalizedBody.value || 0),
+                createdBy: req.user?.id
+            });
+            await entry.save();
+            await invalidateViaQueueOrNow('planning:*');
 
-        res.status(201).json(entry);
+            // Trigger notification
+            const creatorName = req.user?.name || 'A user';
+            await createCompanyNotifications({
+                companyId: req.user?.companyId,
+                title: 'New Planning Entry',
+                message: `Planning entry for FY ${entry.financialYear} (${entry.monthYear}) has been added for ${entry.customerName} by ${creatorName} (Total: ₹${(entry.totalValue || 0).toLocaleString()}).`,
+                type: 'Planning',
+                relatedId: entry._id,
+                excludeUserId: req.user?.id
+            });
+
+            res.status(201).json(entry);
+        } finally {
+            await releaseLock(lockKey);
+        }
     } catch (err) {
         res.status(400).json({ message: err.message });
     }

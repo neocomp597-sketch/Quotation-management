@@ -5,8 +5,9 @@ import {
     MdKeyboardArrowRight, MdInfoOutline 
 } from 'react-icons/md';
 import { toast } from 'react-toastify';
-import { territoryService, userService, mgrService } from '../services/api';
+import { territoryService, userService, mgrService, csmService } from '../services/api';
 import Modal from '../components/Modal';
+import { useSubmitGuard } from '../hooks/useSubmitGuard';
 
 const TERRITORY_TYPE_OPTIONS = ['Country', 'Zone', 'State', 'City', 'Area', 'Custom'];
 const TERRITORY_LOAD_TOAST_ID = 'territory-master-territories-load-error';
@@ -19,6 +20,7 @@ const TerritoryMaster = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingTerritory, setEditingTerritory] = useState(null);
     const [mgrsData, setMgrsData] = useState({ mgr1: [], mgr2: [], mgr3: [], mgr4: [], mgr5: [] });
+    const [engineers, setEngineers] = useState([]);
     
     // UI state for tree collapse/expand
     const [expandedNodes, setExpandedNodes] = useState({});
@@ -29,6 +31,7 @@ const TerritoryMaster = () => {
         parent: '',
         manager: '',
         salesReps: [],
+        engineerId: '',
         rules: {
             cities: '',
             pincodes: ''
@@ -43,14 +46,15 @@ const TerritoryMaster = () => {
     const fetchAllData = useCallback(async () => {
         setLoading(true);
         try {
-            const [terrResult, userResult, m1, m2, m3, m4, m5] = await Promise.allSettled([
+            const [terrResult, userResult, m1, m2, m3, m4, m5, engResult] = await Promise.allSettled([
                 territoryService.getAll(),
                 userService.getAll(),
                 mgrService.getAll('MGR1'),
                 mgrService.getAll('MGR2'),
                 mgrService.getAll('MGR3'),
                 mgrService.getAll('MGR4'),
-                mgrService.getAll('MGR5')
+                mgrService.getAll('MGR5'),
+                csmService.getEngineers()
             ]);
 
             if (terrResult.status === 'fulfilled') {
@@ -69,6 +73,13 @@ const TerritoryMaster = () => {
                 toast.error(userResult.reason?.response?.data?.message || 'Failed to load users.', {
                     toastId: USER_LOAD_TOAST_ID
                 });
+            }
+
+            if (engResult.status === 'fulfilled') {
+                const engList = Array.isArray(engResult.value.data) ? engResult.value.data : [];
+                setEngineers(engList.filter(eng => eng.status === 'Active'));
+            } else {
+                console.error('Error fetching engineers:', engResult.reason);
             }
 
             setMgrsData({
@@ -100,6 +111,7 @@ const TerritoryMaster = () => {
                 parent: territory.parent?._id || territory.parent || '',
                 manager: territory.manager?._id || territory.manager || '',
                 salesReps: (territory.salesReps || []).map(r => r._id || r),
+                engineerId: territory.engineerId?._id || territory.engineerId || '',
                 rules: {
                     cities: (territory.rules?.cities || []).join(', '),
                     pincodes: (territory.rules?.pincodes || []).join(', ')
@@ -118,6 +130,7 @@ const TerritoryMaster = () => {
                 parent: '',
                 manager: '',
                 salesReps: [],
+                engineerId: '',
                 rules: {
                     cities: '',
                     pincodes: ''
@@ -132,7 +145,7 @@ const TerritoryMaster = () => {
         setIsModalOpen(true);
     };
 
-    const handleSubmit = async (e) => {
+    const { isSubmitting: isSaving, execute: handleSubmit } = useSubmitGuard(async (e) => {
         e.preventDefault();
         if (!formData.name.trim()) {
             toast.error('Territory Name is required');
@@ -143,6 +156,7 @@ const TerritoryMaster = () => {
             ...formData,
             parent: formData.parent || null,
             manager: formData.manager || null,
+            engineerId: formData.engineerId || null,
             mgr1: formData.mgr1 || null,
             mgr2: formData.mgr2 || null,
             mgr3: formData.mgr3 || null,
@@ -168,7 +182,7 @@ const TerritoryMaster = () => {
             console.error('Error saving territory:', err);
             toast.error(err.response?.data?.message || 'Error saving territory');
         }
-    };
+    });
 
     const handleDelete = async (territory) => {
         const hasChildren = territories.some(t => String(t.parent?._id || t.parent) === String(territory._id));
@@ -256,6 +270,11 @@ const TerritoryMaster = () => {
                                             <span className="flex items-center gap-1">
                                                 <MdPerson size={13} className="text-slate-400" /> Mgr: {managerName}
                                             </span>
+                                            {node.engineerId && (
+                                                <span className="flex items-center gap-1">
+                                                    🛠️ Eng: {node.engineerId.name || node.engineerId}
+                                                </span>
+                                            )}
                                             <span className="flex items-center gap-1">
                                                 <MdPeople size={13} className="text-slate-400" /> Reps: {repCount}
                                             </span>
@@ -368,9 +387,10 @@ const TerritoryMaster = () => {
                         </button>
                         <button
                             onClick={handleSubmit}
-                            className="bg-primary-600 hover:bg-primary-700 text-white px-10 py-3.5 rounded-2xl font-black transition-all shadow-xl shadow-primary-600/20 uppercase text-[10px] tracking-widest active:scale-95"
+                            disabled={isSaving}
+                            className="bg-primary-600 hover:bg-primary-700 text-white px-10 py-3.5 rounded-2xl font-black transition-all shadow-xl shadow-primary-600/20 uppercase text-[10px] tracking-widest active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
                         >
-                            {editingTerritory ? "Update Details" : "Create Territory"}
+                            {isSaving ? "Saving..." : (editingTerritory ? "Update Details" : "Create Territory")}
                         </button>
                     </>
                 }
@@ -407,7 +427,7 @@ const TerritoryMaster = () => {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div className="space-y-2">
                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
                                 Parent Territory
@@ -438,6 +458,22 @@ const TerritoryMaster = () => {
                                 <option value="">Unassigned</option>
                                 {users.map(u => (
                                     <option key={u._id} value={u._id}>{u.name} ({u.role})</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                                Assigned Engineer
+                            </label>
+                            <select
+                                value={formData.engineerId}
+                                onChange={(e) => setFormData({ ...formData, engineerId: e.target.value })}
+                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-bold"
+                            >
+                                <option value="">Unassigned</option>
+                                {engineers.map(eng => (
+                                    <option key={eng._id} value={eng._id}>{eng.name}</option>
                                 ))}
                             </select>
                         </div>

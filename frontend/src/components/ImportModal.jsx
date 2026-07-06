@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { MdCloudUpload, MdDownload, MdDescription, MdClose, MdCheckCircle, MdError } from 'react-icons/md';
 import Modal from './Modal';
 import api from '../services/api';
+import { useSubmitGuard } from '../hooks/useSubmitGuard';
 
 const ImportModal = ({ isOpen, onClose, title, onImport, onDownloadTemplate, type = 'products' }) => {
     const [file, setFile] = useState(null);
@@ -58,7 +59,7 @@ const ImportModal = ({ isOpen, onClose, title, onImport, onDownloadTemplate, typ
         }
     };
 
-    const handleImport = async () => {
+    const { isSubmitting: isImportingGuard, execute: handleImport } = useSubmitGuard(async () => {
         if (!file) return;
 
         setIsImporting(true);
@@ -110,7 +111,7 @@ const ImportModal = ({ isOpen, onClose, title, onImport, onDownloadTemplate, typ
             setIsImporting(false);
             setImportStage('idle');
         }
-    };
+    });
 
     const handleDownloadMissingCodes = async (filename) => {
         try {
