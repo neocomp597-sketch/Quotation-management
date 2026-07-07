@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { productService, cpqService } from '../services/api';
+import { productService, cpqService, importService } from '../services/api';
 import { toast } from 'react-toastify';
-import { MdAdd, MdSearch, MdEdit, MdDelete, MdInventory, MdCategory, MdPayments, MdFolderOpen, MdStar } from 'react-icons/md';
+import * as XLSX from 'xlsx';
+import { MdAdd, MdSearch, MdEdit, MdDelete, MdInventory, MdCategory, MdPayments, MdFolderOpen, MdStar, MdFileDownload, MdFileUpload } from 'react-icons/md';
 import Modal from '../components/Modal';
+import ImportModal from '../components/ImportModal';
 
 const CatalogSubmodule = ({ mode = 'products' }) => {
     const [activeTab, setActiveTab] = useState(mode);
@@ -10,8 +12,66 @@ const CatalogSubmodule = ({ mode = 'products' }) => {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [editingItem, setEditingItem] = useState(null);
     const [bundlesList, setBundlesList] = useState([]);
+
+    const exportToExcel = async () => {
+        setLoading(true);
+        try {
+            const catalogTypeMap = {
+                products: 'Product',
+                services: 'Service',
+                bundles: 'Bundle',
+                subscriptions: 'Subscription'
+            };
+            const typeParam = catalogTypeMap[activeTab] || 'Product';
+
+            const res = await productService.getAll({
+                limit: 10000,
+                search: searchTerm || undefined,
+            });
+            const list = Array.isArray(res.data) ? res.data : res.data?.data || [];
+            const exportItems = list.filter(item => (item.catalogType || 'Product') === typeParam);
+
+            if (!exportItems.length) {
+                toast.info(`No ${activeTab} found to export`);
+                return;
+            }
+
+            const exportData = exportItems.map((p) => {
+                const standardAttributes = (p.attributes || []).map(a => `${a.code}:${a.description}`).join(', ');
+                return {
+                    'Product Name': p.productName || '',
+                    'Product Code': p.productCode || '',
+                    'Category': p.categoryId?.name || '',
+                    'HSN Code': p.hsnCode || '',
+                    'GST (%)': p.gstPercentage || 0,
+                    'Base Price': p.basePrice || 0,
+                    'MRP': p.mrp || 0,
+                    'UOM': p.uom || '',
+                    'Status': p.status || '',
+                    'MGR 1': p.mgr1?.code || '',
+                    'MGR 2': p.mgr2?.code || '',
+                    'MGR 3': p.mgr3?.code || '',
+                    'MGR 4': p.mgr4?.code || '',
+                    'MGR 5': p.mgr5?.code || '',
+                    'Standard Attributes': standardAttributes
+                };
+            });
+
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Catalog');
+            XLSX.writeFile(wb, `${typeParam}_Catalog_${new Date().toISOString().slice(0, 10)}.xlsx`);
+            toast.success('Export completed successfully');
+        } catch (err) {
+            console.error('Export error:', err);
+            toast.error('Failed to export catalog');
+        } finally {
+            setLoading(false);
+        }
+    };
 
     // Form fields matching catalogTypes
     const [formData, setFormData] = useState({
@@ -171,7 +231,21 @@ const CatalogSubmodule = ({ mode = 'products' }) => {
                     <h1 className="text-3xl font-black text-slate-900 capitalize tracking-tight">{activeTab} Register</h1>
                     <p className="text-slate-500 font-medium">Manage and customize your {activeTab} offerings.</p>
                 </div>
-                <div>
+                <div className="flex gap-3">
+                    <button
+                        onClick={exportToExcel}
+                        className="flex items-center justify-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-5 py-3 rounded-2xl font-bold transition-all shadow-sm uppercase text-xs tracking-widest active:scale-95"
+                    >
+                        <MdFileDownload size={20} />
+                        <span>Export</span>
+                    </button>
+                    <button
+                        onClick={() => setIsImportModalOpen(true)}
+                        className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-emerald-600/20 uppercase text-xs tracking-widest active:scale-95"
+                    >
+                        <MdFileUpload size={20} />
+                        <span>Import</span>
+                    </button>
                     <button
                         onClick={() => handleOpenModal()}
                         className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
@@ -401,6 +475,19 @@ const CatalogSubmodule = ({ mode = 'products' }) => {
                     </div>
                 </form>
             </Modal>
+
+            {/* Import Modal */}
+            <ImportModal
+                isOpen={isImportModalOpen}
+                onClose={() => setIsImportModalOpen(false)}
+                title="Import Products/Catalog"
+                onImport={async (file) => {
+                    const result = await importService.importProducts(file);
+                    fetchCatalogItems();
+                    return result;
+                }}
+                onDownloadTemplate={importService.getProductTemplate}
+            />
         </div>
     );
 };

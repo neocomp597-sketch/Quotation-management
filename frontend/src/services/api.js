@@ -322,6 +322,33 @@ export const importService = {
       },
     });
   },
+  importVendors: (file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return api.post("/import/vendors", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+  },
+  importPriceBooks: (file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return api.post("/import/price-books", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+  },
+  importPriceBookItems: (file, priceBookId) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return api.post(`/import/price-book-items/${priceBookId}`, formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+  },
   importAttributes: (file) => {
     const formData = new FormData();
     formData.append("file", file);
@@ -365,6 +392,12 @@ export const importService = {
       responseType: "blob",
       params: financialYear ? { financialYear } : undefined,
     }),
+  getVendorTemplate: () =>
+    api.get("/import/template/vendors", { responseType: "blob" }),
+  getPriceBookTemplate: () =>
+    api.get("/import/template/price-books", { responseType: "blob" }),
+  getPriceBookItemTemplate: () =>
+    api.get("/import/template/price-book-items", { responseType: "blob" }),
   importWarranties: (file) => {
     const formData = new FormData();
     formData.append("file", file);
@@ -398,6 +431,39 @@ export const importService = {
   },
   getTicketTemplate: () =>
     api.get("/import/template/tickets", { responseType: "blob" }),
+  importEmployees: (file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return api.post("/import/employees", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+  },
+  getEmployeeTemplate: () =>
+    api.get("/import/template/employees", { responseType: "blob" }),
+  importContacts: (file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return api.post("/import/contacts", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+  },
+  getContactTemplate: () =>
+    api.get("/import/template/contacts", { responseType: "blob" }),
+  importContracts: (file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return api.post("/import/contracts", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+  },
+  getContractTemplate: () =>
+    api.get("/import/template/contracts", { responseType: "blob" }),
 };
 
 export const attributeService = {
@@ -764,6 +830,30 @@ export const orderService = {
   update: (id, data) => api.put(`/orders/${id}`, data),
   delete: (id) => api.delete(`/orders/${id}`),
   convertToInvoice: (id) => api.post(`/orders/${id}/invoice`),
+};
+
+export const clmService = {
+  getDashboard: () => api.get("/clm/dashboard"),
+  getContracts: (params) => api.get("/clm/contracts", { params }),
+  createContract: (data) => api.post("/clm/contracts", data),
+  getClauses: () => api.get("/clm/clauses"),
+  createClause: (data) => api.post("/clm/clauses", data),
+  updateClause: (id, data) => api.put(`/clm/clauses/${id}`, data),
+  deleteClause: (id) => api.delete(`/clm/clauses/${id}`),
+  getThemes: () => api.get("/clm/themes"),
+  createTheme: (data) => api.post("/clm/themes", data),
+  updateTheme: (id, data) => api.put(`/clm/themes/${id}`, data),
+  deleteTheme: (id) => api.delete(`/clm/themes/${id}`),
+  getTemplates: () => api.get("/clm/templates"),
+  createTemplate: (data) => api.post("/clm/templates", data),
+  updateTemplate: (id, data) => api.put(`/clm/templates/${id}`, data),
+  deleteTemplate: (id) => api.delete(`/clm/templates/${id}`),
+  generateDocument: (data) => api.post("/clm/generate", data),
+  getVersions: (contractId) => api.get(`/clm/versions/${contractId}`),
+  getVersionHtmlUrl: (id) => `${api.defaults.baseURL || "/api"}/clm/version-html/${id}`,
+  getCategories: () => api.get("/clm/categories"),
+  createCategory: (data) => api.post("/clm/categories", data),
+  deleteCategory: (id) => api.delete(`/clm/categories/${id}`),
 };
 
 export default api;

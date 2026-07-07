@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { MdAdd, MdDelete, MdEdit, MdSearch, MdStorefront } from 'react-icons/md';
+import { MdAdd, MdDelete, MdEdit, MdSearch, MdStorefront, MdFileDownload, MdFileUpload } from 'react-icons/md';
 import { toast } from 'react-toastify';
+import * as XLSX from 'xlsx';
 import Modal from '../components/Modal';
+import ImportModal from '../components/ImportModal';
 import PaginationControls from '../components/PaginationControls';
-import { vendorService } from '../services/api';
+import { vendorService, importService } from '../services/api';
 
 const LIST_PAGE_SIZE = 20;
 
@@ -25,8 +27,45 @@ const Vendors = () => {
     const [page, setPage] = useState(1);
     const [pagination, setPagination] = useState({ page: 1, limit: LIST_PAGE_SIZE, total: 0, pages: 1 });
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [editingVendor, setEditingVendor] = useState(null);
     const [formData, setFormData] = useState(defaultForm);
+
+    const exportToExcel = async () => {
+        setLoading(true);
+        try {
+            const res = await vendorService.getAll(false, {
+                limit: 10000,
+                search: debouncedSearch || undefined,
+            });
+            const exportVendors = Array.isArray(res.data) ? res.data : res.data?.data || [];
+            if (!exportVendors.length) {
+                toast.info('No vendors found to export');
+                return;
+            }
+
+            const exportData = exportVendors.map((v) => ({
+                'Vendor Name': v.name || '',
+                'Contact Person': v.contactPerson || '',
+                'Phone': v.phone || '',
+                'Email': v.email || '',
+                'Address': v.address || '',
+                'GSTIN': v.gstin || '',
+                'Active': v.isActive !== false ? 'TRUE' : 'FALSE'
+            }));
+
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Vendors');
+            XLSX.writeFile(wb, `Vendors_Master_${new Date().toISOString().slice(0, 10)}.xlsx`);
+            toast.success('Export completed successfully');
+        } catch (err) {
+            console.error('Export vendors error:', err);
+            toast.error('Failed to export vendors');
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const fetchVendors = async () => {
         setLoading(true);
@@ -132,13 +171,29 @@ const Vendors = () => {
                     <h1 className="text-3xl font-black text-slate-900 tracking-tight">Vendors</h1>
                     <p className="text-slate-500 font-medium">Manage supplier master and activation status.</p>
                 </div>
-                <button
-                    onClick={() => openModal()}
-                    className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
-                >
-                    <MdAdd size={20} />
-                    <span>Add Vendor</span>
-                </button>
+                <div className="flex gap-3">
+                    <button
+                        onClick={exportToExcel}
+                        className="flex items-center justify-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-5 py-3 rounded-2xl font-bold transition-all shadow-sm uppercase text-xs tracking-widest active:scale-95"
+                    >
+                        <MdFileDownload size={20} />
+                        <span>Export</span>
+                    </button>
+                    <button
+                        onClick={() => setIsImportModalOpen(true)}
+                        className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-emerald-600/20 uppercase text-xs tracking-widest active:scale-95"
+                    >
+                        <MdFileUpload size={20} />
+                        <span>Import</span>
+                    </button>
+                    <button
+                        onClick={() => openModal()}
+                        className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
+                    >
+                        <MdAdd size={20} />
+                        <span>Add Vendor</span>
+                    </button>
+                </div>
             </div>
 
             <div className="mobile-master-shell bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
@@ -339,6 +394,19 @@ const Vendors = () => {
                     </label>
                 </form>
             </Modal>
+
+            {/* Import Modal */}
+            <ImportModal
+                isOpen={isImportModalOpen}
+                onClose={() => setIsImportModalOpen(false)}
+                title="Import Vendors"
+                onImport={async (file) => {
+                    const result = await importService.importVendors(file);
+                    fetchVendors();
+                    return result;
+                }}
+                onDownloadTemplate={importService.getVendorTemplate}
+            />
         </div>
     );
 };

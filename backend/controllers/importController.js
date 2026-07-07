@@ -62,6 +62,11 @@ const Attribute = require('../models/Attribute');
 const MGR = require('../models/MGR');
 const Vendor = require('../models/Vendor');
 const Planning = require('../models/Planning');
+const PriceBook = require('../models/PriceBook');
+const PriceBookItem = require('../models/PriceBookItem');
+const EmployeeProfile = require('../models/EmployeeProfile');
+const Contact = require('../models/Contact');
+const Contract = require('../models/Contract');
 const { deriveBasePriceFromVendors } = require('../utils/vendorSelection');
 const { invalidateCustomerCaches, invalidateProductCaches } = require('../utils/cacheInvalidation');
 
@@ -72,11 +77,13 @@ const toBoolean = (value) => {
     if (typeof value === 'string') return ['1', 'true', 'yes', 'y'].includes(value.toLowerCase().trim());
     return false;
 };
-const FY_MONTHS = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
-const PLANNING_STATUS_OPTIONS = ['Budget', 'Firm', 'MFC', 'B & B', 'Others', 'Order Received', 'Invoice', 'Lost', 'Parked'];
+
 const cleanCellValue = (value = '') => String(value ?? '').trim().replace(/\s+/g, ' ');
 const normalizeKey = (value = '') => cleanCellValue(value).toUpperCase();
 const buildExactRegex = (value = '') => new RegExp(`^${escapeRegex(cleanCellValue(value))}$`, 'i');
+
+const FY_MONTHS = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
+const PLANNING_STATUS_OPTIONS = ['Budget', 'Firm', 'MFC', 'B & B', 'Others', 'Order Received', 'Invoice', 'Lost', 'Parked'];
 const pickFirstNonEmpty = (...values) => {
     for (const value of values) {
         const cleaned = cleanCellValue(value);
@@ -1838,14 +1845,929 @@ const getTicketTemplate = async (req, res) => {
             { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 10 }, { wch: 12 }
         ];
 
-        const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
-
-        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        res.setHeader('Content-Disposition', 'attachment; filename=ticket_import_template.xlsx');
         res.send(buffer);
     } catch (error) {
         console.error('Template error:', error);
         res.status(500).json({ message: 'Error generating template' });
+    }
+};
+
+// Vendor Imports
+const importVendors = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ message: 'No file uploaded' });
+        }
+
+        const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const data = XLSX.utils.sheet_to_json(worksheet);
+
+        const headers = XLSX.utils.sheet_to_json(worksheet, { header: 1 })[0] || [];
+        const cleanHeaders = headers.map(h => String(h || '').trim().toLowerCase());
+        
+        const hasVendorName = cleanHeaders.some(h => [
+            'vendor name', 'vendorname', 'name', 'company name', 'companyname', 'company'
+        ].includes(h));
+        
+        if (!hasVendorName) {
+            return res.status(400).json({
+                message: `Missing required column headers. Vendor Name is required.`,
+                errors: [`The sheet must contain a column for Vendor Name.`]
+            });
+        }
+
+        if (data.length === 0) {
+            return res.status(400).json({ message: 'No data found in file' });
+        }
+
+        const results = {
+            created: 0,
+            updated: 0,
+            skipped: 0,
+            failed: 0,
+            errors: []
+        };
+
+        const companyId = req.user?.companyId;
+
+        const existingVendors = await Vendor.find({ companyId }).lean();
+        const vendorNameMap = new Map();
+        existingVendors.forEach(v => {
+            if (v.name) {
+                vendorNameMap.set(v.name.trim().toLowerCase(), v);
+            }
+        });
+
+        const bulkOps = [];
+
+        for (let i = 0; i < data.length; i++) {
+            const row = data[i];
+            try {
+                const name = pickFirstNonEmpty(row['Vendor Name'], row.vendorName, row['Name'], row['Company Name'], row.name);
+                
+                if (!name) {
+                    throw new Error('Vendor Name is required');
+                }
+
+                const vendorData = {
+                    name: name.trim(),
+                    contactPerson: pickFirstNonEmpty(row['Contact Person'], row.contactPerson, row['Contact'], row['Person']),
+                    phone: pickFirstNonEmpty(row['Phone'], row.phone, row['Mobile'], row['Mobile Phone'], row['Telephone']),
+                    email: pickFirstNonEmpty(row['Email'], row.email, row['E-Mail']),
+                    address: pickFirstNonEmpty(row['Address'], row.address, row['Street'], row['Location']),
+                    gstin: pickFirstNonEmpty(row['GSTIN'], row.gstin, row['GST No'], row['GST Number']),
+                    isActive: typeof row['Active'] !== 'undefined' ? toBoolean(row['Active']) : (typeof row['IsActive'] !== 'undefined' ? toBoolean(row['IsActive']) : true),
+                    companyId: companyId
+                };
+
+                const existing = vendorNameMap.get(vendorData.name.toLowerCase());
+                if (existing) {
+                    bulkOps.push({
+                        updateOne: {
+                            filter: { _id: existing._id },
+                            update: { $set: vendorData }
+                        }
+                    });
+                    results.updated++;
+                } else {
+                    bulkOps.push({
+                        insertOne: {
+                            document: vendorData
+                        }
+                    });
+                    results.created++;
+                }
+            } catch (err) {
+                results.failed++;
+                results.errors.push(`Row ${i + 2}: ${err.message}`);
+            }
+        }
+
+        if (bulkOps.length > 0) {
+            await Vendor.bulkWrite(bulkOps, { ordered: false });
+        }
+
+        res.json({
+            message: `Import completed. Created: ${results.created}, Updated: ${results.updated}, Failed: ${results.failed}`,
+            success: results.created + results.updated,
+            created: results.created,
+            updated: results.updated,
+            failed: results.failed,
+            skipped: results.skipped,
+            errors: results.errors
+        });
+    } catch (error) {
+        console.error('Import vendors error:', error);
+        res.status(500).json({ message: error.message || 'Error importing vendors', errors: [error.message] });
+    }
+};
+
+const getVendorTemplate = async (req, res) => {
+    try {
+        const templateData = [
+            {
+                'Vendor Name': 'Acme Corporation',
+                'Contact Person': 'Jane Smith',
+                'Phone': '9876543210',
+                'Email': 'jane@acme.com',
+                'Address': '456 Industrial Road, Phase 1, Mumbai',
+                'GSTIN': '27AABCU9603R1ZM',
+                'Active': 'TRUE'
+            }
+        ];
+
+        const worksheet = XLSX.utils.json_to_sheet(templateData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Vendors');
+
+        worksheet['!cols'] = [
+            { wch: 25 }, { wch: 20 }, { wch: 15 }, { wch: 25 }, { wch: 40 }, { wch: 20 }, { wch: 10 }
+        ];
+
+        const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename=vendors_import_template.xlsx');
+        res.send(buffer);
+    } catch (error) {
+        console.error('Template error:', error);
+        res.status(500).json({ message: 'Error generating template' });
+    }
+};
+
+// Price Book Imports
+const importPriceBooks = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ message: 'No file uploaded' });
+        }
+
+        const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const data = XLSX.utils.sheet_to_json(worksheet);
+
+        const headers = XLSX.utils.sheet_to_json(worksheet, { header: 1 })[0] || [];
+        const cleanHeaders = headers.map(h => String(h || '').trim().toLowerCase());
+        
+        const hasBookName = cleanHeaders.some(h => [
+            'book name', 'bookname', 'name', 'pricebook name', 'pricebookname'
+        ].includes(h));
+        
+        if (!hasBookName) {
+            return res.status(400).json({
+                message: `Missing required column headers. Book Name is required.`,
+                errors: [`The sheet must contain a column for Book Name.`]
+            });
+        }
+
+        if (data.length === 0) {
+            return res.status(400).json({ message: 'No data found in file' });
+        }
+
+        const results = {
+            created: 0,
+            updated: 0,
+            skipped: 0,
+            failed: 0,
+            errors: []
+        };
+
+        const companyId = req.user?.companyId;
+
+        const existingBooks = await PriceBook.find({ companyId }).lean();
+        const priceBookMap = new Map();
+        existingBooks.forEach(pb => {
+            if (pb.name) {
+                priceBookMap.set(pb.name.trim().toLowerCase(), pb);
+            }
+        });
+
+        const bulkOps = [];
+
+        for (let i = 0; i < data.length; i++) {
+            const row = data[i];
+            try {
+                const name = pickFirstNonEmpty(row['Book Name'], row.bookName, row['Name'], row['PriceBook Name'], row.name);
+                
+                if (!name) {
+                    throw new Error('Book Name is required');
+                }
+
+                const rawType = pickFirstNonEmpty(row['Book Type'], row.bookType, row['Type'], row.type) || 'Standard';
+                let type = 'Standard';
+                const validTypes = ['Standard', 'Customer', 'Region', 'Dealer', 'Project', 'Contract', 'Promotional', 'Opportunity'];
+                const matchedType = validTypes.find(t => t.toLowerCase() === rawType.toLowerCase());
+                if (matchedType) {
+                    type = matchedType;
+                } else {
+                    throw new Error(`Invalid Book Type: '${rawType}'. Must be one of: ${validTypes.join(', ')}`);
+                }
+
+                const priceBookData = {
+                    name: name.trim(),
+                    description: pickFirstNonEmpty(row['Description'], row.description) || '',
+                    type: type,
+                    targetId: pickFirstNonEmpty(row['Target ID'], row.targetId, row['TargetValue'], row.target) || '',
+                    currency: pickFirstNonEmpty(row['Currency'], row.currency) || 'INR',
+                    isActive: typeof row['Active'] !== 'undefined' ? toBoolean(row['Active']) : (typeof row['IsActive'] !== 'undefined' ? toBoolean(row['IsActive']) : true),
+                    validFrom: row['Valid From'] || row.validFrom ? new Date(row['Valid From'] || row.validFrom) : null,
+                    validTo: row['Valid To'] || row.validTo ? new Date(row['Valid To'] || row.validTo) : null,
+                    companyId: companyId
+                };
+
+                const existing = priceBookMap.get(priceBookData.name.toLowerCase());
+                if (existing) {
+                    bulkOps.push({
+                        updateOne: {
+                            filter: { _id: existing._id },
+                            update: { $set: priceBookData }
+                        }
+                    });
+                    results.updated++;
+                } else {
+                    bulkOps.push({
+                        insertOne: {
+                            document: priceBookData
+                        }
+                    });
+                    results.created++;
+                }
+            } catch (err) {
+                results.failed++;
+                results.errors.push(`Row ${i + 2}: ${err.message}`);
+            }
+        }
+
+        if (bulkOps.length > 0) {
+            await PriceBook.bulkWrite(bulkOps, { ordered: false });
+        }
+
+        res.json({
+            message: `Import completed. Created: ${results.created}, Updated: ${results.updated}, Failed: ${results.failed}`,
+            success: results.created + results.updated,
+            created: results.created,
+            updated: results.updated,
+            failed: results.failed,
+            skipped: results.skipped,
+            errors: results.errors
+        });
+    } catch (error) {
+        console.error('Import price books error:', error);
+        res.status(500).json({ message: error.message || 'Error importing price books', errors: [error.message] });
+    }
+};
+
+const getPriceBookTemplate = async (req, res) => {
+    try {
+        const templateData = [
+            {
+                'Book Name': 'Standard Retail Price Book',
+                'Description': 'Base retail price book for all customers',
+                'Book Type': 'Standard',
+                'Target ID': '',
+                'Currency': 'INR',
+                'Valid From': '2026-04-01',
+                'Valid To': '2027-03-31',
+                'Active': 'TRUE'
+            }
+        ];
+
+        const worksheet = XLSX.utils.json_to_sheet(templateData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'PriceBooks');
+
+        worksheet['!cols'] = [
+            { wch: 30 }, { wch: 35 }, { wch: 15 }, { wch: 15 }, { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 10 }
+        ];
+
+        const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename=pricebook_import_template.xlsx');
+        res.send(buffer);
+    } catch (error) {
+        console.error('Template error:', error);
+        res.status(500).json({ message: 'Error generating template' });
+    }
+};
+
+// Price Book Items Imports
+const importPriceBookItems = async (req, res) => {
+    try {
+        const { priceBookId } = req.params;
+        if (!priceBookId) {
+            return res.status(400).json({ message: 'Price Book ID is required' });
+        }
+
+        if (!req.file) {
+            return res.status(400).json({ message: 'No file uploaded' });
+        }
+
+        const priceBook = await PriceBook.findById(priceBookId);
+        if (!priceBook) {
+            return res.status(404).json({ message: 'Price Book not found' });
+        }
+
+        const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const data = XLSX.utils.sheet_to_json(worksheet);
+
+        const headers = XLSX.utils.sheet_to_json(worksheet, { header: 1 })[0] || [];
+        const cleanHeaders = headers.map(h => String(h || '').trim().toLowerCase());
+        
+        const hasProductCode = cleanHeaders.some(h => [
+            'product code', 'productcode', 'code'
+        ].includes(h));
+        
+        const hasPrice = cleanHeaders.some(h => [
+            'price', 'custom price', 'rate', 'customprice'
+        ].includes(h));
+
+        if (!hasProductCode || !hasPrice) {
+            return res.status(400).json({
+                message: `Missing required column headers. Product Code and Price are required.`,
+                errors: [`The sheet must contain columns for Product Code and Price.`]
+            });
+        }
+
+        if (data.length === 0) {
+            return res.status(400).json({ message: 'No data found in file' });
+        }
+
+        const results = {
+            created: 0,
+            updated: 0,
+            skipped: 0,
+            failed: 0,
+            errors: []
+        };
+
+        const companyId = req.user?.companyId;
+
+        const allProducts = await Product.find({ companyId }).select('productCode productName').lean();
+        const productCodeMap = new Map();
+        allProducts.forEach(p => {
+            if (p.productCode) {
+                productCodeMap.set(p.productCode.trim().toLowerCase(), p);
+            }
+        });
+
+        const existingItems = await PriceBookItem.find({ priceBookId }).lean();
+        const existingItemsMap = new Map();
+        existingItems.forEach(item => {
+            existingItemsMap.set(item.productId.toString(), item);
+        });
+
+        const bulkOps = [];
+
+        for (let i = 0; i < data.length; i++) {
+            const row = data[i];
+            try {
+                const productCode = pickFirstNonEmpty(row['Product Code'], row.productCode, row['Code']);
+                const priceVal = row['Price'] ?? row.price ?? row['Custom Price'] ?? row.rate ?? row.customPrice;
+
+                if (!productCode) {
+                    throw new Error('Product Code is required');
+                }
+
+                if (typeof priceVal === 'undefined' || priceVal === '') {
+                    throw new Error('Price is required');
+                }
+
+                const parsedPrice = toSafeNumber(priceVal, -1);
+                if (parsedPrice < 0) {
+                    throw new Error(`Invalid price value: '${priceVal}'`);
+                }
+
+                const productObj = productCodeMap.get(productCode.trim().toLowerCase());
+                if (!productObj) {
+                    throw new Error(`Product with Code '${productCode}' not found`);
+                }
+
+                const itemData = {
+                    priceBookId: priceBookId,
+                    productId: productObj._id,
+                    price: parsedPrice,
+                    currency: pickFirstNonEmpty(row['Currency'], row.currency) || priceBook.currency || 'INR',
+                    companyId: companyId
+                };
+
+                const existing = existingItemsMap.get(itemData.productId.toString());
+                if (existing) {
+                    bulkOps.push({
+                        updateOne: {
+                            filter: { _id: existing._id },
+                            update: { $set: itemData }
+                        }
+                    });
+                    results.updated++;
+                } else {
+                    bulkOps.push({
+                        insertOne: {
+                            document: itemData
+                        }
+                    });
+                    results.created++;
+                }
+            } catch (err) {
+                results.failed++;
+                results.errors.push(`Row ${i + 2}: ${err.message}`);
+            }
+        }
+
+        if (bulkOps.length > 0) {
+            await PriceBookItem.bulkWrite(bulkOps, { ordered: false });
+        }
+
+        res.json({
+            message: `Import completed. Created: ${results.created}, Updated: ${results.updated}, Failed: ${results.failed}`,
+            success: results.created + results.updated,
+            created: results.created,
+            updated: results.updated,
+            failed: results.failed,
+            skipped: results.skipped,
+            errors: results.errors
+        });
+    } catch (error) {
+        console.error('Import price book items error:', error);
+        res.status(500).json({ message: error.message || 'Error importing price book items', errors: [error.message] });
+    }
+};
+
+const getPriceBookItemTemplate = async (req, res) => {
+    try {
+        const templateData = [
+            {
+                'Product Code': 'PROD-001',
+                'Product Name': 'Example Product (Info Only)',
+                'Price': 1500,
+                'Currency': 'INR'
+            }
+        ];
+
+        const worksheet = XLSX.utils.json_to_sheet(templateData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Rates');
+
+        worksheet['!cols'] = [
+            { wch: 15 }, { wch: 30 }, { wch: 15 }, { wch: 10 }
+        ];
+
+        const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename=pricebook_items_template.xlsx');
+        res.send(buffer);
+    } catch (error) {
+        console.error('Template error:', error);
+        res.status(500).json({ message: 'Error generating template' });
+    }
+};
+
+};
+
+const importEmployees = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ message: 'No file uploaded' });
+        }
+
+        const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const data = XLSX.utils.sheet_to_json(worksheet);
+
+        const headers = XLSX.utils.sheet_to_json(worksheet, { header: 1 })[0] || [];
+        const cleanHeaders = headers.map(h => String(h || '').trim().toLowerCase());
+        
+        const hasEmployeeName = cleanHeaders.some(h => ['employee name', 'employeename', 'name'].includes(h));
+        if (!hasEmployeeName) {
+            return res.status(400).json({
+                message: `Missing required column headers. Employee Name is required.`,
+                errors: [`The sheet must contain a column for Employee Name.`]
+            });
+        }
+
+        if (data.length === 0) {
+            return res.status(400).json({ message: 'No data found in file' });
+        }
+
+        const results = {
+            created: 0,
+            updated: 0,
+            skipped: 0,
+            failed: 0,
+            errors: []
+        };
+
+        const companyId = req.user?.companyId;
+
+        const existingEmployees = await EmployeeProfile.find({ companyId }).lean();
+        const employeeNameMap = new Map();
+        existingEmployees.forEach(e => {
+            if (e.name) {
+                employeeNameMap.set(e.name.trim().toLowerCase(), e);
+            }
+        });
+
+        for (let i = 0; i < data.length; i++) {
+            const row = data[i];
+            try {
+                const name = pickFirstNonEmpty(row['Employee Name'], row.employeeName, row['Name'], row.name);
+                if (!name) {
+                    throw new Error('Employee Name is required');
+                }
+
+                const email = pickFirstNonEmpty(row['Email'], row.email);
+                const pan = pickFirstNonEmpty(row['PAN'], row.pan);
+                const aadhaar = pickFirstNonEmpty(row['Aadhaar'], row.aadhaar);
+                const uan = pickFirstNonEmpty(row['UAN'], row.uan);
+                const pfNumber = pickFirstNonEmpty(row['PF Number'], row.pfNumber);
+                const esiNumber = pickFirstNonEmpty(row['ESI Number'], row.esiNumber);
+                const bankName = pickFirstNonEmpty(row['Bank Name'], row.bank);
+                const accountNumber = pickFirstNonEmpty(row['Account Number'], row.account);
+                const ifscCode = pickFirstNonEmpty(row['IFSC Code'], row.ifsc);
+                const joiningDateStr = pickFirstNonEmpty(row['Joining Date'], row.joiningDate);
+                const dobStr = pickFirstNonEmpty(row['DOB'], row.dob);
+                const department = pickFirstNonEmpty(row['Department'], row.dept);
+                const designation = pickFirstNonEmpty(row['Designation'], row.desig);
+                const status = pickFirstNonEmpty(row['Status'], row.status) || 'Active';
+
+                const joiningDate = joiningDateStr ? new Date(joiningDateStr) : new Date();
+                const dob = dobStr ? new Date(dobStr) : null;
+
+                const basic = toSafeNumber(row['Basic Salary'] || row.basic, 0);
+                const hra = toSafeNumber(row['HRA'] || row.hra, 0);
+                const da = toSafeNumber(row['DA'] || row.da, 0);
+                const specialAllowance = toSafeNumber(row['Special Allowance'] || row.specialAllowance, 0);
+
+                const empData = {
+                    name,
+                    email,
+                    pan,
+                    aadhaar,
+                    uan,
+                    pfNumber,
+                    esiNumber,
+                    bankName,
+                    accountNumber,
+                    ifscCode,
+                    joiningDate,
+                    dob,
+                    department,
+                    designation,
+                    status,
+                    salaryStructure: {
+                        basic, hra, da, specialAllowance
+                    },
+                    companyId
+                };
+
+                const normalizedName = name.trim().toLowerCase();
+                const matched = employeeNameMap.get(normalizedName);
+
+                if (matched) {
+                    await EmployeeProfile.findByIdAndUpdate(matched._id, empData);
+                    results.updated++;
+                } else {
+                    await EmployeeProfile.create(empData);
+                    results.created++;
+                }
+            } catch (err) {
+                results.failed++;
+                results.errors.push(`Row ${i + 2}: ${err.message}`);
+            }
+        }
+
+        res.json({
+            message: `Import processed. Created: ${results.created}, Updated: ${results.updated}, Failed: ${results.failed}`,
+            results
+        });
+    } catch (err) {
+        console.error('Import employees error:', err);
+        res.status(500).json({ message: 'Error processing employee import' });
+    }
+};
+
+const getEmployeeTemplate = async (req, res) => {
+    try {
+        const templateData = [
+            {
+                'Employee Name': 'John Doe',
+                'Email': 'john.doe@example.com',
+                'PAN': 'ABCDE1234F',
+                'Aadhaar': '123456789012',
+                'UAN': '100020003000',
+                'PF Number': 'DL/CPM/12345/678',
+                'ESI Number': '31000123450001010',
+                'Bank Name': 'HDFC Bank',
+                'Account Number': '50100123456789',
+                'IFSC Code': 'HDFC0000123',
+                'Joining Date': '2026-01-01',
+                'DOB': '1990-05-15',
+                'Department': 'Engineering',
+                'Designation': 'Software Engineer',
+                'Status': 'Active',
+                'Basic Salary': 30000,
+                'HRA': 12000,
+                'DA': 5000,
+                'Special Allowance': 8000
+            }
+        ];
+
+        const ws = XLSX.utils.json_to_sheet(templateData);
+        const wb = XLSX.utils.book_new();
+        Xcontent = XLSX.utils.book_append_sheet(wb, ws, 'Employees Template');
+
+        const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename=Employees_Import_Template.xlsx');
+        res.send(buffer);
+    } catch (err) {
+        res.status(500).json({ message: 'Error generating employee import template' });
+    }
+};
+
+const importContacts = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ message: 'No file uploaded' });
+        }
+
+        const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const data = XLSX.utils.sheet_to_json(worksheet);
+
+        const headers = XLSX.utils.sheet_to_json(worksheet, { header: 1 })[0] || [];
+        const cleanHeaders = headers.map(h => String(h || '').trim().toLowerCase());
+        
+        const hasContactName = cleanHeaders.some(h => ['contact name', 'contactname', 'name'].includes(h));
+        if (!hasContactName) {
+            return res.status(400).json({
+                message: `Missing required column headers. Contact Name is required.`,
+                errors: [`The sheet must contain a column for Contact Name.`]
+            });
+        }
+
+        if (data.length === 0) {
+            return res.status(400).json({ message: 'No data found in file' });
+        }
+
+        const results = {
+            created: 0,
+            updated: 0,
+            skipped: 0,
+            failed: 0,
+            errors: []
+        };
+
+        const companyId = req.user?.companyId;
+
+        const existingContacts = await Contact.find({ companyId }).lean();
+        const contactNameMap = new Map();
+        existingContacts.forEach(c => {
+            if (c.contactName) {
+                contactNameMap.set(c.contactName.trim().toLowerCase(), c);
+            }
+        });
+
+        for (let i = 0; i < data.length; i++) {
+            const row = data[i];
+            try {
+                const contactName = pickFirstNonEmpty(row['Contact Name'], row.contactName, row['Name'], row.name);
+                if (!contactName) {
+                    throw new Error('Contact Name is required');
+                }
+
+                const contactIdVal = pickFirstNonEmpty(row['Contact ID'], row.contactId) || '';
+                const company = pickFirstNonEmpty(row['Company'], row.company) || '';
+                const email = pickFirstNonEmpty(row['Email'], row.email) || '';
+                const phone = pickFirstNonEmpty(row['Phone'], row.phone) || '';
+                const designation = pickFirstNonEmpty(row['Designation'], row.designation) || '';
+                const customerType = pickFirstNonEmpty(row['Customer Type'], row.customerType) || '';
+                const notes = pickFirstNonEmpty(row['Notes'], row.notes) || '';
+
+                const contactData = {
+                    contactId: contactIdVal,
+                    contactName,
+                    company,
+                    email,
+                    phone,
+                    designation,
+                    customerType,
+                    notes,
+                    companyId
+                };
+
+                const normalizedName = contactName.trim().toLowerCase();
+                const matched = contactNameMap.get(normalizedName);
+
+                if (matched) {
+                    await Contact.findByIdAndUpdate(matched._id, contactData);
+                    results.updated++;
+                } else {
+                    await Contact.create(contactData);
+                    results.created++;
+                }
+            } catch (err) {
+                results.failed++;
+                results.errors.push(`Row ${i + 2}: ${err.message}`);
+            }
+        }
+
+        res.json({
+            message: `Import processed. Created: ${results.created}, Updated: ${results.updated}, Failed: ${results.failed}`,
+            results
+        });
+    } catch (err) {
+        console.error('Import contacts error:', err);
+        res.status(500).json({ message: 'Error processing contact import' });
+    }
+};
+
+const getContactTemplate = async (req, res) => {
+    try {
+        const templateData = [
+            {
+                'Contact Name': 'Alice Smith',
+                'Contact ID': 'CON-001',
+                'Company': 'Acme Corporation',
+                'Email': 'alice@example.com',
+                'Phone': '9876543210',
+                'Designation': 'Procurement Head',
+                'Customer Type': 'Prospect',
+                'Notes': 'Interested in cloud migrations'
+            }
+        ];
+
+        const ws = XLSX.utils.json_to_sheet(templateData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Contacts Template');
+
+        const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename=Contacts_Import_Template.xlsx');
+        res.send(buffer);
+    } catch (err) {
+        res.status(500).json({ message: 'Error generating contact import template' });
+    }
+};
+
+const importContracts = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ message: 'No file uploaded' });
+        }
+
+        const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const data = XLSX.utils.sheet_to_json(worksheet);
+
+        const headers = XLSX.utils.sheet_to_json(worksheet, { header: 1 })[0] || [];
+        const cleanHeaders = headers.map(h => String(h || '').trim().toLowerCase());
+        
+        const hasContractNumber = cleanHeaders.some(h => ['contract number', 'contractnumber', 'contract no', 'contractno'].includes(h));
+        if (!hasContractNumber) {
+            return res.status(400).json({
+                message: `Missing required column headers. Contract Number is required.`,
+                errors: [`The sheet must contain a column for Contract Number.`]
+            });
+        }
+
+        if (data.length === 0) {
+            return res.status(400).json({ message: 'No data found in file' });
+        }
+
+        const results = {
+            created: 0,
+            updated: 0,
+            skipped: 0,
+            failed: 0,
+            errors: []
+        };
+
+        const companyId = req.user?.companyId;
+
+        const existingContracts = await Contract.find({ companyId }).lean();
+        const contractNumberMap = new Map();
+        existingContracts.forEach(c => {
+            if (c.contractNumber) {
+                contractNumberMap.set(c.contractNumber.trim().toLowerCase(), c);
+            }
+        });
+
+        const existingCustomers = await Customer.find({ companyId }).lean();
+        const customerNameMap = new Map();
+        existingCustomers.forEach(c => {
+            if (c.companyName) {
+                customerNameMap.set(c.companyName.trim().toLowerCase(), c);
+            }
+            if (c.customerName) {
+                customerNameMap.set(c.customerName.trim().toLowerCase(), c);
+            }
+        });
+
+        for (let i = 0; i < data.length; i++) {
+            const row = data[i];
+            try {
+                const contractNumber = pickFirstNonEmpty(row['Contract Number'], row.contractNumber, row['Contract No'], row.contractNo);
+                if (!contractNumber) {
+                    throw new Error('Contract Number is required');
+                }
+
+                const title = pickFirstNonEmpty(row['Title'], row.title, row['Name'], row.name) || `Contract ${contractNumber}`;
+                const customerName = pickFirstNonEmpty(row['Customer'], row.customer, row['Company'], row.company);
+                if (!customerName) {
+                    throw new Error('Customer Name is required');
+                }
+
+                const customerMatched = customerNameMap.get(customerName.trim().toLowerCase());
+                if (!customerMatched) {
+                    throw new Error(`Customer "${customerName}" not found in database`);
+                }
+
+                const startDateStr = pickFirstNonEmpty(row['Start Date'], row.startDate);
+                const endDateStr = pickFirstNonEmpty(row['End Date'], row.endDate);
+                if (!startDateStr || !endDateStr) {
+                    throw new Error('Start Date and End Date are required');
+                }
+
+                const value = toSafeNumber(row['Value'] || row.value, 0);
+                const status = pickFirstNonEmpty(row['Status'], row.status) || 'Draft';
+                const category = pickFirstNonEmpty(row['Category'], row.category) || 'Sales Agreement';
+                const renewalRules = pickFirstNonEmpty(row['Renewal Rules'], row.renewalRules) || 'Auto-Renew annually';
+
+                const contractData = {
+                    contractNumber,
+                    title,
+                    customerId: customerMatched._id,
+                    startDate: new Date(startDateStr),
+                    endDate: new Date(endDateStr),
+                    value,
+                    status,
+                    category,
+                    renewalRules,
+                    companyId
+                };
+
+                const normalizedNo = contractNumber.trim().toLowerCase();
+                const matched = contractNumberMap.get(normalizedNo);
+
+                if (matched) {
+                    await Contract.findByIdAndUpdate(matched._id, contractData);
+                    results.updated++;
+                } else {
+                    await Contract.create(contractData);
+                    results.created++;
+                }
+            } catch (err) {
+                results.failed++;
+                results.errors.push(`Row ${i + 2}: ${err.message}`);
+            }
+        }
+
+        res.json({
+            message: `Import processed. Created: ${results.created}, Updated: ${results.updated}, Failed: ${results.failed}`,
+            results
+        });
+    } catch (err) {
+        console.error('Import contracts error:', err);
+        res.status(500).json({ message: 'Error processing contract import' });
+    }
+};
+
+const getContractTemplate = async (req, res) => {
+    try {
+        const templateData = [
+            {
+                'Contract Number': 'CON-2026-101',
+                'Title': 'Annual Service Agreement',
+                'Customer': 'Acme Corporation',
+                'Start Date': '2026-01-01',
+                'End Date': '2026-12-31',
+                'Value': 500000,
+                'Category': 'Sales Agreement',
+                'Status': 'Draft',
+                'Renewal Rules': 'Auto-Renew annually'
+            }
+        ];
+
+        const ws = XLSX.utils.json_to_sheet(templateData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Contracts Template');
+
+        const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename=Contracts_Import_Template.xlsx');
+        res.send(buffer);
+    } catch (err) {
+        res.status(500).json({ message: 'Error generating contract import template' });
     }
 };
 
@@ -1865,5 +2787,17 @@ module.exports = {
     getWarrantyTemplate,
     getAmcTemplate,
     importTickets,
-    getTicketTemplate
+    getTicketTemplate,
+    importVendors,
+    getVendorTemplate,
+    importPriceBooks,
+    getPriceBookTemplate,
+    importPriceBookItems,
+    getPriceBookItemTemplate,
+    importEmployees,
+    getEmployeeTemplate,
+    importContacts,
+    getContactTemplate,
+    importContracts,
+    getContractTemplate
 };

@@ -183,7 +183,15 @@ function App() {
             <Route path="/sales/cpq/simulator" element={<PermissionRoute permissionKey="sales_cpq"><Layout><QuoteSimulator /></Layout></PermissionRoute>} />
             
             <Route path="/sales/approvals" element={<PermissionRoute permissionKey="sales_approvals"><Layout><Approvals /></Layout></PermissionRoute>} />
-            <Route path="/sales/contracts" element={<PermissionRoute permissionKey="sales_contracts"><Layout><Contracts /></Layout></PermissionRoute>} />
+            <Route path="/sales/contracts" element={<PermissionRoute permissionKey="sales_contracts"><Layout><Contracts mode="dashboard" /></Layout></PermissionRoute>} />
+            <Route path="/sales/contracts/dashboard" element={<PermissionRoute permissionKey="sales_contracts"><Layout><Contracts mode="dashboard" /></Layout></PermissionRoute>} />
+            <Route path="/sales/contracts/list" element={<PermissionRoute permissionKey="sales_contracts"><Layout><Contracts mode="contracts" /></Layout></PermissionRoute>} />
+            <Route path="/sales/contracts/templates" element={<PermissionRoute permissionKey="sales_contracts"><Layout><Contracts mode="templates" /></Layout></PermissionRoute>} />
+            <Route path="/sales/contracts/clauses" element={<PermissionRoute permissionKey="sales_contracts"><Layout><Contracts mode="clauses" /></Layout></PermissionRoute>} />
+            <Route path="/sales/contracts/approvals" element={<PermissionRoute permissionKey="sales_contracts"><Layout><Contracts mode="approvals" /></Layout></PermissionRoute>} />
+            <Route path="/sales/contracts/renewals" element={<PermissionRoute permissionKey="sales_contracts"><Layout><Contracts mode="renewals" /></Layout></PermissionRoute>} />
+            <Route path="/sales/contracts/reports" element={<PermissionRoute permissionKey="sales_contracts"><Layout><Contracts mode="reports" /></Layout></PermissionRoute>} />
+            <Route path="/sales/contracts/settings" element={<PermissionRoute permissionKey="sales_contracts"><Layout><Contracts mode="settings" /></Layout></PermissionRoute>} />
             <Route path="/sales/orders" element={<PermissionRoute permissionKey="sales_orders"><Layout><Orders /></Layout></PermissionRoute>} />
             <Route path="/sales/revenue-analytics" element={<PermissionRoute permissionKey="sales_revenue_analytics"><Layout><RevenueAnalytics /></Layout></PermissionRoute>} />
             <Route path="/sales/competitors" element={<PermissionRoute permissionKey="sales_competitors"><Layout><CompetitorIntel /></Layout></PermissionRoute>} />

@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { payrollService } from '../services/api';
+import { payrollService, importService } from '../services/api';
 import { toast } from 'react-toastify';
 import Modal from '../components/Modal';
+import ImportModal from '../components/ImportModal';
 import SearchableSelect from '../components/SearchableSelect';
 import { formatDate } from '../utils/helpers';
+import * as XLSX from 'xlsx';
 import { 
     MdPeople, MdAdd, MdSearch, MdEdit, MdDelete, 
-    MdSave, MdAccountBalance, MdAssignment
+    MdSave, MdAccountBalance, MdAssignment, MdUploadFile, MdDownload
 } from 'react-icons/md';
 
 const PayrollEmployees = () => {
@@ -19,6 +21,7 @@ const PayrollEmployees = () => {
 
     // Modal state
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [modalMode, setModalMode] = useState('add'); // 'add' | 'edit' | 'structure'
     const [selectedEmp, setSelectedEmp] = useState(null);
 
@@ -178,6 +181,40 @@ const PayrollEmployees = () => {
         }
     };
 
+    const handleExport = () => {
+        if (!employees || employees.length === 0) {
+            toast.warn("No employees available to export.");
+            return;
+        }
+        const exportData = employees.map(emp => ({
+            'Employee Name': emp.name,
+            'Email': emp.email || '',
+            'PAN': emp.pan || '',
+            'Aadhaar': emp.aadhaar || '',
+            'UAN': emp.uan || '',
+            'PF Number': emp.pfNumber || '',
+            'ESI Number': emp.esiNumber || '',
+            'Bank Name': emp.bankName || '',
+            'Account Number': emp.accountNumber || '',
+            'IFSC Code': emp.ifscCode || '',
+            'Joining Date': emp.joiningDate ? new Date(emp.joiningDate).toISOString().substring(0, 10) : '',
+            'DOB': emp.dob ? new Date(emp.dob).toISOString().substring(0, 10) : '',
+            'Department': emp.department || '',
+            'Designation': emp.designation || '',
+            'Status': emp.status || 'Active',
+            'Basic Salary': emp.salaryStructure?.basic || 0,
+            'HRA': emp.salaryStructure?.hra || 0,
+            'DA': emp.salaryStructure?.da || 0,
+            'Special Allowance': emp.salaryStructure?.specialAllowance || 0
+        }));
+
+        const ws = XLSX.utils.json_to_sheet(exportData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Employees');
+        XLSX.writeFile(wb, `Employees_List_${new Date().toISOString().slice(0, 10)}.xlsx`);
+        toast.success("Employees list exported successfully!");
+    };
+
     const inputClass = "w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-medium focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all";
     const labelClass = "block text-xs font-bold text-slate-400 uppercase mb-1.5";
 
@@ -201,13 +238,31 @@ const PayrollEmployees = () => {
                     <h1 className="text-3xl font-black text-slate-900 tracking-tight">Employee Profiles</h1>
                     <p className="text-slate-500 font-medium">Register basic details and configure monthly base salary structures.</p>
                 </div>
-                <button
-                    onClick={handleOpenAdd}
-                    className="flex items-center justify-center gap-2 px-5 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-primary-600/20"
-                >
-                    <MdAdd size={20} />
-                    Add Employee Profile
-                </button>
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={handleExport}
+                        className="flex items-center justify-center gap-2 px-5 py-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-bold transition-all shadow-sm"
+                        title="Export Employees to Excel"
+                    >
+                        <MdDownload size={20} />
+                        Export
+                    </button>
+                    <button
+                        onClick={() => setIsImportModalOpen(true)}
+                        className="flex items-center justify-center gap-2 px-5 py-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-bold transition-all shadow-sm"
+                        title="Import Employees from Excel"
+                    >
+                        <MdUploadFile size={20} />
+                        Import
+                    </button>
+                    <button
+                        onClick={handleOpenAdd}
+                        className="flex items-center justify-center gap-2 px-5 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-primary-600/20"
+                    >
+                        <MdAdd size={20} />
+                        Add Employee Profile
+                    </button>
+                </div>
             </div>
 
             {/* Filter Bar */}
@@ -693,6 +748,20 @@ const PayrollEmployees = () => {
                                 </form>
                             )}
             </Modal>
+
+            {/* Import Modal */}
+            <ImportModal
+                isOpen={isImportModalOpen}
+                onClose={() => setIsImportModalOpen(false)}
+                title="Import Employees"
+                type="employees"
+                onImport={async (file) => {
+                    const result = await importService.importEmployees(file);
+                    fetchEmployees(); // Refresh employees after import
+                    return result;
+                }}
+                onDownloadTemplate={importService.getEmployeeTemplate}
+            />
         </div>
     );
 };

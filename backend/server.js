@@ -117,6 +117,7 @@ const salesAnalyticsRoutes = require("./routes/salesAnalyticsRoutes");
 const csmRoutes = require("./routes/csmRoutes");
 const cpqRoutes = require("./routes/cpqRoutes");
 const orderRoutes = require("./routes/orderRoutes");
+const clmRoutes = require("./routes/clmRoutes");
 const scheduler = require("./utils/scheduler");
 
 // API Routes (Reload triggered)
@@ -158,6 +159,7 @@ app.use("/api/sales/analytics", salesAnalyticsRoutes);
 app.use("/api/csm", csmRoutes);
 app.use("/api/cpq", cpqRoutes);
 app.use("/api/orders", orderRoutes);
+app.use("/api/clm", clmRoutes);
 
 app.get('/api/trigger-seed', async (req, res) => {
     try {
@@ -519,6 +521,27 @@ const startBackgroundServices = async () => {
         ],
         deployedBy: "Super Admin",
         deployedAt: new Date("2026-07-04T20:15:00Z"),
+        isActive: true
+      },
+      { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
+    );
+    await SystemUpdate.findOneAndUpdate(
+      { version: "v3.6.0-clm" },
+      {
+        version: "v3.6.0-clm",
+        title: "Contract Lifecycle Management (CLM) & Document Engine",
+        message: "We have launched the new Enterprise Contract Lifecycle Management (CLM) module, featuring a Document Generation Engine, Clause Library, Approvals Workflow, Renewal Kanban Center, and custom category Mini Master.",
+        releaseNotes: [
+          "Integrated full-width CLM Workspace under dedicated Contract Management sidebar group",
+          "Introduced Document Builder with dynamic templates, variables merging, and HTML/PDF compilation",
+          "Added Category Mini Master for inline creation and dynamic selection of agreement types",
+          "Built Clause Library for drag-and-drop reusable terms with styling toolbars and plain text formatting helpers",
+          "Developed lane-based Renewal Kanban Center for tracking expiring agreements (90/60/30/7/Today days)",
+          "Created 14 live-calculated CLM Reports (Operational, Financial, Renewal, and Management) with Excel exports",
+          "Added Excel imports and exports for Employees, Contacts, and Contracts to accelerate onboarding"
+        ],
+        deployedBy: "Super Admin",
+        deployedAt: new Date("2026-07-07T20:52:00Z"),
         isActive: true
       },
       { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }

@@ -20,7 +20,19 @@ const {
     getWarrantyTemplate,
     getAmcTemplate,
     importTickets,
-    getTicketTemplate
+    getTicketTemplate,
+    importVendors,
+    getVendorTemplate,
+    importPriceBooks,
+    getPriceBookTemplate,
+    importPriceBookItems,
+    getPriceBookItemTemplate,
+    importEmployees,
+    getEmployeeTemplate,
+    importContacts,
+    getContactTemplate,
+    importContracts,
+    getContractTemplate
 } = require('../controllers/importController');
 
 // Multer memory storage for Excel/CSV files
@@ -53,6 +65,13 @@ router.post('/planning', protect, upload.single('file'), importPlanning);
 router.post('/warranties', protect, upload.single('file'), importWarranties);
 router.post('/amcs', protect, upload.single('file'), importAmcs);
 router.post('/tickets', protect, upload.single('file'), importTickets);
+router.post('/vendors', protect, upload.single('file'), importVendors);
+router.post('/price-books', protect, upload.single('file'), importPriceBooks);
+router.post('/price-book-items/:priceBookId', protect, upload.single('file'), importPriceBookItems);
+
+router.post('/employees', protect, upload.single('file'), importEmployees);
+router.post('/contacts', protect, upload.single('file'), importContacts);
+router.post('/contracts', protect, upload.single('file'), importContracts);
 
 // Template download routes
 router.get('/template/products', getProductTemplate);
@@ -63,6 +82,12 @@ router.get('/template/planning', protect, getPlanningTemplate);
 router.get('/template/warranties', protect, getWarrantyTemplate);
 router.get('/template/amcs', protect, getAmcTemplate);
 router.get('/template/tickets', protect, getTicketTemplate);
+router.get('/template/vendors', getVendorTemplate);
+router.get('/template/price-books', getPriceBookTemplate);
+router.get('/template/price-book-items', getPriceBookItemTemplate);
+router.get('/template/employees', getEmployeeTemplate);
+router.get('/template/contacts', getContactTemplate);
+router.get('/template/contracts', getContractTemplate);
 
 // Debug endpoint to read Excel headers
 router.post('/debug-headers', upload.single('file'), (req, res) => {

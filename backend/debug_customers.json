@@ -1,16 +1,16 @@
 [
   {
+    "_id": "695a75e7ac70ed0e6a2ffba8",
+    "customerName": "John Doe",
+    "companyName": "JD Interiors & Designs",
+    "gstin": "27AAACJ1234A1Z1"
+  },
+  {
     "_id": "695a75e7ac70ed0e6a2ffba9",
     "customerName": "Sarah Smith",
     "companyName": "Alpha Builders Pvt Ltd",
     "gstin": "24AABCA5678B1Z2",
     "logoUrl": "https://biswjczulbtwqufsviha.supabase.co/storage/v1/object/public/images/uploads/ecf0b8dd-b792-4ebc-8112-7c5e191a46d7-OIP%20(1).jpg"
-  },
-  {
-    "_id": "695a75e7ac70ed0e6a2ffba8",
-    "customerName": "John Doe",
-    "companyName": "JD Interiors & Designs",
-    "gstin": "27AAACJ1234A1Z1"
   },
   {
     "_id": "69c2b4fb63acac947831a5dd",
@@ -18129,8 +18129,8 @@
   },
   {
     "_id": "6a45353cddff79a92160e0c7",
-    "customerName": "dfghghk",
-    "companyName": "dfghghk",
+    "customerName": "D13200",
+    "companyName": "DRUSTER",
     "gstin": ""
   },
   {
@@ -18156,6 +18156,83 @@
     "customerName": "SC210654",
     "companyName": "RAMAN AUTO INDUSTRY",
     "gstin": "27NCBCQ7403OLKJ",
+    "logoUrl": ""
+  },
+  {
+    "_id": "6a4a638aa014ff8e14dabbe1",
+    "customerName": "Robin Prince",
+    "companyName": "laayra Enterprises Pvt Ltd",
+    "gstin": "09AAACH7409R1ZZ",
+    "logoUrl": ""
+  },
+  {
+    "_id": "6a4a638ba014ff8e14dabbe2",
+    "customerName": "Aron Moon",
+    "companyName": "restile Enterprises Pvt Ltd",
+    "gstin": "09AAACH7409R2ZZ",
+    "logoUrl": ""
+  },
+  {
+    "_id": "6a4a638ca014ff8e14dabbe3",
+    "customerName": "Naya House",
+    "companyName": "lemma Enterprises Pvt Ltd",
+    "gstin": "09AAACH7409R3ZZ",
+    "logoUrl": ""
+  },
+  {
+    "_id": "6a4a638ca014ff8e14dabbe4",
+    "customerName": "Yehuda Marshall",
+    "companyName": "DRA Enterprises Pvt Ltd",
+    "gstin": "09AAACH7409R4ZZ",
+    "logoUrl": ""
+  },
+  {
+    "_id": "6a4a638da014ff8e14dabbe5",
+    "customerName": "Adalyn Guerrero",
+    "companyName": "AMAZON Enterprises Pvt Ltd",
+    "gstin": "09AAACH7409R5ZZ",
+    "logoUrl": ""
+  },
+  {
+    "_id": "6a4a638ea014ff8e14dabbe6",
+    "customerName": "Bryce Walls",
+    "companyName": "JCC Enterprises Pvt Ltd",
+    "gstin": "09AAACH7409R6ZZ",
+    "logoUrl": ""
+  },
+  {
+    "_id": "6a4a638fa014ff8e14dabbe7",
+    "customerName": "Lilianna Burgess",
+    "companyName": "hight Enterprises Pvt Ltd",
+    "gstin": "09AAACH7409R7ZZ",
+    "logoUrl": ""
+  },
+  {
+    "_id": "6a4a6390a014ff8e14dabbe8",
+    "customerName": "Kolton Wang",
+    "companyName": "jahrast Enterprises Pvt Ltd",
+    "gstin": "09AAACH7409R8ZZ",
+    "logoUrl": ""
+  },
+  {
+    "_id": "6a4a6391a014ff8e14dabbe9",
+    "customerName": "Kailani Vang",
+    "companyName": "RCC Enterprises Pvt Ltd",
+    "gstin": "09AAACH7409R10Z",
+    "logoUrl": ""
+  },
+  {
+    "_id": "6a4a6392a014ff8e14dabbea",
+    "customerName": "Jimmy Warren",
+    "companyName": "BCC Enterprises Pvt Ltd",
+    "gstin": "09AAACH7409R11Z",
+    "logoUrl": ""
+  },
+  {
+    "_id": "6a4a6393a014ff8e14dabbeb",
+    "customerName": "Sloane Ventura",
+    "companyName": "ACC Enterprises Pvt Ltd",
+    "gstin": "09AAACH7409R12Z",
     "logoUrl": ""
   }
 ]

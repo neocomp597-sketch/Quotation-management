@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { cpqService, productService, customerService } from '../services/api';
+import { cpqService, productService, customerService, importService } from '../services/api';
 import { toast } from 'react-toastify';
-import { MdAdd, MdDelete, MdEdit, MdSettings, MdLanguage, MdReceipt, MdAssignment, MdStars, MdDescription } from 'react-icons/md';
+import * as XLSX from 'xlsx';
+import { MdAdd, MdDelete, MdEdit, MdSettings, MdLanguage, MdReceipt, MdAssignment, MdStars, MdDescription, MdFileDownload, MdFileUpload } from 'react-icons/md';
 import Modal from '../components/Modal';
+import ImportModal from '../components/ImportModal';
 
 const PriceManagement = ({ mode = 'price-books' }) => {
     const [activeTab, setActiveTab] = useState(mode);
@@ -22,10 +24,77 @@ const PriceManagement = ({ mode = 'price-books' }) => {
 
     // Modals
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+    const [isItemsImportModalOpen, setIsItemsImportModalOpen] = useState(false);
     const [formData, setFormData] = useState({});
 
     // Items mapped in price book form
     const [itemFormData, setItemFormData] = useState({ productId: '', price: 0, currency: 'INR' });
+
+    const exportPriceBooksToExcel = async () => {
+        setLoading(true);
+        try {
+            const res = await cpqService.getPriceBooks();
+            const exportBooks = res.data || [];
+            if (!exportBooks.length) {
+                toast.info('No price books found to export');
+                return;
+            }
+
+            const exportData = exportBooks.map((pb) => ({
+                'Book Name': pb.name || '',
+                'Description': pb.description || '',
+                'Book Type': pb.type || '',
+                'Target ID': pb.targetId || '',
+                'Currency': pb.currency || 'INR',
+                'Valid From': pb.validFrom ? new Date(pb.validFrom).toISOString().slice(0, 10) : '',
+                'Valid To': pb.validTo ? new Date(pb.validTo).toISOString().slice(0, 10) : '',
+                'Active': pb.isActive !== false ? 'TRUE' : 'FALSE'
+            }));
+
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'PriceBooks');
+            XLSX.writeFile(wb, `PriceBooks_Master_${new Date().toISOString().slice(0, 10)}.xlsx`);
+            toast.success('Price books export completed successfully');
+        } catch (err) {
+            console.error('Export price books error:', err);
+            toast.error('Failed to export price books');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const exportPriceBookItemsToExcel = async () => {
+        if (!selectedBook) return;
+        setLoading(true);
+        try {
+            const res = await cpqService.getItemsInPriceBook(selectedBook._id);
+            const exportItems = res.data || [];
+            if (!exportItems.length) {
+                toast.info('No custom rates found in this price book to export');
+                return;
+            }
+
+            const exportData = exportItems.map((item) => ({
+                'Product Code': item.productId?.productCode || '',
+                'Product Name': item.productId?.productName || '',
+                'Price': item.price || 0,
+                'Currency': item.currency || 'INR'
+            }));
+
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Rates');
+            XLSX.writeFile(wb, `Rates_${selectedBook.name.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+            toast.success('Rates export completed successfully');
+        } catch (err) {
+            console.error('Export price book items error:', err);
+            toast.error('Failed to export custom rates');
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
         setActiveTab(mode);
@@ -186,7 +255,25 @@ const PriceManagement = ({ mode = 'price-books' }) => {
                     <h1 className="text-3xl font-black text-slate-900 capitalize tracking-tight">Price Management</h1>
                     <p className="text-slate-500 font-medium font-outfit uppercase text-[10px] tracking-widest">Acczite Pricing Hub</p>
                 </div>
-                <div>
+                <div className="flex gap-3">
+                    {activeTab === 'price-books' && (
+                        <>
+                            <button
+                                onClick={exportPriceBooksToExcel}
+                                className="flex items-center justify-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-5 py-3 rounded-2xl font-bold transition-all shadow-sm uppercase text-xs tracking-widest active:scale-95"
+                            >
+                                <MdFileDownload size={20} />
+                                <span>Export</span>
+                            </button>
+                            <button
+                                onClick={() => setIsImportModalOpen(true)}
+                                className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-emerald-600/20 uppercase text-xs tracking-widest active:scale-95"
+                            >
+                                <MdFileUpload size={20} />
+                                <span>Import</span>
+                            </button>
+                        </>
+                    )}
                     <button
                         onClick={handleOpenCreateModal}
                         className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
@@ -514,6 +601,26 @@ const PriceManagement = ({ mode = 'price-books' }) => {
             {/* Price Book Items Editor Drawer */}
             <Modal isOpen={isBookItemsModalOpen} onClose={() => setIsBookItemsModalOpen(false)} title={`Rates for: ${selectedBook?.name}`}>
                 <div className="space-y-6">
+                    <div className="flex justify-between items-center bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                        <span className="text-xs font-black text-slate-500 uppercase tracking-wider">Bulk Actions</span>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={exportPriceBookItemsToExcel}
+                                className="flex items-center gap-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 px-3.5 py-2 rounded-xl text-xs font-bold transition-all active:scale-95"
+                            >
+                                <MdFileDownload size={16} />
+                                Export Rates
+                            </button>
+                            <button
+                                onClick={() => setIsItemsImportModalOpen(true)}
+                                className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition-all active:scale-95 shadow-sm"
+                            >
+                                <MdFileUpload size={16} />
+                                Import Rates
+                            </button>
+                        </div>
+                    </div>
+
                     <form onSubmit={handleAddBookItem} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-wrap gap-4 items-end">
                         <div className="flex-1 min-w-[200px]">
                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Select Product</label>
@@ -551,6 +658,35 @@ const PriceManagement = ({ mode = 'price-books' }) => {
                     </div>
                 </div>
             </Modal>
+
+            {/* Import Price Books Modal */}
+            <ImportModal
+                isOpen={isImportModalOpen}
+                onClose={() => setIsImportModalOpen(false)}
+                title="Import Price Books"
+                onImport={async (file) => {
+                    const result = await importService.importPriceBooks(file);
+                    fetchTabContent();
+                    return result;
+                }}
+                onDownloadTemplate={importService.getPriceBookTemplate}
+            />
+
+            {/* Import Price Book Items Modal */}
+            <ImportModal
+                isOpen={isItemsImportModalOpen}
+                onClose={() => setIsItemsImportModalOpen(false)}
+                title={`Import Rates for: ${selectedBook?.name}`}
+                onImport={async (file) => {
+                    const result = await importService.importPriceBookItems(file, selectedBook?._id);
+                    if (selectedBook) {
+                        const res = await cpqService.getItemsInPriceBook(selectedBook._id);
+                        setBookItems(res.data);
+                    }
+                    return result;
+                }}
+                onDownloadTemplate={importService.getPriceBookItemTemplate}
+            />
         </div>
     );
 };

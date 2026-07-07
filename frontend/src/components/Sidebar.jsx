@@ -34,7 +34,11 @@ import {
     MdBuildCircle,
     MdSpeed,
     MdPayments,
-    MdTag
+    MdTag,
+    MdList,
+    MdSecurity,
+    MdCheckCircle,
+    MdAssessment
 } from 'react-icons/md';
 import { useAuth } from '../context/AuthContext';
 
@@ -157,8 +161,23 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                 { key: 'quotation_list', name: 'Quotations', icon: <MdDescription size={18} />, path: '/quotations' },
                 { key: 'sale_invoices', name: 'Invoices', icon: <MdReceipt size={18} />, path: '/invoices' },
                 { key: 'sales_approvals', name: 'Approvals', icon: <MdLock size={18} />, path: '/sales/approvals' },
-                { key: 'sales_contracts', name: 'Contracts', icon: <MdAssignment size={18} />, path: '/sales/contracts' },
                 { key: 'sales_orders', name: 'Orders', icon: <MdShoppingCart size={18} />, path: '/sales/orders' },
+            ]
+        },
+        {
+            type: 'group',
+            name: 'Contract Management',
+            key: 'clm',
+            icon: <MdAssignment size={22} />,
+            children: [
+                { key: 'sales_contracts', name: 'Dashboard', icon: <MdDashboard size={18} />, path: '/sales/contracts/dashboard' },
+                { key: 'sales_contracts', name: 'Contracts', icon: <MdList size={18} />, path: '/sales/contracts/list' },
+                { key: 'sales_contracts', name: 'Templates', icon: <MdFolderOpen size={18} />, path: '/sales/contracts/templates' },
+                { key: 'sales_contracts', name: 'Clauses Library', icon: <MdSecurity size={18} />, path: '/sales/contracts/clauses' },
+                { key: 'sales_contracts', name: 'Approvals Queue', icon: <MdCheckCircle size={18} />, path: '/sales/contracts/approvals' },
+                { key: 'sales_contracts', name: 'Renewals Kanban', icon: <MdViewKanban size={18} />, path: '/sales/contracts/renewals' },
+                { key: 'sales_contracts', name: 'Reports', icon: <MdAssessment size={18} />, path: '/sales/contracts/reports' },
+                { key: 'sales_contracts', name: 'Settings', icon: <MdSettings size={18} />, path: '/sales/contracts/settings' },
             ]
         },
 

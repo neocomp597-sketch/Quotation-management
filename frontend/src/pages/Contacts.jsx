@@ -3,8 +3,9 @@ import { MdAdd, MdDelete, MdEdit, MdSearch, MdContactPhone, MdFileDownload } fro
 import { toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
 import Modal from '../components/Modal';
+import ImportModal from '../components/ImportModal';
 import PaginationControls from '../components/PaginationControls';
-import { contactService, customerService, csmService } from '../services/api';
+import { contactService, customerService, csmService, importService } from '../services/api';
 import SearchableSelect from '../components/SearchableSelect';
 
 const LIST_PAGE_SIZE = 20;
@@ -53,6 +54,7 @@ const Contacts = () => {
     const [page, setPage] = useState(1);
     const [pagination, setPagination] = useState({ page: 1, limit: LIST_PAGE_SIZE, total: 0, pages: 1 });
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [editingContact, setEditingContact] = useState(null);
     const [formData, setFormData] = useState(defaultForm);
 
@@ -359,6 +361,13 @@ const Contacts = () => {
                     >
                         <MdFileDownload size={18} />
                         <span>Export</span>
+                    </button>
+                    <button
+                        onClick={() => setIsImportModalOpen(true)}
+                        className="flex items-center justify-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-5 py-3 rounded-2xl font-bold transition-all shadow-sm uppercase text-xs tracking-widest active:scale-95"
+                    >
+                        <MdFileDownload className="rotate-180" size={18} />
+                        <span>Import</span>
                     </button>
                     <button
                         onClick={() => openModal()}
@@ -765,6 +774,20 @@ const Contacts = () => {
                     </div>
                 </div>
             </Modal>
+
+            {/* Import Modal */}
+            <ImportModal
+                isOpen={isImportModalOpen}
+                onClose={() => setIsImportModalOpen(false)}
+                title="Import Contacts"
+                type="contacts"
+                onImport={async (file) => {
+                    const result = await importService.importContacts(file);
+                    fetchContacts(); // Refresh contacts after import
+                    return result;
+                }}
+                onDownloadTemplate={importService.getContactTemplate}
+            />
         </div>
     );
 };
