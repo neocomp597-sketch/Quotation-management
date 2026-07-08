@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { MdClose } from 'react-icons/md';
 
-const Modal = ({ isOpen, onClose, title, children, footer, maxWidth = 'max-w-2xl', hideHeader = false }) => {
+const Modal = ({ isOpen, onClose, title, children, footer, maxWidth = 'max-w-2xl', hideHeader = false, scrollable = true }) => {
     useEffect(() => {
         if (isOpen) {
             document.body.style.overflow = 'hidden';
@@ -28,7 +28,7 @@ const Modal = ({ isOpen, onClose, title, children, footer, maxWidth = 'max-w-2xl
 
             {/* Modal Container with focus on centered placement and premium feel */}
             <div
-                className={`relative bg-white w-full ${maxWidth} rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.2)] overflow-hidden transform transition-all duration-300 ease-out scale-100 opacity-100 flex flex-col max-h-[90vh]`}
+                className={`relative bg-white w-full ${maxWidth} rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.2)] transform transition-all duration-300 ease-out scale-100 opacity-100 ${scrollable ? 'overflow-hidden flex flex-col max-h-[90vh]' : 'overflow-visible'}`}
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}
@@ -49,7 +49,7 @@ const Modal = ({ isOpen, onClose, title, children, footer, maxWidth = 'max-w-2xl
                 )}
 
                 {/* Content Area */}
-                <div className="px-5 py-5 md:px-8 md:py-8 overflow-y-auto custom-scrollbar flex-1">
+                <div className={`px-5 py-5 md:px-8 md:py-8 flex-1 ${scrollable ? 'overflow-y-auto custom-scrollbar' : 'overflow-visible'}`}>
                     {children}
                 </div>
 

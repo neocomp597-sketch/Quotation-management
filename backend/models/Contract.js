@@ -10,7 +10,7 @@ const ContractSchema = new mongoose.Schema({
     endDate: { type: Date, required: true },
     status: { type: String, enum: ['Draft', 'Active', 'Expired', 'Terminated', 'Pending Approval', 'Approved', 'Cancelled', 'Renewed'], default: 'Draft', index: true },
     renewalRules: { type: String, default: '' },
-    category: { type: String, enum: ['Sales Agreement', 'AMC', 'NDA', 'Vendor Agreement', 'Maintenance', 'Rental', 'Employment', 'Consultancy'], default: 'Sales Agreement', index: true },
+    category: { type: String, default: 'Sales Agreement', index: true },
     value: { type: Number, default: 0 },
     owner: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true },
     approvalStatus: { type: String, enum: ['Draft', 'Pending Approval', 'Approved', 'Rejected'], default: 'Draft', index: true },

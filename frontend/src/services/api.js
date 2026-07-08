@@ -850,7 +850,11 @@ export const clmService = {
   deleteTemplate: (id) => api.delete(`/clm/templates/${id}`),
   generateDocument: (data) => api.post("/clm/generate", data),
   getVersions: (contractId) => api.get(`/clm/versions/${contractId}`),
-  getVersionHtmlUrl: (id) => `${api.defaults.baseURL || "/api"}/clm/version-html/${id}`,
+  getVersionHtmlUrl: (id) => {
+    const token = getAccessToken();
+    const baseUrl = api.defaults.baseURL || "/api";
+    return token ? `${baseUrl}/clm/version-html/${id}?token=${token}` : `${baseUrl}/clm/version-html/${id}`;
+  },
   getCategories: () => api.get("/clm/categories"),
   createCategory: (data) => api.post("/clm/categories", data),
   deleteCategory: (id) => api.delete(`/clm/categories/${id}`),

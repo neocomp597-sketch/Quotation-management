@@ -29,7 +29,6 @@ const Contracts = ({ mode = 'dashboard' }) => {
     // In-place Contract Workspace focus
     const [activeWorkspaceContract, setActiveWorkspaceContract] = useState(null);
     const [workspaceTab, setWorkspaceTab] = useState('overview');
-
     // Core Data State
     const [contracts, setContracts] = useState([]);
     const [customers, setCustomers] = useState([]);
@@ -54,6 +53,14 @@ const Contracts = ({ mode = 'dashboard' }) => {
     // Editor content states
     const [editorHtml, setEditorHtml] = useState('');
     const [editorStyles, setEditorStyles] = useState('');
+
+    const documentEditorRef = React.useRef(null);
+
+    useEffect(() => {
+        if (documentEditorRef.current && documentEditorRef.current.innerHTML !== editorHtml) {
+            documentEditorRef.current.innerHTML = editorHtml || '';
+        }
+    }, [editorHtml]);
 
     // Modals
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -81,7 +88,7 @@ const Contracts = ({ mode = 'dashboard' }) => {
         customerId: '',
         startDate: '',
         endDate: '',
-        value: 0,
+        value: '',
         category: 'Sales Agreement',
         renewalRules: 'Auto-Renew annually'
     });
@@ -99,6 +106,22 @@ const Contracts = ({ mode = 'dashboard' }) => {
         htmlContent: '<h1>Agreement</h1><p>Insert terms here...</p>',
         cssContent: ''
     });
+
+    const templateEditorRef = React.useRef(null);
+
+    useEffect(() => {
+        if (templateEditorRef.current && templateEditorRef.current.innerHTML !== templateForm.htmlContent) {
+            templateEditorRef.current.innerHTML = templateForm.htmlContent || '';
+        }
+    }, [templateForm.htmlContent]);
+
+    const clauseEditorRef = React.useRef(null);
+
+    useEffect(() => {
+        if (clauseEditorRef.current && clauseEditorRef.current.innerHTML !== clauseForm.content) {
+            clauseEditorRef.current.innerHTML = clauseForm.content || '';
+        }
+    }, [clauseForm.content]);
 
     // Filters
     const [contractsFilter, setContractsFilter] = useState('All');
@@ -688,9 +711,22 @@ const Contracts = ({ mode = 'dashboard' }) => {
     const handleCreateContract = async (e) => {
         e.preventDefault();
         try {
-            await clmService.createContract(contractForm);
+            await clmService.createContract({
+                ...contractForm,
+                value: contractForm.value === '' ? 0 : Number(contractForm.value)
+            });
             toast.success("New locked agreement created!");
             setIsCreateModalOpen(false);
+            setContractForm({
+                contractNumber: '',
+                title: '',
+                customerId: '',
+                startDate: '',
+                endDate: '',
+                value: '',
+                category: 'Sales Agreement',
+                renewalRules: 'Auto-Renew annually'
+            });
             fetchContracts();
             fetchDashboard();
         } catch (err) {
@@ -781,7 +817,8 @@ const Contracts = ({ mode = 'dashboard' }) => {
         try {
             await clmService.generateDocument({
                 contractId: activeWorkspaceContract._id,
-                templateId: selectedTemplateId
+                templateId: selectedTemplateId,
+                customHtml: editorHtml
             });
             toast.success("Contract snapshot compiled successfully!");
             
@@ -982,7 +1019,7 @@ const Contracts = ({ mode = 'dashboard' }) => {
                                 <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div className="space-y-3">
                                         <div className="flex justify-between items-center">
-                                            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Document Editor HTML</h4>
+                                            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Document Editor</h4>
                                             <button 
                                                 onClick={handleCompileDocument}
                                                 className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-md active:scale-95"
@@ -990,11 +1027,104 @@ const Contracts = ({ mode = 'dashboard' }) => {
                                                 Generate PDF Snapshot
                                             </button>
                                         </div>
-                                        <textarea 
-                                            value={editorHtml}
-                                            onChange={(e) => setEditorHtml(e.target.value)}
-                                            className="w-full h-[400px] p-4 bg-slate-900 text-indigo-300 font-mono text-xs rounded-3xl outline-none focus:ring-2 focus:ring-primary-500 border-none"
-                                        />
+                                        <div className="flex flex-col border border-slate-200 rounded-[2rem] overflow-hidden bg-white shadow-sm focus-within:ring-2 focus-within:ring-primary-500 transition-all">
+                                            {/* Rich text editing toolbar */}
+                                            <div className="flex flex-wrap items-center gap-1.5 p-3 bg-slate-50 border-b border-slate-100">
+                                                <button
+                                                    type="button"
+                                                    onMouseDown={(e) => {
+                                                        e.preventDefault();
+                                                        if (documentEditorRef.current) documentEditorRef.current.focus();
+                                                        document.execCommand('bold', false, null);
+                                                        if (documentEditorRef.current) setEditorHtml(documentEditorRef.current.innerHTML);
+                                                    }}
+                                                    className="w-8 h-8 flex items-center justify-center bg-white hover:bg-slate-100 border border-slate-200 rounded-xl text-sm font-black text-slate-800 transition-all active:scale-95"
+                                                    title="Bold"
+                                                >
+                                                    B
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onMouseDown={(e) => {
+                                                        e.preventDefault();
+                                                        if (documentEditorRef.current) documentEditorRef.current.focus();
+                                                        document.execCommand('italic', false, null);
+                                                        if (documentEditorRef.current) setEditorHtml(documentEditorRef.current.innerHTML);
+                                                    }}
+                                                    className="w-8 h-8 flex items-center justify-center bg-white hover:bg-slate-100 border border-slate-200 rounded-xl text-sm font-serif italic font-bold text-slate-800 transition-all active:scale-95"
+                                                    title="Italic"
+                                                >
+                                                    I
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onMouseDown={(e) => {
+                                                        e.preventDefault();
+                                                        if (documentEditorRef.current) documentEditorRef.current.focus();
+                                                        document.execCommand('underline', false, null);
+                                                        if (documentEditorRef.current) setEditorHtml(documentEditorRef.current.innerHTML);
+                                                    }}
+                                                    className="w-8 h-8 flex items-center justify-center bg-white hover:bg-slate-100 border border-slate-200 rounded-xl text-sm underline font-bold text-slate-800 transition-all active:scale-95"
+                                                    title="Underline"
+                                                >
+                                                    U
+                                                </button>
+                                                <div className="h-5 w-px bg-slate-200 mx-1"></div>
+                                                <button
+                                                    type="button"
+                                                    onMouseDown={(e) => {
+                                                        e.preventDefault();
+                                                        if (documentEditorRef.current) documentEditorRef.current.focus();
+                                                        document.execCommand('insertUnorderedList', false, null);
+                                                        if (documentEditorRef.current) setEditorHtml(documentEditorRef.current.innerHTML);
+                                                    }}
+                                                    className="px-2.5 h-8 flex items-center justify-center bg-white hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 transition-all active:scale-95 gap-1"
+                                                    title="Bullet List"
+                                                >
+                                                    • List
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onMouseDown={(e) => {
+                                                        e.preventDefault();
+                                                        if (documentEditorRef.current) documentEditorRef.current.focus();
+                                                        document.execCommand('insertOrderedList', false, null);
+                                                        if (documentEditorRef.current) setEditorHtml(documentEditorRef.current.innerHTML);
+                                                    }}
+                                                    className="px-2.5 h-8 flex items-center justify-center bg-white hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 transition-all active:scale-95 gap-1"
+                                                    title="Numbered List"
+                                                >
+                                                    1. List
+                                                </button>
+                                                <div className="h-5 w-px bg-slate-200 mx-1"></div>
+                                                <button
+                                                    type="button"
+                                                    onMouseDown={(e) => {
+                                                        e.preventDefault();
+                                                        if (documentEditorRef.current) documentEditorRef.current.focus();
+                                                        document.execCommand('removeFormat', false, null);
+                                                        if (documentEditorRef.current) setEditorHtml(documentEditorRef.current.innerHTML);
+                                                    }}
+                                                    className="px-2.5 h-8 flex items-center justify-center bg-white hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-medium text-red-600 hover:text-red-700 transition-all active:scale-95"
+                                                    title="Clear Formatting"
+                                                >
+                                                    Clear
+                                                </button>
+                                            </div>
+                                            
+                                            {/* Rich text editing area */}
+                                            <div
+                                                ref={documentEditorRef}
+                                                contentEditable
+                                                onInput={() => {
+                                                    if (documentEditorRef.current) {
+                                                        setEditorHtml(documentEditorRef.current.innerHTML);
+                                                    }
+                                                }}
+                                                className="w-full h-[360px] p-5 bg-white text-slate-800 font-sans text-sm outline-none overflow-y-auto prose prose-sm max-w-none"
+                                                style={{ minHeight: '360px' }}
+                                            />
+                                        </div>
                                     </div>
 
                                     <div className="space-y-3">
@@ -1760,7 +1890,7 @@ const Contracts = ({ mode = 'dashboard' }) => {
                 )}
 
             {/* CREATE CONTRACT MODAL */}
-            <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} title="Create Agreement">
+            <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} title="Create Agreement" scrollable={false}>
                 <form onSubmit={handleCreateContract} className="space-y-4">
                     <div>
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Contract / Document Number</label>
@@ -1878,7 +2008,7 @@ const Contracts = ({ mode = 'dashboard' }) => {
                             type="number" 
                             className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-semibold"
                             value={contractForm.value}
-                            onChange={e => setContractForm({ ...contractForm, value: Number(e.target.value) })}
+                            onChange={e => setContractForm({ ...contractForm, value: e.target.value })}
                         />
                     </div>
 
@@ -1923,37 +2053,105 @@ const Contracts = ({ mode = 'dashboard' }) => {
                     </div>
 
                     <div>
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Clause Content (Plain text is auto-formatted)</label>
-                        <div className="flex gap-2 mb-2">
-                            <button
-                                type="button"
-                                onClick={() => setClauseForm(prev => ({ ...prev, content: prev.content + '<strong>bold text</strong>' }))}
-                                className="px-3 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg text-[10px] font-bold text-slate-700"
-                            >
-                                Bold
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setClauseForm(prev => ({ ...prev, content: prev.content + '<em>italic text</em>' }))}
-                                className="px-3 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg text-[10px] font-bold text-slate-700"
-                            >
-                                Italic
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setClauseForm(prev => ({ ...prev, content: prev.content + '<br />' }))}
-                                className="px-3 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg text-[10px] font-bold text-slate-700"
-                            >
-                                Line Break
-                            </button>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Clause Content</label>
+                        <div className="flex flex-col border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-sm focus-within:ring-2 focus-within:ring-primary-500 transition-all">
+                            {/* Rich text editing toolbar */}
+                            <div className="flex flex-wrap items-center gap-1.5 p-2.5 bg-slate-50 border-b border-slate-100">
+                                <button
+                                                    type="button"
+                                                    onMouseDown={(e) => {
+                                                        e.preventDefault();
+                                                        if (clauseEditorRef.current) clauseEditorRef.current.focus();
+                                                        document.execCommand('bold', false, null);
+                                                        if (clauseEditorRef.current) setClauseForm(prev => ({ ...prev, content: clauseEditorRef.current.innerHTML }));
+                                                    }}
+                                                    className="w-7 h-7 flex items-center justify-center bg-white hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-black text-slate-800 transition-all active:scale-95"
+                                                    title="Bold"
+                                                >
+                                                    B
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onMouseDown={(e) => {
+                                                        e.preventDefault();
+                                                        if (clauseEditorRef.current) clauseEditorRef.current.focus();
+                                                        document.execCommand('italic', false, null);
+                                                        if (clauseEditorRef.current) setClauseForm(prev => ({ ...prev, content: clauseEditorRef.current.innerHTML }));
+                                                    }}
+                                                    className="w-7 h-7 flex items-center justify-center bg-white hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-serif italic font-bold text-slate-800 transition-all active:scale-95"
+                                                    title="Italic"
+                                                >
+                                                    I
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onMouseDown={(e) => {
+                                                        e.preventDefault();
+                                                        if (clauseEditorRef.current) clauseEditorRef.current.focus();
+                                                        document.execCommand('underline', false, null);
+                                                        if (clauseEditorRef.current) setClauseForm(prev => ({ ...prev, content: clauseEditorRef.current.innerHTML }));
+                                                    }}
+                                                    className="w-7 h-7 flex items-center justify-center bg-white hover:bg-slate-100 border border-slate-200 rounded-xl text-xs underline font-bold text-slate-800 transition-all active:scale-95"
+                                                    title="Underline"
+                                                >
+                                                    U
+                                                </button>
+                                                <div className="h-4 w-px bg-slate-200 mx-1"></div>
+                                                <button
+                                                    type="button"
+                                                    onMouseDown={(e) => {
+                                                        e.preventDefault();
+                                                        if (clauseEditorRef.current) clauseEditorRef.current.focus();
+                                                        document.execCommand('insertUnorderedList', false, null);
+                                                        if (clauseEditorRef.current) setClauseForm(prev => ({ ...prev, content: clauseEditorRef.current.innerHTML }));
+                                                    }}
+                                                    className="px-2 h-7 flex items-center justify-center bg-white hover:bg-slate-100 border border-slate-200 rounded-xl text-[10px] font-bold text-slate-800 transition-all active:scale-95 gap-1"
+                                                    title="Bullet List"
+                                                >
+                                                    • List
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onMouseDown={(e) => {
+                                                        e.preventDefault();
+                                                        if (clauseEditorRef.current) clauseEditorRef.current.focus();
+                                                        document.execCommand('insertOrderedList', false, null);
+                                                        if (clauseEditorRef.current) setClauseForm(prev => ({ ...prev, content: clauseEditorRef.current.innerHTML }));
+                                                    }}
+                                                    className="px-2 h-7 flex items-center justify-center bg-white hover:bg-slate-100 border border-slate-200 rounded-xl text-[10px] font-bold text-slate-800 transition-all active:scale-95 gap-1"
+                                                    title="Numbered List"
+                                                >
+                                                    1. List
+                                                </button>
+                                                <div className="h-4 w-px bg-slate-200 mx-1"></div>
+                                                <button
+                                                    type="button"
+                                                    onMouseDown={(e) => {
+                                                        e.preventDefault();
+                                                        if (clauseEditorRef.current) clauseEditorRef.current.focus();
+                                                        document.execCommand('removeFormat', false, null);
+                                                        if (clauseEditorRef.current) setClauseForm(prev => ({ ...prev, content: clauseEditorRef.current.innerHTML }));
+                                                    }}
+                                                    className="px-2 h-7 flex items-center justify-center bg-white hover:bg-slate-100 border border-slate-200 rounded-xl text-[10px] font-medium text-red-600 hover:text-red-700 transition-all active:scale-95"
+                                                    title="Clear Formatting"
+                                                >
+                                    Clear
+                                </button>
+                            </div>
+                            
+                            {/* Rich text editing area */}
+                            <div
+                                ref={clauseEditorRef}
+                                contentEditable
+                                onInput={() => {
+                                    if (clauseEditorRef.current) {
+                                        setClauseForm(prev => ({ ...prev, content: clauseEditorRef.current.innerHTML }));
+                                    }
+                                }}
+                                className="w-full h-32 p-4 bg-white text-slate-800 font-sans text-sm outline-none overflow-y-auto prose prose-sm max-w-none"
+                                style={{ minHeight: '8rem' }}
+                            />
                         </div>
-                        <textarea 
-                            required 
-                            value={clauseForm.content}
-                            onChange={e => setClauseForm({ ...clauseForm, content: e.target.value })}
-                            placeholder="Type standard text here. No HTML is required. For example:&#10;&#10;Payment should be made within 30 days. Late payments are subject to a fee."
-                            className="w-full h-32 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-semibold"
-                        />
                     </div>
 
                     <div>
@@ -1975,7 +2173,7 @@ const Contracts = ({ mode = 'dashboard' }) => {
             </Modal>
 
             {/* CREATE TEMPLATE MODAL */}
-            <Modal isOpen={isTemplateModalOpen} onClose={() => setIsTemplateModalOpen(false)} title="Create HTML Document Template">
+            <Modal isOpen={isTemplateModalOpen} onClose={() => setIsTemplateModalOpen(false)} title="Create Document Template">
                 <form onSubmit={handleCreateTemplate} className="space-y-4">
                     <div>
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Template Name</label>
@@ -2004,37 +2202,117 @@ const Contracts = ({ mode = 'dashboard' }) => {
                     </div>
 
                     <div>
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Template Body Content (HTML or Plain Text)</label>
-                        <div className="flex gap-2 mb-2">
-                            <button
-                                type="button"
-                                onClick={() => setTemplateForm(prev => ({ ...prev, htmlContent: prev.htmlContent + '<strong>bold text</strong>' }))}
-                                className="px-3 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg text-[10px] font-bold text-slate-700"
-                            >
-                                Bold
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setTemplateForm(prev => ({ ...prev, htmlContent: prev.htmlContent + '<em>italic text</em>' }))}
-                                className="px-3 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg text-[10px] font-bold text-slate-700"
-                            >
-                                Italic
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setTemplateForm(prev => ({ ...prev, htmlContent: prev.htmlContent + '<br />' }))}
-                                className="px-3 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg text-[10px] font-bold text-slate-700"
-                            >
-                                Line Break
-                            </button>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Template Body Content</label>
+                        <div className="flex flex-col border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-sm focus-within:ring-2 focus-within:ring-primary-500 transition-all">
+                            {/* Rich text editing toolbar */}
+                            <div className="flex flex-wrap items-center gap-1.5 p-2.5 bg-slate-50 border-b border-slate-100">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (templateEditorRef.current) templateEditorRef.current.focus();
+                                        document.execCommand('bold', false, null);
+                                        if (templateEditorRef.current) setTemplateForm(prev => ({ ...prev, htmlContent: templateEditorRef.current.innerHTML }));
+                                    }}
+                                    className="w-7 h-7 flex items-center justify-center bg-white hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-black text-slate-800 transition-all active:scale-95"
+                                    title="Bold"
+                                >
+                                    B
+                                </button>
+                                <button
+                                    type="button"
+                                    onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        if (templateEditorRef.current) templateEditorRef.current.focus();
+                                        document.execCommand('bold', false, null);
+                                        if (templateEditorRef.current) setTemplateForm(prev => ({ ...prev, htmlContent: templateEditorRef.current.innerHTML }));
+                                    }}
+                                    className="w-7 h-7 flex items-center justify-center bg-white hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-black text-slate-800 transition-all active:scale-95"
+                                    title="Bold"
+                                >
+                                    B
+                                </button>
+                                <button
+                                    type="button"
+                                    onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        if (templateEditorRef.current) templateEditorRef.current.focus();
+                                        document.execCommand('italic', false, null);
+                                        if (templateEditorRef.current) setTemplateForm(prev => ({ ...prev, htmlContent: templateEditorRef.current.innerHTML }));
+                                    }}
+                                    className="w-7 h-7 flex items-center justify-center bg-white hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-serif italic font-bold text-slate-800 transition-all active:scale-95"
+                                    title="Italic"
+                                >
+                                    I
+                                </button>
+                                <button
+                                    type="button"
+                                    onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        if (templateEditorRef.current) templateEditorRef.current.focus();
+                                        document.execCommand('underline', false, null);
+                                        if (templateEditorRef.current) setTemplateForm(prev => ({ ...prev, htmlContent: templateEditorRef.current.innerHTML }));
+                                    }}
+                                    className="w-7 h-7 flex items-center justify-center bg-white hover:bg-slate-100 border border-slate-200 rounded-xl text-xs underline font-bold text-slate-800 transition-all active:scale-95"
+                                    title="Underline"
+                                >
+                                    U
+                                </button>
+                                <div className="h-4 w-px bg-slate-200 mx-1"></div>
+                                <button
+                                    type="button"
+                                    onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        if (templateEditorRef.current) templateEditorRef.current.focus();
+                                        document.execCommand('insertUnorderedList', false, null);
+                                        if (templateEditorRef.current) setTemplateForm(prev => ({ ...prev, htmlContent: templateEditorRef.current.innerHTML }));
+                                    }}
+                                    className="px-2 h-7 flex items-center justify-center bg-white hover:bg-slate-100 border border-slate-200 rounded-xl text-[10px] font-bold text-slate-800 transition-all active:scale-95 gap-1"
+                                    title="Bullet List"
+                                >
+                                    • List
+                                </button>
+                                <button
+                                    type="button"
+                                    onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        if (templateEditorRef.current) templateEditorRef.current.focus();
+                                        document.execCommand('insertOrderedList', false, null);
+                                        if (templateEditorRef.current) setTemplateForm(prev => ({ ...prev, htmlContent: templateEditorRef.current.innerHTML }));
+                                    }}
+                                    className="px-2 h-7 flex items-center justify-center bg-white hover:bg-slate-100 border border-slate-200 rounded-xl text-[10px] font-bold text-slate-800 transition-all active:scale-95 gap-1"
+                                    title="Numbered List"
+                                >
+                                    1. List
+                                </button>
+                                <div className="h-4 w-px bg-slate-200 mx-1"></div>
+                                <button
+                                    type="button"
+                                    onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        if (templateEditorRef.current) templateEditorRef.current.focus();
+                                        document.execCommand('removeFormat', false, null);
+                                        if (templateEditorRef.current) setTemplateForm(prev => ({ ...prev, htmlContent: templateEditorRef.current.innerHTML }));
+                                    }}
+                                    className="px-2 h-7 flex items-center justify-center bg-white hover:bg-slate-100 border border-slate-200 rounded-xl text-[10px] font-medium text-red-600 hover:text-red-700 transition-all active:scale-95"
+                                    title="Clear Formatting"
+                                >
+                                    Clear
+                                </button>
+                            </div>
+                            
+                            {/* Rich text editing area */}
+                            <div
+                                ref={templateEditorRef}
+                                contentEditable
+                                onInput={() => {
+                                    if (templateEditorRef.current) {
+                                        setTemplateForm(prev => ({ ...prev, htmlContent: templateEditorRef.current.innerHTML }));
+                                    }
+                                }}
+                                className="w-full h-48 p-4 bg-white text-slate-800 font-sans text-sm outline-none overflow-y-auto prose prose-sm max-w-none"
+                                style={{ minHeight: '12rem' }}
+                            />
                         </div>
-                        <textarea 
-                            required 
-                            value={templateForm.htmlContent}
-                            onChange={e => setTemplateForm({ ...templateForm, htmlContent: e.target.value })}
-                            placeholder="Type standard text or HTML template content. Regular text will be automatically formatted to paragraphs on save."
-                            className="w-full h-40 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none text-xs font-semibold"
-                        />
                     </div>
 
                     <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">

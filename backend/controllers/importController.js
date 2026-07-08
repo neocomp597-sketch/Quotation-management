@@ -2328,8 +2328,6 @@ const getPriceBookItemTemplate = async (req, res) => {
     }
 };
 
-};
-
 const importEmployees = async (req, res) => {
     try {
         if (!req.file) {

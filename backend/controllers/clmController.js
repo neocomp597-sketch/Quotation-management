@@ -358,7 +358,7 @@ const deleteTemplate = async (req, res) => {
 // 5. Document Pipeline
 const generateDocument = async (req, res) => {
     try {
-        const { contractId, templateId } = req.body;
+        const { contractId, templateId, customHtml } = req.body;
         const companyId = req.user?.companyId;
 
         // Fetch contract, template, customer, and company settings
@@ -432,7 +432,7 @@ const generateDocument = async (req, res) => {
         };
 
         // Merge values
-        let mergedHtml = template.htmlContent || '';
+        let mergedHtml = customHtml || template.htmlContent || '';
         Object.entries(variables).forEach(([token, val]) => {
             const escapedToken = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             mergedHtml = mergedHtml.replace(new RegExp(escapedToken, 'g'), val);
