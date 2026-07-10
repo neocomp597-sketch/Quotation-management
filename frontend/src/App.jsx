@@ -10,6 +10,7 @@ import Products from './pages/Products';
 import MGRMaster from './pages/MGRMaster';
 import Quotations from './pages/Quotations';
 import CreateQuotation from './pages/CreateQuotation';
+import QuoteConversionReport from './pages/QuoteConversionReport';
 import Terms from './pages/Terms';
 import LandingPage from './pages/LandingPage';
 import Login from './pages/Login';
@@ -143,6 +144,7 @@ function App() {
             <Route path="/simulations" element={<PermissionRoute permissionKey="planning_simulations"><Layout><Simulations /></Layout></PermissionRoute>} />
             <Route path="/reports" element={<PermissionRoute permissionKey="reports_main"><Layout><Reports /></Layout></PermissionRoute>} />
             <Route path="/quotations" element={<PermissionRoute permissionKey="quotation_list"><Layout><Quotations /></Layout></PermissionRoute>} />
+            <Route path="/quotations/conversion-report" element={<PermissionRoute permissionKey="reports_main"><Layout><QuoteConversionReport /></Layout></PermissionRoute>} />
             <Route path="/quotations/new" element={<PermissionRoute permissionKey="quotation_list"><Layout><CreateQuotation /></Layout></PermissionRoute>} />
             <Route path="/quotations/:id" element={<PermissionRoute permissionKey="quotation_list"><Layout><CreateQuotation /></Layout></PermissionRoute>} />
             <Route path="/terms" element={<PermissionRoute permissionKey="master_terms"><Layout><Terms /></Layout></PermissionRoute>} />

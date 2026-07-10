@@ -211,6 +211,7 @@ export const quotationService = {
   downloadPdf: (id) =>
     api.get(`/quotations/${id}/pdf`, { responseType: "blob" }),
   getReports: () => api.get("/quotations/reports"),
+  getConversionReport: () => api.get("/quotations/conversion-report"),
   getDraft: (draftKey = "new") => api.get(`/quotations/drafts/${draftKey}`),
   autosaveDraft: (draftKey = "new", payload) =>
     api.put(`/quotations/drafts/${draftKey}`, payload),

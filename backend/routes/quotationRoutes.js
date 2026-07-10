@@ -9,6 +9,7 @@ const {
     getAllQuotations,
     finalizeQuotation,
     getReports,
+    getConversionReport,
     getDraft,
     autosaveDraft,
     deleteDraft
@@ -18,6 +19,9 @@ const { protect } = require('../middlewares/authMiddleware');
 
 // POST: Create Quotation
 router.post('/', protect, createQuotation);
+
+// GET: Get conversion report
+router.get('/conversion-report', protect, getConversionReport);
 
 // GET: Get reports
 router.get('/reports', protect, getReports);

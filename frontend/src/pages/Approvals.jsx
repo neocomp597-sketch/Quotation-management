@@ -37,8 +37,8 @@ const Approvals = () => {
 
     const { isSubmitting: isRejecting, execute: handleReject } = useSubmitGuard(async (id, quotationNo) => {
         try {
-            await quotationService.updateStatus(id, 'draft');
-            toast.info(`Quotation ${quotationNo} rejected and returned to draft.`);
+            await quotationService.updateStatus(id, 'rejected');
+            toast.info(`Quotation ${quotationNo} has been rejected.`);
             fetchPendingQuotes();
         } catch (err) {
             toast.error("Failed to reject quotation");

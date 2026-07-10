@@ -51,7 +51,7 @@ exports.createOrder = async (req, res) => {
 
         // If created from a quote, update quote status to 'ordered'
         if (quotationId) {
-            await Quotation.findByIdAndUpdate(quotationId, { status: 'ordered' });
+            await Quotation.findByIdAndUpdate(quotationId, { status: 'ordered', convertedAt: new Date() });
         }
 
         res.status(201).json(newOrder);

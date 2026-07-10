@@ -38,7 +38,8 @@ import {
     MdList,
     MdSecurity,
     MdCheckCircle,
-    MdAssessment
+    MdAssessment,
+    MdClose
 } from 'react-icons/md';
 import { useAuth } from '../context/AuthContext';
 
@@ -52,11 +53,36 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
         setExpanded((prev) => ({ ...prev, [key]: !prev[key] }));
     };
 
+    const isPathActive = (childPath) => {
+        try {
+            const childUrl = new URL(childPath, window.location.origin);
+            if (location.pathname !== childUrl.pathname) return false;
+            if (childUrl.search) {
+                return location.search === childUrl.search;
+            }
+            return !location.search;
+        } catch {
+            return false;
+        }
+    };
+
     const isChildActive = (children) => {
         return children.some((child) => {
-            if (location.pathname === child.path) return true;
-            if (child.path !== '/dashboard' && location.pathname.startsWith(child.path + '/')) return true;
-            return false;
+            try {
+                const childUrl = new URL(child.path, window.location.origin);
+                if (location.pathname === childUrl.pathname) {
+                    if (childUrl.search) {
+                        return location.search === childUrl.search;
+                    }
+                    return !location.search;
+                }
+                if (childUrl.pathname !== '/dashboard' && location.pathname.startsWith(childUrl.pathname + '/')) {
+                    return true;
+                }
+                return false;
+            } catch {
+                return false;
+            }
         });
     };
 
@@ -151,14 +177,18 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
         },
         {
             type: 'group',
-            name: 'Sales & CPQ',
+            name: 'Quotation Management',
             key: 'quotation',
             icon: <MdRequestQuote size={22} />,
             children: [
+                { key: 'quotation_list', name: 'Quotation Register', icon: <MdDescription size={18} />, path: '/quotations' },
+                { key: 'quotation_list', name: 'Pending Quotations', icon: <MdLock size={18} />, path: '/quotations?status=pending_approval' },
+                { key: 'quotation_list', name: 'Approved Quotations', icon: <MdCheckCircle size={18} />, path: '/quotations?status=final' },
+                { key: 'quotation_list', name: 'Rejected Quotations', icon: <MdClose size={18} />, path: '/quotations?status=rejected' },
+                { key: 'reports_main', name: 'Quote Conversion Report', icon: <MdAssessment size={18} />, path: '/quotations/conversion-report' },
                 { key: 'sales_cpq', name: 'Guided Selling', icon: <MdPeople size={18} />, path: '/sales/cpq/guided-selling' },
                 { key: 'sales_cpq', name: 'Configurator', icon: <MdBuildCircle size={18} />, path: '/sales/cpq/configurator' },
                 { key: 'sales_cpq', name: 'Quote Simulator', icon: <MdSpeed size={18} />, path: '/sales/cpq/simulator' },
-                { key: 'quotation_list', name: 'Quotations', icon: <MdDescription size={18} />, path: '/quotations' },
                 { key: 'sale_invoices', name: 'Invoices', icon: <MdReceipt size={18} />, path: '/invoices' },
                 { key: 'sales_approvals', name: 'Approvals', icon: <MdLock size={18} />, path: '/sales/approvals' },
                 { key: 'sales_orders', name: 'Orders', icon: <MdShoppingCart size={18} />, path: '/sales/orders' },
@@ -316,12 +346,13 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                                     key={item.path}
                                     to={item.path}
                                     onClick={handleNavClick}
-                                    className={({ isActive }) =>
-                                        `flex items-center gap-4 px-4 py-3 rounded-2xl transition-all duration-200 group relative ${isActive
+                                    className={() => {
+                                        const active = isPathActive(item.path);
+                                        return `flex items-center gap-4 px-4 py-3 rounded-2xl transition-all duration-200 group relative ${active
                                             ? 'bg-primary-600 text-white shadow-xl shadow-primary-600/25 ring-1 ring-white/10'
                                             : 'text-slate-500 hover:bg-slate-50 hover:text-primary-600 font-semibold'
-                                        }`
-                                    }
+                                        }`;
+                                    }}
                                 >
                                     <div className="transition-transform duration-300 group-hover:scale-110 shrink-0">
                                         {item.icon}
@@ -379,12 +410,13 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                                                 key={child.path}
                                                 to={child.path}
                                                 onClick={handleNavClick}
-                                                className={({ isActive }) =>
-                                                    `flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group ${isActive
+                                                className={() => {
+                                                    const active = isPathActive(child.path);
+                                                    return `flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group ${active
                                                         ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/20'
                                                         : 'text-slate-500 hover:bg-slate-50 hover:text-primary-600'
-                                                    }`
-                                                }
+                                                    }`;
+                                                }}
                                             >
                                                 <div className="shrink-0">{child.icon}</div>
                                                 <span className="text-sm font-semibold whitespace-nowrap">{child.name}</span>

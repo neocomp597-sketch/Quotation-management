@@ -63,12 +63,15 @@ export const MENU_PERMISSION_GROUPS = [
     },
     {
         key: 'quotation',
-        label: 'Sales',
-        description: 'Quotation and sales invoice screens',
+        label: 'Quotation Management',
+        description: 'Quotation registers, approvals, rejections and conversion reports',
         defaultRoute: '/quotations',
         children: [
-            { key: 'quotation_list', label: 'Quotations', description: 'Quotation list and creation screens', defaultRoute: '/quotations' },
-            { key: 'sale_invoices', label: 'Create Invoice', description: 'Sales outward invoice screens', defaultRoute: '/invoices' }
+            { key: 'quotation_list', label: 'Quotation Register', description: 'View all quotations', defaultRoute: '/quotations' },
+            { key: 'quotation_list', label: 'Pending Quotations', description: 'View pending approval quotations', defaultRoute: '/quotations?status=pending_approval' },
+            { key: 'quotation_list', label: 'Approved Quotations', description: 'View approved trade quotations', defaultRoute: '/quotations?status=final' },
+            { key: 'quotation_list', label: 'Rejected Quotations', description: 'View rejected trade quotations', defaultRoute: '/quotations?status=rejected' },
+            { key: 'reports_main', label: 'Quote Conversion Report', description: 'Quotation conversion analytics', defaultRoute: '/quotations/conversion-report' }
         ]
     },
     {

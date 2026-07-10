@@ -762,7 +762,7 @@ const updateStatus = async (req, res) => {
         const { id } = req.params;
         const { status } = req.body;
 
-        if (!['draft', 'final', 'ordered'].includes(status)) {
+        if (!['draft', 'final', 'ordered', 'rejected'].includes(status)) {
             return res.status(400).json({ message: 'Invalid status' });
         }
 
@@ -782,6 +782,9 @@ const updateStatus = async (req, res) => {
         }
 
         quotation.status = status;
+        if (status === 'ordered') {
+            quotation.convertedAt = new Date();
+        }
         await quotation.save();
         await clearQuotationDashboardCache();
 
@@ -1088,7 +1091,9 @@ module.exports = {
             const statusBreakdown = {
                 draft: 0,
                 final: 0,
-                ordered: 0
+                ordered: 0,
+                pending_approval: 0,
+                rejected: 0
             };
 
             quotations.forEach(q => {
@@ -1140,6 +1145,149 @@ module.exports = {
         } catch (error) {
             console.error("Aggregation Error:", error);
             res.status(500).json({ message: 'Error generating reports', error: error.message });
+        }
+    },
+    getConversionReport: async (req, res) => {
+        try {
+            let query = {};
+            if (req.user && req.user.role !== 'admin' && req.user.role !== 'manager') {
+                const Territory = require('../models/Territory');
+                const userTerritories = await Territory.find({
+                    $or: [
+                        { manager: req.user.id },
+                        { salesReps: req.user.id }
+                    ]
+                }).select('_id').lean();
+                const territoryIds = userTerritories.map(t => t._id);
+                query.$or = [
+                    { territory: { $in: territoryIds } },
+                    { createdBy: req.user.id }
+                ];
+            }
+
+            const quotations = await Quotation.find(query)
+                .select('quotationNo customerName salespersonName grandTotal status createdAt convertedAt')
+                .populate('createdBy', 'name')
+                .lean();
+
+            const totalQuotations = quotations.length;
+            const convertedQuotations = quotations.filter(q => q.status === 'ordered');
+            const totalConverted = convertedQuotations.length;
+            
+            // Overall Conversion Rate % (Converted / Total)
+            const overallConversionRate = totalQuotations > 0 
+                ? Number(((totalConverted / totalQuotations) * 100).toFixed(1)) 
+                : 0;
+
+            // Approved Conversion Rate % (Converted / (Final + Converted))
+            const finalQuotes = quotations.filter(q => q.status === 'final').length;
+            const approvedConversionRate = (finalQuotes + totalConverted) > 0
+                ? Number(((totalConverted / (finalQuotes + totalConverted)) * 100).toFixed(1))
+                : 0;
+
+            // Average Conversion Time in Days
+            let totalConversionTimeMs = 0;
+            let countWithTime = 0;
+            convertedQuotations.forEach(q => {
+                const start = new Date(q.createdAt);
+                const end = q.convertedAt ? new Date(q.convertedAt) : null;
+                if (end && end >= start) {
+                    totalConversionTimeMs += (end - start);
+                    countWithTime++;
+                }
+            });
+            const avgConversionTimeDays = countWithTime > 0
+                ? Number(((totalConversionTimeMs / (1000 * 60 * 60 * 24)) / countWithTime).toFixed(1))
+                : 0;
+
+            // Monthly Trend (Last 6 Months)
+            const monthlyTrend = [];
+            const now = new Date();
+            for (let i = 5; i >= 0; i--) {
+                const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                const monthName = d.toLocaleString('default', { month: 'short' });
+                const m = d.getMonth();
+                const y = d.getFullYear();
+
+                const createdInMonth = quotations.filter(q => {
+                    const qDate = new Date(q.createdAt);
+                    return qDate.getMonth() === m && qDate.getFullYear() === y;
+                }).length;
+
+                const convertedInMonth = quotations.filter(q => {
+                    if (q.status !== 'ordered') return false;
+                    const cDate = q.convertedAt ? new Date(q.convertedAt) : new Date(q.createdAt);
+                    return cDate.getMonth() === m && cDate.getFullYear() === y;
+                }).length;
+
+                monthlyTrend.push({
+                    month: monthName,
+                    created: createdInMonth,
+                    converted: convertedInMonth,
+                    rate: createdInMonth > 0 ? Number(((convertedInMonth / createdInMonth) * 100).toFixed(1)) : 0
+                });
+            }
+
+            // Salesperson Performance
+            const salespersonMap = {};
+            quotations.forEach(q => {
+                const rep = q.salespersonName || q.createdBy?.name || 'System';
+                if (!salespersonMap[rep]) {
+                    salespersonMap[rep] = {
+                        salespersonName: rep,
+                        totalQuotes: 0,
+                        convertedQuotes: 0,
+                        totalValue: 0,
+                        convertedValue: 0
+                    };
+                }
+                salespersonMap[rep].totalQuotes++;
+                salespersonMap[rep].totalValue += (q.grandTotal || 0);
+                if (q.status === 'ordered') {
+                    salespersonMap[rep].convertedQuotes++;
+                    salespersonMap[rep].convertedValue += (q.grandTotal || 0);
+                }
+            });
+
+            const salespersonPerformance = Object.values(salespersonMap).map(sp => ({
+                ...sp,
+                conversionRate: sp.totalQuotes > 0 ? Number(((sp.convertedQuotes / sp.totalQuotes) * 100).toFixed(1)) : 0
+            })).sort((a, b) => b.convertedQuotes - a.convertedQuotes);
+
+            // Detailed Log of Converted Quotes
+            const conversionDetails = convertedQuotations.map(q => {
+                const start = new Date(q.createdAt);
+                const end = q.convertedAt ? new Date(q.convertedAt) : null;
+                const days = (end && end >= start) 
+                    ? Number(((end - start) / (1000 * 60 * 60 * 24)).toFixed(1)) 
+                    : 0;
+
+                return {
+                    quotationNo: q.quotationNo,
+                    customerName: q.customerName,
+                    salespersonName: q.salespersonName || q.createdBy?.name || 'System',
+                    grandTotal: q.grandTotal || 0,
+                    quotationDate: q.createdAt,
+                    convertedDate: q.convertedAt || q.createdAt,
+                    conversionTimeDays: days
+                };
+            }).sort((a, b) => new Date(b.convertedDate) - new Date(a.convertedDate));
+
+            res.json({
+                summary: {
+                    totalQuotations,
+                    totalConverted,
+                    overallConversionRate,
+                    approvedConversionRate,
+                    avgConversionTimeDays
+                },
+                monthlyTrend,
+                salespersonPerformance,
+                conversionDetails
+            });
+        } catch (error) {
+            console.error("Conversion Report Error:", error);
+            res.status(500).json({ message: 'Error generating conversion report', error: error.message });
         }
     },
     getDraft: async (req, res) => {

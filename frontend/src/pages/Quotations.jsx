@@ -186,12 +186,38 @@ const Quotations = () => {
 
     const filteredQuotations = quotations;
 
+    const getPageHeader = () => {
+        switch (statusFilter) {
+            case 'pending_approval':
+                return {
+                    title: 'Pending Quotations',
+                    desc: 'Review and approve quotations waiting for margin clearance or high-value threshold checks.'
+                };
+            case 'final':
+                return {
+                    title: 'Approved Quotations',
+                    desc: 'View all finalized and approved trade quotations ready for sales orders.'
+                };
+            case 'rejected':
+                return {
+                    title: 'Rejected Quotations',
+                    desc: 'View all trade quotations that have been rejected.'
+                };
+            default:
+                return {
+                    title: 'Quotation Register',
+                    desc: 'Manage and track your professional trade quotations.'
+                };
+        }
+    };
+    const headerDetails = getPageHeader();
+
     return (
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-black text-slate-900 tracking-tight">ARCRM Sales</h1>
-                    <p className="text-slate-500 font-medium">Manage and track your professional trade quotations.</p>
+                    <h1 className="text-3xl font-black text-slate-900 tracking-tight">{headerDetails.title}</h1>
+                    <p className="text-slate-500 font-medium">{headerDetails.desc}</p>
                 </div>
                 <Link
                     to="/quotations/new"
@@ -304,7 +330,7 @@ const Quotations = () => {
                                                 {formatDate(q.quotationDate)}
                                             </div>
                                             <div className="flex gap-1">
-                                                {q.status === 'draft' && (
+                                                {(q.status === 'draft' || q.status === 'rejected') && (
                                                     <>
                                                         <button
                                                             onClick={() => navigate(`/quotations/${q._id}`)}
@@ -411,7 +437,7 @@ const Quotations = () => {
                                                 </td>
                                                 <td className="px-8 py-5 text-right">
                                                     <div className="flex items-center justify-end gap-2">
-                                                        {q.status === 'draft' && (
+                                                        {(q.status === 'draft' || q.status === 'rejected') && (
                                                             <>
                                                                 <button
                                                                     onClick={() => navigate(`/quotations/${q._id}`)}
