@@ -550,6 +550,27 @@ const startBackgroundServices = async () => {
       },
       { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
     );
+    await SystemUpdate.findOneAndUpdate(
+      { version: "v3.7.0-crm-analytics" },
+      {
+        version: "v3.7.0-crm-analytics",
+        title: "Customer CRM Analytics & 360 Workspace Upgrade",
+        message: "We have introduced a comprehensive Customer Analytics Dashboard and a dedicated Salesforce-style Customer 360 Workspace to enhance client visibility, perform dynamic health diagnostics, and streamline workflow operations.",
+        releaseNotes: [
+          "Customer Analytics Dashboard: Added sub-dashboards for growth, retention, segmentations, financial metrics, and operational reports under Reports & Analytics",
+          "Customer 360 Workspace: Standalone view showing Overview, Contacts, Premises, Opportunities, Quotes, Contracts, Orders, Invoices, and SLA tickets",
+          "7-Dimension Weighted Health Score: Real-time client health index computed from frequency, payment timing, tickets, CSAT, and activity",
+          "Chronological Interaction Timeline: Combined history log showing all client milestones in a Salesforce-style activity feed",
+          "Custom Saved Filter Presets: Save, apply, and clear custom multi-dimensional client segments directly on the directory list",
+          "Mongoose Performance Indexing: Added DB indexes for owner, status, segment, and industry to ensure zero-lag dashboard loads",
+          "Secure Access Control: Embedded strict role-based data boundaries on the 360 Workspace and analytics endpoints"
+        ],
+        deployedBy: "Super Admin",
+        deployedAt: new Date("2026-07-12T17:45:00Z"),
+        isActive: true
+      },
+      { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
+    );
   } catch (err) {
     console.error("[Release Seed Error] Failed to seed system update:", err.message);
   }
