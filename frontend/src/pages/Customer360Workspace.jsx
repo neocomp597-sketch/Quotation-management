@@ -180,8 +180,8 @@ const Customer360Workspace = () => {
 
                     <div>
                         <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Lifetime Value</span>
-                        <div className="text-xl font-black text-indigo-600 mt-1">${(stats.clv || 0).toLocaleString()}</div>
-                        <span className="text-[9px] font-bold text-slate-400">Outstanding: <span className="text-rose-600">${(customer.outstanding || 0).toLocaleString()}</span></span>
+                        <div className="text-xl font-black text-indigo-600 mt-1">₹{(stats.clv || 0).toLocaleString()}</div>
+                        <span className="text-[9px] font-bold text-slate-400">Outstanding: <span className="text-rose-600">₹{(customer.outstanding || 0).toLocaleString()}</span></span>
                     </div>
                 </div>
             </div>
@@ -226,7 +226,7 @@ const Customer360Workspace = () => {
                                 <h3 className="font-black text-slate-800 text-xs uppercase tracking-wider">Engagement Summary</h3>
                                 <div className="space-y-3 text-xs font-bold">
                                     <div className="flex justify-between"><span className="text-slate-400">Invoice Count</span><span className="text-slate-800">{stats.invoiceCount} invoices</span></div>
-                                    <div className="flex justify-between"><span className="text-slate-400">Avg Invoice Amount</span><span className="text-slate-800">${Math.round(stats.avgInvoiceValue).toLocaleString()}</span></div>
+                                    <div className="flex justify-between"><span className="text-slate-400">Avg Invoice Amount</span><span className="text-slate-800">₹{Math.round(stats.avgInvoiceValue).toLocaleString()}</span></div>
                                     <div className="flex justify-between"><span className="text-slate-400">Resolved Tickets</span><span className="text-slate-800">{tickets.filter(t => t.status === 'Resolved' || t.status === 'Closed').length} resolved</span></div>
                                     <div className="flex justify-between"><span className="text-slate-400">Open Tickets</span><span className="text-slate-800 text-rose-500">{tickets.filter(t => t.status !== 'Resolved' && t.status !== 'Closed').length} open</span></div>
                                     <div className="flex justify-between"><span className="text-slate-400">SLA Breach Incidents</span><span className="text-slate-800 text-rose-500">{tickets.filter(t => t.isSlaBreached?.resolution || t.isSlaBreached?.response).length} breaches</span></div>
@@ -238,7 +238,7 @@ const Customer360Workspace = () => {
                                 <div className="space-y-2.5 text-xs font-bold">
                                     <div className="flex justify-between items-center"><span className="text-slate-400">Purchase Frequency (25%)</span><span className="text-emerald-600">Excellent</span></div>
                                     <div className="flex justify-between items-center"><span className="text-slate-400">Payment Timeliness (20%)</span><span className={customer.outstanding > 50000 ? 'text-amber-500' : 'text-emerald-600'}>{customer.outstanding > 50000 ? 'Needs Attention' : 'Compliant'}</span></div>
-                                    <div className="flex justify-between items-center"><span className="text-slate-400">Outstanding Balance (15%)</span><span className={customer.outstanding > 100000 ? 'text-rose-500' : 'text-emerald-600'}>${(customer.outstanding || 0).toLocaleString()}</span></div>
+                                    <div className="flex justify-between items-center"><span className="text-slate-400">Outstanding Balance (15%)</span><span className={customer.outstanding > 100000 ? 'text-rose-500' : 'text-emerald-600'}>₹{(customer.outstanding || 0).toLocaleString()}</span></div>
                                     <div className="flex justify-between items-center"><span className="text-slate-400">Support Tickets (15%)</span><span className="text-emerald-600">Stable</span></div>
                                     <div className="flex justify-between items-center"><span className="text-slate-400">Average CSAT Rating (10%)</span><span className="text-emerald-600">{stats.avgCsat ? `${stats.avgCsat.toFixed(1)} ★` : 'N/A'}</span></div>
                                 </div>
@@ -345,7 +345,7 @@ const Customer360Workspace = () => {
                                         // Mock or real deals matching dealId
                                         <tr key={deal._id} className="hover:bg-slate-50/50">
                                             <td className="px-6 py-4 font-black text-slate-900">{deal.dealId?.title || 'Upgrade Project'}</td>
-                                            <td className="px-6 py-4 text-right font-mono text-indigo-600">${(deal.dealId?.value || 25000).toLocaleString()}</td>
+                                            <td className="px-6 py-4 text-right font-mono text-indigo-600">₹{(deal.dealId?.value || 25000).toLocaleString()}</td>
                                             <td className="px-6 py-4 text-center font-mono">{deal.dealId?.probability || 60}%</td>
                                             <td className="px-6 py-4 text-slate-500">{deal.dealId?.forecastCategory || 'Commit'}</td>
                                             <td className="px-6 py-4">
@@ -393,9 +393,9 @@ const Customer360Workspace = () => {
                                     {quotations.map(q => (
                                         <tr key={q._id} className="hover:bg-slate-50/50">
                                             <td className="px-6 py-4 font-black text-slate-900">{q.quotationNumber}</td>
-                                            <td className="px-6 py-4 text-right font-mono">${(q.subtotal || 0).toLocaleString()}</td>
-                                            <td className="px-6 py-4 text-right font-mono">${(q.totalTax || 0).toLocaleString()}</td>
-                                            <td className="px-6 py-4 text-right font-mono text-indigo-600">${(q.grandTotal || 0).toLocaleString()}</td>
+                                            <td className="px-6 py-4 text-right font-mono">₹{(q.subtotal || 0).toLocaleString()}</td>
+                                            <td className="px-6 py-4 text-right font-mono">₹{(q.totalTax || 0).toLocaleString()}</td>
+                                            <td className="px-6 py-4 text-right font-mono text-indigo-600">₹{(q.grandTotal || 0).toLocaleString()}</td>
                                             <td className="px-6 py-4 text-slate-500">{q.createdBy?.name || 'Sales Rep'}</td>
                                             <td className="px-6 py-4">
                                                 <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-lg border ${
@@ -443,7 +443,7 @@ const Customer360Workspace = () => {
                                             <td className="px-6 py-4">{c.title}</td>
                                             <td className="px-6 py-4 text-slate-500">{new Date(c.startDate).toLocaleDateString()}</td>
                                             <td className="px-6 py-4 text-slate-500">{new Date(c.endDate).toLocaleDateString()}</td>
-                                            <td className="px-6 py-4 text-right font-mono text-indigo-600">${(c.value || 0).toLocaleString()}</td>
+                                            <td className="px-6 py-4 text-right font-mono text-indigo-600">₹{(c.value || 0).toLocaleString()}</td>
                                             <td className="px-6 py-4">
                                                 <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${
                                                     c.status === 'Active' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-50 text-slate-500'
@@ -492,9 +492,9 @@ const Customer360Workspace = () => {
                                     {orders.map(o => (
                                         <tr key={o._id} className="hover:bg-slate-50/50">
                                             <td className="px-6 py-4 font-mono font-black text-slate-900">{o.orderNumber}</td>
-                                            <td className="px-6 py-4 text-right font-mono">${(o.subtotal || 0).toLocaleString()}</td>
-                                            <td className="px-6 py-4 text-right font-mono">${(o.totalDiscount || 0).toLocaleString()}</td>
-                                            <td className="px-6 py-4 text-right font-mono text-indigo-600">${(o.grandTotal || 0).toLocaleString()}</td>
+                                            <td className="px-6 py-4 text-right font-mono">₹{(o.subtotal || 0).toLocaleString()}</td>
+                                            <td className="px-6 py-4 text-right font-mono">₹{(o.totalDiscount || 0).toLocaleString()}</td>
+                                            <td className="px-6 py-4 text-right font-mono text-indigo-600">₹{(o.grandTotal || 0).toLocaleString()}</td>
                                             <td className="px-6 py-4 text-slate-500">{o.createdBy?.name || 'Sales Rep'}</td>
                                             <td className="px-6 py-4">
                                                 <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${
@@ -538,8 +538,8 @@ const Customer360Workspace = () => {
                                         <tr key={i._id} className="hover:bg-slate-50/50">
                                             <td className="px-6 py-4 font-mono font-black text-slate-900">{i.voucherNumber}</td>
                                             <td className="px-6 py-4 text-center font-mono">{i.totalQty}</td>
-                                            <td className="px-6 py-4 text-right font-mono">${(i.totalTax || 0).toLocaleString()}</td>
-                                            <td className="px-6 py-4 text-right font-mono text-indigo-600">${(i.grandTotal || 0).toLocaleString()}</td>
+                                            <td className="px-6 py-4 text-right font-mono">₹{(i.totalTax || 0).toLocaleString()}</td>
+                                            <td className="px-6 py-4 text-right font-mono text-indigo-600">₹{(i.grandTotal || 0).toLocaleString()}</td>
                                             <td className="px-6 py-4">
                                                 <span className="text-[10px] font-black uppercase bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded border border-emerald-100">
                                                     Paid

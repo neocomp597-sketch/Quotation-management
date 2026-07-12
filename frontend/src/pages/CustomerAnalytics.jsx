@@ -522,13 +522,13 @@ const CustomerAnalytics = () => {
 
                         <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col justify-between h-36 relative overflow-hidden">
                             <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">CLV (Cumulative)</span>
-                            <span className="text-3xl font-black text-indigo-600 leading-none mt-4">${Math.round(stats.totalCustomers * stats.averageRevenuePerCustomer).toLocaleString()}</span>
+                            <span className="text-3xl font-black text-indigo-600 leading-none mt-4">₹{Math.round(stats.totalCustomers * stats.averageRevenuePerCustomer).toLocaleString()}</span>
                             <span className="text-[9px] font-bold text-indigo-500 mt-2">Gross customer revenue</span>
                         </div>
 
                         <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col justify-between h-36 relative overflow-hidden bg-gradient-to-br from-rose-50 to-white border-rose-100">
                             <span className="text-[10px] font-black uppercase text-rose-700 tracking-wider">Receivables</span>
-                            <span className="text-3xl font-black text-rose-600 leading-none mt-4">${stats.outstandingReceivables?.toLocaleString()}</span>
+                            <span className="text-3xl font-black text-rose-600 leading-none mt-4">₹{stats.outstandingReceivables?.toLocaleString()}</span>
                             <span className="text-[9px] font-bold text-rose-500 mt-2">Total outstanding balance</span>
                         </div>
                     </div>
@@ -764,8 +764,8 @@ const CustomerAnalytics = () => {
                                                 {c.segment || 'Retail'}
                                             </span>
                                         </td>
-                                        <td className="px-6 py-5 text-right font-mono text-rose-600">${(c.outstanding || 0).toLocaleString()}</td>
-                                        <td className="px-6 py-5 text-right font-mono text-indigo-600">${(c.clv || 0).toLocaleString()}</td>
+                                        <td className="px-6 py-5 text-right font-mono text-rose-600">₹{(c.outstanding || 0).toLocaleString()}</td>
+                                        <td className="px-6 py-5 text-right font-mono text-indigo-600">₹{(c.clv || 0).toLocaleString()}</td>
                                         <td className="px-6 py-5 text-center font-mono">{c.invoiceCount || 0}</td>
                                         <td className="px-6 py-5">
                                             <div className="flex items-center gap-2">
