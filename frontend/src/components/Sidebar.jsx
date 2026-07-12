@@ -255,6 +255,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                 { key: 'payroll_reports', name: 'Payroll Reports', icon: <MdBarChart size={18} />, path: '/payroll/reports' },
                 { key: 'sales_reports', name: 'Sales Reports', icon: <MdBarChart size={18} />, path: '/sales/reports' },
                 { key: 'sales_analytics', name: 'Sales Analytics', icon: <MdSpeed size={18} />, path: '/sales/analytics' },
+                { key: 'master_customers', name: 'Customer Analytics', icon: <MdAnalytics size={18} />, path: '/customers/analytics' },
                 { key: 'sales_revenue_analytics', name: 'Revenue Analytics', icon: <MdAnalytics size={18} />, path: '/sales/revenue-analytics' },
                 { key: 'sales_competitors', name: 'Competitor Intel', icon: <MdFlag size={18} />, path: '/sales/competitors' },
                 { key: 'sales_ai_pricing', name: 'AI Pricing Insights', icon: <MdAutoGraph size={18} />, path: '/sales/ai-pricing' },

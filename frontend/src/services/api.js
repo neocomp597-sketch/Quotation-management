@@ -172,6 +172,20 @@ export const customerService = {
   checkDuplicate: (params) => api.get("/customers/check-duplicate", { params }),
 };
 
+export const customerAnalyticsService = {
+  getDashboardSummary: (params) => api.get("/customers/analytics/dashboard", { params }),
+  getSegmentation: (params) => api.get("/customers/analytics/segmentation", { params }),
+  getTopCustomers: (params) => api.get("/customers/analytics/top-customers", { params }),
+  getChurn: (params) => api.get("/customers/analytics/churn", { params }),
+  getCLV: (params) => api.get("/customers/analytics/clv", { params }),
+  getRepeatBusiness: (params) => api.get("/customers/analytics/repeat-business", { params }),
+  getOutstanding: (params) => api.get("/customers/analytics/outstanding", { params }),
+  getHealth: (params) => api.get("/customers/analytics/health", { params }),
+  getExport: (params) => api.get("/customers/analytics/export", { params }),
+  getTable: (params) => api.get("/customers/analytics/table", { params }),
+  get360Data: (id) => api.get(`/customers/${id}/360`),
+};
+
 export const categoryService = {
   getAll: () => api.get("/categories"),
   create: (data) => api.post("/categories", data),

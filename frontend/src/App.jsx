@@ -84,6 +84,8 @@ import RevenueAnalytics from './pages/RevenueAnalytics';
 import CompetitorIntel from './pages/CompetitorIntel';
 import AIPricingInsights from './pages/AIPricingInsights';
 import CustomerPricingDashboard from './pages/CustomerPricingDashboard';
+import CustomerAnalytics from './pages/CustomerAnalytics';
+import Customer360Workspace from './pages/Customer360Workspace';
 
 function App() {
   return (
@@ -117,6 +119,8 @@ function App() {
             <Route path="/dashboard" element={<PermissionRoute permissionKey="dashboard_overview"><Layout><Dashboard /></Layout></PermissionRoute>} />
             <Route path="/salespersons" element={<PermissionRoute permissionKey="admin_salespersons"><Layout><Salespersons /></Layout></PermissionRoute>} />
             <Route path="/customers" element={<PermissionRoute permissionKey="master_customers"><Layout><Customers /></Layout></PermissionRoute>} />
+            <Route path="/customers/analytics" element={<PermissionRoute permissionKey="master_customers"><Layout><CustomerAnalytics /></Layout></PermissionRoute>} />
+            <Route path="/customers/:id/360" element={<PermissionRoute permissionKey="master_customers"><Layout><Customer360Workspace /></Layout></PermissionRoute>} />
             <Route path="/vendors" element={<PermissionRoute permissionKey="master_vendors"><Layout><Vendors /></Layout></PermissionRoute>} />
             <Route path="/contacts" element={<PermissionRoute permissionKey="master_contacts"><Layout><Contacts /></Layout></PermissionRoute>} />
             <Route path="/enquiries" element={<PermissionRoute permissionKey="enquiry_leads"><Layout><Enquiries /></Layout></PermissionRoute>} />

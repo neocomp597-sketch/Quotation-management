@@ -25,6 +25,12 @@ const CustomerSchema = new mongoose.Schema({
     logoUrl: String,
     defaultDiscount: Number,
     territory: { type: mongoose.Schema.Types.ObjectId, ref: 'Territory' },
+    pan: { type: String, default: '' },
+    outstanding: { type: Number, default: 0 },
+    industry: { type: String, default: 'Other' },
+    status: { type: String, default: 'Prospect' },
+    segment: { type: String, default: 'Retail' },
+    owner: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     createdAt: { type: Date, default: Date.now },
 });
@@ -40,6 +46,10 @@ CustomerSchema.index({ companyId: 1, mobile: 1 });
 CustomerSchema.index({ companyId: 1, email: 1 });
 CustomerSchema.index({ territory: 1 });
 CustomerSchema.index({ territory: 1, createdAt: -1 });
+CustomerSchema.index({ owner: 1 });
+CustomerSchema.index({ status: 1 });
+CustomerSchema.index({ segment: 1 });
+CustomerSchema.index({ industry: 1 });
 
 CustomerSchema.plugin(tenantPlugin);
 

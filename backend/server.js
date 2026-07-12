@@ -40,14 +40,18 @@ const redisStartupPromise = connectRedis().then(() => {
 });
 
 // Middleware
-app.use(
-  cors({
-    origin: [
-      "https://quotation-management-2znu.onrender.com",
+const allowedOrigins = process.env.CORS_ORIGINS
+  ? process.env.CORS_ORIGINS.split(",").map(origin => origin.trim()).filter(Boolean)
+  : [
+      "https://arcrm.co.in",
+      "https://www.arcrm.co.in",
       "http://localhost:5173",
       "http://localhost:3000",
-      "https://arcrm.co.in",
-    ],
+    ];
+
+app.use(
+  cors({
+    origin: allowedOrigins,
     credentials: true,
   }),
 );

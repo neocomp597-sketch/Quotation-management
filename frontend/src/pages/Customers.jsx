@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { MdAdd, MdSearch, MdEdit, MdDelete, MdPerson, MdEmail, MdPhone, MdLocationOn, MdBusiness, MdCloudUpload, MdVisibility, MdFileUpload, MdCheckBox, MdCheckBoxOutlineBlank, MdDeleteSweep, MdFileDownload } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
-import { customerService, uploadService, importService, territoryService } from '../services/api';
+import { customerService, uploadService, importService, territoryService, userService } from '../services/api';
 import Modal from '../components/Modal';
 import ImportModal from '../components/ImportModal';
 import PaginationControls from '../components/PaginationControls';
@@ -13,6 +14,7 @@ import { useSubmitGuard } from '../hooks/useSubmitGuard';
 const LIST_PAGE_SIZE = 20;
 
 const Customers = () => {
+    const navigate = useNavigate();
     const [customers, setCustomers] = useState([]);
     const [activeProfileTab, setActiveProfileTab] = useState('details');
     const [loading, setLoading] = useState(true);
@@ -33,6 +35,7 @@ const Customers = () => {
 
     // For full-screen image viewing
     const [viewCustomer, setViewCustomer] = useState(null);
+    const [users, setUsers] = useState([]);
 
     const [formData, setFormData] = useState({
         customerName: '',
@@ -49,6 +52,12 @@ const Customers = () => {
         defaultDiscount: 0,
         logoUrl: '',
         territory: '',
+        pan: '',
+        outstanding: 0,
+        industry: 'Other',
+        status: 'Prospect',
+        segment: 'Retail',
+        owner: '',
         notes: ''
     });
 
@@ -61,7 +70,16 @@ const Customers = () => {
                 console.error("Error fetching territories:", err);
             }
         };
+        const fetchUsers = async () => {
+            try {
+                const res = await userService.getAll();
+                setUsers(Array.isArray(res.data) ? res.data : res.data?.data || []);
+            } catch (err) {
+                console.error("Error fetching users:", err);
+            }
+        };
         fetchTerritories();
+        fetchUsers();
     }, []);
 
     useEffect(() => {
@@ -107,7 +125,13 @@ const Customers = () => {
             setFormData({
                 ...customer,
                 billingAddress: { ...customer.billingAddress },
-                territory: customer.territory?._id || customer.territory || ''
+                territory: customer.territory?._id || customer.territory || '',
+                owner: customer.owner?._id || customer.owner || '',
+                pan: customer.pan || '',
+                outstanding: customer.outstanding || 0,
+                industry: customer.industry || 'Other',
+                status: customer.status || 'Prospect',
+                segment: customer.segment || 'Retail'
             });
         } else {
             setEditingCustomer(null);
@@ -126,6 +150,12 @@ const Customers = () => {
                 defaultDiscount: 0,
                 logoUrl: '',
                 territory: '',
+                pan: '',
+                outstanding: 0,
+                industry: 'Other',
+                status: 'Prospect',
+                segment: 'Retail',
+                owner: '',
                 notes: ''
             });
         }
@@ -409,7 +439,12 @@ const Customers = () => {
                                                 )}
                                             </div>
                                             <div>
-                                                <div className="font-bold text-slate-900 text-sm">{c.companyName}</div>
+                                                <div 
+                                                    className="font-bold text-primary-600 hover:text-primary-800 cursor-pointer hover:underline text-sm"
+                                                    onClick={() => navigate(`/customers/${c._id}/360`)}
+                                                >
+                                                    {c.companyName}
+                                                </div>
                                                 <div className="text-xs text-slate-500">{c.customerName}</div>
                                             </div>
                                         </div>
@@ -530,7 +565,12 @@ const Customers = () => {
                                                         )}
                                                     </div>
                                                     <div>
-                                                        <div className="font-bold text-slate-900">{c.companyName}</div>
+                                                        <div 
+                                                            className="font-bold text-primary-600 hover:text-primary-800 cursor-pointer hover:underline"
+                                                            onClick={() => navigate(`/customers/${c._id}/360`)}
+                                                        >
+                                                            {c.companyName}
+                                                        </div>
                                                         <div className="text-xs text-slate-400 font-medium">{c.customerName}</div>
                                                     </div>
                                                 </div>
@@ -845,6 +885,105 @@ const Customers = () => {
                                         </select>
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+
+                        <div className="pt-6 border-t border-slate-100">
+                            <h4 className="text-[10px] font-black text-primary-600 uppercase tracking-[0.2em] mb-6 flex items-center gap-3">
+                                <span className="h-px flex-1 bg-primary-100"></span>
+                                CRM & Ownership
+                                <span className="h-px flex-1 bg-primary-100"></span>
+                            </h4>
+                            <div className="grid grid-cols-2 gap-6">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">PAN Number</label>
+                                    <input
+                                        type="text"
+                                        name="pan"
+                                        value={formData.pan || ''}
+                                        onChange={handleFormChange}
+                                        className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-mono font-bold uppercase"
+                                        placeholder="10-Digit PAN"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Account Owner</label>
+                                    <select
+                                        name="owner"
+                                        value={formData.owner || ''}
+                                        onChange={handleFormChange}
+                                        className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold"
+                                    >
+                                        <option value="">Select Owner</option>
+                                        {users.map(u => (
+                                            <option key={u._id} value={u._id}>{u.name} ({u.role})</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-3 gap-4 mt-6">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Industry</label>
+                                    <select
+                                        name="industry"
+                                        value={formData.industry || 'Other'}
+                                        onChange={handleFormChange}
+                                        className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-xs font-bold"
+                                    >
+                                        <option value="Manufacturing">Manufacturing</option>
+                                        <option value="Healthcare">Healthcare</option>
+                                        <option value="Retail">Retail</option>
+                                        <option value="Education">Education</option>
+                                        <option value="Government">Government</option>
+                                        <option value="Other">Other</option>
+                                    </select>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Segment</label>
+                                    <select
+                                        name="segment"
+                                        value={formData.segment || 'Retail'}
+                                        onChange={handleFormChange}
+                                        className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-xs font-bold"
+                                    >
+                                        <option value="VIP Customers">VIP Customers</option>
+                                        <option value="High Value">High Value</option>
+                                        <option value="Medium Value">Medium Value</option>
+                                        <option value="Low Value">Low Value</option>
+                                        <option value="Retail">Retail</option>
+                                        <option value="Wholesale">Wholesale</option>
+                                        <option value="Corporate">Corporate</option>
+                                        <option value="Government">Government</option>
+                                    </select>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Status</label>
+                                    <select
+                                        name="status"
+                                        value={formData.status || 'Prospect'}
+                                        onChange={handleFormChange}
+                                        className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-xs font-bold"
+                                    >
+                                        <option value="Active">Active</option>
+                                        <option value="New">New</option>
+                                        <option value="VIP">VIP</option>
+                                        <option value="Inactive">Inactive</option>
+                                        <option value="High Value">High Value</option>
+                                        <option value="Lost">Lost</option>
+                                        <option value="Prospect">Prospect</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="space-y-2 mt-6">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Outstanding Balance</label>
+                                <input
+                                    type="number"
+                                    name="outstanding"
+                                    value={formData.outstanding || 0}
+                                    onChange={handleFormChange}
+                                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold"
+                                    placeholder="0"
+                                />
                             </div>
                         </div>
                     </div>
