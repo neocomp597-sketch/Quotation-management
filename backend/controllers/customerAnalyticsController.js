@@ -635,9 +635,111 @@ exports.getCustomerAnalyticsExport = async (req, res) => {
             .populate('territory', 'name')
             .lean();
 
+        if (customers.length === 0) {
+            return res.json([]);
+        }
+
+        const customerIds = customers.map(c => c._id);
+        const custIds = customerIds.map(id => new mongoose.Types.ObjectId(id));
+
+        // Fetch aggregates in bulk (only 6 optimized parallel queries)
+        const [invoiceStats, orderStats, ticketStats, contractStats, dealActivityCounts, meetingCounts] = await Promise.all([
+            Voucher.aggregate([
+                { $match: { customerId: { $in: custIds }, voucherType: 'Invoice' } },
+                { 
+                    $group: { 
+                        _id: '$customerId', 
+                        totalInvoices: { $sum: 1 }, 
+                        clv: { $sum: '$grandTotal' },
+                        avgInvoiceValue: { $avg: '$grandTotal' },
+                        lastPurchaseDate: { $max: '$date' }
+                    } 
+                }
+            ]),
+            SalesOrder.aggregate([
+                { $match: { customerId: { $in: custIds } } },
+                { 
+                    $group: { 
+                        _id: '$customerId', 
+                        totalOrders: { $sum: 1 },
+                        lastOrderDate: { $max: '$orderDate' }
+                    } 
+                }
+            ]),
+            Ticket.aggregate([
+                { $match: { customerId: { $in: custIds } } },
+                { 
+                    $group: { 
+                        _id: '$customerId', 
+                        totalTickets: { $sum: 1 },
+                        openTickets: { $sum: { $cond: [{ $in: ['$status', ['Open', 'Assigned', 'In Progress', 'Escalated']] }, 1, 0] } },
+                        resolvedTickets: { $sum: { $cond: [{ $in: ['$status', ['Resolved', 'Closed']] }, 1, 0] } },
+                        avgCsat: { $avg: '$feedback.rating' }
+                    } 
+                }
+            ]),
+            Contract.aggregate([
+                { $match: { customerId: { $in: custIds } } },
+                { 
+                    $group: { 
+                        _id: '$customerId', 
+                        activeContracts: { $sum: { $cond: [{ $eq: ['$status', 'Active'] }, 1, 0] } },
+                        expiredContracts: { $sum: { $cond: [{ $eq: ['$status', 'Expired'] }, 1, 0] } }
+                    } 
+                }
+            ]),
+            DealActivity.aggregate([
+                { 
+                    $match: { 
+                        customerId: { $in: custIds }, 
+                        activityDate: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } 
+                    } 
+                },
+                { $group: { _id: '$customerId', count: { $sum: 1 } } }
+            ]),
+            Meeting.aggregate([
+                { 
+                    $match: { 
+                        relatedRecordId: { $in: custIds }, 
+                        startDateTime: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } 
+                    } 
+                },
+                { $group: { _id: '$relatedRecordId', count: { $sum: 1 } } }
+            ])
+        ]);
+
+        // Map aggregates by customer ID string for O(1) lookups
+        const invoiceMap = new Map(invoiceStats.map(i => [i._id.toString(), i]));
+        const orderMap = new Map(orderStats.map(o => [o._id.toString(), o]));
+        const ticketMap = new Map(ticketStats.map(t => [t._id.toString(), t]));
+        const contractMap = new Map(contractStats.map(c => [c._id.toString(), c]));
+        const dealActivityMap = new Map(dealActivityCounts.map(da => [da._id.toString(), da.count]));
+        const meetingMap = new Map(meetingCounts.map(m => [m._id.toString(), m.count]));
+
         const exportData = [];
         for (const c of customers) {
-            const stats = await getCustomerStats(c._id);
+            const cid = c._id.toString();
+            const invObj = invoiceMap.get(cid) || {};
+            const ordObj = orderMap.get(cid) || {};
+            const tktObj = ticketMap.get(cid) || {};
+            const conObj = contractMap.get(cid) || {};
+            const dealActCount = dealActivityMap.get(cid) || 0;
+            const meetCount = meetingMap.get(cid) || 0;
+
+            const stats = {
+                clv: invObj.clv || 0,
+                invoiceCount: invObj.totalInvoices || 0,
+                avgInvoiceValue: invObj.avgInvoiceValue || 0,
+                lastPurchaseDate: invObj.lastPurchaseDate || null,
+                orderCount: (invObj.totalInvoices || 0) + (ordObj.totalOrders || 0),
+                openTickets: tktObj.openTickets || 0,
+                totalTickets: tktObj.totalTickets || 0,
+                avgCsat: tktObj.avgCsat || 0,
+                activeContracts: conObj.activeContracts || 0,
+                expiredContracts: conObj.expiredContracts || 0,
+                recentActivities: dealActCount + meetCount
+            };
+
             const scoreObj = calculateHealthScore(c, stats);
             
             exportData.push({
