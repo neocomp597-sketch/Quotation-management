@@ -80,9 +80,8 @@ const LandingPage = () => {
                             </div>
                         </div>
                         <div className="relative lg:h-[600px] flex items-center justify-center">
-                            {/* Main Dashboard Mockup */}
-                            <div className="relative z-0 w-full max-w-2xl rounded-2xl overflow-hidden shadow-2xl border border-[#bbcabf]/30 bg-[#f7f9fb]">
-                                <img className="w-full h-auto" alt="A clean, high-fidelity CRM dashboard screenshot showcasing green data charts, emerald green analytics lines, and a minimalist enterprise interface in light mode." src="/screen.png" />
+                            <div className="relative z-0 w-full max-w-2xl h-[420px] rounded-2xl overflow-hidden shadow-2xl border border-[#bbcabf]/30 bg-[#f7f9fb]">
+                                <img className="w-full h-full object-cover object-top" alt="A clean, high-fidelity CRM dashboard screenshot showcasing green data charts, emerald green analytics lines, and a minimalist enterprise interface in light mode." src="/screen.png" />
                             </div>
                             {/* Floating Glassmorphic Cards */}
                             <div className="absolute -top-4 -right-4 z-20 glass-card p-4 rounded-xl w-48 floating" style={{ animationDelay: '0s' }}>
