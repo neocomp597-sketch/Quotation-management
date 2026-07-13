@@ -149,6 +149,16 @@ const MENU_GROUPS = [
             { key: 'csm_kb', label: 'Knowledge Base', description: 'Manage troubleshooting articles and FAQs' },
             { key: 'csm_masters', label: 'CSM Masters', description: 'Configure categories, priorities, teams, and SLAs' }
         ]
+    },
+    {
+        key: 'tender',
+        label: 'Tender Management',
+        description: 'Tender dashboard, pipelines, registers, and analysis reports',
+        children: [
+            { key: 'tender_dashboard', label: 'Tender Dashboard', description: 'Tender KPI dashboard and charts' },
+            { key: 'tender_register', label: 'Tender Register', description: 'Tender list register and management' },
+            { key: 'tender_reports', label: 'Tender Reports', description: 'Tender pipeline and win/loss reports' }
+        ]
     }
 ];
 
@@ -188,8 +198,8 @@ const FULL_ACCESS_KEYS = getAllPermissionKeys();
 // Sales: lightweight access - dashboard, enquiry, quotation only
 const DEFAULT_ROLE_PERMISSIONS = {
     admin: buildPermissions(FULL_ACCESS_KEYS),
-    manager: buildPermissions(['dashboard', 'master', 'enquiry', 'sales_pipeline', 'quotation', 'meetings', 'sale', 'purchase', 'planning', 'reports', 'settings', 'csm']),
-    sales: buildPermissions(['dashboard', 'enquiry', 'sales_pipeline', 'quotation', 'meetings', 'csm_tickets', 'csm_kb'])
+    manager: buildPermissions(['dashboard', 'master', 'enquiry', 'sales_pipeline', 'quotation', 'meetings', 'sale', 'purchase', 'planning', 'reports', 'settings', 'csm', 'tender']),
+    sales: buildPermissions(['dashboard', 'enquiry', 'sales_pipeline', 'quotation', 'meetings', 'csm_tickets', 'csm_kb', 'tender_dashboard', 'tender_register'])
 };
 
 /**

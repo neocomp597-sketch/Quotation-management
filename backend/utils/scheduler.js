@@ -2,6 +2,11 @@ const cron = require('node-cron');
 const Enquiry = require('../models/Enquiry');
 const Notification = require('../models/Notification');
 const Meeting = require('../models/Meeting');
+const Quotation = require('../models/Quotation');
+const User = require('../models/User');
+const AuditLog = require('../models/AuditLog');
+const { createCompanyNotifications } = require('./notificationHelper');
+const { runWithTenant } = require('../middlewares/tenantContext');
 const { closeBullMq, createWorker, getQueue, getQueueEvents } = require('../config/bullmq');
 
 const checkFollowUps = async () => {
@@ -148,10 +153,70 @@ const autoCompleteMeetings = async () => {
     }
 };
 
+const autoExpireQuotations = async () => {
+    try {
+        console.log('[Scheduler] Checking for expired quotations...');
+        const now = new Date();
+        const expiryThreshold = new Date();
+        expiryThreshold.setDate(expiryThreshold.getDate() - 30);
+
+        // Find quotations that are pending approval and are older than 30 days
+        const expiredQuotations = await Quotation.find({
+            status: 'pending_approval',
+            $or: [
+                { validTill: { $lt: now } },
+                { quotationDate: { $lt: expiryThreshold } }
+            ]
+        });
+
+        for (const quotation of expiredQuotations) {
+            await runWithTenant(quotation.companyId, async () => {
+                const oldStatus = quotation.status;
+                quotation.status = 'rejected';
+                await quotation.save();
+                console.log(`[Scheduler] Quotation ${quotation.quotationNo} has automatically expired (rejected)`);
+
+                // Create notification for all users in the company
+                await createCompanyNotifications({
+                    companyId: quotation.companyId,
+                    title: 'Quotation Expired & Rejected',
+                    message: `Quotation ${quotation.quotationNo} has automatically expired and is marked as rejected because no approval was received within 30 days.`,
+                    type: 'Quotation',
+                    relatedId: quotation._id
+                });
+
+                // Find a user to act as the audit log performer
+                let logUserId = quotation.createdBy;
+                if (!logUserId) {
+                    const companyUser = await User.findOne({ companyId: quotation.companyId });
+                    logUserId = companyUser ? companyUser._id : null;
+                }
+
+                if (logUserId) {
+                    await AuditLog.create({
+                        action: 'AUTO_EXPIRED',
+                        entityType: 'Quotation',
+                        entityId: quotation._id,
+                        userId: logUserId,
+                        userName: 'System Scheduler',
+                        oldValue: oldStatus,
+                        newValue: 'rejected',
+                        companyId: quotation.companyId,
+                        reason: 'Quotation validity period expired (30 days reached without approval)'
+                    });
+                }
+            });
+        }
+    } catch (err) {
+        console.error('[Scheduler Quotation Expiry Error]', err);
+    }
+};
+
 const runScheduledTasks = async () => {
     await checkFollowUps();
     await checkMeetingReminders();
     await autoCompleteMeetings();
+    await autoExpireQuotations();
 };
 
 const FOLLOW_UP_QUEUE = 'follow-up-notifications';
@@ -243,4 +308,5 @@ exports.stopScheduler = () => {
 exports.checkFollowUps = checkFollowUps;
 exports.checkMeetingReminders = checkMeetingReminders;
 exports.autoCompleteMeetings = autoCompleteMeetings;
+exports.autoExpireQuotations = autoExpireQuotations;
 exports.runScheduledTasks = runScheduledTasks;

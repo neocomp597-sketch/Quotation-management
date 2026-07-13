@@ -71,6 +71,11 @@ import SalesTargets from './pages/SalesTargets';
 import SalesReports from './pages/SalesReports';
 import SalesAnalytics from './pages/SalesAnalytics';
 
+// Tender Pages
+import TenderDashboard from './pages/TenderDashboard';
+import TenderRegister from './pages/TenderRegister';
+import TenderReports from './pages/TenderReports';
+
 // CPQ Pages
 import CatalogSubmodule from './pages/CatalogSubmodule';
 import PriceManagement from './pages/PriceManagement';
@@ -224,6 +229,11 @@ function App() {
             <Route path="/csm/kb" element={<PermissionRoute permissionKey="csm_kb"><Layout><KnowledgeBase /></Layout></PermissionRoute>} />
             <Route path="/csm/masters" element={<PermissionRoute permissionKey="csm_masters"><Layout><CSMMasters /></Layout></PermissionRoute>} />
             <Route path="/csm/reports" element={<PermissionRoute permissionKey="csm_dashboard"><Layout><CSMReports /></Layout></PermissionRoute>} />
+            
+            {/* Tender Routes */}
+            <Route path="/tender/dashboard" element={<PermissionRoute permissionKey="tender_dashboard"><Layout><TenderDashboard /></Layout></PermissionRoute>} />
+            <Route path="/tender/register" element={<PermissionRoute permissionKey="tender_register"><Layout><TenderRegister /></Layout></PermissionRoute>} />
+            <Route path="/tender/reports" element={<PermissionRoute permissionKey="tender_reports"><Layout><TenderReports /></Layout></PermissionRoute>} />
 
             <Route path="/info/:slug" element={<Layout><FooterPageView /></Layout>} />
           </Route>

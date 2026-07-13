@@ -159,6 +159,17 @@ export const MENU_PERMISSION_GROUPS = [
             { key: 'csm_kb', label: 'Knowledge Base', description: 'Manage troubleshooting articles and FAQs', defaultRoute: '/csm/kb' },
             { key: 'csm_masters', label: 'CSM Masters', description: 'Configure categories, priorities, teams, and SLAs', defaultRoute: '/csm/masters' }
         ]
+    },
+    {
+        key: 'tender',
+        label: 'Tender Management',
+        description: 'Tender dashboard, pipelines, registers, and analysis reports',
+        defaultRoute: '/tender/dashboard',
+        children: [
+            { key: 'tender_dashboard', label: 'Tender Dashboard', description: 'Tender KPI dashboard and charts', defaultRoute: '/tender/dashboard' },
+            { key: 'tender_register', label: 'Tender Register', description: 'Tender list register and management', defaultRoute: '/tender/register' },
+            { key: 'tender_reports', label: 'Tender Reports', description: 'Tender pipeline and win/loss reports', defaultRoute: '/tender/reports' }
+        ]
     }
 ];
 

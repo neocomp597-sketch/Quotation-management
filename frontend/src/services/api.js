@@ -481,6 +481,18 @@ export const importService = {
   },
   getContractTemplate: () =>
     api.get("/import/template/contracts", { responseType: "blob" }),
+  importTenders: (file, onUploadProgress) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return api.post("/import/tenders", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+      onUploadProgress,
+    });
+  },
+  getTenderTemplate: () =>
+    api.get("/import/template/tenders", { responseType: "blob" }),
 };
 
 export const attributeService = {
@@ -875,6 +887,15 @@ export const clmService = {
   getCategories: () => api.get("/clm/categories"),
   createCategory: (data) => api.post("/clm/categories", data),
   deleteCategory: (id) => api.delete(`/clm/categories/${id}`),
+};
+
+export const tenderService = {
+  getTenders: (params) => api.get("/tenders", { params }),
+  getTender: (id) => api.get(`/tenders/${id}`),
+  createTender: (data) => api.post("/tenders", data),
+  updateTender: (id, data) => api.put(`/tenders/${id}`, data),
+  deleteTender: (id) => api.delete(`/tenders/${id}`),
+  getDashboard: (params) => api.get("/tenders/dashboard/data", { params }),
 };
 
 export default api;

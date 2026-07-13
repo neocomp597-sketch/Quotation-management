@@ -122,9 +122,11 @@ const csmRoutes = require("./routes/csmRoutes");
 const cpqRoutes = require("./routes/cpqRoutes");
 const orderRoutes = require("./routes/orderRoutes");
 const clmRoutes = require("./routes/clmRoutes");
+const tenderRoutes = require("./routes/tenderRoutes");
 const scheduler = require("./utils/scheduler");
 
 // API Routes (Reload triggered)
+app.use("/api/tenders", tenderRoutes);
 app.use("/api/quotations", quotationRoutes);
 app.use("/api/customers", customerRoutes);
 app.use("/api/products", productRoutes);
@@ -567,6 +569,27 @@ const startBackgroundServices = async () => {
         ],
         deployedBy: "Super Admin",
         deployedAt: new Date("2026-07-12T17:45:00Z"),
+        isActive: true
+      },
+      { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
+    );
+    await SystemUpdate.findOneAndUpdate(
+      { version: "v3.8.0-tenders" },
+      {
+        version: "v3.8.0-tenders",
+        title: "Tender Management & Excel Import/Export Center",
+        message: "We have launched the new Tender Management module, featuring a business-focused dashboard, a comprehensive register, automated PDF validity rules, and full Excel/CSV imports/exports.",
+        releaseNotes: [
+          "Tenders Main Dashboard: Added KPI cards for active/submitted/won/lost count, value, win rate, donut charts, and monthly trends",
+          "Tenders Register: Added detailed list with status, value, owner, client, and department tracking",
+          "Progression Log: Integrated real-time timeline auditing to track status transitions and value changes on tenders",
+          "Automated Quotation Expiry: Implemented 30-day validity auto-expiry rules that reject pending approval quotes after 30 days",
+          "Excel Data Import: Created Excel/CSV import handlers supporting smart matches for clients, departments, and owners",
+          "Excel Data Export: Built client-side Excel export for both the register view and all 8 Tender Management reports",
+          "Portal-based Modals: Aligned all modals and details sidebars to use the shared Portal-based component following system teal aesthetics"
+        ],
+        deployedBy: "Super Admin",
+        deployedAt: new Date("2026-07-13T21:30:00Z"),
         isActive: true
       },
       { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }

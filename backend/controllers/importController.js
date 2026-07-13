@@ -2769,6 +2769,226 @@ const getContractTemplate = async (req, res) => {
     }
 };
 
+const importTenders = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ message: 'No file uploaded' });
+        }
+
+        const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const data = XLSX.utils.sheet_to_json(worksheet);
+
+        const results = {
+            created: 0,
+            updated: 0,
+            failed: 0,
+            errors: []
+        };
+
+        const companyId = req.user?.companyId;
+
+        const Tender = require('../models/Tender');
+        const Department = require('../models/Department');
+        const User = require('../models/User');
+
+        const existingTenders = await Tender.find({ companyId }).lean();
+        const tenderNoMap = new Map();
+        existingTenders.forEach(t => {
+            if (t.tenderNo) {
+                tenderNoMap.set(t.tenderNo.trim().toLowerCase(), t);
+            }
+        });
+
+        const existingCustomers = await Customer.find({ companyId }).lean();
+        const customerNameMap = new Map();
+        existingCustomers.forEach(c => {
+            if (c.companyName) {
+                customerNameMap.set(c.companyName.trim().toLowerCase(), c);
+            }
+            if (c.customerName) {
+                customerNameMap.set(c.customerName.trim().toLowerCase(), c);
+            }
+        });
+
+        const existingDepts = await Department.find({ companyId }).lean();
+        const deptNameMap = new Map();
+        existingDepts.forEach(d => {
+            if (d.name) {
+                deptNameMap.set(d.name.trim().toLowerCase(), d);
+            }
+        });
+
+        const existingUsers = await User.find({ companyId }).lean();
+        const userNameMap = new Map();
+        const userEmailMap = new Map();
+        existingUsers.forEach(u => {
+            if (u.name) userNameMap.set(u.name.trim().toLowerCase(), u);
+            if (u.email) userEmailMap.set(u.email.trim().toLowerCase(), u);
+        });
+
+        const generateTenderNumber = async (companyId) => {
+            const Counter = require('../models/Counter');
+            const year = new Date().getFullYear();
+            const prefix = 'TND';
+            const counter = await Counter.findOneAndUpdate(
+                { type: 'tender', companyId: companyId || null, prefix, year },
+                { $inc: { seq: 1 } },
+                { new: true, upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
+            );
+            const seqStr = counter.seq.toString().padStart(4, '0');
+            return `${prefix}/${year}/${seqStr}`;
+        };
+
+        for (let i = 0; i < data.length; i++) {
+            const row = data[i];
+            try {
+                const title = pickFirstNonEmpty(row['Tender Title'], row.title, row['Title'], row.name);
+                if (!title) {
+                    throw new Error('Tender Title is required');
+                }
+
+                const customerName = pickFirstNonEmpty(row['Client'], row.client, row['Customer'], row.customer, row['Company'], row.company);
+                if (!customerName) {
+                    throw new Error('Client / Customer Name is required');
+                }
+
+                const customerMatched = customerNameMap.get(customerName.trim().toLowerCase());
+                if (!customerMatched) {
+                    throw new Error(`Client "${customerName}" not found in database`);
+                }
+
+                const value = toSafeNumber(row['Value'] || row.value, 0);
+
+                const deadlineDateStr = pickFirstNonEmpty(row['Deadline Date'], row.deadlineDate, row['Deadline'], row.deadline_date);
+                if (!deadlineDateStr) {
+                    throw new Error('Deadline Date is required');
+                }
+                const deadlineDate = new Date(deadlineDateStr);
+                if (isNaN(deadlineDate.getTime())) {
+                    throw new Error('Invalid Deadline Date format');
+                }
+
+                const submissionDateStr = pickFirstNonEmpty(row['Submission Date'], row.submissionDate, row['Submission'], row.submission_date);
+                const submissionDate = submissionDateStr ? new Date(submissionDateStr) : undefined;
+                if (submissionDate && isNaN(submissionDate.getTime())) {
+                    throw new Error('Invalid Submission Date format');
+                }
+
+                const status = pickFirstNonEmpty(row['Status'], row.status) || 'Active';
+                const description = pickFirstNonEmpty(row['Description'], row.description, row['Scope'], row.scope) || '';
+
+                const deptName = pickFirstNonEmpty(row['Department'], row.department);
+                let departmentId = undefined;
+                if (deptName) {
+                    const matchedDept = deptNameMap.get(deptName.trim().toLowerCase());
+                    if (matchedDept) {
+                        departmentId = matchedDept._id;
+                    }
+                }
+
+                const ownerName = pickFirstNonEmpty(row['Owner'], row.owner, row['Assignee'], row.assignee);
+                let ownerId = req.user?.id;
+                if (ownerName) {
+                    const matchedUser = userNameMap.get(ownerName.trim().toLowerCase()) || userEmailMap.get(ownerName.trim().toLowerCase());
+                    if (matchedUser) {
+                        ownerId = matchedUser._id;
+                    }
+                }
+
+                let tenderNo = pickFirstNonEmpty(row['Tender Number'], row.tenderNo, row['Tender No'], row.tenderNo);
+                
+                const tenderData = {
+                    title,
+                    customerId: customerMatched._id,
+                    value,
+                    deadlineDate,
+                    submissionDate,
+                    status,
+                    description,
+                    departmentId,
+                    ownerId,
+                    companyId
+                };
+
+                let matchedTender = null;
+                if (tenderNo) {
+                    matchedTender = tenderNoMap.get(tenderNo.trim().toLowerCase());
+                }
+
+                if (matchedTender) {
+                    const updatedActivities = [...(matchedTender.activities || []), {
+                        userId: req.user?.id,
+                        userName: req.user?.name || 'System',
+                        action: 'Tender imported/updated via excel'
+                    }];
+                    await Tender.findByIdAndUpdate(matchedTender._id, {
+                        ...tenderData,
+                        activities: updatedActivities
+                    });
+                    results.updated++;
+                } else {
+                    if (!tenderNo) {
+                        tenderNo = await generateTenderNumber(companyId);
+                    }
+                    await Tender.create({
+                        ...tenderData,
+                        tenderNo,
+                        activities: [{
+                            userId: req.user?.id,
+                            userName: req.user?.name || 'System',
+                            action: 'Tender imported/created via excel'
+                        }]
+                    });
+                    results.created++;
+                }
+            } catch (err) {
+                results.failed++;
+                results.errors.push(`Row ${i + 2}: ${err.message}`);
+            }
+        }
+
+        res.json({
+            message: `Import processed. Created: ${results.created}, Updated: ${results.updated}, Failed: ${results.failed}`,
+            results
+        });
+    } catch (err) {
+        console.error('Import tenders error:', err);
+        res.status(500).json({ message: 'Error processing tender import' });
+    }
+};
+
+const getTenderTemplate = async (req, res) => {
+    try {
+        const templateData = [
+            {
+                'Tender Number': 'TND/2026/0001',
+                'Tender Title': 'Gov ACC Smart Grid Upgrade',
+                'Client': 'ACC Enterprises Pvt Ltd',
+                'Value': 1500000,
+                'Deadline Date': '2026-08-30',
+                'Submission Date': '',
+                'Status': 'Active',
+                'Department': 'Accounts',
+                'Owner': 'A Dixit',
+                'Description': 'Tender for implementing smart grid sensors and control system updates.'
+            }
+        ];
+
+        const ws = XLSX.utils.json_to_sheet(templateData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Tenders Template');
+
+        const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename=Tenders_Import_Template.xlsx');
+        res.send(buffer);
+    } catch (err) {
+        res.status(500).json({ message: 'Error generating tender import template' });
+    }
+};
+
 module.exports = {
     importProducts,
     importCustomers,
@@ -2797,5 +3017,7 @@ module.exports = {
     importContacts,
     getContactTemplate,
     importContracts,
-    getContractTemplate
+    getContractTemplate,
+    importTenders,
+    getTenderTemplate
 };

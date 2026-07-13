@@ -247,6 +247,17 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
         },
         {
             type: 'group',
+            name: 'Tender Management',
+            key: 'tender',
+            icon: <MdAssignment size={22} />,
+            children: [
+                { key: 'tender_dashboard', name: 'Tender Dashboard', icon: <MdDashboard size={18} />, path: '/tender/dashboard' },
+                { key: 'tender_register', name: 'Tenders Register', icon: <MdAssignment size={18} />, path: '/tender/register' },
+                { key: 'tender_reports', name: 'Tender Reports', icon: <MdBarChart size={18} />, path: '/tender/reports' }
+            ]
+        },
+        {
+            type: 'group',
             name: 'Reports',
             key: 'reports',
             icon: <MdBarChart size={22} />,

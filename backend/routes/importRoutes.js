@@ -32,7 +32,9 @@ const {
     importContacts,
     getContactTemplate,
     importContracts,
-    getContractTemplate
+    getContractTemplate,
+    importTenders,
+    getTenderTemplate
 } = require('../controllers/importController');
 
 // Multer memory storage for Excel/CSV files
@@ -72,6 +74,7 @@ router.post('/price-book-items/:priceBookId', protect, upload.single('file'), im
 router.post('/employees', protect, upload.single('file'), importEmployees);
 router.post('/contacts', protect, upload.single('file'), importContacts);
 router.post('/contracts', protect, upload.single('file'), importContracts);
+router.post('/tenders', protect, upload.single('file'), importTenders);
 
 // Template download routes
 router.get('/template/products', getProductTemplate);
@@ -88,6 +91,7 @@ router.get('/template/price-book-items', getPriceBookItemTemplate);
 router.get('/template/employees', getEmployeeTemplate);
 router.get('/template/contacts', getContactTemplate);
 router.get('/template/contracts', getContractTemplate);
+router.get('/template/tenders', getTenderTemplate);
 
 // Debug endpoint to read Excel headers
 router.post('/debug-headers', upload.single('file'), (req, res) => {

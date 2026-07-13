@@ -340,7 +340,7 @@ const CreateQuotation = () => {
 
         if (!id) {
             const dt = new Date();
-            dt.setDate(dt.getDate() + 7);
+            dt.setDate(dt.getDate() + 30);
             setHeader(prev => ({ ...prev, validTill: dt.toISOString().split('T')[0] }));
         }
     }, [id]);
