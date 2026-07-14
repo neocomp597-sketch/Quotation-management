@@ -39,6 +39,7 @@ router.get('/visits', protect, serviceVisitController.getVisits);
 router.get('/visits/:id', protect, serviceVisitController.getVisitById);
 router.post('/visits/:id/check-in', protect, serviceVisitController.checkIn);
 router.post('/visits/:id/check-out', protect, serviceVisitController.checkOut);
+router.patch('/visits/:id/reschedule', protect, serviceVisitController.rescheduleVisit);
 
 // ─── ENTITLEMENTS (WARRANTY / AMC / ASSETS) ─────────────────────────────────
 router.get('/entitlements/verify', protect, warrantyAmcController.verifyEntitlements);

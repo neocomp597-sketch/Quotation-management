@@ -5,6 +5,7 @@ import {
     MdLocalShipping, MdMyLocation, MdCheckCircle, 
     MdAssignment, MdEvent, MdAttachMoney, MdDelete 
 } from 'react-icons/md';
+import Modal from '../components/Modal';
 
 const ServiceVisits = () => {
     const [loading, setLoading] = useState(false);
@@ -22,6 +23,13 @@ const ServiceVisits = () => {
     const canvasRef = useRef(null);
     const [isDrawing, setIsDrawing] = useState(false);
 
+    // Reschedule State
+    const [showRescheduleModal, setShowRescheduleModal] = useState(false);
+    const [rescheduleDate, setRescheduleDate] = useState('');
+    const [rescheduleEngineer, setRescheduleEngineer] = useState('');
+    const [engineers, setEngineers] = useState([]);
+    const [rescheduling, setRescheduling] = useState(false);
+
     const fetchVisits = async () => {
         setLoading(true);
         try {
@@ -34,8 +42,18 @@ const ServiceVisits = () => {
         }
     };
 
+    const fetchEngineers = async () => {
+        try {
+            const res = await csmService.getEngineers();
+            setEngineers(res.data || []);
+        } catch (error) {
+            console.error('Failed to load engineers', error);
+        }
+    };
+
     useEffect(() => {
         fetchVisits();
+        fetchEngineers();
     }, []);
 
     // Geolocation Check-in simulation
@@ -121,6 +139,30 @@ const ServiceVisits = () => {
 
     const handleRemoveExpense = (idx) => {
         setExpenses(expenses.filter((_, i) => i !== idx));
+    };
+
+    const handleReschedule = async (e) => {
+        e.preventDefault();
+        if (!rescheduleDate || !rescheduleEngineer) {
+            toast.error('Date and Engineer are mandatory');
+            return;
+        }
+        setRescheduling(true);
+        try {
+            await csmService.rescheduleVisit(selectedVisit._id, {
+                scheduledDate: rescheduleDate,
+                engineerId: rescheduleEngineer
+            });
+            toast.success('Service Visit rescheduled successfully');
+            setShowRescheduleModal(false);
+            fetchVisits();
+            setSelectedVisit(null);
+        } catch (error) {
+            const errMsg = error.response?.data?.message || 'Rescheduling failed';
+            toast.error(errMsg);
+        } finally {
+            setRescheduling(false);
+        }
     };
 
     const handleCheckOut = async (e) => {
@@ -256,10 +298,24 @@ const ServiceVisits = () => {
                 <div className="lg:col-span-1">
                     {selectedVisit ? (
                         <div className="glass shadow-premium rounded-[2rem] p-6 bg-white border border-slate-100 space-y-6 animate-scale-in">
-                            <div className="border-b border-slate-50 pb-3">
-                                <span className="text-[10px] font-black uppercase tracking-widest text-teal-600">Active Service Dispatch</span>
-                                <h3 className="text-lg font-black text-slate-900 font-outfit uppercase -mt-0.5">{selectedVisit.visitNo}</h3>
-                                <p className="text-xs text-slate-400 font-bold">{selectedVisit.ticketId?.ticketNo} - {selectedVisit.ticketId?.issueTitle}</p>
+                            <div className="border-b border-slate-50 pb-3 flex justify-between items-start">
+                                <div>
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-teal-600">Active Service Dispatch</span>
+                                    <h3 className="text-lg font-black text-slate-900 font-outfit uppercase -mt-0.5">{selectedVisit.visitNo}</h3>
+                                    <p className="text-xs text-slate-400 font-bold">{selectedVisit.ticketId?.ticketNo} - {selectedVisit.ticketId?.issueTitle}</p>
+                                </div>
+                                {['Scheduled', 'In Transit', 'Started'].includes(selectedVisit.status) && (
+                                    <button
+                                        onClick={() => {
+                                            setRescheduleDate(selectedVisit.scheduledDate ? new Date(selectedVisit.scheduledDate).toISOString().slice(0, 16) : '');
+                                            setRescheduleEngineer(selectedVisit.engineerId?._id || selectedVisit.engineerId || '');
+                                            setShowRescheduleModal(true);
+                                        }}
+                                        className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all border border-slate-200"
+                                    >
+                                        Reschedule
+                                    </button>
+                                )}
                             </div>
 
                             {/* Check-In Mode */}
@@ -401,6 +457,57 @@ const ServiceVisits = () => {
                     )}
                 </div>
             </div>
+
+            <Modal
+                isOpen={showRescheduleModal}
+                onClose={() => setShowRescheduleModal(false)}
+                title="Reschedule Service Visit"
+                maxWidth="max-w-md"
+                footer={
+                    <>
+                        <button
+                            type="button"
+                            onClick={() => setShowRescheduleModal(false)}
+                            className="flex-1 w-full py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            form="reschedule-visit-form"
+                            disabled={rescheduling}
+                            className="flex-1 w-full py-3.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {rescheduling ? 'Rescheduling...' : 'Reschedule'}
+                        </button>
+                    </>
+                }
+            >
+                <form id="reschedule-visit-form" onSubmit={handleReschedule} className="space-y-4">
+                    <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">New Date & Time *</label>
+                        <input
+                            type="datetime-local"
+                            required
+                            value={rescheduleDate}
+                            onChange={(e) => setRescheduleDate(e.target.value)}
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Assign Service Engineer *</label>
+                        <select
+                            required
+                            value={rescheduleEngineer}
+                            onChange={(e) => setRescheduleEngineer(e.target.value)}
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
+                        >
+                            <option value="">Select Engineer</option>
+                            {engineers.map(u => <option key={u._id} value={u._id}>{u.name}</option>)}
+                        </select>
+                    </div>
+                </form>
+            </Modal>
         </div>
     );
 };

@@ -18,7 +18,7 @@ const VisitExpenseSchema = new mongoose.Schema({
 const ServiceVisitSchema = new mongoose.Schema({
     visitNo: { type: String, required: true },
     ticketId: { type: mongoose.Schema.Types.ObjectId, ref: 'Ticket', required: true },
-    engineerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    engineerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Engineer', required: true },
     scheduledDate: { type: Date, required: true },
     status: { 
         type: String, 

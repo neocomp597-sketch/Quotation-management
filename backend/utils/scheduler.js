@@ -155,17 +155,69 @@ const autoCompleteMeetings = async () => {
 
 const autoExpireQuotations = async () => {
     try {
-        console.log('[Scheduler] Checking for expired quotations...');
+        console.log('[Scheduler] Running quotation status auto-updates...');
         const now = new Date();
-        const expiryThreshold = new Date();
-        expiryThreshold.setDate(expiryThreshold.getDate() - 30);
 
-        // Find quotations that are pending approval and are older than 30 days
+        // 1. 15-day check: draft -> pending_approval
+        const fifteenDaysAgo = new Date();
+        fifteenDaysAgo.setDate(fifteenDaysAgo.getDate() - 15);
+
+        const draftQuotations = await Quotation.find({
+            status: 'draft',
+            $or: [
+                { quotationDate: { $lt: fifteenDaysAgo } },
+                { createdAt: { $lt: fifteenDaysAgo } }
+            ]
+        });
+
+        for (const quotation of draftQuotations) {
+            await runWithTenant(quotation.companyId, async () => {
+                const oldStatus = quotation.status;
+                quotation.status = 'pending_approval';
+                await quotation.save();
+                console.log(`[Scheduler] Quotation ${quotation.quotationNo} auto-updated from draft to pending_approval (15 days elapsed)`);
+
+                // Create notification
+                await createCompanyNotifications({
+                    companyId: quotation.companyId,
+                    title: 'Quotation Status Set to Pending',
+                    message: `Quotation ${quotation.quotationNo} has automatically been changed to pending approval because 15 days elapsed without approval.`,
+                    type: 'Quotation',
+                    relatedId: quotation._id
+                });
+
+                // Audit log
+                let logUserId = quotation.createdBy;
+                if (!logUserId) {
+                    const companyUser = await User.findOne({ companyId: quotation.companyId });
+                    logUserId = companyUser ? companyUser._id : null;
+                }
+                if (logUserId) {
+                    await AuditLog.create({
+                        action: 'AUTO_PENDING',
+                        entityType: 'Quotation',
+                        entityId: quotation._id,
+                        userId: logUserId,
+                        userName: 'System Scheduler',
+                        oldValue: oldStatus,
+                        newValue: 'pending_approval',
+                        companyId: quotation.companyId,
+                        reason: 'Quotation 15 days old without approval, status set to Pending'
+                    });
+                }
+            });
+        }
+
+        // 2. 30-day check: pending_approval -> rejected
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
         const expiredQuotations = await Quotation.find({
             status: 'pending_approval',
             $or: [
                 { validTill: { $lt: now } },
-                { quotationDate: { $lt: expiryThreshold } }
+                { quotationDate: { $lt: thirtyDaysAgo } },
+                { createdAt: { $lt: thirtyDaysAgo } }
             ]
         });
 

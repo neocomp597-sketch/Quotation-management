@@ -727,6 +727,7 @@ export const csmService = {
   createVisit: (data) => api.post("/csm/visits", data),
   checkInVisit: (id, data) => api.post(`/csm/visits/${id}/check-in`, data),
   checkOutVisit: (id, data) => api.post(`/csm/visits/${id}/check-out`, data),
+  rescheduleVisit: (id, data) => api.patch(`/csm/visits/${id}/reschedule`, data),
 
   verifyEntitlements: (params = {}) => api.get("/csm/entitlements/verify", { params }),
   getWarranties: () => api.get("/csm/warranties"),

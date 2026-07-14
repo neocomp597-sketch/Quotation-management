@@ -41,6 +41,7 @@ const TicketDetail = () => {
     const [showVisitModal, setShowVisitModal] = useState(false);
     const [visitDate, setVisitDate] = useState('');
     const [visitEngineer, setVisitEngineer] = useState('');
+    const [activeVisit, setActiveVisit] = useState(null);
 
     const fetchTicketDetails = async () => {
         try {
@@ -59,6 +60,14 @@ const TicketDetail = () => {
                     productId: ticketData.productId._id
                 });
                 setEntitlements(entRes.data);
+            }
+
+            // Load service visits for this customer to see if there is an active one
+            if (ticketData.customerId?._id) {
+                const visitsRes = await csmService.getVisits({ customerId: ticketData.customerId._id });
+                const allVisits = visitsRes.data || [];
+                const active = allVisits.find(v => ['Scheduled', 'In Transit', 'Started'].includes(v.status));
+                setActiveVisit(active || null);
             }
         } catch (error) {
             toast.error('Failed to load ticket details');
@@ -149,17 +158,26 @@ const TicketDetail = () => {
     const { isSubmitting: isSchedulingVisit, execute: handleScheduleVisit } = useSubmitGuard(async (e) => {
         e.preventDefault();
         try {
-            await csmService.createVisit({
-                ticketId: id,
-                engineerId: visitEngineer,
-                scheduledDate: visitDate,
-                billingStatus: entitlements?.recommendedBillingType || 'Paid'
-            });
-            toast.success('Service Visit scheduled successfully');
+            if (activeVisit) {
+                await csmService.rescheduleVisit(activeVisit._id, {
+                    engineerId: visitEngineer,
+                    scheduledDate: visitDate
+                });
+                toast.success('Service Visit rescheduled successfully');
+            } else {
+                await csmService.createVisit({
+                    ticketId: id,
+                    engineerId: visitEngineer,
+                    scheduledDate: visitDate,
+                    billingStatus: entitlements?.recommendedBillingType || 'Paid'
+                });
+                toast.success('Service Visit scheduled successfully');
+            }
             setShowVisitModal(false);
             fetchTicketDetails();
         } catch (error) {
-            toast.error('Scheduling visit failed');
+            const errMsg = error.response?.data?.message || (activeVisit ? 'Rescheduling visit failed' : 'Scheduling visit failed');
+            toast.error(errMsg);
         }
     });
 
@@ -517,29 +535,65 @@ const TicketDetail = () => {
                         {/* Tab 2: Service Visits */}
                         {activeTab === 'visits' && (
                             <div className="space-y-6">
-                                <div className="flex items-center justify-between">
+                                <div className="flex items-center justify-between border-b border-slate-50 pb-2">
                                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Scheduled Actions</span>
-                                    <button
-                                        onClick={() => {
-                                            setVisitDate('');
-                                            setVisitEngineer(assignEngineer);
-                                            setShowVisitModal(true);
-                                        }}
-                                        className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-black uppercase text-[10px] tracking-widest rounded-xl transition-all"
-                                    >
-                                        Schedule Visit
-                                    </button>
+                                    {!activeVisit && (
+                                        <button
+                                            onClick={() => {
+                                                setVisitDate('');
+                                                setVisitEngineer(assignEngineer);
+                                                setShowVisitModal(true);
+                                            }}
+                                            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-black uppercase text-[10px] tracking-widest rounded-xl transition-all"
+                                        >
+                                            Schedule Visit
+                                        </button>
+                                    )}
                                 </div>
 
                                 {/* Display Service Visits */}
                                 <div className="space-y-3">
-                                    {ticket.status === 'Resolved' || ticket.status === 'Closed' ? (
+                                    {activeVisit ? (
+                                        <div className="p-5 rounded-2xl bg-indigo-50/50 border border-indigo-100 space-y-3">
+                                            <div className="flex justify-between items-center">
+                                                <div>
+                                                    <span className="text-[9px] font-black uppercase tracking-widest text-indigo-500">Active Visit No</span>
+                                                    <p className="text-sm font-black text-slate-900">{activeVisit.visitNo}</p>
+                                                </div>
+                                                <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase bg-indigo-100 text-indigo-700 border border-indigo-200">
+                                                    {activeVisit.status}
+                                                </span>
+                                            </div>
+                                            
+                                            <div className="grid grid-cols-2 gap-2 text-xs font-semibold text-slate-600">
+                                                <div>
+                                                    <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Scheduled Date</span>
+                                                    <span>{new Date(activeVisit.scheduledDate).toLocaleString()}</span>
+                                                </div>
+                                                <div>
+                                                    <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Service Engineer</span>
+                                                    <span>{activeVisit.engineerId?.name || 'Unassigned'}</span>
+                                                </div>
+                                            </div>
+
+                                            <button
+                                                onClick={() => {
+                                                    setVisitDate(activeVisit.scheduledDate ? new Date(activeVisit.scheduledDate).toISOString().slice(0, 16) : '');
+                                                    setVisitEngineer(activeVisit.engineerId?._id || activeVisit.engineerId || '');
+                                                    setShowVisitModal(true);
+                                                }}
+                                                className="w-full py-2.5 mt-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md animate-pulse"
+                                            >
+                                                Reschedule Visit
+                                            </button>
+                                        </div>
+                                    ) : ticket.status === 'Resolved' || ticket.status === 'Closed' ? (
                                         <div className="p-4 bg-teal-50 border border-teal-200 text-teal-800 rounded-2xl text-xs font-bold text-center">
                                             Ticket resolved/closed. View visit records in the Service Visits menu.
                                         </div>
                                     ) : (
                                         <p className="text-slate-400 font-semibold text-sm text-center py-8">
-                                            Visits scheduled will appear here. Navigate to "Service Visits" tab for geofenced check-ins.
+                                            No active visit scheduled. Navigate to "Service Visits" tab for geofenced check-ins once scheduled.
                                         </p>
                                     )}
                                 </div>
@@ -611,7 +665,7 @@ const TicketDetail = () => {
             <Modal
                 isOpen={showVisitModal}
                 onClose={() => setShowVisitModal(false)}
-                title="Schedule Visit"
+                title={activeVisit ? "Reschedule Visit" : "Schedule Visit"}
                 maxWidth="max-w-md"
                 footer={
                     <>
@@ -628,7 +682,7 @@ const TicketDetail = () => {
                             disabled={isSchedulingVisit}
                             className="flex-1 w-full py-3.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            {isSchedulingVisit ? 'Scheduling...' : 'Schedule'}
+                            {isSchedulingVisit ? (activeVisit ? 'Rescheduling...' : 'Scheduling...') : (activeVisit ? 'Reschedule' : 'Schedule')}
                         </button>
                     </>
                 }
