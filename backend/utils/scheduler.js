@@ -208,16 +208,24 @@ const autoExpireQuotations = async () => {
             });
         }
 
-        // 2. 30-day check: pending_approval -> rejected
+        // 2. 30-day check: pending_approval -> rejected, final (expired validTill) -> rejected
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
         const expiredQuotations = await Quotation.find({
-            status: 'pending_approval',
             $or: [
-                { validTill: { $lt: now } },
-                { quotationDate: { $lt: thirtyDaysAgo } },
-                { createdAt: { $lt: thirtyDaysAgo } }
+                {
+                    status: 'pending_approval',
+                    $or: [
+                        { validTill: { $lt: now } },
+                        { quotationDate: { $lt: thirtyDaysAgo } },
+                        { createdAt: { $lt: thirtyDaysAgo } }
+                    ]
+                },
+                {
+                    status: 'final',
+                    validTill: { $lt: now }
+                }
             ]
         });
 
@@ -228,11 +236,15 @@ const autoExpireQuotations = async () => {
                 await quotation.save();
                 console.log(`[Scheduler] Quotation ${quotation.quotationNo} has automatically expired (rejected)`);
 
+                const notifMessage = oldStatus === 'final'
+                    ? `Quotation ${quotation.quotationNo} has automatically expired and is marked as rejected because the validity date has passed.`
+                    : `Quotation ${quotation.quotationNo} has automatically expired and is marked as rejected because no approval was received within 30 days.`;
+
                 // Create notification for all users in the company
                 await createCompanyNotifications({
                     companyId: quotation.companyId,
                     title: 'Quotation Expired & Rejected',
-                    message: `Quotation ${quotation.quotationNo} has automatically expired and is marked as rejected because no approval was received within 30 days.`,
+                    message: notifMessage,
                     type: 'Quotation',
                     relatedId: quotation._id
                 });
@@ -245,6 +257,10 @@ const autoExpireQuotations = async () => {
                 }
 
                 if (logUserId) {
+                    const logReason = oldStatus === 'final'
+                        ? 'Quotation validity period expired'
+                        : 'Quotation validity period expired (30 days reached without approval)';
+
                     await AuditLog.create({
                         action: 'AUTO_EXPIRED',
                         entityType: 'Quotation',
@@ -254,7 +270,7 @@ const autoExpireQuotations = async () => {
                         oldValue: oldStatus,
                         newValue: 'rejected',
                         companyId: quotation.companyId,
-                        reason: 'Quotation validity period expired (30 days reached without approval)'
+                        reason: logReason
                     });
                 }
             });

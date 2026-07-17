@@ -102,7 +102,8 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             children: [
                 { key: 'master_customers', name: 'Customers', icon: <MdPeople size={18} />, path: '/customers' },
                 { key: 'payroll_employees', name: 'Employees', icon: <MdPeople size={18} />, path: '/payroll/employees' },
-                { key: 'payroll_employees', name: 'Payroll Masters', icon: <MdCategory size={18} />, path: '/payroll/masters' },
+                { key: 'payroll_employees', name: 'Department Master', icon: <MdCategory size={18} />, path: '/payroll/masters?tab=departments' },
+                { key: 'payroll_employees', name: 'Designation Master', icon: <MdAssignment size={18} />, path: '/payroll/masters?tab=designations' },
                 { key: 'master_vendors', name: 'Vendors', icon: <MdStorefront size={18} />, path: '/vendors' },
                 { key: 'master_contacts', name: 'Contacts', icon: <MdContactPhone size={18} />, path: '/contacts' },
                 { key: 'sales_deals', name: 'Deals', icon: <MdViewKanban size={18} />, path: '/sales/deals' },

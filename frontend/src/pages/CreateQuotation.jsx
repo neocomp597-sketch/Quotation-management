@@ -271,7 +271,11 @@ const CreateQuotation = () => {
     const [isSalespersonModalOpen, setIsSalespersonModalOpen] = useState(false);
     const [isSiteModalOpen, setIsSiteModalOpen] = useState(false);
     const [productSearch, setProductSearch] = useState('');
+    const [productPage, setProductPage] = useState(1);
+    const [productTotalPages, setProductTotalPages] = useState(1);
+    const [isProductsLoading, setIsProductsLoading] = useState(false);
     const addressInputRef = React.useRef(null);
+    const isProductsLoadingRef = React.useRef(false);
     const autocompleteRef = React.useRef(null);
 
     // Form State
@@ -320,7 +324,13 @@ const CreateQuotation = () => {
                     salespersonService.getAll()
                 ]);
                 setCustomers(unwrapList(custRes.data));
-                setProducts(unwrapList(prodRes.data));
+                
+                const prodData = unwrapList(prodRes.data);
+                const prodPagination = prodRes.data?.pagination || {};
+                setProducts(prodData);
+                setProductTotalPages(prodPagination.pages || 1);
+                setProductPage(1);
+
                 setTermsTemplates(termsRes.data);
                 setSalespersons(salesRes.data);
 
@@ -361,22 +371,53 @@ const CreateQuotation = () => {
         }
     };
 
-    useEffect(() => {
-        const timer = setTimeout(async () => {
-            try {
-                const res = await productService.getAll({
-                    page: 1,
-                    limit: LIST_PAGE_SIZE,
-                    search: productSearch.trim() || undefined
+    const fetchProducts = useCallback(async (page, searchVal, append = false) => {
+        if (isProductsLoadingRef.current) return;
+        isProductsLoadingRef.current = true;
+        setIsProductsLoading(true);
+        try {
+            const res = await productService.getAll({
+                page,
+                limit: LIST_PAGE_SIZE,
+                search: searchVal.trim() || undefined
+            });
+            const data = unwrapList(res.data);
+            const pagination = res.data?.pagination || {};
+            setProductTotalPages(pagination.pages || 1);
+            setProductPage(page);
+            if (append) {
+                setProducts(prev => {
+                    const existingIds = new Set(prev.map(p => p._id));
+                    const uniqueNew = data.filter(p => !existingIds.has(p._id));
+                    return [...prev, ...uniqueNew];
                 });
-                setProducts(unwrapList(res.data));
-            } catch (err) {
-                console.error('Error searching products:', err);
+            } else {
+                setProducts(data);
             }
+        } catch (err) {
+            console.error('Error fetching products:', err);
+        } finally {
+            isProductsLoadingRef.current = false;
+            setIsProductsLoading(false);
+        }
+    }, []);
+
+    const handleProductScroll = useCallback((e) => {
+        const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+        if (scrollHeight - scrollTop - clientHeight < 50) {
+            if (!isProductsLoadingRef.current && productPage < productTotalPages) {
+                fetchProducts(productPage + 1, productSearch, true);
+            }
+        }
+    }, [fetchProducts, productPage, productTotalPages, productSearch]);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            fetchProducts(1, productSearch, false);
         }, 300);
 
         return () => clearTimeout(timer);
-    }, [productSearch]);
+    }, [productSearch, fetchProducts]);
 
     // Fetch quotation details if in edit mode
     useEffect(() => {
@@ -1605,51 +1646,75 @@ const CreateQuotation = () => {
                         />
                     </div>
 
-                    <div className="max-h-[450px] overflow-y-auto custom-scrollbar space-y-2 pr-2">
-                        {filteredProducts.map(p => {
-                            const vendorList = sortVendors(p.vendors || []);
-                            const bestVendor = p.bestVendor || getBestVendor(vendorList);
-                            const hasStock = vendorList.some(v => Number(v.stock || 0) > 0 && v.vendorId?.isActive !== false);
+                    <div 
+                        onScroll={handleProductScroll}
+                        className="max-h-[450px] overflow-y-auto custom-scrollbar space-y-2 pr-2"
+                    >
+                        {isProductsLoading && filteredProducts.length === 0 ? (
+                            <div className="py-20 text-center text-slate-400 text-xs font-bold uppercase tracking-widest flex flex-col items-center justify-center gap-3">
+                                <svg className="animate-spin h-8 w-8 text-primary-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Searching products...
+                            </div>
+                        ) : (
+                            <>
+                                {filteredProducts.map(p => {
+                                    const vendorList = sortVendors(p.vendors || []);
+                                    const bestVendor = p.bestVendor || getBestVendor(vendorList);
+                                    const hasStock = vendorList.some(v => Number(v.stock || 0) > 0 && v.vendorId?.isActive !== false);
 
-                            return (
-                                <div
-                                    key={p._id}
-                                    onClick={() => addProductToQuotation(p)}
-                                    className="flex items-center gap-4 p-4 rounded-[1.5rem] border border-slate-100 hover:border-primary-200 hover:bg-primary-50/30 cursor-pointer transition-all active:scale-[0.98] group"
-                                >
-                                    <div className="h-12 w-12 rounded-2xl bg-white border border-slate-100 p-1 flex-shrink-0">
-                                        {p.productImageUrl ? (
-                                            <img src={resolveImageUrl(p.productImageUrl)} alt="" className="h-full w-full object-contain" />
-                                        ) : (
-                                            <div className="h-full w-full flex items-center justify-center text-slate-200"><MdInventory2 size={24} /></div>
-                                        )}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <h4 className="font-bold text-slate-900 group-hover:text-primary-700 transition-colors truncate">{p.productName}</h4>
-                                        <div className="flex items-center gap-3">
-                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{p.productCode}</span>
-                                            <span className="h-1 w-1 rounded-full bg-slate-300"></span>
-                                            <span className="text-[10px] font-black text-primary-600 bg-primary-50 px-2 py-0.5 rounded uppercase">
-                                                INR {Number(bestVendor?.price ?? p.basePrice ?? 0).toLocaleString()}
-                                            </span>
+                                    return (
+                                        <div
+                                            key={p._id}
+                                            onClick={() => addProductToQuotation(p)}
+                                            className="flex items-center gap-4 p-4 rounded-[1.5rem] border border-slate-100 hover:border-primary-200 hover:bg-primary-50/30 cursor-pointer transition-all active:scale-[0.98] group"
+                                        >
+                                            <div className="h-12 w-12 rounded-2xl bg-white border border-slate-100 p-1 flex-shrink-0">
+                                                {p.productImageUrl ? (
+                                                    <img src={resolveImageUrl(p.productImageUrl)} alt="" className="h-full w-full object-contain" />
+                                                ) : (
+                                                    <div className="h-full w-full flex items-center justify-center text-slate-200"><MdInventory2 size={24} /></div>
+                                                )}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <h4 className="font-bold text-slate-900 group-hover:text-primary-700 transition-colors truncate">{p.productName}</h4>
+                                                <div className="flex items-center gap-3">
+                                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{p.productCode}</span>
+                                                    <span className="h-1 w-1 rounded-full bg-slate-300"></span>
+                                                    <span className="text-[10px] font-black text-primary-600 bg-primary-50 px-2 py-0.5 rounded uppercase">
+                                                        INR {Number(bestVendor?.price ?? p.basePrice ?? 0).toLocaleString()}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <span className="text-[9px] text-slate-500 font-bold">
+                                                        {bestVendor?.vendorId?.name ? `Best: ${bestVendor.vendorId.name}` : 'No vendor mapped'}
+                                                    </span>
+                                                    <span className={`text-[9px] font-black uppercase ${hasStock ? 'text-emerald-600' : 'text-rose-500'}`}>
+                                                        {hasStock ? 'In Stock' : 'Out of Stock'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div className="h-10 w-10 rounded-xl bg-slate-50 text-slate-300 group-hover:bg-primary-600 group-hover:text-white flex items-center justify-center transition-all">
+                                                <MdAdd size={24} />
+                                            </div>
                                         </div>
-                                        <div className="flex items-center gap-2 mt-1">
-                                            <span className="text-[9px] text-slate-500 font-bold">
-                                                {bestVendor?.vendorId?.name ? `Best: ${bestVendor.vendorId.name}` : 'No vendor mapped'}
-                                            </span>
-                                            <span className={`text-[9px] font-black uppercase ${hasStock ? 'text-emerald-600' : 'text-rose-500'}`}>
-                                                {hasStock ? 'In Stock' : 'Out of Stock'}
-                                            </span>
-                                        </div>
+                                    );
+                                })}
+                                {isProductsLoading && (
+                                    <div className="py-4 text-center text-slate-400 text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2">
+                                        <svg className="animate-spin h-5 w-5 text-primary-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        Loading more products...
                                     </div>
-                                    <div className="h-10 w-10 rounded-xl bg-slate-50 text-slate-300 group-hover:bg-primary-600 group-hover:text-white flex items-center justify-center transition-all">
-                                        <MdAdd size={24} />
-                                    </div>
-                                </div>
-                            );
-                        })}
-                        {filteredProducts.length === 0 && (
-                            <div className="py-20 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest">No matching products found</div>
+                                )}
+                                {filteredProducts.length === 0 && (
+                                    <div className="py-20 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest">No matching products found</div>
+                                )}
+                            </>
                         )}
                     </div>
                 </div>

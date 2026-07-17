@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 
 const EngineerSchema = new mongoose.Schema({
+    employeeId: { type: mongoose.Schema.Types.ObjectId, ref: 'EmployeeProfile', default: null },
     name: { type: String, required: true },
     email: { type: String },
     mobile: { type: String },

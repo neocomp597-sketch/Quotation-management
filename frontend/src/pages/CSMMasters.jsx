@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { csmService, territoryService } from '../services/api';
+import { csmService, territoryService, payrollService } from '../services/api';
 import { toast } from 'react-toastify';
 import { 
     MdCategory, MdSettings, MdPriorityHigh, 
@@ -8,6 +8,7 @@ import {
     MdDelete, MdEdit, MdCloudDownload, MdBuild
 } from 'react-icons/md';
 import Modal from '../components/Modal';
+import SearchableSelect from '../components/SearchableSelect';
 
 const CSMMasters = () => {
     const location = useLocation();
@@ -25,6 +26,7 @@ const CSMMasters = () => {
     const [loading, setLoading] = useState(false);
     const [items, setItems] = useState([]);
     const [territories, setTerritories] = useState([]);
+    const [employeesList, setEmployeesList] = useState([]);
     
     // Form states
     const [showModal, setShowModal] = useState(false);
@@ -35,6 +37,7 @@ const CSMMasters = () => {
         responseSlaHours: '', 
         resolutionSlaHours: '', 
         color: '#64748b',
+        employeeId: '',
         email: '',
         mobile: '',
         status: 'Active',
@@ -56,6 +59,15 @@ const CSMMasters = () => {
             setTerritories(res.data || []);
         } catch (e) {
             console.error('Fetch territories error:', e);
+        }
+    };
+
+    const fetchEmployees = async () => {
+        try {
+            const res = await payrollService.getEmployees({ status: 'Active' });
+            setEmployeesList(res.data || []);
+        } catch (e) {
+            console.error('Fetch employees error:', e);
         }
     };
 
@@ -82,6 +94,7 @@ const CSMMasters = () => {
         fetchItems();
         if (activeTab === 'engineers') {
             fetchTerritories();
+            fetchEmployees();
         }
     }, [activeTab]);
 
@@ -107,6 +120,7 @@ const CSMMasters = () => {
                 responseSlaHours: item.responseSlaHours || '',
                 resolutionSlaHours: item.resolutionSlaHours || '',
                 color: item.color || '#64748b',
+                employeeId: item.employeeId?._id || item.employeeId || '',
                 email: item.email || '',
                 mobile: item.mobile || '',
                 status: item.status || 'Active',
@@ -121,6 +135,7 @@ const CSMMasters = () => {
                 responseSlaHours: '', 
                 resolutionSlaHours: '', 
                 color: '#64748b',
+                employeeId: '',
                 email: '',
                 mobile: '',
                 status: 'Active',
@@ -148,9 +163,7 @@ const CSMMasters = () => {
                 else await csmService.createTeam(formData);
             } else if (activeTab === 'engineers') {
                 const payload = {
-                    name: formData.name,
-                    email: formData.email,
-                    mobile: formData.mobile,
+                    employeeId: formData.employeeId,
                     status: formData.status,
                     territoryId: formData.territoryId || null,
                     pincodes: formData.pincodes.split(',').map(p => p.trim()).filter(Boolean)
@@ -357,16 +370,18 @@ const CSMMasters = () => {
                 }
             >
                 <form onSubmit={handleSubmit} className="space-y-4 py-2">
-                    <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Name *</label>
-                        <input
-                            type="text"
-                            required
-                            value={formData.name}
-                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-bold transition-all"
-                        />
-                    </div>
+                    {activeTab !== 'engineers' && (
+                        <div>
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Name *</label>
+                            <input
+                                type="text"
+                                required
+                                value={formData.name}
+                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-bold transition-all"
+                            />
+                        </div>
+                    )}
                     {activeTab !== 'engineers' && (
                         <div>
                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Description</label>
@@ -380,22 +395,32 @@ const CSMMasters = () => {
                     {activeTab === 'engineers' && (
                         <>
                             <div className="space-y-1">
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Email</label>
-                                <input
-                                    type="email"
-                                    value={formData.email}
-                                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-semibold"
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Select Employee *</label>
+                                <SearchableSelect
+                                    options={employeesList.map(emp => ({
+                                        value: emp._id,
+                                        label: `${emp.name}${emp.email ? ` (${emp.email})` : ''}`
+                                    }))}
+                                    value={formData.employeeId}
+                                    onChange={(val) => {
+                                        const selectedEmp = employeesList.find(e => e._id === val);
+                                        setFormData({
+                                            ...formData,
+                                            employeeId: val,
+                                            name: selectedEmp?.name || '',
+                                            email: selectedEmp?.email || '',
+                                            mobile: selectedEmp?.mobile || ''
+                                        });
+                                    }}
+                                    placeholder="Search & Select Employee..."
                                 />
-                            </div>
-                            <div className="space-y-1">
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Mobile</label>
-                                <input
-                                    type="text"
-                                    value={formData.mobile}
-                                    onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
-                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-semibold"
-                                />
+                                {formData.employeeId && (
+                                    <div className="mt-2 p-3 bg-teal-50/80 border border-teal-100 rounded-xl space-y-1 animate-fade-in">
+                                        <p className="text-[8px] font-black uppercase tracking-wider text-teal-600">Employee Details (Auto-Synced)</p>
+                                        <p className="text-sm font-bold text-slate-900">{formData.name || '—'}</p>
+                                        <p className="text-xs text-slate-500 font-semibold">{formData.email || 'No email'} • {formData.mobile || 'No mobile'}</p>
+                                    </div>
+                                )}
                             </div>
                             <div className="space-y-1">
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Territory</label>

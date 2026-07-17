@@ -23,7 +23,8 @@ import {
     MdLock,
     MdCheckCircle,
     MdWarning,
-    MdError
+    MdError,
+    MdInventory
 } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import {
@@ -54,6 +55,7 @@ const TABS = [
     { id: 'contracts', label: 'Contracts', icon: <MdAssignment size={18} /> },
     { id: 'orders', label: 'Orders', icon: <MdShoppingCart size={18} /> },
     { id: 'invoices', label: 'Invoices & Payments', icon: <MdReceipt size={18} /> },
+    { id: 'products', label: 'Product Details', icon: <MdInventory size={18} /> },
     { id: 'support', label: 'Support Tickets', icon: <MdBuildCircle size={18} /> },
     { id: 'timeline', label: 'Interaction Timeline', icon: <MdTimeline size={18} /> },
     { id: 'analytics', label: 'Customer Analytics', icon: <MdBarChart size={18} /> }
@@ -109,7 +111,7 @@ const Customer360Workspace = () => {
         );
     }
 
-    const { customer, contacts, quotations, contracts, orders, invoices, payments, tickets, meetings, activities, timeline, healthScore, stats } = data;
+    const { customer, contacts, quotations, contracts, orders, invoices, payments, tickets, meetings, activities, timeline, healthScore, stats, assets = [] } = data;
 
     return (
         <div className="space-y-8 font-outfit pb-12">
@@ -551,6 +553,61 @@ const Customer360Workspace = () => {
                                     {invoices.length === 0 && (
                                         <tr>
                                             <td colSpan="6" className="p-8 text-center text-slate-400 font-bold uppercase tracking-widest text-xs">No billing invoices found.</td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
+
+                {/* PRODUCT DETAILS TAB */}
+                {activeTab === 'products' && (
+                    <div className="space-y-6">
+                        <h3 className="font-black text-slate-800 text-sm uppercase tracking-wider">Purchased Products & Installed Assets</h3>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left">
+                                <thead className="bg-slate-50 text-[10px] uppercase font-black tracking-widest border-b border-slate-100 text-slate-400">
+                                    <tr>
+                                        <th className="px-6 py-4">Product Name</th>
+                                        <th className="px-6 py-4">Serial Number</th>
+                                        <th className="px-6 py-4">Status</th>
+                                        <th className="px-6 py-4">Installation Date</th>
+                                        <th className="px-6 py-4">Warranty Validity</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="text-xs font-bold text-slate-700 divide-y divide-slate-50">
+                                    {assets.map(asset => (
+                                        <tr key={asset._id} className="hover:bg-slate-50/50">
+                                            <td className="px-6 py-4 font-black text-slate-900">
+                                                {asset.productId?.productName || asset.customProductName || '-'}
+                                            </td>
+                                            <td className="px-6 py-4 font-mono">{asset.serialNumber || '-'}</td>
+                                            <td className="px-6 py-4">
+                                                <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded border ${
+                                                    asset.status === 'Active' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                                                    asset.status === 'Under Repair' ? 'bg-amber-50 text-amber-700 border-amber-100' :
+                                                    'bg-slate-50 text-slate-600 border-slate-100'
+                                                }`}>
+                                                    {asset.status || 'Active'}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-slate-500">
+                                                {asset.installationDate ? new Date(asset.installationDate).toLocaleDateString() : '-'}
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                {asset.warrantyEndDate ? (
+                                                    <span className={new Date(asset.warrantyEndDate) > new Date() ? 'text-emerald-600 font-bold' : 'text-rose-500 font-bold'}>
+                                                        {new Date(asset.warrantyEndDate).toLocaleDateString()}
+                                                        {new Date(asset.warrantyEndDate) > new Date() ? ' ✓' : ' (Expired)'}
+                                                    </span>
+                                                ) : '-'}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {assets.length === 0 && (
+                                        <tr>
+                                            <td colSpan="5" className="p-8 text-center text-slate-400 font-bold uppercase tracking-widest text-xs">No purchased products or assets found.</td>
                                         </tr>
                                     )}
                                 </tbody>

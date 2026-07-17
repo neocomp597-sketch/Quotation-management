@@ -131,6 +131,18 @@ exports.updateEmployee = async (req, res) => {
         if (!employee) {
             return res.status(404).json({ message: 'Employee not found' });
         }
+        
+        // Sync details to CSM Engineers if this employee is registered as an engineer
+        const Engineer = require('../models/Engineer');
+        await Engineer.updateMany(
+            { employeeId: employee._id },
+            {
+                name: employee.name,
+                email: employee.email,
+                mobile: employee.mobile || ''
+            }
+        );
+
         await writePayrollAudit(req, 'EMPLOYEE_UPDATED', `Updated details for employee ${employee.name}`, employee._id, 'EmployeeProfile');
         res.json(employee);
     } catch (error) {

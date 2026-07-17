@@ -275,7 +275,8 @@ exports.seedMhData = async (req, res) => {
             { upsert: true, new: true }
         );
 
-        // 8. Ensure service engineers exist in Engineer Master
+        // 8. Ensure service engineers exist in Engineer Master and Employee profiles
+        const EmployeeProfile = require('../models/EmployeeProfile');
         const engineersData = [
             { name: 'Rahul Patil', email: 'rahul.patil@jagjeet.com', mobile: '9823012345', pincodes: ['422209', '400607'], territoryId: stateTerritory._id },
             { name: 'Vikram Deshmukh', email: 'vikram.deshmukh@jagjeet.com', mobile: '9823012346', pincodes: ['410101', '400074'], territoryId: stateTerritory._id },
@@ -287,7 +288,23 @@ exports.seedMhData = async (req, res) => {
         
         const engineers = [];
         for (const eng of engineersData) {
+            // Find or create matching employee profile
+            let employee = await EmployeeProfile.findOne({ email: eng.email, companyId });
+            if (!employee) {
+                employee = await EmployeeProfile.create({
+                    name: eng.name,
+                    email: eng.email,
+                    mobile: eng.mobile,
+                    joiningDate: new Date(),
+                    department: 'Service',
+                    designation: 'Service Engineer',
+                    status: 'Active',
+                    companyId
+                });
+            }
+
             let dbEng = await Engineer.create({
+                employeeId: employee._id,
                 name: eng.name,
                 email: eng.email,
                 mobile: eng.mobile,
@@ -731,7 +748,24 @@ exports.designations = createCrudEndpoints(Designation, 'Designation');
 exports.engineers = {
     create: async (req, res) => {
         try {
-            const doc = await Engineer.create({ ...req.body, companyId: req.user?.companyId });
+            const EmployeeProfile = require('../models/EmployeeProfile');
+            const employee = await EmployeeProfile.findById(req.body.employeeId).lean();
+            if (!employee) {
+                return res.status(400).json({ message: 'Selected employee not found' });
+            }
+
+            const engineerData = {
+                employeeId: req.body.employeeId,
+                name: employee.name,
+                email: employee.email,
+                mobile: employee.mobile || '',
+                status: req.body.status || 'Active',
+                territoryId: req.body.territoryId || null,
+                pincodes: req.body.pincodes || [],
+                companyId: req.user?.companyId
+            };
+
+            const doc = await Engineer.create(engineerData);
             res.status(201).json(doc);
         } catch (error) {
             res.status(400).json({ message: 'Error creating Engineer: ' + error.message });
@@ -740,10 +774,24 @@ exports.engineers = {
     getAll: async (req, res) => {
         try {
             const docs = await Engineer.find({ companyId: req.user?.companyId })
-                .populate('territoryId', 'name')
+                .populate('employeeId')
+                .populate('territoryId', 'name rules')
                 .sort({ createdAt: -1 })
                 .lean();
-            res.json(docs);
+
+            const mapped = docs.map(doc => {
+                if (doc.employeeId) {
+                    return {
+                        ...doc,
+                        name: doc.employeeId.name,
+                        email: doc.employeeId.email,
+                        mobile: doc.employeeId.mobile || ''
+                    };
+                }
+                return doc;
+            });
+
+            res.json(mapped);
         } catch (error) {
             res.status(500).json({ message: 'Error fetching Engineers: ' + error.message });
         }
@@ -751,9 +799,16 @@ exports.engineers = {
     getById: async (req, res) => {
         try {
             const doc = await Engineer.findOne({ _id: req.params.id, companyId: req.user?.companyId })
-                .populate('territoryId', 'name')
+                .populate('employeeId')
+                .populate('territoryId', 'name rules')
                 .lean();
             if (!doc) return res.status(404).json({ message: 'Engineer not found' });
+            
+            if (doc.employeeId) {
+                doc.name = doc.employeeId.name;
+                doc.email = doc.employeeId.email;
+                doc.mobile = doc.employeeId.mobile || '';
+            }
             res.json(doc);
         } catch (error) {
             res.status(500).json({ message: 'Error fetching Engineer: ' + error.message });
@@ -761,9 +816,25 @@ exports.engineers = {
     },
     update: async (req, res) => {
         try {
+            const EmployeeProfile = require('../models/EmployeeProfile');
+            const employee = await EmployeeProfile.findById(req.body.employeeId).lean();
+            if (!employee) {
+                return res.status(400).json({ message: 'Selected employee not found' });
+            }
+
+            const updateData = {
+                employeeId: req.body.employeeId,
+                name: employee.name,
+                email: employee.email,
+                mobile: employee.mobile || '',
+                status: req.body.status,
+                territoryId: req.body.territoryId || null,
+                pincodes: req.body.pincodes || []
+            };
+
             const doc = await Engineer.findOneAndUpdate(
                 { _id: req.params.id, companyId: req.user?.companyId },
-                req.body,
+                updateData,
                 { new: true, runValidators: true }
             );
             if (!doc) return res.status(404).json({ message: 'Engineer not found' });

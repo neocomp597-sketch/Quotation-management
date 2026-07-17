@@ -866,7 +866,8 @@ exports.getCustomer360Data = async (req, res) => {
             invoices,
             tickets,
             meetings,
-            activities
+            activities,
+            assets
         ] = await Promise.all([
             mongoose.model('CustomerContact').find({ customerId: custId }).lean(),
             mongoose.model('Quotation').find({ customerId: custId }).populate('createdBy', 'name').sort({ createdAt: -1 }).lean(),
@@ -880,7 +881,8 @@ exports.getCustomer360Data = async (req, res) => {
                 const deals = await mongoose.model('Deal').find({ customerId: custId }).select('_id').lean();
                 const dealIds = deals.map(d => d._id);
                 return mongoose.model('DealActivity').find({ dealId: { $in: dealIds } }).populate('performedBy', 'name').sort({ activityDate: -1 }).lean();
-            })()
+            })(),
+            mongoose.model('Asset').find({ customerId: custId }).populate('productId', 'productName productCode').sort({ createdAt: -1 }).lean()
         ]);
 
         // Health Score calculation
@@ -1015,6 +1017,7 @@ exports.getCustomer360Data = async (req, res) => {
             tickets,
             meetings,
             activities,
+            assets,
             timeline: paginatedTimeline,
             timelinePagination: {
                 page: timelinePage,

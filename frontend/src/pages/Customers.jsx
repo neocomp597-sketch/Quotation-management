@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { MdAdd, MdSearch, MdEdit, MdDelete, MdPerson, MdEmail, MdPhone, MdLocationOn, MdBusiness, MdCloudUpload, MdVisibility, MdFileUpload, MdCheckBox, MdCheckBoxOutlineBlank, MdDeleteSweep, MdFileDownload } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
-import { customerService, uploadService, importService, territoryService, userService } from '../services/api';
+import { customerService, uploadService, importService, territoryService, userService, csmService } from '../services/api';
 import Modal from '../components/Modal';
 import ImportModal from '../components/ImportModal';
 import PaginationControls from '../components/PaginationControls';
@@ -36,6 +36,8 @@ const Customers = () => {
     // For full-screen image viewing
     const [viewCustomer, setViewCustomer] = useState(null);
     const [users, setUsers] = useState([]);
+    const [customerAssets, setCustomerAssets] = useState([]);
+    const [assetsLoading, setAssetsLoading] = useState(false);
 
     const [formData, setFormData] = useState({
         customerName: '',
@@ -993,9 +995,9 @@ const Customers = () => {
             {/* View Customer Details Modal */}
             <Modal
                 isOpen={!!viewCustomer}
-                onClose={() => { setViewCustomer(null); setActiveProfileTab('details'); }}
+                onClose={() => { setViewCustomer(null); setActiveProfileTab('details'); setCustomerAssets([]); }}
                 title="Customer Profile"
-                maxWidth={activeProfileTab === 'pricing' ? 'max-w-4xl' : 'max-w-2xl'}
+                maxWidth={activeProfileTab === 'pricing' || activeProfileTab === 'products' ? 'max-w-4xl' : 'max-w-2xl'}
             >
                 {viewCustomer && (
                     <div className="p-6 space-y-6">
@@ -1042,6 +1044,25 @@ const Customers = () => {
                                 }`}
                             >
                                 Pricing & Agreements
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setActiveProfileTab('products');
+                                    if (viewCustomer?._id && customerAssets.length === 0) {
+                                        setAssetsLoading(true);
+                                        csmService.getAssets({ customerId: viewCustomer._id })
+                                            .then(res => setCustomerAssets(res.data || []))
+                                            .catch(() => setCustomerAssets([]))
+                                            .finally(() => setAssetsLoading(false));
+                                    }
+                                }}
+                                className={`flex-1 py-3 text-xs font-black uppercase tracking-widest transition-all border-b-2 ${
+                                    activeProfileTab === 'products'
+                                        ? 'border-primary-600 text-primary-600'
+                                        : 'border-transparent text-slate-400 hover:text-slate-600'
+                                }`}
+                            >
+                                Product Details
                             </button>
                         </div>
 
@@ -1096,9 +1117,68 @@ const Customers = () => {
                                     </div>
                                 </div>
                             </div>
-                        ) : (
+                        ) : activeProfileTab === 'pricing' ? (
                             <div className="pt-2">
                                 <CustomerPricingDashboard customerId={viewCustomer._id} inlineMode={true} />
+                            </div>
+                        ) : (
+                            <div className="pt-2">
+                                {assetsLoading ? (
+                                    <div className="flex flex-col items-center justify-center py-12 space-y-3">
+                                        <div className="w-10 h-10 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin"></div>
+                                        <p className="text-slate-400 font-bold uppercase text-[10px] tracking-widest">Loading Products...</p>
+                                    </div>
+                                ) : customerAssets.length === 0 ? (
+                                    <div className="text-center py-12">
+                                        <p className="text-slate-400 font-bold text-sm">No products registered for this customer yet.</p>
+                                    </div>
+                                ) : (
+                                    <div className="overflow-x-auto rounded-2xl border border-slate-100">
+                                        <table className="w-full text-left border-collapse">
+                                            <thead>
+                                                <tr className="bg-slate-50 text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100">
+                                                    <th className="px-4 py-3">Product</th>
+                                                    <th className="px-4 py-3">Serial No.</th>
+                                                    <th className="px-4 py-3">Status</th>
+                                                    <th className="px-4 py-3">Install Date</th>
+                                                    <th className="px-4 py-3">Warranty Until</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-50 text-sm font-semibold text-slate-700">
+                                                {customerAssets.map((asset) => (
+                                                    <tr key={asset._id} className="hover:bg-slate-50/50 transition-colors">
+                                                        <td className="px-4 py-3 font-black text-slate-900">
+                                                            {asset.productId?.productName || asset.customProductName || '-'}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-xs font-mono">
+                                                            {asset.serialNumber || '-'}
+                                                        </td>
+                                                        <td className="px-4 py-3">
+                                                            <span className={`inline-block px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider ${
+                                                                asset.status === 'Active' ? 'bg-teal-50 text-teal-700 border border-teal-100' :
+                                                                asset.status === 'Under Repair' ? 'bg-amber-50 text-amber-700 border border-amber-100' :
+                                                                'bg-slate-100 text-slate-500'
+                                                            }`}>
+                                                                {asset.status || 'Active'}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-4 py-3 text-xs">
+                                                            {asset.installationDate ? new Date(asset.installationDate).toLocaleDateString('en-IN') : '-'}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-xs">
+                                                            {asset.warrantyEndDate ? (
+                                                                <span className={new Date(asset.warrantyEndDate) > new Date() ? 'text-teal-600 font-bold' : 'text-rose-500 font-bold'}>
+                                                                    {new Date(asset.warrantyEndDate).toLocaleDateString('en-IN')}
+                                                                    {new Date(asset.warrantyEndDate) > new Date() ? ' ✓' : ' (Expired)'}
+                                                                </span>
+                                                            ) : '-'}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { payrollService } from '../services/api';
 import { toast } from 'react-toastify';
 import { 
@@ -12,10 +13,21 @@ import {
 } from 'react-icons/md';
 
 const PayrollMasters = () => {
-    const [activeTab, setActiveTab] = useState('departments');
+    const location = useLocation();
+    const queryParams = new URLSearchParams(location.search);
+    const initialTab = queryParams.get('tab') || 'departments';
+
+    const [activeTab, setActiveTab] = useState(initialTab);
     const [loading, setLoading] = useState(false);
     const [items, setItems] = useState([]);
     const [employees, setEmployees] = useState([]);
+
+    useEffect(() => {
+        const tab = new URLSearchParams(location.search).get('tab');
+        if (tab && (tab === 'departments' || tab === 'designations')) {
+            setActiveTab(tab);
+        }
+    }, [location.search]);
     
     // Form states
     const [showModal, setShowModal] = useState(false);

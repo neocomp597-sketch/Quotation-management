@@ -1866,17 +1866,6 @@ const importVendors = async (req, res) => {
 
         const headers = XLSX.utils.sheet_to_json(worksheet, { header: 1 })[0] || [];
         const cleanHeaders = headers.map(h => String(h || '').trim().toLowerCase());
-        
-        const hasVendorName = cleanHeaders.some(h => [
-            'vendor name', 'vendorname', 'name', 'company name', 'companyname', 'company'
-        ].includes(h));
-        
-        if (!hasVendorName) {
-            return res.status(400).json({
-                message: `Missing required column headers. Vendor Name is required.`,
-                errors: [`The sheet must contain a column for Vendor Name.`]
-            });
-        }
 
         if (data.length === 0) {
             return res.status(400).json({ message: 'No data found in file' });
@@ -1905,24 +1894,21 @@ const importVendors = async (req, res) => {
         for (let i = 0; i < data.length; i++) {
             const row = data[i];
             try {
-                const name = pickFirstNonEmpty(row['Vendor Name'], row.vendorName, row['Name'], row['Company Name'], row.name);
-                
-                if (!name) {
-                    throw new Error('Vendor Name is required');
-                }
+                const rawName = pickFirstNonEmpty(row['Vendor Name'], row.vendorName, row['Name'], row['Company Name'], row.name);
+                const name = rawName ? String(rawName).trim() : '';
 
                 const vendorData = {
-                    name: name.trim(),
-                    contactPerson: pickFirstNonEmpty(row['Contact Person'], row.contactPerson, row['Contact'], row['Person']),
-                    phone: pickFirstNonEmpty(row['Phone'], row.phone, row['Mobile'], row['Mobile Phone'], row['Telephone']),
-                    email: pickFirstNonEmpty(row['Email'], row.email, row['E-Mail']),
-                    address: pickFirstNonEmpty(row['Address'], row.address, row['Street'], row['Location']),
-                    gstin: pickFirstNonEmpty(row['GSTIN'], row.gstin, row['GST No'], row['GST Number']),
+                    name: name,
+                    contactPerson: pickFirstNonEmpty(row['Contact Person'], row.contactPerson, row['Contact'], row['Person']) || '',
+                    phone: pickFirstNonEmpty(row['Phone'], row.phone, row['Mobile'], row['Mobile Phone'], row['Telephone']) || '',
+                    email: pickFirstNonEmpty(row['Email'], row.email, row['E-Mail']) || '',
+                    address: pickFirstNonEmpty(row['Address'], row.address, row['Street'], row['Location']) || '',
+                    gstin: pickFirstNonEmpty(row['GSTIN'], row.gstin, row['GST No'], row['GST Number']) || '',
                     isActive: typeof row['Active'] !== 'undefined' ? toBoolean(row['Active']) : (typeof row['IsActive'] !== 'undefined' ? toBoolean(row['IsActive']) : true),
                     companyId: companyId
                 };
 
-                const existing = vendorNameMap.get(vendorData.name.toLowerCase());
+                const existing = name ? vendorNameMap.get(name.toLowerCase()) : null;
                 if (existing) {
                     bulkOps.push({
                         updateOne: {

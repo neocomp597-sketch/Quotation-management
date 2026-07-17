@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { MdClose } from 'react-icons/md';
 
-const Modal = ({ isOpen, onClose, title, children, footer, maxWidth = 'max-w-2xl', hideHeader = false, scrollable = true }) => {
+const Modal = ({ isOpen, onClose, title, children, footer, maxWidth = 'max-w-2xl', hideHeader = false, scrollable = true, fullscreen = false }) => {
     useEffect(() => {
         if (isOpen) {
             document.body.style.overflow = 'hidden';
@@ -18,7 +18,7 @@ const Modal = ({ isOpen, onClose, title, children, footer, maxWidth = 'max-w-2xl
 
     // Use a portal to render the modal at the root, avoids layout issues
     return ReactDOM.createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 lg:p-8">
+        <div className={`fixed inset-0 z-[9999] flex items-center justify-center ${fullscreen ? 'p-0' : 'p-4 sm:p-6 lg:p-8'}`}>
             {/* Backdrop with rich styling */}
             <div
                 className="fixed inset-0 bg-slate-900/60 backdrop-blur-md transition-opacity duration-300 ease-in-out"
@@ -28,7 +28,7 @@ const Modal = ({ isOpen, onClose, title, children, footer, maxWidth = 'max-w-2xl
 
             {/* Modal Container with focus on centered placement and premium feel */}
             <div
-                className={`relative bg-white w-full ${maxWidth} rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.2)] transform transition-all duration-300 ease-out scale-100 opacity-100 ${scrollable ? 'overflow-hidden flex flex-col max-h-[90vh]' : 'overflow-visible'}`}
+                className={`relative bg-white w-full ${fullscreen ? 'h-screen max-h-screen rounded-none' : `${maxWidth} rounded-[2rem] max-h-[90vh]`} shadow-[0_20px_50px_rgba(0,0,0,0.2)] transform transition-all duration-300 ease-out scale-100 opacity-100 ${scrollable ? 'overflow-hidden flex flex-col' : 'overflow-visible'}`}
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}

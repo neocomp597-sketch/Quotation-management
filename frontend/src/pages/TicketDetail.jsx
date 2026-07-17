@@ -419,15 +419,40 @@ const TicketDetail = () => {
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Engineer</label>
-                                <select
-                                    value={assignEngineer}
-                                    onChange={(e) => setAssignEngineer(e.target.value)}
-                                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold"
-                                >
-                                    <option value="">Unassigned</option>
-                                    {engineers.map(u => <option key={u._id} value={u._id}>{u.name}</option>)}
-                                </select>
+                                <div className="flex justify-between items-center mb-1">
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Engineer</label>
+                                    {ticket.pincode && (
+                                        <span className="text-[9px] font-bold text-slate-400 uppercase">PIN: {ticket.pincode}</span>
+                                    )}
+                                </div>
+                                {(() => {
+                                    const ticketPincode = ticket.pincode ? String(ticket.pincode).trim() : '';
+                                    const eligibleEngineers = engineers.filter(eng => {
+                                        if (ticket.assignedEngineerId && (ticket.assignedEngineerId._id === eng._id || ticket.assignedEngineerId === eng._id)) return true;
+                                        if (activeVisit && (activeVisit.engineerId?._id === eng._id || activeVisit.engineerId === eng._id)) return true;
+                                        if (!ticketPincode) return true;
+                                        if (Array.isArray(eng.pincodes) && eng.pincodes.includes(ticketPincode)) return true;
+                                        const terrPincodes = eng.territoryId?.rules?.pincodes;
+                                        if (Array.isArray(terrPincodes) && terrPincodes.includes(ticketPincode)) return true;
+                                        return false;
+                                    });
+
+                                    return (
+                                        <>
+                                            <select
+                                                value={assignEngineer}
+                                                onChange={(e) => setAssignEngineer(e.target.value)}
+                                                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold"
+                                            >
+                                                <option value="">Unassigned</option>
+                                                {eligibleEngineers.map(u => <option key={u._id} value={u._id}>{u.name}</option>)}
+                                            </select>
+                                            {ticketPincode && eligibleEngineers.length === 0 && (
+                                                <p className="text-[10px] font-bold text-amber-600 mt-1">No engineers assigned for pincode {ticketPincode}.</p>
+                                            )}
+                                        </>
+                                    );
+                                })()}
                             </div>
                             <button
                                 onClick={handleAssign}
@@ -700,15 +725,30 @@ const TicketDetail = () => {
                     </div>
                     <div>
                         <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Assign Service Engineer *</label>
-                        <select
-                            required
-                            value={visitEngineer}
-                            onChange={(e) => setVisitEngineer(e.target.value)}
-                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
-                        >
-                            <option value="">Select Engineer</option>
-                            {engineers.map(u => <option key={u._id} value={u._id}>{u.name}</option>)}
-                        </select>
+                        {(() => {
+                            const ticketPincode = ticket?.pincode ? String(ticket.pincode).trim() : '';
+                            const eligibleEngineers = engineers.filter(eng => {
+                                if (ticket?.assignedEngineerId && (ticket.assignedEngineerId._id === eng._id || ticket.assignedEngineerId === eng._id)) return true;
+                                if (activeVisit && (activeVisit.engineerId?._id === eng._id || activeVisit.engineerId === eng._id)) return true;
+                                if (!ticketPincode) return true;
+                                if (Array.isArray(eng.pincodes) && eng.pincodes.includes(ticketPincode)) return true;
+                                const terrPincodes = eng.territoryId?.rules?.pincodes;
+                                if (Array.isArray(terrPincodes) && terrPincodes.includes(ticketPincode)) return true;
+                                return false;
+                            });
+
+                            return (
+                                <select
+                                    required
+                                    value={visitEngineer}
+                                    onChange={(e) => setVisitEngineer(e.target.value)}
+                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
+                                >
+                                    <option value="">Select Engineer</option>
+                                    {eligibleEngineers.map(u => <option key={u._id} value={u._id}>{u.name}</option>)}
+                                </select>
+                            );
+                        })()}
                     </div>
                 </form>
             </Modal>

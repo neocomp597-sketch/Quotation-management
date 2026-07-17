@@ -94,6 +94,9 @@ const CSMTickets = () => {
     const [importResult, setImportResult] = useState(null);
     const [showImportResultModal, setShowImportResultModal] = useState(false);
 
+    // Page View State: 'list' | 'standard' | 'manual'
+    const [pageView, setPageView] = useState('list');
+
     // Modal & Form State
     const [showModal, setShowModal] = useState(false);
     const [showManualModal, setShowManualModal] = useState(false);
@@ -1283,6 +1286,7 @@ const CSMTickets = () => {
     return (
         <div className="p-6 space-y-6 max-w-7xl mx-auto animate-fade-in-up">
             {/* Header */}
+            {pageView === 'list' && (<>
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-black tracking-tight text-slate-900 font-outfit uppercase">
@@ -1319,7 +1323,7 @@ const CSMTickets = () => {
                             setAssetSummary(null);
                             setShowAllProducts(false);
                             setGeneratedSerial('');
-                            setShowModal(true);
+                            setPageView('standard');
                         }}
                         className="flex items-center gap-2 px-6 py-4 bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-[10px] tracking-widest rounded-2xl transition-all shadow-lg shadow-primary-600/20 active:scale-95 self-start md:self-auto"
                     >
@@ -1527,45 +1531,55 @@ const CSMTickets = () => {
                     </div>
                 )}
             </div>
+            </>)}
 
-            {/* Creation Modal */}
-            <Modal
-                isOpen={showModal}
-                onClose={() => setShowModal(false)}
-                title="Raise Support Ticket"
-                maxWidth="max-w-2xl"
-                footer={
-                    <>
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setShowModal(false);
-                                setShowManualModal(true);
-                            }}
-                            className="w-full md:w-auto md:mr-auto px-6 py-3.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 shadow-lg shadow-slate-800/10"
-                        >
-                            Manual Register
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setShowModal(false)}
-                            className="w-full md:w-auto px-6 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            form="create-ticket-form"
-                            disabled={isSavingTicket}
-                            className="w-full md:w-auto px-6 py-3.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-primary-600/10 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            {isSavingTicket ? 'Raising...' : 'Raise Ticket'}
-                        </button>
-                    </>
-                }
-            >
-                <form id="create-ticket-form" onSubmit={handleCreateTicket} className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Standard Ticket Creation - Full Page View */}
+            {pageView === 'standard' && (
+                <div className="space-y-6 animate-fade-in-up">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div>
+                            <button
+                                type="button"
+                                onClick={() => setPageView('list')}
+                                className="text-xs font-black uppercase tracking-widest text-primary-600 hover:text-primary-700 mb-2 flex items-center gap-1 transition-all"
+                            >
+                                ← Back to Tickets
+                            </button>
+                            <h1 className="text-3xl font-black tracking-tight text-slate-900 font-outfit uppercase">
+                                Raise Support Ticket
+                            </h1>
+                            <p className="text-slate-500 font-semibold text-sm">Fill in the details to create a new support ticket.</p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setPageView('manual');
+                                }}
+                                className="px-6 py-3.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 shadow-lg shadow-slate-800/10"
+                            >
+                                Manual Register
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setPageView('list')}
+                                className="px-6 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                form="create-ticket-form"
+                                disabled={isSavingTicket}
+                                className="px-6 py-3.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-primary-600/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {isSavingTicket ? 'Raising...' : 'Raise Ticket'}
+                            </button>
+                        </div>
+                    </div>
+                    <div className="glass shadow-premium rounded-[2rem] p-6 md:p-8 bg-white border border-slate-100">
+                    <form id="create-ticket-form" onSubmit={handleCreateTicket} className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                         <div>
                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Customer *</label>
                             <SearchableSelect
@@ -1974,7 +1988,9 @@ const CSMTickets = () => {
                         </div>
                     </div>
                 </form>
-            </Modal>
+                    </div>
+                </div>
+            )}
 
             <Modal
                 isOpen={showContactModal}
@@ -2282,42 +2298,51 @@ const CSMTickets = () => {
                 </div>
             </Modal>
 
-            {/* Manual Registration Modal */}
-            <Modal
-                isOpen={showManualModal}
-                onClose={() => setShowManualModal(false)}
-                title="Manual Ticket Registration"
-                maxWidth="max-w-4xl"
-                footer={
-                    <>
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setShowManualModal(false);
-                                setShowModal(true);
-                            }}
-                            className="w-full md:w-auto md:mr-auto px-6 py-3.5 border border-primary-600 text-primary-600 hover:bg-primary-50 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95"
-                        >
-                            Standard Register
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setShowManualModal(false)}
-                            className="w-full md:w-auto px-6 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            form="manual-ticket-form"
-                            disabled={isSavingManualTicket}
-                            className="w-full md:w-auto px-6 py-3.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-primary-600/10 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            {isSavingManualTicket ? 'Registering...' : 'Raise Ticket'}
-                        </button>
-                    </>
-                }
-            >
+            {/* Manual Registration - Full Page View */}
+            {pageView === 'manual' && (
+                <div className="space-y-6 animate-fade-in-up">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div>
+                            <button
+                                type="button"
+                                onClick={() => setPageView('list')}
+                                className="text-xs font-black uppercase tracking-widest text-primary-600 hover:text-primary-700 mb-2 flex items-center gap-1 transition-all"
+                            >
+                                ← Back to Tickets
+                            </button>
+                            <h1 className="text-3xl font-black tracking-tight text-slate-900 font-outfit uppercase">
+                                Manual Ticket Registration
+                            </h1>
+                            <p className="text-slate-500 font-semibold text-sm">Register a ticket manually with custom details.</p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setPageView('standard');
+                                }}
+                                className="px-6 py-3.5 border border-primary-600 text-primary-600 hover:bg-primary-50 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95"
+                            >
+                                Standard Register
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setPageView('list')}
+                                className="px-6 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                form="manual-ticket-form"
+                                disabled={isSavingManualTicket}
+                                className="px-6 py-3.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-primary-600/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {isSavingManualTicket ? 'Registering...' : 'Raise Ticket'}
+                            </button>
+                        </div>
+                    </div>
+                    <div className="glass shadow-premium rounded-[2rem] p-6 md:p-8 bg-white border border-slate-100">
                 <form id="manual-ticket-form" onSubmit={handleCreateManualTicket} className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                         
@@ -2693,7 +2718,9 @@ const CSMTickets = () => {
                         </div>
                     </div>
                 </form>
-            </Modal>
+                    </div>
+                </div>
+            )}
 
             {/* View Manual Ticket Modal */}
             <Modal

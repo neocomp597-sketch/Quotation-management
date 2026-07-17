@@ -60,7 +60,8 @@ exports.createUser = async (req, res) => {
             return res.status(400).json({ message: 'Invalid role supplied' });
         }
 
-        const existingUser = await User.findOne({ email }).select('_id').lean();
+        const normalizedEmail = email ? String(email).trim().toLowerCase() : '';
+        const existingUser = await User.findOne({ email: { $regex: new RegExp("^" + normalizedEmail.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + "$", "i") } }).select('_id').lean();
         if (existingUser) {
             return res.status(400).json({ message: 'User already exists' });
         }
@@ -84,7 +85,7 @@ exports.createUser = async (req, res) => {
         const passwordHash = await bcrypt.hash(password, salt);
         const user = await User.create({
             name,
-            email,
+            email: normalizedEmail,
             passwordHash,
             role,
             reportsTo: validatedReportsTo,
@@ -206,11 +207,15 @@ exports.updateUser = async (req, res) => {
         }
 
         if (email && email !== user.email) {
-            const existing = await User.findOne({ email }).select('_id').lean();
+            const normalizedEmail = String(email).trim().toLowerCase();
+            const existing = await User.findOne({
+                _id: { $ne: user._id },
+                email: { $regex: new RegExp("^" + normalizedEmail.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + "$", "i") }
+            }).select('_id').lean();
             if (existing) {
                 return res.status(400).json({ message: 'Email already exists' });
             }
-            user.email = email;
+            user.email = normalizedEmail;
         }
 
         if (name) user.name = name;

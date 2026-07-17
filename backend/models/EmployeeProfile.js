@@ -22,6 +22,7 @@ const SalaryStructureSchema = new mongoose.Schema({
 const EmployeeProfileSchema = new mongoose.Schema({
     name: { type: String, required: true },
     email: { type: String, trim: true },
+    mobile: { type: String, trim: true },
     pan: { type: String, uppercase: true, trim: true },
     aadhaar: { type: String, trim: true },
     uan: { type: String, trim: true },

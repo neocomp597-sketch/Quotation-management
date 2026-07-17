@@ -240,8 +240,9 @@ exports.register = async (req, res) => {
 
     try {
         const { name, email, password, companyName } = req.body;
+        const normalizedEmail = email ? String(email).trim().toLowerCase() : '';
 
-        const existingUser = await User.findOne({ email }).select('_id').lean();
+        const existingUser = await User.findOne({ email: { $regex: new RegExp("^" + normalizedEmail.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + "$", "i") } }).select('_id').lean();
         if (existingUser) {
             return res.status(400).json({ message: 'User already exists' });
         }
@@ -258,7 +259,7 @@ exports.register = async (req, res) => {
 
         const newUser = await User.create({
             name,
-            email,
+            email: normalizedEmail,
             passwordHash,
             role: 'admin',
             companyId: newCompany._id,
@@ -277,8 +278,9 @@ exports.register = async (req, res) => {
 exports.login = async (req, res) => {
     try {
         const { email, password } = req.body;
+        const normalizedEmail = email ? String(email).trim().toLowerCase() : '';
 
-        const user = await User.findOne({ email });
+        const user = await User.findOne({ email: { $regex: new RegExp("^" + normalizedEmail.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + "$", "i") } });
         if (!user) {
             return res.status(400).json({ message: 'Invalid credentials' });
         }
