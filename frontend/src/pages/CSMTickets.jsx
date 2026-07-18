@@ -288,10 +288,10 @@ const CSMTickets = () => {
     }, []);
 
     useEffect(() => {
-        if (showModal || showManualModal) {
+        if (showModal || showManualModal || pageView === 'standard' || pageView === 'manual') {
             loadCreationData();
         }
-    }, [showModal, showManualModal]);
+    }, [showModal, showManualModal, pageView]);
 
     // Fetch customer invoices when customer is selected in creation form
     useEffect(() => {

@@ -398,10 +398,10 @@ const PlanningScreen = () => {
         ),
       );
       setStatusOptions(statusRes.data.filter(s => s.isActive).map(s => s.name));
-      
+
       const colorMap = {};
       statusRes.data.forEach(s => {
-          colorMap[s.name] = s.color;
+        colorMap[s.name] = s.color;
       });
       setStatusColorMap(colorMap);
     } catch (err) {
@@ -1044,16 +1044,16 @@ const PlanningScreen = () => {
       statusOptions.length > 0
         ? statusOptions
         : [
-            "Budget",
-            "Firm",
-            "MFC",
-            "B & B",
-            "Others",
-            "Order Received",
-            "Invoice",
-            "Lost",
-            "Parked",
-          ];
+          "Budget",
+          "Firm",
+          "MFC",
+          "B & B",
+          "Others",
+          "Order Received",
+          "Invoice",
+          "Lost",
+          "Parked",
+        ];
     const statuses = allStatuses.filter(status => {
       const normalized = String(status || '').trim().replace(/\s+/g, '').toUpperCase();
       return ['MFC', 'INVOICE', 'FIRM', 'B&B', 'BB', 'BANDB', 'BUDGET'].includes(normalized);
@@ -1712,347 +1712,347 @@ const PlanningScreen = () => {
               <tbody className="divide-y divide-slate-50">
                 {canEdit && (
                   <tr className="bg-primary-50/40 border-b border-primary-100 align-top">
-                  <td className="py-2 px-2 border border-slate-200">
-                    {editingId ? (
-                      <div className="w-full px-3 py-2.5 bg-slate-100 border border-slate-200 rounded-lg text-xs font-black text-slate-500 text-center select-none shadow-sm">
-                        {newRow.monthYear}
-                      </div>
-                    ) : (
-                      <select
-                        value={newRow.monthYear}
+                    <td className="py-2 px-2 border border-slate-200">
+                      {editingId ? (
+                        <div className="w-full px-3 py-2.5 bg-slate-100 border border-slate-200 rounded-lg text-xs font-black text-slate-500 text-center select-none shadow-sm">
+                          {newRow.monthYear}
+                        </div>
+                      ) : (
+                        <select
+                          value={newRow.monthYear}
+                          onChange={(e) =>
+                            handleNewRowChange("monthYear", e.target.value)
+                          }
+                          onFocus={() => {
+                            setShowCustomerDropdown(false);
+                            setShowProductDropdown(false);
+                          }}
+                          className="w-full px-2.5 py-2.5 border border-primary-400 rounded-lg text-xs font-black outline-none focus:border-primary-500 bg-primary-50"
+                        >
+                          <option value="">Select</option>
+                          {monthLabels.map((month) => (
+                            <option key={month} value={month}>
+                              {month}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </td>
+                    <td ref={customerAnchorRef} className="py-2 px-2 border border-slate-200">
+                      <input
+                        type="text"
+                        value={customerSearch}
+                        onChange={(e) => {
+                          setCustomerSearch(e.target.value);
+                          handleNewRowChange("customerId", "");
+                          handleNewRowChange("customerName", "");
+                          setShowCustomerDropdown(true);
+                        }}
+                        onFocus={() => {
+                          setShowCustomerDropdown(true);
+                          setShowProductDropdown(false);
+                        }}
+                        placeholder="Type customer name"
+                        className={compactFieldClass}
+                      />
+                      <PortalDropdown
+                        isOpen={showCustomerDropdown}
+                        anchorRef={customerAnchorRef}
+                      >
+                        <div className="portal-dropdown-content bg-white border border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto custom-scrollbar">
+                          {filteredCustomers.length > 0 ? (
+                            filteredCustomers.map((customer) => (
+                              <button
+                                key={customer._id}
+                                onClick={() => selectCustomer(customer)}
+                                className="w-full text-left px-3 py-2.5 text-sm font-bold hover:bg-primary-50 transition-colors border-b border-slate-50"
+                              >
+                                <div>
+                                  {customer.companyName || customer.customerName}
+                                </div>
+                                <div className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                                  {customer.externalCode ||
+                                    getFallbackCode("CUST", customer._id)}
+                                </div>
+                              </button>
+                            ))
+                          ) : (
+                            <div className="px-4 py-3 text-sm text-slate-500 font-bold text-center">
+                              No customers found
+                            </div>
+                          )}
+                        </div>
+                      </PortalDropdown>
+                    </td>
+                    <td ref={productAnchorRef} className="py-2 px-2 border border-slate-200">
+                      <input
+                        type="text"
+                        value={productSearch}
+                        onChange={(e) => {
+                          setProductSearch(e.target.value);
+                          handleNewRowChange("productId", "");
+                          handleNewRowChange("productName", "");
+                          setShowProductDropdown(true);
+                        }}
+                        onFocus={() => {
+                          setShowProductDropdown(true);
+                          setShowCustomerDropdown(false);
+                        }}
+                        placeholder="Type product name"
+                        className={compactFieldClass}
+                      />
+                      <PortalDropdown
+                        isOpen={showProductDropdown}
+                        anchorRef={productAnchorRef}
+                      >
+                        <div className="portal-dropdown-content bg-white border border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto custom-scrollbar">
+                          {filteredProducts.length > 0 ? (
+                            filteredProducts.map((product) => (
+                              <button
+                                key={product._id}
+                                onClick={() => selectProduct(product)}
+                                className="w-full text-left px-3 py-2.5 text-sm font-bold hover:bg-primary-50 transition-colors border-b border-slate-50"
+                              >
+                                {product.productName}
+                              </button>
+                            ))
+                          ) : (
+                            <div className="px-4 py-3 text-sm text-slate-500 font-bold text-center">
+                              No products found
+                            </div>
+                          )}
+                        </div>
+                      </PortalDropdown>
+                    </td>
+                    <td className="py-2 px-2 border border-slate-200">
+                      <input
+                        type="number"
+                        value={newRow.qty}
                         onChange={(e) =>
-                          handleNewRowChange("monthYear", e.target.value)
+                          handleNewRowChange("qty", e.target.value)
                         }
                         onFocus={() => {
                           setShowCustomerDropdown(false);
                           setShowProductDropdown(false);
                         }}
-                        className="w-full px-2.5 py-2.5 border border-primary-400 rounded-lg text-xs font-black outline-none focus:border-primary-500 bg-primary-50"
-                      >
-                        <option value="">Select</option>
-                        {monthLabels.map((month) => (
-                          <option key={month} value={month}>
-                            {month}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                  </td>
-                  <td ref={customerAnchorRef} className="py-2 px-2 border border-slate-200">
-                    <input
-                      type="text"
-                      value={customerSearch}
-                      onChange={(e) => {
-                        setCustomerSearch(e.target.value);
-                        handleNewRowChange("customerId", "");
-                        handleNewRowChange("customerName", "");
-                        setShowCustomerDropdown(true);
-                      }}
-                      onFocus={() => {
-                        setShowCustomerDropdown(true);
-                        setShowProductDropdown(false);
-                      }}
-                      placeholder="Type customer name"
-                      className={compactFieldClass}
-                    />
-                    <PortalDropdown
-                      isOpen={showCustomerDropdown}
-                      anchorRef={customerAnchorRef}
-                    >
-                      <div className="portal-dropdown-content bg-white border border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto custom-scrollbar">
-                        {filteredCustomers.length > 0 ? (
-                          filteredCustomers.map((customer) => (
-                            <button
-                              key={customer._id}
-                              onClick={() => selectCustomer(customer)}
-                              className="w-full text-left px-3 py-2.5 text-sm font-bold hover:bg-primary-50 transition-colors border-b border-slate-50"
-                            >
-                              <div>
-                                {customer.companyName || customer.customerName}
-                              </div>
-                              <div className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                                {customer.externalCode ||
-                                  getFallbackCode("CUST", customer._id)}
-                              </div>
-                            </button>
-                          ))
-                        ) : (
-                          <div className="px-4 py-3 text-sm text-slate-500 font-bold text-center">
-                            No customers found
-                          </div>
-                        )}
+                        placeholder="0"
+                        className={compactNumericFieldClass}
+                      />
+                    </td>
+                    <td className="py-2 px-2 border border-slate-200">
+                      <input
+                        type="number"
+                        min="0"
+                        value={newRow.value}
+                        onChange={(e) =>
+                          handleNewRowChange("value", e.target.value)
+                        }
+                        onFocus={() => {
+                          setShowCustomerDropdown(false);
+                          setShowProductDropdown(false);
+                        }}
+                        placeholder="0"
+                        className={compactNumericFieldClass}
+                      />
+                    </td>
+                    <td className="py-2 px-2 bg-amber-50/80 border border-slate-200">
+                      <div className="px-2.5 py-2.5 rounded-lg bg-amber-50 border border-amber-100 text-sm font-black text-slate-900 text-right">
+                        {formatToIndian(calculatedTotal, 2)}
                       </div>
-                    </PortalDropdown>
-                  </td>
-                  <td ref={productAnchorRef} className="py-2 px-2 border border-slate-200">
-                    <input
-                      type="text"
-                      value={productSearch}
-                      onChange={(e) => {
-                        setProductSearch(e.target.value);
-                        handleNewRowChange("productId", "");
-                        handleNewRowChange("productName", "");
-                        setShowProductDropdown(true);
-                      }}
-                      onFocus={() => {
-                        setShowProductDropdown(true);
-                        setShowCustomerDropdown(false);
-                      }}
-                      placeholder="Type product name"
-                      className={compactFieldClass}
-                    />
-                    <PortalDropdown
-                      isOpen={showProductDropdown}
-                      anchorRef={productAnchorRef}
-                    >
-                      <div className="portal-dropdown-content bg-white border border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto custom-scrollbar">
-                        {filteredProducts.length > 0 ? (
-                          filteredProducts.map((product) => (
-                            <button
-                              key={product._id}
-                              onClick={() => selectProduct(product)}
-                              className="w-full text-left px-3 py-2.5 text-sm font-bold hover:bg-primary-50 transition-colors border-b border-slate-50"
-                            >
-                              {product.productName}
-                            </button>
-                          ))
-                        ) : (
-                          <div className="px-4 py-3 text-sm text-slate-500 font-bold text-center">
-                            No products found
-                          </div>
-                        )}
-                      </div>
-                    </PortalDropdown>
-                  </td>
-                  <td className="py-2 px-2 border border-slate-200">
-                    <input
-                      type="number"
-                      value={newRow.qty}
-                      onChange={(e) =>
-                        handleNewRowChange("qty", e.target.value)
-                      }
-                      onFocus={() => {
-                        setShowCustomerDropdown(false);
-                        setShowProductDropdown(false);
-                      }}
-                      placeholder="0"
-                      className={compactNumericFieldClass}
-                    />
-                  </td>
-                  <td className="py-2 px-2 border border-slate-200">
-                    <input
-                      type="number"
-                      min="0"
-                      value={newRow.value}
-                      onChange={(e) =>
-                        handleNewRowChange("value", e.target.value)
-                      }
-                      onFocus={() => {
-                        setShowCustomerDropdown(false);
-                        setShowProductDropdown(false);
-                      }}
-                      placeholder="0"
-                      className={compactNumericFieldClass}
-                    />
-                  </td>
-                  <td className="py-2 px-2 bg-amber-50/80 border border-slate-200">
-                    <div className="px-2.5 py-2.5 rounded-lg bg-amber-50 border border-amber-100 text-sm font-black text-slate-900 text-right">
-                      {formatToIndian(calculatedTotal, 2)}
-                    </div>
-                  </td>
-                  <td ref={mgr1AnchorRef} className="py-2 px-2 border border-slate-200">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowMgr1Dropdown(!showMgr1Dropdown);
-                        setShowCustomerDropdown(false);
-                        setShowProductDropdown(false);
-                        setShowMgr2Dropdown(false);
-                        setShowStatusDropdown(false);
-                      }}
-                      className={`${compactFieldClass} flex justify-between items-center bg-white text-left font-bold w-full`}
-                    >
-                      <span className="truncate">
-                        {newRow.mgrCode ? getCanonicalMgrCode(newRow.mgrCode, mgrList) : "Select"}
-                      </span>
-                      <MdKeyboardArrowDown className="text-slate-400 shrink-0 ml-1" size={16} />
-                    </button>
-                    <PortalDropdown isOpen={showMgr1Dropdown} anchorRef={mgr1AnchorRef}>
-                      <div className="portal-dropdown-content bg-white border border-slate-200 rounded-xl shadow-xl max-h-56 flex flex-col overflow-hidden">
-                        <div className="p-2 border-b border-slate-100 bg-slate-50">
-                          <input
-                            type="text"
-                            value={mgr1Search}
-                            onChange={(e) => setMgr1Search(e.target.value)}
-                            onClick={(e) => e.stopPropagation()}
-                            placeholder="Search MGR 1..."
-                            className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-primary-500 bg-white"
-                          />
-                        </div>
-                        <div className="overflow-y-auto custom-scrollbar flex-1 max-h-40">
-                          <button
-                            type="button"
-                            onClick={() => selectMgr1({ code: "" })}
-                            className="w-full text-left px-3 py-2 text-xs font-bold text-slate-400 hover:bg-slate-50 border-b border-slate-50"
-                          >
-                            Select
-                          </button>
-                          {filteredMgrList.map((mgr) => (
-                            <button
-                              key={mgr._id}
-                              type="button"
-                              onClick={() => selectMgr1(mgr)}
-                              className="w-full text-left px-3 py-2 text-xs font-bold hover:bg-primary-50 transition-colors border-b border-slate-50 text-slate-700"
-                            >
-                              {mgr.code} - {mgr.description}
-                            </button>
-                          ))}
-                          {filteredMgrList.length === 0 && (
-                            <div className="px-3 py-2 text-xs text-slate-400 italic">No managers found</div>
-                          )}
-                        </div>
-                      </div>
-                    </PortalDropdown>
-                  </td>
-                  <td ref={mgr2AnchorRef} className="py-2 px-2 border border-slate-200">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowMgr2Dropdown(!showMgr2Dropdown);
-                        setShowCustomerDropdown(false);
-                        setShowProductDropdown(false);
-                        setShowMgr1Dropdown(false);
-                        setShowStatusDropdown(false);
-                      }}
-                      className={`${compactFieldClass} flex justify-between items-center bg-white text-left font-bold w-full`}
-                    >
-                      <span className="truncate">
-                        {newRow.mgrCode2 ? getCanonicalMgrCode(newRow.mgrCode2, mgrList2) : "Select"}
-                      </span>
-                      <MdKeyboardArrowDown className="text-slate-400 shrink-0 ml-1" size={16} />
-                    </button>
-                    <PortalDropdown isOpen={showMgr2Dropdown} anchorRef={mgr2AnchorRef}>
-                      <div className="portal-dropdown-content bg-white border border-slate-200 rounded-xl shadow-xl max-h-56 flex flex-col overflow-hidden">
-                        <div className="p-2 border-b border-slate-100 bg-slate-50">
-                          <input
-                            type="text"
-                            value={mgr2Search}
-                            onChange={(e) => setMgr2Search(e.target.value)}
-                            onClick={(e) => e.stopPropagation()}
-                            placeholder="Search MGR 2..."
-                            className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-primary-500 bg-white"
-                          />
-                        </div>
-                        <div className="overflow-y-auto custom-scrollbar flex-1 max-h-40">
-                          <button
-                            type="button"
-                            onClick={() => selectMgr2({ code: "" })}
-                            className="w-full text-left px-3 py-2 text-xs font-bold text-slate-400 hover:bg-slate-50 border-b border-slate-50"
-                          >
-                            Select
-                          </button>
-                          {filteredMgrList2.map((mgr) => (
-                            <button
-                              key={mgr._id}
-                              type="button"
-                              onClick={() => selectMgr2(mgr)}
-                              className="w-full text-left px-3 py-2 text-xs font-bold hover:bg-primary-50 transition-colors border-b border-slate-50 text-slate-700"
-                            >
-                              {mgr.code} - {mgr.description}
-                            </button>
-                          ))}
-                          {filteredMgrList2.length === 0 && (
-                            <div className="px-3 py-2 text-xs text-slate-400 italic">No managers found</div>
-                          )}
-                        </div>
-                      </div>
-                    </PortalDropdown>
-                  </td>
-                  <td ref={statusAnchorRef} className="py-2 px-2 border border-slate-200">
-                    <div className="space-y-2">
+                    </td>
+                    <td ref={mgr1AnchorRef} className="py-2 px-2 border border-slate-200">
                       <button
                         type="button"
                         onClick={() => {
-                          setShowStatusDropdown(!showStatusDropdown);
+                          setShowMgr1Dropdown(!showMgr1Dropdown);
                           setShowCustomerDropdown(false);
                           setShowProductDropdown(false);
-                          setShowMgr1Dropdown(false);
                           setShowMgr2Dropdown(false);
+                          setShowStatusDropdown(false);
                         }}
                         className={`${compactFieldClass} flex justify-between items-center bg-white text-left font-bold w-full`}
                       >
                         <span className="truncate">
-                          {newRow.status ? newRow.status : "Select"}
+                          {newRow.mgrCode ? getCanonicalMgrCode(newRow.mgrCode, mgrList) : "Select"}
                         </span>
                         <MdKeyboardArrowDown className="text-slate-400 shrink-0 ml-1" size={16} />
                       </button>
-                      <PortalDropdown isOpen={showStatusDropdown} anchorRef={statusAnchorRef}>
+                      <PortalDropdown isOpen={showMgr1Dropdown} anchorRef={mgr1AnchorRef}>
                         <div className="portal-dropdown-content bg-white border border-slate-200 rounded-xl shadow-xl max-h-56 flex flex-col overflow-hidden">
                           <div className="p-2 border-b border-slate-100 bg-slate-50">
                             <input
                               type="text"
-                              value={statusSearch}
-                              onChange={(e) => setStatusSearch(e.target.value)}
+                              value={mgr1Search}
+                              onChange={(e) => setMgr1Search(e.target.value)}
                               onClick={(e) => e.stopPropagation()}
-                              placeholder="Search status..."
+                              placeholder="Search MGR 1..."
                               className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-primary-500 bg-white"
                             />
                           </div>
                           <div className="overflow-y-auto custom-scrollbar flex-1 max-h-40">
                             <button
                               type="button"
-                              onClick={() => selectStatus("")}
+                              onClick={() => selectMgr1({ code: "" })}
                               className="w-full text-left px-3 py-2 text-xs font-bold text-slate-400 hover:bg-slate-50 border-b border-slate-50"
                             >
                               Select
                             </button>
-                            {filteredStatusList.map((status) => (
+                            {filteredMgrList.map((mgr) => (
                               <button
-                                key={status}
+                                key={mgr._id}
                                 type="button"
-                                onClick={() => selectStatus(status)}
+                                onClick={() => selectMgr1(mgr)}
                                 className="w-full text-left px-3 py-2 text-xs font-bold hover:bg-primary-50 transition-colors border-b border-slate-50 text-slate-700"
                               >
-                                {status}
+                                {mgr.code} - {mgr.description}
                               </button>
                             ))}
-                            {filteredStatusList.length === 0 && (
-                              <div className="px-3 py-2 text-xs text-slate-400 italic">No statuses found</div>
+                            {filteredMgrList.length === 0 && (
+                              <div className="px-3 py-2 text-xs text-slate-400 italic">No managers found</div>
                             )}
                           </div>
                         </div>
                       </PortalDropdown>
-                      <div className="flex items-center gap-2">
+                    </td>
+                    <td ref={mgr2AnchorRef} className="py-2 px-2 border border-slate-200">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowMgr2Dropdown(!showMgr2Dropdown);
+                          setShowCustomerDropdown(false);
+                          setShowProductDropdown(false);
+                          setShowMgr1Dropdown(false);
+                          setShowStatusDropdown(false);
+                        }}
+                        className={`${compactFieldClass} flex justify-between items-center bg-white text-left font-bold w-full`}
+                      >
+                        <span className="truncate">
+                          {newRow.mgrCode2 ? getCanonicalMgrCode(newRow.mgrCode2, mgrList2) : "Select"}
+                        </span>
+                        <MdKeyboardArrowDown className="text-slate-400 shrink-0 ml-1" size={16} />
+                      </button>
+                      <PortalDropdown isOpen={showMgr2Dropdown} anchorRef={mgr2AnchorRef}>
+                        <div className="portal-dropdown-content bg-white border border-slate-200 rounded-xl shadow-xl max-h-56 flex flex-col overflow-hidden">
+                          <div className="p-2 border-b border-slate-100 bg-slate-50">
+                            <input
+                              type="text"
+                              value={mgr2Search}
+                              onChange={(e) => setMgr2Search(e.target.value)}
+                              onClick={(e) => e.stopPropagation()}
+                              placeholder="Search MGR 2..."
+                              className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-primary-500 bg-white"
+                            />
+                          </div>
+                          <div className="overflow-y-auto custom-scrollbar flex-1 max-h-40">
+                            <button
+                              type="button"
+                              onClick={() => selectMgr2({ code: "" })}
+                              className="w-full text-left px-3 py-2 text-xs font-bold text-slate-400 hover:bg-slate-50 border-b border-slate-50"
+                            >
+                              Select
+                            </button>
+                            {filteredMgrList2.map((mgr) => (
+                              <button
+                                key={mgr._id}
+                                type="button"
+                                onClick={() => selectMgr2(mgr)}
+                                className="w-full text-left px-3 py-2 text-xs font-bold hover:bg-primary-50 transition-colors border-b border-slate-50 text-slate-700"
+                              >
+                                {mgr.code} - {mgr.description}
+                              </button>
+                            ))}
+                            {filteredMgrList2.length === 0 && (
+                              <div className="px-3 py-2 text-xs text-slate-400 italic">No managers found</div>
+                            )}
+                          </div>
+                        </div>
+                      </PortalDropdown>
+                    </td>
+                    <td ref={statusAnchorRef} className="py-2 px-2 border border-slate-200">
+                      <div className="space-y-2">
                         <button
-                          onClick={handleSaveEntry}
-                          disabled={isSavingEntry}
-                          className={`flex-1 inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-white text-xs font-bold transition-colors ${isSavingEntry ? "bg-slate-400 cursor-not-allowed" : (editingId ? "bg-blue-600 hover:bg-blue-700" : "bg-emerald-600 hover:bg-emerald-700")}`}
+                          type="button"
+                          onClick={() => {
+                            setShowStatusDropdown(!showStatusDropdown);
+                            setShowCustomerDropdown(false);
+                            setShowProductDropdown(false);
+                            setShowMgr1Dropdown(false);
+                            setShowMgr2Dropdown(false);
+                          }}
+                          className={`${compactFieldClass} flex justify-between items-center bg-white text-left font-bold w-full`}
                         >
-                          {isSavingEntry ? (
-                            <>
-                              <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
-                              Saving...
-                            </>
-                          ) : (
-                            <>
-                              <MdSave size={16} />
-                              {editingId ? "Update" : "Save"}
-                            </>
-                          )}
+                          <span className="truncate">
+                            {newRow.status ? newRow.status : "Select"}
+                          </span>
+                          <MdKeyboardArrowDown className="text-slate-400 shrink-0 ml-1" size={16} />
                         </button>
-                        {editingId && (
+                        <PortalDropdown isOpen={showStatusDropdown} anchorRef={statusAnchorRef}>
+                          <div className="portal-dropdown-content bg-white border border-slate-200 rounded-xl shadow-xl max-h-56 flex flex-col overflow-hidden">
+                            <div className="p-2 border-b border-slate-100 bg-slate-50">
+                              <input
+                                type="text"
+                                value={statusSearch}
+                                onChange={(e) => setStatusSearch(e.target.value)}
+                                onClick={(e) => e.stopPropagation()}
+                                placeholder="Search status..."
+                                className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-primary-500 bg-white"
+                              />
+                            </div>
+                            <div className="overflow-y-auto custom-scrollbar flex-1 max-h-40">
+                              <button
+                                type="button"
+                                onClick={() => selectStatus("")}
+                                className="w-full text-left px-3 py-2 text-xs font-bold text-slate-400 hover:bg-slate-50 border-b border-slate-50"
+                              >
+                                Select
+                              </button>
+                              {filteredStatusList.map((status) => (
+                                <button
+                                  key={status}
+                                  type="button"
+                                  onClick={() => selectStatus(status)}
+                                  className="w-full text-left px-3 py-2 text-xs font-bold hover:bg-primary-50 transition-colors border-b border-slate-50 text-slate-700"
+                                >
+                                  {status}
+                                </button>
+                              ))}
+                              {filteredStatusList.length === 0 && (
+                                <div className="px-3 py-2 text-xs text-slate-400 italic">No statuses found</div>
+                              )}
+                            </div>
+                          </div>
+                        </PortalDropdown>
+                        <div className="flex items-center gap-2">
                           <button
-                            onClick={handleCancelEdit}
-                            className="inline-flex items-center justify-center gap-1 px-3 py-2.5 rounded-lg bg-white border border-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-50 transition-colors"
+                            onClick={handleSaveEntry}
+                            disabled={isSavingEntry}
+                            className={`flex-1 inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-white text-xs font-bold transition-colors ${isSavingEntry ? "bg-slate-400 cursor-not-allowed" : (editingId ? "bg-blue-600 hover:bg-blue-700" : "bg-emerald-600 hover:bg-emerald-700")}`}
                           >
-                            <MdClose size={16} />
-                            Cancel
+                            {isSavingEntry ? (
+                              <>
+                                <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                                Saving...
+                              </>
+                            ) : (
+                              <>
+                                <MdSave size={16} />
+                                {editingId ? "Update" : "Save"}
+                              </>
+                            )}
                           </button>
-                        )}
+                          {editingId && (
+                            <button
+                              onClick={handleCancelEdit}
+                              className="inline-flex items-center justify-center gap-1 px-3 py-2.5 rounded-lg bg-white border border-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-50 transition-colors"
+                            >
+                              <MdClose size={16} />
+                              Cancel
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </td>
-                </tr>
+                    </td>
+                  </tr>
                 )}
 
                 {loading ? (
@@ -2117,10 +2117,10 @@ const PlanningScreen = () => {
                         <div className="flex items-center justify-between gap-1">
                           <span
                             className="truncate px-2 py-1 rounded font-bold whitespace-nowrap"
-                            style={{ 
-                                backgroundColor: `${statusColorMap[entry.status] || '#f1f5f9'}20`, 
-                                color: statusColorMap[entry.status] || '#64748b',
-                                border: `1px solid ${statusColorMap[entry.status] || '#cbd5e1'}40`
+                            style={{
+                              backgroundColor: `${statusColorMap[entry.status] || '#f1f5f9'}20`,
+                              color: statusColorMap[entry.status] || '#64748b',
+                              border: `1px solid ${statusColorMap[entry.status] || '#cbd5e1'}40`
                             }}
                             title={entry.status}
                           >
@@ -2191,357 +2191,235 @@ const PlanningScreen = () => {
 
       {hasAccess('planning_view_sbu_wise') && (
         <div className="bg-white rounded-2xl shadow-sm border border-slate-100/80 overflow-hidden transition-all duration-300 hover:shadow-md hover:border-slate-200/60">
-        <div
-          className="p-5 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 to-indigo-50/10 flex justify-between items-center cursor-pointer select-none group"
-          onClick={() => setIsReportExpanded(!isReportExpanded)}
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-black text-xs shadow-sm transition-all group-hover:scale-110">
-              SBU
-            </div>
-            <h2 className="text-xs font-extrabold text-slate-700 uppercase tracking-widest flex items-center gap-2">
-              <MdKeyboardArrowDown
-                className={`text-slate-400 transition-transform duration-300 ${!isReportExpanded ? "-rotate-90 text-slate-400" : "text-indigo-600"}`}
-                size={20}
-              />
-              SBU Wise - FY {financialYear}
-            </h2>
-          </div>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              exportReportToExcel(combinedReportData, "SBU Wise Report");
-            }}
-            disabled={
-              !combinedReportData || !combinedReportData.mgrCodes?.length
-            }
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 font-extrabold text-xs uppercase tracking-widest hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          <div
+            className="p-5 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 to-indigo-50/10 flex justify-between items-center cursor-pointer select-none group"
+            onClick={() => setIsReportExpanded(!isReportExpanded)}
           >
-            <MdDownload size={16} />
-            Export
-          </button>
-        </div>
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-black text-xs shadow-sm transition-all group-hover:scale-110">
+                SBU
+              </div>
+              <h2 className="text-xs font-extrabold text-slate-700 uppercase tracking-widest flex items-center gap-2">
+                <MdKeyboardArrowDown
+                  className={`text-slate-400 transition-transform duration-300 ${!isReportExpanded ? "-rotate-90 text-slate-400" : "text-indigo-600"}`}
+                  size={20}
+                />
+                SBU Wise - FY {financialYear}
+              </h2>
+            </div>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                exportReportToExcel(combinedReportData, "SBU Wise Report");
+              }}
+              disabled={
+                !combinedReportData || !combinedReportData.mgrCodes?.length
+              }
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 font-extrabold text-xs uppercase tracking-widest hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <MdDownload size={16} />
+              Export
+            </button>
+          </div>
 
-        {isReportExpanded && (() => {
-          const entryMgrCodes = reportEntries.map((entry) => normalizeSbuValue(entry.mgrCode)).filter(Boolean);
-          const allMgrCodes = Array.from(new Set([
-            ...(combinedReportData?.mgrCodes?.length > 0 ? combinedReportData.mgrCodes : ["EPC", "SBU1", "SBU2", "SBU3"]),
-            ...entryMgrCodes,
-          ]));
-          const reportRows = combinedReportData?.rows || [];
-          const monthRows = reportRows.filter((row) => row.isMonth && !row.isSegment);
-          const segmentRows = reportRows.filter((row) => row.isSegment);
-          const summaryRowsInOrder = combinedReportData ? [
-            reportRows.find((row) => row.isTotal),
-            reportRows.find((row) => row.isPercentage),
-            reportRows.find((row) => row.isPreviousYearValue),
-            reportRows.find((row) => row.isTotalPercentage),
-          ].filter(Boolean) : [];
-          const hasSbuValue = (row, sbu, monthLabel = "", segment = "") =>
-            Number(getMergedSbuReportCellValue(row, sbu, monthLabel, segment) || 0) > 0;
-          const visibleMgrCodes = allMgrCodes.filter((sbu) =>
-            [...monthRows, ...segmentRows, ...summaryRowsInOrder].some((row) => hasSbuValue(row, sbu)),
-          );
-          const visibleMonthLabels = (combinedReportData?.monthLabels?.length > 0
-            ? combinedReportData.monthLabels
-            : (monthRows.length > 0 ? monthRows.map((r) => r.monthLabel || r.month) : monthLabels)
-          );
+          {isReportExpanded && (() => {
+            const entryMgrCodes = reportEntries.map((entry) => normalizeSbuValue(entry.mgrCode)).filter(Boolean);
+            const allMgrCodes = Array.from(new Set([
+              ...(combinedReportData?.mgrCodes?.length > 0 ? combinedReportData.mgrCodes : ["EPC", "SBU1", "SBU2", "SBU3"]),
+              ...entryMgrCodes,
+            ]));
+            const reportRows = combinedReportData?.rows || [];
+            const monthRows = reportRows.filter((row) => row.isMonth && !row.isSegment);
+            const segmentRows = reportRows.filter((row) => row.isSegment);
+            const summaryRowsInOrder = combinedReportData ? [
+              reportRows.find((row) => row.isTotal),
+              reportRows.find((row) => row.isPercentage),
+              reportRows.find((row) => row.isPreviousYearValue),
+              reportRows.find((row) => row.isTotalPercentage),
+            ].filter(Boolean) : [];
+            const hasSbuValue = (row, sbu, monthLabel = "", segment = "") =>
+              Number(getMergedSbuReportCellValue(row, sbu, monthLabel, segment) || 0) > 0;
+            const visibleMgrCodes = allMgrCodes.filter((sbu) =>
+              [...monthRows, ...segmentRows, ...summaryRowsInOrder].some((row) => hasSbuValue(row, sbu)),
+            );
+            const visibleMonthLabels = (combinedReportData?.monthLabels?.length > 0
+              ? combinedReportData.monthLabels
+              : (monthRows.length > 0 ? monthRows.map((r) => r.monthLabel || r.month) : monthLabels)
+            );
 
-          return (
-            <div className="overflow-x-auto custom-scrollbar">
-              <table className="w-full text-left text-sm border-collapse border border-slate-200">
-                <thead>
-                  <tr className="bg-slate-50/70 border-b border-slate-100">
-                    <th className="py-3.5 px-5 font-black text-slate-500 text-left min-w-[200px] uppercase tracking-wider text-[10px] border border-slate-200">
-                      Month / Segment
-                    </th>
-                    {visibleMgrCodes.map((sbu) => (
-                      <th
-                        key={sbu}
-                        className="py-3.5 px-4 font-black text-slate-500 text-right min-w-[110px] border border-slate-200 uppercase tracking-wider text-[10px]"
-                      >
-                        {sbu}
+            return (
+              <div className="overflow-x-auto custom-scrollbar">
+                <table className="w-full text-left text-sm border-collapse border border-slate-200">
+                  <thead>
+                    <tr className="bg-slate-50/70 border-b border-slate-100">
+                      <th className="py-3.5 px-5 font-black text-slate-500 text-left min-w-[200px] uppercase tracking-wider text-[10px] border border-slate-200">
+                        Month / Segment
                       </th>
-                    ))}
-                    <th className="py-3.5 px-4 font-black text-slate-600 text-right bg-slate-100/40 min-w-[110px] border border-slate-200 uppercase tracking-wider text-[10px]">
-                      Total
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {visibleMonthLabels.length === 0 ? (
-                    <tr>
-                      <td colSpan={visibleMgrCodes.length + 2} className="py-10 px-5 text-center text-slate-400 font-bold border border-slate-200">
-                        No SBU-wise planning data available.
-                      </td>
+                      {visibleMgrCodes.map((sbu) => (
+                        <th
+                          key={sbu}
+                          className="py-3.5 px-4 font-black text-slate-500 text-right min-w-[110px] border border-slate-200 uppercase tracking-wider text-[10px]"
+                        >
+                          {sbu}
+                        </th>
+                      ))}
+                      <th className="py-3.5 px-4 font-black text-slate-600 text-right bg-slate-100/40 min-w-[110px] border border-slate-200 uppercase tracking-wider text-[10px]">
+                        Total
+                      </th>
                     </tr>
-                  ) : (
-                    visibleMonthLabels.map((monthLabel) => {
-                      const monthRow = monthRows.find(
-                        (r) => (r.monthLabel || r.month) === monthLabel
-                      ) || { month: monthLabel, total: 0 };
-                      const monthSegments = segmentRows.filter(
-                        (r) => r.parentMonth === monthLabel
-                      ).filter(
-                        (r) => Number(r.total || 0) > 0 || visibleMgrCodes.some((sbu) => hasSbuValue(r, sbu, monthLabel, r.month))
-                      );
-                      const monthTotal = visibleMgrCodes.reduce(
-                        (sum, sbu) => sum + getMergedSbuReportCellValue(monthRow, sbu, monthLabel),
-                        0,
-                      );
- 
-                      return (
-                        <React.Fragment key={monthLabel}>
-                          {/* MONTH ROW */}
-                          <tr
-                            className="bg-indigo-50/20 hover:bg-indigo-50/40 border-l-4 border-l-indigo-500 transition-all border-b border-slate-100 font-bold cursor-pointer"
-                            onClick={() => toggleSbuWiseMonth(monthLabel)}
-                          >
-                            <td className="py-3.5 px-4 text-slate-800 border border-slate-200">
-                              <div className="flex items-center gap-2">
-                                <MdKeyboardArrowDown
-                                  className={`text-indigo-500 transition-transform duration-300 ${!expandedSbuWiseMonths[monthLabel] ? "-rotate-90" : ""}`}
-                                  size={18}
-                                />
-                                <span className="font-extrabold text-xs tracking-wide">
-                                  {monthRow.month}
-                                </span>
-                              </div>
-                            </td>
-                            {visibleMgrCodes.map((sbu) => {
-                              const cellValue = getMergedSbuReportCellValue(monthRow, sbu, monthLabel);
-                              return (
-                                <td
-                                  key={sbu}
-                                  className="py-3.5 px-4 text-right border border-slate-200"
-                                >
-                                  {cellValue > 0 ? (
-                                    <span className="inline-flex items-center justify-end px-2.5 py-1 rounded-full bg-indigo-50/70 text-indigo-700 text-[11px] font-black min-w-[70px] border border-indigo-100/40 shadow-sm hover:scale-105 transition-all">
-                                      {formatReportValue(cellValue, 2)}
-                                    </span>
-                                  ) : (
-                                    <span className="text-slate-300 font-normal">-</span>
-                                  )}
-                                </td>
-                              );
-                            })}
-                            <td className="py-3.5 px-4 text-right border border-slate-200 bg-indigo-50/10">
-                              {monthTotal > 0 ? (
-                                <span className="inline-flex items-center justify-end px-2.5 py-1 rounded-full bg-indigo-100/50 text-indigo-800 text-[11px] font-black min-w-[70px] border border-indigo-200/30 shadow-sm">
-                                {formatReportValue(monthTotal, 2)}
-                                </span>
-                              ) : (
-                                <span className="text-slate-300 font-normal">-</span>
-                              )}
-                            </td>
-                          </tr>
- 
-                          {/* SEGMENT ROWS (shown when month is expanded) */}
-                          {expandedSbuWiseMonths[monthLabel] && monthSegments.map((segRow) => {
-                            const segmentTotal = visibleMgrCodes.reduce(
-                              (sum, sbu) => sum + getMergedSbuReportCellValue(segRow, sbu, monthLabel, segRow.month),
-                              0,
-                            );
-                            return (
-                              <tr
-                                key={`${monthLabel}-${segRow.month}`}
-                                className="border-b border-slate-100/60 bg-slate-50/20 hover:bg-slate-50/60 transition-colors border-l-4 border-l-slate-200"
-                              >
-                                <td className="py-3 px-4 text-slate-600 font-bold pl-8 text-xs border border-slate-200">
-                                  {segRow.month}
-                                </td>
-                                {visibleMgrCodes.map((sbu) => {
-                                  const val = getMergedSbuReportCellValue(segRow, sbu, monthLabel, segRow.month);
-                                  return (
-                                    <td
-                                      key={`${monthLabel}-${segRow.month}-${sbu}`}
-                                      className="py-3 px-4 text-right border-slate-200 text-xs"
-                                    >
-                                      {val > 0 ? (
-                                        <span className="inline-flex items-center justify-end px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-extrabold min-w-[64px] border border-slate-200/40">
-                                          {formatReportValue(val, 2)}
-                                        </span>
-                                      ) : (
-                                        <span className="text-slate-300 font-normal">-</span>
-                                      )}
-                                    </td>
-                                  );
-                                })}
-                                <td className="py-3 px-4 text-right border-slate-200 bg-slate-50/30 font-bold text-slate-700 text-xs">
-                                  {segmentTotal > 0 ? formatReportValue(segmentTotal, 2) : "-"}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </React.Fragment>
-                      );
-                    })
-                  )}
- 
-                  {/* SUMMARY ROWS */}
-                  {summaryRowsInOrder.map((row) => {
-                    const isTotal = row.isTotal;
-                    const isPercentage = row.isPercentage;
-                    const isPreviousYearValue = row.isPreviousYearValue;
-                    const isTotalPercentage = row.isTotalPercentage;
- 
-                    return (
-                      <tr
-                        key={`sbu-summary-${row.month}`}
-                        className={`border-b border-slate-200/60 transition-colors ${isTotal
-                          ? "bg-emerald-50/60 border-t border-emerald-100 font-black text-emerald-900"
-                          : isPreviousYearValue
-                            ? "bg-amber-50/50 border-t border-amber-100 font-bold text-amber-900"
-                            : isPercentage || isTotalPercentage
-                              ? "bg-violet-50/50 border-t border-violet-100 text-violet-900"
-                              : "border-slate-100 hover:bg-slate-50 text-slate-700"
-                        }`}
-                      >
-                        <td
-                          className="py-3.5 px-5 font-extrabold text-xs uppercase tracking-wide border border-slate-200"
-                        >
-                          {isPercentage ? "Percentage CY" : row.month}
-                        </td>
-                        {visibleMgrCodes.map((sbu) => {
-                          const cellValue = getSbuReportCellValue(row, sbu);
-                          return (
-                            <td
-                              key={`sbu-summary-${row.month}-${sbu}`}
-                              className="py-3.5 px-4 text-right border-slate-200"
-                            >
-                              {cellValue > 0 ? (
-                                <span className={`inline-flex items-center justify-end px-2.5 py-1 rounded-full text-[11px] font-black min-w-[70px] border ${isTotal
-                                  ? "bg-emerald-100/50 text-emerald-800 border-emerald-200/40"
-                                  : isPreviousYearValue
-                                    ? "bg-amber-100/50 text-amber-800 border-amber-200/40"
-                                    : "bg-violet-100/50 text-violet-800 border-violet-200/40"
-                                }`}>
-                                  {isPercentage || isTotalPercentage
-                                    ? formatReportPercentage(cellValue)
-                                    : formatReportValue(cellValue, 3)}
-                                </span>
-                              ) : (
-                                <span className="text-slate-300 font-normal">-</span>
-                              )}
-                            </td>
-                          );
-                        })}
-                        <td
-                          className="py-3.5 px-4 text-right border border-slate-200 bg-slate-100/20 font-black text-xs"
-                        >
-                          {isPercentage || isTotalPercentage
-                            ? formatReportPercentageTotal(row.total)
-                            : formatReportValue(row.total || 0, 3)}
+                  </thead>
+                  <tbody>
+                    {visibleMonthLabels.length === 0 ? (
+                      <tr>
+                        <td colSpan={visibleMgrCodes.length + 2} className="py-10 px-5 text-center text-slate-400 font-bold border border-slate-200">
+                          No SBU-wise planning data available.
                         </td>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          );
-        })()}
-        </div>
-      )}
+                    ) : (
+                      visibleMonthLabels.map((monthLabel) => {
+                        const monthRow = monthRows.find(
+                          (r) => (r.monthLabel || r.month) === monthLabel
+                        ) || { month: monthLabel, total: 0 };
+                        const monthSegments = segmentRows.filter(
+                          (r) => r.parentMonth === monthLabel
+                        ).filter(
+                          (r) => Number(r.total || 0) > 0 || visibleMgrCodes.some((sbu) => hasSbuValue(r, sbu, monthLabel, r.month))
+                        );
+                        const monthTotal = visibleMgrCodes.reduce(
+                          (sum, sbu) => sum + getMergedSbuReportCellValue(monthRow, sbu, monthLabel),
+                          0,
+                        );
 
-      {hasAccess('planning_view_segment_wise') && (
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100/80 overflow-hidden transition-all duration-300 hover:shadow-md hover:border-slate-200/60">
-        <div
-          className="p-5 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 to-sky-50/10 flex justify-between items-center cursor-pointer select-none group"
-          onClick={() => setIsReportExpanded2(!isReportExpanded2)}
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center font-black text-xs shadow-sm transition-all group-hover:scale-110">
-              SEG
-            </div>
-            <h2 className="text-xs font-extrabold text-slate-700 uppercase tracking-widest flex items-center gap-2">
-              <MdKeyboardArrowDown
-                className={`text-slate-400 transition-transform duration-300 ${!isReportExpanded2 ? "-rotate-90 text-slate-400" : "text-sky-600"}`}
-                size={20}
-              />
-              Segment Wise - FY {financialYear}
-            </h2>
-          </div>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              exportReportToExcel(reportData2, "Segment Wise Report");
-            }}
-            disabled={!reportData2 || !reportData2.mgrCodes?.length}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 font-extrabold text-xs uppercase tracking-widest hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <MdDownload size={16} />
-            Export
-          </button>
-        </div>
+                        return (
+                          <React.Fragment key={monthLabel}>
+                            {/* MONTH ROW */}
+                            <tr
+                              className="bg-indigo-50/20 hover:bg-indigo-50/40 border-l-4 border-l-indigo-500 transition-all border-b border-slate-100 font-bold cursor-pointer"
+                              onClick={() => toggleSbuWiseMonth(monthLabel)}
+                            >
+                              <td className="py-3.5 px-4 text-slate-800 border border-slate-200">
+                                <div className="flex items-center gap-2">
+                                  <MdKeyboardArrowDown
+                                    className={`text-indigo-500 transition-transform duration-300 ${!expandedSbuWiseMonths[monthLabel] ? "-rotate-90" : ""}`}
+                                    size={18}
+                                  />
+                                  <span className="font-extrabold text-xs tracking-wide">
+                                    {monthRow.month}
+                                  </span>
+                                </div>
+                              </td>
+                              {visibleMgrCodes.map((sbu) => {
+                                const cellValue = getMergedSbuReportCellValue(monthRow, sbu, monthLabel);
+                                return (
+                                  <td
+                                    key={sbu}
+                                    className="py-3.5 px-4 text-right border border-slate-200"
+                                  >
+                                    {cellValue > 0 ? (
+                                      <span className="inline-flex items-center justify-end px-2.5 py-1 rounded-full bg-indigo-50/70 text-indigo-700 text-[11px] font-black min-w-[70px] border border-indigo-100/40 shadow-sm hover:scale-105 transition-all">
+                                        {formatReportValue(cellValue, 2)}
+                                      </span>
+                                    ) : (
+                                      <span className="text-slate-300 font-normal">-</span>
+                                    )}
+                                  </td>
+                                );
+                              })}
+                              <td className="py-3.5 px-4 text-right border border-slate-200 bg-indigo-50/10">
+                                {monthTotal > 0 ? (
+                                  <span className="inline-flex items-center justify-end px-2.5 py-1 rounded-full bg-indigo-100/50 text-indigo-800 text-[11px] font-black min-w-[70px] border border-indigo-200/30 shadow-sm">
+                                    {formatReportValue(monthTotal, 2)}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-300 font-normal">-</span>
+                                )}
+                              </td>
+                            </tr>
 
-        {isReportExpanded2 && (
-          <div className="overflow-x-auto custom-scrollbar">
-            <table className="w-full text-left text-sm border-collapse border border-slate-200">
-              <thead>
-                <tr className="bg-slate-50/70 border-b border-slate-100">
-                  <th className="py-3.5 px-5 font-black text-slate-500 text-left min-w-[200px] uppercase tracking-wider text-[10px] border border-slate-200">
-                    Month
-                  </th>
-                  {(reportData2?.mgrCodes?.length > 0 ? reportData2.mgrCodes : ['Export', 'Industry', 'UC', 'Utility']).map((mgr) => (
-                    <th
-                      key={mgr}
-                      className="py-3.5 px-4 font-black text-slate-500 text-right min-w-[110px] uppercase tracking-wider text-[10px] border border-slate-200"
-                    >
-                      {mgr}
-                    </th>
-                  ))}
-                  <th className="py-3.5 px-4 font-black text-slate-600 text-right bg-slate-100/40 min-w-[110px] uppercase tracking-wider text-[10px] border border-slate-200">
-                    Total
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {(() => {
-                  const mgrCodes = reportData2?.mgrCodes?.length > 0 ? reportData2.mgrCodes : ['Export', 'Industry', 'UC', 'Utility'];
-                  const monthRowsByLabel = new Map(
-                    (reportData2?.rows || [])
-                      .filter((row) => row.isMonth && !row.isSegment)
-                      .map((row) => [row.monthLabel || row.month, row]),
-                  );
-                  const segmentMonthLabels =
-                    reportData2?.monthLabels?.length > 0
-                      ? reportData2.monthLabels
-                      : (monthRowsByLabel.size > 0 ? Array.from(monthRowsByLabel.keys()) : monthLabels);
- 
-                  return segmentMonthLabels.map((monthLabel) => {
-                    const monthRow = monthRowsByLabel.get(monthLabel) || {
-                      month: monthLabel,
-                      total: 0,
-                    };
- 
-                    return (
-                      <React.Fragment key={monthLabel}>
+                            {/* SEGMENT ROWS (shown when month is expanded) */}
+                            {expandedSbuWiseMonths[monthLabel] && monthSegments.map((segRow) => {
+                              const segmentTotal = visibleMgrCodes.reduce(
+                                (sum, sbu) => sum + getMergedSbuReportCellValue(segRow, sbu, monthLabel, segRow.month),
+                                0,
+                              );
+                              return (
+                                <tr
+                                  key={`${monthLabel}-${segRow.month}`}
+                                  className="border-b border-slate-100/60 bg-slate-50/20 hover:bg-slate-50/60 transition-colors border-l-4 border-l-slate-200"
+                                >
+                                  <td className="py-3 px-4 text-slate-600 font-bold pl-8 text-xs border border-slate-200">
+                                    {segRow.month}
+                                  </td>
+                                  {visibleMgrCodes.map((sbu) => {
+                                    const val = getMergedSbuReportCellValue(segRow, sbu, monthLabel, segRow.month);
+                                    return (
+                                      <td
+                                        key={`${monthLabel}-${segRow.month}-${sbu}`}
+                                        className="py-3 px-4 text-right border-slate-200 text-xs"
+                                      >
+                                        {val > 0 ? (
+                                          <span className="inline-flex items-center justify-end px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-extrabold min-w-[64px] border border-slate-200/40">
+                                            {formatReportValue(val, 2)}
+                                          </span>
+                                        ) : (
+                                          <span className="text-slate-300 font-normal">-</span>
+                                        )}
+                                      </td>
+                                    );
+                                  })}
+                                  <td className="py-3 px-4 text-right border-slate-200 bg-slate-50/30 font-bold text-slate-700 text-xs">
+                                    {segmentTotal > 0 ? formatReportValue(segmentTotal, 2) : "-"}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </React.Fragment>
+                        );
+                      })
+                    )}
+
+                    {/* SUMMARY ROWS */}
+                    {summaryRowsInOrder.map((row) => {
+                      const isTotal = row.isTotal;
+                      const isPercentage = row.isPercentage;
+                      const isPreviousYearValue = row.isPreviousYearValue;
+                      const isTotalPercentage = row.isTotalPercentage;
+
+                      return (
                         <tr
-                          className="bg-sky-50/20 hover:bg-sky-50/40 border-l-4 border-l-sky-500 transition-all border-b border-slate-100 font-bold cursor-pointer"
-                          onClick={() => toggleSegmentMonth(monthLabel)}
+                          key={`sbu-summary-${row.month}`}
+                          className={`border-b border-slate-200/60 transition-colors ${isTotal
+                            ? "bg-emerald-50/60 border-t border-emerald-100 font-black text-emerald-900"
+                            : isPreviousYearValue
+                              ? "bg-amber-50/50 border-t border-amber-100 font-bold text-amber-900"
+                              : isPercentage || isTotalPercentage
+                                ? "bg-violet-50/50 border-t border-violet-100 text-violet-900"
+                                : "border-slate-100 hover:bg-slate-50 text-slate-700"
+                            }`}
                         >
-                          <td className="py-3.5 px-4 text-slate-800 border border-slate-200">
-                            <div className="flex items-center gap-2">
-                              <MdKeyboardArrowDown
-                                className={`text-sky-500 transition-transform duration-300 ${!expandedSegmentMonths[monthLabel] ? "-rotate-90" : ""}`}
-                                size={18}
-                              />
-                              <span className="font-extrabold text-xs tracking-wide">{monthRow.month}</span>
-                            </div>
+                          <td
+                            className="py-3.5 px-5 font-extrabold text-xs uppercase tracking-wide border border-slate-200"
+                          >
+                            {isPercentage ? "Percentage CY" : row.month}
                           </td>
-                          {mgrCodes.map((mgr) => {
-                            const cellValue = Number(monthRow[mgr] || 0);
+                          {visibleMgrCodes.map((sbu) => {
+                            const cellValue = getSbuReportCellValue(row, sbu);
                             return (
                               <td
-                                key={mgr}
-                                className="py-3.5 px-4 text-right border border-slate-200"
+                                key={`sbu-summary-${row.month}-${sbu}`}
+                                className="py-3.5 px-4 text-right border-slate-200"
                               >
                                 {cellValue > 0 ? (
-                                  <span className="inline-flex items-center justify-end px-2.5 py-1 rounded-full bg-sky-50/70 text-sky-700 text-[11px] font-black min-w-[70px] border border-sky-100/40 shadow-sm hover:scale-105 transition-all">
-                                    {formatReportValue(cellValue, 3)}
+                                  <span className={`inline-flex items-center justify-end px-2.5 py-1 rounded-full text-[11px] font-black min-w-[70px] border ${isTotal
+                                    ? "bg-emerald-100/50 text-emerald-800 border-emerald-200/40"
+                                    : isPreviousYearValue
+                                      ? "bg-amber-100/50 text-amber-800 border-amber-200/40"
+                                      : "bg-violet-100/50 text-violet-800 border-violet-200/40"
+                                    }`}>
+                                    {isPercentage || isTotalPercentage
+                                      ? formatReportPercentage(cellValue)
+                                      : formatReportValue(cellValue, 3)}
                                   </span>
                                 ) : (
                                   <span className="text-slate-300 font-normal">-</span>
@@ -2550,172 +2428,551 @@ const PlanningScreen = () => {
                             );
                           })}
                           <td
-                            className="py-3.5 px-4 text-right bg-sky-50/10 border border-slate-200"
+                            className="py-3.5 px-4 text-right border border-slate-200 bg-slate-100/20 font-black text-xs"
                           >
-                            {Number(monthRow.total || 0) > 0 ? (
-                              <span className="inline-flex items-center justify-end px-2.5 py-1 rounded-full bg-sky-100/50 text-sky-800 text-[11px] font-black min-w-[70px] border border-sky-200/30 shadow-sm">
-                                {formatReportValue(monthRow.total || 0, 3)}
-                              </span>
-                            ) : (
-                              <span className="text-slate-300 font-normal">-</span>
-                            )}
+                            {isPercentage || isTotalPercentage
+                              ? formatReportPercentageTotal(row.total)
+                              : formatReportValue(row.total || 0, 3)}
                           </td>
                         </tr>
-                        {expandedSegmentMonths[monthLabel] &&
-                          (() => {
-                            const sbuMap = new Map();
-                            const resolveSbuLabel = (value) => {
-                              const normalized = normalizeSbuValue(value);
-                              const match = (
-                                combinedReportData?.mgrCodes || []
-                              ).find(
-                                (code) =>
-                                  normalizeSbuValue(code) === normalized,
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {hasAccess('planning_view_segment_wise') && (
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-100/80 overflow-hidden transition-all duration-300 hover:shadow-md hover:border-slate-200/60">
+          <div
+            className="p-5 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 to-sky-50/10 flex justify-between items-center cursor-pointer select-none group"
+            onClick={() => setIsReportExpanded2(!isReportExpanded2)}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center font-black text-xs shadow-sm transition-all group-hover:scale-110">
+                SEG
+              </div>
+              <h2 className="text-xs font-extrabold text-slate-700 uppercase tracking-widest flex items-center gap-2">
+                <MdKeyboardArrowDown
+                  className={`text-slate-400 transition-transform duration-300 ${!isReportExpanded2 ? "-rotate-90 text-slate-400" : "text-sky-600"}`}
+                  size={20}
+                />
+                Segment Wise - FY {financialYear}
+              </h2>
+            </div>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                exportReportToExcel(reportData2, "Segment Wise Report");
+              }}
+              disabled={!reportData2 || !reportData2.mgrCodes?.length}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 font-extrabold text-xs uppercase tracking-widest hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <MdDownload size={16} />
+              Export
+            </button>
+          </div>
+
+          {isReportExpanded2 && (
+            <div className="overflow-x-auto custom-scrollbar">
+              <table className="w-full text-left text-sm border-collapse border border-slate-200">
+                <thead>
+                  <tr className="bg-slate-50/70 border-b border-slate-100">
+                    <th className="py-3.5 px-5 font-black text-slate-500 text-left min-w-[200px] uppercase tracking-wider text-[10px] border border-slate-200">
+                      Month
+                    </th>
+                    {(reportData2?.mgrCodes?.length > 0 ? reportData2.mgrCodes : ['Export', 'Industry', 'UC', 'Utility']).map((mgr) => (
+                      <th
+                        key={mgr}
+                        className="py-3.5 px-4 font-black text-slate-500 text-right min-w-[110px] uppercase tracking-wider text-[10px] border border-slate-200"
+                      >
+                        {mgr}
+                      </th>
+                    ))}
+                    <th className="py-3.5 px-4 font-black text-slate-600 text-right bg-slate-100/40 min-w-[110px] uppercase tracking-wider text-[10px] border border-slate-200">
+                      Total
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(() => {
+                    const mgrCodes = reportData2?.mgrCodes?.length > 0 ? reportData2.mgrCodes : ['Export', 'Industry', 'UC', 'Utility'];
+                    const monthRowsByLabel = new Map(
+                      (reportData2?.rows || [])
+                        .filter((row) => row.isMonth && !row.isSegment)
+                        .map((row) => [row.monthLabel || row.month, row]),
+                    );
+                    const segmentMonthLabels =
+                      reportData2?.monthLabels?.length > 0
+                        ? reportData2.monthLabels
+                        : (monthRowsByLabel.size > 0 ? Array.from(monthRowsByLabel.keys()) : monthLabels);
+
+                    return segmentMonthLabels.map((monthLabel) => {
+                      const monthRow = monthRowsByLabel.get(monthLabel) || {
+                        month: monthLabel,
+                        total: 0,
+                      };
+
+                      return (
+                        <React.Fragment key={monthLabel}>
+                          <tr
+                            className="bg-sky-50/20 hover:bg-sky-50/40 border-l-4 border-l-sky-500 transition-all border-b border-slate-100 font-bold cursor-pointer"
+                            onClick={() => toggleSegmentMonth(monthLabel)}
+                          >
+                            <td className="py-3.5 px-4 text-slate-800 border border-slate-200">
+                              <div className="flex items-center gap-2">
+                                <MdKeyboardArrowDown
+                                  className={`text-sky-500 transition-transform duration-300 ${!expandedSegmentMonths[monthLabel] ? "-rotate-90" : ""}`}
+                                  size={18}
+                                />
+                                <span className="font-extrabold text-xs tracking-wide">{monthRow.month}</span>
+                              </div>
+                            </td>
+                            {mgrCodes.map((mgr) => {
+                              const cellValue = Number(monthRow[mgr] || 0);
+                              return (
+                                <td
+                                  key={mgr}
+                                  className="py-3.5 px-4 text-right border border-slate-200"
+                                >
+                                  {cellValue > 0 ? (
+                                    <span className="inline-flex items-center justify-end px-2.5 py-1 rounded-full bg-sky-50/70 text-sky-700 text-[11px] font-black min-w-[70px] border border-sky-100/40 shadow-sm hover:scale-105 transition-all">
+                                      {formatReportValue(cellValue, 3)}
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-300 font-normal">-</span>
+                                  )}
+                                </td>
                               );
-                              return match || value || "Unassigned";
-                            };
- 
-                            (combinedReportData?.sbuWise || [])
-                              .filter((r) => r.month === monthLabel)
-                              .forEach((r) => {
-                                const canonicalSbu = resolveSbuLabel(r.sbu);
-                                const normalizedSbu =
-                                  normalizeSbuValue(canonicalSbu);
-                                const key = normalizedSbu || canonicalSbu;
-                                if (!sbuMap.has(key)) {
-                                  sbuMap.set(key, {
-                                    normalizedSbu,
-                                    sbu: canonicalSbu,
-                                    values: {},
-                                    total: 0,
-                                  });
-                                }
-                                const entry = sbuMap.get(key);
-                                const segKey = r.segment || "Unassigned";
-                                entry.values[segKey] =
-                                  (entry.values[segKey] || 0) +
-                                  Number(r.value || 0);
-                                entry.total += Number(r.value || 0);
-                              });
-                            const sbuRows = Array.from(sbuMap.values());
- 
-                            if (sbuRows.length === 0) {
-                              return ['EPC', 'SBU1', 'SBU2', 'SBU3'].map(sbu => (
+                            })}
+                            <td
+                              className="py-3.5 px-4 text-right bg-sky-50/10 border border-slate-200"
+                            >
+                              {Number(monthRow.total || 0) > 0 ? (
+                                <span className="inline-flex items-center justify-end px-2.5 py-1 rounded-full bg-sky-100/50 text-sky-800 text-[11px] font-black min-w-[70px] border border-sky-200/30 shadow-sm">
+                                  {formatReportValue(monthRow.total || 0, 3)}
+                                </span>
+                              ) : (
+                                <span className="text-slate-300 font-normal">-</span>
+                              )}
+                            </td>
+                          </tr>
+                          {expandedSegmentMonths[monthLabel] &&
+                            (() => {
+                              const sbuMap = new Map();
+                              const resolveSbuLabel = (value) => {
+                                const normalized = normalizeSbuValue(value);
+                                const match = (
+                                  combinedReportData?.mgrCodes || []
+                                ).find(
+                                  (code) =>
+                                    normalizeSbuValue(code) === normalized,
+                                );
+                                return match || value || "Unassigned";
+                              };
+
+                              (combinedReportData?.sbuWise || [])
+                                .filter((r) => r.month === monthLabel)
+                                .forEach((r) => {
+                                  const canonicalSbu = resolveSbuLabel(r.sbu);
+                                  const normalizedSbu =
+                                    normalizeSbuValue(canonicalSbu);
+                                  const key = normalizedSbu || canonicalSbu;
+                                  if (!sbuMap.has(key)) {
+                                    sbuMap.set(key, {
+                                      normalizedSbu,
+                                      sbu: canonicalSbu,
+                                      values: {},
+                                      total: 0,
+                                    });
+                                  }
+                                  const entry = sbuMap.get(key);
+                                  const segKey = r.segment || "Unassigned";
+                                  entry.values[segKey] =
+                                    (entry.values[segKey] || 0) +
+                                    Number(r.value || 0);
+                                  entry.total += Number(r.value || 0);
+                                });
+                              const sbuRows = Array.from(sbuMap.values());
+
+                              if (sbuRows.length === 0) {
+                                return ['EPC', 'SBU1', 'SBU2', 'SBU3'].map(sbu => (
+                                  <tr
+                                    key={`${monthLabel}-${sbu}`}
+                                    className="border-b border-slate-100/60 bg-slate-50/20 hover:bg-slate-50/60 transition-colors border-l-4 border-l-slate-200"
+                                  >
+                                    <td className="py-3 px-4 text-slate-600 font-bold pl-8 text-xs border border-slate-200">
+                                      <span>{sbu}</span>
+                                    </td>
+                                    {mgrCodes.map((mgr) => (
+                                      <td
+                                        key={mgr}
+                                        className="py-3 px-4 text-right text-xs text-slate-300 border border-slate-200"
+                                      >
+                                        -
+                                      </td>
+                                    ))}
+                                    <td className="py-3 px-4 text-right bg-slate-50/30 font-bold text-xs text-slate-300 border border-slate-200">
+                                      -
+                                    </td>
+                                  </tr>
+                                ));
+                              }
+
+                              return sbuRows.map((row) => (
                                 <tr
-                                  key={`${monthLabel}-${sbu}`}
+                                  key={`${monthLabel}-${row.normalizedSbu}`}
                                   className="border-b border-slate-100/60 bg-slate-50/20 hover:bg-slate-50/60 transition-colors border-l-4 border-l-slate-200"
                                 >
                                   <td className="py-3 px-4 text-slate-600 font-bold pl-8 text-xs border border-slate-200">
-                                    <span>{sbu}</span>
+                                    <span>{row.sbu}</span>
                                   </td>
-                                  {mgrCodes.map((mgr) => (
-                                    <td
-                                      key={mgr}
-                                      className="py-3 px-4 text-right text-xs text-slate-300 border border-slate-200"
-                                    >
-                                      -
-                                    </td>
-                                  ))}
-                                  <td className="py-3 px-4 text-right bg-slate-50/30 font-bold text-xs text-slate-300 border border-slate-200">
-                                    -
+                                  {mgrCodes.map((mgr) => {
+                                    const val = Number(row.values[mgr] || 0);
+                                    return (
+                                      <td
+                                        key={mgr}
+                                        className="py-3 px-4 text-right text-xs border border-slate-200"
+                                      >
+                                        {val > 0 ? (
+                                          <span className="inline-flex items-center justify-end px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-extrabold min-w-[64px] border border-slate-200/40">
+                                            {formatReportValue(val, 3)}
+                                          </span>
+                                        ) : (
+                                          <span className="text-slate-300 font-normal">-</span>
+                                        )}
+                                      </td>
+                                    );
+                                  })}
+                                  <td
+                                    className="py-3 px-4 text-right bg-slate-50/30 font-bold text-slate-700 text-xs border border-slate-200"
+                                  >
+                                    {row.total > 0 ? formatReportValue(row.total, 3) : "-"}
                                   </td>
                                 </tr>
                               ));
-                            }
- 
-                            return sbuRows.map((row) => (
-                              <tr
-                                key={`${monthLabel}-${row.normalizedSbu}`}
-                                className="border-b border-slate-100/60 bg-slate-50/20 hover:bg-slate-50/60 transition-colors border-l-4 border-l-slate-200"
-                              >
-                                <td className="py-3 px-4 text-slate-600 font-bold pl-8 text-xs border border-slate-200">
-                                  <span>{row.sbu}</span>
-                                </td>
-                                {mgrCodes.map((mgr) => {
-                                  const val = Number(row.values[mgr] || 0);
-                                  return (
-                                    <td
-                                      key={mgr}
-                                      className="py-3 px-4 text-right text-xs border border-slate-200"
-                                    >
-                                      {val > 0 ? (
-                                        <span className="inline-flex items-center justify-end px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-extrabold min-w-[64px] border border-slate-200/40">
-                                          {formatReportValue(val, 3)}
-                                        </span>
-                                      ) : (
-                                        <span className="text-slate-300 font-normal">-</span>
-                                      )}
-                                    </td>
-                                  );
-                                })}
-                                <td
-                                  className="py-3 px-4 text-right bg-slate-50/30 font-bold text-slate-700 text-xs border border-slate-200"
-                                >
-                                  {row.total > 0 ? formatReportValue(row.total, 3) : "-"}
-                                </td>
-                              </tr>
-                            ));
-                          })()}
-                      </React.Fragment>
-                    );
-                  });
-                })()}
-                {(() => {
-                  const mgrCodes = reportData2?.mgrCodes?.length > 0 ? reportData2.mgrCodes : ['Export', 'Industry', 'UC', 'Utility'];
-                  const summaryRowsInOrder = reportData2 ? [
-                    (reportData2.rows || []).find((row) => row.isTotal),
-                    (reportData2.rows || []).find((row) => row.isPercentage),
-                    (reportData2.rows || []).find(
-                      (row) => row.isPreviousYearValue,
-                    ),
-                    (reportData2.rows || []).find(
-                      (row) => row.isTotalPercentage,
-                    ),
-                  ].filter(Boolean) : [
-                    { month: 'Total', isTotal: true, total: 0 },
-                    { month: 'Percentage CY', isPercentage: true, total: 0 },
-                    { month: 'Value (Previous Year)', isPreviousYearValue: true, total: 0 },
-                    { month: 'Percentage PY', isTotalPercentage: true, total: 0 },
-                  ];
- 
-                  return summaryRowsInOrder.map((row) => {
-                    const isTotal = row.isTotal;
-                    const isPercentage = row.isPercentage;
-                    const isPreviousYearValue = row.isPreviousYearValue;
-                    const isTotalPercentage = row.isTotalPercentage;
- 
-                    return (
-                      <tr
-                        key={row.month}
-                        className={`border-b border-slate-200/60 transition-colors ${isTotal
+                            })()}
+                        </React.Fragment>
+                      );
+                    });
+                  })()}
+                  {(() => {
+                    const mgrCodes = reportData2?.mgrCodes?.length > 0 ? reportData2.mgrCodes : ['Export', 'Industry', 'UC', 'Utility'];
+                    const summaryRowsInOrder = reportData2 ? [
+                      (reportData2.rows || []).find((row) => row.isTotal),
+                      (reportData2.rows || []).find((row) => row.isPercentage),
+                      (reportData2.rows || []).find(
+                        (row) => row.isPreviousYearValue,
+                      ),
+                      (reportData2.rows || []).find(
+                        (row) => row.isTotalPercentage,
+                      ),
+                    ].filter(Boolean) : [
+                      { month: 'Total', isTotal: true, total: 0 },
+                      { month: 'Percentage CY', isPercentage: true, total: 0 },
+                      { month: 'Value (Previous Year)', isPreviousYearValue: true, total: 0 },
+                      { month: 'Percentage PY', isTotalPercentage: true, total: 0 },
+                    ];
+
+                    return summaryRowsInOrder.map((row) => {
+                      const isTotal = row.isTotal;
+                      const isPercentage = row.isPercentage;
+                      const isPreviousYearValue = row.isPreviousYearValue;
+                      const isTotalPercentage = row.isTotalPercentage;
+
+                      return (
+                        <tr
+                          key={row.month}
+                          className={`border-b border-slate-200/60 transition-colors ${isTotal
                             ? "bg-emerald-50/60 border-t border-emerald-100 font-black text-emerald-900"
                             : isPreviousYearValue
                               ? "bg-amber-50/50 border-t border-amber-100 font-bold text-amber-900"
                               : isPercentage || isTotalPercentage
                                 ? "bg-violet-50/50 border-t border-violet-100 text-violet-900"
                                 : "border-slate-100 hover:bg-slate-50 text-slate-700"
-                          }`}
+                            }`}
+                        >
+                          <td
+                            className="py-3.5 px-5 font-extrabold text-xs uppercase tracking-wide border border-slate-200"
+                          >
+                            {isPercentage ? "Percentage CY" : row.month}
+                          </td>
+                          {mgrCodes.map((mgr) => {
+                            const cellValue = Number(row[mgr] || 0);
+                            return (
+                              <td
+                                key={mgr}
+                                className="py-3.5 px-4 text-right border-slate-200 border"
+                              >
+                                {cellValue > 0 ? (
+                                  <span className={`inline-flex items-center justify-end px-2.5 py-1 rounded-full text-[11px] font-black min-w-[70px] border ${isTotal
+                                    ? "bg-emerald-100/50 text-emerald-800 border-emerald-200/40"
+                                    : isPreviousYearValue
+                                      ? "bg-amber-100/50 text-amber-800 border-amber-200/40"
+                                      : "bg-violet-100/50 text-violet-800 border-violet-200/40"
+                                    }`}>
+                                    {isPercentage || isTotalPercentage
+                                      ? formatReportPercentage(cellValue)
+                                      : formatReportValue(cellValue, 3)}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-300 font-normal">-</span>
+                                )}
+                              </td>
+                            );
+                          })}
+                          <td
+                            className="py-3.5 px-4 text-right bg-slate-100/20 font-black text-xs border border-slate-200"
+                          >
+                            {isPercentage || isTotalPercentage
+                              ? formatReportPercentageTotal(row.total)
+                              : formatReportValue(row.total || 0, 3)}
+                          </td>
+                        </tr>
+                      );
+                    });
+                  })()}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {hasAccess('planning_view_status_breakdown') && (
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-100/80 overflow-hidden transition-all duration-300 hover:shadow-md hover:border-slate-200/60">
+          <div
+            className="p-5 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 to-emerald-50/10 flex justify-between items-center cursor-pointer select-none group"
+            onClick={() =>
+              setIsStatusBreakdownExpanded(!isStatusBreakdownExpanded)
+            }
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-black text-xs shadow-sm transition-all group-hover:scale-110">
+                STT
+              </div>
+              <h2 className="text-xs font-extrabold text-slate-700 uppercase tracking-widest flex items-center gap-2">
+                <MdKeyboardArrowDown
+                  className={`text-slate-400 transition-transform duration-300 ${!isStatusBreakdownExpanded ? "-rotate-90 text-slate-400" : "text-emerald-600"}`}
+                  size={20}
+                />
+                Status Breakdown Summary - FY {financialYear}
+              </h2>
+            </div>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                exportStatusBreakdownToExcel();
+              }}
+              disabled={
+                !computedStatusBreakdownData ||
+                !computedStatusBreakdownData.length
+              }
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 font-extrabold text-xs uppercase tracking-widest hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <MdDownload size={16} />
+              Export
+            </button>
+          </div>
+
+          {isStatusBreakdownExpanded && (
+            <div className="overflow-x-auto custom-scrollbar">
+              <table className="w-full text-sm border-collapse border border-slate-200">
+                <thead>
+                  <tr className="bg-slate-50/70 border-b border-slate-100">
+                    <th className="py-3.5 px-4 text-left font-black text-slate-500 text-[10px] min-w-[90px] border border-slate-200 uppercase tracking-wider">Month</th>
+                    <th className="py-3.5 px-3 text-left font-black text-slate-500 text-[10px] min-w-[110px] border border-slate-200 uppercase tracking-wider">SBU/EPC</th>
+                    <th className="py-3.5 px-3 text-left font-black text-slate-500 text-[10px] min-w-[110px] border border-slate-200 uppercase tracking-wider">Segment</th>
+                    {(visibleStatusColumns.length > 0 ? visibleStatusColumns : STATUS_REPORT_COLUMNS).map((column) => (
+                      <th
+                        key={`status-breakdown-header-${column}`}
+                        className="py-3.5 px-3 text-right font-black text-slate-500 text-[10px] min-w-[80px] border border-slate-200 uppercase tracking-wider"
+                      >
+                        {column}
+                      </th>
+                    ))}
+                    <th className="py-3.5 px-3 text-right font-black text-slate-600 text-[10px] min-w-[90px] bg-slate-100/40 border border-slate-200 uppercase tracking-wider">
+                      Total
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(computedStatusBreakdownData?.length > 0 ? computedStatusBreakdownData : []).map((monthData, mIdx) => {
+                    const isMonthExpanded = expandedStatusBreakdownMonths[monthData.month];
+                    const statusCols = visibleStatusColumns.length > 0 ? visibleStatusColumns : STATUS_REPORT_COLUMNS;
+
+                    return (
+                      <React.Fragment key={monthData.month}>
+                        {/* Month Header Row */}
+                        <tr
+                          className="bg-emerald-50/20 border-l-4 border-l-emerald-500 border-b border-slate-100 cursor-pointer hover:bg-emerald-50/40 transition-colors font-bold"
+                          onClick={() => toggleStatusBreakdownMonth(monthData.month)}
+                        >
+                          <td className="py-3 px-4 text-emerald-900 font-extrabold uppercase tracking-wider text-[11px] flex items-center gap-2 border border-slate-200">
+                            <MdKeyboardArrowDown
+                              className={`text-emerald-500 transition-transform duration-200 ${!isMonthExpanded ? "-rotate-90" : ""}`}
+                              size={18}
+                            />
+                            {monthData.month}
+                          </td>
+                          <td className="py-3 px-3 border border-slate-200"></td>
+                          <td className="py-3 px-3 border border-slate-200"></td>
+                          {statusCols.map(col => {
+                            const cellVal = monthData.monthTotalStatuses?.[col] || 0;
+                            return (
+                              <td key={col} className="py-3 px-3 text-right border border-slate-200">
+                                {cellVal > 0 ? (
+                                  <span className="inline-flex items-center justify-end px-2.5 py-1 rounded-full bg-emerald-50/70 text-emerald-700 text-[11px] font-black min-w-[70px] border border-emerald-100/40 shadow-sm">
+                                    {formatReportValue(cellVal, 3)}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-300 font-normal">-</span>
+                                )}
+                              </td>
+                            );
+                          })}
+                          <td className="py-3 px-3 text-right font-black text-emerald-950 bg-emerald-50/30 border border-slate-200">
+                            {monthData.monthGrandTotal > 0 ? (
+                              <span className="inline-flex items-center justify-end px-2.5 py-1 rounded-full bg-emerald-100/50 text-emerald-800 text-[11px] font-black min-w-[70px] border border-emerald-200/30 shadow-sm">
+                                {formatReportValue(monthData.monthGrandTotal || 0, 3)}
+                              </span>
+                            ) : (
+                              <span className="text-slate-300 font-normal">-</span>
+                            )}
+                          </td>
+                        </tr>
+
+                        {isMonthExpanded && (monthData.sbuGroups?.length > 0 ? monthData.sbuGroups : [
+                          { sbu: 'EPC', segmentGroups: [], sbuTotalStatuses: {}, sbuGrandTotal: 0 },
+                          { sbu: 'SBU1', segmentGroups: [], sbuTotalStatuses: {}, sbuGrandTotal: 0 },
+                          { sbu: 'SBU2', segmentGroups: [], sbuTotalStatuses: {}, sbuGrandTotal: 0 },
+                          { sbu: 'SBU3', segmentGroups: [], sbuTotalStatuses: {}, sbuGrandTotal: 0 }
+                        ]).map((sbuGroup, sIdx) => {
+                          const sbuKey = `${monthData.month}-${sbuGroup.sbu}`;
+                          const isSbuExpanded = expandedStatusBreakdownSbus[sbuKey];
+
+                          return (
+                            <React.Fragment key={sbuGroup.sbu}>
+                              {/* SBU Header Row */}
+                              <tr
+                                className="bg-slate-50/40 border-b border-slate-100 cursor-pointer hover:bg-slate-100/60 transition-colors border-l-4 border-l-slate-300"
+                                onClick={() => toggleStatusBreakdownSbu(monthData.month, sbuGroup.sbu)}
+                              >
+                                <td className="py-2.5 px-4 border border-slate-200"></td>
+                                <td className="py-2.5 px-3 text-slate-700 font-extrabold flex items-center gap-2 border border-slate-200 text-xs">
+                                  <MdKeyboardArrowDown
+                                    className={`text-slate-400 transition-transform duration-200 ${!isSbuExpanded ? "-rotate-90" : ""}`}
+                                    size={16}
+                                  />
+                                  {sbuGroup.sbu}
+                                </td>
+                                <td colSpan={statusCols.length + 2} className="bg-slate-50/10 border border-slate-200"></td>
+                              </tr>
+
+                              {isSbuExpanded && (
+                                <>
+                                  {(sbuGroup.segmentGroups?.length > 0 ? sbuGroup.segmentGroups : [
+                                    { segment: 'Export', statuses: {}, total: 0 },
+                                    { segment: 'Industry', statuses: {}, total: 0 },
+                                    { segment: 'UC', statuses: {}, total: 0 },
+                                    { segment: 'Utility', statuses: {}, total: 0 }
+                                  ]).map((seg) => {
+                                    return (
+                                      <tr key={`${monthData.month}-${sbuGroup.sbu}-${seg.segment}`} className="bg-white border-b border-slate-100/40 hover:bg-slate-50/40 transition-colors border-l-4 border-l-slate-200">
+                                        <td className="py-2 px-4 border border-slate-200"></td>
+                                        <td className="py-2 px-3 border border-slate-200"></td>
+                                        <td className="py-2 px-6 text-slate-600 font-bold border border-slate-200 text-xs pl-8">
+                                          {seg.segment}
+                                        </td>
+                                        {statusCols.map(col => {
+                                          const cellVal = seg.statuses?.[col] || 0;
+                                          return (
+                                            <td key={col} className="py-2 px-3 text-right border border-slate-200 text-xs">
+                                              {cellVal > 0 ? (
+                                                <span className="inline-flex items-center justify-end px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-extrabold min-w-[64px] border border-slate-200/40">
+                                                  {formatReportValue(cellVal, 3)}
+                                                </span>
+                                              ) : (
+                                                <span className="text-slate-300 font-normal">-</span>
+                                              )}
+                                            </td>
+                                          );
+                                        })}
+                                        <td className="py-2 px-3 text-right font-bold text-slate-700 bg-slate-50/30 text-xs border border-slate-200">
+                                          {seg.total > 0 ? formatReportValue(seg.total || 0, 3) : "-"}
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                  {/* SBU TOTAL Row */}
+                                  <tr className="bg-teal-50/30 font-bold border-b border-teal-100 border-l-4 border-l-teal-400">
+                                    <td className="py-2 px-4 border border-slate-200"></td>
+                                    <td className="py-2 px-3 border border-slate-200"></td>
+                                    <td className="py-2 px-6 text-teal-900 border border-slate-200 uppercase tracking-tight text-[11px] font-black pl-8">SBU TOTAL</td>
+                                    {statusCols.map(col => {
+                                      const cellVal = sbuGroup.sbuTotalStatuses?.[col] || 0;
+                                      return (
+                                        <td key={col} className="py-2 px-3 text-right border border-slate-200">
+                                          {cellVal > 0 ? (
+                                            <span className="inline-flex items-center justify-end px-2.5 py-0.5 rounded-full bg-teal-100/50 text-teal-800 text-[10px] font-black min-w-[64px] border border-teal-200/30">
+                                              {formatReportValue(cellVal, 3)}
+                                            </span>
+                                          ) : (
+                                            <span className="text-slate-300 font-normal">-</span>
+                                          )}
+                                        </td>
+                                      );
+                                    })}
+                                    <td className="py-2 px-3 text-right font-black text-teal-950 bg-teal-50/40 text-xs border border-slate-200">
+                                      {sbuGroup.sbuGrandTotal > 0 ? formatReportValue(sbuGroup.sbuGrandTotal || 0, 3) : "-"}
+                                    </td>
+                                  </tr>
+                                </>
+                              )}
+                            </React.Fragment>
+                          );
+                        })}
+                      </React.Fragment>
+                    );
+                  })}
+                  {(statusBreakdownSummaryRows?.length > 0 ? statusBreakdownSummaryRows : [
+                    { key: 'total', label: 'TOTAL', isTotal: true, values: {}, rowTotal: 0 },
+                    { key: 'percentage', label: 'Percentage CY', isPercentage: true, values: {}, rowTotal: 0 },
+                    { key: 'prev-year', label: 'Value (Previous Year)', isPreviousYearValue: true, values: {}, rowTotal: 0 },
+                    { key: 'prev-percentage', label: 'Percentage PY', isTotalPercentage: true, values: {}, rowTotal: 0 }
+                  ]).map((summaryRow) => {
+                    const isYellowLabel = summaryRow.isTotal || summaryRow.isPreviousYearValue;
+                    const statusCols = visibleStatusColumns.length > 0 ? visibleStatusColumns : STATUS_REPORT_COLUMNS;
+
+                    return (
+                      <tr
+                        key={`status-breakdown-${summaryRow.key}`}
+                        className={`border-b border-slate-200/60 transition-colors ${isYellowLabel ? "border-t border-emerald-100 bg-emerald-50/60 font-black text-emerald-900" : "border-t border-indigo-100 bg-indigo-50/50 text-indigo-900"}`}
                       >
                         <td
-                          className="py-3.5 px-5 font-extrabold text-xs uppercase tracking-wide border border-slate-200"
+                          colSpan={3}
+                          className="py-3.5 px-4 font-extrabold text-xs uppercase tracking-wide border border-slate-200"
                         >
-                          {isPercentage ? "Percentage CY" : row.month}
+                          {summaryRow.label}
                         </td>
-                        {mgrCodes.map((mgr) => {
-                          const cellValue = Number(row[mgr] || 0);
+                        {statusCols.map((column) => {
+                          const cellValue = Number(summaryRow.values?.[column] || 0);
                           return (
                             <td
-                              key={mgr}
-                              className="py-3.5 px-4 text-right border-slate-200 border"
+                              key={`${summaryRow.key}-${column}`}
+                              className="py-3.5 px-3 text-right border border-slate-200"
                             >
                               {cellValue > 0 ? (
-                                <span className={`inline-flex items-center justify-end px-2.5 py-1 rounded-full text-[11px] font-black min-w-[70px] border ${isTotal
+                                <span className={`inline-flex items-center justify-end px-2.5 py-1 rounded-full text-[11px] font-black min-w-[70px] border ${isYellowLabel
                                   ? "bg-emerald-100/50 text-emerald-800 border-emerald-200/40"
-                                  : isPreviousYearValue
-                                    ? "bg-amber-100/50 text-amber-800 border-amber-200/40"
-                                    : "bg-violet-100/50 text-violet-800 border-violet-200/40"
-                                }`}>
-                                  {isPercentage || isTotalPercentage
+                                  : "bg-indigo-100/50 text-indigo-800 border-indigo-200/40"
+                                  }`}>
+                                  {summaryRow.isPercentage || summaryRow.isTotalPercentage
                                     ? formatReportPercentage(cellValue)
                                     : formatReportValue(cellValue, 3)}
                                 </span>
@@ -2726,276 +2983,19 @@ const PlanningScreen = () => {
                           );
                         })}
                         <td
-                          className="py-3.5 px-4 text-right bg-slate-100/20 font-black text-xs border border-slate-200"
+                          className="py-3.5 px-3 text-right font-black border border-slate-200 bg-slate-100/20 text-xs"
                         >
-                          {isPercentage || isTotalPercentage
-                            ? formatReportPercentageTotal(row.total)
-                            : formatReportValue(row.total || 0, 3)}
+                          {summaryRow.isPercentage || summaryRow.isTotalPercentage
+                            ? formatReportPercentageTotal(summaryRow.rowTotal)
+                            : formatReportValue(summaryRow.rowTotal || 0, 3)}
                         </td>
                       </tr>
                     );
-                  });
-                })()}
-              </tbody>
-            </table>
-          </div>
-        )}
-        </div>
-      )}
-
-      {hasAccess('planning_view_status_breakdown') && (
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100/80 overflow-hidden transition-all duration-300 hover:shadow-md hover:border-slate-200/60">
-        <div
-          className="p-5 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 to-emerald-50/10 flex justify-between items-center cursor-pointer select-none group"
-          onClick={() =>
-            setIsStatusBreakdownExpanded(!isStatusBreakdownExpanded)
-          }
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-black text-xs shadow-sm transition-all group-hover:scale-110">
-              STT
+                  })}
+                </tbody>
+              </table>
             </div>
-            <h2 className="text-xs font-extrabold text-slate-700 uppercase tracking-widest flex items-center gap-2">
-              <MdKeyboardArrowDown
-                className={`text-slate-400 transition-transform duration-300 ${!isStatusBreakdownExpanded ? "-rotate-90 text-slate-400" : "text-emerald-600"}`}
-                size={20}
-              />
-              Status Breakdown Summary - FY {financialYear}
-            </h2>
-          </div>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              exportStatusBreakdownToExcel();
-            }}
-            disabled={
-              !computedStatusBreakdownData ||
-              !computedStatusBreakdownData.length
-            }
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 font-extrabold text-xs uppercase tracking-widest hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <MdDownload size={16} />
-            Export
-          </button>
-        </div>
-
-        {isStatusBreakdownExpanded && (
-          <div className="overflow-x-auto custom-scrollbar">
-            <table className="w-full text-sm border-collapse border border-slate-200">
-              <thead>
-                <tr className="bg-slate-50/70 border-b border-slate-100">
-                  <th className="py-3.5 px-4 text-left font-black text-slate-500 text-[10px] min-w-[90px] border border-slate-200 uppercase tracking-wider">Month</th>
-                  <th className="py-3.5 px-3 text-left font-black text-slate-500 text-[10px] min-w-[110px] border border-slate-200 uppercase tracking-wider">SBU/EPC</th>
-                  <th className="py-3.5 px-3 text-left font-black text-slate-500 text-[10px] min-w-[110px] border border-slate-200 uppercase tracking-wider">Segment</th>
-                  {(visibleStatusColumns.length > 0 ? visibleStatusColumns : STATUS_REPORT_COLUMNS).map((column) => (
-                    <th
-                      key={`status-breakdown-header-${column}`}
-                      className="py-3.5 px-3 text-right font-black text-slate-500 text-[10px] min-w-[80px] border border-slate-200 uppercase tracking-wider"
-                    >
-                      {column}
-                    </th>
-                  ))}
-                  <th className="py-3.5 px-3 text-right font-black text-slate-600 text-[10px] min-w-[90px] bg-slate-100/40 border border-slate-200 uppercase tracking-wider">
-                    Total
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {(computedStatusBreakdownData?.length > 0 ? computedStatusBreakdownData : []).map((monthData, mIdx) => {
-                  const isMonthExpanded = expandedStatusBreakdownMonths[monthData.month];
-                  const statusCols = visibleStatusColumns.length > 0 ? visibleStatusColumns : STATUS_REPORT_COLUMNS;
-
-                  return (
-                    <React.Fragment key={monthData.month}>
-                      {/* Month Header Row */}
-                      <tr
-                        className="bg-emerald-50/20 border-l-4 border-l-emerald-500 border-b border-slate-100 cursor-pointer hover:bg-emerald-50/40 transition-colors font-bold"
-                        onClick={() => toggleStatusBreakdownMonth(monthData.month)}
-                      >
-                        <td className="py-3 px-4 text-emerald-900 font-extrabold uppercase tracking-wider text-[11px] flex items-center gap-2 border border-slate-200">
-                          <MdKeyboardArrowDown
-                            className={`text-emerald-500 transition-transform duration-200 ${!isMonthExpanded ? "-rotate-90" : ""}`}
-                            size={18}
-                          />
-                          {monthData.month}
-                        </td>
-                        <td className="py-3 px-3 border border-slate-200"></td>
-                        <td className="py-3 px-3 border border-slate-200"></td>
-                        {statusCols.map(col => {
-                          const cellVal = monthData.monthTotalStatuses?.[col] || 0;
-                          return (
-                            <td key={col} className="py-3 px-3 text-right border border-slate-200">
-                              {cellVal > 0 ? (
-                                <span className="inline-flex items-center justify-end px-2.5 py-1 rounded-full bg-emerald-50/70 text-emerald-700 text-[11px] font-black min-w-[70px] border border-emerald-100/40 shadow-sm">
-                                  {formatReportValue(cellVal, 3)}
-                                </span>
-                              ) : (
-                                <span className="text-slate-300 font-normal">-</span>
-                              )}
-                            </td>
-                          );
-                        })}
-                        <td className="py-3 px-3 text-right font-black text-emerald-950 bg-emerald-50/30 border border-slate-200">
-                          {monthData.monthGrandTotal > 0 ? (
-                            <span className="inline-flex items-center justify-end px-2.5 py-1 rounded-full bg-emerald-100/50 text-emerald-800 text-[11px] font-black min-w-[70px] border border-emerald-200/30 shadow-sm">
-                              {formatReportValue(monthData.monthGrandTotal || 0, 3)}
-                            </span>
-                          ) : (
-                            <span className="text-slate-300 font-normal">-</span>
-                          )}
-                        </td>
-                      </tr>
-
-                      {isMonthExpanded && (monthData.sbuGroups?.length > 0 ? monthData.sbuGroups : [
-                        { sbu: 'EPC', segmentGroups: [], sbuTotalStatuses: {}, sbuGrandTotal: 0 },
-                        { sbu: 'SBU1', segmentGroups: [], sbuTotalStatuses: {}, sbuGrandTotal: 0 },
-                        { sbu: 'SBU2', segmentGroups: [], sbuTotalStatuses: {}, sbuGrandTotal: 0 },
-                        { sbu: 'SBU3', segmentGroups: [], sbuTotalStatuses: {}, sbuGrandTotal: 0 }
-                      ]).map((sbuGroup, sIdx) => {
-                        const sbuKey = `${monthData.month}-${sbuGroup.sbu}`;
-                        const isSbuExpanded = expandedStatusBreakdownSbus[sbuKey];
-
-                        return (
-                          <React.Fragment key={sbuGroup.sbu}>
-                            {/* SBU Header Row */}
-                            <tr
-                              className="bg-slate-50/40 border-b border-slate-100 cursor-pointer hover:bg-slate-100/60 transition-colors border-l-4 border-l-slate-300"
-                              onClick={() => toggleStatusBreakdownSbu(monthData.month, sbuGroup.sbu)}
-                            >
-                              <td className="py-2.5 px-4 border border-slate-200"></td>
-                              <td className="py-2.5 px-3 text-slate-700 font-extrabold flex items-center gap-2 border border-slate-200 text-xs">
-                                <MdKeyboardArrowDown
-                                  className={`text-slate-400 transition-transform duration-200 ${!isSbuExpanded ? "-rotate-90" : ""}`}
-                                  size={16}
-                                />
-                                {sbuGroup.sbu}
-                              </td>
-                              <td colSpan={statusCols.length + 2} className="bg-slate-50/10 border border-slate-200"></td>
-                            </tr>
-
-                            {isSbuExpanded && (
-                              <>
-                                {(sbuGroup.segmentGroups?.length > 0 ? sbuGroup.segmentGroups : [
-                                  { segment: 'Export', statuses: {}, total: 0 },
-                                  { segment: 'Industry', statuses: {}, total: 0 },
-                                  { segment: 'UC', statuses: {}, total: 0 },
-                                  { segment: 'Utility', statuses: {}, total: 0 }
-                                ]).map((seg) => {
-                                  return (
-                                    <tr key={`${monthData.month}-${sbuGroup.sbu}-${seg.segment}`} className="bg-white border-b border-slate-100/40 hover:bg-slate-50/40 transition-colors border-l-4 border-l-slate-200">
-                                      <td className="py-2 px-4 border border-slate-200"></td>
-                                      <td className="py-2 px-3 border border-slate-200"></td>
-                                      <td className="py-2 px-6 text-slate-600 font-bold border border-slate-200 text-xs pl-8">
-                                        {seg.segment}
-                                      </td>
-                                      {statusCols.map(col => {
-                                        const cellVal = seg.statuses?.[col] || 0;
-                                        return (
-                                          <td key={col} className="py-2 px-3 text-right border border-slate-200 text-xs">
-                                            {cellVal > 0 ? (
-                                              <span className="inline-flex items-center justify-end px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-extrabold min-w-[64px] border border-slate-200/40">
-                                                {formatReportValue(cellVal, 3)}
-                                              </span>
-                                            ) : (
-                                              <span className="text-slate-300 font-normal">-</span>
-                                            )}
-                                          </td>
-                                        );
-                                      })}
-                                      <td className="py-2 px-3 text-right font-bold text-slate-700 bg-slate-50/30 text-xs border border-slate-200">
-                                        {seg.total > 0 ? formatReportValue(seg.total || 0, 3) : "-"}
-                                      </td>
-                                    </tr>
-                                  );
-                                })}
-                                {/* SBU TOTAL Row */}
-                                <tr className="bg-teal-50/30 font-bold border-b border-teal-100 border-l-4 border-l-teal-400">
-                                  <td className="py-2 px-4 border border-slate-200"></td>
-                                  <td className="py-2 px-3 border border-slate-200"></td>
-                                  <td className="py-2 px-6 text-teal-900 border border-slate-200 uppercase tracking-tight text-[11px] font-black pl-8">SBU TOTAL</td>
-                                  {statusCols.map(col => {
-                                    const cellVal = sbuGroup.sbuTotalStatuses?.[col] || 0;
-                                    return (
-                                      <td key={col} className="py-2 px-3 text-right border border-slate-200">
-                                        {cellVal > 0 ? (
-                                          <span className="inline-flex items-center justify-end px-2.5 py-0.5 rounded-full bg-teal-100/50 text-teal-800 text-[10px] font-black min-w-[64px] border border-teal-200/30">
-                                            {formatReportValue(cellVal, 3)}
-                                          </span>
-                                        ) : (
-                                          <span className="text-slate-300 font-normal">-</span>
-                                        )}
-                                      </td>
-                                    );
-                                  })}
-                                  <td className="py-2 px-3 text-right font-black text-teal-950 bg-teal-50/40 text-xs border border-slate-200">
-                                    {sbuGroup.sbuGrandTotal > 0 ? formatReportValue(sbuGroup.sbuGrandTotal || 0, 3) : "-"}
-                                  </td>
-                                </tr>
-                              </>
-                            )}
-                          </React.Fragment>
-                        );
-                      })}
-                    </React.Fragment>
-                  );
-                })}
-                {(statusBreakdownSummaryRows?.length > 0 ? statusBreakdownSummaryRows : [
-                  { key: 'total', label: 'TOTAL', isTotal: true, values: {}, rowTotal: 0 },
-                  { key: 'percentage', label: 'Percentage CY', isPercentage: true, values: {}, rowTotal: 0 },
-                  { key: 'prev-year', label: 'Value (Previous Year)', isPreviousYearValue: true, values: {}, rowTotal: 0 },
-                  { key: 'prev-percentage', label: 'Percentage PY', isTotalPercentage: true, values: {}, rowTotal: 0 }
-                ]).map((summaryRow) => {
-                  const isYellowLabel = summaryRow.isTotal || summaryRow.isPreviousYearValue;
-                  const statusCols = visibleStatusColumns.length > 0 ? visibleStatusColumns : STATUS_REPORT_COLUMNS;
-
-                  return (
-                    <tr
-                      key={`status-breakdown-${summaryRow.key}`}
-                      className={`border-b border-slate-200/60 transition-colors ${isYellowLabel ? "border-t border-emerald-100 bg-emerald-50/60 font-black text-emerald-900" : "border-t border-indigo-100 bg-indigo-50/50 text-indigo-900"}`}
-                    >
-                      <td
-                        colSpan={3}
-                        className="py-3.5 px-4 font-extrabold text-xs uppercase tracking-wide border border-slate-200"
-                      >
-                        {summaryRow.label}
-                      </td>
-                      {statusCols.map((column) => {
-                        const cellValue = Number(summaryRow.values?.[column] || 0);
-                        return (
-                          <td
-                            key={`${summaryRow.key}-${column}`}
-                            className="py-3.5 px-3 text-right border border-slate-200"
-                          >
-                            {cellValue > 0 ? (
-                              <span className={`inline-flex items-center justify-end px-2.5 py-1 rounded-full text-[11px] font-black min-w-[70px] border ${isYellowLabel
-                                ? "bg-emerald-100/50 text-emerald-800 border-emerald-200/40"
-                                : "bg-indigo-100/50 text-indigo-800 border-indigo-200/40"
-                              }`}>
-                                {summaryRow.isPercentage || summaryRow.isTotalPercentage
-                                  ? formatReportPercentage(cellValue)
-                                  : formatReportValue(cellValue, 3)}
-                              </span>
-                            ) : (
-                              <span className="text-slate-300 font-normal">-</span>
-                            )}
-                          </td>
-                        );
-                      })}
-                      <td
-                        className="py-3.5 px-3 text-right font-black border border-slate-200 bg-slate-100/20 text-xs"
-                      >
-                        {summaryRow.isPercentage || summaryRow.isTotalPercentage
-                          ? formatReportPercentageTotal(summaryRow.rowTotal)
-                          : formatReportValue(summaryRow.rowTotal || 0, 3)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+          )}
         </div>
       )}
 
