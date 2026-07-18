@@ -3,10 +3,16 @@ import { MdAdd, MdEdit, MdDelete, MdDescription, MdCheckCircle } from 'react-ico
 import { toast } from 'react-toastify';
 import { termsService } from '../services/api';
 import Modal from '../components/Modal';
+import PaginationControls from '../components/PaginationControls';
+import { formatDate } from '../utils/helpers';
+
+const LIST_PAGE_SIZE = 20;
 
 const Terms = () => {
     const [templates, setTemplates] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [page, setPage] = useState(1);
+    const [pagination, setPagination] = useState({ page: 1, limit: LIST_PAGE_SIZE, total: 0, pages: 1 });
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingTemplate, setEditingTemplate] = useState(null);
     const [formData, setFormData] = useState({
@@ -15,14 +21,23 @@ const Terms = () => {
         isDefault: false
     });
 
+    const pagedTemplates = templates;
+
     useEffect(() => {
         fetchTemplates();
-    }, []);
+    }, [page]);
 
     const fetchTemplates = async () => {
         try {
-            const res = await termsService.getAll();
-            setTemplates(res.data);
+            const res = await termsService.getAll({ page, limit: LIST_PAGE_SIZE });
+            const payload = res.data;
+            setTemplates(Array.isArray(payload) ? payload : payload.data || []);
+            setPagination(payload.pagination || {
+                page: 1,
+                limit: LIST_PAGE_SIZE,
+                total: Array.isArray(payload) ? payload.length : 0,
+                pages: 1
+            });
         } catch (err) {
             console.error("Error fetching terms templates:", err);
         } finally {
@@ -125,9 +140,10 @@ const Terms = () => {
                     <p className="text-xs uppercase font-black tracking-widest">Loading Templates...</p>
                 </div>
             ) : (
+                <>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {templates.map((t) => (
-                        <div key={t._id} className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100 hover:shadow-xl transition-all group relative overflow-hidden flex flex-col">
+                    {pagedTemplates.map((t) => (
+                        <div key={t._id} className="mobile-master-card bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100 hover:shadow-xl transition-all group relative overflow-hidden flex flex-col">
                             {t.isDefault && (
                                 <div className="absolute top-0 right-0 bg-emerald-50 text-emerald-600 px-4 py-1 rounded-bl-2xl text-[10px] font-black uppercase tracking-widest border-b border-l border-emerald-100">
                                     Default
@@ -148,7 +164,7 @@ const Terms = () => {
 
                             <div className="flex items-center justify-between mt-auto pt-4 border-t border-slate-50">
                                 <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">
-                                    {new Date(t.createdAt).toLocaleDateString()}
+                                    {formatDate(t.createdAt)}
                                 </span>
                                 <div className="flex gap-2">
                                     <button
@@ -170,6 +186,8 @@ const Terms = () => {
                         </div>
                     ))}
                 </div>
+                <PaginationControls pagination={pagination} onPageChange={setPage} />
+                </>
             )}
 
             <Modal

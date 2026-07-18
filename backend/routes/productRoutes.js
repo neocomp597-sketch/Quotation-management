@@ -11,6 +11,9 @@ const {
     bulkDeleteProducts,
     bulkUpdateProducts
 } = require('../controllers/productController');
+const { protect } = require('../middlewares/authMiddleware');
+
+router.use(protect);
 
 router.post('/', createProduct);
 router.get('/', getAllProducts);

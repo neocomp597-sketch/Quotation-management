@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Price Book Management User Manual</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-light: #e0e7ff;
+            --text-dark: #0f172a;
+            --text-muted: #64748b;
+            --bg-light: #f8fafc;
+            --border-color: #e2e8f0;
+            --success: #10b981;
+            --success-light: #ecfdf5;
+            --note-bg: #eff6ff;
+            --note-border: #bfdbfe;
+            --note-text: #1e40af;
+        }
+
+        @page {
+            size: A4;
+            margin: 20mm;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            color: var(--text-dark);
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            background-color: #ffffff;
+            -webkit-print-color-adjust: exact;
+        }
+
+        h1, h2, h3, h4 {
+            font-family: 'Outfit', sans-serif;
+            color: var(--text-dark);
+            font-weight: 800;
+            margin-top: 1.5em;
+            margin-bottom: 0.5em;
+            page-break-after: avoid;
+        }
+
+        h1 {
+            font-size: 28px;
+            border-bottom: 2px solid var(--primary-light);
+            padding-bottom: 10px;
+            margin-top: 0;
+        }
+
+        h2 {
+            font-size: 20px;
+            color: var(--primary);
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 5px;
+        }
+
+        h3 {
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        p {
+            margin-top: 0;
+            margin-bottom: 1.2em;
+            font-size: 14px;
+            color: #334155;
+        }
+
+        ul, ol {
+            margin-top: 0;
+            margin-bottom: 1.5em;
+            padding-left: 20px;
+            font-size: 14px;
+            color: #334155;
+        }
+
+        li {
+            margin-bottom: 0.6em;
+        }
+
+        /* Cover header */
+        .manual-header {
+            background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
+            color: #ffffff;
+            padding: 40px;
+            border-radius: 20px;
+            margin-bottom: 40px;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05);
+        }
+
+        .manual-header h1 {
+            color: #ffffff;
+            border-bottom: none;
+            margin-bottom: 5px;
+            font-size: 32px;
+            font-weight: 900;
+        }
+
+        .manual-header p.subtitle {
+            color: #c7d2fe;
+            font-size: 16px;
+            margin-bottom: 0;
+            font-family: 'Outfit', sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-weight: 600;
+        }
+
+        /* Note block */
+        .note-box {
+            background-color: var(--note-bg);
+            border-left: 4px solid var(--note-border);
+            color: var(--note-text);
+            padding: 15px 20px;
+            border-radius: 0 12px 12px 0;
+            margin: 20px 0;
+            font-size: 13.5px;
+        }
+
+        .note-box strong {
+            color: #1e3a8a;
+            display: block;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: 1px;
+        }
+
+        /* Diagram / Flowchart placeholder */
+        .diagram-container {
+            background-color: var(--bg-light);
+            border: 1px dashed var(--border-color);
+            border-radius: 16px;
+            padding: 25px;
+            text-align: center;
+            margin: 25px 0;
+            page-break-inside: avoid;
+        }
+
+        .flow-step {
+            display: inline-block;
+            background: white;
+            border: 1px solid var(--border-color);
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 700;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+
+        .flow-arrow {
+            display: inline-block;
+            margin: 0 10px;
+            color: var(--text-muted);
+            font-weight: bold;
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 25px 0;
+            font-size: 13.5px;
+            page-break-inside: avoid;
+        }
+
+        th, td {
+            padding: 12px 15px;
+            border: 1px solid var(--border-color);
+            text-align: left;
+        }
+
+        th {
+            background-color: var(--bg-light);
+            color: var(--text-dark);
+            font-weight: 700;
+        }
+
+        tr:nth-child(even) td {
+            background-color: #fafbfd;
+        }
+
+        /* Code/Text Highlight */
+        code {
+            font-family: Consolas, Monaco, monospace;
+            background-color: var(--bg-light);
+            color: #c084fc;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+
+        .code-block {
+            display: inline-block;
+            background-color: #0f172a;
+            color: #38bdf8;
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-weight: bold;
+        }
+
+        /* Steps wrapper */
+        .step-container {
+            margin-bottom: 25px;
+            page-break-inside: avoid;
+        }
+
+        .step-number {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
+            height: 24px;
+            background-color: var(--primary);
+            color: white;
+            border-radius: 50%;
+            font-size: 12px;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+        .step-title {
+            display: inline-flex;
+            align-items: center;
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--text-dark);
+        }
+
+        .step-content {
+            margin-left: 34px;
+            margin-top: 8px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="manual-header">
+        <h1>Price Management Hub</h1>
+        <p class="subtitle">User & Operator Manual</p>
+    </div>
+
+    <p>This manual covers the centralized pricing engine for the quotation and CPQ (Configure, Price, Quote) system. It enables your organization to configure static price books, quantity-based slab pricing, customer-specific discounts, promo coupons, and multi-currency conversion sheets.</p>
+
+    <h2>🧭 Key Concepts</h2>
+    <p>The system uses a hierarchical pricing engine to compute the final price of an item when generating a quotation:</p>
+
+    <div class="diagram-container">
+        <div class="flow-step">1. Base Price (Catalog)</div>
+        <div class="flow-arrow">➔</div>
+        <div class="flow-step">2. Price Book Override</div>
+        <div class="flow-arrow">➔</div>
+        <div class="flow-step">3. Pricing Rules (Slabs)</div>
+        <div class="flow-arrow">➔</div>
+        <div class="flow-step">4. Discount Policies</div>
+        <div class="flow-arrow">➔</div>
+        <div class="flow-step">5. Promotions / Coupons</div>
+    </div>
+
+    <div class="note-box">
+        <strong>How it layers:</strong>
+        When a salesperson adds a product to a quotation, the engine starts with the product's base catalog price, checks for active Price Books, layers on quantity-based slab rules, and then applies stackable discounts and promotional codes.
+    </div>
+
+    <h2>🗂️ Core Pricing Modules</h2>
+    <p>The Price Management Hub is divided into 5 core tabs:</p>
+    
+    <ul>
+        <li><strong>Price Books:</strong> Catalogs of custom product rates that override default prices for specific segments (Standard, Customer Specific, Region Specific, Dealer/Partner Specific, or Project Specific).</li>
+        <li><strong>Pricing Rules:</strong> Rules designed for volume-based pricing or specific group markups (e.g. Slab tiers based on quantity).</li>
+        <li><strong>Discount Policies:</strong> Company-wide structural policies that run automatically during calculations. Can be percentage-based or flat rates, and set as stackable.</li>
+        <li><strong>Promotions & Coupons:</strong> Code-activated marketing campaigns (e.g., <span class="code-block">SUMMER26</span>) with usage limits and dates.</li>
+        <li><strong>Currency Sheets:</strong> Live ledger mapping conversion rates from your base currency (INR) to foreign currencies (USD, AED, EUR) for international quotes.</li>
+    </ul>
+
+    <h2>📖 Step-by-Step Guides</h2>
+
+    <div class="step-container">
+        <div class="step-title">
+            <span class="step-number">1</span>
+            <span>How to Create a New Price Book</span>
+        </div>
+        <div class="step-content">
+            <p>Go to <strong>Master ➔ Price Management</strong> in the sidebar. Click the <strong>Add Config</strong> button, fill in the Book Name, Book Type (e.g. <code>Region</code> or <code>Customer</code>), and input target values (such as state code <code>KA</code>). Click <strong>Save</strong>.</p>
+        </div>
+    </div>
+
+    <div class="step-container">
+        <div class="step-title">
+            <span class="step-number">2</span>
+            <span>How to Map Rates to a Price Book</span>
+        </div>
+        <div class="step-content">
+            <p>Click <strong>Manage Rates</strong> on the card of your Price Book. In the modal, select a product from the list, input the custom rate, and click <strong>Map Rate</strong>. The custom rate will now override default catalog prices automatically.</p>
+        </div>
+    </div>
+
+    <div class="step-container">
+        <div class="step-title">
+            <span class="step-number">3</span>
+            <span>How to Set Up a Slab-Based Pricing Rule</span>
+        </div>
+        <div class="step-content">
+            <p>Switch to the <strong>Pricing Rules</strong> tab and click <strong>Add Config</strong>. Choose <code>Quantity/Slab Pricing</code> as the rule type, choose your product, and fill in the tier conditions (e.g., Min Qty: <code>10</code>, Max Qty: <code>50</code>, Value: <code>45000</code>). Save the configuration.</p>
+        </div>
+    </div>
+
+    <h2>⚙️ How Pricing Works at Quote Creation</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Step</th>
+                <th>System Action</th>
+                <th>What the User Sees</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>1. Customer Selection</strong></td>
+                <td>System checks customer's state, group, and specific ID.</td>
+                <td>Selected Price Book automatically applies in the background.</td>
+            </tr>
+            <tr>
+                <td><strong>2. Product Selection</strong></td>
+                <td>System retrieves the price mapped inside the selected Price Book.</td>
+                <td>The default unit price is pre-filled with the custom book rate.</td>
+            </tr>
+            <tr>
+                <td><strong>3. Quantity Update</strong></td>
+                <td>System checks if the item quantity falls into any Slab Rules.</td>
+                <td>If quantity goes from 5 to 15, unit price drops automatically to match the slab tier.</td>
+            </tr>
+            <tr>
+                <td><strong>4. Applying Coupons</strong></td>
+                <td>Salesperson enters a promo code (e.g., <code>OFFER10</code>).</td>
+                <td>Subtotal updates instantly with the percentage or flat discount.</td>
+            </tr>
+        </tbody>
+    </table>
+
+</body>
+</html>

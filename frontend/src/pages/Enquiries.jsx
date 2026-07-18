@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { MdAdd, MdEdit, MdDelete, MdSearch, MdMoreVert, MdTimer, MdCheckCircle, MdCancel, MdPerson, MdNumbers, MdEventAvailable, MdReceiptLong, MdFilterList, MdPercent, MdAnalytics } from 'react-icons/md';
+import { MdAdd, MdEdit, MdDelete, MdSearch, MdMoreVert, MdTimer, MdCheckCircle, MdCancel, MdPerson, MdNumbers, MdEventAvailable, MdReceiptLong, MdFilterList, MdPercent, MdAnalytics, MdVisibility, MdStar, MdClose } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
 import { enquiryService } from '../services/api';
 import Modal from '../components/Modal';
 import CreateEnquiry from './CreateEnquiry';
+import { formatDate } from '../utils/helpers';
 
 const StatusPill = ({ status }) => {
     const styles = {
@@ -47,6 +48,10 @@ const Enquiries = () => {
     const [loading, setLoading] = useState(true);
     const [deleteModal, setDeleteModal] = useState({ open: false, id: null });
     const [enquiryModal, setEnquiryModal] = useState({ open: false, id: null });
+    const [viewModal, setViewModal] = useState({ open: false, id: null, data: null });
+    const [newNote, setNewNote] = useState('');
+    const [newActionType, setNewActionType] = useState('Call');
+    const [addingFollowUp, setAddingFollowUp] = useState(false);
     const [showFilters, setShowFilters] = useState(false);
 
     // Advanced Filters State
@@ -68,6 +73,78 @@ const Enquiries = () => {
             toast.error('Failed to fetch enquiries');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleOpenViewModal = async (id) => {
+        try {
+            const res = await enquiryService.getById(id);
+            setViewModal({ open: true, id, data: res.data });
+        } catch (err) {
+            toast.error('Failed to load enquiry details');
+        }
+    };
+
+    const handleAddFollowUp = async (e) => {
+        e.preventDefault();
+        if (!newNote.trim()) {
+            toast.error('Follow-up note cannot be empty');
+            return;
+        }
+
+        setAddingFollowUp(true);
+        try {
+            const currentHistory = viewModal.data.followUpHistory || [];
+            const updatedHistory = [
+                ...currentHistory,
+                {
+                    note: newNote,
+                    actionType: newActionType,
+                    date: new Date()
+                }
+            ];
+
+            const payload = {
+                ...viewModal.data,
+                followUpHistory: updatedHistory
+            };
+
+            // Normalize payload fields for save
+            if (payload.customerId && typeof payload.customerId === 'object') {
+                payload.customerId = payload.customerId._id;
+            }
+            if (payload.assignedTo && typeof payload.assignedTo === 'object') {
+                payload.assignedTo = payload.assignedTo._id;
+            } else if (payload.assignedTo === '') {
+                delete payload.assignedTo;
+            }
+
+            payload.items = (payload.items || []).map(item => {
+                const cleaned = { ...item };
+                if (cleaned.finalVendor && typeof cleaned.finalVendor === 'object') {
+                    cleaned.finalVendor = cleaned.finalVendor._id;
+                } else if (cleaned.finalVendor === '') {
+                    delete cleaned.finalVendor;
+                }
+                cleaned.vendors = (cleaned.vendors || []).map(v => (v && typeof v === 'object') ? v._id : v).filter(Boolean);
+                cleaned.vendorQuotes = (cleaned.vendorQuotes || []).map(vq => ({
+                    ...vq,
+                    vendorId: (vq.vendorId && typeof vq.vendorId === 'object') ? vq.vendorId._id : vq.vendorId
+                })).filter(vq => vq.vendorId);
+                return cleaned;
+            });
+
+            await enquiryService.update(viewModal.id, payload);
+            toast.success('Follow-up entry added successfully');
+
+            const refreshed = await enquiryService.getById(viewModal.id);
+            setViewModal(prev => ({ ...prev, data: refreshed.data }));
+            setNewNote('');
+            fetchEnquiries();
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Failed to add follow-up entry');
+        } finally {
+            setAddingFollowUp(false);
         }
     };
 
@@ -103,7 +180,7 @@ const Enquiries = () => {
     };
 
     const filteredEnquiries = useMemo(() => {
-        return enquiries.filter(e => {
+        const filtered = enquiries.filter(e => {
             // General text match
             const matchesSearch = 
                 e.enquiryNo.toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
@@ -129,6 +206,11 @@ const Enquiries = () => {
 
             return matchesSearch && matchesStatus && matchesFollowUp && matchesProb && matchesProduct && matchesVendor;
         });
+
+        // Sort by enquiryNo descending (e.g., 8 at top, 1 at bottom)
+        return filtered.sort((a, b) => {
+            return String(b.enquiryNo || '').localeCompare(String(a.enquiryNo || ''), undefined, { numeric: true, sensitivity: 'base' });
+        });
     }, [enquiries, filters]);
 
     const wonCount = enquiries.filter(e => e.status === 'PO Received' || e.status === 'Finalized').length;
@@ -140,10 +222,10 @@ const Enquiries = () => {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div>
                     <h1 className="text-4xl font-black text-slate-900 tracking-tight flex items-center gap-3">
-                        Lead Management
+                        Enquiry Register
                         <span className="text-sm font-bold bg-slate-100 text-slate-500 px-3 py-1 rounded-full">{filteredEnquiries.length}</span>
                     </h1>
-                    <p className="text-slate-500 font-medium mt-1">Track enquiries from lead to conversion</p>
+                    <p className="text-slate-500 font-medium mt-1">Track and manage enquiries from creation to closure</p>
                 </div>
                 <div className="flex gap-3 flex-col sm:flex-row">
                     <button
@@ -154,13 +236,13 @@ const Enquiries = () => {
                         Analytics
                     </button>
                     <button
-                        onClick={() => setEnquiryModal({ open: true, id: null })}
+                        onClick={() => navigate('/enquiries/create')}
                         className="group px-8 py-4 bg-primary-600 text-white rounded-[2rem] font-black uppercase text-[10px] tracking-widest hover:bg-primary-700 transition-all shadow-xl shadow-primary-600/20 active:scale-95 flex items-center gap-3"
                     >
                         <div className="h-6 w-6 rounded-full bg-white/20 flex items-center justify-center group-hover:rotate-90 transition-transform">
                             <MdAdd size={20} />
                         </div>
-                        New Lead Entry
+                        New Enquiry
                     </button>
                 </div>
             </div>
@@ -285,7 +367,7 @@ const Enquiries = () => {
                             <tr className="bg-slate-50/50">
                                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Enquiry No</th>
                                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 min-w-[180px]">Customer & Date</th>
-                                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Items (Vendors Cited)</th>
+                                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Items / Partners</th>
                                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 min-w-[150px]">Stats</th>
                                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Status</th>
                                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 text-center">Actions</th>
@@ -317,7 +399,7 @@ const Enquiries = () => {
                                                 </div>
                                                 <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-tighter">
                                                     <MdEventAvailable size={14} />
-                                                    {new Date(e.enquiryDate).toLocaleDateString()}
+                                                    {formatDate(e.enquiryDate)}
                                                 </div>
                                             </div>
                                         </td>
@@ -325,14 +407,17 @@ const Enquiries = () => {
                                             <div className="flex flex-col gap-1">
                                                 {e.items.slice(0, 2).map((item, i) => (
                                                     <div key={i} className="text-xs font-bold text-slate-700 truncate max-w-[200px]">
-                                                        • {item.productName} 
+                                                        • {item.productName || item.productId?.productName || 'Unnamed Product'} 
                                                         <span className="text-[9px] text-slate-400 ml-1">
-                                                            ({item.finalVendor ? 1 : item.vendors.length} vend)
+                                                        ({item.finalVendor ? 1 : item.vendors.length} vend)
                                                         </span>
                                                     </div>
                                                 ))}
                                                 {e.items.length > 2 && (
                                                     <span className="text-[10px] font-bold text-primary-500">+{e.items.length - 2} more items</span>
+                                                )}
+                                                {Array.isArray(e.partners) && e.partners.length > 0 && (
+                                                    <span className="text-[10px] font-black text-teal-600 uppercase tracking-wider">{e.partners.length} partner{e.partners.length > 1 ? 's' : ''}</span>
                                                 )}
                                             </div>
                                         </td>
@@ -345,7 +430,7 @@ const Enquiries = () => {
                                                 {e.followUpDate && (
                                                     <div className="flex items-center gap-2 text-[10px] font-bold text-slate-600">
                                                         <span className="w-16">Follow-up:</span> 
-                                                        <span className="text-slate-900">{new Date(e.followUpDate).toLocaleDateString()}</span>
+                                                        <span className="text-slate-900">{formatDate(e.followUpDate)}</span>
                                                     </div>
                                                 )}
                                             </div>
@@ -356,7 +441,14 @@ const Enquiries = () => {
                                         <td className="px-6 py-4">
                                             <div className="flex items-center justify-center gap-2">
                                                 <button
-                                                    onClick={() => setEnquiryModal({ open: true, id: e._id })}
+                                                    onClick={() => handleOpenViewModal(e._id)}
+                                                    className="p-2 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all"
+                                                    title="View Enquiry"
+                                                >
+                                                    <MdVisibility size={18} />
+                                                </button>
+                                                <button
+                                                    onClick={() => navigate(`/enquiries/edit/${e._id}`)}
                                                     className="p-2 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all"
                                                     title="Edit Enquiry"
                                                 >
@@ -376,7 +468,7 @@ const Enquiries = () => {
                             ) : (
                                 <tr>
                                     <td colSpan="6" className="px-8 py-20 text-center text-slate-400 font-bold">
-                                        No leads found matching your search.
+                                        No enquiries found matching your search.
                                     </td>
                                 </tr>
                             )}
@@ -389,10 +481,10 @@ const Enquiries = () => {
             <Modal
                 isOpen={deleteModal.open}
                 onClose={() => setDeleteModal({ open: false, id: null })}
-                title="Remove Lead Entry"
+                title="Delete Enquiry"
             >
                 <div className="space-y-6">
-                    <p className="text-slate-600 font-medium">Are you sure you want to remove this lead? This action cannot be undone.</p>
+                    <p className="text-slate-600 font-medium">Are you sure you want to delete this enquiry from the register? This action cannot be undone.</p>
                     <div className="flex gap-3">
                         <button
                             onClick={() => setDeleteModal({ open: false, id: null })}
@@ -410,17 +502,204 @@ const Enquiries = () => {
                 </div>
             </Modal>
 
-            {/* Create/Edit Enquiry Modal */}
-            {enquiryModal.open && (
-                <CreateEnquiry 
-                    id={enquiryModal.id} 
-                    isOpen={enquiryModal.open} 
-                    onClose={() => {
-                        setEnquiryModal({ open: false, id: null });
-                        fetchEnquiries();
-                    }} 
-                />
+            {/* View Enquiry Modal */}
+            {viewModal.open && viewModal.data && (
+                <Modal
+                    isOpen={viewModal.open}
+                    onClose={() => setViewModal({ open: false, id: null, data: null })}
+                    title={`Enquiry Details: ${viewModal.data.enquiryNo}`}
+                    maxWidth="max-w-[95vw] md:max-w-7xl"
+                >
+                    <div className="space-y-8 animate-in fade-in duration-300">
+                        {/* Summary Header */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 p-6 bg-slate-50 border border-slate-100 rounded-3xl">
+                            <div>
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Customer Name</span>
+                                <span className="text-sm font-black text-slate-900 mt-1 block">{viewModal.data.customerId?.companyName || viewModal.data.customerId?.customerName || 'N/A'}</span>
+                            </div>
+                            <div>
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Enquiry Date</span>
+                                <span className="text-sm font-black text-slate-900 mt-1 block">{formatDate(viewModal.data.enquiryDate)}</span>
+                            </div>
+                            <div>
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Outcome Status</span>
+                                <div className="mt-1 flex"><StatusPill status={viewModal.data.status} /></div>
+                            </div>
+                            <div>
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Closure Probability</span>
+                                <span className="text-sm font-black text-slate-900 mt-1 block">{viewModal.data.probability || 0}%</span>
+                            </div>
+                        </div>
+
+                        {/* Details Grid */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                            {/* Left Side: General Info & Items */}
+                            <div className="space-y-6">
+                                {/* Customer Card */}
+                                <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
+                                    <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 pb-3 mb-4 flex items-center gap-2">
+                                        <MdPerson className="text-primary-600" size={16} /> Customer Details
+                                    </h3>
+                                    <div className="grid grid-cols-2 gap-4 text-xs font-medium">
+                                        <div>
+                                            <span className="text-slate-400 block">Contact Person</span>
+                                            <span className="text-slate-900 font-bold">{viewModal.data.customerId?.customerName || 'N/A'}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-slate-400 block">GSTIN</span>
+                                            <span className="text-slate-900 font-bold">{viewModal.data.customerId?.gstin || 'N/A'}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-slate-400 block">Mobile Phone</span>
+                                            <span className="text-slate-900 font-bold">{viewModal.data.customerId?.mobile || 'N/A'}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-slate-400 block">Email Address</span>
+                                            <span className="text-slate-900 font-bold">{viewModal.data.customerId?.email || 'N/A'}</span>
+                                        </div>
+                                        {viewModal.data.customerId?.billingAddress && (
+                                            <div className="col-span-2 border-t border-slate-50 pt-2">
+                                                <span className="text-slate-400 block">Billing Address</span>
+                                                <span className="text-slate-800 font-semibold">
+                                                    {viewModal.data.customerId.billingAddress.line1}, {viewModal.data.customerId.billingAddress.line2 || ''} {viewModal.data.customerId.billingAddress.city}, {viewModal.data.customerId.billingAddress.state} - {viewModal.data.customerId.billingAddress.pincode}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {Array.isArray(viewModal.data.partners) && viewModal.data.partners.length > 0 && (
+                                    <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
+                                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 pb-3 mb-4 flex items-center gap-2">
+                                            <MdPerson className="text-teal-600" size={16} /> Partner Details
+                                        </h3>
+                                        <div className="space-y-3">
+                                            {viewModal.data.partners.map((partner, idx) => (
+                                                <div key={idx} className="grid grid-cols-1 md:grid-cols-2 gap-3 p-4 bg-slate-50 border border-slate-100 rounded-2xl text-xs">
+                                                    <div>
+                                                        <span className="text-slate-400 block">Partner</span>
+                                                        <span className="text-slate-900 font-bold">{partner.name || 'N/A'}</span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-slate-400 block">Contact Person</span>
+                                                        <span className="text-slate-900 font-bold">{partner.contactPerson || 'N/A'}</span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-slate-400 block">Mobile</span>
+                                                        <span className="text-slate-900 font-bold">{partner.mobile || 'N/A'}</span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-slate-400 block">Email</span>
+                                                        <span className="text-slate-900 font-bold">{partner.email || 'N/A'}</span>
+                                                    </div>
+                                                    {partner.notes && (
+                                                        <div className="md:col-span-2">
+                                                            <span className="text-slate-400 block">Notes</span>
+                                                            <span className="text-slate-900 font-bold">{partner.notes}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Items Card */}
+                                <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
+                                    <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 pb-3 mb-4 flex items-center gap-2">
+                                        <MdReceiptLong className="text-orange-600" size={16} /> Enquiry Items
+                                    </h3>
+                                    <div className="space-y-4 max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar">
+                                        {viewModal.data.items?.map((item, idx) => (
+                                            <div key={idx} className="p-4 bg-slate-50 border border-slate-100 rounded-2xl space-y-3">
+                                                <div className="flex justify-between items-start gap-4">
+                                                    <div>
+                                                        <h4 className="text-xs font-black text-slate-900">{item.productName || item.productId?.productName || 'Unnamed Product'}</h4>
+                                                        <p className="text-[10px] font-bold text-slate-500 mt-1">Qty: {item.quantity} {item.uom}</p>
+                                                    </div>
+                                                    <ActionStatusPill status={item.actionStatus} />
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-2 text-[10px] font-medium border-t border-slate-200/60 pt-2">
+                                                    <div>
+                                                        <span className="text-slate-400 block">Final Vendor Selection</span>
+                                                        <span className="text-emerald-700 font-bold">{item.finalVendor?.name || 'Pending Selection'}</span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-slate-400 block">Assigned Salesman</span>
+                                                        <span className="text-slate-700 font-bold">{item.salespersonName || 'Unassigned'}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Right Side: Follow-up Section */}
+                            <div className="space-y-6">
+                                <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm flex flex-col max-h-[85vh]">
+                                    <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 pb-3 mb-4 flex items-center gap-2">
+                                        <MdStar className="text-purple-600" size={16} /> Follow-Up Logs & Add Entry
+                                    </h3>
+
+                                    {/* Action Form */}
+                                    <form onSubmit={handleAddFollowUp} className="bg-slate-50 border border-slate-100 p-4 rounded-2xl space-y-3 mb-4">
+                                        <div className="flex gap-2">
+                                            <select
+                                                value={newActionType}
+                                                onChange={(e) => setNewActionType(e.target.value)}
+                                                className="px-3 py-2 bg-white border border-slate-200 rounded-xl outline-none text-xs font-bold text-slate-700"
+                                            >
+                                                <option value="Call">Call</option>
+                                                <option value="Email">Email</option>
+                                                <option value="Visit">Visit</option>
+                                                <option value="Meeting">Meeting</option>
+                                                <option value="Other">Other</option>
+                                            </select>
+                                            <span className="text-[10px] font-bold text-slate-400 self-center">Record client interaction details</span>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="text"
+                                                placeholder="What was discussed with the client?"
+                                                value={newNote}
+                                                onChange={(e) => setNewNote(e.target.value)}
+                                                className="flex-1 px-4 py-2 bg-white border border-slate-200 rounded-xl outline-none text-xs font-bold text-slate-700"
+                                                required
+                                            />
+                                            <button
+                                                type="submit"
+                                                disabled={addingFollowUp}
+                                                className="px-4 py-2 bg-primary-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-primary-700 transition-all shadow-md shadow-primary-600/10"
+                                            >
+                                                {addingFollowUp ? 'Adding...' : 'Add'}
+                                            </button>
+                                        </div>
+                                    </form>
+
+                                    {/* History list */}
+                                    <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-3 max-h-[35vh]">
+                                        {(!viewModal.data.followUpHistory || viewModal.data.followUpHistory.length === 0) ? (
+                                            <p className="text-xs font-bold text-slate-400 bg-slate-50/50 p-4 rounded-2xl border border-dashed border-slate-200 text-center">No follow-up entries recorded yet.</p>
+                                        ) : (
+                                            viewModal.data.followUpHistory.slice().reverse().map((log, idx) => (
+                                                <div key={idx} className="bg-slate-50 border border-slate-100 p-4 rounded-2xl flex flex-col gap-2">
+                                                    <div className="flex justify-between items-center">
+                                                        <span className="px-2 py-0.5 bg-white text-[9px] font-black text-slate-600 rounded-md border border-slate-100 uppercase tracking-wider">{log.actionType}</span>
+                                                        <span className="text-[9px] font-bold text-slate-400">{new Date(log.date).toLocaleString()}</span>
+                                                    </div>
+                                                    <p className="text-xs text-slate-700 font-bold leading-relaxed">{log.note}</p>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </Modal>
             )}
+
         </div>
     );
 };

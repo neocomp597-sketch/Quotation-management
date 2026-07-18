@@ -1,23 +1,45 @@
 import React, { useState, useEffect } from 'react';
 import { MdAdd, MdSearch, MdFilterList, MdVisibility, MdDescription, MdDownload, MdPictureAsPdf, MdDelete, MdEdit, MdCheckCircle, MdReceipt } from 'react-icons/md';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { quotationService } from '../services/api';
+import { quotationService, territoryService } from '../services/api';
 import { formatDate, resolveImageUrl, fetchPdfImageBase64 } from '../utils/helpers';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import QuotationPDF from '../components/QuotationPDF';
 import Modal from '../components/Modal';
+import PaginationControls from '../components/PaginationControls';
+
+const LIST_PAGE_SIZE = 20;
 
 const Quotations = () => {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const statusFilter = searchParams.get('status');
     const [quotations, setQuotations] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedQuotation, setSelectedQuotation] = useState(null);
     const [pdfImages, setPdfImages] = useState({});
     const [isPreviewOpen, setIsPreviewOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
+    const [page, setPage] = useState(1);
+    const [pagination, setPagination] = useState({ page: 1, limit: LIST_PAGE_SIZE, total: 0, pages: 1 });
     const [pdfFormat, setPdfFormat] = useState('format1');
     const [companySettings, setCompanySettings] = useState(null);
+    const [territories, setTerritories] = useState([]);
+    const [selectedTerritory, setSelectedTerritory] = useState('');
+
+    useEffect(() => {
+        const fetchTerritories = async () => {
+            try {
+                const res = await territoryService.getAll();
+                setTerritories(res.data || []);
+            } catch (err) {
+                console.error("Error fetching territories:", err);
+            }
+        };
+        fetchTerritories();
+    }, []);
 
     useEffect(() => {
         if (!selectedQuotation) return;
@@ -56,9 +78,25 @@ const Quotations = () => {
     }, [selectedQuotation]);
 
     useEffect(() => {
-        fetchQuotations();
         fetchCompanySettings();
     }, []);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(searchTerm.trim());
+            setPage(1);
+        }, 300);
+
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
+
+    useEffect(() => {
+        setPage(1);
+    }, [statusFilter]);
+
+    useEffect(() => {
+        fetchQuotations();
+    }, [page, debouncedSearch, statusFilter, selectedTerritory]);
 
     const fetchCompanySettings = async () => {
         try {
@@ -71,9 +109,23 @@ const Quotations = () => {
     };
 
     const fetchQuotations = async () => {
+        setLoading(true);
         try {
-            const res = await quotationService.getAll();
-            setQuotations(res.data);
+            const res = await quotationService.getAll({
+                page,
+                limit: LIST_PAGE_SIZE,
+                search: debouncedSearch || undefined,
+                status: statusFilter || undefined,
+                territory: selectedTerritory || undefined,
+            });
+            const payload = res.data;
+            setQuotations(Array.isArray(payload) ? payload : payload.data || []);
+            setPagination(payload.pagination || {
+                page: 1,
+                limit: LIST_PAGE_SIZE,
+                total: Array.isArray(payload) ? payload.length : 0,
+                pages: 1,
+            });
         } catch (err) {
             console.error("Error fetching quotations:", err);
         } finally {
@@ -121,8 +173,8 @@ const Quotations = () => {
     const handleMarkAsOrdered = async (id) => {
         if (window.confirm("Mark this quotation as ORDERED? This will reflect in your sales reports.")) {
             try {
-                // Update status to 'ordered'
-                await quotationService.update(id, { status: 'ordered' });
+                // Update status to 'ordered' using dedicated status endpoint
+                await quotationService.updateStatus(id, 'ordered');
                 toast.success('Quotation marked as ORDERED!');
                 fetchQuotations();
             } catch (err) {
@@ -132,17 +184,40 @@ const Quotations = () => {
         }
     };
 
-    const filteredQuotations = quotations.filter(q =>
-        q.quotationNo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        q.customerId?.companyName?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredQuotations = quotations;
+
+    const getPageHeader = () => {
+        switch (statusFilter) {
+            case 'pending_approval':
+                return {
+                    title: 'Pending Quotations',
+                    desc: 'Review and approve quotations waiting for margin clearance or high-value threshold checks.'
+                };
+            case 'final':
+                return {
+                    title: 'Approved Quotations',
+                    desc: 'View all finalized and approved trade quotations ready for sales orders.'
+                };
+            case 'rejected':
+                return {
+                    title: 'Rejected Quotations',
+                    desc: 'View all trade quotations that have been rejected.'
+                };
+            default:
+                return {
+                    title: 'Quotation Register',
+                    desc: 'Manage and track your professional trade quotations.'
+                };
+        }
+    };
+    const headerDetails = getPageHeader();
 
     return (
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-black text-slate-900 tracking-tight">ARCRM Sales</h1>
-                    <p className="text-slate-500 font-medium">Manage and track your professional trade quotations.</p>
+                    <h1 className="text-3xl font-black text-slate-900 tracking-tight">{headerDetails.title}</h1>
+                    <p className="text-slate-500 font-medium">{headerDetails.desc}</p>
                 </div>
                 <Link
                     to="/quotations/new"
@@ -153,8 +228,8 @@ const Quotations = () => {
                 </Link>
             </div>
 
-            <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
-                <div className="p-6 border-b border-slate-50 flex flex-col md:flex-row gap-4 items-center bg-slate-50/30">
+            <div className="mobile-master-shell bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
+                <div className="mobile-master-toolbar p-6 border-b border-slate-50 flex flex-col md:flex-row gap-4 items-center bg-slate-50/30 w-full">
                     <div className="relative flex-1 w-full text-slate-400 focus-within:text-primary-600 transition-colors">
                         <MdSearch className="absolute left-4 top-1/2 -translate-y-1/2" size={20} />
                         <input
@@ -165,26 +240,70 @@ const Quotations = () => {
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
                     </div>
+                    <div className="w-full md:w-64">
+                        <select
+                            value={selectedTerritory}
+                            onChange={(e) => {
+                                setSelectedTerritory(e.target.value);
+                                setPage(1);
+                            }}
+                            className="w-full px-4 py-3.5 bg-white border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-bold text-slate-900 transition-all shadow-sm"
+                        >
+                            <option value="">All Territories</option>
+                            {territories.map(t => (
+                                <option key={t._id} value={t._id}>{t.name} ({t.type})</option>
+                            ))}
+                        </select>
+                    </div>
                 </div>
 
                 <div>
                     {loading ? (
-                        <div className="p-20 text-center">
-                            <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-primary-500 border-t-transparent mb-4"></div>
-                            <p className="text-slate-400 font-black uppercase tracking-widest text-xs">Syncing Quotation Data...</p>
+                        <div className="hidden md:block">
+                            <table className="w-full text-left">
+                                <thead className="bg-slate-50 text-slate-400 text-[10px] uppercase font-black tracking-widest border-b border-slate-100">
+                                    <tr>
+                                        <th className="px-8 py-5">Ref Number</th>
+                                        <th className="px-8 py-5">Customer Info</th>
+                                        <th className="px-8 py-5">Validity</th>
+                                        <th className="px-8 py-5 text-right">Net Amount</th>
+                                        <th className="px-8 py-5 text-center">Status</th>
+                                        <th className="px-8 py-5 text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-50">
+                                    {[...Array(5)].map((_, i) => (
+                                        <tr key={i} className="animate-pulse">
+                                            <td className="px-8 py-5"><div className="space-y-2"><div className="h-3.5 w-28 bg-slate-200 rounded" /><div className="h-2.5 w-20 bg-slate-100 rounded" /></div></td>
+                                            <td className="px-8 py-5"><div className="space-y-2"><div className="h-3.5 w-36 bg-slate-200 rounded" /><div className="h-2.5 w-24 bg-slate-100 rounded" /></div></td>
+                                            <td className="px-8 py-5"><div className="h-3 w-24 bg-slate-200 rounded" /></td>
+                                            <td className="px-8 py-5 text-right"><div className="h-5 w-24 bg-slate-200 rounded ml-auto" /></td>
+                                            <td className="px-8 py-5"><div className="flex justify-center"><div className="h-6 w-16 bg-slate-200 rounded-xl" /></div></td>
+                                            <td className="px-8 py-5"><div className="flex justify-end gap-2">{[...Array(4)].map((_, j) => <div key={j} className="h-9 w-9 bg-slate-100 rounded-xl" />)}</div></td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
                         </div>
                     ) : (
                         <>
                             {/* Mobile Card View */}
                             <div className="md:hidden p-4 space-y-4 bg-slate-50/50">
                                 {filteredQuotations.map((q) => (
-                                    <div key={q._id} className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                                    <div key={q._id} className="mobile-master-card bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
                                         <div className="p-5 border-b border-slate-50">
                                             <div className="flex justify-between items-start mb-2">
                                                 <div>
                                                     <span className="text-[10px] font-black uppercase tracking-widest text-primary-600 bg-primary-50 px-2 py-1 rounded-md">{q.quotationNo}</span>
                                                     <h3 className="font-bold text-slate-900 mt-2 text-sm">{q.customerId?.companyName}</h3>
-                                                    <p className="text-xs text-slate-400 font-medium">{q.customerId?.customerName}</p>
+                                                    <div className="flex flex-wrap items-center gap-2 mt-1">
+                                                        <p className="text-xs text-slate-400 font-medium">{q.customerId?.customerName}</p>
+                                                        {q.territory && (
+                                                            <span className="px-1.5 py-0.5 bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-md text-[9px] font-black uppercase tracking-wider">
+                                                                {q.territory.name}
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </div>
                                                 <span className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border ${q.status === 'ordered'
                                                     ? 'bg-blue-50 text-blue-600 border-blue-100'
@@ -211,7 +330,7 @@ const Quotations = () => {
                                                 {formatDate(q.quotationDate)}
                                             </div>
                                             <div className="flex gap-1">
-                                                {q.status === 'draft' && (
+                                                {(q.status === 'draft' || q.status === 'rejected') && (
                                                     <>
                                                         <button
                                                             onClick={() => navigate(`/quotations/${q._id}`)}
@@ -252,12 +371,7 @@ const Quotations = () => {
                                                         </button>
                                                     )}
                                                 </PDFDownloadLink>
-                                                <button
-                                                    onClick={() => handleDelete(q._id)}
-                                                    className="p-2 text-slate-400 hover:text-rose-600 hover:bg-white rounded-lg transition-all"
-                                                >
-                                                    <MdDelete size={18} />
-                                                </button>
+
                                             </div>
                                         </div>
                                     </div>
@@ -288,8 +402,17 @@ const Quotations = () => {
                                                     <div className="text-[10px] text-slate-400 font-bold uppercase">{formatDate(q.quotationDate)}</div>
                                                 </td>
                                                 <td className="px-8 py-5">
-                                                    <div className="font-bold text-slate-700">{q.customerId?.companyName}</div>
-                                                    <div className="text-[10px] text-slate-400 font-black uppercase tracking-tighter">{q.customerId?.customerName}</div>
+                                                    <div className="flex items-center gap-3">
+                                                        <div>
+                                                            <div className="font-bold text-slate-700">{q.customerId?.companyName}</div>
+                                                            <div className="text-[10px] text-slate-400 font-black uppercase tracking-tighter">{q.customerId?.customerName}</div>
+                                                        </div>
+                                                        {q.territory && (
+                                                            <span className="px-2 py-0.5 bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-lg text-[9px] font-black uppercase tracking-widest whitespace-nowrap">
+                                                                {q.territory.name}
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </td>
                                                 <td className="px-8 py-5">
                                                     <div className="text-xs font-bold text-rose-500 uppercase tracking-tighter flex items-center gap-1">
@@ -314,7 +437,7 @@ const Quotations = () => {
                                                 </td>
                                                 <td className="px-8 py-5 text-right">
                                                     <div className="flex items-center justify-end gap-2">
-                                                        {q.status === 'draft' && (
+                                                        {(q.status === 'draft' || q.status === 'rejected') && (
                                                             <>
                                                                 <button
                                                                     onClick={() => navigate(`/quotations/${q._id}`)}
@@ -374,13 +497,7 @@ const Quotations = () => {
                                                             )}
                                                         </PDFDownloadLink>
 
-                                                        <button
-                                                            onClick={() => handleDelete(q._id)}
-                                                            className="p-2.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
-                                                            title="Purge Record"
-                                                        >
-                                                            <MdDelete size={18} />
-                                                        </button>
+
                                                     </div>
                                                 </td>
                                             </tr>
@@ -393,6 +510,7 @@ const Quotations = () => {
                                     </tbody>
                                 </table>
                             </div>
+                            <PaginationControls pagination={pagination} onPageChange={setPage} />
                         </>
                     )}
                 </div>

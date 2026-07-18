@@ -1,6 +1,6 @@
 import React from 'react';
 import { Page, Text, View, Document, StyleSheet, Image, Font } from '@react-pdf/renderer';
-import { resolveImageUrl } from '../utils/helpers';
+import { formatDate, resolveImageUrl } from '../utils/helpers';
 
 const styles = StyleSheet.create({
     page: { padding: 30, fontFamily: 'Helvetica', fontSize: 9, color: '#000', backgroundColor: '#ffffff' },
@@ -92,7 +92,7 @@ const styles = StyleSheet.create({
     f2LogoBox: { width: '20%', padding: 5, justifyContent: 'center', alignItems: 'flex-start' },
     f2CenterBox: { width: '60%', paddingVertical: 10, paddingHorizontal: 5, alignItems: 'center', justifyContent: 'center' },
     f2RightBox: { width: '20%', justifyContent: 'center', alignItems: 'flex-end', paddingRight: 10 },
-    f2Divider: { width: 3, height: 45, backgroundColor: '#0d9488', marginRight: 8 }, // Teal divider
+    f2Divider: { width: 3, height: 45, backgroundColor: '#0d9488', marginRight: 8 },
 
     // Typography
     f2CompanyName: { fontSize: 13, fontWeight: 'bold', color: '#000', textTransform: 'uppercase', marginBottom: 2, textAlign: 'center' },
@@ -102,8 +102,8 @@ const styles = StyleSheet.create({
 
     // Right Side Title
     f2TitleBlock: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end' },
-    f2TitleSub: { fontSize: 8, color: '#666', textAlign: 'right', marginBottom: 0 },
-    f2TitleMain: { fontSize: 15, fontWeight: 'bold', color: '#0d9488', textTransform: 'uppercase' }, // Teal Title
+    f2TitleSub: { fontSize: 8, color: '#666', textAlign: 'right', marginBottom: 2, textTransform: 'uppercase' },
+    f2TitleMain: { fontSize: 13, fontWeight: 'bold', color: '#0d9488', textTransform: 'uppercase', lineHeight: 1.2 },
 
     // Middle Grid
     f2Grid: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#000' },
@@ -112,7 +112,7 @@ const styles = StyleSheet.create({
 
     // Section Headers (Bill To / Ship To)
     f2SectionHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
-    f2SectionBar: { width: 3, height: 10, backgroundColor: '#0d9488', marginRight: 5 }, // Teal Bar
+    f2SectionBar: { width: 3, height: 10, backgroundColor: '#0d9488', marginRight: 5 },
     f2SectionTitle: { fontSize: 8, fontWeight: 'bold', color: '#0d9488', textTransform: 'uppercase' },
 
     // Content Rows
@@ -125,6 +125,23 @@ const styles = StyleSheet.create({
     f2IRNBox: { padding: 6, flexDirection: 'row' },
     qrCodeImage: { width: 60, height: 60, marginTop: 10, alignSelf: 'center' },
 });
+
+const GST_STATE_CODES = {
+    'JAMMU AND KASHMIR': '01', 'HIMACHAL PRADESH': '02', 'PUNJAB': '03', 'CHANDIGARH': '04',
+    'UTTARAKHAND': '05', 'HARYANA': '06', 'DELHI': '07', 'RAJASTHAN': '08', 'UTTAR PRADESH': '09',
+    'BIHAR': '10', 'SIKKIM': '11', 'ARUNACHAL PRADESH': '12', 'NAGALAND': '13', 'MANIPUR': '14',
+    'MIZORAM': '15', 'TRIPURA': '16', 'MEGHALAYA': '17', 'ASSAM': '18', 'WEST BENGAL': '19',
+    'JHARKHAND': '20', 'ODISHA': '21', 'CHHATTISGARH': '22', 'MADHYA PRADESH': '23', 'GUJARAT': '24',
+    'MAHARASHTRA': '27', 'ANDHRA PRADESH': '37', 'KARNATAKA': '29', 'GOA': '30', 'KERALA': '32',
+    'TAMIL NADU': '33', 'TELANGANA': '36'
+};
+
+const getStateCode = (stateName) => {
+    if (!stateName) return '-';
+    const s = String(stateName).trim().toUpperCase();
+    if (/^\d{2}$/.test(s)) return s;
+    return GST_STATE_CODES[s] || '27';
+};
 
 const QuotationPDF = ({ quotation, format = 'format1', images = {}, companySettings: passedSettings }) => {
     console.log("PDF RENDERING: ", format); // DEBUG LOG
@@ -139,8 +156,39 @@ const QuotationPDF = ({ quotation, format = 'format1', images = {}, companySetti
         return images[url] || resolveImageUrl(url);
     };
 
-    // Group items by site
-    const groupedItems = items.reduce((acc, item) => {
+    // Normalize items to ensure all fields exist regardless of model type (Quotation or Voucher/Invoice)
+    const normalizedItems = items.map(item => {
+        const qty = item.quantity ?? item.qty ?? 1;
+        const rate = item.rate ?? item.unitPrice ?? item.price ?? 0;
+        const discPercent = item.discountPercent ?? item.discount ?? 0;
+        const taxable = item.taxableAmount ?? (qty * rate * (1 - discPercent / 100));
+        const gstPct = item.productSnapshot?.gstPercentage ?? item.productId?.gstPercentage ?? item.gstPercentage ?? item.taxPercentage ?? 18;
+        const gstAmt = item.gstAmount ?? item.taxAmount ?? (taxable * (gstPct / 100));
+        const total = item.lineTotal ?? (item.amount ? item.amount + (item.taxAmount || 0) : null) ?? (taxable + gstAmt);
+        const name = item.productSnapshot?.productName || item.productId?.productName || item.productName || item.customProductName || 'Product Item';
+        const code = item.productSnapshot?.productCode || item.productId?.productCode || item.productCode || '';
+        const hsn = item.productSnapshot?.hsnCode || item.productId?.hsnCode || item.hsnCode || item.hsn || '-';
+        const uom = item.productSnapshot?.uom || item.productId?.uom || item.uom || 'pcs';
+        const imgUrl = item.productSnapshot?.productImageUrl || item.productId?.productImageUrl || item.productImageUrl;
+
+        return {
+            ...item,
+            quantity: qty,
+            rate: rate,
+            discountPercent: discPercent,
+            taxableAmount: taxable,
+            gstAmount: gstAmt,
+            lineTotal: total,
+            productName: name,
+            productCode: code,
+            hsnCode: hsn,
+            uom: uom,
+            imageUrl: imgUrl
+        };
+    });
+
+    // Group normalized items by site
+    const groupedItems = normalizedItems.reduce((acc, item) => {
         const siteKey = item.siteId?._id || 'other';
         const siteName = item.siteId?.siteName || 'General Items';
         if (!acc[siteKey]) acc[siteKey] = { name: siteName, items: [], subtotal: 0, gst: 0, total: 0 };
@@ -150,6 +198,12 @@ const QuotationPDF = ({ quotation, format = 'format1', images = {}, companySetti
         acc[siteKey].total += item.lineTotal;
         return acc;
     }, {});
+
+    const calcSubtotal = quotation.subtotal ?? normalizedItems.reduce((sum, i) => sum + (i.rate * i.quantity), 0);
+    const calcGst = quotation.gstBreakup
+        ? ((quotation.gstBreakup.cgst || 0) + (quotation.gstBreakup.sgst || 0) + (quotation.gstBreakup.igst || 0))
+        : (quotation.totalTax ?? normalizedItems.reduce((sum, i) => sum + i.gstAmount, 0));
+    const calcGrandTotal = quotation.grandTotal ?? (calcSubtotal + calcGst + (quotation.roundOff || 0));
 
     // Build company address string
     const getCompanyAddressString = () => {
@@ -161,11 +215,8 @@ const QuotationPDF = ({ quotation, format = 'format1', images = {}, companySetti
 
     // Get terms content
     const getTermsContent = () => {
-        // First check for custom terms on the quotation
         if (quotation.customTerms) return quotation.customTerms;
-        // Then check for populated terms template
         if (quotation.termsTemplateId?.content) return quotation.termsTemplateId.content;
-        // Finally use company default terms
         if (companySettings?.defaultTerms) return companySettings.defaultTerms;
         return null;
     };
@@ -204,16 +255,16 @@ const QuotationPDF = ({ quotation, format = 'format1', images = {}, companySetti
                                 </View>
                                 <View style={styles.qtnMetaRow}>
                                     <Text style={styles.qtnMetaLabel}>Date</Text>
-                                    <Text style={styles.qtnMetaValue}>{new Date(quotation.quotationDate).toLocaleDateString('en-GB')}</Text>
+                                    <Text style={styles.qtnMetaValue}>{formatDate(quotation.quotationDate)}</Text>
                                 </View>
                                 <View style={[styles.qtnMetaRow, { borderBottomWidth: 0 }]}>
                                     <Text style={styles.qtnMetaLabel}>Valid Till</Text>
-                                    <Text style={styles.qtnMetaValue}>{new Date(quotation.validTill).toLocaleDateString('en-GB')}</Text>
+                                    <Text style={styles.qtnMetaValue}>{formatDate(quotation.validTill)}</Text>
                                 </View>
                             </View>
                         </View>
 
-                        {/* From Company Section - Company Address */}
+                        {/* From Company Section */}
                         {companySettings && (
                             <View style={styles.fromCompanyBox}>
                                 <Text style={styles.fromLabel}>From:</Text>
@@ -241,7 +292,6 @@ const QuotationPDF = ({ quotation, format = 'format1', images = {}, companySetti
                         {/* To Customer Section */}
                         <View style={styles.customerBox}>
                             <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-                                {/* Customer Logo */}
                                 {quotation.customerId?.logoUrl && (
                                     <View style={{ width: 50, height: 50, marginRight: 10, borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 4, padding: 2, backgroundColor: '#fff' }}>
                                         <Image
@@ -329,7 +379,7 @@ const QuotationPDF = ({ quotation, format = 'format1', images = {}, companySetti
                             {/* Right Side Title Block */}
                             <View style={styles.f2RightBox}>
                                 <View style={styles.f2TitleBlock}>
-                                    <View>
+                                    <View style={{ flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'center' }}>
                                         <Text style={styles.f2TitleSub}>Original</Text>
                                         <Text style={styles.f2TitleMain}>Tax Invoice</Text>
                                     </View>
@@ -346,7 +396,9 @@ const QuotationPDF = ({ quotation, format = 'format1', images = {}, companySetti
                                     <View style={styles.f2SectionBar} />
                                     <Text style={styles.f2SectionTitle}>Bill To</Text>
                                 </View>
-                                <Text style={{ fontSize: 9, fontWeight: 'bold', marginBottom: 2, color: '#000' }}>{quotation.customerId?.companyName}</Text>
+                                <Text style={{ fontSize: 9, fontWeight: 'bold', marginBottom: 2, color: '#000' }}>
+                                    {quotation.customerId?.companyName || quotation.customerName || 'Customer'}
+                                </Text>
                                 {quotation.customerId?.billingAddress && (
                                     <Text style={styles.f2AddressText}>
                                         {[
@@ -361,10 +413,10 @@ const QuotationPDF = ({ quotation, format = 'format1', images = {}, companySetti
                                     </Text>
                                 )}
 
-                                <View style={styles.f2Row}><Text style={styles.f2Key}>State Code</Text><Text style={styles.f2Val}>: {quotation.customerId?.billingAddress?.state ? '27' : '-'}</Text></View>
-                                <View style={styles.f2Row}><Text style={styles.f2Key}>GSTIN No</Text><Text style={styles.f2Val}>: {quotation.customerId?.gstin || '-'}</Text></View>
-                                <View style={styles.f2Row}><Text style={styles.f2Key}>Contact Person</Text><Text style={styles.f2Val}>: {quotation.customerId?.customerName || '-'}</Text></View>
-                                <View style={styles.f2Row}><Text style={styles.f2Key}>Mobile No.</Text><Text style={styles.f2Val}>: {quotation.customerId?.mobile || '-'}</Text></View>
+                                <View style={styles.f2Row}><Text style={styles.f2Key}>State Code</Text><Text style={styles.f2Val}>: {getStateCode(quotation.customerId?.billingAddress?.state)}</Text></View>
+                                <View style={styles.f2Row}><Text style={styles.f2Key}>GSTIN No</Text><Text style={styles.f2Val}>: {quotation.customerId?.gstin || quotation.gstin || '-'}</Text></View>
+                                <View style={styles.f2Row}><Text style={styles.f2Key}>Contact Person</Text><Text style={styles.f2Val}>: {quotation.customerId?.contactPerson || quotation.customerId?.contactName || quotation.customerId?.customerName || '-'}</Text></View>
+                                <View style={styles.f2Row}><Text style={styles.f2Key}>Mobile No.</Text><Text style={styles.f2Val}>: {quotation.customerId?.mobile || quotation.customerId?.phone || quotation.contactPhone || '-'}</Text></View>
                             </View>
 
                             {/* Col 2: Ship To */}
@@ -374,7 +426,7 @@ const QuotationPDF = ({ quotation, format = 'format1', images = {}, companySetti
                                     <Text style={styles.f2SectionTitle}>Ship To</Text>
                                 </View>
                                 <Text style={{ fontSize: 9, fontWeight: 'bold', marginBottom: 2, color: '#000' }}>
-                                    {quotation.siteId?.siteName || quotation.customerId?.companyName}
+                                    {quotation.siteId?.siteName || quotation.customerId?.companyName || quotation.customerName}
                                 </Text>
                                 <Text style={styles.f2AddressText}>
                                     {quotation.siteId?.address || (quotation.customerId?.shippingAddress ? [
@@ -387,24 +439,24 @@ const QuotationPDF = ({ quotation, format = 'format1', images = {}, companySetti
                                     {quotation.siteId?.country || 'India'}
                                 </Text>
 
-                                <View style={styles.f2Row}><Text style={styles.f2Key}>State Code</Text><Text style={styles.f2Val}>: {quotation.siteId || quotation.customerId?.shippingAddress ? '27' : '-'}</Text></View>
-                                <View style={styles.f2Row}><Text style={styles.f2Key}>GSTIN No</Text><Text style={styles.f2Val}>: {quotation.customerId?.gstin || '-'}</Text></View>
+                                <View style={styles.f2Row}><Text style={styles.f2Key}>State Code</Text><Text style={styles.f2Val}>: {getStateCode(quotation.siteId?.state || quotation.customerId?.shippingAddress?.state || quotation.customerId?.billingAddress?.state)}</Text></View>
+                                <View style={styles.f2Row}><Text style={styles.f2Key}>GSTIN No</Text><Text style={styles.f2Val}>: {quotation.customerId?.gstin || quotation.gstin || '-'}</Text></View>
                                 <View style={styles.f2Row}><Text style={styles.f2Key}>Ack No</Text><Text style={styles.f2Val}>: {quotation.ackNo || '-'}</Text></View>
-                                <View style={styles.f2Row}><Text style={styles.f2Key}>Ack Date</Text><Text style={styles.f2Val}>: {quotation.ackDate ? new Date(quotation.ackDate).toLocaleDateString('en-GB') : '-'}</Text></View>
+                                <View style={styles.f2Row}><Text style={styles.f2Key}>Ack Date</Text><Text style={styles.f2Val}>: {quotation.ackDate ? formatDate(quotation.ackDate) : '-'}</Text></View>
                             </View>
 
                             {/* Col 3: Invoice Info & QR */}
                             <View style={styles.f2ColLast}>
-                                <View style={styles.f2Row}><Text style={[styles.f2Key, { width: 80 }]}>Invoice Number</Text><Text style={styles.f2Val}>: {quotation.quotationNo}</Text></View>
-                                <View style={styles.f2Row}><Text style={[styles.f2Key, { width: 80 }]}>Invoice Date</Text><Text style={styles.f2Val}>: {new Date(quotation.quotationDate).toLocaleDateString('en-GB')}</Text></View>
-                                <View style={styles.f2Row}><Text style={[styles.f2Key, { width: 80 }]}>Customer Code</Text><Text style={styles.f2Val}>: {quotation.customerId?.code || 'CUST-' + (quotation.customerId?._id?.slice(-4).toUpperCase() || '0000')}</Text></View>
-                                <View style={styles.f2Row}><Text style={[styles.f2Key, { width: 80 }]}>Ref No.</Text><Text style={styles.f2Val}>: {quotation.referenceNo || '-'}</Text></View>
+                                <View style={styles.f2Row}><Text style={[styles.f2Key, { width: 80 }]}>Invoice Number</Text><Text style={styles.f2Val}>: {quotation.invoiceNo || quotation.voucherNumber || quotation.quotationNo || '-'}</Text></View>
+                                <View style={styles.f2Row}><Text style={[styles.f2Key, { width: 80 }]}>Invoice Date</Text><Text style={styles.f2Val}>: {formatDate(quotation.invoiceDate || quotation.date || quotation.quotationDate)}</Text></View>
+                                <View style={styles.f2Row}><Text style={[styles.f2Key, { width: 80 }]}>Customer Code</Text><Text style={styles.f2Val}>: {quotation.customerId?.code || (quotation.customerId?._id ? 'CUST-' + quotation.customerId._id.slice(-4).toUpperCase() : '-')}</Text></View>
+                                <View style={styles.f2Row}><Text style={[styles.f2Key, { width: 80 }]}>Ref No.</Text><Text style={styles.f2Val}>: {quotation.referenceNo || quotation.refNo || '-'}</Text></View>
                                 <View style={styles.f2Row}><Text style={[styles.f2Key, { width: 80 }]}>Payment Terms</Text><Text style={styles.f2Val}>: {quotation.paymentTerms || 'Advance'}</Text></View>
 
-                                {/* QR Code Integration */}
+                                {/* QR Code */}
                                 <View style={{ alignItems: 'center', marginTop: 5 }}>
                                     <Image
-                                        src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(quotation.irnNo || quotation.quotationNo)}`}
+                                        src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(quotation.irnNo || quotation.invoiceNo || quotation.voucherNumber || quotation.quotationNo)}`}
                                         style={{ width: 50, height: 50 }}
                                     />
                                 </View>
@@ -440,58 +492,52 @@ const QuotationPDF = ({ quotation, format = 'format1', images = {}, companySetti
                                     <Text style={styles.groupHeaderText}>{group.name.toUpperCase()}</Text>
                                 </View>
                             )}
-                            {group.items.map((item, idx) => {
-                                const imageUrl = item.productSnapshot?.productImageUrl ||
-                                    item.productId?.productImageUrl ||
-                                    item.productImageUrl;
-
-                                return (
-                                    <View key={idx} style={styles.tableRow}>
-                                        <View style={[styles.tableCell, styles.colNo, styles.cellCenter]}><Text>{idx + 1}</Text></View>
-                                        <View style={[styles.tableCell, styles.colImg, { alignItems: 'center' }]}>
-                                            {imageUrl ? (
-                                                <Image
-                                                    src={resolveImage(imageUrl)}
-                                                    style={{ width: 45, height: 45, objectFit: 'contain' }}
-                                                />
-                                            ) : (
-                                                <View style={{ width: 40, height: 40, backgroundColor: '#f8fafc', borderRadius: 4 }} />
-                                            )}
-                                        </View>
-                                        <View style={[styles.tableCell, styles.colProd]}>
-                                            <Text style={styles.productTitle}>{item.productSnapshot?.productName || item.productId?.productName}</Text>
-                                            <Text style={styles.productSub}>{item.productSnapshot?.productCode || item.productId?.productCode}</Text>
-                                            {(item.vendorName || item.vendorId?.name) ? (
-                                                <Text style={styles.productSub}>Vendor: {item.vendorName || item.vendorId?.name}</Text>
-                                            ) : null}
-                                        </View>
-                                        <View style={[styles.tableCell, styles.colHsn, styles.cellCenter]}><Text>{item.productSnapshot?.hsnCode || item.productId?.hsnCode || '-'}</Text></View>
-                                        <View style={[styles.tableCell, styles.colQty, styles.cellCenter]}>
-                                            <Text>{item.quantity} ({item.productSnapshot?.uom || item.productId?.uom || 'pcs'})</Text>
-                                        </View>
-                                        <View style={[styles.tableCell, styles.colPrice, styles.cellRight]}><Text>{item.rate.toFixed(2)}</Text></View>
-                                        <View style={[styles.tableCell, styles.colDisc, styles.cellCenter]}><Text>{item.discountPercent || 0}%</Text></View>
-                                        <View style={[styles.tableCell, styles.colFinal, styles.cellRight, { borderRightWidth: 0 }]}>
-                                            <Text style={{ fontWeight: 'bold' }}>{item.lineTotal.toFixed(0)}</Text>
-                                        </View>
+                            {group.items.map((item, idx) => (
+                                <View key={idx} style={styles.tableRow}>
+                                    <View style={[styles.tableCell, styles.colNo, styles.cellCenter]}><Text>{idx + 1}</Text></View>
+                                    <View style={[styles.tableCell, styles.colImg, { alignItems: 'center' }]}>
+                                        {item.imageUrl ? (
+                                            <Image
+                                                src={resolveImage(item.imageUrl)}
+                                                style={{ width: 45, height: 45, objectFit: 'contain' }}
+                                            />
+                                        ) : (
+                                            <View style={{ width: 40, height: 40, backgroundColor: '#f8fafc', borderRadius: 4 }} />
+                                        )}
                                     </View>
-                                );
-                            })}
+                                    <View style={[styles.tableCell, styles.colProd]}>
+                                        <Text style={styles.productTitle}>{item.productName}</Text>
+                                        {item.productCode ? <Text style={styles.productSub}>{item.productCode}</Text> : null}
+                                        {(item.vendorName || item.vendorId?.name) ? (
+                                            <Text style={styles.productSub}>Vendor: {item.vendorName || item.vendorId?.name}</Text>
+                                        ) : null}
+                                    </View>
+                                    <View style={[styles.tableCell, styles.colHsn, styles.cellCenter]}><Text>{item.hsnCode}</Text></View>
+                                    <View style={[styles.tableCell, styles.colQty, styles.cellCenter]}>
+                                        <Text>{item.quantity} ({item.uom})</Text>
+                                    </View>
+                                    <View style={[styles.tableCell, styles.colPrice, styles.cellRight]}><Text>{Number(item.rate).toFixed(2)}</Text></View>
+                                    <View style={[styles.tableCell, styles.colDisc, styles.cellCenter]}><Text>{item.discountPercent}%</Text></View>
+                                    <View style={[styles.tableCell, styles.colFinal, styles.cellRight, { borderRightWidth: 0 }]}>
+                                        <Text style={{ fontWeight: 'bold' }}>{Number(item.lineTotal).toFixed(2)}</Text>
+                                    </View>
+                                </View>
+                            ))}
 
                             {/* Group Footer Totals */}
                             {Object.keys(groupedItems).length > 1 && (
                                 <View style={styles.groupTotalSection}>
                                     <View style={styles.groupTotalRow}>
                                         <Text style={styles.groupTotalLabel}>Total Group ({group.name}):</Text>
-                                        <Text style={styles.groupTotalValue}>{group.subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
+                                        <Text style={styles.groupTotalValue}>{(group.subtotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
                                     </View>
                                     <View style={styles.groupTotalRow}>
                                         <Text style={styles.groupTotalLabel}>Total GST ({group.name}):</Text>
-                                        <Text style={styles.groupTotalValue}>{group.gst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
+                                        <Text style={styles.groupTotalValue}>{(group.gst || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
                                     </View>
                                     <View style={styles.groupTotalRow}>
                                         <Text style={styles.groupTotalLabel}>Total (Included GST) ({group.name}):</Text>
-                                        <Text style={styles.groupTotalValue}>{group.total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
+                                        <Text style={styles.groupTotalValue}>{(group.total || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
                                     </View>
                                 </View>
                             )}
@@ -499,25 +545,25 @@ const QuotationPDF = ({ quotation, format = 'format1', images = {}, companySetti
                     ))}
                 </View>
 
-                {/* Final Totals Table-like Summary */}
+                {/* Final Totals Summary */}
                 <View style={styles.summarySection}>
                     <View style={styles.summaryDummy} />
                     <View style={styles.summaryBox}>
                         <View style={styles.summaryRow}>
                             <Text style={styles.summaryLabel}>Total:</Text>
-                            <Text style={styles.summaryValue}>{quotation.subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
+                            <Text style={styles.summaryValue}>{(calcSubtotal).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
                         </View>
                         <View style={styles.summaryRow}>
                             <Text style={styles.summaryLabel}>GST:</Text>
-                            <Text style={styles.summaryValue}>{(quotation.gstBreakup.cgst + quotation.gstBreakup.sgst + quotation.gstBreakup.igst).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
+                            <Text style={styles.summaryValue}>{(calcGst).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
                         </View>
                         <View style={styles.summaryRow}>
                             <Text style={styles.summaryLabel}>Round Off:</Text>
-                            <Text style={styles.summaryValue}>{quotation.roundOff}</Text>
+                            <Text style={styles.summaryValue}>{quotation.roundOff || 0}</Text>
                         </View>
                         <View style={[styles.grandTotalRow, { borderBottomWidth: 0 }]}>
                             <Text style={[styles.summaryLabel, { fontSize: 10 }]}>Grand Total:</Text>
-                            <Text style={{ fontSize: 12, fontWeight: 'bold', width: 80, textAlign: 'right' }}>₹{quotation.grandTotal.toLocaleString('en-IN')}</Text>
+                            <Text style={{ fontSize: 12, fontWeight: 'bold', width: 80, textAlign: 'right' }}>₹{(calcGrandTotal).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
                         </View>
                     </View>
                 </View>
@@ -548,7 +594,7 @@ const QuotationPDF = ({ quotation, format = 'format1', images = {}, companySetti
                             {companySettings.authorizedSignatory.designation && ` (${companySettings.authorizedSignatory.designation})`}
                         </Text>
                     )}
-                    <Text style={styles.signatoryDate}>Date: {new Date().toLocaleDateString('en-GB')}</Text>
+                    <Text style={styles.signatoryDate}>Date: {formatDate(new Date())}</Text>
                 </View>
 
                 <Text style={styles.footer}>

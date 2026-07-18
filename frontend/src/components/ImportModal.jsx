@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { MdCloudUpload, MdDownload, MdDescription, MdClose, MdCheckCircle, MdError } from 'react-icons/md';
 import Modal from './Modal';
 import api from '../services/api';
+import { useSubmitGuard } from '../hooks/useSubmitGuard';
 
 const ImportModal = ({ isOpen, onClose, title, onImport, onDownloadTemplate, type = 'products' }) => {
     const [file, setFile] = useState(null);
@@ -58,7 +59,7 @@ const ImportModal = ({ isOpen, onClose, title, onImport, onDownloadTemplate, typ
         }
     };
 
-    const handleImport = async () => {
+    const { isSubmitting: isImportingGuard, execute: handleImport } = useSubmitGuard(async () => {
         if (!file) return;
 
         setIsImporting(true);
@@ -89,6 +90,9 @@ const ImportModal = ({ isOpen, onClose, title, onImport, onDownloadTemplate, typ
                 message: response.data.message,
                 successCount: response.data.success,
                 failedCount: response.data.failed,
+                createdCount: response.data.created,
+                updatedCount: response.data.updated,
+                skippedCount: response.data.skipped,
                 errors: response.data.errors || []
             });
             setFile(null);
@@ -107,7 +111,7 @@ const ImportModal = ({ isOpen, onClose, title, onImport, onDownloadTemplate, typ
             setIsImporting(false);
             setImportStage('idle');
         }
-    };
+    });
 
     const handleDownloadMissingCodes = async (filename) => {
         try {
@@ -284,112 +288,137 @@ const ImportModal = ({ isOpen, onClose, title, onImport, onDownloadTemplate, typ
                     </div>
                 )}
 
-                {/* Result Section */}
+                {/* Import Results Display */}
                 {result && (
-                    <div className={`rounded-2xl p-4 ${result.success ? 'bg-emerald-50 border border-emerald-100' : 'bg-rose-50 border border-rose-100'}`}>
-                        <div className="flex items-start gap-3">
-                            {result.success ? (
-                                <MdCheckCircle className="text-emerald-600 flex-shrink-0 mt-0.5" size={20} />
-                            ) : (
-                                <MdError className="text-rose-600 flex-shrink-0 mt-0.5" size={20} />
-                            )}
-                            <div className="flex-1">
-                                <p className={`font-bold ${result.success ? 'text-emerald-800' : 'text-rose-800'}`}>
-                                    {result.message}
-                                </p>
-                                {result.success && (
-                                    <p className="text-sm text-emerald-600 mt-1">
-                                        {result.successCount} imported successfully, {result.failedCount} failed
-                                    </p>
-                                )}
-                                {(result.missingCustomerCodes && result.missingCustomerCodes.length > 0) && (
-                                    <div className="mt-3">
-                                        <p className="text-xs text-rose-600 font-bold uppercase tracking-widest mb-1">
-                                            Missing Customer Codes ({result.missingCustomerCodes.length}):
-                                        </p>
-                                        <div className="max-h-24 overflow-y-auto bg-white rounded-lg p-2 border border-rose-200">
-                                            <p className="text-xs font-mono text-rose-700">{result.missingCustomerCodes.slice(0, 10).join(', ')}</p>
-                                            {result.missingCustomerCodes.length > 10 && (
-                                                <p className="text-xs text-rose-500">...and {result.missingCustomerCodes.length - 10} more</p>
-                                            )}
-                                        </div>
-                                        {result.missingCustomerCodesFile && (
-                                            <button
-                                                onClick={() => handleDownloadMissingCodes(result.missingCustomerCodesFile)}
-                                                className="mt-2 flex items-center gap-1 px-3 py-1.5 bg-rose-100 hover:bg-rose-200 rounded-lg text-rose-700 text-xs font-bold transition-all"
-                                            >
-                                                <MdDescription size={14} />
-                                                Download List
-                                            </button>
-                                        )}
-                                    </div>
-                                )}
-                                {(result.missingProductCodes && result.missingProductCodes.length > 0) && (
-                                    <div className="mt-3">
-                                        <p className="text-xs text-rose-600 font-bold uppercase tracking-widest mb-1">
-                                            Missing Product Codes ({result.missingProductCodes.length}):
-                                        </p>
-                                        <div className="max-h-24 overflow-y-auto bg-white rounded-lg p-2 border border-rose-200">
-                                            <p className="text-xs font-mono text-rose-700">{result.missingProductCodes.slice(0, 10).join(', ')}</p>
-                                            {result.missingProductCodes.length > 10 && (
-                                                <p className="text-xs text-rose-500">...and {result.missingProductCodes.length - 10} more</p>
-                                            )}
-                                        </div>
-                                        {result.missingProductCodesFile && (
-                                            <button
-                                                onClick={() => handleDownloadMissingCodes(result.missingProductCodesFile)}
-                                                className="mt-2 flex items-center gap-1 px-3 py-1.5 bg-rose-100 hover:bg-rose-200 rounded-lg text-rose-700 text-xs font-bold transition-all"
-                                            >
-                                                <MdDescription size={14} />
-                                                Download List
-                                            </button>
-                                        )}
-                                    </div>
-                                )}
-                                {(result.missingMgr1Codes && result.missingMgr1Codes.length > 0) && (
-                                    <div className="mt-3">
-                                        <p className="text-xs text-rose-600 font-bold uppercase tracking-widest mb-1">
-                                            Missing MGR 1 Codes ({result.missingMgr1Codes.length}):
-                                        </p>
-                                        <div className="max-h-24 overflow-y-auto bg-white rounded-lg p-2 border border-rose-200">
-                                            <p className="text-xs font-mono text-rose-700">{result.missingMgr1Codes.slice(0, 10).join(', ')}</p>
-                                            {result.missingMgr1Codes.length > 10 && (
-                                                <p className="text-xs text-rose-500">...and {result.missingMgr1Codes.length - 10} more</p>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
-                                {(result.missingMgr2Codes && result.missingMgr2Codes.length > 0) && (
-                                    <div className="mt-3">
-                                        <p className="text-xs text-rose-600 font-bold uppercase tracking-widest mb-1">
-                                            Missing MGR 2 Codes ({result.missingMgr2Codes.length}):
-                                        </p>
-                                        <div className="max-h-24 overflow-y-auto bg-white rounded-lg p-2 border border-rose-200">
-                                            <p className="text-xs font-mono text-rose-700">{result.missingMgr2Codes.slice(0, 10).join(', ')}</p>
-                                            {result.missingMgr2Codes.length > 10 && (
-                                                <p className="text-xs text-rose-500">...and {result.missingMgr2Codes.length - 10} more</p>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
-                                {result.errors && result.errors.length > 0 && (
-                                    <div className="mt-3 max-h-32 overflow-y-auto">
-                                        <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mb-1">Errors:</p>
-                                        {result.errors.map((err, idx) => (
-                                            <p key={idx} className="text-xs text-rose-600">{err}</p>
-                                        ))}
-                                    </div>
-                                )}
+                    <div className="space-y-4">
+                        {/* 1. Complete Success */}
+                        {result.success && result.failedCount === 0 && (
+                            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-start gap-3">
+                                <MdCheckCircle className="text-emerald-600 shrink-0 mt-0.5" size={20} />
+                                <div className="flex-1">
+                                    <p className="font-bold text-emerald-900 text-sm">Import Successful</p>
+                                    <p className="text-xs text-emerald-700 mt-1">{result.message || `Successfully imported ${result.successCount} items.`}</p>
+                                </div>
                             </div>
-                        </div>
+                        )}
+
+                        {/* 2. Partial Success (Warning) */}
+                        {result.success && result.failedCount > 0 && (
+                            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3">
+                                <MdError className="text-amber-600 shrink-0 mt-0.5" size={20} />
+                                <div className="flex-1">
+                                    <p className="font-bold text-amber-900 text-sm">Import Completed with Warnings</p>
+                                    <p className="text-xs text-amber-700 mt-1">
+                                        Imported {result.successCount} items successfully, but {result.failedCount} items failed to import.
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Summary breakdown pills */}
+                        {result.success && (result.createdCount !== undefined || result.updatedCount !== undefined || result.skippedCount !== undefined) && (
+                            <div className="grid grid-cols-3 gap-3">
+                                <div className="bg-emerald-50/50 border border-emerald-100 rounded-2xl p-3 text-center shadow-sm">
+                                    <span className="block text-[10px] font-bold text-emerald-500 uppercase tracking-widest mb-0.5">Created</span>
+                                    <span className="text-xl font-black text-emerald-750">{result.createdCount ?? 0}</span>
+                                </div>
+                                <div className="bg-blue-50/50 border border-blue-100 rounded-2xl p-3 text-center shadow-sm">
+                                    <span className="block text-[10px] font-bold text-blue-500 uppercase tracking-widest mb-0.5">Updated</span>
+                                    <span className="text-xl font-black text-blue-750">{result.updatedCount ?? 0}</span>
+                                </div>
+                                <div className="bg-slate-50 border border-slate-100 rounded-2xl p-3 text-center shadow-sm">
+                                    <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Skipped</span>
+                                    <span className="text-xl font-black text-slate-700">{result.skippedCount ?? 0}</span>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* 3. Complete Failure */}
+                        {!result.success && (
+                            <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 flex items-start gap-3">
+                                <MdError className="text-rose-600 shrink-0 mt-0.5" size={20} />
+                                <div>
+                                    <p className="font-bold text-rose-900 text-sm">Import Failed</p>
+                                    <p className="text-xs text-rose-700 mt-1">{result.message || 'The import process encountered errors and could not be completed.'}</p>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Row level errors display */}
+                        {result.errors && result.errors.length > 0 && (
+                            <div className="border border-slate-100 rounded-2xl overflow-hidden bg-slate-50">
+                                <div className="px-4 py-2 bg-slate-100 border-b border-slate-200 flex items-center justify-between">
+                                    <span className="font-bold text-xs text-slate-700 uppercase tracking-wider">Errors ({result.errors.length})</span>
+                                </div>
+                                <div className="max-h-48 overflow-y-auto p-4 space-y-2">
+                                    {result.errors.map((err, idx) => (
+                                        <div key={idx} className="text-xs text-rose-600 font-mono py-1 border-b border-slate-100 last:border-0">
+                                            {err}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Missing Codes Download (if any) */}
+                        {((result.missingCustomerCodes && result.missingCustomerCodes.length > 0) ||
+                          (result.missingProductCodes && result.missingProductCodes.length > 0) ||
+                          (result.missingMgr1Codes && result.missingMgr1Codes.length > 0) ||
+                          (result.missingMgr2Codes && result.missingMgr2Codes.length > 0)) && (
+                            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
+                                <p className="font-bold text-slate-800 text-xs uppercase tracking-wider">Missing Master Records</p>
+                                <p className="text-xs text-slate-500">
+                                    The import contains items or customers that do not exist in the system. Download these files and create them before importing again:
+                                </p>
+                                <div className="flex flex-wrap gap-2">
+                                    {result.missingCustomerCodes?.length > 0 && (
+                                        <button
+                                            onClick={() => handleDownloadMissingCodes('missing_customer_codes.txt')}
+                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-700 font-semibold hover:bg-slate-50 shadow-sm"
+                                        >
+                                            <MdDownload size={14} />
+                                            Missing Customer Codes ({result.missingCustomerCodes.length})
+                                        </button>
+                                    )}
+                                    {result.missingProductCodes?.length > 0 && (
+                                        <button
+                                            onClick={() => handleDownloadMissingCodes('missing_product_codes.txt')}
+                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-700 font-semibold hover:bg-slate-50 shadow-sm"
+                                        >
+                                            <MdDownload size={14} />
+                                            Missing Product Codes ({result.missingProductCodes.length})
+                                        </button>
+                                    )}
+                                    {result.missingMgr1Codes?.length > 0 && (
+                                        <button
+                                            onClick={() => handleDownloadMissingCodes('missing_mgr1_codes.txt')}
+                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-700 font-semibold hover:bg-slate-50 shadow-sm"
+                                        >
+                                            <MdDownload size={14} />
+                                            Missing MGR 1 Codes ({result.missingMgr1Codes.length})
+                                        </button>
+                                    )}
+                                    {result.missingMgr2Codes?.length > 0 && (
+                                        <button
+                                            onClick={() => handleDownloadMissingCodes('missing_mgr2_codes.txt')}
+                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-700 font-semibold hover:bg-slate-50 shadow-sm"
+                                        >
+                                            <MdDownload size={14} />
+                                            Missing MGR 2 Codes ({result.missingMgr2Codes.length})
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
 
-                {/* Action Buttons */}
+                {/* Actions */}
                 <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
                     <button
                         onClick={handleClose}
-                        className="px-6 py-2.5 text-slate-500 font-black hover:text-slate-900 transition-all uppercase text-[10px] tracking-widest"
+                        disabled={isImporting}
+                        className="border border-slate-200 text-slate-500 hover:bg-slate-50 px-8 py-3 rounded-2xl font-black transition-all uppercase text-[10px] tracking-widest active:scale-95 disabled:opacity-50"
                     >
                         Cancel
                     </button>

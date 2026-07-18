@@ -1,1819 +1,3024 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  useRef,
+} from "react";
 import {
-    MdDelete,
-    MdCalendarMonth,
-    MdSave,
-    MdDownload,
-    MdRefresh,
-    MdEdit,
-    MdClose,
-    MdKeyboardArrowDown,
-    MdFileUpload
-} from 'react-icons/md';
-import { toast } from 'react-toastify';
-import { planningService, customerService, productService, mgrService, importService } from '../services/api';
-import * as XLSX from 'xlsx';
-import ImportModal from '../components/ImportModal';
-import PortalDropdown from '../components/PortalDropdown';
-import { formatToLakhs, formatToIndian } from '../utils/formatters';
+  MdDelete,
+  MdCalendarMonth,
+  MdSave,
+  MdDownload,
+  MdRefresh,
+  MdEdit,
+  MdClose,
+  MdKeyboardArrowDown,
+  MdFileUpload,
+} from "react-icons/md";
+import { toast } from "react-toastify";
+import {
+  planningService,
+  customerService,
+  productService,
+  mgrService,
+  importService,
+  statusService,
+} from "../services/api";
+import * as XLSX from "xlsx";
+import ImportModal from "../components/ImportModal";
+import PortalDropdown from "../components/PortalDropdown";
+import { formatToLakhs, formatToIndian } from "../utils/formatters";
+import { useAuth } from "../context/AuthContext";
+import { useSubmitGuard } from "../hooks/useSubmitGuard";
 
 // Financial year months (Apr-Mar)
 const FY_MONTHS = [
-    'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep',
-    'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+  "Jan",
+  "Feb",
+  "Mar",
 ];
 
-const STATUS_OPTIONS = ['Firm', 'MFC', 'B & B', 'Others', 'Order Received', 'Invoice', 'Lost', 'Parked'];
-const STATUS_REPORT_COLUMNS = ['Firm', 'MFC', 'B&B', 'Other', 'Invoice', 'Lost', 'Parked', 'Order Received'];
+const STATUS_REPORT_COLUMNS = [
+  "Budget",
+  "Firm",
+  "MFC",
+  "B&B",
+  "Invoice",
+];
 const STATUS_REPORT_ROWS = [
-    { key: 'Firm', label: 'Firm', aliases: ['Firm'] },
-    { key: 'Invoice', label: 'Invoice', aliases: ['Invoice'] },
-    { key: 'B&B', label: 'Book & Bill', aliases: ['B&B', 'B & B', 'Book & Bill'] },
-    { key: 'MFC', label: 'MFC', aliases: ['MFC'] },
-    { key: 'Other', label: 'Others', aliases: ['Other', 'Others'] },
-    { key: 'Lost', label: 'Lost', aliases: ['Lost'] },
-    { key: 'Parked', label: 'Parked', aliases: ['Parked'] },
-    { key: 'Order Received', label: 'Order Received', aliases: ['Order Received'] }
+  { key: "Firm", label: "Firm", aliases: ["Firm"] },
+  { key: "Invoice", label: "Invoice", aliases: ["Invoice"] },
+  {
+    key: "B&B",
+    label: "Book & Bill",
+    aliases: ["B&B", "B & B", "Book & Bill"],
+  },
+  { key: "MFC", label: "MFC", aliases: ["MFC"] },
 ];
 // Generate financial year options (current + next 2)
 const getFinancialYears = () => {
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const fyStart = currentMonth >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+  const now = new Date();
+  const currentMonth = now.getMonth();
+  const fyStart = currentMonth >= 3 ? now.getFullYear() : now.getFullYear() - 1;
 
-    const years = [];
-    for (let i = -1; i < 3; i++) {
-        const start = fyStart + i;
-        const end = (start + 1).toString().slice(-2);
-        years.push(`${start}-${end}`);
-    }
+  const years = [];
+  for (let i = -1; i < 3; i++) {
+    const start = fyStart + i;
+    const end = (start + 1).toString().slice(-2);
+    years.push(`${start}-${end}`);
+  }
 
-    return years;
+  return years;
 };
 
 // Generate month-year labels for a financial year
 const getMonthLabels = (fy) => {
-    const startYear = parseInt(fy.split('-')[0], 10);
-    return FY_MONTHS.map((month, idx) => {
-        const year = idx < 9 ? startYear : startYear + 1;
-        return `${month}-${year.toString().slice(-2)}`;
-    });
+  const startYear = parseInt(fy.split("-")[0], 10);
+  return FY_MONTHS.map((month, idx) => {
+    const year = idx < 9 ? startYear : startYear + 1;
+    return `${month}-${year.toString().slice(-2)}`;
+  });
 };
 
-// Get current month label for default selection
-const getCurrentMonthLabel = (fy) => {
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const startYear = parseInt(fy.split('-')[0], 10);
-    
-    // Map JS month (0-11) to FY_MONTHS index
-    // April=3 -> index 0, May=4 -> index 1, ..., Mar=2 -> index 11
-    let monthIndex;
-    if (currentMonth >= 3) {
-        // Apr-Dec: index = currentMonth - 3
-        monthIndex = currentMonth - 3;
-    } else {
-        // Jan-Mar: index = currentMonth + 9
-        monthIndex = currentMonth + 9;
-    }
-    
-    // Only return if it's within the FY range
-    if (monthIndex >= 0 && monthIndex < 12) {
-        const fyMonth = FY_MONTHS[monthIndex];
-        const year = monthIndex < 9 ? startYear : startYear + 1;
-        return `${fyMonth}-${year.toString().slice(-2)}`;
-    }
-    
-    // Fallback: return first month if calculation is off
-    return getMonthLabels(fy)[0];
+const normalizeMgrCode = (value = "") =>
+  String(value || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toUpperCase();
+
+const normalizeCodeKey = (value = "") => normalizeMgrCode(value);
+
+const normalizeSbuValue = (sbuName = "") => {
+  // Normalize "Sbu 1" → "SBU1", "Sbu 2" → "SBU2", etc.
+  const cleaned = String(sbuName || "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "");
+
+  // Map variations to canonical form
+  if (cleaned === "SBU1") return "SBU1";
+  if (cleaned === "SBU2") return "SBU2";
+  if (cleaned === "SBU3") return "SBU3";
+  if (cleaned === "EPC") return "EPC";
+
+  return cleaned;
 };
 
-const normalizeMgrCode = (value = '') => String(value || '').trim().replace(/\s+/g, ' ').toUpperCase();
+const formatReportValue = (value, decimals = 3) =>
+  Number(value || 0) === 0 ? "-" : formatToLakhs(value, decimals);
 
-const normalizeCodeKey = (value = '') => normalizeMgrCode(value);
+const formatReportPercentage = (value, decimals = 2) =>
+  Number(value || 0) === 0
+    ? "-"
+    : `${Number(value || 0).toLocaleString("en-IN", {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    })}%`;
 
-const formatReportValue = (value, decimals = 3) => formatToLakhs(value || 0, decimals);
+const formatReportPercentageTotal = (value) =>
+  Number(value || 0) === 0
+    ? "-"
+    : `${Number(value || 0).toLocaleString("en-IN", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}%`;
 
-const formatReportPercentage = (value, decimals = 2) => `${Number(value || 0).toLocaleString('en-IN', {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals
-})}%`;
-
-const formatReportPercentageTotal = (value) => `${Number(value || 0).toLocaleString('en-IN', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-})}%`;
-
-
-const STATUS_BREAKDOWN_ROWS = ['Export', 'Industry', 'UC', 'Utility', 'Total'];
+const STATUS_BREAKDOWN_ORDERED_ROWS = [
+  { key: "Firm", label: "FIRM" },
+  { key: "MFC", label: "MFC" },
+  { key: "B&B", label: "B&B" },
+  { key: "Invoice", label: "INVOICE" },
+];
 
 const dedupeMgrOptions = (items = []) => {
-    const seen = new Set();
+  const seen = new Set();
 
-    return items.filter((mgr) => {
-        const key = normalizeMgrCode(mgr.code);
-        if (!key || seen.has(key)) {
-            return false;
-        }
+  return items.filter((mgr) => {
+    const key = normalizeMgrCode(mgr.code);
+    if (!key || seen.has(key)) {
+      return false;
+    }
 
-        seen.add(key);
-        return true;
-    });
+    seen.add(key);
+    return true;
+  });
 };
 
 const getCanonicalMgrCode = (value, mgrItems = []) => {
-    const normalized = normalizeMgrCode(value);
-    if (!normalized) {
-        return '';
-    }
+  const normalized = normalizeMgrCode(value);
+  if (!normalized) {
+    return "";
+  }
 
-    const match = mgrItems.find((mgr) => normalizeMgrCode(mgr.code) === normalized);
-    return match?.code || String(value || '').trim().replace(/\s+/g, ' ');
+  const match = mgrItems.find(
+    (mgr) => normalizeMgrCode(mgr.code) === normalized,
+  );
+  return (
+    match?.code ||
+    String(value || "")
+      .trim()
+      .replace(/\s+/g, " ")
+  );
 };
 
 const getEntityId = (value) => {
-    if (!value) {
-        return '';
-    }
+  if (!value) {
+    return "";
+  }
 
-    if (typeof value === 'object') {
-        return String(value._id || '');
-    }
+  if (typeof value === "object") {
+    return String(value._id || "");
+  }
 
-    return String(value);
+  return String(value);
 };
 
 const getFallbackCode = (prefix, value) => {
-    const entityId = getEntityId(value);
-    return entityId ? `${prefix}-${entityId.slice(-8).toUpperCase()}` : '';
+  const entityId = getEntityId(value);
+  return entityId ? `${prefix}-${entityId.slice(-8).toUpperCase()}` : "";
 };
 
 const compareSortValues = (left, right) => {
-    if (typeof left === 'number' && typeof right === 'number') {
-        return left - right;
-    }
+  if (typeof left === "number" && typeof right === "number") {
+    return left - right;
+  }
 
-    return String(left || '').localeCompare(String(right || ''), undefined, {
-        numeric: true,
-        sensitivity: 'base'
-    });
+  return String(left || "").localeCompare(String(right || ""), undefined, {
+    numeric: true,
+    sensitivity: "base",
+  });
 };
 
 const getReportYearOptions = (financialYear) => {
-    const startYear = parseInt(financialYear.split('-')[0], 10);
-    return [String(startYear), String(startYear + 1)];
+  const startYear = parseInt(financialYear.split("-")[0], 10);
+  return [String(startYear), String(startYear + 1)];
 };
 
 const PlanningScreen = () => {
-    const [financialYear, setFinancialYear] = useState(getFinancialYears()[1]);
-    const [entries, setEntries] = useState([]);
-    const [combinedReportData, setCombinedReportData] = useState(null);
-    const [reportData2, setReportData2] = useState(null);
-    const [loading, setLoading] = useState(false);
+  const { hasAccess } = useAuth();
+  const [financialYear, setFinancialYear] = useState(getFinancialYears()[1]);
 
-    const [isGridExpanded, setIsGridExpanded] = useState(true);
-    const [isReportExpanded, setIsReportExpanded] = useState(false);
-    const [isReportExpanded2, setIsReportExpanded2] = useState(false);
-    const [isStatusBreakdownExpanded, setIsStatusBreakdownExpanded] = useState(false);
-    const [expandedSegmentMonths, setExpandedSegmentMonths] = useState({});
-    const [expandedStatusBreakdownMonths, setExpandedStatusBreakdownMonths] = useState({});
-    const [expandedStatusBreakdownSegments, setExpandedStatusBreakdownSegments] = useState({});
-    const [expandedSbuWiseMonths, setExpandedSbuWiseMonths] = useState({});
+  const isSelectedYearPrevious = useMemo(() => {
+    if (!financialYear) return false;
+    const startYear = parseInt(financialYear.split("-")[0], 10);
+    if (isNaN(startYear)) return false;
 
-    const [customers, setCustomers] = useState([]);
-    const [products, setProducts] = useState([]);
-    const [mgrList, setMgrList] = useState([]);
-    const [mgrList2, setMgrList2] = useState([]);
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentFYStartYear = currentMonth >= 3 ? now.getFullYear() : now.getFullYear() - 1;
 
-    const [editingId, setEditingId] = useState(null);
-    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+    return startYear < currentFYStartYear;
+  }, [financialYear]);
 
-    const emptyRow = {
-        monthYear: '',
-        customerId: '',
-        customerName: '',
-        productId: '',
-        productName: '',
-        qty: '',
-        value: '',
-        mgrCode: '',
-        mgrCode2: '',
-        status: ''
+  const canEdit = useMemo(() => {
+    if (!isSelectedYearPrevious) return true;
+    return hasAccess("planning_edit_prev_year");
+  }, [isSelectedYearPrevious, hasAccess]);
+  const [entries, setEntries] = useState([]);
+  const [reportEntries, setReportEntries] = useState([]);
+  const [combinedReportData, setCombinedReportData] = useState(null);
+  const [reportData2, setReportData2] = useState(null);
+  const [statusReportData, setStatusReportData] = useState(null);
+  console.log({ reportData2 });
+  const [loading, setLoading] = useState(false);
+  const [totalEntries, setTotalEntries] = useState(0);
+  const [offset, setOffset] = useState(0);
+  const [limit] = useState(5);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+
+
+  const [isReportExpanded, setIsReportExpanded] = useState(false);
+  const [isReportExpanded2, setIsReportExpanded2] = useState(false);
+  const [isStatusBreakdownExpanded, setIsStatusBreakdownExpanded] =
+    useState(false);
+  const [expandedSegmentMonths, setExpandedSegmentMonths] = useState({});
+  const [expandedStatusBreakdownMonths, setExpandedStatusBreakdownMonths] =
+    useState({});
+  const [expandedStatusBreakdownSbus, setExpandedStatusBreakdownSbus] =
+    useState({});
+  const [expandedStatusBreakdownSegments, setExpandedStatusBreakdownSegments] =
+    useState({});
+  const [expandedSbuWiseMonths, setExpandedSbuWiseMonths] = useState({});
+  const [isExportExpanded, setIsExportExpanded] = useState(false);
+  const [isGridExpanded, setIsGridExpanded] = useState(false);
+
+  const [customers, setCustomers] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [mgrList, setMgrList] = useState([]);
+  const [mgrList2, setMgrList2] = useState([]);
+  const [statusOptions, setStatusOptions] = useState([]);
+  const [statusColorMap, setStatusColorMap] = useState({});
+
+  const [editingId, setEditingId] = useState(null);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+
+  const emptyRow = {
+    monthYear: "",
+    customerId: "",
+    customerName: "",
+    productId: "",
+    productName: "",
+    qty: "",
+    value: "",
+    mgrCode: "",
+    mgrCode2: "",
+    status: "",
+  };
+  const [newRow, setNewRow] = useState({ ...emptyRow });
+
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [productSearch, setProductSearch] = useState("");
+  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
+  const [showProductDropdown, setShowProductDropdown] = useState(false);
+  const customerAnchorRef = useRef(null);
+  const productAnchorRef = useRef(null);
+
+  const [mgr1Search, setMgr1Search] = useState("");
+  const [mgr2Search, setMgr2Search] = useState("");
+  const [statusSearch, setStatusSearch] = useState("");
+  const [showMgr1Dropdown, setShowMgr1Dropdown] = useState(false);
+  const [showMgr2Dropdown, setShowMgr2Dropdown] = useState(false);
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+  const mgr1AnchorRef = useRef(null);
+  const mgr2AnchorRef = useRef(null);
+  const statusAnchorRef = useRef(null);
+
+  // Initialize filters with month as primary filter
+  const initializeFilters = () => {
+    return {
+      month: "",
+      mgrCode: "",
+      mgrCode2: "",
+      status: "",
     };
-    const [newRow, setNewRow] = useState({ ...emptyRow });
+  };
 
-    const [customerSearch, setCustomerSearch] = useState('');
-    const [productSearch, setProductSearch] = useState('');
-    const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
-    const [showProductDropdown, setShowProductDropdown] = useState(false);
-    const customerAnchorRef = useRef(null);
-    const productAnchorRef = useRef(null);
-    
-    // Initialize filters with month as primary filter
-    const initializeFilters = () => {
-        const monthLabels = getMonthLabels(getFinancialYears()[1]);
-        const defaultMonth = getCurrentMonthLabel(getFinancialYears()[1]);
-        return {
-            month: monthLabels.includes(defaultMonth) ? defaultMonth : monthLabels[0],
-            mgrCode: '',
-            mgrCode2: '',
-            status: ''
-        };
+  const [filters, setFilters] = useState(initializeFilters());
+  const [sortConfig, setSortConfig] = useState({
+    key: "monthYear",
+    direction: "asc",
+  });
+
+  const fetchData = useCallback(async () => {
+    const isLoadMore = offset > 0;
+    if (isLoadMore) {
+      setIsLoadingMore(true);
+    } else {
+      setLoading(true);
+    }
+
+    try {
+      const reportQuery = { excludeStatus: "Budget" };
+      if (filters.month) {
+        const [mName] = filters.month.split("-");
+        const startYear = parseInt(financialYear.split("-")[0], 10);
+        const mIdx = FY_MONTHS.indexOf(mName);
+        reportQuery.month = mName;
+        reportQuery.year = String(mIdx <= 8 ? startYear : startYear + 1);
+      }
+
+      const params = {
+        financialYear,
+        month: filters.month,
+        mgr1: filters.mgrCode,
+        mgr2: filters.mgrCode2,
+        status: filters.status,
+        limit,
+        offset,
+      };
+      const reportEntriesParams = {
+        ...params,
+        excludeStatus: "Budget",
+        limit: 100000,
+        offset: 0,
+      };
+
+
+      if (isLoadMore) {
+        const entriesRes = await planningService.getAll(params);
+        setEntries((prev) => [...prev, ...entriesRes.data.data]);
+        setTotalEntries(entriesRes.data.total);
+      } else {
+        const [entriesRes, reportEntriesRes, sbuReportRes, segmentReportRes, statusReportRes] = await Promise.all([
+          planningService.getAll(params),
+          planningService.getAll(reportEntriesParams),
+          planningService.getMGRReport(financialYear, "SBU", reportQuery),
+          planningService.getMGRReport(financialYear, "SEGMENT", reportQuery),
+          planningService.getMGRReport(financialYear, "STATUS", reportQuery),
+        ]);
+
+        setEntries(entriesRes.data.data || []);
+        setReportEntries(reportEntriesRes.data.data || []);
+        setTotalEntries(entriesRes.data.total || 0);
+        setCombinedReportData(sbuReportRes.data);
+        setReportData2(segmentReportRes.data);
+        setStatusReportData(statusReportRes.data);
+      }
+    } catch (err) {
+      console.error("Failed to load planning data:", err);
+    } finally {
+      setLoading(false);
+      setIsLoadingMore(false);
+    }
+  }, [financialYear, filters, offset, limit]);
+
+  const fetchMasters = useCallback(async () => {
+    try {
+      const [custRes, prodRes, mgrRes, mgr2Res, statusRes] = await Promise.all([
+        customerService.getAll({ limit: 50 }),
+        productService.getAll({ limit: 50 }),
+        mgrService.getAll("MGR1"),
+        mgrService.getAll("MGR2"),
+        statusService.getAll(),
+      ]);
+
+      const custData = Array.isArray(custRes.data) ? custRes.data : custRes.data.data || [];
+      const prodData = Array.isArray(prodRes.data) ? prodRes.data : prodRes.data.data || [];
+
+      setCustomers(custData);
+      setProducts(prodData);
+      setMgrList(
+        dedupeMgrOptions(
+          mgrRes.data.filter((mgr) => mgr.status === "Active"),
+        ),
+      );
+      setMgrList2(
+        dedupeMgrOptions(
+          mgr2Res.data.filter((mgr) => mgr.status === "Active"),
+        ),
+      );
+      setStatusOptions(statusRes.data.filter(s => s.isActive).map(s => s.name));
+
+      const colorMap = {};
+      statusRes.data.forEach(s => {
+        colorMap[s.name] = s.color;
+      });
+      setStatusColorMap(colorMap);
+    } catch (err) {
+      console.error("Failed to load master data:", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchMasters();
+  }, [fetchMasters]);
+
+  // Debounced search for customers
+  useEffect(() => {
+    if (!showCustomerDropdown) return;
+    const timer = setTimeout(async () => {
+      try {
+        const res = await customerService.getAll({
+          limit: 50,
+          search: customerSearch.trim() || undefined,
+        });
+        const data = Array.isArray(res.data) ? res.data : res.data.data || [];
+        setCustomers(data);
+      } catch (err) {
+        console.error("Error searching customers:", err);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [customerSearch, showCustomerDropdown]);
+
+  // Debounced search for products
+  useEffect(() => {
+    if (!showProductDropdown) return;
+    const timer = setTimeout(async () => {
+      try {
+        const res = await productService.getAll({
+          limit: 50,
+          search: productSearch.trim() || undefined,
+        });
+        const data = Array.isArray(res.data) ? res.data : res.data.data || [];
+        setProducts(data);
+      } catch (err) {
+        console.error("Error searching products:", err);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [productSearch, showProductDropdown]);
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setOffset(0);
+  }, [filters, financialYear]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Click outside to close dropdown portals
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        customerAnchorRef.current &&
+        !customerAnchorRef.current.contains(event.target) &&
+        !event.target.closest(".portal-dropdown-content")
+      ) {
+        setShowCustomerDropdown(false);
+      }
+      if (
+        productAnchorRef.current &&
+        !productAnchorRef.current.contains(event.target) &&
+        !event.target.closest(".portal-dropdown-content")
+      ) {
+        setShowProductDropdown(false);
+      }
+      if (
+        mgr1AnchorRef.current &&
+        !mgr1AnchorRef.current.contains(event.target) &&
+        !event.target.closest(".portal-dropdown-content")
+      ) {
+        setShowMgr1Dropdown(false);
+      }
+      if (
+        mgr2AnchorRef.current &&
+        !mgr2AnchorRef.current.contains(event.target) &&
+        !event.target.closest(".portal-dropdown-content")
+      ) {
+        setShowMgr2Dropdown(false);
+      }
+      if (
+        statusAnchorRef.current &&
+        !statusAnchorRef.current.contains(event.target) &&
+        !event.target.closest(".portal-dropdown-content")
+      ) {
+        setShowStatusDropdown(false);
+      }
     };
-    
-    const [filters, setFilters] = useState(initializeFilters());
-    const [reportFilters, setReportFilters] = useState({
-        month: '',
-        year: ''
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  // Keep month filter empty when financial year changes
+  useEffect(() => {
+    setFilters((prev) => ({
+      ...prev,
+      month: "",
+    }));
+  }, [financialYear]);
+
+  const filteredCustomers = useMemo(() => {
+    return (customers || []).slice(0, 10);
+  }, [customers]);
+
+  const filteredProducts = useMemo(() => {
+    return (products || []).slice(0, 10);
+  }, [products]);
+
+  const filteredEntries = useMemo(() => {
+    // The entries are already filtered by the backend
+    return entries;
+  }, [entries]);
+
+  const hasActiveFilters = Boolean(
+    filters.mgrCode || filters.mgrCode2 || filters.status,
+  );
+  const monthLabels = useMemo(
+    () => getMonthLabels(financialYear),
+    [financialYear],
+  );
+  const monthOrder = useMemo(
+    () => new Map(monthLabels.map((label, index) => [label, index])),
+    [monthLabels],
+  );
+  useEffect(() => {
+    setExpandedStatusBreakdownMonths((prev) => {
+      const next = { ...prev };
+      monthLabels.forEach((month) => {
+        if (typeof next[month] === "undefined") {
+          next[month] = false;
+        }
+      });
+      return next;
     });
-    const [sortConfig, setSortConfig] = useState({
-        key: 'monthYear',
-        direction: 'asc'
+    setExpandedSbuWiseMonths((prev) => {
+      const next = { ...prev };
+      monthLabels.forEach((month) => {
+        if (typeof next[month] === "undefined") {
+          next[month] = true;
+        }
+      });
+      return next;
+    });
+  }, [monthLabels]);
+
+  const customerMap = useMemo(
+    () =>
+      new Map(customers.map((customer) => [String(customer._id), customer])),
+    [customers],
+  );
+  const productMap = useMemo(
+    () => new Map(products.map((product) => [String(product._id), product])),
+    [products],
+  );
+
+  const getCustomerById = useCallback(
+    (customerId) => customerMap.get(getEntityId(customerId)) || null,
+    [customerMap],
+  );
+  const getProductById = useCallback(
+    (productId) => productMap.get(getEntityId(productId)) || null,
+    [productMap],
+  );
+  const getCustomerCode = useCallback(
+    (customerId) =>
+      getCustomerById(customerId)?.externalCode ||
+      getFallbackCode("CUST", customerId) ||
+      "-",
+    [getCustomerById],
+  );
+  const getProductCode = useCallback(
+    (productId) => getProductById(productId)?.productCode || "-",
+    [getProductById],
+  );
+
+  const sortedEntries = useMemo(() => {
+    const rows = [...filteredEntries];
+
+    rows.sort((left, right) => {
+      let leftValue;
+      let rightValue;
+
+      switch (sortConfig.key) {
+        case "monthYear":
+          leftValue = monthOrder.get(left.monthYear) ?? Number.MAX_SAFE_INTEGER;
+          rightValue =
+            monthOrder.get(right.monthYear) ?? Number.MAX_SAFE_INTEGER;
+          break;
+        case "customerCode":
+          leftValue = getCustomerCode(left.customerId);
+          rightValue = getCustomerCode(right.customerId);
+          break;
+        case "customerName":
+          leftValue = left.customerName;
+          rightValue = right.customerName;
+          break;
+        case "productCode":
+          leftValue = getProductCode(left.productId);
+          rightValue = getProductCode(right.productId);
+          break;
+        case "productName":
+          leftValue = left.productName;
+          rightValue = right.productName;
+          break;
+        case "qty":
+          leftValue = Number(left.qty || 0);
+          rightValue = Number(right.qty || 0);
+          break;
+        case "value":
+          leftValue = Number(left.value || 0);
+          rightValue = Number(right.value || 0);
+          break;
+        case "totalValue":
+          leftValue = Number(left.totalValue || 0);
+          rightValue = Number(right.totalValue || 0);
+          break;
+        case "mgrCode":
+          leftValue = getCanonicalMgrCode(left.mgrCode, mgrList);
+          rightValue = getCanonicalMgrCode(right.mgrCode, mgrList);
+          break;
+        case "mgrCode2":
+          leftValue = getCanonicalMgrCode(left.mgrCode2 || "", mgrList2);
+          rightValue = getCanonicalMgrCode(right.mgrCode2 || "", mgrList2);
+          break;
+        case "status":
+          leftValue = left.status;
+          rightValue = right.status;
+          break;
+        default:
+          leftValue = left[sortConfig.key];
+          rightValue = right[sortConfig.key];
+      }
+
+      const comparison = compareSortValues(leftValue, rightValue);
+      return sortConfig.direction === "asc" ? comparison : -comparison;
     });
 
-    const fetchData = useCallback(async () => {
-        setLoading(true);
-        try {
-            const reportQuery = {
-                month: reportFilters.month,
-                year: reportFilters.year
-            };
-            const [entriesRes, sbuReportRes, segmentReportRes] = await Promise.all([
-                planningService.getAll(financialYear),
-                planningService.getMGRReport(financialYear, 'SBU', reportQuery),
-                planningService.getMGRReport(financialYear, 'SEGMENT', reportQuery)
-            ]);
+    return rows;
+  }, [
+    filteredEntries,
+    sortConfig,
+    monthOrder,
+    mgrList,
+    mgrList2,
+    getCustomerCode,
+    getProductCode,
+  ]);
 
-            setEntries(entriesRes.data);
-            setCombinedReportData(sbuReportRes.data);
-            setReportData2(segmentReportRes.data);
-        } catch (err) {
-            console.error('Failed to load planning data:', err);
-        } finally {
-            setLoading(false);
-        }
-    }, [financialYear, reportFilters.month, reportFilters.year]);
+  const toggleStatusBreakdownMonth = (month) => {
+    setExpandedStatusBreakdownMonths((prev) => ({
+      ...prev,
+      [month]: !prev[month],
+    }));
+  };
 
-    useEffect(() => {
-        const fetchMasters = async () => {
-            try {
-                const [custRes, prodRes, mgrRes, mgr2Res] = await Promise.all([
-                    customerService.getAll(),
-                    productService.getAll(),
-                    mgrService.getAll('MGR1'),
-                    mgrService.getAll('MGR2')
-                ]);
+  const toggleStatusBreakdownSbu = (month, sbu) => {
+    const key = `${month}-${sbu}`;
+    setExpandedStatusBreakdownSbus((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
+  };
 
-                setCustomers(custRes.data);
-                setProducts(prodRes.data);
-                setMgrList(dedupeMgrOptions(mgrRes.data.filter((mgr) => mgr.status === 'Active')));
-                setMgrList2(dedupeMgrOptions(mgr2Res.data.filter((mgr) => mgr.status === 'Active')));
-            } catch (err) {
-                console.error('Failed to load master data:', err);
-            }
-        };
+  const statusBreakdownColumns = STATUS_REPORT_COLUMNS;
+  const _unused_statusBreakdownColumns = useMemo(() => {
+    const reportColumnSource =
+      combinedReportData?.mgrColumns?.length > 0
+        ? combinedReportData.mgrColumns
+        : combinedReportData?.mgrCodes || [];
 
-        fetchMasters();
-    }, []);
+    const normalizedFromMgrCodes = reportColumnSource
+      .map((code) => normalizeSbuValue(code))
+      .filter(Boolean);
 
-    useEffect(() => {
-        fetchData();
-    }, [fetchData]);
-    useEffect(() => {
-        const nextYears = getReportYearOptions(financialYear);
-        setReportFilters((prev) => (
-            nextYears.includes(prev.year)
-                ? prev
-                : { ...prev, year: '' }
-        ));
-    }, [financialYear]);
+    const normalizedFromRows = (combinedReportData?.sbuWise || [])
+      .map((row) => normalizeSbuValue(row.sbu))
+      .filter(Boolean);
 
-    // Update month filter when financial year changes
-    useEffect(() => {
-        const monthLabels = getMonthLabels(financialYear);
-        const defaultMonth = getCurrentMonthLabel(financialYear);
-        const newMonth = monthLabels.includes(defaultMonth) ? defaultMonth : monthLabels[0];
-        
-        setFilters((prev) => ({
-            ...prev,
-            month: newMonth
-        }));
-    }, [financialYear]);
-
-    const filteredCustomers = useMemo(() => {
-        if (!customerSearch) {
-            return customers.slice(0, 10);
-        }
-
-        return customers.filter((customer) =>
-            (customer.externalCode || '').toLowerCase().includes(customerSearch.toLowerCase()) ||
-            (customer.companyName || '').toLowerCase().includes(customerSearch.toLowerCase()) ||
-            (customer.customerName || '').toLowerCase().includes(customerSearch.toLowerCase())
-        ).slice(0, 10);
-    }, [customers, customerSearch]);
-
-    const filteredProducts = useMemo(() => {
-        if (!productSearch) {
-            return products.slice(0, 10);
-        }
-
-        return products.filter((product) =>
-            (product.productName || '').toLowerCase().includes(productSearch.toLowerCase()) ||
-            (product.productCode || '').toLowerCase().includes(productSearch.toLowerCase())
-        ).slice(0, 10);
-    }, [products, productSearch]);
-
-    const filteredEntries = useMemo(() => {
-        return entries.filter((entry) => {
-            // STEP 1: Filter by month (PRIMARY FILTER)
-            const matchesMonth = !filters.month || entry.monthYear === filters.month;
-            
-            // STEP 2: Filter by status
-            const matchesStatus = !filters.status || entry.status === filters.status;
-            
-            // STEP 3: Filter by MGR codes
-            const matchesMgr1 = !filters.mgrCode || normalizeMgrCode(entry.mgrCode) === normalizeMgrCode(filters.mgrCode);
-            const matchesMgr2 = !filters.mgrCode2 || normalizeMgrCode(entry.mgrCode2) === normalizeMgrCode(filters.mgrCode2);
-
-            // All conditions must match
-            return matchesMonth && matchesStatus && matchesMgr1 && matchesMgr2;
-        });
-    }, [entries, filters]);
-
-    const hasActiveFilters = Boolean(filters.mgrCode || filters.mgrCode2 || filters.status);
-    const monthLabels = useMemo(() => getMonthLabels(financialYear), [financialYear]);
-    const monthOrder = useMemo(
-        () => new Map(monthLabels.map((label, index) => [label, index])),
-        [monthLabels]
-    );
-    useEffect(() => {
-        setExpandedStatusBreakdownMonths((prev) => {
-            const next = { ...prev };
-            monthLabels.forEach((month) => {
-                if (typeof next[month] === 'undefined') {
-                    next[month] = true;
-                }
-            });
-            return next;
-        });
-        setExpandedSbuWiseMonths((prev) => {
-            const next = { ...prev };
-            monthLabels.forEach((month) => {
-                if (typeof next[month] === 'undefined') {
-                    next[month] = true;
-                }
-            });
-            return next;
-        });
-    }, [monthLabels]);
-
-    const customerMap = useMemo(
-        () => new Map(customers.map((customer) => [String(customer._id), customer])),
-        [customers]
-    );
-    const productMap = useMemo(
-        () => new Map(products.map((product) => [String(product._id), product])),
-        [products]
+    const unique = Array.from(
+      new Set([...normalizedFromMgrCodes, ...normalizedFromRows]),
     );
 
-    const getCustomerById = useCallback(
-        (customerId) => customerMap.get(getEntityId(customerId)) || null,
-        [customerMap]
+    const fallback = ["EPC", "SBU1", "SBU2", "SBU3"];
+    const toSort = unique.length > 0 ? unique : fallback;
+
+    const getWeight = (value) => {
+      if (value === "EPC") return [0, 0, value];
+      const sbuMatch = value.match(/^SBU(\d+)$/);
+      if (sbuMatch) return [1, Number(sbuMatch[1]), value];
+      return [2, Number.MAX_SAFE_INTEGER, value];
+    };
+
+    return [...toSort].sort((left, right) => {
+      const [leftGroup, leftNumber, leftLabel] = getWeight(left);
+      const [rightGroup, rightNumber, rightLabel] = getWeight(right);
+
+      if (leftGroup !== rightGroup) return leftGroup - rightGroup;
+      if (leftNumber !== rightNumber) return leftNumber - rightNumber;
+
+      return leftLabel.localeCompare(rightLabel, undefined, {
+        numeric: true,
+        sensitivity: "base",
+      });
+    });
+  }, [combinedReportData]);
+
+  const getSbuReportCellValue = (row = {}, sbu = "") => {
+    const normalizedSbu = normalizeSbuValue(sbu);
+    const directValue = row[sbu];
+    if (Number(directValue || 0) !== 0) {
+      return Number(directValue || 0);
+    }
+
+    const matchedKey = Object.keys(row).find(
+      (key) => normalizeSbuValue(key) === normalizedSbu,
     );
-    const getProductById = useCallback(
-        (productId) => productMap.get(getEntityId(productId)) || null,
-        [productMap]
-    );
-    const getCustomerCode = useCallback(
-        (customerId) => getCustomerById(customerId)?.externalCode || getFallbackCode('CUST', customerId) || '-',
-        [getCustomerById]
-    );
-    const getProductCode = useCallback(
-        (productId) => getProductById(productId)?.productCode || '-',
-        [getProductById]
-    );
 
-    const sortedEntries = useMemo(() => {
-        const rows = [...filteredEntries];
+    return Number(row[matchedKey] || 0);
+  };
 
-        rows.sort((left, right) => {
-            let leftValue;
-            let rightValue;
+  const getPlanningEntryTotal = (entry = {}) =>
+    Number(entry.totalValue || (Number(entry.qty || 0) * Number(entry.value || 0)) || 0);
 
-            switch (sortConfig.key) {
-                case 'monthYear':
-                    leftValue = monthOrder.get(left.monthYear) ?? Number.MAX_SAFE_INTEGER;
-                    rightValue = monthOrder.get(right.monthYear) ?? Number.MAX_SAFE_INTEGER;
-                    break;
-                case 'customerCode':
-                    leftValue = getCustomerCode(left.customerId);
-                    rightValue = getCustomerCode(right.customerId);
-                    break;
-                case 'customerName':
-                    leftValue = left.customerName;
-                    rightValue = right.customerName;
-                    break;
-                case 'productCode':
-                    leftValue = getProductCode(left.productId);
-                    rightValue = getProductCode(right.productId);
-                    break;
-                case 'productName':
-                    leftValue = left.productName;
-                    rightValue = right.productName;
-                    break;
-                case 'qty':
-                    leftValue = Number(left.qty || 0);
-                    rightValue = Number(right.qty || 0);
-                    break;
-                case 'value':
-                    leftValue = Number(left.value || 0);
-                    rightValue = Number(right.value || 0);
-                    break;
-                case 'totalValue':
-                    leftValue = Number(left.totalValue || 0);
-                    rightValue = Number(right.totalValue || 0);
-                    break;
-                case 'mgrCode':
-                    leftValue = getCanonicalMgrCode(left.mgrCode, mgrList);
-                    rightValue = getCanonicalMgrCode(right.mgrCode, mgrList);
-                    break;
-                case 'mgrCode2':
-                    leftValue = getCanonicalMgrCode(left.mgrCode2 || '', mgrList2);
-                    rightValue = getCanonicalMgrCode(right.mgrCode2 || '', mgrList2);
-                    break;
-                case 'status':
-                    leftValue = left.status;
-                    rightValue = right.status;
-                    break;
-                default:
-                    leftValue = left[sortConfig.key];
-                    rightValue = right[sortConfig.key];
-            }
+  const getEntriesBackedSbuValue = (monthLabel, sbu, segment = "") => {
+    const normalizedSbu = normalizeSbuValue(sbu);
+    const normalizedSegment = normalizeCodeKey(segment);
 
-            const comparison = compareSortValues(leftValue, rightValue);
-            return sortConfig.direction === 'asc' ? comparison : -comparison;
+    return reportEntries
+      .filter((entry) => entry.monthYear === monthLabel)
+      .filter((entry) => normalizeSbuValue(entry.mgrCode) === normalizedSbu)
+      .filter((entry) => !segment || normalizeCodeKey(entry.mgrCode2) === normalizedSegment)
+      .reduce((sum, entry) => sum + getPlanningEntryTotal(entry), 0);
+  };
+
+  const getMergedSbuReportCellValue = (row = {}, sbu = "", monthLabel = "", segment = "") => {
+    const reportValue = getSbuReportCellValue(row, sbu);
+    if (reportValue > 0) {
+      return reportValue;
+    }
+
+    return getEntriesBackedSbuValue(monthLabel || row.monthLabel || row.month, sbu, segment);
+  };
+
+  const computedStatusBreakdownData = useMemo(() => {
+    const visibleMonths = combinedReportData?.monthYear ? [combinedReportData.monthYear] : monthLabels;
+    const sbuWise = combinedReportData?.sbuWise || [];
+
+    return visibleMonths.map(month => {
+      const monthRows = sbuWise.filter(r => r.month?.toUpperCase() === month?.toUpperCase());
+      const sbus = Array.from(new Set(monthRows.map(r => normalizeSbuValue(r.sbu)))).filter(Boolean);
+
+      const sbuGroups = sbus.map(sbu => {
+        const sbuRows = monthRows.filter(r => normalizeSbuValue(r.sbu) === sbu);
+        const sbuLabel = sbuRows[0]?.sbu || sbu;
+
+        const segments = Array.from(new Set(sbuRows.map(r => r.segment || "Unassigned"))).filter(Boolean);
+
+        const segmentGroups = segments.map(seg => {
+          const segRows = sbuRows.filter(r => (r.segment || "Unassigned") === seg);
+          const statuses = {};
+          STATUS_REPORT_COLUMNS.forEach(col => {
+            statuses[col] = segRows.filter(r => r.status === col).reduce((sum, r) => sum + Number(r.value || 0), 0);
+          });
+          const total = Object.values(statuses).reduce((sum, v) => sum + v, 0);
+          return { segment: seg, statuses, total };
+        }).filter(seg => seg.total > 0);
+
+        const sbuTotalStatuses = {};
+        STATUS_REPORT_COLUMNS.forEach(col => {
+          sbuTotalStatuses[col] = segmentGroups.reduce((sum, seg) => sum + seg.statuses[col], 0);
         });
+        const sbuGrandTotal = Object.values(sbuTotalStatuses).reduce((sum, v) => sum + v, 0);
 
-        return rows;
-    }, [filteredEntries, sortConfig, monthOrder, mgrList, mgrList2, getCustomerCode, getProductCode]);
+        return { sbu: sbuLabel, segmentGroups, sbuTotalStatuses, sbuGrandTotal };
+      }).filter(sbu => sbu.sbuGrandTotal > 0);
 
-    const computedStatusBreakdownData = useMemo(() => {
-        const visibleMonthLabels = combinedReportData?.monthYear ? [combinedReportData.monthYear] : monthLabels;
+      const monthTotalStatuses = {};
+      STATUS_REPORT_COLUMNS.forEach(col => {
+        monthTotalStatuses[col] = sbuGroups.reduce((sum, sbu) => sum + sbu.sbuTotalStatuses[col], 0);
+      });
+      const monthGrandTotal = Object.values(monthTotalStatuses).reduce((sum, v) => sum + v, 0);
 
-        const grouped = {};
+      return { month, sbuGroups, monthTotalStatuses, monthGrandTotal };
+    });
+  }, [combinedReportData, monthLabels]);
 
-        visibleMonthLabels.forEach((monthLabel) => {
-            grouped[monthLabel] = {};
-        });
+  const statusBreakdownSummaryRows = useMemo(() => {
+    if (!computedStatusBreakdownData || computedStatusBreakdownData.length === 0) return [];
 
-        if (combinedReportData?.sbuWise) {
-            combinedReportData.sbuWise.forEach((row) => {
-                const { month, segment, status, sbu, value } = row;
+    const grandTotals = {};
+    STATUS_REPORT_COLUMNS.forEach(col => {
+      grandTotals[col] = computedStatusBreakdownData.reduce((sum, month) => {
+        return sum + month.sbuGroups.reduce((sSum, sbu) => sSum + sbu.sbuTotalStatuses[col], 0);
+      }, 0);
+    });
+    const grandTotalValue = Object.values(grandTotals).reduce((sum, v) => sum + v, 0);
 
-                if (!grouped[month]) grouped[month] = {};
-                if (!grouped[month][segment]) grouped[month][segment] = {};
-                if (!grouped[month][segment][status]) {
-                    grouped[month][segment][status] = {
-                        EPC: 0,
-                        SBU1: 0,
-                        SBU2: 0,
-                        SBU3: 0
-                    };
-                }
+    const percentageRow = {};
+    STATUS_REPORT_COLUMNS.forEach(col => {
+      percentageRow[col] = grandTotalValue > 0
+        ? Number(((grandTotals[col] / grandTotalValue) * 100).toFixed(2))
+        : 0;
+    });
+    percentageRow.total = grandTotalValue > 0 ? 100 : 0;
 
-                if (sbu && grouped[month][segment][status][sbu] !== undefined) {
-                    grouped[month][segment][status][sbu] += Number(value || 0);
-                }
-            });
-        }
+    const prevYearStatusTotals = combinedReportData?.prevYearStatusTotals || {};
+    const prevYearTotal = Number(prevYearStatusTotals.total || 0);
 
-        const months = visibleMonthLabels
-            .map((monthLabel) => {
-                const segments = Object.keys(grouped[monthLabel] || {}).map((segment) => ({
-                    segment,
-                    statuses: grouped[monthLabel][segment]
-                }));
+    const percentagePYRow = {};
+    STATUS_REPORT_COLUMNS.forEach(col => {
+      percentagePYRow[col] = prevYearTotal > 0
+        ? Number(((Number(prevYearStatusTotals[col] || 0) / prevYearTotal) * 100).toFixed(2))
+        : 0;
+    });
 
-                return {
-                    month: monthLabel,
-                    segments
-                };
-            });
+    return [
+      {
+        key: "total",
+        label: "TOTAL",
+        isTotal: true,
+        values: grandTotals,
+        rowTotal: grandTotalValue,
+      },
+      {
+        key: "percentage",
+        label: "Percentage CY",
+        isPercentage: true,
+        values: percentageRow,
+        rowTotal: percentageRow.total,
+      },
+      {
+        key: "prev-year",
+        label: "Value (Previous Year)",
+        isPreviousYearValue: true,
+        values: prevYearStatusTotals,
+        rowTotal: prevYearTotal,
+      },
+      {
+        key: "prev-percentage",
+        label: "Percentage PY",
+        isTotalPercentage: true,
+        values: percentagePYRow,
+        rowTotal: prevYearTotal > 0 ? 100 : 0,
+      }
+    ];
+  }, [computedStatusBreakdownData, combinedReportData]);
 
-        return months;
-    }, [combinedReportData, monthLabels]);
+  const visibleStatusColumns = useMemo(() => {
+    if (!computedStatusBreakdownData) return [];
+    return STATUS_REPORT_COLUMNS.filter(col => {
+      // Check if any month/SBU/segment has data for this column
+      const hasDataInMain = computedStatusBreakdownData.some(month =>
+        month.sbuGroups.some(sbu => sbu.sbuTotalStatuses[col] > 0)
+      );
+      if (hasDataInMain) return true;
 
-    useEffect(() => {
-        if (computedStatusBreakdownData) {
-            setExpandedStatusBreakdownSegments((prev) => {
-                const next = { ...prev };
-                computedStatusBreakdownData.forEach((monthEntry) => {
-                    monthEntry.segments.forEach((segmentEntry) => {
-                        const key = `${monthEntry.month}-${segmentEntry.segment}`;
-                        if (typeof next[key] === 'undefined') {
-                            next[key] = true;
-                        }
-                    });
-                });
-                return next;
-            });
-        }
-    }, [computedStatusBreakdownData]);
+      // Check summary rows
+      const hasDataInSummary = (statusBreakdownSummaryRows || []).some(row =>
+        Number(row.values[col] || 0) > 0
+      );
+      return hasDataInSummary;
+    });
+  }, [computedStatusBreakdownData, statusBreakdownSummaryRows]);
 
-    const computedSbuWiseData = useMemo(() => {
-        const visibleMonthLabels = combinedReportData?.monthYear ? [combinedReportData.monthYear] : monthLabels;
-
-        const monthMap = new Map();
-
-        visibleMonthLabels.forEach((monthLabel) => {
-            const statusRows = {};
-            STATUS_REPORT_ROWS.forEach((statusRow) => {
-                statusRows[statusRow.key] = { status: statusRow.label, ...Object.fromEntries(combinedReportData?.mgrCodes?.map(sbu => [sbu, 0]) || []), total: 0 };
-            });
-            // Add All row
-            statusRows['All'] = { status: 'All', ...Object.fromEntries(combinedReportData?.mgrCodes?.map(sbu => [sbu, 0]) || []), total: 0 };
-            monthMap.set(monthLabel, {
-                month: monthLabel,
-                rows: statusRows
-            });
-        });
-
-        if (combinedReportData?.sbuWise) {
-            combinedReportData.sbuWise.forEach((row) => {
-                const monthEntry = monthMap.get(row.month);
-                const normalizedStatus = STATUS_REPORT_ROWS.find((statusRow) => statusRow.aliases.includes(row.status))?.key;
-                const allRow = monthEntry?.rows?.All;
-
-                if (!monthEntry || !normalizedStatus) {
-                    return;
-                }
-
-                const statusRow = monthEntry.rows[normalizedStatus];
-                const value = Number(row.value || 0);
-
-                if (statusRow && row.sbu) {
-                    statusRow[row.sbu] = (statusRow[row.sbu] || 0) + value;
-                    statusRow.total += value;
-                    if (allRow) {
-                        allRow[row.sbu] = (allRow[row.sbu] || 0) + value;
-                        allRow.total += value;
-                    }
-                }
-            });
-        }
-
-        const months = visibleMonthLabels
-            .map((monthLabel) => {
-                const monthEntry = monthMap.get(monthLabel);
-                const monthRows = STATUS_REPORT_ROWS
-                    .map((statusRow) => monthEntry.rows[statusRow.key])
-                    .concat(monthEntry.rows.All);
-
-                return {
-                    month: monthLabel,
-                    rows: monthRows,
-                    total: Number(monthEntry.rows.All?.total || 0)
-                };
-            });
-
-        return months;
-    }, [combinedReportData, monthLabels]);
-
-    const handleNewRowChange = (field, value) => {
-        setNewRow((prev) => ({ ...prev, [field]: value }));
-    };
-
-    const handleFilterChange = (field, value) => {
-        setFilters((prev) => ({ ...prev, [field]: value }));
-    };
-
-    const clearFilters = () => {
-        const monthLabels = getMonthLabels(financialYear);
-        const defaultMonth = getCurrentMonthLabel(financialYear);
-        setFilters({
-            month: monthLabels.includes(defaultMonth) ? defaultMonth : monthLabels[0],
-            mgrCode: '',
-            mgrCode2: '',
-            status: ''
-        });
-    };
-
-    const handleReportFilterChange = (field, value) => {
-        setReportFilters((prev) => {
-            const next = { ...prev, [field]: value };
-            if (field === 'month') {
-                if (!value) {
-                    next.year = '';
-                } else {
-                    const startYear = parseInt(financialYear.split('-')[0], 10);
-                    const monthIndex = FY_MONTHS.indexOf(value);
-                    next.year = String(monthIndex <= 8 ? startYear : startYear + 1);
-                }
-            }
-            return next;
-        });
-    };
-
-    const clearReportFilters = () => {
-        setReportFilters({
-            month: '',
-            year: ''
-        });
-    };
-
-    const getStatusClasses = (status) => {
-        switch (status) {
-            case 'Firm':
-                return 'bg-emerald-50 text-emerald-700';
-            case 'MFC':
-                return 'bg-amber-50 text-amber-700';
-            case 'B & B':
-                return 'bg-purple-50 text-purple-700';
-            case 'Invoice':
-                return 'bg-orange-50 text-orange-700';
-            case 'Order Received':
-                return 'bg-sky-50 text-sky-700';
-            case 'Lost':
-                return 'bg-rose-50 text-rose-700';
-            case 'Parked':
-                return 'bg-slate-200 text-slate-700';
-            default:
-                return 'bg-slate-100 text-slate-600';
-        }
-    };
-
-    const selectCustomer = (customer) => {
-        const name = customer.companyName || customer.customerName;
-        setNewRow((prev) => ({
-            ...prev,
-            customerId: customer._id,
-            customerName: name
-        }));
-        setCustomerSearch(name);
-        setShowCustomerDropdown(false);
-    };
-
-    const selectProduct = (product) => {
-        setNewRow((prev) => ({
-            ...prev,
-            productId: product._id,
-            productName: product.productName
-        }));
-        setProductSearch(product.productName);
-        setShowProductDropdown(false);
-    };
-
-    const handleSaveEntry = async () => {
-        // CRITICAL: Enforce month selection first
-        if (!filters.month) {
-            toast.error('⚠️ Please select a Month first in the filters above');
-            return;
-        }
-        
-        if (!newRow.customerId || !newRow.productId || newRow.qty === '' || newRow.value === '' || !newRow.mgrCode || !newRow.status) {
-            toast.error('Please fill all mandatory fields (MGR 2 is optional, Month auto-set)');
-            return;
-        }
-        
-        // Auto-set inline entry month to selected filter month
-        const monthToUse = newRow.monthYear || filters.month;
-        if (!monthToUse) {
-            toast.error('Please select a Month');
-            return;
-        }
-
-        try {
-            const dataToSave = {
-                ...newRow,
-                monthYear: monthToUse,
-                financialYear,
-                qty: Number(newRow.qty),
-                value: Number(newRow.value),
-                mgrCode: getCanonicalMgrCode(newRow.mgrCode, mgrList),
-                mgrCode2: getCanonicalMgrCode(newRow.mgrCode2, mgrList2),
-                month: FY_MONTHS.indexOf(monthToUse.split('-')[0]) + 1
-            };
-
-            if (editingId) {
-                await planningService.update(editingId, dataToSave);
-                toast.success('Entry updated');
-                setEditingId(null);
-            } else {
-                await planningService.create(dataToSave);
-                toast.success('Entry added');
-            }
-
-            setNewRow({ ...emptyRow });
-            setCustomerSearch('');
-            setProductSearch('');
-            setShowCustomerDropdown(false);
-            setShowProductDropdown(false);
-            await fetchData();
-        } catch (err) {
-            toast.error(err.response?.data?.message || (editingId ? 'Failed to update entry' : 'Failed to add entry'));
-        }
-    };
-
-    const handleEditEntry = (entry) => {
-        setEditingId(entry._id);
-        // Set filter month to the entry's month when editing
-        setFilters((prev) => ({
-            ...prev,
-            month: entry.monthYear
-        }));
-        setNewRow({
-            monthYear: entry.monthYear,
-            customerId: entry.customerId?._id || entry.customerId || '',
-            customerName: entry.customerName || entry.customerId?.companyName || entry.customerId?.customerName || '',
-            productId: entry.productId?._id || entry.productId || '',
-            productName: entry.productName || entry.productId?.productName || '',
-            qty: entry.qty,
-            value: entry.value,
-            mgrCode: getCanonicalMgrCode(entry.mgrCode, mgrList),
-            mgrCode2: getCanonicalMgrCode(entry.mgrCode2 || '', mgrList2),
-            status: entry.status
-        });
-        setCustomerSearch(entry.customerName || entry.customerId?.companyName || entry.customerId?.customerName || '');
-        setProductSearch(entry.productName || entry.productId?.productName || '');
-        setShowCustomerDropdown(false);
-        setShowProductDropdown(false);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        setIsGridExpanded(true);
-    };
-
-    const handleCancelEdit = () => {
-        setEditingId(null);
-        setNewRow({ ...emptyRow });
-        setCustomerSearch('');
-        setProductSearch('');
-        setShowCustomerDropdown(false);
-        setShowProductDropdown(false);
-    };
-
-    const handleDeleteEntry = async (id) => {
-        try {
-            await planningService.delete(id);
-            toast.success('Entry removed');
-            await fetchData();
-        } catch {
-            toast.error('Failed to delete entry');
-        }
-    };
-
-    const buildReportExportRows = (data, getExportCellValue) => {
-        const reportRows = [['', ...data.mgrCodes, 'Total']];
-
-        data.rows.forEach((row) => {
-            const firstCell = data.reportType === 'SBU'
-                ? row.isSegment
-                    ? `   ${row.month}`
-                    : row.isMonth
-                        ? `v ${row.month}`
-                        : row.month
-                : row.parentMonth
-                ? `   ${row.month}`
-                : row.isMonth
-                    ? `▼ ${row.month}`
-                    : row.month;
-
-            reportRows.push([
-                firstCell,
-                ...data.mgrCodes.map((mgr) => getExportCellValue(row, row[mgr] || 0)),
-                getExportCellValue(row, row.total || 0, true)
-            ]);
-
-        });
-
-        return reportRows;
-    };
-
-    const getReportSheetColumns = (data) => [{ wch: 26 }, ...data.mgrCodes.map(() => ({ wch: 16 })), { wch: 16 }];
-
-    const exportToExcel = () => {
-        if (!sortedEntries.length && !combinedReportData && !reportData2) {
-            toast.error('No planning data available to export');
-            return;
-        }
-
-        const workbook = XLSX.utils.book_new();
-        const getExportCellValue = (row, value, isTotalColumn = false) => {
-            if (row.isPercentage || row.isTotalPercentage) {
-                return isTotalColumn ? formatReportPercentageTotal(value) : formatReportPercentage(value);
-            }
-
-            return formatReportValue(value, 3);
-        };
-
-        const buildReportSheet = (data) => {
-            const sheet = XLSX.utils.aoa_to_sheet(buildReportExportRows(data, getExportCellValue));
-            sheet['!cols'] = getReportSheetColumns(data);
-            return sheet;
-        };
-
-        const entriesData = sortedEntries.map((entry) => ({
-            Month: entry.monthYear,
-            'Customer Code': getCustomerCode(entry.customerId),
-            'Customer Name': entry.customerName,
-            'Product Code': getProductCode(entry.productId),
-            'Product Name': entry.productName,
-            Qty: entry.qty,
-            Value: entry.value,
-            Total: entry.totalValue,
-            'MGR 1': getCanonicalMgrCode(entry.mgrCode, mgrList),
-            'MGR 2': getCanonicalMgrCode(entry.mgrCode2 || '', mgrList2),
-            Status: entry.status
-        }));
-        const entriesSheet = XLSX.utils.json_to_sheet(entriesData);
-        entriesSheet['!cols'] = [
-            { wch: 12 }, { wch: 15 }, { wch: 20 }, { wch: 15 },
-            { wch: 25 }, { wch: 10 }, { wch: 12 }, { wch: 12 },
-            { wch: 12 }, { wch: 12 }, { wch: 15 }
-        ];
-        XLSX.utils.book_append_sheet(workbook, entriesSheet, 'Planning Entries');
-
-        if (combinedReportData) {
-            const reportSheet = buildReportSheet(combinedReportData);
-            XLSX.utils.book_append_sheet(workbook, reportSheet, 'SBU Wise Report');
-        }
-
-        if (reportData2) {
-            const reportSheet2 = buildReportSheet(reportData2);
-            XLSX.utils.book_append_sheet(workbook, reportSheet2, 'Segment Wise Report');
-        }
-
-        XLSX.writeFile(workbook, `Planning-${financialYear}.xlsx`);
-        toast.success('Excel downloaded with customer and product code details');
-    };
-
-    const exportReportToExcel = (data, reportLabel) => {
-        if (!data || !data.mgrCodes?.length) {
-            toast.error(`No data available for ${reportLabel}`);
-            return;
-        }
-
-        const workbook = XLSX.utils.book_new();
-        let reportRows = [];
-
-        // Handle SBU Wise Report (Status x SBU matrix)
-        if (reportLabel.includes('SBU')) {
-            reportRows = [['Status', ...data.mgrCodes, 'Total']];
-            
-            (data.statusColumns || []).forEach((status) => {
-                let rowTotal = 0;
-                const rowData = [status];
-
-                data.mgrCodes.forEach((sbu) => {
-                    const value = (data.sbuWise || [])
-                        .filter((entry) => normalizeCodeKey(entry.sbu) === normalizeCodeKey(sbu) && entry.status === status)
-                        .reduce((sum, entry) => sum + Number(entry.value || 0), 0);
-                    rowData.push(formatReportValue(value, 0));
-                    rowTotal += value;
-                });
-
-                rowData.push(formatReportValue(rowTotal, 0));
-                reportRows.push(rowData);
-            });
-
-            // Add total row
-            const totalRow = ['Total'];
-            let grandTotal = 0;
-            data.mgrCodes.forEach((sbu) => {
-                const total = (data.sbuWise || [])
-                    .filter((entry) => normalizeCodeKey(entry.sbu) === normalizeCodeKey(sbu))
-                    .reduce((sum, entry) => sum + Number(entry.value || 0), 0);
-                totalRow.push(formatReportValue(total, 0));
-                grandTotal += total;
-            });
-            totalRow.push(formatReportValue(grandTotal, 0));
-            reportRows.push(totalRow);
-        } else {
-            // Handle other report types (original logic)
-            const getExportCellValue = (row, value, isTotalColumn = false) => {
-                if (row.isPercentage || row.isTotalPercentage) {
-                    return isTotalColumn ? formatReportPercentageTotal(value) : formatReportPercentage(value);
-                }
-                return formatReportValue(value, 3);
-            };
-
-            reportRows = buildReportExportRows(data, getExportCellValue);
-        }
-
-        const sheet = XLSX.utils.aoa_to_sheet(reportRows);
-        sheet['!cols'] = [{ wch: 16 }, ...data.mgrCodes.map(() => ({ wch: 14 })), { wch: 14 }];
-        XLSX.utils.book_append_sheet(workbook, sheet, reportLabel);
-
-        const safeReportLabel = reportLabel.replace(/\s+/g, '-');
-        XLSX.writeFile(workbook, `${safeReportLabel}-${financialYear}.xlsx`);
-        toast.success(`${reportLabel} exported`);
-    };
-
-    const exportStatusBreakdownToExcel = () => {
-        if (!computedStatusBreakdownData || computedStatusBreakdownData.length === 0) {
-            toast.error('No status breakdown data available to export');
-            return;
-        }
-
-        const workbook = XLSX.utils.book_new();
-
-        const rows = [['Month', 'Segment', 'Status', 'EPC', 'SBU1', 'SBU2', 'SBU3']];
-
+  useEffect(() => {
+    if (computedStatusBreakdownData) {
+      setExpandedStatusBreakdownSegments((prev) => {
+        const next = { ...prev };
         computedStatusBreakdownData.forEach((monthEntry) => {
-            monthEntry.segments.forEach((segmentEntry) => {
-                Object.keys(segmentEntry.statuses).forEach((status) => {
-                    const row = segmentEntry.statuses[status];
-                    rows.push([
-                        monthEntry.month,
-                        segmentEntry.segment,
-                        status,
-                        formatReportValue(row.EPC || 0, 0),
-                        formatReportValue(row.SBU1 || 0, 0),
-                        formatReportValue(row.SBU2 || 0, 0),
-                        formatReportValue(row.SBU3 || 0, 0)
-                    ]);
-                });
-            });
+          STATUS_BREAKDOWN_ORDERED_ROWS.forEach((segmentEntry) => {
+            const key = `${monthEntry.month}-${segmentEntry.key}`;
+            if (typeof next[key] === "undefined") {
+              next[key] = false;
+            }
+          });
+        });
+        return next;
+      });
+    }
+  }, [computedStatusBreakdownData]);
+
+  const computedSbuWiseData = useMemo(() => {
+    const visibleMonthLabels = combinedReportData?.monthYear
+      ? [combinedReportData.monthYear]
+      : monthLabels;
+
+    const monthMap = new Map();
+
+    visibleMonthLabels.forEach((monthLabel) => {
+      const statusRows = {};
+      STATUS_REPORT_ROWS.forEach((statusRow) => {
+        statusRows[statusRow.key] = {
+          status: statusRow.label,
+          ...Object.fromEntries(
+            combinedReportData?.mgrCodes?.map((sbu) => [sbu, 0]) || [],
+          ),
+          total: 0,
+        };
+      });
+      // Add All row
+      statusRows["All"] = {
+        status: "All",
+        ...Object.fromEntries(
+          combinedReportData?.mgrCodes?.map((sbu) => [sbu, 0]) || [],
+        ),
+        total: 0,
+      };
+      monthMap.set(monthLabel, {
+        month: monthLabel,
+        rows: statusRows,
+      });
+    });
+
+    if (combinedReportData?.sbuWise) {
+      combinedReportData.sbuWise.forEach((row) => {
+        const monthEntry = monthMap.get(row.month);
+        const normalizedStatus = STATUS_REPORT_ROWS.find((statusRow) =>
+          statusRow.aliases.includes(row.status),
+        )?.key;
+        const allRow = monthEntry?.rows?.All;
+
+        if (!monthEntry || !normalizedStatus) {
+          return;
+        }
+
+        const statusRow = monthEntry.rows[normalizedStatus];
+        const value = Number(row.value || 0);
+
+        if (statusRow && row.sbu) {
+          statusRow[row.sbu] = (statusRow[row.sbu] || 0) + value;
+          statusRow.total += value;
+          if (allRow) {
+            allRow[row.sbu] = (allRow[row.sbu] || 0) + value;
+            allRow.total += value;
+          }
+        }
+      });
+    }
+
+    const months = visibleMonthLabels.map((monthLabel) => {
+      const monthEntry = monthMap.get(monthLabel);
+      const monthRows = STATUS_REPORT_ROWS.map(
+        (statusRow) => monthEntry.rows[statusRow.key],
+      ).concat(monthEntry.rows.All);
+
+      return {
+        month: monthLabel,
+        rows: monthRows,
+        total: Number(monthEntry.rows.All?.total || 0),
+      };
+    });
+
+    return months;
+  }, [combinedReportData, monthLabels]);
+
+  const handleNewRowChange = (field, value) => {
+    setNewRow((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleFilterChange = (field, value) => {
+    setFilters((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const clearFilters = () => {
+    setFilters({
+      month: "",
+      mgrCode: "",
+      mgrCode2: "",
+      status: "",
+    });
+  };
+
+  const selectCustomer = (customer) => {
+    const name = customer.companyName || customer.customerName;
+    setNewRow((prev) => ({
+      ...prev,
+      customerId: customer._id,
+      customerName: name,
+    }));
+    setCustomerSearch(name);
+    setShowCustomerDropdown(false);
+  };
+
+  const selectProduct = (product) => {
+    setNewRow((prev) => ({
+      ...prev,
+      productId: product._id,
+      productName: product.productName,
+    }));
+    setProductSearch(product.productName);
+    setShowProductDropdown(false);
+  };
+
+  const selectMgr1 = (mgr) => {
+    handleNewRowChange("mgrCode", mgr.code);
+    setMgr1Search("");
+    setShowMgr1Dropdown(false);
+  };
+
+  const selectMgr2 = (mgr) => {
+    handleNewRowChange("mgrCode2", mgr.code);
+    setMgr2Search("");
+    setShowMgr2Dropdown(false);
+  };
+
+  const selectStatus = (status) => {
+    handleNewRowChange("status", status);
+    setStatusSearch("");
+    setShowStatusDropdown(false);
+  };
+
+  const filteredMgrList = useMemo(() => {
+    if (!mgr1Search) return mgrList;
+    return mgrList.filter((mgr) =>
+      (mgr.code || "").toLowerCase().includes(mgr1Search.toLowerCase()) ||
+      (mgr.description || "").toLowerCase().includes(mgr1Search.toLowerCase())
+    );
+  }, [mgrList, mgr1Search]);
+
+  const filteredMgrList2 = useMemo(() => {
+    if (!mgr2Search) return mgrList2;
+    return mgrList2.filter((mgr) =>
+      (mgr.code || "").toLowerCase().includes(mgr2Search.toLowerCase()) ||
+      (mgr.description || "").toLowerCase().includes(mgr2Search.toLowerCase())
+    );
+  }, [mgrList2, mgr2Search]);
+
+  const filteredStatusList = useMemo(() => {
+    const allStatuses =
+      statusOptions.length > 0
+        ? statusOptions
+        : [
+          "Budget",
+          "Firm",
+          "MFC",
+          "B & B",
+          "Others",
+          "Order Received",
+          "Invoice",
+          "Lost",
+          "Parked",
+        ];
+    const statuses = allStatuses.filter(status => {
+      const normalized = String(status || '').trim().replace(/\s+/g, '').toUpperCase();
+      return ['MFC', 'INVOICE', 'FIRM', 'B&B', 'BB', 'BANDB', 'BUDGET'].includes(normalized);
+    });
+    if (!statusSearch) return statuses;
+    return statuses.filter((status) =>
+      (status || "").toLowerCase().includes(statusSearch.toLowerCase())
+    );
+  }, [statusOptions, statusSearch]);
+
+  const { isSubmitting: isSavingEntry, execute: handleSaveEntry } = useSubmitGuard(async () => {
+    // Validate entry month selection
+    if (!newRow.monthYear) {
+      toast.error("⚠️ Please select a Month for the entry");
+      return;
+    }
+
+    if (
+      !newRow.customerId ||
+      !newRow.productId ||
+      newRow.qty === "" ||
+      newRow.value === "" ||
+      !newRow.mgrCode ||
+      !newRow.status
+    ) {
+      toast.error(
+        "Please fill all mandatory fields (MGR 2 is optional)",
+      );
+      return;
+    }
+
+    const monthToUse = newRow.monthYear;
+    if (!monthToUse) {
+      toast.error("Please select a Month");
+      return;
+    }
+
+    try {
+      const dataToSave = {
+        ...newRow,
+        monthYear: monthToUse,
+        financialYear,
+        qty: Number(newRow.qty),
+        value: Number(newRow.value),
+        mgrCode: getCanonicalMgrCode(newRow.mgrCode, mgrList),
+        mgrCode2: getCanonicalMgrCode(newRow.mgrCode2, mgrList2),
+        month: FY_MONTHS.indexOf(monthToUse.split("-")[0].substring(0, 3)) + 1,
+      };
+
+      if (editingId) {
+        await planningService.update(editingId, dataToSave);
+        toast.success("Entry updated");
+        setEditingId(null);
+      } else {
+        await planningService.create(dataToSave);
+        toast.success("Entry added");
+      }
+
+      setNewRow({ ...emptyRow });
+      setCustomerSearch("");
+      setProductSearch("");
+      setShowCustomerDropdown(false);
+      setShowProductDropdown(false);
+      if (offset !== 0) {
+        setOffset(0);
+      } else {
+        await fetchData();
+      }
+    } catch (err) {
+      toast.error(
+        err.response?.data?.message ||
+        (editingId ? "Failed to update entry" : "Failed to add entry"),
+      );
+    }
+  });
+
+  const handleEditEntry = (entry) => {
+    setEditingId(entry._id);
+    setNewRow({
+      monthYear: entry.monthYear,
+      customerId: entry.customerId?._id || entry.customerId || "",
+      customerName:
+        entry.customerName ||
+        entry.customerId?.companyName ||
+        entry.customerId?.customerName ||
+        "",
+      productId: entry.productId?._id || entry.productId || "",
+      productName: entry.productName || entry.productId?.productName || "",
+      qty: entry.qty,
+      value: entry.value,
+      mgrCode: getCanonicalMgrCode(entry.mgrCode, mgrList),
+      mgrCode2: getCanonicalMgrCode(entry.mgrCode2 || "", mgrList2),
+      status: entry.status,
+    });
+    setCustomerSearch(
+      entry.customerName ||
+      entry.customerId?.companyName ||
+      entry.customerId?.customerName ||
+      "",
+    );
+    setProductSearch(entry.productName || entry.productId?.productName || "");
+    setShowCustomerDropdown(false);
+    setShowProductDropdown(false);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    setIsGridExpanded(true);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setNewRow({ ...emptyRow });
+    setCustomerSearch("");
+    setProductSearch("");
+    setShowCustomerDropdown(false);
+    setShowProductDropdown(false);
+  };
+
+  const handleDeleteEntry = async (id) => {
+    try {
+      await planningService.delete(id);
+      toast.success("Entry removed");
+      if (offset !== 0) {
+        setOffset(0);
+      } else {
+        await fetchData();
+      }
+    } catch {
+      toast.error("Failed to delete entry");
+    }
+  };
+
+  const buildReportExportRows = (data, getExportCellValue) => {
+    const reportRows = [["", ...data.mgrCodes, "Total"]];
+
+    data.rows.forEach((row) => {
+      const firstCell =
+        data.reportType === "SBU"
+          ? row.isSegment
+            ? `   ${row.month}`
+            : row.isMonth
+              ? `v ${row.month}`
+              : row.month
+          : row.parentMonth
+            ? `   ${row.month}`
+            : row.isMonth
+              ? `▼ ${row.month}`
+              : row.month;
+
+      reportRows.push([
+        firstCell,
+        ...data.mgrCodes.map((mgr) => getExportCellValue(row, row[mgr] || 0)),
+        getExportCellValue(row, row.total || 0, true),
+      ]);
+    });
+
+    return reportRows;
+  };
+
+  const getReportSheetColumns = (data) => [
+    { wch: 26 },
+    ...data.mgrCodes.map(() => ({ wch: 16 })),
+    { wch: 16 },
+  ];
+
+  const exportToExcel = () => {
+    if (!sortedEntries.length && !combinedReportData && !reportData2) {
+      toast.error("No planning data available to export");
+      return;
+    }
+
+    const workbook = XLSX.utils.book_new();
+    const getExportCellValue = (row, value, isTotalColumn = false) => {
+      if (row.isPercentage || row.isTotalPercentage) {
+        return isTotalColumn
+          ? formatReportPercentageTotal(value)
+          : formatReportPercentage(value);
+      }
+
+      return formatReportValue(value, 3);
+    };
+
+    const buildReportSheet = (data) => {
+      const sheet = XLSX.utils.aoa_to_sheet(
+        buildReportExportRows(data, getExportCellValue),
+      );
+      sheet["!cols"] = getReportSheetColumns(data);
+      return sheet;
+    };
+
+    const entriesData = sortedEntries.map((entry) => ({
+      Month: entry.monthYear,
+      "Customer Code": getCustomerCode(entry.customerId),
+      "Customer Name": entry.customerName,
+      "Product Code": getProductCode(entry.productId),
+      "Product Name": entry.productName,
+      Qty: entry.qty,
+      Value: entry.value,
+      Total: entry.totalValue,
+      "MGR 1": getCanonicalMgrCode(entry.mgrCode, mgrList),
+      "MGR 2": getCanonicalMgrCode(entry.mgrCode2 || "", mgrList2),
+      Status: entry.status,
+    }));
+    const entriesSheet = XLSX.utils.json_to_sheet(entriesData);
+    entriesSheet["!cols"] = [
+      { wch: 12 },
+      { wch: 15 },
+      { wch: 20 },
+      { wch: 15 },
+      { wch: 25 },
+      { wch: 10 },
+      { wch: 12 },
+      { wch: 12 },
+      { wch: 12 },
+      { wch: 12 },
+      { wch: 15 },
+    ];
+    XLSX.utils.book_append_sheet(workbook, entriesSheet, "Planning Entries");
+
+    if (combinedReportData) {
+      const reportSheet = buildReportSheet(combinedReportData);
+      XLSX.utils.book_append_sheet(workbook, reportSheet, "SBU Wise Report");
+    }
+
+    if (reportData2) {
+      const reportSheet2 = buildReportSheet(reportData2);
+      XLSX.utils.book_append_sheet(
+        workbook,
+        reportSheet2,
+        "Segment Wise Report",
+      );
+    }
+
+    XLSX.writeFile(workbook, `Planning-${financialYear}.xlsx`);
+    toast.success("Excel downloaded with customer and product code details");
+  };
+
+  const exportReportToExcel = (data, reportLabel) => {
+    if (!data || !data.mgrCodes?.length) {
+      toast.error(`No data available for ${reportLabel}`);
+      return;
+    }
+
+    const workbook = XLSX.utils.book_new();
+    let reportRows = [];
+
+    // Handle SBU Wise Report (Status x SBU matrix)
+    if (reportLabel.includes("SBU")) {
+      reportRows = [["Status", ...data.mgrCodes, "Total"]];
+
+      (data.statusColumns || []).forEach((status) => {
+        let rowTotal = 0;
+        const rowData = [status];
+
+        data.mgrCodes.forEach((sbu) => {
+          const value = (data.sbuWise || [])
+            .filter(
+              (entry) =>
+                normalizeCodeKey(entry.sbu) === normalizeCodeKey(sbu) &&
+                entry.status === status,
+            )
+            .reduce((sum, entry) => sum + Number(entry.value || 0), 0);
+          rowData.push(formatReportValue(value, 0));
+          rowTotal += value;
         });
 
-        const sheet = XLSX.utils.aoa_to_sheet(rows);
-        sheet['!cols'] = [{ wch: 16 }, { wch: 20 }, { wch: 20 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 16 }];
-        XLSX.utils.book_append_sheet(workbook, sheet, 'Status Breakdown Summary');
+        rowData.push(formatReportValue(rowTotal, 0));
+        reportRows.push(rowData);
+      });
 
-        XLSX.writeFile(workbook, `Status-Breakdown-Summary-${financialYear}.xlsx`);
-        toast.success('Status Breakdown Summary exported');
-    };
+      // Add total row
+      const totalRow = ["Total"];
+      let grandTotal = 0;
+      data.mgrCodes.forEach((sbu) => {
+        const total = (data.sbuWise || [])
+          .filter(
+            (entry) => normalizeCodeKey(entry.sbu) === normalizeCodeKey(sbu),
+          )
+          .reduce((sum, entry) => sum + Number(entry.value || 0), 0);
+        totalRow.push(formatReportValue(total, 0));
+        grandTotal += total;
+      });
+      totalRow.push(formatReportValue(grandTotal, 0));
+      reportRows.push(totalRow);
+    } else {
+      // Handle other report types (original logic)
+      const getExportCellValue = (row, value, isTotalColumn = false) => {
+        if (row.isPercentage || row.isTotalPercentage) {
+          return isTotalColumn
+            ? formatReportPercentageTotal(value)
+            : formatReportPercentage(value);
+        }
+        return formatReportValue(value, 3);
+      };
 
-    const requestSort = (key) => {
-        setSortConfig((prev) => ({
-            key,
-            direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
-        }));
-    };
+      reportRows = buildReportExportRows(data, getExportCellValue);
+    }
 
-    const renderSortableHeader = (label, key, className = '') => {
-        const isActive = sortConfig.key === key;
-        const isRightAligned = className.includes('text-right');
+    const sheet = XLSX.utils.aoa_to_sheet(reportRows);
+    sheet["!cols"] = [
+      { wch: 16 },
+      ...data.mgrCodes.map(() => ({ wch: 14 })),
+      { wch: 14 },
+    ];
+    XLSX.utils.book_append_sheet(workbook, sheet, reportLabel);
 
-        return (
-            <th className={`py-3 px-3 ${className}`}>
-                <button
-                    type="button"
-                    onClick={() => requestSort(key)}
-                    className={`group inline-flex items-center gap-1.5 font-black text-slate-700 text-xs ${isRightAligned ? 'w-full justify-end' : ''}`}
-                >
-                    <span>{label}</span>
-                    <MdKeyboardArrowDown
-                        className={`transition-all duration-200 ${isActive ? 'text-primary-600 opacity-100' : 'text-slate-300 opacity-70 group-hover:text-slate-500'} ${isActive && sortConfig.direction === 'asc' ? 'rotate-180' : ''}`}
-                        size={16}
-                    />
-                </button>
-            </th>
-        );
-    };
+    const safeReportLabel = reportLabel.replace(/\s+/g, "-");
+    XLSX.writeFile(workbook, `${safeReportLabel}-${financialYear}.xlsx`);
+    toast.success(`${reportLabel} exported`);
+  };
 
-    const toggleSegmentMonth = (monthLabel) => {
-        setExpandedSegmentMonths((prev) => ({
-            ...prev,
-            [monthLabel]: !prev[monthLabel]
-        }));
-    };
+  const exportStatusBreakdownToExcel = () => {
+    if (
+      !computedStatusBreakdownData ||
+      computedStatusBreakdownData.length === 0
+    ) {
+      toast.error("No status breakdown data available to export");
+      return;
+    }
 
-    const toggleStatusBreakdownMonth = (month) => {
-        setExpandedStatusBreakdownMonths((prev) => ({
-            ...prev,
-            [month]: !prev[month]
-        }));
-    };
+    const workbook = XLSX.utils.book_new();
+    const columns = visibleStatusColumns;
 
-    const toggleStatusBreakdownSegment = (month, segment) => {
-        setExpandedStatusBreakdownSegments((prev) => ({
-            ...prev,
-            [`${month}-${segment}`]: !prev[`${month}-${segment}`]
-        }));
-    };
+    const rows = [
+      ["Month", "SBU/EPC", "Segment", ...columns, "Total"]
+    ];
 
-    const toggleSbuWiseMonth = (month) => {
-        setExpandedSbuWiseMonths((prev) => ({
-            ...prev,
-            [month]: !prev[month]
-        }));
-    };
+    computedStatusBreakdownData.forEach((monthData) => {
+      // Month Total row
+      rows.push([
+        monthData.month,
+        "",
+        "",
+        ...columns.map((col) => monthData.monthTotalStatuses[col] || 0),
+        monthData.monthGrandTotal,
+      ]);
 
-    const calculatedTotal = (newRow.qty && newRow.value) ? Number(newRow.qty) * Number(newRow.value) : 0;
-    const compactFieldClass = 'w-full px-2.5 py-2.5 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-primary-500 bg-white';
-    const compactNumericFieldClass = `${compactFieldClass} text-right`;
-    const reportYearOptions = useMemo(() => getReportYearOptions(financialYear), [financialYear]);
-    const hasActiveReportFilters = Boolean(reportFilters.month || reportFilters.year);
+      monthData.sbuGroups.forEach((sbuGroup) => {
+        sbuGroup.segmentGroups.forEach((seg, segIdx) => {
+          rows.push([
+            "",
+            segIdx === 0 ? sbuGroup.sbu : "",
+            seg.segment,
+            ...columns.map((col) => seg.statuses[col] || 0),
+            seg.total,
+          ]);
+        });
+
+        // Add SBU Total row
+        rows.push([
+          "",
+          "",
+          `${sbuGroup.sbu} TOTAL`,
+          ...columns.map((col) => sbuGroup.sbuTotalStatuses[col] || 0),
+          sbuGroup.sbuGrandTotal,
+        ]);
+      });
+      rows.push([]); // Empty row for spacing
+    });
+
+    // Add summary rows
+    statusBreakdownSummaryRows.forEach((summaryRow) => {
+      rows.push([
+        summaryRow.label,
+        "",
+        "",
+        ...columns.map((col) => {
+          const val = summaryRow.values[col] || 0;
+          return summaryRow.isPercentage || summaryRow.isTotalPercentage
+            ? `${val}%`
+            : val;
+        }),
+        summaryRow.isPercentage || summaryRow.isTotalPercentage
+          ? `${summaryRow.rowTotal}%`
+          : summaryRow.rowTotal,
+      ]);
+    });
+
+    const sheet = XLSX.utils.aoa_to_sheet(rows);
+    sheet["!cols"] = [
+      { wch: 15 },
+      { wch: 15 },
+      { wch: 20 },
+      ...columns.map(() => ({ wch: 12 })),
+      { wch: 12 },
+    ];
+    XLSX.utils.book_append_sheet(workbook, sheet, "Status Breakdown Summary");
+
+    XLSX.writeFile(workbook, `Status-Breakdown-Summary-${financialYear}.xlsx`);
+    toast.success("Status Breakdown Summary exported");
+  };
+
+  const requestSort = (key) => {
+    setSortConfig((prev) => ({
+      key,
+      direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc",
+    }));
+  };
+
+  const renderSortableHeader = (label, key, className = "") => {
+    const isActive = sortConfig.key === key;
+    const isRightAligned = className.includes("text-right");
 
     return (
-        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-24">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-4xl font-black text-slate-900 tracking-tight flex items-center gap-3">
-                        <MdCalendarMonth className="text-primary-600" />
-                        Planning Screen
-                    </h1>
-                    <p className="text-slate-500 font-medium mt-1">Plan monthly targets by customer, product, and MGR</p>
-                </div>
-                <div className="flex flex-wrap gap-3 items-center">
-                    <select
-                        value={financialYear}
-                        onChange={(e) => setFinancialYear(e.target.value)}
-                        className="px-4 py-3 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-primary-500 bg-white"
-                    >
-                        {getFinancialYears().map((fy) => (
-                            <option key={fy} value={fy}>FY {fy}</option>
-                        ))}
-                    </select>
-                    <button onClick={fetchData} className="p-3 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition-all" title="Refresh now">
-                        <MdRefresh size={20} />
-                    </button>
-                    <button
-                        onClick={() => setIsImportModalOpen(true)}
-                        className="px-5 py-3 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center gap-2"
-                    >
-                        <MdFileUpload size={18} />
-                        Import
-                    </button>
-                    <button
-                        onClick={exportToExcel}
-                        className="px-5 py-3 bg-primary-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-primary-700 transition-all flex items-center gap-2"
-                    >
-                        <MdDownload size={18} />
-                        Export
-                    </button>
-                </div>
-            </div>
-
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-                <div className="p-4 md:p-5 border-b border-slate-100 bg-slate-50/60">
-                    <p className="text-xs font-black uppercase tracking-[0.25em] text-primary-600">Report Filters</p>
-                    <h2 className="text-xl font-black text-slate-900 mt-1">Month + Year Control</h2>
-                    <p className="text-sm text-slate-500 font-medium mt-1">
-                        These filters apply to the SBU Wise and Segment Wise reports together.
-                    </p>
-                </div>
-                <div className="p-4 md:p-5">
-                    <div className="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 xl:flex-1">
-                            <div>
-                                <label className="block text-[11px] font-black uppercase tracking-widest text-slate-500 mb-2">Month</label>
-                                <select
-                                    value={reportFilters.month}
-                                    onChange={(e) => handleReportFilterChange('month', e.target.value)}
-                                    className="w-full px-3 py-3 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-primary-500 bg-white"
-                                >
-                                    <option value="">All Months</option>
-                                    {FY_MONTHS.map((month) => (
-                                        <option key={month} value={month}>{month}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-[11px] font-black uppercase tracking-widest text-slate-500 mb-2">Year</label>
-                                <select
-                                    value={reportFilters.year}
-                                    onChange={(e) => handleReportFilterChange('year', e.target.value)}
-                                    disabled={!reportFilters.month}
-                                    className="w-full px-3 py-3 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-primary-500 bg-white disabled:bg-slate-100 disabled:text-slate-400"
-                                >
-                                    <option value="">All Years</option>
-                                    {reportYearOptions.map((year) => (
-                                        <option key={year} value={year}>{year}</option>
-                                    ))}
-                                </select>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <button
-                                onClick={clearReportFilters}
-                                disabled={!hasActiveReportFilters}
-                                className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-600 font-bold hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                <MdRefresh size={18} />
-                                Clear Report Filters
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-                <div
-                    className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center cursor-pointer hover:bg-slate-100/50 transition-colors"
-                    onClick={() => setIsGridExpanded(!isGridExpanded)}
-                >
-                    <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
-                        <MdKeyboardArrowDown className={`text-slate-500 transition-transform duration-300 ${!isGridExpanded ? '-rotate-90' : ''}`} size={20} />
-                        Planning Grid
-                    </h2>
-                </div>
-
-                {isGridExpanded && (
-                    <>
-                        <div className="p-4 md:p-5 border-b border-slate-100 bg-slate-50/60 space-y-4">
-                            <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
-                                <div>
-                                    <p className="text-xs font-black uppercase tracking-[0.25em] text-primary-600">
-                                        {editingId ? 'Edit Entry' : 'Inline Entry'}
-                                    </p>
-                                    <h3 className="text-xl font-black text-slate-900 mt-1">
-                                        {editingId ? 'Update Planning Entry' : 'Add Planning Entry'}
-                                    </h3>
-                                    <p className="text-sm text-slate-500 font-medium mt-1">
-                                        The data-entry row is back inside the grid for faster single-line entry.
-                                    </p>
-                                </div>
-                                {editingId && (
-                                    <button
-                                        onClick={handleCancelEdit}
-                                        className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 transition-colors"
-                                    >
-                                        <MdClose size={18} />
-                                        Cancel Edit
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-
-                        <div className="px-4 md:px-5 py-4 border-b border-slate-100 bg-white">
-                            <div className="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-4">
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 xl:flex-1">
-                                    <div>
-                                        <label className="block text-[11px] font-black uppercase tracking-widest text-slate-500 mb-2">📅 Filter Month (Primary)</label>
-                                        <select
-                                            value={filters.month}
-                                            onChange={(e) => handleFilterChange('month', e.target.value)}
-                                            className="w-full px-3 py-3 border border-primary-300 rounded-xl text-sm font-bold outline-none focus:border-primary-500 bg-primary-50"
-                                        >
-                                            <option value="">Select month...</option>
-                                            {monthLabels.map((month) => (
-                                                <option key={month} value={month}>{month}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-[11px] font-black uppercase tracking-widest text-slate-500 mb-2">Filter MGR 1</label>
-                                        <select
-                                            value={filters.mgrCode}
-                                            onChange={(e) => handleFilterChange('mgrCode', e.target.value)}
-                                            className="w-full px-3 py-3 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-primary-500 bg-white"
-                                        >
-                                            <option value="">All MGR 1</option>
-                                            {mgrList.map((mgr) => (
-                                                <option key={mgr._id} value={mgr.code}>{mgr.code}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-[11px] font-black uppercase tracking-widest text-slate-500 mb-2">Filter MGR 2</label>
-                                        <select
-                                            value={filters.mgrCode2}
-                                            onChange={(e) => handleFilterChange('mgrCode2', e.target.value)}
-                                            className="w-full px-3 py-3 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-primary-500 bg-white"
-                                        >
-                                            <option value="">All MGR 2</option>
-                                            {mgrList2.map((mgr) => (
-                                                <option key={mgr._id} value={mgr.code}>{mgr.code}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-[11px] font-black uppercase tracking-widest text-slate-500 mb-2">Filter Status</label>
-                                        <select
-                                            value={filters.status}
-                                            onChange={(e) => handleFilterChange('status', e.target.value)}
-                                            className="w-full px-3 py-3 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-primary-500 bg-white"
-                                        >
-                                            <option value="">All Statuses</option>
-                                            {STATUS_OPTIONS.map((status) => (
-                                                <option key={status} value={status}>{status}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                </div>
-
-                                <div className="flex items-center gap-3">
-                                    <span className="px-3 py-2 rounded-xl bg-slate-100 text-slate-600 text-sm font-bold">
-                                        {filteredEntries.length} {filteredEntries.length === 1 ? 'entry' : 'entries'}
-                                    </span>
-                                    <button
-                                        onClick={clearFilters}
-                                        disabled={!hasActiveFilters}
-                                        className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-600 font-bold hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        <MdRefresh size={18} />
-                                        Clear Filters
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="overflow-hidden">
-                            <table className="w-full table-fixed text-left text-sm">
-                                <colgroup>
-                                    <col className="w-[8%]" />
-                                    <col className="w-[17%]" />
-                                    <col className="w-[21%]" />
-                                    <col className="w-[6%]" />
-                                    <col className="w-[8%]" />
-                                    <col className="w-[9%]" />
-                                    <col className="w-[9%]" />
-                                    <col className="w-[9%]" />
-                                    <col className="w-[13%]" />
-                                </colgroup>
-                                <thead>
-                                    <tr className="bg-amber-50 border-b border-amber-100">
-                                        {renderSortableHeader('Month', 'monthYear', 'px-2 py-3')}
-                                        {renderSortableHeader('Customer', 'customerName', 'px-2 py-3')}
-                                        {renderSortableHeader('Product Name', 'productName', 'px-2 py-3')}
-                                        {renderSortableHeader('Qty', 'qty', 'px-2 py-3 text-right')}
-                                        {renderSortableHeader('Value', 'value', 'px-2 py-3 text-right')}
-                                        {renderSortableHeader('Total', 'totalValue', 'px-2 py-3 text-right bg-amber-100')}
-                                        {renderSortableHeader('MGR 1', 'mgrCode', 'px-2 py-3')}
-                                        {renderSortableHeader('MGR 2', 'mgrCode2', 'px-2 py-3')}
-                                        {renderSortableHeader('Status', 'status', 'px-2 py-3')}
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-50">
-                                    <tr className="bg-primary-50/40 border-b border-primary-100 align-top">
-                                        <td className="py-2 px-2">
-                                            <div className="w-full px-2.5 py-2.5 border border-primary-400 rounded-lg text-xs font-black outline-none bg-primary-100 text-primary-700">
-                                                {filters.month || '⚠️ Select month'}
-                                            </div>
-                                        </td>
-                                        <td ref={customerAnchorRef} className="py-2 px-2">
-                                            <input
-                                                type="text"
-                                                value={customerSearch}
-                                                onChange={(e) => {
-                                                    setCustomerSearch(e.target.value);
-                                                    handleNewRowChange('customerId', '');
-                                                    handleNewRowChange('customerName', '');
-                                                    setShowCustomerDropdown(true);
-                                                }}
-                                                onFocus={() => setShowCustomerDropdown(true)}
-                                                placeholder="Type customer name"
-                                                className={compactFieldClass}
-                                            />
-                                            <PortalDropdown isOpen={showCustomerDropdown && filteredCustomers.length > 0} anchorRef={customerAnchorRef}>
-                                                <div className="bg-white border border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto custom-scrollbar">
-                                                    {filteredCustomers.map((customer) => (
-                                                        <button
-                                                            key={customer._id}
-                                                            onClick={() => selectCustomer(customer)}
-                                                            className="w-full text-left px-3 py-2.5 text-sm font-bold hover:bg-primary-50 transition-colors border-b border-slate-50"
-                                                        >
-                                                            <div>{customer.companyName || customer.customerName}</div>
-                                                            <div className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                                                                {customer.externalCode || getFallbackCode('CUST', customer._id)}
-                                                            </div>
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            </PortalDropdown>
-                                        </td>
-                                        <td ref={productAnchorRef} className="py-2 px-2">
-                                            <input
-                                                type="text"
-                                                value={productSearch}
-                                                onChange={(e) => {
-                                                    setProductSearch(e.target.value);
-                                                    handleNewRowChange('productId', '');
-                                                    handleNewRowChange('productName', '');
-                                                    setShowProductDropdown(true);
-                                                }}
-                                                onFocus={() => setShowProductDropdown(true)}
-                                                placeholder="Type product name"
-                                                className={compactFieldClass}
-                                            />
-                                            <PortalDropdown isOpen={showProductDropdown && filteredProducts.length > 0} anchorRef={productAnchorRef}>
-                                                <div className="bg-white border border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto custom-scrollbar">
-                                                    {filteredProducts.map((product) => (
-                                                        <button
-                                                            key={product._id}
-                                                            onClick={() => selectProduct(product)}
-                                                            className="w-full text-left px-3 py-2.5 text-sm font-bold hover:bg-primary-50 transition-colors border-b border-slate-50"
-                                                        >
-                                                            {product.productName}
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            </PortalDropdown>
-                                        </td>
-                                        <td className="py-2 px-2">
-                                            <input
-                                                type="number"
-                                                value={newRow.qty}
-                                                onChange={(e) => handleNewRowChange('qty', e.target.value)}
-                                                placeholder="0"
-                                                className={compactNumericFieldClass}
-                                            />
-                                        </td>
-                                        <td className="py-2 px-2">
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                value={newRow.value}
-                                                onChange={(e) => handleNewRowChange('value', e.target.value)}
-                                                placeholder="0"
-                                                className={compactNumericFieldClass}
-                                            />
-                                        </td>
-                                        <td className="py-2 px-2 bg-amber-50/80">
-                                            <div className="px-2.5 py-2.5 rounded-lg bg-amber-50 border border-amber-100 text-sm font-black text-slate-900 text-right">
-                                                {formatToIndian(calculatedTotal, 2)}
-                                            </div>
-                                        </td>
-                                        <td className="py-2 px-2">
-                                            <select
-                                                value={newRow.mgrCode}
-                                                onChange={(e) => handleNewRowChange('mgrCode', e.target.value)}
-                                                className={compactFieldClass}
-                                            >
-                                                <option value="">Select MGR 1</option>
-                                                {mgrList.map((mgr) => (
-                                                    <option key={mgr._id} value={mgr.code}>{mgr.code} - {mgr.description}</option>
-                                                ))}
-                                            </select>
-                                        </td>
-                                        <td className="py-2 px-2">
-                                            <select
-                                                value={newRow.mgrCode2}
-                                                onChange={(e) => handleNewRowChange('mgrCode2', e.target.value)}
-                                                className={compactFieldClass}
-                                            >
-                                                <option value="">Select MGR 2</option>
-                                                {mgrList2.map((mgr) => (
-                                                    <option key={mgr._id} value={mgr.code}>{mgr.code} - {mgr.description}</option>
-                                                ))}
-                                            </select>
-                                        </td>
-                                        <td className="py-2 px-2">
-                                            <div className="space-y-2">
-                                                <select
-                                                    value={newRow.status}
-                                                    onChange={(e) => handleNewRowChange('status', e.target.value)}
-                                                    className={compactFieldClass}
-                                                >
-                                                    <option value="">Select status</option>
-                                                    {STATUS_OPTIONS.map((status) => (
-                                                        <option key={status} value={status}>{status}</option>
-                                                    ))}
-                                                </select>
-                                                <div className="flex items-center gap-2">
-                                                    <button
-                                                        onClick={handleSaveEntry}
-                                                        className={`flex-1 inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-white text-xs font-bold transition-colors ${editingId ? 'bg-blue-600 hover:bg-blue-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}
-                                                    >
-                                                        <MdSave size={16} />
-                                                        {editingId ? 'Update' : 'Save'}
-                                                    </button>
-                                                    {editingId && (
-                                                        <button
-                                                            onClick={handleCancelEdit}
-                                                            className="inline-flex items-center justify-center gap-1 px-3 py-2.5 rounded-lg bg-white border border-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-50 transition-colors"
-                                                        >
-                                                            <MdClose size={16} />
-                                                            Cancel
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </td>
-                                    </tr>
-
-                                    {loading ? (
-                                        <tr>
-                                            <td colSpan="9" className="py-10 text-center">
-                                                <div className="animate-spin border-4 border-slate-200 border-t-primary-600 rounded-full h-8 w-8 mx-auto"></div>
-                                            </td>
-                                        </tr>
-                                    ) : sortedEntries.length > 0 ? (
-                                        sortedEntries.map((entry) => (
-                                            <tr key={entry._id} className={`hover:bg-slate-50 transition-colors ${editingId === entry._id ? 'bg-primary-50/60' : ''}`}>
-                                                <td className="py-3 px-2 font-bold text-slate-700 text-xs whitespace-nowrap">{entry.monthYear}</td>
-                                                <td className="py-3 px-2 font-bold text-slate-900 text-xs">
-                                                    <p className="truncate" title={entry.customerName}>{entry.customerName}</p>
-                                                </td>
-                                                <td className="py-3 px-2 text-slate-700 text-xs">
-                                                    <p className="truncate" title={entry.productName}>{entry.productName}</p>
-                                                </td>
-                                                <td className="py-3 px-2 text-right font-bold text-slate-700 text-xs whitespace-nowrap">{entry.qty}</td>
-                                                <td className="py-3 px-2 text-right font-bold text-slate-700 text-xs whitespace-nowrap">{entry.value?.toLocaleString()}</td>
-                                                <td className="py-3 px-2 text-right font-black text-slate-900 text-xs bg-amber-50/50 whitespace-nowrap">
-                                                    {entry.totalValue?.toLocaleString()}
-                                                </td>
-                                                <td className="py-3 px-2 text-xs whitespace-nowrap">
-                                                    <span className="block truncate px-2 py-1 bg-blue-50 text-blue-700 rounded font-bold" title={getCanonicalMgrCode(entry.mgrCode, mgrList)}>
-                                                        {getCanonicalMgrCode(entry.mgrCode, mgrList)}
-                                                    </span>
-                                                </td>
-                                                <td className="py-3 px-2 text-xs whitespace-nowrap">
-                                                    <span className="block truncate px-2 py-1 bg-indigo-50 text-indigo-700 rounded font-bold" title={getCanonicalMgrCode(entry.mgrCode2 || '', mgrList2) || '-'}>
-                                                        {getCanonicalMgrCode(entry.mgrCode2 || '', mgrList2) || '-'}
-                                                    </span>
-                                                </td>
-                                                <td className="py-3 px-2 text-xs">
-                                                    <div className="flex items-center justify-between gap-1">
-                                                        <span className={`truncate px-2 py-1 rounded font-bold whitespace-nowrap ${getStatusClasses(entry.status)}`} title={entry.status}>
-                                                            {entry.status}
-                                                        </span>
-                                                        <div className="flex items-center gap-1">
-                                                            <button
-                                                                onClick={() => handleEditEntry(entry)}
-                                                                className={`p-1.5 rounded-lg transition-all ${editingId === entry._id ? 'text-primary-600 bg-primary-50' : 'text-slate-400 hover:text-primary-600 hover:bg-primary-50'}`}
-                                                                title="Edit Entry"
-                                                            >
-                                                                <MdEdit size={16} />
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleDeleteEntry(entry._id)}
-                                                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
-                                                                title="Delete Entry"
-                                                            >
-                                                                <MdDelete size={16} />
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))
-                                    ) : (
-                                        <tr>
-                                            <td colSpan="9" className="py-10 text-center text-slate-400 font-bold text-sm">
-                                                {hasActiveFilters
-                                                    ? 'No planning entries match the selected filters.'
-                                                    : `No planning entries for FY ${financialYear}. Add your first entry above.`}
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    </>
-                )}
-            </div>
-
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-                <div
-                    className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center cursor-pointer hover:bg-slate-100/50 transition-colors"
-                    onClick={() => setIsReportExpanded(!isReportExpanded)}
-                >
-                    <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
-                        <MdKeyboardArrowDown className={`text-slate-500 transition-transform duration-300 ${!isReportExpanded ? '-rotate-90' : ''}`} size={20} />
-                        SBU Wise - FY {financialYear}
-                    </h2>
-                    <button
-                        type="button"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            exportReportToExcel(combinedReportData, 'SBU Wise Report');
-                        }}
-                        disabled={!combinedReportData || !combinedReportData.mgrCodes?.length}
-                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 font-bold text-xs uppercase tracking-widest hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        <MdDownload size={16} />
-                        Export
-                    </button>
-                </div>
-
-                {isReportExpanded && (
-                    computedSbuWiseData && computedSbuWiseData.length > 0 ? (
-                        <div className="overflow-x-auto">
-                            {computedSbuWiseData.map((monthEntry) => (
-                                <div key={monthEntry.month} className="border-b border-slate-200 last:border-b-0">
-                                    <div
-                                        className="bg-blue-50 font-bold cursor-pointer hover:bg-blue-100/60 transition-colors border-b border-blue-200"
-                                        onClick={() => toggleSbuWiseMonth(monthEntry.month)}
-                                    >
-                                        <div className="flex items-center gap-2 py-3 px-4">
-                                            <MdKeyboardArrowDown
-                                                className={`text-slate-700 transition-transform duration-300 ${!expandedSbuWiseMonths[monthEntry.month] ? '-rotate-90' : ''}`}
-                                                size={18}
-                                            />
-                                            <span className="text-slate-900 font-black">{monthEntry.month}</span>
-                                            <span className="ml-auto text-slate-700 font-bold">{formatReportValue(monthEntry.total, 0)}</span>
-                                        </div>
-                                    </div>
-                                    {expandedSbuWiseMonths[monthEntry.month] && (
-                                        <table className="w-full text-left text-sm">
-                                            <thead>
-                                                <tr className="bg-slate-50 border-b border-slate-200">
-                                                    <th className="py-3 px-4 font-bold text-slate-700 text-left min-w-[140px]">Status</th>
-                                                    {combinedReportData.mgrCodes.map((sbu) => (
-                                                        <th key={sbu} className="py-3 px-4 font-bold text-slate-700 text-right min-w-[100px] border-l border-slate-300">{sbu}</th>
-                                                    ))}
-                                                    <th className="py-3 px-4 font-bold text-slate-900 text-right bg-slate-100 min-w-[100px] border-l border-slate-300">Total</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {monthEntry.rows.map((row) => {
-                                                    const isAllRow = row.status === 'All';
-
-                                                    return (
-                                                        <tr key={`${monthEntry.month}-${row.status}`} className={`border-b border-slate-100 ${isAllRow ? 'bg-amber-50 font-black' : 'hover:bg-slate-50'}`}>
-                                                            <td className={`py-3 px-4 ${isAllRow ? 'font-black text-slate-900' : 'font-bold text-slate-900'}`}>{row.status}</td>
-                                                            {combinedReportData.mgrCodes.map((sbu) => (
-                                                                <td key={`${monthEntry.month}-${row.status}-${sbu}`} className={`py-3 px-4 text-right border-l border-slate-200 ${isAllRow ? 'font-black text-slate-900' : 'font-semibold text-slate-700'}`}>
-                                                                    {formatReportValue(row[sbu] || 0, 0)}
-                                                                </td>
-                                                            ))}
-                                                            <td className={`py-3 px-4 text-right border-l border-slate-300 ${isAllRow ? 'bg-amber-100 font-black text-slate-900' : 'bg-slate-50 font-bold text-slate-900'}`}>
-                                                                {formatReportValue(row.total || 0, 0)}
-                                                            </td>
-                                                        </tr>
-                                                    );
-                                                })}
-                                            </tbody>
-                                        </table>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="p-10 text-center text-slate-400 font-bold">
-                            {loading ? (
-                                <div className="animate-spin border-4 border-slate-200 border-t-primary-600 rounded-full h-8 w-8 mx-auto"></div>
-                            ) : (
-                                'No data available. Add planning entries above to generate the SBU Wise report.'
-                            )}
-                        </div>
-                    )
-                )}
-            </div>
-
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-                <div
-                    className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center cursor-pointer hover:bg-slate-100/50 transition-colors"
-                    onClick={() => setIsReportExpanded2(!isReportExpanded2)}
-                >
-                    <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
-                        <MdKeyboardArrowDown className={`text-slate-500 transition-transform duration-300 ${!isReportExpanded2 ? '-rotate-90' : ''}`} size={20} />
-                        Segment Wise - FY {financialYear}
-                    </h2>
-                    <button
-                        type="button"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            exportReportToExcel(reportData2, 'Segment Wise Report');
-                        }}
-                        disabled={!reportData2 || !reportData2.mgrCodes?.length}
-                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 font-bold text-xs uppercase tracking-widest hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        <MdDownload size={16} />
-                        Export
-                    </button>
-                </div>
-
-                {isReportExpanded2 && (
-                    reportData2 && reportData2.mgrCodes.length > 0 ? (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left text-sm">
-                                <thead>
-                                    <tr className="bg-amber-50 border-b border-amber-100">
-                                        <th className="py-3 px-4 font-black text-slate-700 min-w-[160px]">Month / Segment</th>
-                                        {reportData2.mgrCodes.map((mgr) => (
-                                            <th key={mgr} className="py-3 px-4 font-black text-slate-700 text-right min-w-[100px]">{mgr}</th>
-                                        ))}
-                                        <th className="py-3 px-4 font-black text-slate-900 text-right bg-amber-100 min-w-[100px]">Total</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {(reportData2.rows || [])
-                                        .filter((row) => row.isMonth)
-                                        .map((monthRow) => {
-                                            const monthLabel = monthRow.monthLabel || monthRow.month;
-                                            const childRows = (reportData2.rows || []).filter((row) => row.parentMonth === monthLabel);
-
-                                            return (
-                                                <React.Fragment key={monthLabel}>
-                                                    <tr
-                                                        className="border-b-2 border-slate-200 bg-blue-50 font-bold cursor-pointer hover:bg-blue-100/60 transition-colors"
-                                                        onClick={() => toggleSegmentMonth(monthLabel)}
-                                                    >
-                                                        <td className="py-3 px-4 text-slate-900">
-                                                            <div className="flex items-center gap-2">
-                                                                <MdKeyboardArrowDown
-                                                                    className={`text-slate-700 transition-transform duration-300 ${!expandedSegmentMonths[monthLabel] ? '-rotate-90' : ''}`}
-                                                                    size={18}
-                                                                />
-                                                                {monthRow.month}
-                                                            </div>
-                                                        </td>
-                                                        {reportData2.mgrCodes.map((mgr) => (
-                                                            <td key={mgr} className="py-3 px-4 text-right text-slate-900 font-bold">
-                                                                {formatReportValue(monthRow[mgr] || 0, 3)}
-                                                            </td>
-                                                        ))}
-                                                        <td className="py-3 px-4 text-right text-slate-900 bg-slate-50 font-black">
-                                                            {formatReportValue(monthRow.total || 0, 3)}
-                                                        </td>
-                                                    </tr>
-                                                    {expandedSegmentMonths[monthLabel] && childRows.map((row) => (
-                                                        <tr
-                                                            key={`${monthLabel}-${row.month}`}
-                                                            className="border-b border-slate-100 hover:bg-slate-50"
-                                                        >
-                                                            <td className="py-3 px-4 text-slate-900 font-bold pl-12">{row.month}</td>
-                                                            {reportData2.mgrCodes.map((mgr) => (
-                                                                <td key={mgr} className="py-3 px-4 text-right text-slate-700">
-                                                                    {formatReportValue(row[mgr] || 0, 3)}
-                                                                </td>
-                                                            ))}
-                                                            <td className="py-3 px-4 text-right text-slate-900 bg-amber-50/50 font-bold">
-                                                                {formatReportValue(row.total || 0, 3)}
-                                                            </td>
-                                                        </tr>
-                                                    ))}
-                                                </React.Fragment>
-                                            );
-                                        })}
-                                    {(reportData2.rows || [])
-                                        .filter((row) => !row.isMonth && !row.parentMonth)
-                                        .map((row) => {
-                                            const isTotal = row.isTotal;
-                                            const isPercentage = row.isPercentage;
-                                            const isPreviousYearValue = row.isPreviousYearValue;
-                                            const isTotalPercentage = row.isTotalPercentage;
-
-                                            return (
-                                                <tr
-                                                    key={row.month}
-                                                    className={`border-b transition-colors ${
-                                                        isTotal ? 'bg-amber-50 border-amber-200 font-black' :
-                                                        isPreviousYearValue ? 'bg-amber-100/70 border-amber-200 font-bold' :
-                                                        isPercentage || isTotalPercentage ? 'bg-slate-50 border-slate-200' :
-                                                        'border-slate-50 hover:bg-slate-50'
-                                                    }`}
-                                                >
-                                                    <td className={`py-3 px-4 ${isTotal || isPercentage || isPreviousYearValue || isTotalPercentage ? 'font-black text-slate-900' : 'font-semibold text-slate-600'}`}>
-                                                        {row.month}
-                                                    </td>
-                                                    {reportData2.mgrCodes.map((mgr) => (
-                                                        <td key={mgr} className={`py-3 px-4 text-right ${(isTotal || isPercentage || isPreviousYearValue || isTotalPercentage) ? 'font-bold text-slate-900' : 'text-slate-700'}`}>
-                                                            {isPercentage || isTotalPercentage
-                                                                ? formatReportPercentage(row[mgr] || 0)
-                                                                : formatReportValue(row[mgr] || 0, 3)}
-                                                        </td>
-                                                    ))}
-                                                    <td className={`py-3 px-4 text-right ${
-                                                        isTotal ? 'bg-amber-100 font-black' :
-                                                        isPreviousYearValue ? 'bg-amber-200/80 font-bold' :
-                                                        isPercentage || isTotalPercentage ? 'bg-slate-100 font-bold' :
-                                                        'bg-amber-50/50 font-bold'
-                                                    } text-slate-900`}>
-                                                        {isPercentage || isTotalPercentage
-                                                            ? formatReportPercentageTotal(row.total)
-                                                            : formatReportValue(row.total || 0, 3)}
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                </tbody>
-                            </table>
-                        </div>
-                    ) : (
-                        <div className="p-10 text-center text-slate-400 font-bold">
-                            {loading ? (
-                                <div className="animate-spin border-4 border-slate-200 border-t-primary-600 rounded-full h-8 w-8 mx-auto"></div>
-                            ) : (
-                                'No data available for Segment Wise. Add entries with MGR 2 codes to generate this report.'
-                            )}
-                        </div>
-                    )
-                )}
-            </div>
-
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-                <div
-                    className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center cursor-pointer hover:bg-slate-100/50 transition-colors"
-                    onClick={() => setIsStatusBreakdownExpanded(!isStatusBreakdownExpanded)}
-                >
-                    <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
-                        <MdKeyboardArrowDown
-                            className={`text-slate-500 transition-transform duration-300 ${!isStatusBreakdownExpanded ? '-rotate-90' : ''}`}
-                            size={20}
-                        />
-                        Status Breakdown Summary - FY {financialYear}
-                    </h2>
-                    <button
-                        type="button"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            exportStatusBreakdownToExcel();
-                        }}
-                        disabled={!computedStatusBreakdownData || !computedStatusBreakdownData.length}
-                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 font-bold text-xs uppercase tracking-widest hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        <MdDownload size={16} />
-                        Export
-                    </button>
-                </div>
-
-                {isStatusBreakdownExpanded && (
-                    computedStatusBreakdownData && computedStatusBreakdownData.length > 0 ? (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="bg-amber-50 border-b border-amber-100">
-                                        <th className="py-3 px-4 text-left font-black text-slate-900 min-w-[200px]">Month / Segment / Status</th>
-                                        <th className="py-3 px-4 text-right font-black text-slate-900 min-w-[100px]">EPC</th>
-                                        <th className="py-3 px-4 text-right font-black text-slate-900 min-w-[100px]">SBU1</th>
-                                        <th className="py-3 px-4 text-right font-black text-slate-900 min-w-[100px]">SBU2</th>
-                                        <th className="py-3 px-4 text-right font-black text-slate-900 min-w-[100px]">SBU3</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {computedStatusBreakdownData.map((monthEntry) => (
-                                        <React.Fragment key={monthEntry.month}>
-                                            {/* MONTH */}
-                                            <tr
-                                                className="border-b-2 border-slate-200 bg-blue-50 font-bold cursor-pointer hover:bg-blue-100/60 transition-colors"
-                                                onClick={() => toggleStatusBreakdownMonth(monthEntry.month)}
-                                            >
-                                                <td className="py-3 px-4 text-slate-900">
-                                                    <div className="flex items-center gap-2">
-                                                        <MdKeyboardArrowDown
-                                                            className={`text-slate-700 transition-transform duration-300 ${!expandedStatusBreakdownMonths[monthEntry.month] ? '-rotate-90' : ''}`}
-                                                            size={18}
-                                                        />
-                                                        {monthEntry.month}
-                                                    </div>
-                                                </td>
-                                                <td colSpan="4"></td>
-                                            </tr>
-
-                                            {expandedStatusBreakdownMonths[monthEntry.month] && monthEntry.segments.map((segmentEntry) => (
-                                                <React.Fragment key={`${monthEntry.month}-${segmentEntry.segment}`}>
-                                                    {/* SEGMENT */}
-                                                    <tr
-                                                        className="border-b border-slate-100 bg-slate-50 font-bold cursor-pointer hover:bg-slate-100/60 transition-colors"
-                                                        onClick={() => toggleStatusBreakdownSegment(monthEntry.month, segmentEntry.segment)}
-                                                    >
-                                                        <td className="py-3 px-4 text-slate-900 pl-8">
-                                                            <div className="flex items-center gap-2">
-                                                                <MdKeyboardArrowDown
-                                                                    className={`text-slate-600 transition-transform duration-300 ${!expandedStatusBreakdownSegments[`${monthEntry.month}-${segmentEntry.segment}`] ? '-rotate-90' : ''}`}
-                                                                    size={16}
-                                                                />
-                                                                {segmentEntry.segment.toUpperCase()}
-                                                            </div>
-                                                        </td>
-                                                        <td colSpan="4"></td>
-                                                    </tr>
-
-                                                    {expandedStatusBreakdownSegments[`${monthEntry.month}-${segmentEntry.segment}`] && Object.keys(segmentEntry.statuses).map((status) => {
-                                                        const row = segmentEntry.statuses[status];
-
-                                                        return (
-                                                            <tr
-                                                                key={`${monthEntry.month}-${segmentEntry.segment}-${status}`}
-                                                                className="border-b border-slate-50 hover:bg-slate-50"
-                                                            >
-                                                                <td className="py-3 px-4 text-slate-700 pl-16 font-bold">{status}</td>
-                                                                <td className="py-3 px-4 text-right text-slate-700">{formatReportValue(row.EPC || 0, 0)}</td>
-                                                                <td className="py-3 px-4 text-right text-slate-700">{formatReportValue(row.SBU1 || 0, 0)}</td>
-                                                                <td className="py-3 px-4 text-right text-slate-700">{formatReportValue(row.SBU2 || 0, 0)}</td>
-                                                                <td className="py-3 px-4 text-right text-slate-700">{formatReportValue(row.SBU3 || 0, 0)}</td>
-                                                            </tr>
-                                                        );
-                                                    })}
-                                                </React.Fragment>
-                                            ))}
-                                        </React.Fragment>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    ) : (
-                        <div className="p-10 text-center text-slate-400 font-bold">
-                            {loading ? (
-                                <div className="animate-spin border-4 border-slate-200 border-t-primary-600 rounded-full h-8 w-8 mx-auto"></div>
-                            ) : (
-                                'No data available. Add planning entries to generate the status breakdown.'
-                            )}
-                        </div>
-                    )
-                )}
-            </div>
-
-            <ImportModal
-                isOpen={isImportModalOpen}
-                onClose={() => setIsImportModalOpen(false)}
-                title={`Import Planning - FY ${financialYear}`}
-                type="planning"
-                onImport={async (file, onUploadProgress) => {
-                    const result = await importService.importPlanning(file, financialYear, onUploadProgress);
-                    await fetchData();
-                    return result;
-                }}
-                onDownloadTemplate={() => importService.getPlanningTemplate(financialYear)}
-            />
-        </div>
+      <th className={`py-3 px-3 border border-slate-200 ${className}`}>
+        <button
+          type="button"
+          onClick={() => requestSort(key)}
+          className={`group inline-flex items-center gap-1.5 font-black text-slate-700 text-xs ${isRightAligned ? "w-full justify-end" : ""}`}
+        >
+          <span>{label}</span>
+          <MdKeyboardArrowDown
+            className={`transition-all duration-200 ${isActive ? "text-primary-600 opacity-100" : "text-slate-300 opacity-70 group-hover:text-slate-500"} ${isActive && sortConfig.direction === "asc" ? "rotate-180" : ""}`}
+            size={16}
+          />
+        </button>
+      </th>
     );
+  };
+
+  const toggleSegmentMonth = (monthLabel) => {
+    setExpandedSegmentMonths((prev) => ({
+      ...prev,
+      [monthLabel]: !prev[monthLabel],
+    }));
+  };
+
+
+  const toggleSbuWiseMonth = (month) => {
+    setExpandedSbuWiseMonths((prev) => ({
+      ...prev,
+      [month]: !prev[month],
+    }));
+  };
+
+  const calculatedTotal =
+    newRow.qty && newRow.value ? Number(newRow.qty) * Number(newRow.value) : 0;
+  const compactFieldClass =
+    "w-full px-2.5 py-2.5 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-primary-500 bg-white";
+  const compactNumericFieldClass = `${compactFieldClass} text-right`;
+
+  return (
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-24">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+            <MdCalendarMonth className="text-primary-600" />
+            Planning Screen
+          </h1>
+        </div>
+        <div className="flex flex-wrap gap-3 items-center">
+          <select
+            value={financialYear}
+            onChange={(e) => setFinancialYear(e.target.value)}
+            className="px-4 py-3 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-primary-500 bg-white"
+          >
+            {getFinancialYears().map((fy) => (
+              <option key={fy} value={fy}>
+                FY {fy}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={fetchData}
+            className="p-3 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition-all"
+            title="Refresh now"
+          >
+            <MdRefresh size={20} />
+          </button>
+          {isSelectedYearPrevious && !canEdit && (
+            <span className="text-xs font-bold text-amber-600 bg-amber-50 px-3 py-2 rounded-lg border border-amber-200 flex items-center gap-1.5 shadow-sm">
+              ⚠️ Read-only (Previous Year)
+            </span>
+          )}
+          {canEdit && (
+            <button
+              onClick={() => setIsImportModalOpen(true)}
+              className="px-5 py-3 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center gap-2"
+            >
+              <MdFileUpload size={18} />
+              Import
+            </button>
+          )}
+          <button
+            onClick={exportToExcel}
+            className="px-5 py-3 bg-primary-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-primary-700 transition-all flex items-center gap-2"
+          >
+            <MdDownload size={18} />
+            Export
+          </button>
+        </div>
+      </div>
+
+
+
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+        <>
+          {editingId && (
+            <div className="p-4 md:p-5 border-b border-slate-100 bg-slate-50/60 flex justify-end">
+              <button
+                onClick={handleCancelEdit}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 transition-colors"
+              >
+                <MdClose size={18} />
+                Cancel Edit
+              </button>
+            </div>
+          )}
+
+          <div className="px-4 md:px-5 py-4 border-b border-slate-100 bg-white">
+            <div className="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 xl:flex-1">
+                <div>
+                  <label className="block text-[11px] font-black uppercase tracking-widest text-slate-500 mb-2">
+                    📅 Filter Month (Primary)
+                  </label>
+                  <select
+                    value={filters.month}
+                    onChange={(e) =>
+                      handleFilterChange("month", e.target.value)
+                    }
+                    className="w-full px-3 py-3 border border-primary-300 rounded-xl text-sm font-bold outline-none focus:border-primary-500 bg-primary-50"
+                  >
+                    <option value="">Select</option>
+                    {monthLabels.map((month) => (
+                      <option key={month} value={month}>
+                        {month}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-black uppercase tracking-widest text-slate-500 mb-2">
+                    Filter MGR 1
+                  </label>
+                  <select
+                    value={filters.mgrCode}
+                    onChange={(e) =>
+                      handleFilterChange("mgrCode", e.target.value)
+                    }
+                    className="w-full px-3 py-3 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-primary-500 bg-white"
+                  >
+                    <option value="">All MGR 1</option>
+                    {mgrList.map((mgr) => (
+                      <option key={mgr._id} value={mgr.code}>
+                        {mgr.code}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-black uppercase tracking-widest text-slate-500 mb-2">
+                    Filter MGR 2
+                  </label>
+                  <select
+                    value={filters.mgrCode2}
+                    onChange={(e) =>
+                      handleFilterChange("mgrCode2", e.target.value)
+                    }
+                    className="w-full px-3 py-3 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-primary-500 bg-white"
+                  >
+                    <option value="">All MGR 2</option>
+                    {mgrList2.map((mgr) => (
+                      <option key={mgr._id} value={mgr.code}>
+                        {mgr.code}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-black uppercase tracking-widest text-slate-500 mb-2">
+                    Filter Status
+                  </label>
+                  <select
+                    value={filters.status}
+                    onChange={(e) =>
+                      handleFilterChange("status", e.target.value)
+                    }
+                    className="w-full px-3 py-3 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-primary-500 bg-white"
+                  >
+                    <option value="">All Statuses</option>
+                    {(statusOptions.length > 0 ? statusOptions : ["Budget", "Firm", "MFC", "B & B", "Others", "Order Received", "Invoice", "Lost", "Parked"])
+                      .filter(status => {
+                        const normalized = String(status || '').trim().replace(/\s+/g, '').toUpperCase();
+                        return ['MFC', 'INVOICE', 'FIRM', 'B&B', 'BB', 'BANDB', 'BUDGET'].includes(normalized);
+                      })
+                      .map((status) => (
+                        <option key={status} value={status}>
+                          {status}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <span className="px-3 py-2 rounded-xl bg-slate-100 text-slate-600 text-sm font-bold">
+                  {filteredEntries.length}{" "}
+                  {filteredEntries.length === 1 ? "entry" : "entries"}
+                </span>
+                <button
+                  onClick={clearFilters}
+                  disabled={!hasActiveFilters}
+                  className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-600 font-bold hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <MdRefresh size={18} />
+                  Clear Filters
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="overflow-hidden">
+            <table className="w-full table-fixed text-left text-sm border-collapse border border-slate-200">
+              <colgroup>
+                <col className="w-[8%]" />
+                <col className="w-[17%]" />
+                <col className="w-[21%]" />
+                <col className="w-[6%]" />
+                <col className="w-[8%]" />
+                <col className="w-[9%]" />
+                <col className="w-[9%]" />
+                <col className="w-[9%]" />
+                <col className="w-[13%]" />
+              </colgroup>
+              <thead>
+                <tr className="bg-amber-50 border-b border-amber-100">
+                  {renderSortableHeader("Month", "monthYear", "px-2 py-3")}
+                  {renderSortableHeader(
+                    "Customer",
+                    "customerName",
+                    "px-2 py-3",
+                  )}
+                  {renderSortableHeader(
+                    "Product Name",
+                    "productName",
+                    "px-2 py-3",
+                  )}
+                  {renderSortableHeader("Qty", "qty", "px-2 py-3 text-right")}
+                  {renderSortableHeader(
+                    "Value",
+                    "value",
+                    "px-2 py-3 text-right",
+                  )}
+                  {renderSortableHeader(
+                    "Total",
+                    "totalValue",
+                    "px-2 py-3 text-right bg-amber-100",
+                  )}
+                  {renderSortableHeader("MGR 1", "mgrCode", "px-2 py-3")}
+                  {renderSortableHeader("MGR 2", "mgrCode2", "px-2 py-3")}
+                  {renderSortableHeader("Status", "status", "px-2 py-3")}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {canEdit && (
+                  <tr className="bg-primary-50/40 border-b border-primary-100 align-top">
+                    <td className="py-2 px-2 border border-slate-200">
+                      {editingId ? (
+                        <div className="w-full px-3 py-2.5 bg-slate-100 border border-slate-200 rounded-lg text-xs font-black text-slate-500 text-center select-none shadow-sm">
+                          {newRow.monthYear}
+                        </div>
+                      ) : (
+                        <select
+                          value={newRow.monthYear}
+                          onChange={(e) =>
+                            handleNewRowChange("monthYear", e.target.value)
+                          }
+                          onFocus={() => {
+                            setShowCustomerDropdown(false);
+                            setShowProductDropdown(false);
+                          }}
+                          className="w-full px-2.5 py-2.5 border border-primary-400 rounded-lg text-xs font-black outline-none focus:border-primary-500 bg-primary-50"
+                        >
+                          <option value="">Select</option>
+                          {monthLabels.map((month) => (
+                            <option key={month} value={month}>
+                              {month}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </td>
+                    <td ref={customerAnchorRef} className="py-2 px-2 border border-slate-200">
+                      <input
+                        type="text"
+                        value={customerSearch}
+                        onChange={(e) => {
+                          setCustomerSearch(e.target.value);
+                          handleNewRowChange("customerId", "");
+                          handleNewRowChange("customerName", "");
+                          setShowCustomerDropdown(true);
+                        }}
+                        onFocus={() => {
+                          setShowCustomerDropdown(true);
+                          setShowProductDropdown(false);
+                        }}
+                        placeholder="Type customer name"
+                        className={compactFieldClass}
+                      />
+                      <PortalDropdown
+                        isOpen={showCustomerDropdown}
+                        anchorRef={customerAnchorRef}
+                      >
+                        <div className="portal-dropdown-content bg-white border border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto custom-scrollbar">
+                          {filteredCustomers.length > 0 ? (
+                            filteredCustomers.map((customer) => (
+                              <button
+                                key={customer._id}
+                                onClick={() => selectCustomer(customer)}
+                                className="w-full text-left px-3 py-2.5 text-sm font-bold hover:bg-primary-50 transition-colors border-b border-slate-50"
+                              >
+                                <div>
+                                  {customer.companyName || customer.customerName}
+                                </div>
+                                <div className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                                  {customer.externalCode ||
+                                    getFallbackCode("CUST", customer._id)}
+                                </div>
+                              </button>
+                            ))
+                          ) : (
+                            <div className="px-4 py-3 text-sm text-slate-500 font-bold text-center">
+                              No customers found
+                            </div>
+                          )}
+                        </div>
+                      </PortalDropdown>
+                    </td>
+                    <td ref={productAnchorRef} className="py-2 px-2 border border-slate-200">
+                      <input
+                        type="text"
+                        value={productSearch}
+                        onChange={(e) => {
+                          setProductSearch(e.target.value);
+                          handleNewRowChange("productId", "");
+                          handleNewRowChange("productName", "");
+                          setShowProductDropdown(true);
+                        }}
+                        onFocus={() => {
+                          setShowProductDropdown(true);
+                          setShowCustomerDropdown(false);
+                        }}
+                        placeholder="Type product name"
+                        className={compactFieldClass}
+                      />
+                      <PortalDropdown
+                        isOpen={showProductDropdown}
+                        anchorRef={productAnchorRef}
+                      >
+                        <div className="portal-dropdown-content bg-white border border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto custom-scrollbar">
+                          {filteredProducts.length > 0 ? (
+                            filteredProducts.map((product) => (
+                              <button
+                                key={product._id}
+                                onClick={() => selectProduct(product)}
+                                className="w-full text-left px-3 py-2.5 text-sm font-bold hover:bg-primary-50 transition-colors border-b border-slate-50"
+                              >
+                                {product.productName}
+                              </button>
+                            ))
+                          ) : (
+                            <div className="px-4 py-3 text-sm text-slate-500 font-bold text-center">
+                              No products found
+                            </div>
+                          )}
+                        </div>
+                      </PortalDropdown>
+                    </td>
+                    <td className="py-2 px-2 border border-slate-200">
+                      <input
+                        type="number"
+                        value={newRow.qty}
+                        onChange={(e) =>
+                          handleNewRowChange("qty", e.target.value)
+                        }
+                        onFocus={() => {
+                          setShowCustomerDropdown(false);
+                          setShowProductDropdown(false);
+                        }}
+                        placeholder="0"
+                        className={compactNumericFieldClass}
+                      />
+                    </td>
+                    <td className="py-2 px-2 border border-slate-200">
+                      <input
+                        type="number"
+                        min="0"
+                        value={newRow.value}
+                        onChange={(e) =>
+                          handleNewRowChange("value", e.target.value)
+                        }
+                        onFocus={() => {
+                          setShowCustomerDropdown(false);
+                          setShowProductDropdown(false);
+                        }}
+                        placeholder="0"
+                        className={compactNumericFieldClass}
+                      />
+                    </td>
+                    <td className="py-2 px-2 bg-amber-50/80 border border-slate-200">
+                      <div className="px-2.5 py-2.5 rounded-lg bg-amber-50 border border-amber-100 text-sm font-black text-slate-900 text-right">
+                        {formatToIndian(calculatedTotal, 2)}
+                      </div>
+                    </td>
+                    <td ref={mgr1AnchorRef} className="py-2 px-2 border border-slate-200">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowMgr1Dropdown(!showMgr1Dropdown);
+                          setShowCustomerDropdown(false);
+                          setShowProductDropdown(false);
+                          setShowMgr2Dropdown(false);
+                          setShowStatusDropdown(false);
+                        }}
+                        className={`${compactFieldClass} flex justify-between items-center bg-white text-left font-bold w-full`}
+                      >
+                        <span className="truncate">
+                          {newRow.mgrCode ? getCanonicalMgrCode(newRow.mgrCode, mgrList) : "Select"}
+                        </span>
+                        <MdKeyboardArrowDown className="text-slate-400 shrink-0 ml-1" size={16} />
+                      </button>
+                      <PortalDropdown isOpen={showMgr1Dropdown} anchorRef={mgr1AnchorRef}>
+                        <div className="portal-dropdown-content bg-white border border-slate-200 rounded-xl shadow-xl max-h-56 flex flex-col overflow-hidden">
+                          <div className="p-2 border-b border-slate-100 bg-slate-50">
+                            <input
+                              type="text"
+                              value={mgr1Search}
+                              onChange={(e) => setMgr1Search(e.target.value)}
+                              onClick={(e) => e.stopPropagation()}
+                              placeholder="Search MGR 1..."
+                              className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-primary-500 bg-white"
+                            />
+                          </div>
+                          <div className="overflow-y-auto custom-scrollbar flex-1 max-h-40">
+                            <button
+                              type="button"
+                              onClick={() => selectMgr1({ code: "" })}
+                              className="w-full text-left px-3 py-2 text-xs font-bold text-slate-400 hover:bg-slate-50 border-b border-slate-50"
+                            >
+                              Select
+                            </button>
+                            {filteredMgrList.map((mgr) => (
+                              <button
+                                key={mgr._id}
+                                type="button"
+                                onClick={() => selectMgr1(mgr)}
+                                className="w-full text-left px-3 py-2 text-xs font-bold hover:bg-primary-50 transition-colors border-b border-slate-50 text-slate-700"
+                              >
+                                {mgr.code} - {mgr.description}
+                              </button>
+                            ))}
+                            {filteredMgrList.length === 0 && (
+                              <div className="px-3 py-2 text-xs text-slate-400 italic">No managers found</div>
+                            )}
+                          </div>
+                        </div>
+                      </PortalDropdown>
+                    </td>
+                    <td ref={mgr2AnchorRef} className="py-2 px-2 border border-slate-200">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowMgr2Dropdown(!showMgr2Dropdown);
+                          setShowCustomerDropdown(false);
+                          setShowProductDropdown(false);
+                          setShowMgr1Dropdown(false);
+                          setShowStatusDropdown(false);
+                        }}
+                        className={`${compactFieldClass} flex justify-between items-center bg-white text-left font-bold w-full`}
+                      >
+                        <span className="truncate">
+                          {newRow.mgrCode2 ? getCanonicalMgrCode(newRow.mgrCode2, mgrList2) : "Select"}
+                        </span>
+                        <MdKeyboardArrowDown className="text-slate-400 shrink-0 ml-1" size={16} />
+                      </button>
+                      <PortalDropdown isOpen={showMgr2Dropdown} anchorRef={mgr2AnchorRef}>
+                        <div className="portal-dropdown-content bg-white border border-slate-200 rounded-xl shadow-xl max-h-56 flex flex-col overflow-hidden">
+                          <div className="p-2 border-b border-slate-100 bg-slate-50">
+                            <input
+                              type="text"
+                              value={mgr2Search}
+                              onChange={(e) => setMgr2Search(e.target.value)}
+                              onClick={(e) => e.stopPropagation()}
+                              placeholder="Search MGR 2..."
+                              className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-primary-500 bg-white"
+                            />
+                          </div>
+                          <div className="overflow-y-auto custom-scrollbar flex-1 max-h-40">
+                            <button
+                              type="button"
+                              onClick={() => selectMgr2({ code: "" })}
+                              className="w-full text-left px-3 py-2 text-xs font-bold text-slate-400 hover:bg-slate-50 border-b border-slate-50"
+                            >
+                              Select
+                            </button>
+                            {filteredMgrList2.map((mgr) => (
+                              <button
+                                key={mgr._id}
+                                type="button"
+                                onClick={() => selectMgr2(mgr)}
+                                className="w-full text-left px-3 py-2 text-xs font-bold hover:bg-primary-50 transition-colors border-b border-slate-50 text-slate-700"
+                              >
+                                {mgr.code} - {mgr.description}
+                              </button>
+                            ))}
+                            {filteredMgrList2.length === 0 && (
+                              <div className="px-3 py-2 text-xs text-slate-400 italic">No managers found</div>
+                            )}
+                          </div>
+                        </div>
+                      </PortalDropdown>
+                    </td>
+                    <td ref={statusAnchorRef} className="py-2 px-2 border border-slate-200">
+                      <div className="space-y-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowStatusDropdown(!showStatusDropdown);
+                            setShowCustomerDropdown(false);
+                            setShowProductDropdown(false);
+                            setShowMgr1Dropdown(false);
+                            setShowMgr2Dropdown(false);
+                          }}
+                          className={`${compactFieldClass} flex justify-between items-center bg-white text-left font-bold w-full`}
+                        >
+                          <span className="truncate">
+                            {newRow.status ? newRow.status : "Select"}
+                          </span>
+                          <MdKeyboardArrowDown className="text-slate-400 shrink-0 ml-1" size={16} />
+                        </button>
+                        <PortalDropdown isOpen={showStatusDropdown} anchorRef={statusAnchorRef}>
+                          <div className="portal-dropdown-content bg-white border border-slate-200 rounded-xl shadow-xl max-h-56 flex flex-col overflow-hidden">
+                            <div className="p-2 border-b border-slate-100 bg-slate-50">
+                              <input
+                                type="text"
+                                value={statusSearch}
+                                onChange={(e) => setStatusSearch(e.target.value)}
+                                onClick={(e) => e.stopPropagation()}
+                                placeholder="Search status..."
+                                className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-primary-500 bg-white"
+                              />
+                            </div>
+                            <div className="overflow-y-auto custom-scrollbar flex-1 max-h-40">
+                              <button
+                                type="button"
+                                onClick={() => selectStatus("")}
+                                className="w-full text-left px-3 py-2 text-xs font-bold text-slate-400 hover:bg-slate-50 border-b border-slate-50"
+                              >
+                                Select
+                              </button>
+                              {filteredStatusList.map((status) => (
+                                <button
+                                  key={status}
+                                  type="button"
+                                  onClick={() => selectStatus(status)}
+                                  className="w-full text-left px-3 py-2 text-xs font-bold hover:bg-primary-50 transition-colors border-b border-slate-50 text-slate-700"
+                                >
+                                  {status}
+                                </button>
+                              ))}
+                              {filteredStatusList.length === 0 && (
+                                <div className="px-3 py-2 text-xs text-slate-400 italic">No statuses found</div>
+                              )}
+                            </div>
+                          </div>
+                        </PortalDropdown>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={handleSaveEntry}
+                            disabled={isSavingEntry}
+                            className={`flex-1 inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-white text-xs font-bold transition-colors ${isSavingEntry ? "bg-slate-400 cursor-not-allowed" : (editingId ? "bg-blue-600 hover:bg-blue-700" : "bg-emerald-600 hover:bg-emerald-700")}`}
+                          >
+                            {isSavingEntry ? (
+                              <>
+                                <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                                Saving...
+                              </>
+                            ) : (
+                              <>
+                                <MdSave size={16} />
+                                {editingId ? "Update" : "Save"}
+                              </>
+                            )}
+                          </button>
+                          {editingId && (
+                            <button
+                              onClick={handleCancelEdit}
+                              className="inline-flex items-center justify-center gap-1 px-3 py-2.5 rounded-lg bg-white border border-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-50 transition-colors"
+                            >
+                              <MdClose size={16} />
+                              Cancel
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+
+                {loading ? (
+                  <tr>
+                    <td colSpan="9" className="py-10 text-center">
+                      <div className="animate-spin border-4 border-slate-200 border-t-primary-600 rounded-full h-8 w-8 mx-auto"></div>
+                    </td>
+                  </tr>
+                ) : sortedEntries.length > 0 ? (
+                  sortedEntries.map((entry) => (
+                    <tr
+                      key={entry._id}
+                      className={`hover:bg-slate-50 transition-colors ${editingId === entry._id ? "bg-primary-50/60" : ""}`}
+                    >
+                      <td className="py-3 px-2 font-bold text-slate-700 text-xs whitespace-nowrap border border-slate-200">
+                        {entry.monthYear}
+                      </td>
+                      <td className="py-3 px-2 font-bold text-slate-900 text-xs border border-slate-200">
+                        <p className="truncate" title={entry.customerId?.companyName || entry.customerId?.customerName || getCustomerById(entry.customerId)?.companyName || "-"}>
+                          {entry.customerId?.companyName || entry.customerId?.customerName || getCustomerById(entry.customerId)?.companyName || "-"}
+                        </p>
+                      </td>
+                      <td className="py-3 px-2 text-slate-700 text-xs border border-slate-200">
+                        <p className="truncate" title={entry.productId?.productName || getProductById(entry.productId)?.productName || "-"}>
+                          {entry.productId?.productName || getProductById(entry.productId)?.productName || "-"}
+                        </p>
+                      </td>
+                      <td className="py-3 px-2 text-right font-bold text-slate-700 text-xs whitespace-nowrap border border-slate-200">
+                        {entry.qty}
+                      </td>
+                      <td className="py-3 px-2 text-right font-bold text-slate-700 text-xs whitespace-nowrap border border-slate-200">
+                        {entry.value?.toLocaleString()}
+                      </td>
+                      <td className="py-3 px-2 text-right font-black text-slate-900 text-xs bg-amber-50/50 whitespace-nowrap border border-slate-200">
+                        {entry.totalValue?.toLocaleString()}
+                      </td>
+                      <td className="py-3 px-2 text-xs whitespace-nowrap border border-slate-200">
+                        <span
+                          className="block truncate px-2 py-1 bg-blue-50 text-blue-700 rounded font-bold"
+                          title={getCanonicalMgrCode(entry.mgrCode, mgrList)}
+                        >
+                          {getCanonicalMgrCode(entry.mgrCode, mgrList)}
+                        </span>
+                      </td>
+                      <td className="py-3 px-2 text-xs whitespace-nowrap border border-slate-200">
+                        <span
+                          className="block truncate px-2 py-1 bg-indigo-50 text-indigo-700 rounded font-bold"
+                          title={
+                            getCanonicalMgrCode(
+                              entry.mgrCode2 || "",
+                              mgrList2,
+                            ) || "-"
+                          }
+                        >
+                          {getCanonicalMgrCode(
+                            entry.mgrCode2 || "",
+                            mgrList2,
+                          ) || "-"}
+                        </span>
+                      </td>
+                      <td className="py-3 px-2 text-xs border border-slate-200">
+                        <div className="flex items-center justify-between gap-1">
+                          <span
+                            className="truncate px-2 py-1 rounded font-bold whitespace-nowrap"
+                            style={{
+                              backgroundColor: `${statusColorMap[entry.status] || '#f1f5f9'}20`,
+                              color: statusColorMap[entry.status] || '#64748b',
+                              border: `1px solid ${statusColorMap[entry.status] || '#cbd5e1'}40`
+                            }}
+                            title={entry.status}
+                          >
+                            {entry.status}
+                          </span>
+                          <div className="flex items-center gap-1">
+                            {canEdit && (
+                              <>
+                                <button
+                                  onClick={() => handleEditEntry(entry)}
+                                  className={`p-1.5 rounded-lg transition-all ${editingId === entry._id ? "text-primary-600 bg-primary-50" : "text-slate-400 hover:text-primary-600 hover:bg-primary-50"}`}
+                                  title="Edit Entry"
+                                >
+                                  <MdEdit size={16} />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteEntry(entry._id)}
+                                  className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                                  title="Delete Entry"
+                                >
+                                  <MdDelete size={16} />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td
+                      colSpan="9"
+                      className="py-10 text-center text-slate-400 font-bold text-sm"
+                    >
+                      {hasActiveFilters
+                        ? "No planning entries match the selected filters."
+                        : `No planning entries for FY ${financialYear}. Add your first entry above.`}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination Footer */}
+          <div className="px-4 py-4 border-t border-slate-100 bg-slate-50/30 flex flex-col items-center gap-3">
+            <div className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+              Showing <span className="text-primary-600">{entries.length}</span> of <span className="text-slate-900">{totalEntries}</span> entries
+            </div>
+
+            {entries.length < totalEntries && (
+              <button
+                onClick={() => setOffset(prev => prev + limit)}
+                disabled={isLoadingMore}
+                className="px-6 py-2.5 bg-white border border-primary-200 text-primary-600 rounded-xl font-black text-[11px] uppercase tracking-widest hover:bg-primary-50 transition-all flex items-center gap-2 shadow-sm disabled:opacity-50"
+              >
+                {isLoadingMore ? (
+                  <div className="h-4 w-4 border-2 border-primary-600 border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  "Load More Entries"
+                )}
+              </button>
+            )}
+          </div>
+        </>
+      </div>
+
+      {hasAccess('planning_view_sbu_wise') && (
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-100/80 overflow-hidden transition-all duration-300 hover:shadow-md hover:border-slate-200/60">
+          <div
+            className="p-5 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 to-indigo-50/10 flex justify-between items-center cursor-pointer select-none group"
+            onClick={() => setIsReportExpanded(!isReportExpanded)}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-black text-xs shadow-sm transition-all group-hover:scale-110">
+                SBU
+              </div>
+              <h2 className="text-xs font-extrabold text-slate-700 uppercase tracking-widest flex items-center gap-2">
+                <MdKeyboardArrowDown
+                  className={`text-slate-400 transition-transform duration-300 ${!isReportExpanded ? "-rotate-90 text-slate-400" : "text-indigo-600"}`}
+                  size={20}
+                />
+                SBU Wise - FY {financialYear}
+              </h2>
+            </div>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                exportReportToExcel(combinedReportData, "SBU Wise Report");
+              }}
+              disabled={
+                !combinedReportData || !combinedReportData.mgrCodes?.length
+              }
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 font-extrabold text-xs uppercase tracking-widest hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <MdDownload size={16} />
+              Export
+            </button>
+          </div>
+
+          {isReportExpanded && (() => {
+            const entryMgrCodes = reportEntries.map((entry) => normalizeSbuValue(entry.mgrCode)).filter(Boolean);
+            const allMgrCodes = Array.from(new Set([
+              ...(combinedReportData?.mgrCodes?.length > 0 ? combinedReportData.mgrCodes : ["EPC", "SBU1", "SBU2", "SBU3"]),
+              ...entryMgrCodes,
+            ]));
+            const reportRows = combinedReportData?.rows || [];
+            const monthRows = reportRows.filter((row) => row.isMonth && !row.isSegment);
+            const segmentRows = reportRows.filter((row) => row.isSegment);
+            const summaryRowsInOrder = combinedReportData ? [
+              reportRows.find((row) => row.isTotal),
+              reportRows.find((row) => row.isPercentage),
+              reportRows.find((row) => row.isPreviousYearValue),
+              reportRows.find((row) => row.isTotalPercentage),
+            ].filter(Boolean) : [];
+            const hasSbuValue = (row, sbu, monthLabel = "", segment = "") =>
+              Number(getMergedSbuReportCellValue(row, sbu, monthLabel, segment) || 0) > 0;
+            const visibleMgrCodes = allMgrCodes.filter((sbu) =>
+              [...monthRows, ...segmentRows, ...summaryRowsInOrder].some((row) => hasSbuValue(row, sbu)),
+            );
+            const visibleMonthLabels = (combinedReportData?.monthLabels?.length > 0
+              ? combinedReportData.monthLabels
+              : (monthRows.length > 0 ? monthRows.map((r) => r.monthLabel || r.month) : monthLabels)
+            );
+
+            return (
+              <div className="overflow-x-auto custom-scrollbar">
+                <table className="w-full text-left text-sm border-collapse border border-slate-200">
+                  <thead>
+                    <tr className="bg-slate-50/70 border-b border-slate-100">
+                      <th className="py-3.5 px-5 font-black text-slate-500 text-left min-w-[200px] uppercase tracking-wider text-[10px] border border-slate-200">
+                        Month / Segment
+                      </th>
+                      {visibleMgrCodes.map((sbu) => (
+                        <th
+                          key={sbu}
+                          className="py-3.5 px-4 font-black text-slate-500 text-right min-w-[110px] border border-slate-200 uppercase tracking-wider text-[10px]"
+                        >
+                          {sbu}
+                        </th>
+                      ))}
+                      <th className="py-3.5 px-4 font-black text-slate-600 text-right bg-slate-100/40 min-w-[110px] border border-slate-200 uppercase tracking-wider text-[10px]">
+                        Total
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visibleMonthLabels.length === 0 ? (
+                      <tr>
+                        <td colSpan={visibleMgrCodes.length + 2} className="py-10 px-5 text-center text-slate-400 font-bold border border-slate-200">
+                          No SBU-wise planning data available.
+                        </td>
+                      </tr>
+                    ) : (
+                      visibleMonthLabels.map((monthLabel) => {
+                        const monthRow = monthRows.find(
+                          (r) => (r.monthLabel || r.month) === monthLabel
+                        ) || { month: monthLabel, total: 0 };
+                        const monthSegments = segmentRows.filter(
+                          (r) => r.parentMonth === monthLabel
+                        ).filter(
+                          (r) => Number(r.total || 0) > 0 || visibleMgrCodes.some((sbu) => hasSbuValue(r, sbu, monthLabel, r.month))
+                        );
+                        const monthTotal = visibleMgrCodes.reduce(
+                          (sum, sbu) => sum + getMergedSbuReportCellValue(monthRow, sbu, monthLabel),
+                          0,
+                        );
+
+                        return (
+                          <React.Fragment key={monthLabel}>
+                            {/* MONTH ROW */}
+                            <tr
+                              className="bg-indigo-50/20 hover:bg-indigo-50/40 border-l-4 border-l-indigo-500 transition-all border-b border-slate-100 font-bold cursor-pointer"
+                              onClick={() => toggleSbuWiseMonth(monthLabel)}
+                            >
+                              <td className="py-3.5 px-4 text-slate-800 border border-slate-200">
+                                <div className="flex items-center gap-2">
+                                  <MdKeyboardArrowDown
+                                    className={`text-indigo-500 transition-transform duration-300 ${!expandedSbuWiseMonths[monthLabel] ? "-rotate-90" : ""}`}
+                                    size={18}
+                                  />
+                                  <span className="font-extrabold text-xs tracking-wide">
+                                    {monthRow.month}
+                                  </span>
+                                </div>
+                              </td>
+                              {visibleMgrCodes.map((sbu) => {
+                                const cellValue = getMergedSbuReportCellValue(monthRow, sbu, monthLabel);
+                                return (
+                                  <td
+                                    key={sbu}
+                                    className="py-3.5 px-4 text-right border border-slate-200"
+                                  >
+                                    {cellValue > 0 ? (
+                                      <span className="inline-flex items-center justify-end px-2.5 py-1 rounded-full bg-indigo-50/70 text-indigo-700 text-[11px] font-black min-w-[70px] border border-indigo-100/40 shadow-sm hover:scale-105 transition-all">
+                                        {formatReportValue(cellValue, 2)}
+                                      </span>
+                                    ) : (
+                                      <span className="text-slate-300 font-normal">-</span>
+                                    )}
+                                  </td>
+                                );
+                              })}
+                              <td className="py-3.5 px-4 text-right border border-slate-200 bg-indigo-50/10">
+                                {monthTotal > 0 ? (
+                                  <span className="inline-flex items-center justify-end px-2.5 py-1 rounded-full bg-indigo-100/50 text-indigo-800 text-[11px] font-black min-w-[70px] border border-indigo-200/30 shadow-sm">
+                                    {formatReportValue(monthTotal, 2)}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-300 font-normal">-</span>
+                                )}
+                              </td>
+                            </tr>
+
+                            {/* SEGMENT ROWS (shown when month is expanded) */}
+                            {expandedSbuWiseMonths[monthLabel] && monthSegments.map((segRow) => {
+                              const segmentTotal = visibleMgrCodes.reduce(
+                                (sum, sbu) => sum + getMergedSbuReportCellValue(segRow, sbu, monthLabel, segRow.month),
+                                0,
+                              );
+                              return (
+                                <tr
+                                  key={`${monthLabel}-${segRow.month}`}
+                                  className="border-b border-slate-100/60 bg-slate-50/20 hover:bg-slate-50/60 transition-colors border-l-4 border-l-slate-200"
+                                >
+                                  <td className="py-3 px-4 text-slate-600 font-bold pl-8 text-xs border border-slate-200">
+                                    {segRow.month}
+                                  </td>
+                                  {visibleMgrCodes.map((sbu) => {
+                                    const val = getMergedSbuReportCellValue(segRow, sbu, monthLabel, segRow.month);
+                                    return (
+                                      <td
+                                        key={`${monthLabel}-${segRow.month}-${sbu}`}
+                                        className="py-3 px-4 text-right border-slate-200 text-xs"
+                                      >
+                                        {val > 0 ? (
+                                          <span className="inline-flex items-center justify-end px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-extrabold min-w-[64px] border border-slate-200/40">
+                                            {formatReportValue(val, 2)}
+                                          </span>
+                                        ) : (
+                                          <span className="text-slate-300 font-normal">-</span>
+                                        )}
+                                      </td>
+                                    );
+                                  })}
+                                  <td className="py-3 px-4 text-right border-slate-200 bg-slate-50/30 font-bold text-slate-700 text-xs">
+                                    {segmentTotal > 0 ? formatReportValue(segmentTotal, 2) : "-"}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </React.Fragment>
+                        );
+                      })
+                    )}
+
+                    {/* SUMMARY ROWS */}
+                    {summaryRowsInOrder.map((row) => {
+                      const isTotal = row.isTotal;
+                      const isPercentage = row.isPercentage;
+                      const isPreviousYearValue = row.isPreviousYearValue;
+                      const isTotalPercentage = row.isTotalPercentage;
+
+                      return (
+                        <tr
+                          key={`sbu-summary-${row.month}`}
+                          className={`border-b border-slate-200/60 transition-colors ${isTotal
+                            ? "bg-emerald-50/60 border-t border-emerald-100 font-black text-emerald-900"
+                            : isPreviousYearValue
+                              ? "bg-amber-50/50 border-t border-amber-100 font-bold text-amber-900"
+                              : isPercentage || isTotalPercentage
+                                ? "bg-violet-50/50 border-t border-violet-100 text-violet-900"
+                                : "border-slate-100 hover:bg-slate-50 text-slate-700"
+                            }`}
+                        >
+                          <td
+                            className="py-3.5 px-5 font-extrabold text-xs uppercase tracking-wide border border-slate-200"
+                          >
+                            {isPercentage ? "Percentage CY" : row.month}
+                          </td>
+                          {visibleMgrCodes.map((sbu) => {
+                            const cellValue = getSbuReportCellValue(row, sbu);
+                            return (
+                              <td
+                                key={`sbu-summary-${row.month}-${sbu}`}
+                                className="py-3.5 px-4 text-right border-slate-200"
+                              >
+                                {cellValue > 0 ? (
+                                  <span className={`inline-flex items-center justify-end px-2.5 py-1 rounded-full text-[11px] font-black min-w-[70px] border ${isTotal
+                                    ? "bg-emerald-100/50 text-emerald-800 border-emerald-200/40"
+                                    : isPreviousYearValue
+                                      ? "bg-amber-100/50 text-amber-800 border-amber-200/40"
+                                      : "bg-violet-100/50 text-violet-800 border-violet-200/40"
+                                    }`}>
+                                    {isPercentage || isTotalPercentage
+                                      ? formatReportPercentage(cellValue)
+                                      : formatReportValue(cellValue, 3)}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-300 font-normal">-</span>
+                                )}
+                              </td>
+                            );
+                          })}
+                          <td
+                            className="py-3.5 px-4 text-right border border-slate-200 bg-slate-100/20 font-black text-xs"
+                          >
+                            {isPercentage || isTotalPercentage
+                              ? formatReportPercentageTotal(row.total)
+                              : formatReportValue(row.total || 0, 3)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {hasAccess('planning_view_segment_wise') && (
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-100/80 overflow-hidden transition-all duration-300 hover:shadow-md hover:border-slate-200/60">
+          <div
+            className="p-5 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 to-sky-50/10 flex justify-between items-center cursor-pointer select-none group"
+            onClick={() => setIsReportExpanded2(!isReportExpanded2)}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center font-black text-xs shadow-sm transition-all group-hover:scale-110">
+                SEG
+              </div>
+              <h2 className="text-xs font-extrabold text-slate-700 uppercase tracking-widest flex items-center gap-2">
+                <MdKeyboardArrowDown
+                  className={`text-slate-400 transition-transform duration-300 ${!isReportExpanded2 ? "-rotate-90 text-slate-400" : "text-sky-600"}`}
+                  size={20}
+                />
+                Segment Wise - FY {financialYear}
+              </h2>
+            </div>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                exportReportToExcel(reportData2, "Segment Wise Report");
+              }}
+              disabled={!reportData2 || !reportData2.mgrCodes?.length}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 font-extrabold text-xs uppercase tracking-widest hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <MdDownload size={16} />
+              Export
+            </button>
+          </div>
+
+          {isReportExpanded2 && (
+            <div className="overflow-x-auto custom-scrollbar">
+              <table className="w-full text-left text-sm border-collapse border border-slate-200">
+                <thead>
+                  <tr className="bg-slate-50/70 border-b border-slate-100">
+                    <th className="py-3.5 px-5 font-black text-slate-500 text-left min-w-[200px] uppercase tracking-wider text-[10px] border border-slate-200">
+                      Month
+                    </th>
+                    {(reportData2?.mgrCodes?.length > 0 ? reportData2.mgrCodes : ['Export', 'Industry', 'UC', 'Utility']).map((mgr) => (
+                      <th
+                        key={mgr}
+                        className="py-3.5 px-4 font-black text-slate-500 text-right min-w-[110px] uppercase tracking-wider text-[10px] border border-slate-200"
+                      >
+                        {mgr}
+                      </th>
+                    ))}
+                    <th className="py-3.5 px-4 font-black text-slate-600 text-right bg-slate-100/40 min-w-[110px] uppercase tracking-wider text-[10px] border border-slate-200">
+                      Total
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(() => {
+                    const mgrCodes = reportData2?.mgrCodes?.length > 0 ? reportData2.mgrCodes : ['Export', 'Industry', 'UC', 'Utility'];
+                    const monthRowsByLabel = new Map(
+                      (reportData2?.rows || [])
+                        .filter((row) => row.isMonth && !row.isSegment)
+                        .map((row) => [row.monthLabel || row.month, row]),
+                    );
+                    const segmentMonthLabels =
+                      reportData2?.monthLabels?.length > 0
+                        ? reportData2.monthLabels
+                        : (monthRowsByLabel.size > 0 ? Array.from(monthRowsByLabel.keys()) : monthLabels);
+
+                    return segmentMonthLabels.map((monthLabel) => {
+                      const monthRow = monthRowsByLabel.get(monthLabel) || {
+                        month: monthLabel,
+                        total: 0,
+                      };
+
+                      return (
+                        <React.Fragment key={monthLabel}>
+                          <tr
+                            className="bg-sky-50/20 hover:bg-sky-50/40 border-l-4 border-l-sky-500 transition-all border-b border-slate-100 font-bold cursor-pointer"
+                            onClick={() => toggleSegmentMonth(monthLabel)}
+                          >
+                            <td className="py-3.5 px-4 text-slate-800 border border-slate-200">
+                              <div className="flex items-center gap-2">
+                                <MdKeyboardArrowDown
+                                  className={`text-sky-500 transition-transform duration-300 ${!expandedSegmentMonths[monthLabel] ? "-rotate-90" : ""}`}
+                                  size={18}
+                                />
+                                <span className="font-extrabold text-xs tracking-wide">{monthRow.month}</span>
+                              </div>
+                            </td>
+                            {mgrCodes.map((mgr) => {
+                              const cellValue = Number(monthRow[mgr] || 0);
+                              return (
+                                <td
+                                  key={mgr}
+                                  className="py-3.5 px-4 text-right border border-slate-200"
+                                >
+                                  {cellValue > 0 ? (
+                                    <span className="inline-flex items-center justify-end px-2.5 py-1 rounded-full bg-sky-50/70 text-sky-700 text-[11px] font-black min-w-[70px] border border-sky-100/40 shadow-sm hover:scale-105 transition-all">
+                                      {formatReportValue(cellValue, 3)}
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-300 font-normal">-</span>
+                                  )}
+                                </td>
+                              );
+                            })}
+                            <td
+                              className="py-3.5 px-4 text-right bg-sky-50/10 border border-slate-200"
+                            >
+                              {Number(monthRow.total || 0) > 0 ? (
+                                <span className="inline-flex items-center justify-end px-2.5 py-1 rounded-full bg-sky-100/50 text-sky-800 text-[11px] font-black min-w-[70px] border border-sky-200/30 shadow-sm">
+                                  {formatReportValue(monthRow.total || 0, 3)}
+                                </span>
+                              ) : (
+                                <span className="text-slate-300 font-normal">-</span>
+                              )}
+                            </td>
+                          </tr>
+                          {expandedSegmentMonths[monthLabel] &&
+                            (() => {
+                              const sbuMap = new Map();
+                              const resolveSbuLabel = (value) => {
+                                const normalized = normalizeSbuValue(value);
+                                const match = (
+                                  combinedReportData?.mgrCodes || []
+                                ).find(
+                                  (code) =>
+                                    normalizeSbuValue(code) === normalized,
+                                );
+                                return match || value || "Unassigned";
+                              };
+
+                              (combinedReportData?.sbuWise || [])
+                                .filter((r) => r.month === monthLabel)
+                                .forEach((r) => {
+                                  const canonicalSbu = resolveSbuLabel(r.sbu);
+                                  const normalizedSbu =
+                                    normalizeSbuValue(canonicalSbu);
+                                  const key = normalizedSbu || canonicalSbu;
+                                  if (!sbuMap.has(key)) {
+                                    sbuMap.set(key, {
+                                      normalizedSbu,
+                                      sbu: canonicalSbu,
+                                      values: {},
+                                      total: 0,
+                                    });
+                                  }
+                                  const entry = sbuMap.get(key);
+                                  const segKey = r.segment || "Unassigned";
+                                  entry.values[segKey] =
+                                    (entry.values[segKey] || 0) +
+                                    Number(r.value || 0);
+                                  entry.total += Number(r.value || 0);
+                                });
+                              const sbuRows = Array.from(sbuMap.values());
+
+                              if (sbuRows.length === 0) {
+                                return ['EPC', 'SBU1', 'SBU2', 'SBU3'].map(sbu => (
+                                  <tr
+                                    key={`${monthLabel}-${sbu}`}
+                                    className="border-b border-slate-100/60 bg-slate-50/20 hover:bg-slate-50/60 transition-colors border-l-4 border-l-slate-200"
+                                  >
+                                    <td className="py-3 px-4 text-slate-600 font-bold pl-8 text-xs border border-slate-200">
+                                      <span>{sbu}</span>
+                                    </td>
+                                    {mgrCodes.map((mgr) => (
+                                      <td
+                                        key={mgr}
+                                        className="py-3 px-4 text-right text-xs text-slate-300 border border-slate-200"
+                                      >
+                                        -
+                                      </td>
+                                    ))}
+                                    <td className="py-3 px-4 text-right bg-slate-50/30 font-bold text-xs text-slate-300 border border-slate-200">
+                                      -
+                                    </td>
+                                  </tr>
+                                ));
+                              }
+
+                              return sbuRows.map((row) => (
+                                <tr
+                                  key={`${monthLabel}-${row.normalizedSbu}`}
+                                  className="border-b border-slate-100/60 bg-slate-50/20 hover:bg-slate-50/60 transition-colors border-l-4 border-l-slate-200"
+                                >
+                                  <td className="py-3 px-4 text-slate-600 font-bold pl-8 text-xs border border-slate-200">
+                                    <span>{row.sbu}</span>
+                                  </td>
+                                  {mgrCodes.map((mgr) => {
+                                    const val = Number(row.values[mgr] || 0);
+                                    return (
+                                      <td
+                                        key={mgr}
+                                        className="py-3 px-4 text-right text-xs border border-slate-200"
+                                      >
+                                        {val > 0 ? (
+                                          <span className="inline-flex items-center justify-end px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-extrabold min-w-[64px] border border-slate-200/40">
+                                            {formatReportValue(val, 3)}
+                                          </span>
+                                        ) : (
+                                          <span className="text-slate-300 font-normal">-</span>
+                                        )}
+                                      </td>
+                                    );
+                                  })}
+                                  <td
+                                    className="py-3 px-4 text-right bg-slate-50/30 font-bold text-slate-700 text-xs border border-slate-200"
+                                  >
+                                    {row.total > 0 ? formatReportValue(row.total, 3) : "-"}
+                                  </td>
+                                </tr>
+                              ));
+                            })()}
+                        </React.Fragment>
+                      );
+                    });
+                  })()}
+                  {(() => {
+                    const mgrCodes = reportData2?.mgrCodes?.length > 0 ? reportData2.mgrCodes : ['Export', 'Industry', 'UC', 'Utility'];
+                    const summaryRowsInOrder = reportData2 ? [
+                      (reportData2.rows || []).find((row) => row.isTotal),
+                      (reportData2.rows || []).find((row) => row.isPercentage),
+                      (reportData2.rows || []).find(
+                        (row) => row.isPreviousYearValue,
+                      ),
+                      (reportData2.rows || []).find(
+                        (row) => row.isTotalPercentage,
+                      ),
+                    ].filter(Boolean) : [
+                      { month: 'Total', isTotal: true, total: 0 },
+                      { month: 'Percentage CY', isPercentage: true, total: 0 },
+                      { month: 'Value (Previous Year)', isPreviousYearValue: true, total: 0 },
+                      { month: 'Percentage PY', isTotalPercentage: true, total: 0 },
+                    ];
+
+                    return summaryRowsInOrder.map((row) => {
+                      const isTotal = row.isTotal;
+                      const isPercentage = row.isPercentage;
+                      const isPreviousYearValue = row.isPreviousYearValue;
+                      const isTotalPercentage = row.isTotalPercentage;
+
+                      return (
+                        <tr
+                          key={row.month}
+                          className={`border-b border-slate-200/60 transition-colors ${isTotal
+                            ? "bg-emerald-50/60 border-t border-emerald-100 font-black text-emerald-900"
+                            : isPreviousYearValue
+                              ? "bg-amber-50/50 border-t border-amber-100 font-bold text-amber-900"
+                              : isPercentage || isTotalPercentage
+                                ? "bg-violet-50/50 border-t border-violet-100 text-violet-900"
+                                : "border-slate-100 hover:bg-slate-50 text-slate-700"
+                            }`}
+                        >
+                          <td
+                            className="py-3.5 px-5 font-extrabold text-xs uppercase tracking-wide border border-slate-200"
+                          >
+                            {isPercentage ? "Percentage CY" : row.month}
+                          </td>
+                          {mgrCodes.map((mgr) => {
+                            const cellValue = Number(row[mgr] || 0);
+                            return (
+                              <td
+                                key={mgr}
+                                className="py-3.5 px-4 text-right border-slate-200 border"
+                              >
+                                {cellValue > 0 ? (
+                                  <span className={`inline-flex items-center justify-end px-2.5 py-1 rounded-full text-[11px] font-black min-w-[70px] border ${isTotal
+                                    ? "bg-emerald-100/50 text-emerald-800 border-emerald-200/40"
+                                    : isPreviousYearValue
+                                      ? "bg-amber-100/50 text-amber-800 border-amber-200/40"
+                                      : "bg-violet-100/50 text-violet-800 border-violet-200/40"
+                                    }`}>
+                                    {isPercentage || isTotalPercentage
+                                      ? formatReportPercentage(cellValue)
+                                      : formatReportValue(cellValue, 3)}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-300 font-normal">-</span>
+                                )}
+                              </td>
+                            );
+                          })}
+                          <td
+                            className="py-3.5 px-4 text-right bg-slate-100/20 font-black text-xs border border-slate-200"
+                          >
+                            {isPercentage || isTotalPercentage
+                              ? formatReportPercentageTotal(row.total)
+                              : formatReportValue(row.total || 0, 3)}
+                          </td>
+                        </tr>
+                      );
+                    });
+                  })()}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {hasAccess('planning_view_status_breakdown') && (
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-100/80 overflow-hidden transition-all duration-300 hover:shadow-md hover:border-slate-200/60">
+          <div
+            className="p-5 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 to-emerald-50/10 flex justify-between items-center cursor-pointer select-none group"
+            onClick={() =>
+              setIsStatusBreakdownExpanded(!isStatusBreakdownExpanded)
+            }
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-black text-xs shadow-sm transition-all group-hover:scale-110">
+                STT
+              </div>
+              <h2 className="text-xs font-extrabold text-slate-700 uppercase tracking-widest flex items-center gap-2">
+                <MdKeyboardArrowDown
+                  className={`text-slate-400 transition-transform duration-300 ${!isStatusBreakdownExpanded ? "-rotate-90 text-slate-400" : "text-emerald-600"}`}
+                  size={20}
+                />
+                Status Breakdown Summary - FY {financialYear}
+              </h2>
+            </div>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                exportStatusBreakdownToExcel();
+              }}
+              disabled={
+                !computedStatusBreakdownData ||
+                !computedStatusBreakdownData.length
+              }
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 font-extrabold text-xs uppercase tracking-widest hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <MdDownload size={16} />
+              Export
+            </button>
+          </div>
+
+          {isStatusBreakdownExpanded && (
+            <div className="overflow-x-auto custom-scrollbar">
+              <table className="w-full text-sm border-collapse border border-slate-200">
+                <thead>
+                  <tr className="bg-slate-50/70 border-b border-slate-100">
+                    <th className="py-3.5 px-4 text-left font-black text-slate-500 text-[10px] min-w-[90px] border border-slate-200 uppercase tracking-wider">Month</th>
+                    <th className="py-3.5 px-3 text-left font-black text-slate-500 text-[10px] min-w-[110px] border border-slate-200 uppercase tracking-wider">SBU/EPC</th>
+                    <th className="py-3.5 px-3 text-left font-black text-slate-500 text-[10px] min-w-[110px] border border-slate-200 uppercase tracking-wider">Segment</th>
+                    {(visibleStatusColumns.length > 0 ? visibleStatusColumns : STATUS_REPORT_COLUMNS).map((column) => (
+                      <th
+                        key={`status-breakdown-header-${column}`}
+                        className="py-3.5 px-3 text-right font-black text-slate-500 text-[10px] min-w-[80px] border border-slate-200 uppercase tracking-wider"
+                      >
+                        {column}
+                      </th>
+                    ))}
+                    <th className="py-3.5 px-3 text-right font-black text-slate-600 text-[10px] min-w-[90px] bg-slate-100/40 border border-slate-200 uppercase tracking-wider">
+                      Total
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(computedStatusBreakdownData?.length > 0 ? computedStatusBreakdownData : []).map((monthData, mIdx) => {
+                    const isMonthExpanded = expandedStatusBreakdownMonths[monthData.month];
+                    const statusCols = visibleStatusColumns.length > 0 ? visibleStatusColumns : STATUS_REPORT_COLUMNS;
+
+                    return (
+                      <React.Fragment key={monthData.month}>
+                        {/* Month Header Row */}
+                        <tr
+                          className="bg-emerald-50/20 border-l-4 border-l-emerald-500 border-b border-slate-100 cursor-pointer hover:bg-emerald-50/40 transition-colors font-bold"
+                          onClick={() => toggleStatusBreakdownMonth(monthData.month)}
+                        >
+                          <td className="py-3 px-4 text-emerald-900 font-extrabold uppercase tracking-wider text-[11px] flex items-center gap-2 border border-slate-200">
+                            <MdKeyboardArrowDown
+                              className={`text-emerald-500 transition-transform duration-200 ${!isMonthExpanded ? "-rotate-90" : ""}`}
+                              size={18}
+                            />
+                            {monthData.month}
+                          </td>
+                          <td className="py-3 px-3 border border-slate-200"></td>
+                          <td className="py-3 px-3 border border-slate-200"></td>
+                          {statusCols.map(col => {
+                            const cellVal = monthData.monthTotalStatuses?.[col] || 0;
+                            return (
+                              <td key={col} className="py-3 px-3 text-right border border-slate-200">
+                                {cellVal > 0 ? (
+                                  <span className="inline-flex items-center justify-end px-2.5 py-1 rounded-full bg-emerald-50/70 text-emerald-700 text-[11px] font-black min-w-[70px] border border-emerald-100/40 shadow-sm">
+                                    {formatReportValue(cellVal, 3)}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-300 font-normal">-</span>
+                                )}
+                              </td>
+                            );
+                          })}
+                          <td className="py-3 px-3 text-right font-black text-emerald-950 bg-emerald-50/30 border border-slate-200">
+                            {monthData.monthGrandTotal > 0 ? (
+                              <span className="inline-flex items-center justify-end px-2.5 py-1 rounded-full bg-emerald-100/50 text-emerald-800 text-[11px] font-black min-w-[70px] border border-emerald-200/30 shadow-sm">
+                                {formatReportValue(monthData.monthGrandTotal || 0, 3)}
+                              </span>
+                            ) : (
+                              <span className="text-slate-300 font-normal">-</span>
+                            )}
+                          </td>
+                        </tr>
+
+                        {isMonthExpanded && (monthData.sbuGroups?.length > 0 ? monthData.sbuGroups : [
+                          { sbu: 'EPC', segmentGroups: [], sbuTotalStatuses: {}, sbuGrandTotal: 0 },
+                          { sbu: 'SBU1', segmentGroups: [], sbuTotalStatuses: {}, sbuGrandTotal: 0 },
+                          { sbu: 'SBU2', segmentGroups: [], sbuTotalStatuses: {}, sbuGrandTotal: 0 },
+                          { sbu: 'SBU3', segmentGroups: [], sbuTotalStatuses: {}, sbuGrandTotal: 0 }
+                        ]).map((sbuGroup, sIdx) => {
+                          const sbuKey = `${monthData.month}-${sbuGroup.sbu}`;
+                          const isSbuExpanded = expandedStatusBreakdownSbus[sbuKey];
+
+                          return (
+                            <React.Fragment key={sbuGroup.sbu}>
+                              {/* SBU Header Row */}
+                              <tr
+                                className="bg-slate-50/40 border-b border-slate-100 cursor-pointer hover:bg-slate-100/60 transition-colors border-l-4 border-l-slate-300"
+                                onClick={() => toggleStatusBreakdownSbu(monthData.month, sbuGroup.sbu)}
+                              >
+                                <td className="py-2.5 px-4 border border-slate-200"></td>
+                                <td className="py-2.5 px-3 text-slate-700 font-extrabold flex items-center gap-2 border border-slate-200 text-xs">
+                                  <MdKeyboardArrowDown
+                                    className={`text-slate-400 transition-transform duration-200 ${!isSbuExpanded ? "-rotate-90" : ""}`}
+                                    size={16}
+                                  />
+                                  {sbuGroup.sbu}
+                                </td>
+                                <td colSpan={statusCols.length + 2} className="bg-slate-50/10 border border-slate-200"></td>
+                              </tr>
+
+                              {isSbuExpanded && (
+                                <>
+                                  {(sbuGroup.segmentGroups?.length > 0 ? sbuGroup.segmentGroups : [
+                                    { segment: 'Export', statuses: {}, total: 0 },
+                                    { segment: 'Industry', statuses: {}, total: 0 },
+                                    { segment: 'UC', statuses: {}, total: 0 },
+                                    { segment: 'Utility', statuses: {}, total: 0 }
+                                  ]).map((seg) => {
+                                    return (
+                                      <tr key={`${monthData.month}-${sbuGroup.sbu}-${seg.segment}`} className="bg-white border-b border-slate-100/40 hover:bg-slate-50/40 transition-colors border-l-4 border-l-slate-200">
+                                        <td className="py-2 px-4 border border-slate-200"></td>
+                                        <td className="py-2 px-3 border border-slate-200"></td>
+                                        <td className="py-2 px-6 text-slate-600 font-bold border border-slate-200 text-xs pl-8">
+                                          {seg.segment}
+                                        </td>
+                                        {statusCols.map(col => {
+                                          const cellVal = seg.statuses?.[col] || 0;
+                                          return (
+                                            <td key={col} className="py-2 px-3 text-right border border-slate-200 text-xs">
+                                              {cellVal > 0 ? (
+                                                <span className="inline-flex items-center justify-end px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-extrabold min-w-[64px] border border-slate-200/40">
+                                                  {formatReportValue(cellVal, 3)}
+                                                </span>
+                                              ) : (
+                                                <span className="text-slate-300 font-normal">-</span>
+                                              )}
+                                            </td>
+                                          );
+                                        })}
+                                        <td className="py-2 px-3 text-right font-bold text-slate-700 bg-slate-50/30 text-xs border border-slate-200">
+                                          {seg.total > 0 ? formatReportValue(seg.total || 0, 3) : "-"}
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                  {/* SBU TOTAL Row */}
+                                  <tr className="bg-teal-50/30 font-bold border-b border-teal-100 border-l-4 border-l-teal-400">
+                                    <td className="py-2 px-4 border border-slate-200"></td>
+                                    <td className="py-2 px-3 border border-slate-200"></td>
+                                    <td className="py-2 px-6 text-teal-900 border border-slate-200 uppercase tracking-tight text-[11px] font-black pl-8">SBU TOTAL</td>
+                                    {statusCols.map(col => {
+                                      const cellVal = sbuGroup.sbuTotalStatuses?.[col] || 0;
+                                      return (
+                                        <td key={col} className="py-2 px-3 text-right border border-slate-200">
+                                          {cellVal > 0 ? (
+                                            <span className="inline-flex items-center justify-end px-2.5 py-0.5 rounded-full bg-teal-100/50 text-teal-800 text-[10px] font-black min-w-[64px] border border-teal-200/30">
+                                              {formatReportValue(cellVal, 3)}
+                                            </span>
+                                          ) : (
+                                            <span className="text-slate-300 font-normal">-</span>
+                                          )}
+                                        </td>
+                                      );
+                                    })}
+                                    <td className="py-2 px-3 text-right font-black text-teal-950 bg-teal-50/40 text-xs border border-slate-200">
+                                      {sbuGroup.sbuGrandTotal > 0 ? formatReportValue(sbuGroup.sbuGrandTotal || 0, 3) : "-"}
+                                    </td>
+                                  </tr>
+                                </>
+                              )}
+                            </React.Fragment>
+                          );
+                        })}
+                      </React.Fragment>
+                    );
+                  })}
+                  {(statusBreakdownSummaryRows?.length > 0 ? statusBreakdownSummaryRows : [
+                    { key: 'total', label: 'TOTAL', isTotal: true, values: {}, rowTotal: 0 },
+                    { key: 'percentage', label: 'Percentage CY', isPercentage: true, values: {}, rowTotal: 0 },
+                    { key: 'prev-year', label: 'Value (Previous Year)', isPreviousYearValue: true, values: {}, rowTotal: 0 },
+                    { key: 'prev-percentage', label: 'Percentage PY', isTotalPercentage: true, values: {}, rowTotal: 0 }
+                  ]).map((summaryRow) => {
+                    const isYellowLabel = summaryRow.isTotal || summaryRow.isPreviousYearValue;
+                    const statusCols = visibleStatusColumns.length > 0 ? visibleStatusColumns : STATUS_REPORT_COLUMNS;
+
+                    return (
+                      <tr
+                        key={`status-breakdown-${summaryRow.key}`}
+                        className={`border-b border-slate-200/60 transition-colors ${isYellowLabel ? "border-t border-emerald-100 bg-emerald-50/60 font-black text-emerald-900" : "border-t border-indigo-100 bg-indigo-50/50 text-indigo-900"}`}
+                      >
+                        <td
+                          colSpan={3}
+                          className="py-3.5 px-4 font-extrabold text-xs uppercase tracking-wide border border-slate-200"
+                        >
+                          {summaryRow.label}
+                        </td>
+                        {statusCols.map((column) => {
+                          const cellValue = Number(summaryRow.values?.[column] || 0);
+                          return (
+                            <td
+                              key={`${summaryRow.key}-${column}`}
+                              className="py-3.5 px-3 text-right border border-slate-200"
+                            >
+                              {cellValue > 0 ? (
+                                <span className={`inline-flex items-center justify-end px-2.5 py-1 rounded-full text-[11px] font-black min-w-[70px] border ${isYellowLabel
+                                  ? "bg-emerald-100/50 text-emerald-800 border-emerald-200/40"
+                                  : "bg-indigo-100/50 text-indigo-800 border-indigo-200/40"
+                                  }`}>
+                                  {summaryRow.isPercentage || summaryRow.isTotalPercentage
+                                    ? formatReportPercentage(cellValue)
+                                    : formatReportValue(cellValue, 3)}
+                                </span>
+                              ) : (
+                                <span className="text-slate-300 font-normal">-</span>
+                              )}
+                            </td>
+                          );
+                        })}
+                        <td
+                          className="py-3.5 px-3 text-right font-black border border-slate-200 bg-slate-100/20 text-xs"
+                        >
+                          {summaryRow.isPercentage || summaryRow.isTotalPercentage
+                            ? formatReportPercentageTotal(summaryRow.rowTotal)
+                            : formatReportValue(summaryRow.rowTotal || 0, 3)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      <ImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        title={`Import Planning - FY ${financialYear}`}
+        type="planning"
+        onImport={async (file, onUploadProgress) => {
+          const result = await importService.importPlanning(
+            file,
+            financialYear,
+            onUploadProgress,
+          );
+          await fetchData();
+          return result;
+        }}
+        onDownloadTemplate={() =>
+          importService.getPlanningTemplate(financialYear)
+        }
+      />
+    </div>
+  );
 };
 
 export default PlanningScreen;

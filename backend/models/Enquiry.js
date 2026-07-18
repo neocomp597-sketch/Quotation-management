@@ -1,17 +1,42 @@
 const mongoose = require('mongoose');
 
 const EnquirySchema = new mongoose.Schema({
-    enquiryNo: { type: String, required: true, unique: true },
+    enquiryNo: { type: String, required: true },
     enquiryDate: { type: Date, required: true, default: Date.now },
     customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', required: true },
+    companyName: { type: String },
+    contactPerson: { type: String },
     refReceivedFrom: { type: String }, // OUR Ref. received from
     followUpDate: { type: Date },      // To handle Followup date time action
+    contactDesignation: { type: String },
+    contactMobile: { type: String },
+    contactEmail: { type: String },
+    partners: [{
+        name: { type: String },
+        contactPerson: { type: String },
+        mobile: { type: String },
+        email: { type: String },
+        notes: { type: String }
+    }],
+    siteAddress: { type: String },
+    projectName: { type: String },
+    requiredDeliveryDate: { type: Date },
+    priority: { type: String, enum: ['Low', 'Medium', 'High', 'Urgent'], default: 'Medium' },
+    budget: { type: String },
+    technicalSpecifications: { type: String },
+    attachmentName: { type: String },
     
     // Line items captured in the table
     items: [{
+        productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
+        productCode: { type: String },
         productName: { type: String, required: true },
         quantity: { type: Number, required: true },
-        uom: { type: String, enum: ['Pcs', 'Set', 'Ltr', 'Pack', 'Doz', 'Kg', 'Mtr'], default: 'Pcs' },
+        uom: { type: String, enum: ['Pcs', 'Nos', 'Kg', 'Meter', 'Set', 'Ltr', 'Pack', 'Doz', 'Mtr'], default: 'Pcs' },
+        rate: { type: Number, default: 0 },
+        price: { type: Number, default: 0 },
+        discountPercent: { type: Number, default: 0 },
+        value: { type: Number, default: 0 },
         actionStatus: { 
             type: String, 
             enum: [
@@ -40,6 +65,12 @@ const EnquirySchema = new mongoose.Schema({
         }],
         finalVendor: { type: mongoose.Schema.Types.ObjectId, ref: 'Vendor' }
     }],
+
+    subtotal: { type: Number, default: 0 },
+    discount: { type: Number, default: 0 },
+    freight: { type: Number, default: 0 },
+    otherCharges: { type: Number, default: 0 },
+    grandTotal: { type: Number, default: 0 },
 
     status: { 
         type: String, 
@@ -83,4 +114,7 @@ EnquirySchema.pre(['updateOne', 'updateMany'], function() {
     this.set({ lastActivityDate: new Date() });
 });
 
+const tenantPlugin = require('./plugins/tenantPlugin');
+EnquirySchema.plugin(tenantPlugin);
+EnquirySchema.index({ companyId: 1, enquiryNo: 1 }, { unique: true });
 module.exports = mongoose.model('Enquiry', EnquirySchema);

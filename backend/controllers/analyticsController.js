@@ -1,4 +1,5 @@
 const Enquiry = require('../models/Enquiry');
+const Quotation = require('../models/Quotation');
 const mongoose = require('mongoose');
 
 // Compute health score for an enquiry (0-100)
@@ -251,7 +252,8 @@ exports.getFollowUpIntelligence = async (req, res) => {
                 .populate('customerId', 'companyName')
                 .populate('items.finalVendor', 'name')
                 .sort({ followUpDate: 1 })
-                .select('enquiryNo followUpDate probability status items customerId'),
+                .select('enquiryNo followUpDate probability status items customerId')
+                .lean(),
 
             Enquiry.find({
                 status: statusMatch,
@@ -259,7 +261,8 @@ exports.getFollowUpIntelligence = async (req, res) => {
             })
                 .populate('customerId', 'companyName')
                 .sort({ followUpDate: 1 })
-                .select('enquiryNo followUpDate probability status items customerId'),
+                .select('enquiryNo followUpDate probability status items customerId')
+                .lean(),
 
             Enquiry.find({
                 status: statusMatch,
@@ -268,6 +271,7 @@ exports.getFollowUpIntelligence = async (req, res) => {
                 .populate('customerId', 'companyName')
                 .sort({ followUpDate: 1 })
                 .select('enquiryNo followUpDate probability status items customerId')
+                .lean()
         ]);
 
         // High-risk enquiries: inactive + low probability, or overdue follow-ups + low probability
@@ -281,7 +285,8 @@ exports.getFollowUpIntelligence = async (req, res) => {
         })
             .populate('customerId', 'companyName')
             .sort({ lastActivityDate: 1 })
-            .select('enquiryNo lastActivityDate probability status items customerId followUpDate');
+            .select('enquiryNo lastActivityDate probability status items customerId followUpDate')
+            .lean();
 
         res.json({
             today: todayFollowups,
@@ -301,30 +306,35 @@ exports.getVendorIntelligence = async (req, res) => {
 
         let matchStage = {};
         if (from || to) {
-            matchStage.enquiryDate = {};
-            if (from) matchStage.enquiryDate.$gte = new Date(from);
-            if (to) matchStage.enquiryDate.$lte = new Date(to);
+            matchStage.createdAt = {};
+            if (from) matchStage.createdAt.$gte = new Date(from);
+            if (to) matchStage.createdAt.$lte = new Date(to);
         }
 
-        const vendors = await Enquiry.aggregate([
+        const vendors = await Quotation.aggregate([
             { $match: matchStage },
             { $unwind: '$items' },
-            { $unwind: { path: '$items.vendorQuotes', preserveNullAndEmptyArrays: true } },
             {
                 $group: {
-                    _id: '$items.vendorQuotes.vendorId',
-                    vendorName: { $first: '$items.vendorQuotes.vendorName' },
+                    _id: '$items.vendorId',
+                    vendorName: { $first: '$items.vendorName' },
                     quoteCount: { $sum: 1 },
-                    avgPrice: { $avg: '$items.vendorQuotes.price' },
+                    avgPrice: { $avg: '$items.vendorPrice' },
                     winCount: {
                         $sum: {
-                            $cond: [{ $eq: ['$items.finalVendor', '$items.vendorQuotes.vendorId'] }, 1, 0]
+                            $cond: [{ $eq: ['$status', 'ordered'] }, 1, 0]
                         }
                     }
                 }
             },
             {
-                $addFields: {
+                $project: {
+                    _id: 1,
+                    vendorName: { $ifNull: ['$vendorName', 'Unknown Vendor'] },
+                    quoteCount: 1,
+                    avgPrice: 1,
+                    winCount: 1,
+                    lossCount: { $subtract: ['$quoteCount', '$winCount'] },
                     winRatio: {
                         $cond: [
                             { $gt: ['$quoteCount', 0] },
@@ -339,6 +349,7 @@ exports.getVendorIntelligence = async (req, res) => {
 
         res.json(vendors);
     } catch (err) {
+        console.error('[Analytics Error] getVendorIntelligence:', err);
         res.status(500).json({ message: err.message });
     }
 };
@@ -349,33 +360,34 @@ exports.getProductIntelligence = async (req, res) => {
 
         let matchStage = {};
         if (from || to) {
-            matchStage.enquiryDate = {};
-            if (from) matchStage.enquiryDate.$gte = new Date(from);
-            if (to) matchStage.enquiryDate.$lte = new Date(to);
+            matchStage.createdAt = {};
+            if (from) matchStage.createdAt.$gte = new Date(from);
+            if (to) matchStage.createdAt.$lte = new Date(to);
         }
 
-        const products = await Enquiry.aggregate([
+        const products = await Quotation.aggregate([
             { $match: matchStage },
             { $unwind: '$items' },
             {
                 $group: {
-                    _id: '$items.productName',
+                    _id: '$items.productSnapshot.productName',
                     enquiryCount: { $sum: 1 },
                     wonCount: {
                         $sum: {
-                            $cond: [{ $in: ['$status', ['PO Received', 'Finalized']] }, 1, 0]
+                            $cond: [{ $eq: ['$status', 'ordered'] }, 1, 0]
                         }
                     },
-                    lostCount: {
-                        $sum: { $cond: [{ $eq: ['$status', 'Lost'] }, 1, 0] }
-                    },
-                    vendorCount: {
-                        $sum: { $cond: [{ $gt: [{ $size: { $ifNull: ['$items.vendors', []] } }, 0] }, 1, 0] }
-                    }
+                    vendors: { $addToSet: '$items.vendorId' }
                 }
             },
             {
-                $addFields: {
+                $project: {
+                    _id: 1,
+                    productName: '$_id',
+                    enquiryCount: 1,
+                    wonCount: 1,
+                    lostCount: { $subtract: ['$enquiryCount', '$wonCount'] },
+                    vendorCount: { $size: '$vendors' },
                     conversionRate: {
                         $cond: [
                             { $gt: ['$enquiryCount', 0] },
@@ -390,6 +402,7 @@ exports.getProductIntelligence = async (req, res) => {
 
         res.json(products);
     } catch (err) {
+        console.error('[Analytics Error] getProductIntelligence:', err);
         res.status(500).json({ message: err.message });
     }
 };
@@ -479,7 +492,8 @@ exports.getProbabilityIntelligence = async (req, res) => {
             .populate('customerId', 'companyName')
             .select('enquiryNo probability status customerId items')
             .sort({ probability: -1 })
-            .limit(10);
+            .limit(10)
+            .lean();
 
         // Low probability that won (insights)
         const lowProbWon = await Enquiry.find({
@@ -490,7 +504,8 @@ exports.getProbabilityIntelligence = async (req, res) => {
             .populate('customerId', 'companyName')
             .select('enquiryNo probability status customerId items')
             .sort({ probability: 1 })
-            .limit(10);
+            .limit(10)
+            .lean();
 
         res.json({
             byStage,
@@ -515,8 +530,10 @@ exports.getHealthScores = async (req, res) => {
         if (status) matchStage.status = status;
 
         let enquiries = await Enquiry.find(matchStage)
+            .select('enquiryNo customerId status probability followUpDate lastActivityDate createdAt')
             .populate('customerId', 'companyName')
-            .sort({ createdAt: -1 });
+            .sort({ createdAt: -1 })
+            .lean();
 
         const data = enquiries.map(e => {
             const healthScore = computeHealthScore(e);
@@ -554,7 +571,8 @@ exports.exportReport = async (req, res) => {
         if (type === 'enquiries') {
             data = await Enquiry.find()
                 .populate('customerId', 'companyName')
-                .select('enquiryNo enquiryDate status probability items');
+                .select('enquiryNo enquiryDate status probability items')
+                .lean();
         } else if (type === 'vendors') {
             const result = await exports.getVendorIntelligence({}, {});
             // This is a workaround — better to call the controller logic directly
@@ -584,7 +602,8 @@ exports.exportReport = async (req, res) => {
             })
                 .populate('customerId', 'companyName')
                 .select('enquiryNo followUpDate probability status')
-                .sort({ followUpDate: 1 });
+                .sort({ followUpDate: 1 })
+                .lean();
         } else if (type === 'conversion') {
             data = await Enquiry.aggregate([
                 {

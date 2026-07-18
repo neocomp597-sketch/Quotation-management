@@ -1,100 +1,754 @@
-const express = require('express');
-const cors = require('cors');
-const bodyParser = require('body-parser');
-const connectDB = require('./config/db');
-require('dotenv').config();
+require("dotenv").config();
+const express = require("express");
+const cors = require("cors");
+const bodyParser = require("body-parser");
+const connectDB = require("./config/db");
+const { connectRedis, disconnectRedis } = require("./config/redis");
+const { closeBullMq } = require("./config/bullmq");
+const { startAuthSessionWorker } = require("./queues/authSessionQueue");
+const { startCacheInvalidationWorker } = require("./queues/cacheInvalidationQueue");
 
 const app = express();
 
+let lastServerError = null;
+global.setLastServerError = (err) => {
+    lastServerError = {
+        message: err?.message || String(err),
+        stack: err?.stack || null,
+        time: new Date().toISOString()
+    };
+};
+
+process.on('unhandledRejection', (reason) => {
+    console.error('Unhandled Rejection:', reason);
+    global.setLastServerError(reason);
+});
+
+process.on('uncaughtException', (error) => {
+    console.error('Uncaught Exception:', error);
+    global.setLastServerError(error);
+});
+
 // Connect to Database
-connectDB();
+const dbStartupPromise = connectDB();
+const redisStartupPromise = connectRedis().then(() => {
+  console.log("Redis connected");
+  return true;
+}).catch(() => {
+  console.warn("Redis unavailable at startup; Redis-backed features will retry per request.");
+  return false;
+});
 
 // Middleware
-app.use(cors({
-    origin: [
-        'https://quotation-management-2znu.onrender.com',
-        'http://localhost:5173',
-        'http://localhost:3000',
-        'https://arcrm.co.in'
-    ],
-    credentials: true
-}));
+const allowedOrigins = process.env.CORS_ORIGINS
+  ? process.env.CORS_ORIGINS.split(",").map(origin => origin.trim()).filter(Boolean)
+  : [
+      "https://arcrm.co.in",
+      "https://www.arcrm.co.in",
+      "http://localhost:5173",
+      "http://localhost:3000",
+    ];
+
+app.use(
+  cors({
+    origin: allowedOrigins,
+    credentials: true,
+  }),
+);
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on("finish", () => {
+    const duration = Date.now() - start;
+    const slowThresholdMs = Number(process.env.SLOW_API_THRESHOLD_MS || 500);
+    if (duration >= slowThresholdMs) {
+      console.warn(`[Slow API] ${req.method} ${req.originalUrl} ${duration}ms ${res.statusCode}`);
+    } else if (process.env.LOG_API_TIMINGS === "true") {
+      console.log(`[API] ${req.method} ${req.originalUrl} ${duration}ms ${res.statusCode}`);
+    }
+  });
+  next();
+});
+app.use((req, res, next) => {
+  const timeoutMs = Number(process.env.API_REQUEST_TIMEOUT_MS || 30000);
+  req.setTimeout(timeoutMs);
+  res.setTimeout(timeoutMs, () => {
+    if (!res.headersSent) {
+      res.status(503).json({ message: "Request timed out" });
+    }
+  });
+  next();
+});
 
 // Route Imports
-const quotationRoutes = require('./routes/quotationRoutes');
-const customerRoutes = require('./routes/customerRoutes');
-const productRoutes = require('./routes/productRoutes');
-const termsRoutes = require('./routes/termsRoutes');
-const uploadRoutes = require('./routes/uploadRoutes');
-const salespersonRoutes = require('./routes/salespersonRoutes');
-const siteRoutes = require('./routes/siteRoutes');
-const path = require('path');
-const userRoutes = require('./routes/userRoutes');
-const authRoutes = require('./routes/authRoutes');
-const importRoutes = require('./routes/importRoutes');
-const companySettingsRoutes = require('./routes/companySettingsRoutes');
-const mgrRoutes = require('./routes/mgrRoutes');
-const attributeRoutes = require('./routes/attributeRoutes');
-const productAttributeRoutes = require('./routes/productAttributeRoutes');
-const vendorRoutes = require('./routes/vendorRoutes');
-const voucherRoutes = require('./routes/voucherRoutes');
-const enquiryRoutes = require('./routes/enquiryRoutes');
-const notificationRoutes = require('./routes/notificationRoutes');
-const analyticsRoutes = require('./routes/analyticsRoutes');
-const planningRoutes = require('./routes/planningRoutes');
-const authorizationRoutes = require('./routes/authorizationRoutes');
-const scheduler = require('./utils/scheduler');
+const quotationRoutes = require("./routes/quotationRoutes");
+const customerRoutes = require("./routes/customerRoutes");
+const productRoutes = require("./routes/productRoutes");
+const termsRoutes = require("./routes/termsRoutes");
+const uploadRoutes = require("./routes/uploadRoutes");
+const salespersonRoutes = require("./routes/salespersonRoutes");
+const siteRoutes = require("./routes/siteRoutes");
+const path = require("path");
+const userRoutes = require("./routes/userRoutes");
+const authRoutes = require("./routes/authRoutes");
+const importRoutes = require("./routes/importRoutes");
+const categoryRoutes = require("./routes/categoryRoutes");
+const companySettingsRoutes = require("./routes/companySettingsRoutes");
+const mgrRoutes = require("./routes/mgrRoutes");
+const attributeRoutes = require("./routes/attributeRoutes");
+const productAttributeRoutes = require("./routes/productAttributeRoutes");
+const vendorRoutes = require("./routes/vendorRoutes");
+const voucherRoutes = require("./routes/voucherRoutes");
+const enquiryRoutes = require("./routes/enquiryRoutes");
+const notificationRoutes = require("./routes/notificationRoutes");
+const systemUpdateRoutes = require("./routes/systemUpdateRoutes");
+const analyticsRoutes = require("./routes/analyticsRoutes");
+const planningRoutes = require("./routes/planningRoutes");
+const authorizationRoutes = require("./routes/authorizationRoutes");
+const statusRoutes = require("./routes/statusRoutes");
+const territoryRoutes = require("./routes/territoryRoutes");
+const footerPageRoutes = require("./routes/footerPageRoutes");
+const superAdminRoutes = require("./routes/superAdminRoutes");
+const payrollRoutes = require("./routes/payrollRoutes");
+const meetingRoutes = require("./routes/meetingRoutes");
+const contactRoutes = require("./routes/contactRoutes");
+const salesPipelineRoutes = require("./routes/salesPipelineRoutes");
+const dealRoutes = require("./routes/dealRoutes");
+const salesTargetRoutes = require("./routes/salesTargetRoutes");
+const forecastRoutes = require("./routes/forecastRoutes");
+const salesAnalyticsRoutes = require("./routes/salesAnalyticsRoutes");
+const csmRoutes = require("./routes/csmRoutes");
+const cpqRoutes = require("./routes/cpqRoutes");
+const orderRoutes = require("./routes/orderRoutes");
+const clmRoutes = require("./routes/clmRoutes");
+const tenderRoutes = require("./routes/tenderRoutes");
+const scheduler = require("./utils/scheduler");
 
-// API Routes
-app.use('/api/quotations', quotationRoutes);
-app.use('/api/customers', customerRoutes);
-app.use('/api/products', productRoutes);
-app.use('/api/terms', termsRoutes);
-app.use('/api/upload', uploadRoutes);
-app.use('/api/salespersons', salespersonRoutes);
-app.use('/api/sites', siteRoutes);
-app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/import', importRoutes);
-app.use('/api/company-settings', companySettingsRoutes);
-app.use('/api/mgrs', mgrRoutes);
-app.use('/api/attributes', attributeRoutes);
-app.use('/api/product-attributes', productAttributeRoutes);
-app.use('/api/vendors', vendorRoutes);
-app.use('/api/vouchers', voucherRoutes);
-app.use('/api/enquiries', enquiryRoutes);
-app.use('/api/notifications', notificationRoutes);
-app.use('/api/analytics', analyticsRoutes);
-app.use('/api/planning', planningRoutes);
-app.use('/api/authorization', authorizationRoutes);
+// API Routes (Reload triggered)
+app.use("/api/tenders", tenderRoutes);
+app.use("/api/quotations", quotationRoutes);
+app.use("/api/customers", customerRoutes);
+app.use("/api/products", productRoutes);
+app.use("/api/terms", termsRoutes);
+app.use("/api/upload", uploadRoutes);
+app.use("/api/salespersons", salespersonRoutes);
+app.use("/api/sites", siteRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/categories", categoryRoutes);
+app.use("/api/users", userRoutes);
+app.use("/api/import", importRoutes);
+app.use("/api/company-settings", companySettingsRoutes);
+app.use("/api/mgrs", mgrRoutes);
+app.use("/api/attributes", attributeRoutes);
+app.use("/api/product-attributes", productAttributeRoutes);
+app.use("/api/vendors", vendorRoutes);
+app.use("/api/vouchers", voucherRoutes);
+app.use("/api/enquiries", enquiryRoutes);
+app.use("/api/notifications", notificationRoutes);
+app.use("/api/system-updates", systemUpdateRoutes);
+app.use("/api/analytics", analyticsRoutes);
+app.use("/api/planning", planningRoutes);
+app.use("/api/authorization", authorizationRoutes);
+app.use("/api/statuses", statusRoutes);
+app.use("/api/territories", territoryRoutes);
+app.use("/api/footer-pages", footerPageRoutes);
+app.use("/api/super-admin", superAdminRoutes);
+app.use("/api/payroll", payrollRoutes);
+app.use("/api/meetings", meetingRoutes);
+app.use("/api/contacts", contactRoutes);
+app.use("/api/sales/pipelines", salesPipelineRoutes);
+app.use("/api/sales/deals", dealRoutes);
+app.use("/api/sales/targets", salesTargetRoutes);
+app.use("/api/sales/forecast", forecastRoutes);
+app.use("/api/sales/analytics", salesAnalyticsRoutes);
+app.use("/api/csm", csmRoutes);
+app.use("/api/cpq", cpqRoutes);
+app.use("/api/orders", orderRoutes);
+app.use("/api/clm", clmRoutes);
+
+app.get('/api/trigger-seed', async (req, res) => {
+    try {
+        const seedData = require('./seed_data_direct');
+        await seedData();
+        res.send('Seeded successfully');
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+app.get('/api/debug-updates', async (req, res) => {
+    try {
+        const SystemUpdate = require('./models/SystemUpdate');
+        const updates = await SystemUpdate.find({}).lean();
+        res.json({ success: true, count: updates.length, updates });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message, stack: err.stack });
+    }
+});
+
+app.get('/api/temp-migration-admin', async (req, res) => {
+    try {
+        const User = require('./models/User');
+        const Company = require('./models/Company');
+        const bcrypt = require('bcryptjs');
+
+        // 1. Find a valid company (e.g. first company in DB)
+        const company = await Company.findOne().lean();
+        if (!company) {
+            return res.status(404).send('No company found in database to assign to Admin@gmail.com');
+        }
+        const companyId = company._id;
+
+        // 2. Find or update Admin@gmail.com to normal admin with companyId
+        let adminUser = await User.findOne({ email: /Admin@gmail.com/i });
+        if (adminUser) {
+            adminUser.role = 'admin';
+            adminUser.companyId = companyId;
+            adminUser.isActive = true;
+            adminUser.status = true;
+            await adminUser.save();
+        } else {
+            // Create Admin@gmail.com if it doesn't exist
+            const salt = await bcrypt.genSalt(10);
+            const passwordHash = await bcrypt.hash('123456', salt);
+            adminUser = await User.create({
+                name: 'Admin User',
+                email: 'Admin@gmail.com',
+                passwordHash,
+                role: 'admin',
+                companyId,
+                isActive: true,
+                status: true
+            });
+        }
+
+        // 3. Find or create admin@arcrm.in with role SUPER_ADMIN and password 1235678
+        const salt2 = await bcrypt.genSalt(10);
+        const passwordHash2 = await bcrypt.hash('1235678', salt2);
+
+        let superAdminUser = await User.findOne({ email: /admin@arcrm.in/i });
+        if (superAdminUser) {
+            superAdminUser.passwordHash = passwordHash2;
+            superAdminUser.role = 'SUPER_ADMIN';
+            superAdminUser.companyId = undefined; // Super Admins don't have companyId
+            superAdminUser.isActive = true;
+            superAdminUser.status = true;
+            await superAdminUser.save();
+        } else {
+            superAdminUser = await User.create({
+                name: 'Super Admin',
+                email: 'admin@arcrm.in',
+                passwordHash: passwordHash2,
+                role: 'SUPER_ADMIN',
+                isActive: true,
+                status: true
+            });
+        }
+
+        res.json({
+            message: 'Migration completed successfully',
+            adminUser: {
+                id: adminUser._id,
+                email: adminUser.email,
+                role: adminUser.role,
+                companyId: adminUser.companyId
+            },
+            superAdminUser: {
+                id: superAdminUser._id,
+                email: superAdminUser.email,
+                role: superAdminUser.role
+            }
+        });
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+app.get('/api/seed-statuses', async (req, res) => {
+    try {
+        const Status = require('./models/Status');
+        const DEFAULT_STATUSES = [
+            { name: 'Budget', color: '#6366f1', isActive: true }, 
+            { name: 'Firm', color: '#10b981', isActive: true }, 
+            { name: 'MFC', color: '#f59e0b', isActive: true }, 
+            { name: 'B & B', color: '#3b82f6', isActive: true }, 
+            { name: 'Others', color: '#64748b', isActive: true }, 
+            { name: 'Order Received', color: '#8b5cf6', isActive: true }, 
+            { name: 'Invoice', color: '#ec4899', isActive: true }, 
+            { name: 'Lost', color: '#ef4444', isActive: true }, 
+            { name: 'Parked', color: '#84cc16', isActive: true }
+        ];
+
+        let added = 0;
+        for (const statusData of DEFAULT_STATUSES) {
+            const existing = await Status.findOne({ name: { $regex: new RegExp(`^${statusData.name}$`, 'i') } }).select('_id').lean();
+            if (!existing) {
+                await Status.create(statusData);
+                added++;
+            }
+        }
+        res.json({ message: `Statuses seeded successfully! Added ${added} new statuses.` });
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+app.get('/api/check-db', async (req, res) => {
+    try {
+        const Planning = require('./models/Planning');
+        const counts = await Planning.aggregate([
+            { $group: { _id: "$financialYear", count: { $sum: 1 } } }
+        ]);
+        const sample = await Planning.findOne().lean();
+        res.json({ counts, sample });
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+app.get('/api/debug-last-error', (req, res) => {
+    res.json({ success: true, lastServerError });
+});
+
+app.get('/api/debug-quotations', async (req, res) => {
+    try {
+        const Quotation = require('./models/Quotation');
+        const quotations = await Quotation.find({}).lean();
+        res.json(quotations);
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+app.get('/api/cleanup-data', async (req, res) => {
+    try {
+        const Planning = require('./models/Planning');
+        const result = await Planning.deleteMany({});
+        res.json({ message: 'Deleted all planning entries', result });
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+app.get('/api/check-excel', async (req, res) => {
+    try {
+        const XLSX = require('xlsx');
+        const filePath = 'D:/tally/Quotations/SALES REGISTER FROM 01-04-25 TO 31-03-26.xlsx';
+        const workbook = XLSX.readFile(filePath);
+        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+        
+        const rowLabels = [];
+        for (let i = 0; i < Math.min(100, rows.length); i++) {
+            if (rows[i] && rows[i][0]) {
+                rowLabels.push(rows[i][0]);
+            }
+        }
+        res.json({ rowLabels });
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+app.get('/api/read-revenue-plan', async (req, res) => {
+    try {
+        const XLSX = require('xlsx');
+        const filePath = 'D:/tally/Quotations/Ularia_1+3M FY27 Revenue Plan_09_04_26R.xlsx';
+        const workbook = XLSX.readFile(filePath);
+        const result = { sheetNames: workbook.SheetNames, sheets: {} };
+        workbook.SheetNames.forEach(name => {
+            const ws = workbook.Sheets[name];
+            const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+            result.sheets[name] = rows.slice(0, 80);
+        });
+        res.json(result);
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+app.get('/api/git-revert', (req, res) => {
+    const { exec } = require('child_process');
+    exec('git checkout -- d:/tally/Quotations/frontend/src/pages/Reports.jsx', (err, stdout, stderr) => {
+        if (err) {
+            return res.status(500).json({ error: err.message, stderr });
+        }
+        res.json({ message: 'Git revert successful', stdout });
+    });
+});
 
 // Start Scheduler
-scheduler.startScheduler();
+const startBackgroundServices = async () => {
+  await dbStartupPromise;
+  const redisReady = await redisStartupPromise;
+
+  // Seed current platform release notes
+  try {
+    const SystemUpdate = require("./models/models/SystemUpdate" ? "./models/SystemUpdate" : "./models/SystemUpdate");
+    await SystemUpdate.deleteOne({ version: "v2.8.1" });
+    await SystemUpdate.findOneAndUpdate(
+      { version: "v2.9.0" },
+      {
+        version: "v2.9.0",
+        title: "Enquiry Register & Partner Workflow",
+        message: "The enquiry module has been refreshed with a cleaner creation flow, partner tracking, reliable product row selection, and a proper enquiry register.",
+        releaseNotes: [
+          "Added Enquiry Register with view, edit, delete, filtering, and partner count visibility",
+          "Removed extra enquiry reference fields from the create/edit form for faster entry",
+          "Added partner details to enquiries, including company, contact, mobile, email, and notes",
+          "Fixed product dropdown selection so every product row updates correctly, not only the first row",
+          "Added system update release history to the notification bell",
+          "Improved system updates history loading and latest release access"
+        ],
+        deployedBy: "Super Admin",
+        deployedAt: new Date("2026-06-15T12:00:00Z"),
+        isActive: true
+      },
+      { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
+    );
+    await SystemUpdate.findOneAndUpdate(
+      { version: "v3.0.0-meetings" },
+      {
+        version: "v3.0.0-meetings",
+        title: "CRM Meetings Module Architecture Plan",
+        message: "The Meetings module plan has been revised with UTC ISO scheduling, reminder tracking, soft deletes, conflict warnings, modular reports, and premium list, calendar, and agenda views.",
+        releaseNotes: [
+          "Store meeting startDateTime and endDateTime directly as UTC ISO Date fields",
+          "Track one-day and thirty-minute reminders with remindersSent flags to prevent duplicate alerts",
+          "Use soft deletes with isDeleted, deletedAt, and deletedBy instead of hard removal",
+          "Add backend conflict detection for organizers and participants, with allowConflict override support",
+          "Capture meeting outcomes for completed meetings and audit all status changes in statusHistory",
+          "Split reporting into stats, user-summary, monthly-summary, and client-history endpoints",
+          "Add notification support for meeting created, updated, cancelled, rescheduled, and reminder events",
+          "Add frontend Meetings list, visual calendar, agenda, reporting dashboard, and create/edit conflict warning flow"
+        ],
+        deployedBy: "Super Admin",
+        deployedAt: new Date("2026-06-16T21:22:39+05:30"),
+        isActive: true
+      },
+      { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
+    );
+    await SystemUpdate.findOneAndUpdate(
+      { version: "v3.1.0-appointments" },
+      {
+        version: "v3.1.0-appointments",
+        title: "Appointments, Discussion Notes & Reporting Visibility",
+        message: "The Meetings module has been renamed to Appointments with discussion notes, Report To visibility, and senior/team appointment tracking.",
+        releaseNotes: [
+          "Renamed the Meetings module and register labels to Appointments",
+          "Added Discussion Notes so users can record what was discussed in each appointment",
+          "Added Report To on users and appointments so senior users can see team appointments",
+          "Added Report To visibility in the appointments register and appointment details",
+          "Removed the visible delete action from the appointments register and appointment popup",
+          "Improved Report To display by falling back to the organizer's assigned senior for older appointments",
+          "Added Redis outage handling so BullMQ startup failures no longer crash the backend"
+        ],
+        deployedBy: "Super Admin",
+        deployedAt: new Date("2026-06-17T21:35:00+05:30"),
+        isActive: true
+      },
+      { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
+    );
+    await SystemUpdate.findOneAndUpdate(
+      { version: "v3.2.0-contacts" },
+      {
+        version: "v3.2.0-contacts",
+        title: "Contact Management Module",
+        message: "A new lightweight Contact Management module has been added to manage customers, prospects, vendors and partners with simple CRUD operations and a table view.",
+        releaseNotes: [
+          "Added Contact Management page under Master with full CRUD operations",
+          "Auto-generated Contact IDs (C001, C002...) for each new contact",
+          "Contact form with Name, Company, Email, Phone, Designation, Customer Type, Last Interaction Date, and Notes",
+          "Contact list table with search by name, company, email or phone",
+          "Filter contacts by Customer Type (Customer, Prospect, Vendor, Partner)",
+          "Color-coded Customer Type badges in the contact list",
+          "Export contacts to Excel (.xlsx) with one click",
+          "Added Contacts link in sidebar under Master section",
+          "Added master_contacts permission for role-based access control"
+        ],
+        deployedBy: "Super Admin",
+        deployedAt: new Date("2026-06-18T21:25:00+05:30"),
+        isActive: true
+      },
+      { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
+    );
+    await SystemUpdate.findOneAndUpdate(
+      { version: "v3.3.0-deals" },
+      {
+        version: "v3.3.0-deals",
+        title: "Sales Pipeline Customer Dropdown & Modal Enhancements",
+        message: "We have upgraded the Deal creation and edit flow with a searchable customer dropdown, paginated list support, and a larger modal interface for a more spacious user experience.",
+        releaseNotes: [
+          "Changed the New Deal modal width on the Kanban board to max-w-2xl for better layout visibility",
+          "Replaced standard customer select boxes with custom input fields powered by PortalDropdown",
+          "Added search filtering inside customer selection dropdown in both Deal Board and Deal Detail pages",
+          "Fixed backend pagination parsing (custRes.data?.data) to support larger customer directories up to 500+ records",
+          "Refined event bubbling and focus states to ensure smooth dropdown selection without premature closing"
+        ],
+        deployedBy: "Super Admin",
+        deployedAt: new Date("2026-06-19T21:20:00+05:30"),
+        isActive: true
+      },
+      { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
+    );
+    await SystemUpdate.findOneAndUpdate(
+      { version: "v3.4.0-csm" },
+      {
+        version: "v3.4.0-csm",
+        title: "Customer Service Management (CSM) & Dynamic Masters",
+        message: "We have rolled out the Customer Service Management (CSM) module upgrades, database seeding shortcuts, and customizable Deal Source masters.",
+        releaseNotes: [
+          "Dynamic Deal Source Master: manage lead source entries inline with search, add, and delete controls directly inside forms",
+          "CSM Analytics Dashboard: visual glassmorphism cards, live SLA compliance donut charts, and top engineering performance charts",
+          "Maharashtra Power Utility Seed: realistic MSEDCL/MSETCL customer substations, switchgear assets, AMCs, and active tickets",
+          "CSM Knowledge Base Seed: step-by-step guides for SF6 switchgear refill, oil BDV tests, and numerical relay logs",
+          "Unified Modal Architecture: all edit and publication forms follow standardized Modal component formatting",
+          "System Seeding Shortcuts: trigger demo data seeding directly from the notifications bell dropdown or the What's New updates popup"
+        ],
+        deployedBy: "Super Admin",
+        deployedAt: new Date("2026-06-20T23:30:00+05:30"),
+        isActive: true
+      },
+      { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
+    );
+    await SystemUpdate.findOneAndUpdate(
+      { version: "v3.5.0-csm-autoassign" },
+      {
+        version: "v3.5.0-csm-autoassign",
+        title: "Pincode Validation & Territory Sales Rep Auto-Assignment",
+        message: "We have added mandatory pincode verification during ticket registration, and implemented Territory-based automatic sales representative assignment.",
+        releaseNotes: [
+          "Mandatory Pincode: Ensured Pincode is a required field on support tickets and manual ticket creation",
+          "Customer Auto-Fill: Selected customers automatically pre-populate the pincode field from their billing address",
+          "Territory Master Mapping: Assigned active salespeople to specific territories inside the Salesperson Master",
+          "Automatic Salesperson Routing: Tickets are automatically assigned to the designated sales representative based on their registered pincode",
+          "Assignee Dashboard View: Displayed the auto-assigned sales rep profile directly on the ticket list, details, and Assign Case section",
+          "Export Masters: Exported Customer and Product Masters directly to Excel (.xlsx) from the catalog headers"
+        ],
+        deployedBy: "Super Admin",
+        deployedAt: new Date("2026-07-04T20:15:00Z"),
+        isActive: true
+      },
+      { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
+    );
+    await SystemUpdate.findOneAndUpdate(
+      { version: "v3.6.0-clm" },
+      {
+        version: "v3.6.0-clm",
+        title: "Contract Lifecycle Management (CLM) & Document Engine",
+        message: "We have launched the new Enterprise Contract Lifecycle Management (CLM) module, featuring a Document Generation Engine, Clause Library, Approvals Workflow, Renewal Kanban Center, and custom category Mini Master.",
+        releaseNotes: [
+          "Integrated full-width CLM Workspace under dedicated Contract Management sidebar group",
+          "Introduced Document Builder with dynamic templates, variables merging, and HTML/PDF compilation",
+          "Added Category Mini Master for inline creation and dynamic selection of agreement types",
+          "Built Clause Library for drag-and-drop reusable terms with styling toolbars and plain text formatting helpers",
+          "Developed lane-based Renewal Kanban Center for tracking expiring agreements (90/60/30/7/Today days)",
+          "Created 14 live-calculated CLM Reports (Operational, Financial, Renewal, and Management) with Excel exports",
+          "Added Excel imports and exports for Employees, Contacts, and Contracts to accelerate onboarding"
+        ],
+        deployedBy: "Super Admin",
+        deployedAt: new Date("2026-07-07T20:52:00Z"),
+        isActive: true
+      },
+      { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
+    );
+    await SystemUpdate.findOneAndUpdate(
+      { version: "v3.7.0-crm-analytics" },
+      {
+        version: "v3.7.0-crm-analytics",
+        title: "Customer CRM Analytics & 360 Workspace Upgrade",
+        message: "We have introduced a comprehensive Customer Analytics Dashboard and a dedicated Salesforce-style Customer 360 Workspace to enhance client visibility, perform dynamic health diagnostics, and streamline workflow operations.",
+        releaseNotes: [
+          "Customer Analytics Dashboard: Added sub-dashboards for growth, retention, segmentations, financial metrics, and operational reports under Reports & Analytics",
+          "Customer 360 Workspace: Standalone view showing Overview, Contacts, Premises, Opportunities, Quotes, Contracts, Orders, Invoices, and SLA tickets",
+          "7-Dimension Weighted Health Score: Real-time client health index computed from frequency, payment timing, tickets, CSAT, and activity",
+          "Chronological Interaction Timeline: Combined history log showing all client milestones in a Salesforce-style activity feed",
+          "Custom Saved Filter Presets: Save, apply, and clear custom multi-dimensional client segments directly on the directory list",
+          "Mongoose Performance Indexing: Added DB indexes for owner, status, segment, and industry to ensure zero-lag dashboard loads",
+          "Secure Access Control: Embedded strict role-based data boundaries on the 360 Workspace and analytics endpoints"
+        ],
+        deployedBy: "Super Admin",
+        deployedAt: new Date("2026-07-12T17:45:00Z"),
+        isActive: true
+      },
+      { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
+    );
+    await SystemUpdate.findOneAndUpdate(
+      { version: "v3.8.0-tenders" },
+      {
+        version: "v3.8.0-tenders",
+        title: "Tender Management & Excel Import/Export Center",
+        message: "We have launched the new Tender Management module, featuring a business-focused dashboard, a comprehensive register, automated PDF validity rules, and full Excel/CSV imports/exports.",
+        releaseNotes: [
+          "Tenders Main Dashboard: Added KPI cards for active/submitted/won/lost count, value, win rate, donut charts, and monthly trends",
+          "Tenders Register: Added detailed list with status, value, owner, client, and department tracking",
+          "Progression Log: Integrated real-time timeline auditing to track status transitions and value changes on tenders",
+          "Automated Quotation Expiry: Implemented 30-day validity auto-expiry rules that reject pending approval quotes after 30 days",
+          "Excel Data Import: Created Excel/CSV import handlers supporting smart matches for clients, departments, and owners",
+          "Excel Data Export: Built client-side Excel export for both the register view and all 8 Tender Management reports",
+          "Portal-based Modals: Aligned all modals and details sidebars to use the shared Portal-based component following system teal aesthetics"
+        ],
+        deployedBy: "Super Admin",
+        deployedAt: new Date("2026-07-13T21:30:00Z"),
+        isActive: true
+      },
+      { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
+    );
+  } catch (err) {
+    console.error("[Release Seed Error] Failed to seed system update:", err.message);
+  }
+
+  // Database Migration for 'Sept' month entries
+  try {
+    const Planning = require("./models/Planning");
+    const FY_MONTH_NAMES = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
+    const entries = await Planning.find({
+      $or: [
+        { monthYear: /Sept/i },
+        { month: { $lt: 1 } },
+        { month: { $gt: 12 } },
+        { month: null }
+      ]
+    });
+    if (entries.length > 0) {
+      console.log(`[Migration] Found ${entries.length} planning documents with invalid months. Correcting...`);
+      let updatedCount = 0;
+      for (const entry of entries) {
+        let changed = false;
+        if (entry.monthYear && entry.monthYear.toLowerCase().startsWith('sept')) {
+          const parts = entry.monthYear.split('-');
+          const yearSuffix = parts[1];
+          entry.monthYear = `Sep-${yearSuffix}`;
+          changed = true;
+        }
+        if (entry.monthYear) {
+          const prefix = entry.monthYear.split('-')[0].substring(0, 3);
+          const expectedMonth = FY_MONTH_NAMES.findIndex(
+            m => m.toLowerCase() === prefix.toLowerCase()
+          ) + 1;
+          if (expectedMonth > 0 && entry.month !== expectedMonth) {
+            entry.month = expectedMonth;
+            changed = true;
+          }
+        }
+        if (changed) {
+          await entry.save();
+          updatedCount++;
+        }
+      }
+      console.log(`[Migration] Successfully updated ${updatedCount} planning documents.`);
+    } else {
+      console.log("[Migration] No invalid planning documents found.");
+    }
+  } catch (migErr) {
+    console.error("[Migration] Error during startup migration:", migErr.message);
+  }
+
+  try {
+      const RolePermission = require("./models/RolePermission");
+      await RolePermission.collection.dropIndex('role_1');
+      console.log('[Migration] Dropped old role_1 index successfully.');
+  } catch (err) {
+      // Ignore if index doesn't exist
+  }
+
+  try {
+      const Counter = require("./models/Counter");
+      await Counter.collection.dropIndex('type_1_prefix_1_year_1');
+      console.log('[Migration] Dropped old type_1_prefix_1_year_1 index on counters successfully.');
+  } catch (err) {
+      // Ignore if index doesn't exist
+  }
+
+  if (redisReady) {
+    await startCacheInvalidationWorker();
+    await startAuthSessionWorker();
+    await scheduler.startScheduler();
+  } else {
+    console.warn("[Background] Redis unavailable; skipping BullMQ workers and starting scheduler fallback.");
+    await scheduler.startScheduler({ preferFallback: true });
+  }
+};
 
 // Serve Static Files
 // Serve Static Files with logging
-app.use('/uploads', (req, res, next) => {
+app.use(
+  "/uploads",
+  (req, res, next) => {
     console.log(`[Static] Serving file: ${req.path}`);
     next();
-}, express.static(path.join(__dirname, 'uploads')));
+  },
+  express.static(path.join(__dirname, "uploads")),
+);
 
 // Serve Static Files - Frontend (Production & Deployment)
 const rootDir = path.resolve();
 app.use(express.static(path.join(rootDir, "dist")));
 
-// SPA fallback — THIS FIXES YOUR ISSUE
-app.get(/(.*)/, (req, res) => {
-    res.sendFile(path.join(rootDir, "dist", "index.html"));
+// SPA fallback — Only in production or if dist exists
+app.get(/.*/, (req, res, next) => {
+  // If it's an API route that reached here, it's a 404 for API
+  if (req.path.startsWith("/api")) {
+    return res.status(404).json({ message: `API route ${req.path} not found` });
+  }
+
+  const indexPath = path.join(rootDir, "dist", "index.html");
+  if (require('fs').existsSync(indexPath)) {
+    res.sendFile(indexPath);
+  } else {
+    // In development, if we reach here, it's a 404
+    res.status(404).send("Not Found");
+  }
 });
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 4003;
 
 if (require.main === module) {
-    app.listen(PORT, () => {
-        console.log(`Server running on port ${PORT}`);
+  const server = app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+  server.timeout = Number(process.env.API_REQUEST_TIMEOUT_MS || 30000);
+
+  startBackgroundServices().catch((error) => {
+    console.error("Failed to start background services:", error.message);
+  });
+
+  const shutdown = async (signal) => {
+    console.log(`${signal} received. Closing server...`);
+    server.close(async () => {
+      scheduler.stopScheduler();
+      await closeBullMq();
+      await disconnectRedis();
+      process.exit(0);
     });
+  };
+
+  process.on("SIGINT", () => shutdown("SIGINT"));
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
 }
 
+// Temporary Debug: Inspect quotations and products in DB
+(async () => {
+    try {
+        require('fs').writeFileSync(require('path').join(__dirname, 'test_run.txt'), 'Hello at ' + new Date().toISOString());
+        await dbStartupPromise;
+        const Quotation = require('./models/Quotation');
+        const quotations = await Quotation.find({}).lean();
+        const output = quotations.map(q => `ID: ${q._id}, quotationNo: ${q.quotationNo}, companyId: ${q.companyId}, status: ${q.status}`).join('\n');
+        require('fs').writeFileSync(require('path').join(__dirname, 'debug_output.txt'), `Total quotations: ${quotations.length}\n${output}`);
+        console.log("[DEBUG] Written quotations to debug_output.txt");
+
+        const Product = require('./models/Product');
+        const products = await Product.find({}).limit(50).lean();
+        const prodOutput = products.map(p => `ID: ${p._id}, code: ${p.productCode}, name: ${p.productName}, price: ${p.basePrice}`).join('\n');
+        require('fs').writeFileSync(require('path').join(__dirname, 'debug_products.txt'), `Total products: ${products.length}\n${prodOutput}`);
+        console.log("[DEBUG] Written products to debug_products.txt");
+    } catch (err) {
+        require('fs').writeFileSync(require('path').join(__dirname, 'debug_error.txt'), `Error: ${err.message}\nStack: ${err.stack}`);
+        console.error("[DEBUG] Error writing quotations/products:", err);
+    }
+})();
+
+// Trigger nodemon reload - force reload csm routes
 module.exports = app;
+// Force nodemon reload: 2026-07-01T22:45:00

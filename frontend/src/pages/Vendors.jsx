@@ -1,8 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { MdAdd, MdDelete, MdEdit, MdSearch, MdStorefront } from 'react-icons/md';
+import { MdAdd, MdDelete, MdEdit, MdSearch, MdStorefront, MdFileDownload, MdFileUpload } from 'react-icons/md';
 import { toast } from 'react-toastify';
+import * as XLSX from 'xlsx';
 import Modal from '../components/Modal';
-import { vendorService } from '../services/api';
+import ImportModal from '../components/ImportModal';
+import PaginationControls from '../components/PaginationControls';
+import { vendorService, importService } from '../services/api';
+
+const LIST_PAGE_SIZE = 20;
 
 const defaultForm = {
     name: '',
@@ -18,14 +23,66 @@ const Vendors = () => {
     const [vendors, setVendors] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
+    const [page, setPage] = useState(1);
+    const [pagination, setPagination] = useState({ page: 1, limit: LIST_PAGE_SIZE, total: 0, pages: 1 });
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [editingVendor, setEditingVendor] = useState(null);
     const [formData, setFormData] = useState(defaultForm);
 
-    const fetchVendors = async () => {
+    const exportToExcel = async () => {
+        setLoading(true);
         try {
-            const res = await vendorService.getAll();
-            setVendors(res.data);
+            const res = await vendorService.getAll(false, {
+                limit: 10000,
+                search: debouncedSearch || undefined,
+            });
+            const exportVendors = Array.isArray(res.data) ? res.data : res.data?.data || [];
+            if (!exportVendors.length) {
+                toast.info('No vendors found to export');
+                return;
+            }
+
+            const exportData = exportVendors.map((v) => ({
+                'Vendor Name': v.name || '',
+                'Contact Person': v.contactPerson || '',
+                'Phone': v.phone || '',
+                'Email': v.email || '',
+                'Address': v.address || '',
+                'GSTIN': v.gstin || '',
+                'Active': v.isActive !== false ? 'TRUE' : 'FALSE'
+            }));
+
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Vendors');
+            XLSX.writeFile(wb, `Vendors_Master_${new Date().toISOString().slice(0, 10)}.xlsx`);
+            toast.success('Export completed successfully');
+        } catch (err) {
+            console.error('Export vendors error:', err);
+            toast.error('Failed to export vendors');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const fetchVendors = async () => {
+        setLoading(true);
+        try {
+            const res = await vendorService.getAll(false, {
+                page,
+                limit: LIST_PAGE_SIZE,
+                search: debouncedSearch || undefined
+            });
+            const payload = res.data;
+            setVendors(Array.isArray(payload) ? payload : payload.data || []);
+            setPagination(payload.pagination || {
+                page: 1,
+                limit: LIST_PAGE_SIZE,
+                total: Array.isArray(payload) ? payload.length : 0,
+                pages: 1
+            });
         } catch (err) {
             console.error('Error fetching vendors:', err);
             toast.error('Failed to fetch vendors');
@@ -35,18 +92,20 @@ const Vendors = () => {
     };
 
     useEffect(() => {
-        fetchVendors();
-    }, []);
+        const timer = setTimeout(() => {
+            setDebouncedSearch(searchTerm.trim());
+            setPage(1);
+        }, 300);
 
-    const filteredVendors = useMemo(() => {
-        const q = searchTerm.toLowerCase();
-        return vendors.filter((vendor) =>
-            vendor.name?.toLowerCase().includes(q) ||
-            vendor.contactPerson?.toLowerCase().includes(q) ||
-            vendor.phone?.toLowerCase().includes(q) ||
-            vendor.email?.toLowerCase().includes(q)
-        );
-    }, [searchTerm, vendors]);
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
+
+    useEffect(() => {
+        fetchVendors();
+    }, [page, debouncedSearch]);
+
+    const filteredVendors = useMemo(() => vendors, [vendors]);
+    const pagedVendors = filteredVendors;
 
     const openModal = (vendor = null) => {
         setEditingVendor(vendor);
@@ -112,17 +171,33 @@ const Vendors = () => {
                     <h1 className="text-3xl font-black text-slate-900 tracking-tight">Vendors</h1>
                     <p className="text-slate-500 font-medium">Manage supplier master and activation status.</p>
                 </div>
-                <button
-                    onClick={() => openModal()}
-                    className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
-                >
-                    <MdAdd size={20} />
-                    <span>Add Vendor</span>
-                </button>
+                <div className="flex gap-3">
+                    <button
+                        onClick={exportToExcel}
+                        className="flex items-center justify-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-5 py-3 rounded-2xl font-bold transition-all shadow-sm uppercase text-xs tracking-widest active:scale-95"
+                    >
+                        <MdFileDownload size={20} />
+                        <span>Export</span>
+                    </button>
+                    <button
+                        onClick={() => setIsImportModalOpen(true)}
+                        className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-emerald-600/20 uppercase text-xs tracking-widest active:scale-95"
+                    >
+                        <MdFileUpload size={20} />
+                        <span>Import</span>
+                    </button>
+                    <button
+                        onClick={() => openModal()}
+                        className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
+                    >
+                        <MdAdd size={20} />
+                        <span>Add Vendor</span>
+                    </button>
+                </div>
             </div>
 
-            <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
-                <div className="p-6 border-b border-slate-50 flex flex-col md:flex-row gap-4 items-center bg-slate-50/30">
+            <div className="mobile-master-shell bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
+                <div className="mobile-master-toolbar p-6 border-b border-slate-50 flex flex-col md:flex-row gap-4 items-center bg-slate-50/30">
                     <div className="relative flex-1 w-full text-slate-400 focus-within:text-primary-600 transition-colors">
                         <MdSearch className="absolute left-4 top-1/2 -translate-y-1/2" size={20} />
                         <input
@@ -141,6 +216,7 @@ const Vendors = () => {
                         <p className="text-xs uppercase font-black tracking-widest">Loading Vendors...</p>
                     </div>
                 ) : (
+                    <>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left">
                             <thead className="bg-slate-50 text-slate-400 text-[10px] uppercase font-black tracking-widest border-b border-slate-100">
@@ -153,7 +229,7 @@ const Vendors = () => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50">
-                                {filteredVendors.map((vendor) => (
+                                {pagedVendors.map((vendor) => (
                                     <tr key={vendor._id} className="hover:bg-slate-50/50 transition-colors">
                                         <td className="px-8 py-5">
                                             <div className="flex items-center gap-3">
@@ -209,6 +285,8 @@ const Vendors = () => {
                             </tbody>
                         </table>
                     </div>
+                    <PaginationControls pagination={pagination} onPageChange={setPage} />
+                    </>
                 )}
             </div>
 
@@ -316,6 +394,19 @@ const Vendors = () => {
                     </label>
                 </form>
             </Modal>
+
+            {/* Import Modal */}
+            <ImportModal
+                isOpen={isImportModalOpen}
+                onClose={() => setIsImportModalOpen(false)}
+                title="Import Vendors"
+                onImport={async (file) => {
+                    const result = await importService.importVendors(file);
+                    fetchVendors();
+                    return result;
+                }}
+                onDownloadTemplate={importService.getVendorTemplate}
+            />
         </div>
     );
 };

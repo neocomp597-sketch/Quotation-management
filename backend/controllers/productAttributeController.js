@@ -3,7 +3,9 @@ const ProductAttribute = require('../models/ProductAttribute');
 // Get all product attributes
 const getAllProductAttributes = async (req, res) => {
     try {
-        const attributes = await ProductAttribute.find({});
+        const attributes = await ProductAttribute.find({})
+            .select('productCode attributeCode attributeValue createdAt updatedAt')
+            .lean();
         res.status(200).json(attributes);
     } catch (error) {
         console.error('Error fetching all product attributes:', error);
@@ -16,7 +18,9 @@ const getAllProductAttributes = async (req, res) => {
 const getProductAttributes = async (req, res) => {
     try {
         const { productCode } = req.params;
-        const attributes = await ProductAttribute.find({ productCode });
+        const attributes = await ProductAttribute.find({ productCode })
+            .select('productCode attributeCode attributeValue createdAt updatedAt')
+            .lean();
         res.status(200).json(attributes);
     } catch (error) {
         console.error('Error fetching product attributes:', error);
@@ -64,4 +68,3 @@ module.exports = {
     saveProductAttribute,
     deleteProductAttribute
 };
-

@@ -1,0 +1,28 @@
+const path = require('path');
+const mongoose = require('mongoose');
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+
+const User = require('../models/User');
+
+async function check() {
+    try {
+        console.log('Connecting to MongoDB...');
+        await mongoose.connect(process.env.MONGO_URI);
+        console.log('Connected.');
+
+        const user = await User.findOne({ email: /Admin@gmail.com/i }).lean();
+        if (user) {
+            console.log('User Admin@gmail.com found:');
+            console.log(JSON.stringify(user, null, 2));
+        } else {
+            console.log('User Admin@gmail.com NOT found!');
+        }
+    } catch (err) {
+        console.error('Error:', err);
+    } finally {
+        await mongoose.disconnect();
+        process.exit();
+    }
+}
+
+check();

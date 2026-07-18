@@ -1,0 +1,16 @@
+{
+  "watch": [
+    "**/*.js"
+  ],
+  "ignore": [
+    "node_modules",
+    "uploads/*",
+    "scratch/*",
+    "dist/*",
+    "*.log",
+    "*.txt",
+    "*.xlsx",
+    "*.json"
+  ],
+  "delay": "1000"
+}

@@ -1,0 +1,17 @@
+Total rows found: 100
+Sample rows (first 15):
+Row 0: ["Sum of Value","Column Labels"]
+Row 1: ["Row Labels","Sbu 1","Sbu 2","SBU-2","SBU-3","(blank)","Grand Total"]
+Row 2: ["April-2025",120381747.83999997,8887.32,276065682.85999995,47055406.4,null,443511724.4199999]
+Row 3: ["Debtors - Branch & Division",null,null,4203452.4799999995,46202906.4,null,50406358.879999995]
+Row 4: ["Debtors - Export",null,null,3967770.2200000007,null,null,3967770.2200000007]
+Row 5: ["Debtors - Industries",26187070,null,1165000,687500,null,28039570]
+Row 6: ["Debtors - Others",255075,null,919510,null,null,1174585]
+Row 7: ["Debtors - Spares",4222469.819999999,8887.32,-13024.87,null,null,4218332.27]
+Row 8: ["Debtors - Utility",24899836.42999997,null,246294337.73999995,165000,null,271359174.1699999]
+Row 9: ["Debtors - Utility Contractor",64817296.59000001,null,19528637.29,null,null,84345933.88000001]
+Row 10: ["August-2025",526652432.4000002,6868976.949999999,196982686.40999997,90287317.8,null,820791413.5600002]
+Row 11: ["Debtors - Branch & Division",null,null,1619900,77160968.8,null,78780868.8]
+Row 12: ["Debtors - Export",295722.5,null,161714.25,null,null,457436.75]
+Row 13: ["Debtors - Industries",51409500,null,1062767.72,176600,null,52648867.72]
+Row 14: ["Debtors - Others",1617105.66,null,362552,null,null,1979657.66]

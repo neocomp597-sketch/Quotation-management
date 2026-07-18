@@ -6,6 +6,58 @@ const {
     deriveBasePriceFromVendors,
     isVendorActive
 } = require('../utils/vendorSelection');
+const { invalidateProductCaches } = require('../utils/cacheInvalidation');
+const { getCachedJson, makeCacheKey, setCachedJson } = require('../utils/apiCache');
+
+const PRODUCTS_CACHE_KEY = 'products:all';
+const PRODUCTS_CACHE_TTL_SECONDS = 10 * 60;
+const PRODUCTS_LIST_CACHE_TTL_SECONDS = Number(process.env.PRODUCTS_LIST_CACHE_TTL_SECONDS || 300);
+const PRODUCTS_DETAIL_CACHE_TTL_SECONDS = Number(process.env.PRODUCTS_DETAIL_CACHE_TTL_SECONDS || 300);
+
+const escapeRegex = (value = '') => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const getPagination = (query) => {
+    const page = Math.max(1, Number(query.page || 1));
+    const limit = Math.min(100, Math.max(1, Number(query.limit || 25)));
+    return { page, limit, skip: (page - 1) * limit };
+};
+
+const hasListParams = (query) => Boolean(query.page || query.limit || query.search || query.mgr1 || query.mgr2 || query.mgr3 || query.mgr4 || query.mgr5 || query.catalogType);
+
+const buildProductQuery = (queryParams = {}) => {
+    const query = {};
+    const search = String(queryParams.search || '').trim();
+
+    if (search) {
+        const regex = new RegExp(escapeRegex(search), 'i');
+        query.$or = [
+            { productName: regex },
+            { productCode: regex },
+            { hsnCode: regex },
+            { uom: regex },
+        ];
+    }
+
+    ['mgr1', 'mgr2', 'mgr3', 'mgr4', 'mgr5'].forEach((key) => {
+        if (queryParams[key]) {
+            query[key] = queryParams[key];
+        }
+    });
+
+    if (queryParams.catalogType) {
+        if (queryParams.catalogType === 'Product') {
+            query.catalogType = { $in: ['Product', null] };
+        } else {
+            query.catalogType = queryParams.catalogType;
+        }
+    }
+
+    return query;
+};
+
+const clearProductsCache = async () => {
+    await invalidateProductCaches();
+};
 
 const toBoolean = (value) => {
     if (typeof value === 'boolean') return value;
@@ -81,7 +133,7 @@ const validateAndPrepareVendors = async (vendors = [], options = {}) => {
     }
 
     const vendorIds = normalized.map((v) => v.vendorId);
-    const vendorsInDb = await Vendor.find({ _id: { $in: vendorIds } }).select('_id isActive name');
+    const vendorsInDb = await Vendor.find({ _id: { $in: vendorIds } }).select('_id isActive name').lean();
     const vendorMap = new Map(vendorsInDb.map((v) => [String(v._id), v]));
 
     normalized.forEach((entry) => {
@@ -118,13 +170,16 @@ const buildProductResponse = (productDoc) => {
 
 const fetchProductByIdWithRelations = (id) => {
     return Product.findById(id)
-        .populate('mgr1')
-        .populate('mgr2')
-        .populate('mgr3')
-        .populate('mgr4')
-        .populate('mgr5')
-        .populate('attributes')
-        .populate('vendors.vendorId');
+        .select('productCode productName categoryId hsnCode gstPercentage basePrice mrp uom productImageUrl status mgr1 mgr2 mgr3 mgr4 mgr5 attributes vendors catalogType subscriptionDetails rentalDetails inventory pricing createdAt updatedAt')
+        .populate('categoryId', 'name status')
+        .populate('mgr1', 'code description status')
+        .populate('mgr2', 'code description status')
+        .populate('mgr3', 'code description status')
+        .populate('mgr4', 'code description status')
+        .populate('mgr5', 'code description status')
+        .populate('attributes', 'code description status')
+        .populate('vendors.vendorId', 'name isActive')
+        .lean();
 };
 
 // Create Product
@@ -147,14 +202,19 @@ const createProduct = async (req, res) => {
             mgr4,
             mgr5,
             attributes,
-            vendors
+            vendors,
+            catalogType,
+            subscriptionDetails,
+            rentalDetails,
+            inventory,
+            pricing
         } = req.body;
 
         if (!productCode || !productName || !hsnCode) {
             return res.status(400).json({ message: 'Product code, name and HSN code are required' });
         }
 
-        if (Object.prototype.hasOwnProperty.call(req.body, 'vendors') && Array.isArray(vendors) && vendors.length === 0) {
+        if (catalogType === 'Product' && Object.prototype.hasOwnProperty.call(req.body, 'vendors') && Array.isArray(vendors) && vendors.length === 0) {
             return res.status(400).json({ message: 'At least one vendor is required when vendor mapping is provided' });
         }
 
@@ -178,6 +238,11 @@ const createProduct = async (req, res) => {
             mgr5: mgr5 || undefined,
             attributes: attributes || [],
             vendors: preparedVendors,
+            catalogType: catalogType || 'Product',
+            subscriptionDetails,
+            rentalDetails,
+            inventory,
+            pricing
         });
 
         if (preparedVendors.length) {
@@ -185,6 +250,7 @@ const createProduct = async (req, res) => {
         }
 
         await newProduct.save();
+        await clearProductsCache();
         const hydrated = await fetchProductByIdWithRelations(newProduct._id);
         res.status(201).json(buildProductResponse(hydrated));
     } catch (error) {
@@ -196,16 +262,52 @@ const createProduct = async (req, res) => {
 // Get All Products
 const getAllProducts = async (req, res) => {
     try {
-        const products = await Product.find()
-            .populate('mgr1')
-            .populate('mgr2')
-            .populate('mgr3')
-            .populate('mgr4')
-            .populate('mgr5')
-            .populate('attributes')
-            .populate('vendors.vendorId');
+        const listParams = hasListParams(req.query);
+        const query = buildProductQuery(req.query);
+        const cacheKey = listParams
+            ? makeCacheKey('products:list', req)
+            : makeCacheKey('products:all', req);
+        const { redis, value: cachedProducts } = await getCachedJson(cacheKey);
+        if (cachedProducts) {
+            return res.json(cachedProducts);
+        }
 
-        res.json(products.map(buildProductResponse));
+        let productsQuery = Product.find(query)
+            .select('productCode productName categoryId hsnCode gstPercentage basePrice mrp uom productImageUrl status mgr1 mgr2 mgr3 mgr4 mgr5 attributes vendors catalogType subscriptionDetails rentalDetails inventory pricing updatedAt')
+            .populate('categoryId', 'name status')
+            .populate('mgr1', 'code description status')
+            .populate('mgr2', 'code description status')
+            .populate('mgr3', 'code description status')
+            .populate('mgr4', 'code description status')
+            .populate('mgr5', 'code description status')
+            .populate('attributes', 'code description status')
+            .populate('vendors.vendorId', 'name isActive')
+            .sort({ updatedAt: -1 });
+
+        if (listParams) {
+            const { page, limit, skip } = getPagination(req.query);
+            const [products, total] = await Promise.all([
+                productsQuery.skip(skip).limit(limit).lean(),
+                Product.countDocuments(query),
+            ]);
+            const response = {
+                data: products.map(buildProductResponse),
+                pagination: {
+                    page,
+                    limit,
+                    total,
+                    pages: Math.ceil(total / limit) || 1,
+                },
+            };
+            await setCachedJson(redis, cacheKey, response, PRODUCTS_LIST_CACHE_TTL_SECONDS);
+            return res.json(response);
+        }
+
+        const products = await productsQuery.lean();
+        const response = products.map(buildProductResponse);
+        await setCachedJson(redis, cacheKey, response, PRODUCTS_CACHE_TTL_SECONDS);
+
+        res.json(response);
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Error fetching products' });
@@ -215,11 +317,19 @@ const getAllProducts = async (req, res) => {
 // Get Product by ID
 const getProductById = async (req, res) => {
     try {
+        const cacheKey = `products:detail:${req.user?.companyId || 'unknown'}:${req.params.id}`;
+        const { redis, value: cachedProduct } = await getCachedJson(cacheKey);
+        if (cachedProduct) {
+            return res.json(cachedProduct);
+        }
+
         const product = await fetchProductByIdWithRelations(req.params.id);
         if (!product) {
             return res.status(404).json({ message: 'Product not found' });
         }
-        res.json(buildProductResponse(product));
+        const response = buildProductResponse(product);
+        await setCachedJson(redis, cacheKey, response, PRODUCTS_DETAIL_CACHE_TTL_SECONDS);
+        res.json(response);
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Error fetching product' });
@@ -229,7 +339,16 @@ const getProductById = async (req, res) => {
 // Get Product Vendors
 const getProductVendors = async (req, res) => {
     try {
-        const product = await Product.findById(req.params.id).populate('vendors.vendorId');
+        const cacheKey = makeCacheKey(`products:vendors:${req.params.id}`, req);
+        const { redis, value: cachedVendors } = await getCachedJson(cacheKey);
+        if (cachedVendors) {
+            return res.json(cachedVendors);
+        }
+
+        const product = await Product.findById(req.params.id)
+            .select('vendors')
+            .populate('vendors.vendorId', 'name isActive')
+            .lean();
         if (!product) {
             return res.status(404).json({ message: 'Product not found' });
         }
@@ -239,6 +358,7 @@ const getProductVendors = async (req, res) => {
             vendors = vendors.filter((entry) => Number(entry.stock) > 0 && isVendorActive(entry));
         }
 
+        await setCachedJson(redis, cacheKey, vendors, PRODUCTS_DETAIL_CACHE_TTL_SECONDS);
         res.json(vendors);
     } catch (error) {
         console.error(error);
@@ -266,7 +386,12 @@ const updateProduct = async (req, res) => {
             mgr4,
             mgr5,
             attributes,
-            vendors
+            vendors,
+            catalogType,
+            subscriptionDetails,
+            rentalDetails,
+            inventory,
+            pricing
         } = req.body;
 
         const updateData = {
@@ -286,6 +411,11 @@ const updateProduct = async (req, res) => {
             mgr4: mgr4 || undefined,
             mgr5: mgr5 || undefined,
             attributes: attributes || [],
+            catalogType,
+            subscriptionDetails,
+            rentalDetails,
+            inventory,
+            pricing,
             updatedAt: new Date()
         };
 
@@ -303,18 +433,22 @@ const updateProduct = async (req, res) => {
             updateData,
             { new: true, runValidators: true }
         )
-            .populate('mgr1')
-            .populate('mgr2')
-            .populate('mgr3')
-            .populate('mgr4')
-            .populate('mgr5')
-            .populate('attributes')
-            .populate('vendors.vendorId');
+            .select('productCode productName categoryId hsnCode gstPercentage basePrice mrp uom productImageUrl status mgr1 mgr2 mgr3 mgr4 mgr5 attributes vendors catalogType subscriptionDetails rentalDetails inventory pricing createdAt updatedAt')
+            .populate('categoryId', 'name status')
+            .populate('mgr1', 'code description status')
+            .populate('mgr2', 'code description status')
+            .populate('mgr3', 'code description status')
+            .populate('mgr4', 'code description status')
+            .populate('mgr5', 'code description status')
+            .populate('attributes', 'code description status')
+            .populate('vendors.vendorId', 'name isActive')
+            .lean();
 
         if (!updatedProduct) {
             return res.status(404).json({ message: 'Product not found' });
         }
 
+        await clearProductsCache();
         res.json(buildProductResponse(updatedProduct));
     } catch (error) {
         console.error(error);
@@ -335,7 +469,9 @@ const updateProductVendor = async (req, res) => {
             return res.status(400).json({ message: 'Stock cannot be negative' });
         }
 
-        const product = await Product.findById(id).populate('vendors.vendorId');
+        const product = await Product.findById(id)
+            .select('productCode basePrice vendors updatedAt')
+            .populate('vendors.vendorId', 'name isActive');
         if (!product) {
             return res.status(404).json({ message: 'Product not found' });
         }
@@ -368,6 +504,7 @@ const updateProductVendor = async (req, res) => {
         product.basePrice = deriveBasePriceFromVendors(product);
         product.updatedAt = new Date();
         await product.save();
+        await clearProductsCache();
 
         const hydrated = await fetchProductByIdWithRelations(id);
         res.json(buildProductResponse(hydrated));
@@ -386,6 +523,7 @@ const deleteProduct = async (req, res) => {
             return res.status(404).json({ message: 'Product not found' });
         }
 
+        await clearProductsCache();
         res.json({ message: 'Product deleted successfully' });
     } catch (error) {
         console.error(error);
@@ -403,6 +541,7 @@ const bulkDeleteProducts = async (req, res) => {
         }
 
         const result = await Product.deleteMany({ _id: { $in: ids } });
+        await clearProductsCache();
 
         res.json({
             message: `${result.deletedCount} products deleted successfully`,
@@ -431,6 +570,7 @@ const bulkUpdateProducts = async (req, res) => {
             { _id: { $in: ids } },
             { $set: { ...updateData, updatedAt: new Date() } }
         );
+        await clearProductsCache();
 
         res.json({
             message: `${result.modifiedCount} products updated successfully`,

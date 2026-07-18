@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { toast } from 'react-toastify';
 import { MdBusiness, MdPerson, MdLocationOn, MdAccountBalance, MdDescription, MdCloudUpload, MdSave, MdEdit } from 'react-icons/md';
-import { userService, companySettingsService, uploadService } from '../services/api';
+import { userService, companySettingsService, uploadService, footerPageService } from '../services/api';
 import { resolveImageUrl } from '../utils/helpers';
 import { useAuth } from '../context/AuthContext';
 import { ROLE_LABELS } from '../constants/menuPermissions';
+import RichTextEditor from '../components/RichTextEditor';
 
 const Settings = () => {
     const { user: authUser, refreshSession } = useAuth();
@@ -48,11 +49,57 @@ const Settings = () => {
             signatureImageUrl: ''
         },
         defaultTerms: '',
-        quotationPrefix: 'JAG/QTN'
+        quotationPrefix: 'ARM/QTN'
     });
 
 const [logoUploading, setLogoUploading] = useState(false);
     const [signatureUploading, setSignatureUploading] = useState(false);
+
+    // Footer Pages State
+    const [selectedPageSlug, setSelectedPageSlug] = useState('privacy-policy');
+    const [pageLabel, setPageLabel] = useState('');
+    const [pageContent, setPageContent] = useState('');
+    const [savingPage, setSavingPage] = useState(false);
+
+    const fetchPageData = useCallback(async (slug) => {
+        try {
+            const res = await footerPageService.getBySlug(slug);
+            if (res.data) {
+                setPageLabel(res.data.label || '');
+                setPageContent(res.data.content || '');
+            }
+        } catch (error) {
+            console.error('Error fetching page data:', error);
+            toast.error('Failed to load page content');
+        }
+    }, []);
+
+    useEffect(() => {
+        if (activeTab === 'footer-pages') {
+            fetchPageData(selectedPageSlug);
+        }
+    }, [activeTab, selectedPageSlug, fetchPageData]);
+
+    const handlePageSave = async (e) => {
+        e.preventDefault();
+        if (!pageLabel.trim()) {
+            toast.error('Display label is required');
+            return;
+        }
+        setSavingPage(true);
+        try {
+            await footerPageService.update(selectedPageSlug, {
+                label: pageLabel,
+                content: pageContent
+            });
+            toast.success('Page updated successfully!');
+        } catch (error) {
+            console.error('Error updating page:', error);
+            toast.error('Failed to update page');
+        } finally {
+            setSavingPage(false);
+        }
+    };
 
     const fetchCompanySettings = useCallback(async () => {
         try {
@@ -207,6 +254,9 @@ const [logoUploading, setLogoUploading] = useState(false);
         { id: 'banking', label: 'Banking', icon: MdAccountBalance },
         { id: 'terms', label: 'Terms & Signatory', icon: MdDescription }
     ];
+    if (authUser?.role === 'admin') {
+        tabs.push({ id: 'footer-pages', label: 'Footer Pages', icon: MdDescription });
+    }
 
     const inputClass = "w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-700 font-medium focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all";
     const labelClass = "block text-sm font-bold text-slate-500 mb-1.5";
@@ -411,10 +461,16 @@ const [logoUploading, setLogoUploading] = useState(false);
                                     type="text"
                                     name="quotationPrefix"
                                     value={companySettings.quotationPrefix}
-                                    onChange={handleCompanyChange}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        if (val.toUpperCase().startsWith('ARM') || val === '') {
+                                            handleCompanyChange(e);
+                                        }
+                                    }}
                                     className={inputClass}
-                                    placeholder="JAG/QTN"
+                                    placeholder="ARM/QTN"
                                 />
+                                <p className="text-[10px] text-slate-400 mt-1 font-bold">Must start with "ARM" (e.g. ARM/QTN)</p>
                             </div>
                         </div>
 
@@ -744,6 +800,73 @@ const [logoUploading, setLogoUploading] = useState(false);
                             >
                                 <MdSave size={18} />
                                 {loading ? 'Saving...' : 'Save Settings'}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            )}
+
+            {/* Footer Pages Tab (Admin Only) */}
+            {activeTab === 'footer-pages' && authUser?.role === 'admin' && (
+                <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden p-6 md:p-8 max-w-4xl">
+                    <h2 className="text-xl font-bold text-slate-800 mb-2 flex items-center gap-2">
+                        <MdDescription className="text-primary-500" />
+                        Footer Pages Manager
+                    </h2>
+                    <p className="text-sm text-slate-500 mb-6">Customize the content and display labels of footer links (Privacy Policy, Terms of Service, Help Center).</p>
+
+                    {/* Page Sub-Tabs */}
+                    <div className="flex gap-2 border-b border-slate-100 pb-4 mb-6">
+                        {[
+                            { slug: 'privacy-policy', label: 'Privacy Policy' },
+                            { slug: 'terms-of-service', label: 'Terms of Service' },
+                            { slug: 'help-center', label: 'Help Center' }
+                        ].map((p) => (
+                            <button
+                                key={p.slug}
+                                type="button"
+                                onClick={() => setSelectedPageSlug(p.slug)}
+                                className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${
+                                    selectedPageSlug === p.slug
+                                        ? 'bg-slate-900 text-white shadow-sm'
+                                        : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                                }`}
+                            >
+                                {p.label}
+                            </button>
+                        ))}
+                    </div>
+
+                    <form onSubmit={handlePageSave} className="space-y-6">
+                        <div>
+                            <label className={labelClass}>Display Name / Label <span className="text-rose-500">*</span></label>
+                            <input
+                                type="text"
+                                value={pageLabel}
+                                onChange={(e) => setPageLabel(e.target.value)}
+                                className={inputClass}
+                                placeholder="e.g., Privacy Policy"
+                            />
+                            <p className="text-[10px] text-slate-400 mt-1 font-bold">This label will display in the website footer.</p>
+                        </div>
+
+                        <div>
+                            <label className={labelClass}>Page Content</label>
+                            <RichTextEditor
+                                value={pageContent}
+                                onChange={setPageContent}
+                                placeholder="Enter rich text page content here..."
+                            />
+                        </div>
+
+                        <div className="pt-4 border-t border-slate-100">
+                            <button
+                                type="submit"
+                                disabled={savingPage}
+                                className="flex items-center gap-2 px-8 py-3 bg-primary-600 text-white rounded-xl font-bold hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <MdSave size={18} />
+                                {savingPage ? 'Saving...' : 'Save Page'}
                             </button>
                         </div>
                     </form>

@@ -1,6 +1,9 @@
 /* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { authService, authorizationService } from "../services/api";
+import { useDispatch } from "react-redux";
+import { authService, authorizationService, setAccessToken } from "../services/api";
+import { MENU_PERMISSION_GROUPS } from "../constants/menuPermissions";
+import { clearCredentials, setCredentials, setPermissions as setReduxPermissions } from "../store/authSlice";
 
 const AuthContext = createContext(null);
 
@@ -15,69 +18,157 @@ const normalizeUser = (userData) => {
     };
 };
 
+const readStoredUser = () => {
+    try {
+        const raw = localStorage.getItem("user");
+        return raw ? normalizeUser(JSON.parse(raw)) : null;
+    } catch {
+        return null;
+    }
+};
+
+const readStoredAccessToken = () => {
+    try {
+        return localStorage.getItem("accessToken") || null;
+    } catch {
+        return null;
+    }
+};
+
+const decodeJwtPayload = (token) => {
+    if (!token || typeof token !== "string") {
+        return null;
+    }
+
+    const parts = token.split(".");
+    if (parts.length < 2) {
+        return null;
+    }
+
+    try {
+        const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+        const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
+        return JSON.parse(atob(padded));
+    } catch {
+        return null;
+    }
+};
+
+const isTokenValidForBoot = (token, skewSeconds = 60) => {
+    const payload = decodeJwtPayload(token);
+    if (!payload?.exp) {
+        return false;
+    }
+
+    return payload.exp * 1000 > Date.now() + (skewSeconds * 1000);
+};
+
 export const AuthProvider = ({ children }) => {
-    const [user, setUser] = useState(null);
+    const dispatch = useDispatch();
+    const [user, setUser] = useState(() => readStoredUser());
     const [permissions, setPermissions] = useState({});
     const [loading, setLoading] = useState(true);
 
     const clearSession = useCallback(() => {
-        localStorage.removeItem("token");
+        setAccessToken(null);
         localStorage.removeItem("user");
         setUser(null);
         setPermissions({});
-    }, []);
+        dispatch(clearCredentials());
+    }, [dispatch]);
 
     const refreshSession = useCallback(async () => {
-        const token = localStorage.getItem("token");
-
-        if (!token) {
-            setUser(null);
-            setPermissions({});
-            setLoading(false);
-            return null;
-        }
-
         setLoading(true);
 
         try {
-            const [userRes, permissionsRes] = await Promise.all([
-                authService.getMe(),
-                authorizationService.getMy(),
-            ]);
+            const session = await authService.refresh();
+            const nextUser = normalizeUser(session.user);
 
-            const nextUser = normalizeUser(userRes.data);
+            setAccessToken(session.accessToken);
             localStorage.setItem("user", JSON.stringify(nextUser));
             setUser(nextUser);
-            setPermissions(permissionsRes.data?.permissions || {});
+
+            // Fetch permissions separately so a failure here
+            // doesn't wipe the authenticated session.
+            let nextPermissions = {};
+            try {
+                const permissionsRes = await authorizationService.getMy();
+                nextPermissions = permissionsRes.data?.permissions || {};
+            } catch (permErr) {
+                console.warn("Failed to load permissions after refresh:", permErr);
+            }
+
+            setPermissions(nextPermissions);
+            dispatch(setCredentials({ user: nextUser, permissions: nextPermissions }));
 
             return {
                 user: nextUser,
-                permissions: permissionsRes.data?.permissions || {},
+                permissions: nextPermissions,
             };
         } catch (error) {
-            console.error("Failed to refresh session:", error);
-            clearSession();
+            if (!readStoredUser()) {
+                clearSession();
+            }
             return null;
         } finally {
             setLoading(false);
         }
-    }, [clearSession]);
+    }, [clearSession, dispatch]);
+
+    const bootstrapFromStoredSession = useCallback(async () => {
+        const storedUser = readStoredUser();
+        const storedToken = readStoredAccessToken();
+
+        if (storedUser && storedToken && isTokenValidForBoot(storedToken)) {
+            setAccessToken(storedToken);
+            setUser(storedUser);
+
+            let nextPermissions = {};
+            try {
+                const permissionsRes = await authorizationService.getMy();
+                nextPermissions = permissionsRes.data?.permissions || {};
+            } catch (permErr) {
+                console.warn("Failed to load permissions from stored session:", permErr);
+            }
+
+            setPermissions(nextPermissions);
+            dispatch(setCredentials({ user: storedUser, permissions: nextPermissions }));
+            setLoading(false);
+            return;
+        }
+
+        await refreshSession();
+    }, [dispatch, refreshSession]);
 
     useEffect(() => {
-        refreshSession();
-    }, [refreshSession]);
+        bootstrapFromStoredSession();
+    }, [bootstrapFromStoredSession]);
 
-    const login = useCallback(async (token, userData) => {
-        const normalizedUser = normalizeUser(userData);
+    const login = useCallback(async (sessionOrToken, maybeUserData) => {
+        const session = typeof sessionOrToken === "string"
+            ? { accessToken: sessionOrToken, user: maybeUserData }
+            : sessionOrToken;
+        const normalizedUser = normalizeUser(session?.user);
 
-        localStorage.setItem("token", token);
+        setAccessToken(session?.accessToken);
         localStorage.setItem("user", JSON.stringify(normalizedUser));
         setUser(normalizedUser);
 
-        return refreshSession();
-    }, [refreshSession]);
+        const permissionsRes = await authorizationService.getMy();
+        const nextPermissions = permissionsRes.data?.permissions || {};
+        setPermissions(nextPermissions);
+        dispatch(setCredentials({ user: normalizedUser, permissions: nextPermissions }));
+        dispatch(setReduxPermissions(nextPermissions));
 
-    const logout = useCallback(() => {
+        return { user: normalizedUser, permissions: nextPermissions };
+    }, [dispatch]);
+
+    const logout = useCallback(async () => {
+        try {
+            await authService.logout();
+        } catch {
+            // Local cleanup still happens if the network request fails.
+        }
         clearSession();
     }, [clearSession]);
 
@@ -86,11 +177,35 @@ export const AuthProvider = ({ children }) => {
             return false;
         }
 
+        if (user.role === "SUPER_ADMIN" || user.role === "super_admin") {
+            return true;
+        }
+
+        if (user.role === "admin" || user.role === "Admin") {
+            return true;
+        }
+
         if (!permissionKey) {
             return true;
         }
 
-        return Boolean(permissions?.[permissionKey]);
+        if (Object.prototype.hasOwnProperty.call(permissions || {}, permissionKey)) {
+            return Boolean(permissions?.[permissionKey]);
+        }
+
+        const group = MENU_PERMISSION_GROUPS.find((item) =>
+            item.key === permissionKey || (item.children || []).some((child) => child.key === permissionKey)
+        );
+
+        if (!group) {
+            return false;
+        }
+
+        if (group.key === permissionKey) {
+            return Boolean(permissions?.[group.key]) || (group.children || []).some((child) => Boolean(permissions?.[child.key]));
+        }
+
+        return Boolean(permissions?.[group.key]);
     }, [permissions, user]);
 
     return (
@@ -103,7 +218,8 @@ export const AuthProvider = ({ children }) => {
                 logout,
                 refreshSession,
                 hasAccess,
-                isAdmin: user?.role === "admin",
+                isAdmin: user?.role === "admin" || user?.role === "Admin",
+                isSuperAdmin: user?.role === "SUPER_ADMIN" || user?.role === "super_admin",
             }}
         >
             {children}

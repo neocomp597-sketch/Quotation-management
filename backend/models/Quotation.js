@@ -1,7 +1,10 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('./plugins/tenantPlugin');
 
 const QuotationSchema = new mongoose.Schema({
-    quotationNo: { type: String, required: true, unique: true },
+    quotationNo: { type: String, required: true },
+    quotationNumber: { type: String },
+        customerName: { type: String },
     customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer' },
     quotationDate: { type: Date, required: true, default: Date.now },
     validTill: { type: Date, required: true },
@@ -47,9 +50,28 @@ const QuotationSchema = new mongoose.Schema({
     ackNo: { type: String },
     ackDate: { type: Date },
     irnNo: { type: String },
-    status: { type: String, enum: ['draft', 'final', 'ordered'], default: 'draft' },
+    status: { type: String, enum: ['draft', 'final', 'ordered', 'pending_approval', 'rejected'], default: 'draft' },
+    convertedAt: { type: Date },
+    territory: { type: mongoose.Schema.Types.ObjectId, ref: 'Territory' },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    clientRequestId: { type: String },
     createdAt: { type: Date, default: Date.now },
 });
+
+QuotationSchema.index({ quotationNumber: 1 });
+QuotationSchema.index({ customerId: 1 });
+QuotationSchema.index({ createdBy: 1 });
+QuotationSchema.index({ createdAt: -1 });
+QuotationSchema.index({ status: 1 });
+QuotationSchema.index({ companyId: 1, quotationNo: 1 }, { unique: true });
+QuotationSchema.index({ companyId: 1, quotationNumber: 1 });
+QuotationSchema.index(
+    { companyId: 1, clientRequestId: 1 },
+    { unique: true, partialFilterExpression: { clientRequestId: { $type: 'string' } } }
+);
+QuotationSchema.index({ customerName: 'text' });
+QuotationSchema.index({ territory: 1 });
+
+QuotationSchema.plugin(tenantPlugin);
 
 module.exports = mongoose.model('Quotation', QuotationSchema);

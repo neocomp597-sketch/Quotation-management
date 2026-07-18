@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { MdClose } from 'react-icons/md';
 
-const Modal = ({ isOpen, onClose, title, children, footer, maxWidth = 'max-w-2xl' }) => {
+const Modal = ({ isOpen, onClose, title, children, footer, maxWidth = 'max-w-2xl', hideHeader = false, scrollable = true, fullscreen = false }) => {
     useEffect(() => {
         if (isOpen) {
             document.body.style.overflow = 'hidden';
@@ -18,7 +18,7 @@ const Modal = ({ isOpen, onClose, title, children, footer, maxWidth = 'max-w-2xl
 
     // Use a portal to render the modal at the root, avoids layout issues
     return ReactDOM.createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 lg:p-8">
+        <div className={`fixed inset-0 z-[9999] flex items-center justify-center ${fullscreen ? 'p-0' : 'p-4 sm:p-6 lg:p-8'}`}>
             {/* Backdrop with rich styling */}
             <div
                 className="fixed inset-0 bg-slate-900/60 backdrop-blur-md transition-opacity duration-300 ease-in-out"
@@ -28,26 +28,28 @@ const Modal = ({ isOpen, onClose, title, children, footer, maxWidth = 'max-w-2xl
 
             {/* Modal Container with focus on centered placement and premium feel */}
             <div
-                className={`relative bg-white w-full ${maxWidth} rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.2)] overflow-hidden transform transition-all duration-300 ease-out scale-100 opacity-100 flex flex-col max-h-[90vh]`}
+                className={`relative bg-white w-full ${fullscreen ? 'h-screen max-h-screen rounded-none' : `${maxWidth} rounded-[2rem] max-h-[90vh]`} shadow-[0_20px_50px_rgba(0,0,0,0.2)] transform transition-all duration-300 ease-out scale-100 opacity-100 ${scrollable ? 'overflow-hidden flex flex-col' : 'overflow-visible'}`}
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}
-                <div className="px-5 py-4 md:px-8 md:py-6 border-b border-slate-100 flex justify-between items-center bg-white">
-                    <div>
-                        <h3 className="text-lg md:text-2xl font-black text-slate-900 tracking-tight">{title}</h3>
-                        <div className="h-1.5 w-12 bg-primary-600 rounded-full mt-1.5"></div>
+                {!hideHeader && (
+                    <div className="px-5 py-4 md:px-8 md:py-6 border-b border-slate-100 flex justify-between items-center bg-white">
+                        <div>
+                            <h3 className="text-lg md:text-2xl font-black text-slate-900 tracking-tight">{title}</h3>
+                            <div className="h-1.5 w-12 bg-primary-600 rounded-full mt-1.5"></div>
+                        </div>
+                        <button
+                            onClick={onClose}
+                            className="p-2 md:p-2.5 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-2xl transition-all duration-200"
+                            aria-label="Close modal"
+                        >
+                            <MdClose size={24} />
+                        </button>
                     </div>
-                    <button
-                        onClick={onClose}
-                        className="p-2 md:p-2.5 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-2xl transition-all duration-200"
-                        aria-label="Close modal"
-                    >
-                        <MdClose size={24} />
-                    </button>
-                </div>
+                )}
 
                 {/* Content Area */}
-                <div className="px-5 py-5 md:px-8 md:py-8 overflow-y-auto custom-scrollbar flex-1">
+                <div className={`px-5 py-5 md:px-8 md:py-8 flex-1 ${scrollable ? 'overflow-y-auto custom-scrollbar' : 'overflow-visible'}`}>
                     {children}
                 </div>
 

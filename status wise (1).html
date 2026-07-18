@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Status Breakdown Summary - FY 2026-27</title>
+<style>
+  body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+  h2 { margin: 0; font-size: 18px; }
+.export-btn {
+    padding: 8px 16px; background: #1976d2; color: #fff; border: none;
+    border-radius: 4px; cursor: pointer; font-size: 14px;
+  }
+.export-btn:hover { background: #1565c0; }
+.table-container { overflow-x: auto; background: #fff; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 1200px; }
+  th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: right; }
+  th { background: #e0e0e0; font-weight: 600; position: sticky; top: 0; }
+  td:first-child, td:nth-child(2), td:nth-child(3), th { text-align: left; }
+.month-col { font-weight: 600; vertical-align: top; background: #fafafa; }
+.sbu-col { font-weight: 500; vertical-align: top; }
+.total-row { background: #FFFF00; font-weight: 600; }
+.segment-col { padding-left: 20px; }
+.zero { color: #999; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h2>Status Breakdown Summary - FY 2026-27</h2>
+  <button class="export-btn" onclick="exportTableToExcel('statusTable', 'Status_Breakdown_Summary_FY26-27')">EXPORT</button>
+</div>
+
+<div class="table-container">
+<table id="statusTable">
+  <thead>
+    <tr>
+      <th>Month</th>
+      <th>SBU/EPC</th>
+      <th>Segment</th>
+      <th>Firm</th>
+      <th>MFC</th>
+      <th>B&B</th>
+      <th>Other</th>
+      <th>Invoice</th>
+      <th>Lost</th>
+      <th>Parked</th>
+      <th>Order received</th>
+      <th>Total</th>
+    </tr>
+  </thead>
+  <tbody id="tableBody">
+    <!-- Data will be populated by JS -->
+  </tbody>
+</table>
+</div>
+
+<script>
+// Fixed: Use consistent key OrderReceived everywhere
+const fyData = {
+  'Apr-26': {
+    'SBU1': {
+      'Utility': {Firm: 2, MFC: 32, B_B: 55, Other: 55, Invoice: 2, Lost: 13, Parked: 4, OrderReceived: 22},
+      'Uc': {Firm: 3, MFC: 4, B_B: 12, Other: 12, Invoice: 12, Lost: 21, Parked: 312, OrderReceived: 323},
+      'Industry': {Firm: 4, MFC: 55, B_B: 123, Other: 123, Invoice: 321, Lost: 1, Parked: 13, OrderReceived: 0}
+    },
+    'SBU2': {
+      'Utility': {Firm: 2, MFC: 0, B_B: 4, Other: 1, Invoice: 3, Lost: 21, Parked: 123, OrderReceived: 0},
+      'Uc': {Firm: 0, MFC: 2, B_B: 9, Other: 3, Invoice: 6, Lost: 0, Parked: 0, OrderReceived: 0},
+      'Industry': {Firm: 4, MFC: 1, B_B: 3, Other: 5, Invoice: 8, Lost: 3, Parked: 6, OrderReceived: 0}
+    },
+    'SBU3': {
+      'Utility': {Firm: 3, MFC: 1, B_B: 3, Other: 1, Invoice: 3, Lost: 0, Parked: 1, OrderReceived: 0},
+      'Uc': {Firm: 55, MFC: 0, B_B: 12, Other: 21, Invoice: 312, Lost: 0, Parked: 0, OrderReceived: 0},
+      'Industry': {Firm: 3, MFC: 3, B_B: 4, Other: 7, Invoice: 3, Lost: 6, Parked: 0, OrderReceived: 0}
+    },
+    'EPC': {
+      'Utility': {Firm: 4, MFC: 55, B_B: 123, Other: 123, Invoice: 321, Lost: 1, Parked: 13, OrderReceived: 0},
+      'Uc': {Firm: 2, MFC: 32, B_B: 55, Other: 55, Invoice: 2, Lost: 13, Parked: 4, OrderReceived: 0},
+      'Industry': {Firm: 2, MFC: 32, B_B: 55, Other: 55, Invoice: 2, Lost: 13, Parked: 4, OrderReceived: 0}
+    }
+  },
+  'May-26': {
+    'SBU1': {
+      'Utility': {Firm: 4, MFC: 55, B_B: 123, Other: 123, Invoice: 321, Lost: 1, Parked: 13, OrderReceived: 0},
+      'Uc': {Firm: 2, MFC: 32, B_B: 55, Other: 55, Invoice: 2, Lost: 13, Parked: 4, OrderReceived: 0},
+      'Industry': {Firm: 2, MFC: 32, B_B: 55, Other: 55, Invoice: 2, Lost: 13, Parked: 4, OrderReceived: 0}
+    }
+  }
+};
+
+const months = ['Apr-26','May-26','Jun-26','Jul-26','Aug-26','Sep-26','Oct-26','Nov-26','Dec-26','Jan-27','Feb-27','Mar-27'];
+const sbus = ['SBU1','SBU2','SBU3','EPC'];
+const segments = ['Utility','Uc','Industry'];
+
+function calcRowTotal(row) {
+  return (row.Firm || 0) + (row.MFC || 0) + (row.B_B || 0) + (row.Other || 0) +
+         (row.Invoice || 0) + (row.Lost || 0) + (row.Parked || 0) + (row.OrderReceived || 0);
+}
+
+function formatCell(val) {
+  return val === 0 || val === undefined || val === null? '<span class="zero">0</span>' : val;
+}
+
+function renderTable() {
+  const tbody = document.getElementById('tableBody');
+  tbody.innerHTML = '';
+
+  months.forEach(month => {
+    let monthData = fyData[month] || {};
+    let isFirstMonthRow = true;
+
+    sbus.forEach(sbu => {
+      let sbuData = monthData[sbu] || {};
+      let isFirstSbuRow = true;
+      let sbuTotals = {Firm:0,MFC:0,B_B:0,Other:0,Invoice:0,Lost:0,Parked:0,OrderReceived:0};
+
+      segments.forEach(segment => {
+        let rowData = sbuData[segment] || {Firm:0,MFC:0,B_B:0,Other:0,Invoice:0,Lost:0,Parked:0,OrderReceived:0};
+        let rowTotal = calcRowTotal(rowData);
+
+        Object.keys(sbuTotals).forEach(k => sbuTotals[k] += rowData[k] || 0);
+
+        let tr = document.createElement('tr');
+        tr.innerHTML = `
+          ${isFirstMonthRow? `<td class="month-col" rowspan="${sbus.length * 4}">${month}</td>` : ''}
+          ${isFirstSbuRow? `<td class="sbu-col" rowspan="4">${sbu}</td>` : ''}
+          <td class="segment-col">${segment}</td>
+          <td>${formatCell(rowData.Firm)}</td>
+          <td>${formatCell(rowData.MFC)}</td>
+          <td>${formatCell(rowData.B_B)}</td>
+          <td>${formatCell(rowData.Other)}</td>
+          <td>${formatCell(rowData.Invoice)}</td>
+          <td>${formatCell(rowData.Lost)}</td>
+          <td>${formatCell(rowData.Parked)}</td>
+          <td>${formatCell(rowData.OrderReceived)}</td>
+          <td>${formatCell(rowTotal)}</td>
+        `;
+        tbody.appendChild(tr);
+        isFirstMonthRow = false;
+        isFirstSbuRow = false;
+      });
+
+      let totalRow = document.createElement('tr');
+      totalRow.className = 'total-row';
+      let sbuTotal = calcRowTotal(sbuTotals);
+      totalRow.innerHTML = `
+        <td>Total</td>
+        <td>${formatCell(sbuTotals.Firm)}</td>
+        <td>${formatCell(sbuTotals.MFC)}</td>
+        <td>${formatCell(sbuTotals.B_B)}</td>
+        <td>${formatCell(sbuTotals.Other)}</td>
+        <td>${formatCell(sbuTotals.Invoice)}</td>
+        <td>${formatCell(sbuTotals.Lost)}</td>
+        <td>${formatCell(sbuTotals.Parked)}</td>
+        <td>${formatCell(sbuTotals.OrderReceived)}</td>
+        <td>${formatCell(sbuTotal)}</td>
+      `;
+      tbody.appendChild(totalRow);
+    });
+  });
+}
+
+function exportTableToExcel(tableID, filename = ''){
+  const dataType = 'application/vnd.ms-excel';
+  const tableSelect = document.getElementById(tableID);
+  const tableHTML = tableSelect.outerHTML.replace(/ /g, '%20');
+
+  filename = filename? filename + '.xls' : 'excel_data.xls';
+  const downloadLink = document.createElement("a");
+  document.body.appendChild(downloadLink);
+
+  if(navigator.msSaveOrOpenBlob){
+    const blob = new Blob(['\ufeff', tableHTML], { type: dataType });
+    navigator.msSaveOrOpenBlob(blob, filename);
+  } else {
+    downloadLink.href = 'data:' + dataType + ', ' + tableHTML;
+    downloadLink.download = filename;
+    downloadLink.click();
+  }
+}
+
+renderTable();
+</script>
+
+</body>
+</html>

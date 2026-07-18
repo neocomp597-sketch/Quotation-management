@@ -1,16 +1,21 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MdAdd, MdDelete, MdSave, MdArrowBack, MdPrint, MdEdit } from 'react-icons/md';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { voucherService, vendorService, productService } from '../services/api';
+import { voucherService, vendorService, productService, customerService } from '../services/api';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import VoucherPDF from '../components/VoucherPDF';
 import PortalDropdown from '../components/PortalDropdown';
+import Modal from '../components/Modal';
 
-const CreateVoucher = () => {
+const CreateVoucher = ({ mode = 'grn', isViewOnly = false }) => {
     const navigate = useNavigate();
     const { id } = useParams();
+    const { pathname } = useLocation();
+    const isViewOnlyMode = isViewOnly || pathname.includes('/view/');
     const isEditMode = Boolean(id);
+    const isInvoiceMode = mode === 'invoice';
+    const basePath = isInvoiceMode ? '/invoices' : '/grn';
     
     const [loading, setLoading] = useState(false);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -25,16 +30,21 @@ const CreateVoucher = () => {
 
     // Master data
     const [vendors, setVendors] = useState([]);
+    const [customers, setCustomers] = useState([]);
     const [products, setProducts] = useState([]);
+    const [grnOptions, setGrnOptions] = useState([]);
 
     // Form state
     const [voucherData, setVoucherData] = useState({
-        voucherType: 'Purchase',
-        voucherNumber: `VCH-${Date.now()}`,
+        voucherType: isInvoiceMode ? 'Invoice' : 'Purchase',
+        voucherNumber: `${isInvoiceMode ? 'INV' : 'GRN'}-${Date.now()}`,
         date: new Date().toISOString().split('T')[0],
         vendorId: '',
         vendorName: '',
+        customerId: '',
+        customerName: '',
         contactNumber: '',
+        referenceVoucherId: '',
         items: [
             { id: Date.now(), srNumber: 1, productId: '', productName: '', qty: 0, uom: 'Pcs', price: 0, amount: 0, taxPercentage: 5, taxAmount: 0 }
         ]
@@ -50,17 +60,35 @@ const CreateVoucher = () => {
     const fetchMasterData = async () => {
         try {
             const { companySettingsService } = await import('../services/api');
-            const [vendorsRes, productsRes, settingsRes] = await Promise.all([
+            const [vendorsRes, customersRes, productsRes, settingsRes, grnRes] = await Promise.all([
                 vendorService.getAll(true),
+                customerService.getAll({ limit: 100000 }),
                 productService.getAll(),
-                companySettingsService.get()
+                companySettingsService.get(),
+                voucherService.getAll({ type: 'Purchase' })
             ]);
             setVendors(vendorsRes.data);
+            setCustomers(customersRes.data?.data || customersRes.data || []);
             setProducts(productsRes.data);
+            setGrnOptions(grnRes.data || []);
             if (settingsRes.data) setCompanySettings(settingsRes.data);
         } catch (error) {
             console.error("Error fetching master data:", error);
             toast.error("Failed to load master data");
+        }
+    };
+
+    const handleCustomerChange = (value) => {
+        const selectedCustomer = customers.find(c => c._id === value);
+        if (selectedCustomer) {
+            setVoucherData(prev => ({
+                ...prev,
+                customerId: selectedCustomer._id,
+                customerName: selectedCustomer.companyName || selectedCustomer.customerName || selectedCustomer.name || '',
+                contactNumber: selectedCustomer.phone || selectedCustomer.mobile || selectedCustomer.contactNumber || ''
+            }));
+        } else {
+            setVoucherData(prev => ({ ...prev, customerId: '', customerName: value }));
         }
     };
 
@@ -173,9 +201,11 @@ const CreateVoucher = () => {
     const grandTotal = totalAmount + totalTax;
 
     const handleSubmit = async () => {
-        // Validations
+        if (loading) return;
         if (!voucherData.date) return toast.error("Date is required");
-        if (!voucherData.vendorName?.trim()) return toast.error("Vendor Name is required");
+        const isCustomerParty = ['Invoice', 'Sale Return'].includes(voucherData.voucherType);
+        if (isCustomerParty && !voucherData.customerName?.trim()) return toast.error("Customer Name is required");
+        if (!isCustomerParty && !voucherData.vendorName?.trim()) return toast.error("Vendor Name is required");
         if (voucherData.items.length === 0) return toast.error("Add at least one product");
 
         const isValidItems = voucherData.items.every(item => item.productName && item.qty > 0 && item.price >= 0);
@@ -185,6 +215,7 @@ const CreateVoucher = () => {
             setLoading(true);
             const payload = {
                 ...voucherData,
+                voucherType: isInvoiceMode ? 'Invoice' : voucherData.voucherType,
                 totalQty,
                 totalAmount,
                 totalTax,
@@ -194,11 +225,11 @@ const CreateVoucher = () => {
             let savedId;
             if (isEditMode) {
                 const res = await voucherService.update(id, payload);
-                savedId = res.data?.voucher?._id;
+                    savedId = res.data?.voucher?._id;
                 toast.success("Voucher Updated");
             } else {
                 const res = await voucherService.create(payload);
-                savedId = res.data?.voucher?._id;
+                    savedId = res.data?.voucher?._id;
                 toast.success("Voucher Created");
             }
             
@@ -217,24 +248,47 @@ const CreateVoucher = () => {
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                     <button
-                        onClick={() => navigate('/vouchers')}
+                        onClick={() => navigate(basePath)}
                         className="p-2.5 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-primary-600 hover:bg-primary-50 transition-all active:scale-95 shadow-sm"
                     >
                         <MdArrowBack size={20} />
                     </button>
                     <div>
-                        <h1 className="text-3xl font-black text-slate-900 tracking-tight">{isEditMode ? 'Edit Voucher' : 'Voucher Entry'}</h1>
-                        <p className="text-slate-500 font-medium tracking-tight">Purchase / Sale Return processing</p>
+                        <h1 className="text-3xl font-black text-slate-900 tracking-tight">
+                            {isViewOnlyMode ? (isInvoiceMode ? 'View Invoice' : 'View GRN') : isEditMode ? (isInvoiceMode ? 'Edit Invoice' : 'Edit GRN') : (isInvoiceMode ? 'Create Invoice' : 'GRN Entry')}
+                        </h1>
+                        <p className="text-slate-500 font-medium tracking-tight">
+                            {isViewOnlyMode ? (isInvoiceMode ? 'Invoice details and stock transaction details' : 'GRN details and purchase breakdown') : isInvoiceMode ? 'Sales outward, GST billing and stock deduction' : 'Purchase inward and sale return processing'}
+                        </p>
                     </div>
                 </div>
-                <button
-                    onClick={handleSubmit}
-                    disabled={loading}
-                    className="flex items-center gap-2 bg-slate-900 hover:bg-black text-white px-6 py-3 rounded-xl font-bold transition-all shadow-xl disabled:opacity-50"
-                >
-                    <MdSave size={20} />
-                    <span>{loading ? 'Saving...' : (isEditMode ? 'Update Voucher' : 'Save & Update Stock')}</span>
-                </button>
+                {!isViewOnlyMode ? (
+                    <button
+                        onClick={handleSubmit}
+                        disabled={loading}
+                        className="flex items-center gap-2 bg-slate-900 hover:bg-black text-white px-6 py-3 rounded-xl font-bold transition-all shadow-xl disabled:opacity-50"
+                    >
+                        <MdSave size={20} />
+                        <span>{loading ? 'Saving...' : (isEditMode ? (isInvoiceMode ? 'Update Invoice' : 'Update GRN') : 'Save & Update Stock')}</span>
+                    </button>
+                ) : (
+                    companySettings && (
+                        <PDFDownloadLink
+                            document={<VoucherPDF voucher={voucherData} companySettings={companySettings} />}
+                            fileName={`Voucher-${voucherData.voucherNumber?.replace(/\//g, '-')}.pdf`}
+                        >
+                            {({ loading: pdfLoading }) => (
+                                <button
+                                    disabled={pdfLoading}
+                                    className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-xl disabled:opacity-50 active:scale-95"
+                                >
+                                    <MdPrint size={20} />
+                                    <span>{pdfLoading ? 'Preparing PDF...' : 'Print Voucher'}</span>
+                                </button>
+                            )}
+                        </PDFDownloadLink>
+                    )
+                )}
             </div>
 
             <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200 space-y-8">
@@ -247,32 +301,77 @@ const CreateVoucher = () => {
                             className="w-full px-4 py-2.5 bg-white border border-blue-200 rounded-lg focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none text-slate-900 font-bold transition-all"
                             value={voucherData.date}
                             onChange={(e) => setVoucherData({ ...voucherData, date: e.target.value })}
+                            disabled={isViewOnlyMode}
                         />
                     </div>
                     <div className="bg-amber-50/50 p-4 rounded-xl border border-amber-100">
-                        <label className="text-xs font-black uppercase text-amber-600 tracking-widest block mb-2">Voucher Number</label>
+                        <label className="text-xs font-black uppercase text-amber-600 tracking-widest block mb-2">{isInvoiceMode ? 'Invoice Number' : 'GRN Number'}</label>
                         <input
                             type="text"
                             className="w-full px-4 py-2.5 bg-white border border-amber-200 rounded-lg focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 outline-none text-slate-900 font-bold transition-all"
                             value={voucherData.voucherNumber}
                             onChange={(e) => setVoucherData({ ...voucherData, voucherNumber: e.target.value })}
+                            disabled={isViewOnlyMode}
                         />
                     </div>
                     <div className="bg-emerald-50/50 p-4 rounded-xl border border-emerald-100">
-                        <label className="text-xs font-black uppercase text-emerald-600 tracking-widest block mb-2">Voucher Type</label>
+                        <label className="text-xs font-black uppercase text-emerald-600 tracking-widest block mb-2">Transaction Type</label>
                         <select
                             className="w-full px-4 py-2.5 bg-white border border-emerald-200 rounded-lg focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none text-slate-900 font-bold transition-all"
                             value={voucherData.voucherType}
-                            onChange={(e) => setVoucherData({ ...voucherData, voucherType: e.target.value })}
+                            onChange={(e) => {
+                                const newType = e.target.value;
+                                setVoucherData(prev => ({
+                                    ...prev,
+                                    voucherType: newType,
+                                    vendorId: '',
+                                    vendorName: '',
+                                    customerId: '',
+                                    customerName: '',
+                                    contactNumber: '',
+                                    referenceVoucherId: ''
+                                }));
+                            }}
+                            disabled={isInvoiceMode || isViewOnlyMode}
                         >
-                            <option value="Purchase">Purchase</option>
-                            <option value="Sale Return">Sale Return</option>
+                            {isInvoiceMode ? (
+                                <option value="Invoice">Invoice</option>
+                            ) : (
+                                <>
+                                    <option value="Purchase">Purchase</option>
+                                    <option value="Sale Return">Sale Return</option>
+                                </>
+                            )}
                         </select>
                     </div>
                 </div>
 
-                {/* Vendor Details */}
+                {/* Party Details */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50/50 p-6 rounded-2xl border border-slate-100">
+                    {['Invoice', 'Sale Return'].includes(voucherData.voucherType) ? (
+                    <div>
+                        <label className="text-xs font-black uppercase text-slate-400 tracking-widest block mb-2">Customer Name</label>
+                        <select
+                            className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-slate-900 font-bold transition-all"
+                            value={voucherData.customerId || ''}
+                            onChange={(e) => handleCustomerChange(e.target.value)}
+                            disabled={isViewOnlyMode}
+                        >
+                            <option value="">Select Customer</option>
+                            {customers.map(c => (
+                                <option key={c._id} value={c._id}>{c.companyName || c.customerName || c.name}</option>
+                            ))}
+                        </select>
+                        <input
+                            type="text"
+                            placeholder="Or type customer name"
+                            className="mt-2 w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-slate-900 font-bold transition-all"
+                            value={voucherData.customerName || ''}
+                            onChange={(e) => setVoucherData({ ...voucherData, customerId: '', customerName: e.target.value })}
+                            disabled={isViewOnlyMode}
+                        />
+                    </div>
+                    ) : (
                     <div className="relative">
                         <label className="text-xs font-black uppercase text-slate-400 tracking-widest block mb-2">Vendor Name</label>
                         <input
@@ -281,16 +380,19 @@ const CreateVoucher = () => {
                             className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-slate-900 font-bold transition-all"
                             value={voucherData.vendorName || ''}
                             onFocus={(e) => {
+                                if (isViewOnlyMode) return;
                                 setVendorAnchorRef({ current: e.target });
                                 setVendorDropdownOpen(true);
                             }}
                             onBlur={() => setVendorDropdownOpen(false)}
                             onChange={(e) => {
+                                if (isViewOnlyMode) return;
                                 const val = e.target.value;
                                 setVoucherData({ ...voucherData, vendorId: '', vendorName: val });
                                 setVendorAnchorRef({ current: e.target });
                                 setVendorDropdownOpen(true);
                             }}
+                            disabled={isViewOnlyMode}
                         />
                         <PortalDropdown isOpen={vendorDropdownOpen && vendors.length > 0} anchorRef={vendorAnchorRef}>
                             <ul className="w-full bg-white border border-slate-200 rounded-2xl shadow-2xl max-h-64 overflow-y-auto divide-y divide-slate-50 overflow-hidden">
@@ -309,6 +411,7 @@ const CreateVoucher = () => {
                             </ul>
                         </PortalDropdown>
                     </div>
+                    )}
                     <div>
                         <label className="text-xs font-black uppercase text-slate-400 tracking-widest block mb-2">Contact Number</label>
                         <input
@@ -317,8 +420,25 @@ const CreateVoucher = () => {
                             className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-slate-900 font-bold transition-all"
                             value={voucherData.contactNumber}
                             onChange={(e) => setVoucherData({ ...voucherData, contactNumber: e.target.value })}
+                            disabled={isViewOnlyMode}
                         />
                     </div>
+                    {!isInvoiceMode && voucherData.voucherType === 'Sale Return' && (
+                        <div className="md:col-span-2">
+                            <label className="text-xs font-black uppercase text-slate-400 tracking-widest block mb-2">Link Existing GRN</label>
+                            <select
+                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-slate-900 font-bold transition-all"
+                                value={voucherData.referenceVoucherId || ''}
+                                onChange={(e) => setVoucherData({ ...voucherData, referenceVoucherId: e.target.value })}
+                                disabled={isViewOnlyMode}
+                            >
+                                <option value="">Select GRN</option>
+                                {grnOptions.map(grn => (
+                                    <option key={grn._id} value={grn._id}>{grn.voucherNumber} - {grn.vendorName}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
                 </div>
 
                 {/* Product Grid */}
@@ -333,7 +453,7 @@ const CreateVoucher = () => {
                                 <th className="px-4 py-4 text-right">Price</th>
                                 <th className="px-4 py-4 text-right">Amount</th>
                                 <th className="px-4 py-4 text-center">Tax %</th>
-                                <th className="px-4 py-4 text-center">Action</th>
+                                {!isViewOnlyMode && <th className="px-4 py-4 text-center">Action</th>}
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -347,14 +467,17 @@ const CreateVoucher = () => {
                                             className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none text-sm font-bold text-slate-900"
                                             value={item.productName || ''}
                                             onFocus={(e) => {
+                                                if (isViewOnlyMode) return;
                                                 setProductAnchorRef({ current: e.target });
                                                 setActiveProductDropdown(item.id);
                                             }}
                                             onBlur={() => setActiveProductDropdown(null)}
                                             onChange={(e) => {
+                                                if (isViewOnlyMode) return;
                                                 setProductAnchorRef({ current: e.target });
                                                 handleItemChange(item.id, 'productName', e.target.value);
                                             }}
+                                            disabled={isViewOnlyMode}
                                         />
                                         <PortalDropdown isOpen={activeProductDropdown === item.id && products.length > 0} anchorRef={productAnchorRef}>
                                             <ul className="w-full bg-white border border-slate-200 rounded-2xl shadow-2xl max-h-64 overflow-y-auto divide-y divide-slate-50 overflow-hidden">
@@ -382,6 +505,7 @@ const CreateVoucher = () => {
                                             className="w-full px-3 py-2 text-center bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none text-sm font-bold text-slate-900"
                                             value={item.qty || ''}
                                             onChange={(e) => handleItemChange(item.id, 'qty', e.target.value)}
+                                            disabled={isViewOnlyMode}
                                         />
                                     </td>
                                     <td className="px-4 py-3">
@@ -389,6 +513,7 @@ const CreateVoucher = () => {
                                             className="w-full px-2 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none text-xs font-bold text-slate-900"
                                             value={item.uom}
                                             onChange={(e) => handleItemChange(item.id, 'uom', e.target.value)}
+                                            disabled={isViewOnlyMode}
                                         >
                                             <option value="Pcs">Pcs</option>
                                             <option value="Nos">Nos</option>
@@ -406,6 +531,7 @@ const CreateVoucher = () => {
                                             className="w-full px-3 py-2 text-right bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none text-sm font-bold text-slate-900"
                                             value={item.price || ''}
                                             onChange={(e) => handleItemChange(item.id, 'price', e.target.value)}
+                                            disabled={isViewOnlyMode}
                                         />
                                     </td>
                                     <td className="px-4 py-3 text-right font-black text-slate-900">
@@ -419,30 +545,35 @@ const CreateVoucher = () => {
                                                 className="w-16 px-2 py-2 text-center bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none text-sm font-bold text-slate-900"
                                                 value={item.taxPercentage || ''}
                                                 onChange={(e) => handleItemChange(item.id, 'taxPercentage', e.target.value)}
+                                                disabled={isViewOnlyMode}
                                             />
                                         </div>
                                     </td>
-                                    <td className="px-4 py-3 text-center">
-                                        <button
-                                            onClick={() => removeRow(item.id)}
-                                            className="p-2 text-rose-400 hover:bg-rose-50 hover:text-rose-600 rounded-lg transition-all"
-                                            disabled={voucherData.items.length === 1}
-                                        >
-                                            <MdDelete size={20} />
-                                        </button>
-                                    </td>
+                                    {!isViewOnlyMode && (
+                                        <td className="px-4 py-3 text-center">
+                                            <button
+                                                onClick={() => removeRow(item.id)}
+                                                className="p-2 text-rose-400 hover:bg-rose-50 hover:text-rose-600 rounded-lg transition-all"
+                                                disabled={voucherData.items.length === 1}
+                                            >
+                                                <MdDelete size={20} />
+                                            </button>
+                                        </td>
+                                    )}
                                 </tr>
                             ))}
                         </tbody>
                     </table>
-                    <div className="p-4 border-t border-slate-200 bg-slate-50">
-                        <button
-                            onClick={addRow}
-                            className="flex items-center gap-2 text-primary-600 font-bold hover:text-primary-700 transition-colors text-sm"
-                        >
-                            <MdAdd size={20} /> Add New Row
-                        </button>
-                    </div>
+                    {!isViewOnlyMode && (
+                        <div className="p-4 border-t border-slate-200 bg-slate-50">
+                            <button
+                                onClick={addRow}
+                                className="flex items-center gap-2 text-primary-600 font-bold hover:text-primary-700 transition-colors text-sm"
+                            >
+                                <MdAdd size={20} /> Add New Row
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 {/* Totals Section */}
@@ -469,69 +600,78 @@ const CreateVoucher = () => {
             </div>
 
             {/* Success Actions Modal */}
-            {showSuccessModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-                    <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl space-y-6 text-center animate-in fade-in zoom-in duration-200">
-                        <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <MdSave size={40} />
-                        </div>
-                        <div>
-                            <h3 className="text-2xl font-black text-slate-900 tracking-tight">Voucher Saved!</h3>
-                            <p className="text-slate-500 font-medium mt-2 leading-relaxed">Your voucher has been successfully recorded and inventory is updated.</p>
-                        </div>
-                        
-                        <div className="space-y-3 pt-4 border-t border-slate-100">
-                            <PDFDownloadLink document={<VoucherPDF voucher={voucherData} companySettings={companySettings} />} fileName={`Voucher-${voucherData.voucherNumber.replace(/\//g, '-')}.pdf`}>
-                                {({ loading: pdfLoading }) => (
-                                    <button
-                                        disabled={pdfLoading}
-                                        className="w-full flex items-center justify-center gap-2 py-3.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-900 rounded-xl font-bold transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50"
-                                    >
-                                        <MdPrint size={20} className="text-slate-500" /> {pdfLoading ? 'Preparing PDF...' : 'Print Voucher'}
-                                    </button>
-                                )}
-                            </PDFDownloadLink>
-                            
-                            {!isEditMode && savedVoucherId && savedVoucherId !== 'new' && (
+            <Modal
+                isOpen={showSuccessModal}
+                onClose={() => setShowSuccessModal(false)}
+                hideHeader={true}
+                maxWidth="max-w-sm"
+            >
+                <div className="text-center space-y-6 py-2">
+                    <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
+                        <MdSave size={40} />
+                    </div>
+                    <div>
+                        <h3 className="text-2xl font-black text-slate-900 tracking-tight">Voucher Saved!</h3>
+                        <p className="text-slate-500 font-medium mt-2 leading-relaxed">Your voucher has been successfully recorded and inventory is updated.</p>
+                    </div>
+                    
+                    <div className="space-y-3 pt-4 border-t border-slate-100">
+                        <PDFDownloadLink document={<VoucherPDF voucher={voucherData} companySettings={companySettings} />} fileName={`Voucher-${voucherData.voucherNumber.replace(/\//g, '-')}.pdf`}>
+                            {({ loading: pdfLoading }) => (
                                 <button
-                                    onClick={() => {
-                                        setShowSuccessModal(false);
-                                        navigate(`/vouchers/${savedVoucherId}`);
-                                    }}
-                                    className="w-full flex items-center justify-center gap-2 py-3.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-900 rounded-xl font-bold transition-all hover:scale-[1.02] active:scale-95"
+                                    disabled={pdfLoading}
+                                    className="w-full flex items-center justify-center gap-2 py-3.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-900 rounded-xl font-bold transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50"
                                 >
-                                    <MdEdit size={20} className="text-amber-500" /> Edit Current Voucher
+                                    <MdPrint size={20} className="text-slate-500" /> {pdfLoading ? 'Preparing PDF...' : 'Print Voucher'}
                                 </button>
                             )}
+                        </PDFDownloadLink>
+                        
+                        {!isEditMode && savedVoucherId && savedVoucherId !== 'new' && (
                             <button
                                 onClick={() => {
-                                    setVoucherData({
-                                        voucherType: 'Purchase',
-                                        voucherNumber: `VCH-${Date.now()}`,
-                                        date: new Date().toISOString().split('T')[0],
-                                        vendorId: '',
-                                        vendorName: '',
-                                        contactNumber: '',
-                                        items: [
-                                            { id: Date.now(), srNumber: 1, productId: '', productName: '', qty: 0, uom: 'Pcs', price: 0, amount: 0, taxPercentage: 5, taxAmount: 0 }
-                                        ]
-                                    });
                                     setShowSuccessModal(false);
+                                    navigate(`${basePath}/${savedVoucherId}`);
                                 }}
-                                className="w-full flex items-center justify-center gap-2 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-lg shadow-emerald-600/20 transition-all hover:scale-[1.02] active:scale-95"
+                                className="w-full flex items-center justify-center gap-2 py-3.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-900 rounded-xl font-bold transition-all hover:scale-[1.02] active:scale-95"
                             >
-                                <MdAdd size={20} /> Create New
+                                <MdEdit size={20} className="text-amber-500" /> Edit Current Voucher
                             </button>
-                            <button
-                                onClick={() => navigate('/vouchers')}
-                                className="w-full flex items-center justify-center gap-2 pt-2 text-slate-400 hover:text-slate-900 font-bold transition-colors"
-                            >
-                                Go to Vouchers List
-                            </button>
-                        </div>
+                        )}
+                        <button
+                            onClick={() => {
+                                setVoucherData({
+                                    voucherType: isInvoiceMode ? 'Invoice' : 'Purchase',
+                                    voucherNumber: `${isInvoiceMode ? 'INV' : 'GRN'}-${Date.now()}`,
+                                    date: new Date().toISOString().split('T')[0],
+                                    vendorId: '',
+                                    vendorName: '',
+                                    customerId: '',
+                                    customerName: '',
+                                    contactNumber: '',
+                                    referenceVoucherId: '',
+                                    items: [
+                                        { id: Date.now(), srNumber: 1, productId: '', productName: '', qty: 0, uom: 'Pcs', price: 0, amount: 0, taxPercentage: 5, taxAmount: 0 }
+                                    ]
+                                });
+                                setShowSuccessModal(false);
+                            }}
+                            className="w-full flex items-center justify-center gap-2 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-lg shadow-emerald-600/20 transition-all hover:scale-[1.02] active:scale-95"
+                        >
+                            <MdAdd size={20} /> Create New
+                        </button>
+                        <button
+                            onClick={() => {
+                                setShowSuccessModal(false);
+                                navigate(basePath);
+                            }}
+                            className="w-full flex items-center justify-center gap-2 pt-2 text-slate-400 hover:text-slate-900 font-bold transition-colors"
+                        >
+                            Go to {isInvoiceMode ? 'Invoices' : 'GRN'} List
+                        </button>
                     </div>
                 </div>
-            )}
+            </Modal>
         </div>
     );
 };

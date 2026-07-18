@@ -1,0 +1,31 @@
+# Dependencies
+node_modules
+
+# Environment files
+.env
+.env.*
+
+# Logs and Debug
+*.log
+npm-debug.log*
+*.txt
+*.json
+!package.json
+!package-lock.json
+!nodemon.json
+
+# Local Uploads (should be handled via external storage or volume mounts)
+uploads/
+
+# IDE / Editors
+.vscode
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS files
+.DS_Store
+Thumbs.db

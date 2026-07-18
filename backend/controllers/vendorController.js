@@ -1,5 +1,13 @@
 const Vendor = require('../models/Vendor');
 
+const escapeRegex = (value = '') => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const getPagination = (query) => {
+    const page = Math.max(1, Number(query.page || 1));
+    const limit = Math.min(100, Math.max(1, Number(query.limit || 20)));
+    return { page, limit, skip: (page - 1) * limit };
+};
+
 const createVendor = async (req, res) => {
     try {
         const { name, contactPerson, phone, email, address, isActive } = req.body;
@@ -30,8 +38,45 @@ const getAllVendors = async (req, res) => {
         if (typeof req.query.active !== 'undefined') {
             filter.isActive = req.query.active === 'true';
         }
+        const search = String(req.query.search || '').trim();
+        if (search) {
+            const regex = new RegExp(escapeRegex(search), 'i');
+            filter.$or = [
+                { name: regex },
+                { contactPerson: regex },
+                { phone: regex },
+                { email: regex },
+                { gstin: regex }
+            ];
+        }
 
-        const vendors = await Vendor.find(filter).sort({ name: 1 });
+        if (req.query.page || req.query.limit || search) {
+            const { page, limit, skip } = getPagination(req.query);
+            const [vendors, total] = await Promise.all([
+                Vendor.find(filter)
+                    .select('name contactPerson phone email address gstin isActive createdAt updatedAt')
+                    .sort({ name: 1 })
+                    .skip(skip)
+                    .limit(limit)
+                    .lean(),
+                Vendor.countDocuments(filter)
+            ]);
+
+            return res.json({
+                data: vendors,
+                pagination: {
+                    page,
+                    limit,
+                    total,
+                    pages: Math.ceil(total / limit) || 1
+                }
+            });
+        }
+
+        const vendors = await Vendor.find(filter)
+            .select('name contactPerson phone email address gstin isActive createdAt updatedAt')
+            .sort({ name: 1 })
+            .lean();
         res.json(vendors);
     } catch (error) {
         console.error('Get vendors error:', error);
@@ -41,7 +86,9 @@ const getAllVendors = async (req, res) => {
 
 const getVendorById = async (req, res) => {
     try {
-        const vendor = await Vendor.findById(req.params.id);
+        const vendor = await Vendor.findById(req.params.id)
+            .select('name contactPerson phone email address gstin isActive createdAt updatedAt')
+            .lean();
         if (!vendor) {
             return res.status(404).json({ message: 'Vendor not found' });
         }

@@ -11,7 +11,9 @@ import {
     MdPeople,
     MdSchedule,
     MdTrendingDown,
-    MdAutoGraph
+    MdAutoGraph,
+    MdInventory2,
+    MdStorefront
 } from 'react-icons/md';
 import { Link } from 'react-router-dom';
 import { quotationService, customerService } from '../services/api';
@@ -19,8 +21,8 @@ import { formatCurrency, formatDate } from '../utils/helpers';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import QuotationPDF from '../components/QuotationPDF';
 
-const StatCard = ({ title, value, icon, trend, color, subValue, isTrendUp }) => (
-    <div className="group p-6 bg-white rounded-3xl border border-slate-100 hover:border-primary-600/20 transition-all duration-300 shadow-sm hover:shadow-xl hover:-translate-y-1 relative overflow-hidden">
+const StatCard = ({ title, value, icon, trend, color, subValue, isTrendUp, to }) => (
+    <Link to={to} className="group p-6 bg-white rounded-3xl border border-slate-100 hover:border-primary-600/20 transition-all duration-300 shadow-sm hover:shadow-xl hover:-translate-y-1 relative overflow-hidden block">
         <div className="absolute top-0 right-0 w-24 h-24 bg-slate-50 rounded-bl-full opacity-50 group-hover:scale-110 transition-transform duration-500"></div>
         
         <div className="flex justify-between items-start mb-6 relative">
@@ -37,10 +39,10 @@ const StatCard = ({ title, value, icon, trend, color, subValue, isTrendUp }) => 
 
         <div className="relative">
             <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest leading-none mb-3">{title}</h3>
-            <p className="text-3xl font-black text-slate-900 leading-none">{value}</p>
+            <p className="text-2xl font-black text-slate-900 leading-none">{value}</p>
             <p className="text-xs font-bold text-slate-400 mt-3">{subValue}</p>
         </div>
-    </div>
+    </Link>
 );
 
 const Dashboard = () => {
@@ -48,7 +50,9 @@ const Dashboard = () => {
         totalQuotations: 0,
         pendingDrafts: 0,
         totalValue: 0,
-        customerCount: 0
+        customerCount: 0,
+        productCount: 0,
+        vendorCount: 0
     });
     const [recentQuotations, setRecentQuotations] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -56,23 +60,19 @@ const Dashboard = () => {
     useEffect(() => {
         const fetchDashboardData = async () => {
             try {
-                const [qtnRes, custRes] = await Promise.all([
-                    quotationService.getAll(),
-                    customerService.getAll()
-                ]);
-
-                const qtns = qtnRes.data;
-                const totalValue = qtns.reduce((sum, q) => sum + (q.grandTotal || 0), 0);
-                const drafts = qtns.filter(q => q.status === 'draft').length;
+                const response = await quotationService.getReports();
+                const { summary, recentQuotations } = response.data;
 
                 setStats({
-                    totalQuotations: qtns.length,
-                    pendingDrafts: drafts,
-                    totalValue: totalValue,
-                    customerCount: custRes.data.length
+                    totalQuotations: summary?.totalQuotations || 0,
+                    pendingDrafts: summary?.statusBreakdown?.draft || 0,
+                    totalValue: summary?.totalValue || 0,
+                    customerCount: summary?.customerCount || 0,
+                    productCount: summary?.productCount || 0,
+                    vendorCount: summary?.vendorCount || 0
                 });
 
-                setRecentQuotations(qtns.slice(0, 5));
+                setRecentQuotations(recentQuotations || []);
             } catch (err) {
                 console.error("Error fetching dashboard data:", err);
             } finally {
@@ -90,7 +90,8 @@ const Dashboard = () => {
             desc: "All time generated",
             icon: <MdDescription size={26} />,
             color: "bg-gradient-to-br from-teal-500 to-emerald-600",
-            subValue: "All time generated"
+            subValue: "All time generated",
+            to: "/quotations"
         },
         {
             title: "Draft Quotes",
@@ -98,17 +99,19 @@ const Dashboard = () => {
             desc: "Awaiting finalization",
             icon: <MdSchedule size={26} />,
             color: "bg-gradient-to-br from-amber-400 to-orange-500",
-            subValue: "Awaiting finalization"
+            subValue: "Awaiting finalization",
+            to: "/quotations?status=draft"
         },
         {
             title: "Business Pipeline",
-            value: formatCurrency(stats.totalValue),
+            value: formatCurrency(stats.totalValue, 0),
             desc: "Total quoted value",
             icon: <MdAttachMoney size={26} />,
             color: "bg-gradient-to-br from-primary-600 to-accent",
             subValue: "Total quoted value",
             trend: "+100%",
-            isTrendUp: true
+            isTrendUp: true,
+            to: "/reports"
         },
         {
             title: "Registered Customers",
@@ -116,7 +119,26 @@ const Dashboard = () => {
             desc: "Direct & Retail",
             icon: <MdPeople size={26} />,
             color: "bg-gradient-to-br from-blue-500 to-indigo-600",
-            subValue: "Direct & Retail"
+            subValue: "Direct & Retail",
+            to: "/customers"
+        },
+        {
+            title: "Total Products",
+            value: stats.productCount,
+            desc: "Active Inventory",
+            icon: <MdInventory2 size={26} />,
+            color: "bg-gradient-to-br from-purple-500 to-fuchsia-600",
+            subValue: "Active Inventory",
+            to: "/products"
+        },
+        {
+            title: "Total Vendors",
+            value: stats.vendorCount,
+            desc: "Onboarded Suppliers",
+            icon: <MdStorefront size={26} />,
+            color: "bg-gradient-to-br from-rose-500 to-pink-600",
+            subValue: "Onboarded Suppliers",
+            to: "/vendors"
         }
     ];
 
@@ -143,7 +165,7 @@ const Dashboard = () => {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-6 gap-6">
                 {statItems.map((stat, i) => (
                     <StatCard
                         key={i}
@@ -154,6 +176,7 @@ const Dashboard = () => {
                         color={stat.color}
                         subValue={stat.subValue}
                         isTrendUp={stat.isTrendUp}
+                        to={stat.to}
                     />
                 ))}
             </div>

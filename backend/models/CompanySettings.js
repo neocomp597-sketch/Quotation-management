@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('./plugins/tenantPlugin');
 
 const CompanySettingsSchema = new mongoose.Schema({
     // Basic Company Information
@@ -15,11 +16,11 @@ const CompanySettingsSchema = new mongoose.Schema({
 
     // Address Details
     address: {
-        line1: { type: String, required: true },
+        line1: { type: String, default: '' },
         line2: { type: String },
-        city: { type: String, required: true },
-        state: { type: String, required: true },
-        pincode: { type: String, required: true },
+        city: { type: String, default: '' },
+        state: { type: String, default: '' },
+        pincode: { type: String, default: '' },
         country: { type: String, default: 'India' }
     },
 
@@ -39,7 +40,7 @@ const CompanySettingsSchema = new mongoose.Schema({
 
     // Authorized Signatory
     authorizedSignatory: {
-        name: { type: String, required: true },
+        name: { type: String, default: '' },
         designation: { type: String },
         signatureImageUrl: { type: String }
     },
@@ -48,10 +49,17 @@ const CompanySettingsSchema = new mongoose.Schema({
     defaultTerms: { type: String },
 
     // Quotation prefix settings
-    quotationPrefix: { type: String, default: 'JAG/QTN' },
+    quotationPrefix: { type: String, default: 'ARM/QTN' },
 
-    // User who owns these settings
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, unique: true },
+    // User who originally configured these settings
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+
+    companyId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Company',
+        required: true,
+        index: { unique: true }
+    },
 
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
@@ -61,5 +69,7 @@ const CompanySettingsSchema = new mongoose.Schema({
 CompanySettingsSchema.pre('save', async function () {
     this.updatedAt = Date.now();
 });
+
+CompanySettingsSchema.plugin(tenantPlugin);
 
 module.exports = mongoose.model('CompanySettings', CompanySettingsSchema);

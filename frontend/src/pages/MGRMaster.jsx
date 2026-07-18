@@ -3,13 +3,18 @@ import { MdAdd, MdEdit, MdDelete, MdSync } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import { mgrService } from '../services/api';
 import Modal from '../components/Modal';
+import PaginationControls from '../components/PaginationControls';
 import { useNavigate } from 'react-router-dom';
+
+const LIST_PAGE_SIZE = 20;
 
 const MGRMaster = () => {
     const navigate = useNavigate();
     const [mgrs, setMgrs] = useState([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('MGR1');
+    const [page, setPage] = useState(1);
+    const [pagination, setPagination] = useState({ page: 1, limit: LIST_PAGE_SIZE, total: 0, pages: 1 });
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingMGR, setEditingMGR] = useState(null);
 
@@ -20,14 +25,27 @@ const MGRMaster = () => {
     });
 
     useEffect(() => {
-        fetchMGRs();
+        setPage(1);
     }, [activeTab]);
+
+    useEffect(() => {
+        fetchMGRs();
+    }, [activeTab, page]);
+
+    const pagedMGRs = mgrs;
 
     const fetchMGRs = async () => {
         setLoading(true);
         try {
-            const res = await mgrService.getAll(activeTab);
-            setMgrs(res.data);
+            const res = await mgrService.getAll(activeTab, { page, limit: LIST_PAGE_SIZE });
+            const payload = res.data;
+            setMgrs(Array.isArray(payload) ? payload : payload.data || []);
+            setPagination(payload.pagination || {
+                page: 1,
+                limit: LIST_PAGE_SIZE,
+                total: Array.isArray(payload) ? payload.length : 0,
+                pages: 1
+            });
         } catch (err) {
             console.error("Error fetching MGRs:", err);
             toast.error('Failed to load MGRs');
@@ -138,8 +156,8 @@ const MGRMaster = () => {
                 </div>
             </div>
 
-            <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
-                <div className="p-4 border-b border-slate-100 flex flex-wrap gap-2 bg-slate-50">
+            <div className="mobile-master-shell bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
+                <div className="mobile-master-toolbar p-4 border-b border-slate-100 flex flex-wrap gap-2 bg-slate-50">
                     {['MGR1', 'MGR2', 'MGR3', 'MGR4', 'MGR5'].map(tab => (
                         <button
                             key={tab}
@@ -161,6 +179,7 @@ const MGRMaster = () => {
                             <p className="text-xs uppercase font-black tracking-widest">Loading...</p>
                         </div>
                     ) : (
+                        <>
                         <div className="overflow-x-auto">
                             <table className="w-full text-left border-collapse">
                                 <thead>
@@ -173,7 +192,7 @@ const MGRMaster = () => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {mgrs.map(mgr => (
+                                    {pagedMGRs.map(mgr => (
                                         <tr key={mgr._id} className="border-b last:border-0 border-slate-50 hover:bg-slate-50/50 transition-colors">
                                             <td className="p-4 text-sm font-bold text-slate-800">{mgr.code}</td>
                                             <td className="p-4 text-sm font-medium text-slate-600">{mgr.description}</td>
@@ -228,6 +247,8 @@ const MGRMaster = () => {
                                 </tbody>
                             </table>
                         </div>
+                        <PaginationControls pagination={pagination} onPageChange={setPage} />
+                        </>
                     )}
                 </div>
             </div>

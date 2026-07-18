@@ -1,11 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { MdAdd, MdSearch, MdEdit, MdDelete, MdInventory, MdCategory, MdQrCode, MdPayments, MdProductionQuantityLimits, MdCloudUpload, MdVisibility, MdFileUpload, MdCheckBox, MdCheckBoxOutlineBlank, MdDeleteSweep, MdSync, MdImage } from 'react-icons/md';
+import { MdAdd, MdSearch, MdEdit, MdDelete, MdInventory, MdCategory, MdQrCode, MdPayments, MdProductionQuantityLimits, MdCloudUpload, MdVisibility, MdFileUpload, MdCheckBox, MdCheckBoxOutlineBlank, MdDeleteSweep, MdSync, MdImage, MdFileDownload } from 'react-icons/md';
 import { toast } from 'react-toastify';
-import { productService, uploadService, importService, mgrService, attributeService, productAttributeService, vendorService } from '../services/api';
+import * as XLSX from 'xlsx';
+import { productService, uploadService, importService, mgrService, attributeService, productAttributeService, vendorService, categoryService } from '../services/api';
 
 import Modal from '../components/Modal';
 import ImportModal from '../components/ImportModal';
+import PaginationControls from '../components/PaginationControls';
 import { resolveImageUrl, getPlaceholderImage } from '../utils/helpers';
+import { useSubmitGuard } from '../hooks/useSubmitGuard';
+
+const LIST_PAGE_SIZE = 20;
 
 const emptyVendorRow = () => ({
     vendorId: '',
@@ -14,12 +19,17 @@ const emptyVendorRow = () => ({
     isPrimary: false
 });
 
-const Products = () => {
+const Products = ({ initialTab = 'products' }) => {
+    const [activeTab, setActiveTab] = useState(initialTab);
     const [products, setProducts] = useState([]);
     const [vendors, setVendors] = useState([]);
+    const [categories, setCategories] = useState([]);
     const [mgrsData, setMgrsData] = useState({ mgr1: [], mgr2: [], mgr3: [], mgr4: [], mgr5: [] });
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
+    const [page, setPage] = useState(1);
+    const [pagination, setPagination] = useState({ page: 1, limit: LIST_PAGE_SIZE, total: 0, pages: 1 });
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState(null);
     const [isUploading, setIsUploading] = useState(false);
@@ -28,7 +38,19 @@ const Products = () => {
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [isAttrImportModalOpen, setIsAttrImportModalOpen] = useState(false);
 
-    
+    // Inline Mini Masters states
+    const [isCatModalOpen, setIsCatModalOpen] = useState(false);
+    const [newCatData, setNewCatData] = useState({ name: '', description: '' });
+
+    const [isVenModalOpen, setIsVenModalOpen] = useState(false);
+    const [newVenData, setNewVenData] = useState({ name: '', active: true });
+
+    const [isMgrModalOpen, setIsMgrModalOpen] = useState(false);
+    const [newMgrData, setNewMgrData] = useState({ type: 'MGR1', code: '', description: '', status: 'Active' });
+
+    const [isAttrModalOpen, setIsAttrModalOpen] = useState(false);
+    const [newAttrData, setNewAttrData] = useState({ code: '', description: '', status: 'Active' });
+
     // MGR Filters
     const [mgrFilters, setMgrFilters] = useState({
         mgr1: '',
@@ -48,8 +70,6 @@ const Products = () => {
     const [customAttributes, setCustomAttributes] = useState([]);
     const [allProductAttributes, setAllProductAttributes] = useState({});
 
-
-
     const [formData, setFormData] = useState({
         productName: '',
         productCode: '',
@@ -67,16 +87,36 @@ const Products = () => {
         mgr4: '',
         mgr5: '',
         attributes: [],
-        vendors: [emptyVendorRow()]
+        vendors: [emptyVendorRow()],
+        catalogType: 'Product',
+        subscriptionDetails: { billingCycle: 'Monthly', setupFee: 0, renewalPrice: 0 },
+        rentalDetails: { minLeaseTerm: 1, securityDeposit: 0, baseRatePerDay: 0, baseRatePerMonth: 0 },
+        pricing: { baseCost: 0, minPrice: 0, maxPrice: 0, marginPercent: 0, currency: 'INR' }
     });
 
     useEffect(() => {
-        fetchProducts();
         fetchMGRs();
         fetchVendors();
+        fetchCategories();
         fetchAllAttributes();
     }, []);
 
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(searchTerm.trim());
+            setPage(1);
+        }, 300);
+
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
+
+    useEffect(() => {
+        setPage(1);
+    }, [activeTab, mgrFilters.mgr1, mgrFilters.mgr2, mgrFilters.mgr3, mgrFilters.mgr4, mgrFilters.mgr5]);
+
+    useEffect(() => {
+        fetchProducts();
+    }, [activeTab, page, debouncedSearch, mgrFilters.mgr1, mgrFilters.mgr2, mgrFilters.mgr3, mgrFilters.mgr4, mgrFilters.mgr5]);
 
     useEffect(() => {
         if (mgrFilters.mgr3) {
@@ -86,6 +126,15 @@ const Products = () => {
             setAttributeFilters({});
         }
     }, [mgrFilters.mgr3]);
+
+    const fetchCategories = async () => {
+        try {
+            const res = await categoryService.getAll();
+            setCategories(res.data || []);
+        } catch (err) {
+            console.error("Error fetching categories:", err);
+        }
+    };
 
     const fetchMGRs = async () => {
         try {
@@ -133,7 +182,7 @@ const Products = () => {
             console.error("Error fetching filter attributes:", err);
         }
     };
-    
+
     const fetchAllAttributes = async () => {
         try {
             const res = await productAttributeService.getAll();
@@ -149,7 +198,6 @@ const Products = () => {
         }
     };
 
-
     const fetchCustomAttributes = async (productCode) => {
         if (!productCode) {
             setCustomAttributes([]);
@@ -164,9 +212,31 @@ const Products = () => {
     };
 
     const fetchProducts = async () => {
+        setLoading(true);
         try {
-            const res = await productService.getAll();
-            setProducts(res.data);
+            const catalogTypeMap = {
+                products: 'Product',
+                services: 'Service',
+                bundles: 'Bundle',
+                subscriptions: 'Subscription'
+            };
+            const typeParam = catalogTypeMap[activeTab] || 'Product';
+
+            const res = await productService.getAll({
+                page,
+                limit: LIST_PAGE_SIZE,
+                search: debouncedSearch || undefined,
+                catalogType: typeParam,
+                ...Object.fromEntries(Object.entries(mgrFilters).filter(([, value]) => value)),
+            });
+            const payload = res.data;
+            setProducts(Array.isArray(payload) ? payload : payload.data || []);
+            setPagination(payload.pagination || {
+                page: 1,
+                limit: LIST_PAGE_SIZE,
+                total: Array.isArray(payload) ? payload.length : 0,
+                pages: 1,
+            });
         } catch (err) {
             console.error("Error fetching products:", err);
         } finally {
@@ -174,59 +244,10 @@ const Products = () => {
         }
     };
 
-    const handleOpenModal = (product = null) => {
-        if (product) {
-            setEditingProduct(product);
-            setFormData({ 
-                ...product,
-                attributes: product.attributes ? product.attributes.map(a => a._id || a) : [],
-                vendors: product.vendors && product.vendors.length
-                    ? product.vendors.map(v => ({
-                        vendorId: v.vendorId?._id || v.vendorId || '',
-                        price: v.price ?? '',
-                        stock: v.stock ?? 0,
-                        isPrimary: Boolean(v.isPrimary)
-                    }))
-                    : [emptyVendorRow()]
-            });
-            if (product.mgr3) {
-                fetchAvailableAttributes(product.mgr3._id || product.mgr3);
-            }
-            if (product.productCode) {
-                fetchCustomAttributes(product.productCode);
-            }
-        } else {
-            setEditingProduct(null);
-            setCustomAttributes([]);
-
-            setFormData({
-                productName: '',
-                productCode: '',
-                categoryId: '',
-                hsnCode: '',
-                gstPercentage: 18,
-                basePrice: 0,
-                mrp: 0,
-                uom: 'Nos',
-                productImageUrl: '',
-                status: 'Active',
-                mgr1: '',
-                mgr2: '',
-                mgr3: '',
-                mgr4: '',
-                mgr5: '',
-                attributes: [],
-                vendors: [emptyVendorRow()]
-            });
-            setAvailableAttributes([]);
-        }
-        setIsModalOpen(true);
-    };
-
     const handleFormChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
-        
+
         if (name === 'mgr3') {
             fetchAvailableAttributes(value);
             setFormData(prev => ({ ...prev, attributes: [] }));
@@ -287,7 +308,7 @@ const Products = () => {
         }
     };
 
-    const handleSubmit = async (e) => {
+    const { isSubmitting: isSaving, execute: handleSubmit } = useSubmitGuard(async (e) => {
         e.preventDefault();
 
         // Validate required fields
@@ -393,7 +414,7 @@ const Products = () => {
             console.error("Error saving product:", err);
             toast.error(err.response?.data?.message || 'Error saving product data');
         }
-    };
+    });
 
     const handleDelete = async (id) => {
         if (window.confirm("Are you sure you want to delete this product?")) {
@@ -463,7 +484,7 @@ const Products = () => {
 
     const filteredProducts = products.filter(p => {
         const searchLower = searchTerm.toLowerCase();
-        
+
         // Search in basic info
         const matchesBasic = p.productName?.toLowerCase().includes(searchLower) ||
             p.productCode?.toLowerCase().includes(searchLower) ||
@@ -471,7 +492,7 @@ const Products = () => {
             p.uom?.toLowerCase().includes(searchLower);
 
         // Search in MGRs
-        const matchesMGRNames = 
+        const matchesMGRNames =
             p.mgr1?.code?.toLowerCase().includes(searchLower) || p.mgr1?.description?.toLowerCase().includes(searchLower) ||
             p.mgr2?.code?.toLowerCase().includes(searchLower) || p.mgr2?.description?.toLowerCase().includes(searchLower) ||
             p.mgr3?.code?.toLowerCase().includes(searchLower) || p.mgr3?.description?.toLowerCase().includes(searchLower) ||
@@ -479,15 +500,15 @@ const Products = () => {
             p.mgr5?.code?.toLowerCase().includes(searchLower) || p.mgr5?.description?.toLowerCase().includes(searchLower);
 
         // Search in Attributes
-        const matchesAttributeSearch = (p.attributes || []).some(attr => 
-            attr.code?.toLowerCase().includes(searchLower) || 
+        const matchesAttributeSearch = (p.attributes || []).some(attr =>
+            attr.code?.toLowerCase().includes(searchLower) ||
             attr.description?.toLowerCase().includes(searchLower)
         );
 
         // Search in Custom Attributes
         const productCustomAttrs = allProductAttributes[p.productCode] || [];
-        const matchesCustomAttributeSearch = productCustomAttrs.some(attr => 
-            attr.attributeCode?.toLowerCase().includes(searchLower) || 
+        const matchesCustomAttributeSearch = productCustomAttrs.some(attr =>
+            attr.attributeCode?.toLowerCase().includes(searchLower) ||
             attr.attributeValue?.toLowerCase().includes(searchLower)
         );
 
@@ -501,7 +522,7 @@ const Products = () => {
 
         // Attribute filtering: if any attribute filter is selected, product MUST have all of them
         const selectedAttrIds = Object.keys(attributeFilters);
-        const matchesAttributes = selectedAttrIds.length === 0 || 
+        const matchesAttributes = selectedAttrIds.length === 0 ||
             selectedAttrIds.every(id => {
                 const attrObj = allFilterAttributes.find(a => a._id === id);
                 if (!attrObj) return false;
@@ -514,7 +535,7 @@ const Products = () => {
                     if (!attr) return false;
                     const attrId = attr._id || attr;
                     if (attrId === id) return true;
-                    
+
                     if (typeof attr === 'object') {
                         const code = attr.code?.toString().toLowerCase().trim();
                         const desc = attr.description?.toString().toLowerCase().trim();
@@ -523,7 +544,7 @@ const Products = () => {
                     return false;
                 });
                 if (hasStandard) return true;
-                
+
                 // If not found in standard, check in custom attributes
                 const productCustomAttrs = allProductAttributes[p.productCode] || [];
                 return productCustomAttrs.some(ca => {
@@ -580,14 +601,83 @@ const Products = () => {
         setSearchTerm('');
     };
 
+    const exportToExcel = async () => {
+        setLoading(true);
+        try {
+            const catalogTypeMap = {
+                products: 'Product',
+                services: 'Service',
+                bundles: 'Bundle',
+                subscriptions: 'Subscription'
+            };
+            const typeParam = catalogTypeMap[activeTab] || 'Product';
+
+            const res = await productService.getAll({
+                limit: 10000,
+                search: debouncedSearch || undefined,
+                catalogType: typeParam,
+                ...Object.fromEntries(Object.entries(mgrFilters).filter(([, value]) => value)),
+            });
+            
+            const exportProducts = Array.isArray(res.data) ? res.data : res.data?.data || [];
+            if (!exportProducts.length) {
+                toast.info('No products found to export');
+                return;
+            }
+
+            const exportData = exportProducts.map((p) => {
+                const standardAttributes = (p.attributes || []).map(a => `${a.code}:${a.description}`).join(', ');
+                const customAttrs = allProductAttributes[p.productCode] || [];
+                const customAttributesStr = customAttrs.map(ca => `${ca.attributeCode}:${ca.attributeValue}`).join(', ');
+                
+                return {
+                    'Product Name': p.productName || '',
+                    'Product Code': p.productCode || '',
+                    'Category': p.categoryId?.name || '',
+                    'HSN Code': p.hsnCode || '',
+                    'GST (%)': p.gstPercentage || 0,
+                    'Base Price': p.basePrice || 0,
+                    'MRP': p.mrp || 0,
+                    'UOM': p.uom || '',
+                    'Status': p.status || '',
+                    'MGR 1': p.mgr1?.code || '',
+                    'MGR 2': p.mgr2?.code || '',
+                    'MGR 3': p.mgr3?.code || '',
+                    'MGR 4': p.mgr4?.code || '',
+                    'MGR 5': p.mgr5?.code || '',
+                    'Standard Attributes': standardAttributes,
+                    'Custom Attributes': customAttributesStr
+                };
+            });
+
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Products');
+            XLSX.writeFile(wb, `${typeParam}_Catalog_${new Date().toISOString().slice(0, 10)}.xlsx`);
+            toast.success('Export completed successfully');
+        } catch (err) {
+            console.error('Export products error:', err);
+            toast.error('Failed to export products');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-black text-slate-900 tracking-tight">Product Catalog</h1>
-                    <p className="text-slate-500 font-medium">Central database for sanitaryware & CP fittings.</p>
+                    <h1 className="text-3xl font-black text-slate-900 tracking-tight font-outfit uppercase">Product Catalog</h1>
+                    <p className="text-slate-500 font-medium">All products at one place.</p>
                 </div>
                 <div className="flex gap-3">
+                    <button
+                        onClick={exportToExcel}
+                        className="flex items-center justify-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-5 py-3 rounded-2xl font-bold transition-all shadow-sm uppercase text-xs tracking-widest active:scale-95"
+                    >
+                        <MdFileDownload size={20} />
+                        <span>Export</span>
+                    </button>
                     <button
                         onClick={() => setIsImportModalOpen(true)}
                         className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-emerald-600/20 uppercase text-xs tracking-widest active:scale-95"
@@ -660,9 +750,9 @@ const Products = () => {
                 </div>
             )}
 
-            <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
+            <div className="mobile-master-shell bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
                 {/* MGR Filters Section */}
-                <div className="px-6 py-6 border-b border-slate-50 bg-white">
+                <div className="mobile-master-toolbar px-6 py-6 border-b border-slate-50 bg-white">
                     <div className="space-y-6">
                         <div className="flex flex-wrap gap-4">
                             {[1, 2, 3, 4, 5].map(num => {
@@ -714,11 +804,10 @@ const Products = () => {
                                                     <button
                                                         key={attr._id}
                                                         onClick={() => handleAttributeFilterChange(attr._id)}
-                                                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all border ${
-                                                            attributeFilters[attr._id]
+                                                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all border ${attributeFilters[attr._id]
                                                                 ? 'bg-primary-600 text-white border-primary-600 shadow-sm'
                                                                 : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
-                                                        }`}
+                                                            }`}
                                                     >
                                                         {attr.description}
                                                     </button>
@@ -776,7 +865,7 @@ const Products = () => {
                             {/* Mobile Card View */}
                             <div className="md:hidden p-4 space-y-4 bg-slate-50/50">
                                 {filteredProducts.map((p) => (
-                                    <div key={p._id} className={`bg-white rounded-2xl border shadow-sm overflow-hidden ${selectedIds.includes(p._id) ? 'border-primary-500 ring-1 ring-primary-500' : 'border-slate-100'}`}>
+                                    <div key={p._id} className={`mobile-master-card bg-white rounded-2xl border shadow-sm overflow-hidden ${selectedIds.includes(p._id) ? 'border-primary-500 ring-1 ring-primary-500' : 'border-slate-100'}`}>
                                         <div className="p-4 flex gap-4">
                                             <div
                                                 className="h-20 w-20 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-center flex-shrink-0 cursor-pointer overflow-hidden"
@@ -988,7 +1077,7 @@ const Products = () => {
                                 ) : (
                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 p-6">
                                         {filteredProducts.map((p) => (
-                                            <div key={p._id} className={`bg-white rounded-2xl border hover:shadow-xl transition-all group flex flex-col overflow-hidden ${selectedIds.includes(p._id) ? 'border-primary-400 ring-2 ring-primary-200' : 'border-slate-100 hover:border-primary-100'}`}>
+                                            <div key={p._id} className={`mobile-master-card bg-white rounded-2xl border hover:shadow-xl transition-all group flex flex-col overflow-hidden ${selectedIds.includes(p._id) ? 'border-primary-400 ring-2 ring-primary-200' : 'border-slate-100 hover:border-primary-100'}`}>
                                                 <div className="aspect-square bg-slate-50 relative overflow-hidden group-hover:bg-slate-100 transition-colors">
                                                     {/* Checkbox */}
                                                     <button
@@ -1050,6 +1139,7 @@ const Products = () => {
                                     </div>
                                 )}
                             </div>
+                            <PaginationControls pagination={pagination} onPageChange={setPage} />
                         </>
                     )}
                 </div>
@@ -1070,9 +1160,10 @@ const Products = () => {
                         </button>
                         <button
                             onClick={handleSubmit}
-                            className="bg-primary-600 hover:bg-primary-700 text-white px-10 py-3.5 rounded-2xl font-black transition-all shadow-xl shadow-primary-600/20 uppercase text-[10px] tracking-widest active:scale-95"
+                            disabled={isSaving}
+                            className="bg-primary-600 hover:bg-primary-700 text-white px-10 py-3.5 rounded-2xl font-black transition-all shadow-xl shadow-primary-600/20 uppercase text-[10px] tracking-widest active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100"
                         >
-                            {editingProduct ? "Update Product" : "Enlist Product"}
+                            {isSaving ? "Saving..." : editingProduct ? "Update Product" : "Enlist Product"}
                         </button>
                     </>
                 }
@@ -1198,7 +1289,7 @@ const Products = () => {
                                     </div>
                                 ))}
                             </div>
-                            
+
                             {/* Attributes Selection */}
                             {formData.mgr3 && availableAttributes.length > 0 && (
                                 <div className="mt-8">
@@ -1223,22 +1314,21 @@ const Products = () => {
                                                     const exists = current.includes(attr._id);
                                                     setFormData(prev => ({
                                                         ...prev,
-                                                        attributes: exists 
+                                                        attributes: exists
                                                             ? current.filter(id => id !== attr._id)
                                                             : [...current, attr._id]
                                                     }));
                                                 }}
-                                                className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${
-                                                    (formData.attributes || []).includes(attr._id)
+                                                className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${(formData.attributes || []).includes(attr._id)
                                                         ? 'bg-primary-600 text-white border-primary-600 shadow-lg shadow-primary-600/20'
                                                         : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
-                                                }`}
+                                                    }`}
                                             >
                                                 {attr.description} ({attr.code})
                                             </button>
                                         ))}
                                     </div>
-                                    
+
                                     {/* Custom Imported Attributes */}
                                     {customAttributes.length > 0 && (
                                         <div className="mt-4 pt-4 border-t border-slate-100">
