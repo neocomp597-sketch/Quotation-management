@@ -18247,5 +18247,11 @@
     "companyName": "Henry Johnson",
     "gstin": "27NCBCQ7403OLMM",
     "logoUrl": ""
+  },
+  {
+    "_id": "6a5b0cf0d6f123b821dbc532",
+    "customerName": "SDFS",
+    "companyName": "SDFS",
+    "gstin": ""
   }
 ]
