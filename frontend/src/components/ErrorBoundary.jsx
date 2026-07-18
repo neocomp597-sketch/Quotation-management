@@ -32,7 +32,7 @@ class ErrorBoundary extends React.Component {
                         >
                             Refresh Page
                         </button>
-                        {process.env.NODE_ENV === 'development' && (
+                        {import.meta.env.DEV && (
                             <details className="mt-4 text-left">
                                 <summary className="cursor-pointer text-sm text-red-700">Error Details</summary>
                                 <pre className="mt-2 text-xs text-red-800 whitespace-pre-wrap">
