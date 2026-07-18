@@ -2,6 +2,7 @@ const Enquiry = require('../models/Enquiry');
 const Counter = require('../models/Counter');
 const mongoose = require('mongoose');
 const { updateActivityDate, logStatusChange } = require('../utils/activityHelper');
+const { broadcastCrmUpdate } = require('../config/socket');
 
 let indexDropped = false;
 
@@ -114,6 +115,7 @@ exports.createEnquiry = async (req, res) => {
         });
 
         await newEnquiry.save();
+        broadcastCrmUpdate('ENQUIRY', 'CREATE', newEnquiry);
         res.status(201).json(newEnquiry);
     } catch (err) {
         console.error('[Enquiry Create Error] Exception caught during save:', err);
@@ -205,6 +207,7 @@ exports.updateEnquiry = async (req, res) => {
         // Ensure activity date is updated
         await updateActivityDate(id, 'status_update');
 
+        broadcastCrmUpdate('ENQUIRY', 'UPDATE', updatedEnquiry);
         res.json(updatedEnquiry);
     } catch (err) {
         console.error('[Enquiry Update Error] Exception caught during update:', err);
@@ -225,7 +228,59 @@ exports.deleteEnquiry = async (req, res) => {
         const { id } = req.params;
         const result = await Enquiry.findByIdAndDelete(id);
         if (!result) return res.status(404).json({ message: 'Enquiry not found' });
+        broadcastCrmUpdate('ENQUIRY', 'DELETE', { id });
         res.json({ message: 'Enquiry deleted successfully' });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+};
+
+exports.searchHierarchical = async (req, res) => {
+    try {
+        const { q } = req.query;
+        if (!q || !q.trim()) {
+            return res.json([]);
+        }
+
+        const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const queryRegex = new RegExp(escapeRegex(q.trim()), 'i');
+        const enquiries = await Enquiry.find({
+            $or: [
+                { enquiryNo: queryRegex },
+                { title: queryRegex },
+                { customerName: queryRegex },
+                { contactPerson: queryRegex },
+                { email: queryRegex },
+                { phone: queryRegex }
+            ]
+        }).limit(5).lean();
+
+        const results = enquiries.map(enq => {
+            const followUpCount = enq.followUpDate ? 1 : 0;
+            const taskCount = Array.isArray(enq.items) ? enq.items.length : 0;
+            const quotationCount = enq.quotationId ? 1 : (enq.status === 'Quoted' ? 1 : 0);
+            const notesCount = enq.notes ? 1 : 0;
+            const attachmentsCount = Array.isArray(enq.attachments) ? enq.attachments.length : 0;
+
+            return {
+                id: enq._id,
+                enquiryNo: enq.enquiryNo || 'ENQ',
+                customerName: enq.customerName || 'Customer',
+                title: enq.title || enq.customerName || 'Enquiry Record',
+                submodules: [
+                    { key: 'customer', label: 'Customer Details', path: `/customers`, icon: '👤', hasData: true },
+                    { key: 'followups', label: 'Follow-ups', count: followUpCount, path: `/enquiries/edit/${enq._id}?tab=followup`, icon: '📞', hasData: true },
+                    { key: 'tasks', label: 'Tasks', count: taskCount, path: `/enquiries/edit/${enq._id}?tab=tasks`, icon: '✅', hasData: taskCount > 0 },
+                    { key: 'quotations', label: 'Quotations', count: quotationCount, path: `/quotations`, icon: '📄', hasData: quotationCount > 0 },
+                    { key: 'deals', label: 'Deals', path: `/sales/deals`, icon: '💼', hasData: true },
+                    { key: 'notes', label: 'Notes', count: notesCount, path: `/enquiries/edit/${enq._id}?tab=notes`, icon: '📝', hasData: notesCount > 0 },
+                    { key: 'attachments', label: 'Attachments', count: attachmentsCount, path: `/enquiries/edit/${enq._id}?tab=attachments`, icon: '📎', hasData: attachmentsCount > 0 },
+                    { key: 'timeline', label: 'Timeline', path: `/enquiries/edit/${enq._id}?tab=timeline`, icon: '🕒', hasData: true }
+                ]
+            };
+        });
+
+        res.json(results);
     } catch (err) {
         res.status(500).json({ message: err.message });
     }

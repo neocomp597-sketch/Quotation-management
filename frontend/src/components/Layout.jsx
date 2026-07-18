@@ -94,7 +94,7 @@ const Layout = ({ children }) => {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50/50 relative overflow-hidden">
+        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 relative overflow-hidden transition-colors duration-300">
             {/* Elegant Background Pattern */}
             <div className="fixed inset-0 z-0 pointer-events-none opacity-20"
                 style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, #cbd5e1 1px, transparent 0)', backgroundSize: '32px 32px' }}>

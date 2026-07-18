@@ -523,6 +523,7 @@ export const enquiryService = {
   create: (data) => api.post("/enquiries", data),
   update: (id, data) => api.put(`/enquiries/${id}`, data),
   delete: (id) => api.delete(`/enquiries/${id}`),
+  searchHierarchical: (query) => api.get("/enquiries/search-hierarchical", { params: { q: query } }),
 };
 
 export const analyticsService = {

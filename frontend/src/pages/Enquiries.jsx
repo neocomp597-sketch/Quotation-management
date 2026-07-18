@@ -150,6 +150,15 @@ const Enquiries = () => {
 
     useEffect(() => {
         fetchEnquiries();
+
+        const handleRealtimeUpdate = (e) => {
+            if (e.detail?.entity === 'ENQUIRY') {
+                fetchEnquiries();
+            }
+        };
+
+        window.addEventListener('onCrmSocketUpdate', handleRealtimeUpdate);
+        return () => window.removeEventListener('onCrmSocketUpdate', handleRealtimeUpdate);
     }, []);
 
     const handleDelete = async () => {

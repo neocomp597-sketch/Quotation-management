@@ -28,19 +28,19 @@ const Modal = ({ isOpen, onClose, title, children, footer, maxWidth = 'max-w-2xl
 
             {/* Modal Container with focus on centered placement and premium feel */}
             <div
-                className={`relative bg-white w-full ${fullscreen ? 'h-screen max-h-screen rounded-none' : `${maxWidth} rounded-[2rem] max-h-[90vh]`} shadow-[0_20px_50px_rgba(0,0,0,0.2)] transform transition-all duration-300 ease-out scale-100 opacity-100 ${scrollable ? 'overflow-hidden flex flex-col' : 'overflow-visible'}`}
+                className={`relative bg-white dark:bg-slate-900 w-full ${fullscreen ? 'h-screen max-h-screen rounded-none' : `${maxWidth} rounded-[2rem] max-h-[90vh]`} shadow-[0_20px_50px_rgba(0,0,0,0.2)] transform transition-all duration-300 ease-out scale-100 opacity-100 ${scrollable ? 'overflow-hidden flex flex-col' : 'overflow-visible'}`}
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}
                 {!hideHeader && (
-                    <div className="px-5 py-4 md:px-8 md:py-6 border-b border-slate-100 flex justify-between items-center bg-white">
+                    <div className="px-5 py-4 md:px-8 md:py-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-white dark:bg-slate-900">
                         <div>
-                            <h3 className="text-lg md:text-2xl font-black text-slate-900 tracking-tight">{title}</h3>
+                            <h3 className="text-lg md:text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight">{title}</h3>
                             <div className="h-1.5 w-12 bg-primary-600 rounded-full mt-1.5"></div>
                         </div>
                         <button
                             onClick={onClose}
-                            className="p-2 md:p-2.5 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-2xl transition-all duration-200"
+                            className="p-2 md:p-2.5 text-slate-400 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-2xl transition-all duration-200"
                             aria-label="Close modal"
                         >
                             <MdClose size={24} />
@@ -55,7 +55,7 @@ const Modal = ({ isOpen, onClose, title, children, footer, maxWidth = 'max-w-2xl
 
                 {/* Footer */}
                 {footer && (
-                    <div className="px-5 py-4 md:px-8 md:py-6 border-t border-slate-100 bg-slate-50 flex flex-col md:flex-row justify-end items-center gap-3 md:gap-4">
+                    <div className="px-5 py-4 md:px-8 md:py-6 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex flex-col md:flex-row justify-end items-center gap-3 md:gap-4">
                         {footer}
                     </div>
                 )}

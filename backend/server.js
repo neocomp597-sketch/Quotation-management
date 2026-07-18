@@ -701,6 +701,8 @@ app.get(/.*/, (req, res, next) => {
   }
 });
 
+const { initSocket } = require("./config/socket");
+
 const PORT = process.env.PORT || 4003;
 
 if (require.main === module) {
@@ -708,6 +710,9 @@ if (require.main === module) {
     console.log(`Server running on port ${PORT}`);
   });
   server.timeout = Number(process.env.API_REQUEST_TIMEOUT_MS || 30000);
+  
+  // Initialize Socket.io real-time server
+  initSocket(server);
 
   startBackgroundServices().catch((error) => {
     console.error("Failed to start background services:", error.message);
