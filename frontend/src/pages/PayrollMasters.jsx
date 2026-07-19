@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { payrollService, salespersonService } from '../services/api';
 import Modal from '../components/Modal';
@@ -13,7 +13,11 @@ import {
     MdViewColumn as IconViewColumn,
     MdList as IconList,
     MdPersonAdd as IconPersonAdd,
-    MdClose as IconClose
+    MdClose as IconClose,
+    MdFilterList as IconFilterList,
+    MdSearch as IconSearch,
+    MdExpandMore,
+    MdCheckCircle
 } from 'react-icons/md';
 
 const DEFAULT_SAMPLE_PERSONNEL = {
@@ -23,6 +27,85 @@ const DEFAULT_SAMPLE_PERSONNEL = {
     'Support': ['Amit', 'Suman'],
     'Marketing Department': ['Neha', 'Karan'],
     'Marketing': ['Neha', 'Karan']
+};
+
+const SearchableSelect = ({ label, options, value, onChange, placeholder = "Search module name..." }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const containerRef = useRef(null);
+
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (containerRef.current && !containerRef.current.contains(e.target)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const filteredOptions = options.filter(opt =>
+        opt.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    return (
+        <div className="relative" ref={containerRef}>
+            {label && (
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                    {label}
+                </label>
+            )}
+            <div 
+                onClick={() => setIsOpen(!isOpen)}
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus-within:ring-2 focus-within:ring-primary-500 focus-within:bg-white flex items-center justify-between cursor-pointer transition-all shadow-sm hover:border-slate-300"
+            >
+                <span className="truncate">{value || 'All'}</span>
+                <MdExpandMore size={16} className={`text-slate-400 shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+            </div>
+
+            {isOpen && (
+                <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-white border border-slate-200 rounded-2xl shadow-xl p-2.5 space-y-2 max-h-64 overflow-hidden animate-fade-in">
+                    <div className="relative">
+                        <input
+                            type="text"
+                            autoFocus
+                            placeholder={placeholder}
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white"
+                        />
+                        <MdSearch className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                    </div>
+
+                    <div className="space-y-0.5 max-h-40 overflow-y-auto custom-scrollbar pr-1">
+                        {filteredOptions.length === 0 ? (
+                            <div className="px-3 py-2 text-xs text-slate-400 font-semibold">No matching modules</div>
+                        ) : (
+                            filteredOptions.map((opt) => (
+                                <button
+                                    key={opt}
+                                    type="button"
+                                    onClick={() => {
+                                        onChange(opt);
+                                        setIsOpen(false);
+                                        setSearchQuery('');
+                                    }}
+                                    className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-between ${
+                                        value === opt
+                                            ? 'bg-primary-600 text-white shadow-sm'
+                                            : 'text-slate-700 hover:bg-slate-100'
+                                    }`}
+                                >
+                                    <span>{opt}</span>
+                                    {value === opt && <MdCheckCircle size={14} />}
+                                </button>
+                            ))
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
 };
 
 const PayrollMasters = () => {
@@ -35,6 +118,10 @@ const PayrollMasters = () => {
     const [items, setItems] = useState([]);
     const [employees, setEmployees] = useState([]);
     const [salespersons, setSalespersons] = useState([]);
+
+    // Filter states
+    const [selectedModule, setSelectedModule] = useState('All');
+    const [searchQuery, setSearchQuery] = useState('');
 
     // View toggle: 'column' (default for departments) or 'list'
     const [viewMode, setViewMode] = useState('column');
@@ -284,12 +371,26 @@ const PayrollMasters = () => {
         }
     };
 
+    // Filter items based on typing search & module selection
+    const filteredItems = items.filter(item => {
+        const query = searchQuery.trim().toLowerCase();
+        if (!query) return true;
+
+        const matchesName = item.name?.toLowerCase().includes(query);
+        const matchesDesc = item.description?.toLowerCase().includes(query);
+        const matchesPerson = activeTab === 'departments' && getDepartmentPersonnel(item.name).some(p => p.name?.toLowerCase().includes(query));
+
+        return matchesName || matchesDesc || matchesPerson;
+    });
+
     // Calculate maximum rows needed across all department columns
     const calculateMaxRows = () => {
-        if (items.length === 0) return 3;
-        const rowCounts = items.map(dept => getDepartmentPersonnel(dept.name).length);
+        if (filteredItems.length === 0) return 3;
+        const rowCounts = filteredItems.map(dept => getDepartmentPersonnel(dept.name).length);
         return Math.max(3, ...rowCounts);
     };
+
+    const moduleOptions = ['All', 'CRM Core', 'Reports', 'Dashboard', 'System', 'Payroll'];
 
     return (
         <div className="space-y-6 max-w-7xl mx-auto animate-fade-in-up">
@@ -358,17 +459,63 @@ const PayrollMasters = () => {
                 ))}
             </div>
 
+            {/* Filters Section (Directly on Page layout matching Image 2) */}
+            <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-100 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+                <div className="flex items-center gap-2 text-slate-800 font-black text-xs uppercase tracking-wider shrink-0">
+                    <IconFilterList size={18} className="text-primary-600" />
+                    <span>FILTERS</span>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 flex-1 max-w-3xl">
+                    {/* Searchable Module Dropdown */}
+                    <div className="min-w-[200px]">
+                        <SearchableSelect
+                            label="MODULE"
+                            options={moduleOptions}
+                            value={selectedModule}
+                            onChange={(mod) => setSelectedModule(mod)}
+                            placeholder="Type module name..."
+                        />
+                    </div>
+
+                    {/* Search Typing Option Filter */}
+                    <div className="flex-1 min-w-[220px]">
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                            SEARCH
+                        </label>
+                        <div className="relative">
+                            <input
+                                type="text"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                placeholder="Type to search department or personnel..."
+                                className="w-full pl-9 pr-8 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all"
+                            />
+                            <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                            {searchQuery && (
+                                <button
+                                    onClick={() => setSearchQuery('')}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold"
+                                >
+                                    ✕
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             {/* Content Container (Light Theme) */}
             <div className="glass shadow-premium rounded-[2rem] p-6 bg-white border border-slate-100">
                 {loading && items.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-16 space-y-3">
                         <div className="w-12 h-12 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin"></div>
-                        <p className="text-slate-400 font-bold uppercase text-xs tracking-widest">Loading Department Master...</p>
+                        <p className="text-slate-400 font-bold uppercase text-xs tracking-widest">Loading Master Data...</p>
                     </div>
-                ) : items.length === 0 ? (
+                ) : filteredItems.length === 0 ? (
                     <div className="text-center py-16">
-                        <p className="text-slate-400 font-bold text-lg mb-2">No department records found.</p>
-                        <p className="text-slate-400 text-sm mb-4">Click "Add New" to populate your organizational structure.</p>
+                        <p className="text-slate-400 font-bold text-lg mb-2">No records found.</p>
+                        <p className="text-slate-400 text-sm mb-4">Try clearing search inputs or click "Add New" to populate.</p>
                     </div>
                 ) : activeTab === 'departments' && viewMode === 'column' ? (
                     /* COLUMN-WISE LIGHT MODE TABLE FORMAT */
@@ -378,7 +525,7 @@ const PayrollMasters = () => {
                                 Department Structure
                             </h2>
                             <span className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1 rounded-full border border-slate-200">
-                                {items.length} Department Column{items.length > 1 ? 's' : ''}
+                                {filteredItems.length} Department Column{filteredItems.length > 1 ? 's' : ''}
                             </span>
                         </div>
 
@@ -386,7 +533,7 @@ const PayrollMasters = () => {
                             <table className="w-full text-left border-collapse min-w-[700px]">
                                 <thead>
                                     <tr className="bg-slate-50/90 border-b border-slate-200">
-                                        {items.map((dept) => {
+                                        {filteredItems.map((dept) => {
                                             const personnelList = getDepartmentPersonnel(dept.name);
                                             return (
                                                 <th 
@@ -403,22 +550,6 @@ const PayrollMasters = () => {
                                                                     <IconPeople size={13} />
                                                                     {personnelList.length} person{personnelList.length !== 1 ? 's' : ''}
                                                                 </span>
-                                                            </div>
-                                                            <div className="flex items-center gap-1">
-                                                                <button
-                                                                    onClick={() => handleOpenModal(dept)}
-                                                                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-all"
-                                                                    title="Edit Department"
-                                                                >
-                                                                    <IconEdit size={16} />
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => handleDelete(dept._id)}
-                                                                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-all"
-                                                                    title="Delete Department"
-                                                                >
-                                                                    <IconDelete size={16} />
-                                                                </button>
                                                             </div>
                                                         </div>
 
@@ -438,7 +569,7 @@ const PayrollMasters = () => {
                                 <tbody className="divide-y divide-slate-100 text-sm font-semibold">
                                     {Array.from({ length: calculateMaxRows() }).map((_, rowIndex) => (
                                         <tr key={rowIndex} className="hover:bg-slate-50/70 transition-colors">
-                                            {items.map((dept) => {
+                                            {filteredItems.map((dept) => {
                                                 const personnel = getDepartmentPersonnel(dept.name);
                                                 const person = personnel[rowIndex];
                                                 return (
@@ -491,7 +622,7 @@ const PayrollMasters = () => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 text-sm font-semibold text-slate-700">
-                                {items.map((item) => {
+                                {filteredItems.map((item) => {
                                     const personnelCount = activeTab === 'departments' 
                                         ? getDepartmentPersonnel(item.name).length 
                                         : employees.filter(emp => emp.designation === item.name).length;

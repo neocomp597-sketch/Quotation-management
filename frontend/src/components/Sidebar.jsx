@@ -165,7 +165,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
         },
         {
             type: 'group',
-            name: 'Catalog & Price Masters',
+            name: 'Catalog',
             key: 'cpq_masters',
             icon: <MdFolderOpen size={22} />,
             children: [
@@ -178,7 +178,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
         },
         {
             type: 'group',
-            name: 'Quotation Management',
+            name: 'Quotations',
             key: 'quotation',
             icon: <MdRequestQuote size={22} />,
             children: [
@@ -197,7 +197,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
         },
         {
             type: 'group',
-            name: 'Contract Management',
+            name: 'Contracts',
             key: 'clm',
             icon: <MdAssignment size={22} />,
             children: [
@@ -211,10 +211,9 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                 { key: 'sales_contracts', name: 'Settings', icon: <MdSettings size={18} />, path: '/sales/contracts/settings' },
             ]
         },
-
         {
             type: 'group',
-            name: 'Material Received',
+            name: 'Material',
             key: 'purchase',
             icon: <MdShoppingCart size={22} />,
             children: [
@@ -248,7 +247,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
         },
         {
             type: 'group',
-            name: 'Tender Management',
+            name: 'Tenders',
             key: 'tender',
             icon: <MdAssignment size={22} />,
             children: [

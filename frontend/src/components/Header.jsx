@@ -107,72 +107,301 @@ const HighlightText = ({ text, query }) => {
 };
 
 const moduleSubmodulesMap = {
+    '/dashboard': [
+        { label: 'Executive Summary', path: '/dashboard' },
+        { label: 'Quick Metrics & KPIs', path: '/dashboard' },
+        { label: 'Recent Deals & Enquiries', path: '/enquiries' },
+        { label: 'Pending Approvals Queue', path: '/sales/approvals' }
+    ],
+    '/customers': [
+        { label: 'Customer Directory', path: '/customers' },
+        { label: 'Customer 360 Workspace', path: '/customers' },
+        { label: 'Customer Analytics', path: '/customers/analytics' },
+        { label: 'Quotations & Invoices', path: '/quotations' }
+    ],
+    '/vendors': [
+        { label: 'Vendor Directory', path: '/vendors' },
+        { label: 'Material Received GRN', path: '/grn' },
+        { label: 'Supplies & Catalog', path: '/products' }
+    ],
+    '/contacts': [
+        { label: 'Contact Directory', path: '/contacts' },
+        { label: 'Customer & Vendor Contacts', path: '/customers' }
+    ],
+    '/products': [
+        { label: 'Products & Items Master', path: '/products' },
+        { label: 'Services Catalog', path: '/products' },
+        { label: 'Product Bundles', path: '/products' },
+        { label: 'Subscription Plans', path: '/products' }
+    ],
+    '/invoices': [
+        { label: 'Sales Invoices Register', path: '/invoices' },
+        { label: 'Create New Invoice', path: '/invoices/new' },
+        { label: 'Sales Orders', path: '/sales/orders' }
+    ],
+    '/grn': [
+        { label: 'Goods Received Note (GRN)', path: '/grn' },
+        { label: 'Create New GRN Receipt', path: '/grn/new' },
+        { label: 'Vendor Material Delivery', path: '/vendors' }
+    ],
+    '/mgrs': [
+        { label: 'MGR Category Master', path: '/mgrs' },
+        { label: 'Product Grouping', path: '/products' }
+    ],
+    '/attributes': [
+        { label: 'Product Attributes', path: '/attributes' },
+        { label: 'Specifications & Variants', path: '/products' }
+    ],
     '/enquiries': [
         { label: 'Enquiry Register', path: '/enquiries' },
         { label: 'Customer Details', path: '/customers' },
         { label: 'Follow-ups & Log', path: '/enquiries' },
         { label: 'Tasks & Reminders', path: '/planning' },
         { label: 'Quotations', path: '/quotations' },
-        { label: 'Deals & Pipeline', path: '/sales/deals' },
-        { label: 'Notes & Attachments', path: '/enquiries' },
-        { label: 'Activity Timeline', path: '/sales/activities' }
+        { label: 'Deals & Pipeline', path: '/sales/deals' }
     ],
-    '/payroll/dashboard': [
-        { label: 'Active Employees', path: '/payroll/employees' },
-        { label: 'Run Payroll Process', path: '/payroll/runs' },
-        { label: 'Salary Payments', path: '/payroll/payments' },
-        { label: 'Payslips Register', path: '/payroll/payslips' },
-        { label: 'Offer & Appointment Letters', path: '/payroll/letters' },
-        { label: 'Payroll Reports', path: '/payroll/reports' },
-        { label: 'Payroll Configuration', path: '/payroll/settings' }
+    '/enquiries/analytics': [
+        { label: 'Enquiry Lead Analytics', path: '/enquiries/analytics' },
+        { label: 'Conversion Funnel', path: '/quotations/conversion-report' }
     ],
-    '/payroll/payments': [
-        { label: 'Payment Register', path: '/payroll/payments' },
-        { label: 'Salary Payslips', path: '/payroll/payslips' },
-        { label: 'Run Payroll', path: '/payroll/runs' },
-        { label: 'Employee Summary', path: '/payroll/employees' }
+    '/meetings': [
+        { label: 'Appointments Register', path: '/meetings' },
+        { label: 'Schedule New Appointment', path: '/meetings/new' },
+        { label: 'Follow-up Tasks', path: '/planning' }
     ],
     '/sales/dashboard': [
+        { label: 'Sales Dashboard', path: '/sales/dashboard' },
         { label: 'Deals Board', path: '/sales/deals' },
         { label: 'Pipelines Config', path: '/sales/pipelines' },
         { label: 'Sales Targets', path: '/sales/targets' },
-        { label: 'Price Books & Discounts', path: '/sales/price-management/discounts' },
-        { label: 'Revenue Analytics', path: '/sales/revenue-analytics' },
-        { label: 'Competitor Intel', path: '/sales/competitors' }
+        { label: 'Revenue Analytics', path: '/sales/revenue-analytics' }
     ],
-    '/sales/price-management/currencies': [
-        { label: 'Currency Rates', path: '/sales/price-management/currencies' },
-        { label: 'Price Books', path: '/sales/price-management/price-books' },
+    '/sales/deals': [
+        { label: 'Kanban Deal Board', path: '/sales/deals' },
+        { label: 'Create New Deal', path: '/sales/deals/new' },
+        { label: 'Sales Pipeline Stages', path: '/sales/pipelines' }
+    ],
+    '/sales/pipelines': [
+        { label: 'Pipeline Manager', path: '/sales/pipelines' },
+        { label: 'Custom Sales Stages', path: '/sales/pipelines' }
+    ],
+    '/sales/forecasting': [
+        { label: 'Weighted Revenue Forecast', path: '/sales/forecasting' },
+        { label: 'Quota Achievements', path: '/sales/targets' }
+    ],
+    '/sales/activities': [
+        { label: 'Sales Rep Activities', path: '/sales/activities' },
+        { label: 'Calls & Meeting Logs', path: '/meetings' }
+    ],
+    '/sales/targets': [
+        { label: 'Sales Target Quotas', path: '/sales/targets' },
+        { label: 'Performance Progress', path: '/sales/analytics' }
+    ],
+    '/sales/price-management/price-books': [
+        { label: 'Price Books List', path: '/sales/price-management/price-books' },
         { label: 'Pricing Rules', path: '/sales/price-management/pricing-rules' },
-        { label: 'Discount Policies', path: '/sales/price-management/discounts' },
-        { label: 'Promotions', path: '/sales/price-management/promotions' }
+        { label: 'Discount Policies', path: '/sales/price-management/discounts' }
+    ],
+    '/sales/price-management/pricing-rules': [
+        { label: 'Pricing Rules Config', path: '/sales/price-management/pricing-rules' },
+        { label: 'Price Books', path: '/sales/price-management/price-books' },
+        { label: 'Discount Policies', path: '/sales/price-management/discounts' }
     ],
     '/sales/price-management/discounts': [
         { label: 'Discount Policies', path: '/sales/price-management/discounts' },
-        { label: 'Price Books', path: '/sales/price-management/price-books' },
-        { label: 'Pricing Rules', path: '/sales/price-management/pricing-rules' },
-        { label: 'Currency Rates', path: '/sales/price-management/currencies' },
-        { label: 'Promotions', path: '/sales/price-management/promotions' }
+        { label: 'Promotions & Off-Season', path: '/sales/price-management/promotions' },
+        { label: 'Currency Rates', path: '/sales/price-management/currencies' }
     ],
-    '/csm/dashboard': [
-        { label: 'Service Tickets', path: '/csm/tickets' },
-        { label: 'Service Visits', path: '/csm/visits' },
-        { label: 'Warranty & AMC', path: '/csm/warranties-amc' },
-        { label: 'Knowledge Base FAQs', path: '/csm/kb' },
-        { label: 'CSM Masters Config', path: '/csm/masters' },
-        { label: 'Service Reports', path: '/csm/reports' }
+    '/sales/price-management/promotions': [
+        { label: 'Promotions & Special Offers', path: '/sales/price-management/promotions' },
+        { label: 'Discount Policies', path: '/sales/price-management/discounts' }
+    ],
+    '/sales/price-management/currencies': [
+        { label: 'Currency Conversion Rates', path: '/sales/price-management/currencies' },
+        { label: 'Price Books', path: '/sales/price-management/price-books' }
+    ],
+    '/sales/cpq/guided-selling': [
+        { label: 'Guided Selling Flow', path: '/sales/cpq/guided-selling' },
+        { label: 'CPQ Product Configurator', path: '/sales/cpq/configurator' },
+        { label: 'Quote Simulator', path: '/sales/cpq/simulator' }
+    ],
+    '/sales/cpq/configurator': [
+        { label: 'Custom Product Configurator', path: '/sales/cpq/configurator' },
+        { label: 'Guided Selling', path: '/sales/cpq/guided-selling' },
+        { label: 'Dynamic BOM Pricing', path: '/products' }
+    ],
+    '/sales/cpq/simulator': [
+        { label: 'Quote Profitability Simulator', path: '/sales/cpq/simulator' },
+        { label: 'Margin & Discount Calculator', path: '/sales/price-management/discounts' }
     ],
     '/quotations': [
         { label: 'Quotations Register', path: '/quotations' },
         { label: 'Create New Quotation', path: '/quotations/new' },
-        { label: 'Pricing Simulator', path: '/simulations' },
-        { label: 'Products Master', path: '/products' },
-        { label: 'Contracts Management', path: '/sales/contracts' }
+        { label: 'Quote Conversion Report', path: '/quotations/conversion-report' },
+        { label: 'Approvals Queue', path: '/sales/approvals' }
     ],
-    '/meetings': [
-        { label: 'Scheduled Meetings', path: '/meetings' },
-        { label: 'Appointments Calendar', path: '/appointments' },
-        { label: 'Follow-up Tasks', path: '/planning' }
+    '/sales/approvals': [
+        { label: 'Pending Approvals Queue', path: '/sales/approvals' },
+        { label: 'Quotations List', path: '/quotations' }
+    ],
+    '/sales/contracts': [
+        { label: 'Contracts Dashboard', path: '/sales/contracts/dashboard' },
+        { label: 'Contracts List', path: '/sales/contracts/list' },
+        { label: 'Templates & Clauses', path: '/sales/contracts/templates' },
+        { label: 'Renewals Kanban', path: '/sales/contracts/renewals' }
+    ],
+    '/sales/orders': [
+        { label: 'Sales Orders List', path: '/sales/orders' },
+        { label: 'Invoices', path: '/invoices' }
+    ],
+    '/sales/revenue-analytics': [
+        { label: 'Revenue & Margin Breakdown', path: '/sales/revenue-analytics' },
+        { label: 'Sales Reports', path: '/sales/reports' }
+    ],
+    '/sales/competitors': [
+        { label: 'Competitor Intelligence', path: '/sales/competitors' },
+        { label: 'Battle Cards & Counter Tactics', path: '/sales/competitors' }
+    ],
+    '/sales/ai-pricing': [
+        { label: 'AI Dynamic Pricing Engine', path: '/sales/ai-pricing' },
+        { label: 'Win Probability Calculator', path: '/sales/ai-pricing' }
+    ],
+    '/payroll/dashboard': [
+        { label: 'Payroll Summary', path: '/payroll/dashboard' },
+        { label: 'Active Employees', path: '/payroll/employees' },
+        { label: 'Run Payroll Process', path: '/payroll/runs' },
+        { label: 'Salary Payments', path: '/payroll/payments' },
+        { label: 'Department Master', path: '/payroll/masters?tab=departments' }
+    ],
+    '/payroll/employees': [
+        { label: 'Employee Directory', path: '/payroll/employees' },
+        { label: 'Department Master', path: '/payroll/masters?tab=departments' },
+        { label: 'Designation Master', path: '/payroll/masters?tab=designations' }
+    ],
+    '/payroll/runs': [
+        { label: 'Payroll Execution Runs', path: '/payroll/runs' },
+        { label: 'Payslips Register', path: '/payroll/payslips' },
+        { label: 'Salary Payments', path: '/payroll/payments' }
+    ],
+    '/payroll/payments': [
+        { label: 'Payment Disbursement', path: '/payroll/payments' },
+        { label: 'Payslips', path: '/payroll/payslips' }
+    ],
+    '/payroll/payslips': [
+        { label: 'Salary Payslips Directory', path: '/payroll/payslips' },
+        { label: 'Employee Payroll Runs', path: '/payroll/runs' }
+    ],
+    '/payroll/letters': [
+        { label: 'Offer & Appointment Letters', path: '/payroll/letters' },
+        { label: 'Letter Templates', path: '/payroll/letters' }
+    ],
+    '/payroll/reports': [
+        { label: 'Payroll Reports & Analytics', path: '/payroll/reports' },
+        { label: 'Tax & PF Breakdown', path: '/payroll/reports' }
+    ],
+    '/payroll/settings': [
+        { label: 'Payroll Rules & Configuration', path: '/payroll/settings' },
+        { label: 'Salary Components', path: '/payroll/settings' }
+    ],
+    '/payroll/masters': [
+        { label: 'Department Structure', path: '/payroll/masters?tab=departments' },
+        { label: 'Designation Master', path: '/payroll/masters?tab=designations' },
+        { label: 'Personnel Assignment', path: '/payroll/masters' }
+    ],
+    '/csm/dashboard': [
+        { label: 'Customer Service Dashboard', path: '/csm/dashboard' },
+        { label: 'Service Tickets Register', path: '/csm/tickets' },
+        { label: 'Service Visits', path: '/csm/visits' },
+        { label: 'Warranty & AMC', path: '/csm/warranties-amc' },
+        { label: 'Knowledge Base FAQs', path: '/csm/kb' },
+        { label: 'CSM Masters Config', path: '/csm/masters' }
+    ],
+    '/csm/tickets': [
+        { label: 'Tickets Register', path: '/csm/tickets' },
+        { label: 'Ticket Resolution SLA', path: '/csm/tickets' },
+        { label: 'Engineers Master', path: '/csm/masters?tab=engineers' }
+    ],
+    '/csm/visits': [
+        { label: 'Field Service Visits', path: '/csm/visits' },
+        { label: 'Service Engineers Log', path: '/csm/visits' }
+    ],
+    '/csm/warranties-amc': [
+        { label: 'Warranty & AMC Contracts', path: '/csm/warranties-amc' },
+        { label: 'Contract Renewals', path: '/csm/warranties-amc' }
+    ],
+    '/csm/kb': [
+        { label: 'Knowledge Base Articles', path: '/csm/kb' },
+        { label: 'Technical Solutions', path: '/csm/kb' }
+    ],
+    '/csm/masters': [
+        { label: 'Engineers Master', path: '/csm/masters?tab=engineers' },
+        { label: 'CSM Configuration', path: '/csm/masters' }
+    ],
+    '/csm/reports': [
+        { label: 'Service Performance Reports', path: '/csm/reports' },
+        { label: 'CSAT & Resolution Time', path: '/csm/reports' }
+    ],
+    '/tender/dashboard': [
+        { label: 'Tender Dashboard', path: '/tender/dashboard' },
+        { label: 'Tenders Register', path: '/tender/register' },
+        { label: 'Tender Analytics', path: '/tender/reports' }
+    ],
+    '/tender/register': [
+        { label: 'Tenders Register', path: '/tender/register' },
+        { label: 'EMD & Bid Submissions', path: '/tender/register' }
+    ],
+    '/tender/reports': [
+        { label: 'Tender Win Rate Reports', path: '/tender/reports' },
+        { label: 'Financial EMD Summary', path: '/tender/reports' }
+    ],
+    '/planning': [
+        { label: 'Planning & Scheduling Screen', path: '/planning' },
+        { label: 'Simulations & Scenarios', path: '/simulations' }
+    ],
+    '/simulations': [
+        { label: 'Simulation Scenarios', path: '/simulations' },
+        { label: 'What-If Price Analysis', path: '/simulations' }
+    ],
+    '/reports': [
+        { label: 'Reports Hub', path: '/reports' },
+        { label: 'Sales Reports', path: '/sales/reports' },
+        { label: 'Payroll Reports', path: '/payroll/reports' }
+    ],
+    '/terms': [
+        { label: 'Terms & Conditions Master', path: '/terms' },
+        { label: 'Legal Clauses', path: '/terms' }
+    ],
+    '/territory-master': [
+        { label: 'Territory Master', path: '/territory-master' },
+        { label: 'Geographical Regions', path: '/territory-master' }
+    ],
+    '/serial-no-master': [
+        { label: 'Serial No. Master', path: '/serial-no-master' },
+        { label: 'Barcode & Asset Tracker', path: '/serial-no-master' }
+    ],
+    '/settings': [
+        { label: 'Profile & Preferences', path: '/settings' },
+        { label: 'System Configuration', path: '/settings' }
+    ],
+    '/status-master': [
+        { label: 'System Status Master', path: '/status-master' },
+        { label: 'Custom Workflow States', path: '/status-master' }
+    ],
+    '/admin/authorization': [
+        { label: 'Authorization Matrix', path: '/admin/authorization' },
+        { label: 'Roles & Module Access', path: '/admin/authorization' }
+    ],
+    '/salespersons': [
+        { label: 'Salespersons List', path: '/salespersons' },
+        { label: 'Commission & Quotas', path: '/salespersons' }
+    ],
+    '/super-admin': [
+        { label: 'Super Admin Console', path: '/super-admin' },
+        { label: 'Platform Tenants & Logs', path: '/super-admin' }
+    ],
+    '/system-updates': [
+        { label: 'Daily CRM Changes Update', path: '/system-updates' },
+        { label: 'Release Logs & Notes', path: '/system-updates' }
     ]
 };
 
@@ -313,7 +542,7 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
             localStorage.setItem('lastSeenSystemVersion', n.version);
             setSystemUpdateNotification(null);
             setIsNotifOpen(false);
-            setIsInfoModalOpen(true);
+            navigate('/system-updates');
             return;
         }
 
@@ -547,7 +776,7 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
                         {/* Information (i) Button */}
                         <button
                             type="button"
-                            onClick={() => setIsInfoModalOpen(true)}
+                            onClick={() => navigate('/system-updates')}
                             title="Daily CRM Changes Update"
                             className="p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-300 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-white dark:hover:bg-slate-700 transition-all flex items-center justify-center border border-transparent hover:border-slate-200 dark:hover:border-slate-700"
                         >
@@ -656,12 +885,6 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
                     </div>
                 </div>
             </header>
-
-            {/* Daily CRM Changes System Updates Modal */}
-            <SystemUpdatesModal
-                isOpen={isInfoModalOpen}
-                onClose={() => setIsInfoModalOpen(false)}
-            />
         </>
     );
 };
