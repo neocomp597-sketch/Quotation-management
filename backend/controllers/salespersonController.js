@@ -87,11 +87,12 @@ const getAllSalespersons = async (req, res) => {
 
 const createSalesperson = async (req, res) => {
     try {
-        const { name, email, mobile, territoryId, status } = req.body;
+        const { name, email, mobile, department, territoryId, status } = req.body;
         const newSalesperson = new Salesperson({ 
             name, 
             email, 
             mobile, 
+            department: department || '',
             territoryId: territoryId || null, 
             status: status || 'Active' 
         });
@@ -107,7 +108,7 @@ const createSalesperson = async (req, res) => {
 const updateSalesperson = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, email, mobile, territoryId, status } = req.body;
+        const { name, email, mobile, department, territoryId, status } = req.body;
         const mongoose = require('mongoose');
 
         let salesperson = await Salesperson.findById(id);
@@ -123,9 +124,10 @@ const updateSalesperson = async (req, res) => {
         }
 
         if (salesperson) {
-            salesperson.name = name || salesperson.name;
-            salesperson.email = email || salesperson.email;
-            salesperson.mobile = mobile || salesperson.mobile;
+            if (name !== undefined) salesperson.name = name;
+            if (email !== undefined) salesperson.email = email;
+            if (mobile !== undefined) salesperson.mobile = mobile;
+            if (department !== undefined) salesperson.department = department;
             salesperson.territoryId = territoryId !== undefined ? (territoryId || null) : salesperson.territoryId;
             salesperson.status = status || salesperson.status;
             await salesperson.save();
@@ -135,6 +137,7 @@ const updateSalesperson = async (req, res) => {
                 name,
                 email,
                 mobile,
+                department: department || '',
                 territoryId: territoryId || null,
                 status: status || 'Active'
             });
