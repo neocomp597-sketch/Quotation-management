@@ -82,7 +82,7 @@ const PayrollMasters = () => {
         } catch (error) {
             console.error('Fetch masters error:', error);
             toast.error('Failed to load payroll configuration masters');
-        } fontally {
+        } finally {
             setLoading(false);
         }
     };
