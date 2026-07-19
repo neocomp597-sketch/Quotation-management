@@ -9,7 +9,8 @@ const CounterItem = ({
     decimals = 0, 
     duration = 2000,
     intervalMs = 1500,
-    stepAmount = 1
+    stepAmount = 1,
+    continuous = true
 }) => {
     const [count, setCount] = useState(0);
     const containerRef = useRef(null);
@@ -32,8 +33,8 @@ const CounterItem = ({
 
                     if (progress < 1) {
                         window.requestAnimationFrame(step);
-                    } else {
-                        // Start continuous live increasing counter
+                    } else if (continuous) {
+                        // Start continuous live increasing counter only if enabled
                         timer = setInterval(() => {
                             setCount(prev => prev + (decimals > 0 ? 0.01 : stepAmount));
                         }, intervalMs);
@@ -53,7 +54,7 @@ const CounterItem = ({
                 observer.unobserve(containerRef.current);
             }
         };
-    }, [targetValue, duration, hasAnimated, intervalMs, stepAmount, decimals]);
+    }, [targetValue, duration, hasAnimated, intervalMs, stepAmount, decimals, continuous]);
 
     const formattedValue = decimals > 0 ? count.toFixed(decimals) : Math.floor(count).toLocaleString();
 
@@ -212,7 +213,7 @@ const LandingPage = () => {
                             <div className="text-white/80 font-semibold text-[11px] uppercase tracking-wider">Deals Managed</div>
                         </div>
                         <div>
-                            <CounterItem targetValue={99.94} suffix="%" decimals={2} intervalMs={3000} />
+                            <CounterItem targetValue={99.9} suffix="%" decimals={1} continuous={false} />
                             <div className="text-white/80 font-semibold text-[11px] uppercase tracking-wider">Uptime SLA</div>
                         </div>
                     </div>
