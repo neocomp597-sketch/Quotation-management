@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { payrollService, salespersonService } from '../services/api';
+import Modal from '../components/Modal';
 import { toast } from 'react-toastify';
 import { 
     MdCategory as IconCategory, 
@@ -357,11 +358,11 @@ const PayrollMasters = () => {
                 ))}
             </div>
 
-            {/* Content Container */}
-            <div className="glass shadow-premium rounded-[2rem] p-6 bg-slate-900/95 text-white border border-slate-800">
+            {/* Content Container (Light Theme) */}
+            <div className="glass shadow-premium rounded-[2rem] p-6 bg-white border border-slate-100">
                 {loading && items.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-16 space-y-3">
-                        <div className="w-12 h-12 border-4 border-primary-400 border-t-primary-600 rounded-full animate-spin"></div>
+                        <div className="w-12 h-12 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin"></div>
                         <p className="text-slate-400 font-bold uppercase text-xs tracking-widest">Loading Department Master...</p>
                     </div>
                 ) : items.length === 0 ? (
@@ -370,61 +371,62 @@ const PayrollMasters = () => {
                         <p className="text-slate-400 text-sm mb-4">Click "Add New" to populate your organizational structure.</p>
                     </div>
                 ) : activeTab === 'departments' && viewMode === 'column' ? (
-                    /* COLUMN-WISE FORMAT (Matching reference image) */
+                    /* COLUMN-WISE LIGHT MODE TABLE FORMAT */
                     <div className="space-y-4">
                         <div className="flex items-center justify-between px-2">
-                            <h2 className="text-xl font-bold tracking-tight text-white font-outfit">
-                                What you want - Column wise
+                            <h2 className="text-xl font-black tracking-tight text-slate-900 font-outfit uppercase">
+                                Department Structure
                             </h2>
-                            <span className="text-xs font-semibold text-slate-400">
+                            <span className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1 rounded-full border border-slate-200">
                                 {items.length} Department Column{items.length > 1 ? 's' : ''}
                             </span>
                         </div>
 
-                        <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950/80 shadow-2xl">
-                            <table className="w-full text-left border-collapse min-w-[650px]">
+                        <div className="overflow-x-auto rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+                            <table className="w-full text-left border-collapse min-w-[700px]">
                                 <thead>
-                                    <tr className="bg-slate-900 border-b border-slate-800">
+                                    <tr className="bg-slate-50/90 border-b border-slate-200">
                                         {items.map((dept) => {
                                             const personnelList = getDepartmentPersonnel(dept.name);
                                             return (
                                                 <th 
                                                     key={dept._id} 
-                                                    className="px-6 py-4 border-r border-slate-800 last:border-r-0 align-top w-1/3 min-w-[200px]"
+                                                    className="px-6 py-5 border-r border-slate-200/80 last:border-r-0 align-top w-1/3 min-w-[220px]"
                                                 >
-                                                    <div className="flex flex-col gap-2">
+                                                    <div className="flex flex-col gap-3">
                                                         <div className="flex items-start justify-between">
                                                             <div>
-                                                                <h3 className="text-base font-bold text-white tracking-wide font-outfit">
+                                                                <h3 className="text-base font-black text-slate-900 tracking-wide font-outfit uppercase">
                                                                     {dept.name}
                                                                 </h3>
-                                                                <p className="text-[11px] font-medium text-slate-400 mt-0.5">
+                                                                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200/80 rounded-full px-2.5 py-0.5 mt-1">
+                                                                    <IconPeople size={13} />
                                                                     {personnelList.length} person{personnelList.length !== 1 ? 's' : ''}
-                                                                </p>
+                                                                </span>
                                                             </div>
-                                                            <div className="flex items-center gap-1 opacity-70 hover:opacity-100 transition-opacity">
+                                                            <div className="flex items-center gap-1">
                                                                 <button
                                                                     onClick={() => handleOpenModal(dept)}
-                                                                    className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-all"
+                                                                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-all"
                                                                     title="Edit Department"
                                                                 >
-                                                                    <IconEdit size={15} />
+                                                                    <IconEdit size={16} />
                                                                 </button>
                                                                 <button
                                                                     onClick={() => handleDelete(dept._id)}
-                                                                    className="p-1 rounded text-slate-400 hover:text-rose-400 hover:bg-rose-950/30 transition-all"
+                                                                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-all"
                                                                     title="Delete Department"
                                                                 >
-                                                                    <IconDelete size={15} />
+                                                                    <IconDelete size={16} />
                                                                 </button>
                                                             </div>
                                                         </div>
 
                                                         <button
                                                             onClick={() => handleOpenAssignModal(dept.name)}
-                                                            className="flex items-center justify-center gap-1.5 w-full py-1.5 px-3 bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white rounded-lg text-xs font-semibold border border-slate-700/60 transition-all shadow-sm mt-1"
+                                                            className="flex items-center justify-center gap-1.5 w-full py-2 px-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95"
                                                         >
-                                                            <IconPersonAdd size={14} />
+                                                            <IconPersonAdd size={15} />
                                                             + Add Person
                                                         </button>
                                                     </div>
@@ -433,34 +435,39 @@ const PayrollMasters = () => {
                                         })}
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-slate-800/80 text-sm font-medium">
+                                <tbody className="divide-y divide-slate-100 text-sm font-semibold">
                                     {Array.from({ length: calculateMaxRows() }).map((_, rowIndex) => (
-                                        <tr key={rowIndex} className="hover:bg-slate-900/40 transition-colors">
+                                        <tr key={rowIndex} className="hover:bg-slate-50/70 transition-colors">
                                             {items.map((dept) => {
                                                 const personnel = getDepartmentPersonnel(dept.name);
                                                 const person = personnel[rowIndex];
                                                 return (
                                                     <td 
                                                         key={dept._id} 
-                                                        className="px-6 py-4 border-r border-slate-800/80 last:border-r-0 text-slate-200"
+                                                        className="px-6 py-4 border-r border-slate-100 last:border-r-0 bg-white"
                                                     >
                                                         {person ? (
-                                                            <div className="flex items-center justify-between group">
-                                                                <span className="font-semibold text-slate-100 text-base">
-                                                                    {person.name}
-                                                                </span>
+                                                            <div className="flex items-center justify-between group py-1">
+                                                                <div className="flex items-center gap-2.5 min-w-0">
+                                                                    <div className="w-7 h-7 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs flex items-center justify-center shrink-0 border border-emerald-200/60">
+                                                                        {person.name ? person.name.charAt(0).toUpperCase() : 'P'}
+                                                                    </div>
+                                                                    <span className="font-bold text-slate-900 text-sm truncate">
+                                                                        {person.name}
+                                                                    </span>
+                                                                </div>
                                                                 {!person.isSample && (
                                                                     <button
                                                                         onClick={() => handleUnassignPerson(person, dept.name)}
-                                                                        className="opacity-0 group-hover:opacity-100 p-1 text-slate-500 hover:text-rose-400 transition-all"
+                                                                        className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
                                                                         title="Remove from Department"
                                                                     >
-                                                                        <IconClose size={14} />
+                                                                        <IconClose size={15} />
                                                                     </button>
                                                                 )}
                                                             </div>
                                                         ) : (
-                                                            <span className="text-slate-700 font-normal opacity-40">-</span>
+                                                            <span className="text-slate-300 font-medium text-sm opacity-50 block py-1">-</span>
                                                         )}
                                                     </td>
                                                 );
@@ -472,32 +479,32 @@ const PayrollMasters = () => {
                         </div>
                     </div>
                 ) : (
-                    /* LIST VIEW FORMAT */
+                    /* LIST VIEW LIGHT MODE FORMAT */
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse">
                             <thead>
-                                <tr className="bg-slate-950 text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-800">
+                                <tr className="bg-slate-50 text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100">
                                     <th className="px-6 py-4">Name</th>
                                     <th className="px-6 py-4">Description</th>
                                     <th className="px-6 py-4 text-center">Assigned Personnel</th>
                                     <th className="px-6 py-4 text-center">Actions</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-800/60 text-sm font-semibold text-slate-200">
+                            <tbody className="divide-y divide-slate-100 text-sm font-semibold text-slate-700">
                                 {items.map((item) => {
                                     const personnelCount = activeTab === 'departments' 
                                         ? getDepartmentPersonnel(item.name).length 
                                         : employees.filter(emp => emp.designation === item.name).length;
 
                                     return (
-                                        <tr key={item._id} className="hover:bg-slate-800/40 transition-colors">
-                                            <td className="px-6 py-4 font-black text-white">{item.name}</td>
-                                            <td className="px-6 py-4 text-slate-400 max-w-sm truncate">{item.description || '-'}</td>
+                                        <tr key={item._id} className="hover:bg-slate-50/50 transition-colors">
+                                            <td className="px-6 py-4 font-black text-slate-900">{item.name}</td>
+                                            <td className="px-6 py-4 text-slate-500 max-w-sm truncate">{item.description || '-'}</td>
                                             <td className="px-6 py-4 text-center">
                                                 <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${
                                                     personnelCount > 0 
-                                                        ? 'bg-teal-950/60 text-teal-300 border border-teal-800/60'
-                                                        : 'bg-slate-800 text-slate-500'
+                                                        ? 'bg-teal-50 text-teal-800 border border-teal-100'
+                                                        : 'bg-slate-100 text-slate-400'
                                                 }`}>
                                                     <IconPeople size={14} />
                                                     {personnelCount} assigned
@@ -507,14 +514,14 @@ const PayrollMasters = () => {
                                                 <div className="flex items-center justify-center gap-3">
                                                     <button
                                                         onClick={() => handleOpenModal(item)}
-                                                        className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all"
+                                                        className="p-2 rounded-xl text-slate-400 hover:text-primary-600 hover:bg-slate-50 transition-all"
                                                         title="Edit Details"
                                                     >
                                                         <IconEdit size={18} />
                                                     </button>
                                                     <button
                                                         onClick={() => handleDelete(item._id)}
-                                                        className="p-2 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-rose-950/40 transition-all"
+                                                        className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50/50 transition-all"
                                                         title="Delete Master Item"
                                                     >
                                                         <IconDelete size={18} />
@@ -530,180 +537,159 @@ const PayrollMasters = () => {
                 )}
             </div>
 
-            {/* Department / Designation Modal */}
-            {showModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-4 animate-fade-in">
-                    <div className="bg-slate-900 rounded-[2rem] shadow-2xl border border-slate-800 max-w-md w-full overflow-hidden text-white animate-scale-in">
-                        <div className="px-6 py-5 border-b border-slate-800 bg-slate-950 flex items-center justify-between">
-                            <h3 className="font-outfit font-black text-lg text-white uppercase tracking-wide">
-                                {editId ? 'Edit Master Record' : 'Create Master Record'}
-                            </h3>
-                            <button 
-                                onClick={() => setShowModal(false)}
-                                className="text-slate-400 hover:text-white font-bold"
+            {/* Department / Designation Modal using Portal Modal */}
+            <Modal
+                isOpen={showModal}
+                onClose={() => setShowModal(false)}
+                title={editId ? 'EDIT MASTER RECORD' : 'CREATE MASTER RECORD'}
+                maxWidth="max-w-md"
+                footer={
+                    <>
+                        <button
+                            type="button"
+                            onClick={() => setShowModal(false)}
+                            className="w-full md:w-auto px-6 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            form="master-record-form"
+                            className="w-full md:w-auto px-6 py-3.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-primary-600/20"
+                        >
+                            Save Record
+                        </button>
+                    </>
+                }
+            >
+                <form id="master-record-form" onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">
+                            {activeTab === 'departments' ? 'Department Name' : 'Designation Name'} *
+                        </label>
+                        <input
+                            type="text"
+                            required
+                            value={formData.name}
+                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white text-sm font-semibold"
+                            placeholder={activeTab === 'departments' ? 'e.g. Sales Department' : 'e.g. Sales Executive'}
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Description</label>
+                        <textarea
+                            value={formData.description}
+                            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white text-sm font-semibold h-24"
+                            placeholder="Optional description of roles and responsibilities"
+                        />
+                    </div>
+                </form>
+            </Modal>
+
+            {/* Assign Person Modal using Portal Modal */}
+            <Modal
+                isOpen={showAssignModal}
+                onClose={() => setShowAssignModal(false)}
+                title={`ASSIGN PERSON TO ${assignDeptName.toUpperCase()}`}
+                maxWidth="max-w-md"
+                footer={
+                    <>
+                        <button
+                            type="button"
+                            onClick={() => setShowAssignModal(false)}
+                            className="w-full md:w-auto px-6 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            form="assign-person-form"
+                            disabled={savingAssign}
+                            className="w-full md:w-auto px-6 py-3.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-primary-600/20 disabled:opacity-50"
+                        >
+                            {savingAssign ? 'Saving...' : 'Assign Person'}
+                        </button>
+                    </>
+                }
+            >
+                <form id="assign-person-form" onSubmit={handleSaveAssignment} className="space-y-4">
+                    <div>
+                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
+                            Assignment Type
+                        </label>
+                        <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl border border-slate-200">
+                            <button
+                                type="button"
+                                onClick={() => setAssignPersonType('new')}
+                                className={`py-2 px-3 rounded-lg text-xs font-bold transition-all ${
+                                    assignPersonType === 'new'
+                                        ? 'bg-primary-600 text-white shadow'
+                                        : 'text-slate-600 hover:text-slate-900'
+                                }`}
                             >
-                                ✕
+                                + Add New Person
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setAssignPersonType('existing')}
+                                className={`py-2 px-3 rounded-lg text-xs font-bold transition-all ${
+                                    assignPersonType === 'existing'
+                                        ? 'bg-primary-600 text-white shadow'
+                                        : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                            >
+                                Select Existing
                             </button>
                         </div>
-                        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                            <div>
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
-                                    {activeTab === 'departments' ? 'Department Name' : 'Designation Name'} *
-                                </label>
-                                <input
-                                    type="text"
-                                    required
-                                    value={formData.name}
-                                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                    className="w-full px-4 py-3 rounded-xl border border-slate-700 bg-slate-800 text-white focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-semibold"
-                                    placeholder={activeTab === 'departments' ? 'e.g. Sales Department' : 'e.g. Sales Executive'}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Description</label>
-                                <textarea
-                                    value={formData.description}
-                                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                    className="w-full px-4 py-3 rounded-xl border border-slate-700 bg-slate-800 text-white focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-semibold h-24"
-                                    placeholder="Optional description of roles and responsibilities"
-                                />
-                            </div>
-                            <div className="flex gap-3 pt-4 border-t border-slate-800">
-                                <button
-                                    type="button"
-                                    onClick={() => setShowModal(false)}
-                                    className="flex-1 py-3.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    className="flex-1 py-3.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-primary-600/20"
-                                >
-                                    Save Record
-                                </button>
-                            </div>
-                        </form>
                     </div>
-                </div>
-            )}
 
-            {/* Assign Person to Department Modal */}
-            {showAssignModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-4 animate-fade-in">
-                    <div className="bg-slate-900 rounded-[2rem] shadow-2xl border border-slate-800 max-w-md w-full overflow-hidden text-white animate-scale-in">
-                        <div className="px-6 py-5 border-b border-slate-800 bg-slate-950 flex items-center justify-between">
-                            <div>
-                                <h3 className="font-outfit font-black text-lg text-white uppercase tracking-wide">
-                                    Assign Person
-                                </h3>
-                                <p className="text-xs text-primary-400 font-semibold mt-0.5">
-                                    Department: {assignDeptName}
-                                </p>
-                            </div>
-                            <button 
-                                onClick={() => setShowAssignModal(false)}
-                                className="text-slate-400 hover:text-white font-bold"
-                            >
-                                ✕
-                            </button>
+                    {assignPersonType === 'new' ? (
+                        <div>
+                            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">
+                                Person Name *
+                            </label>
+                            <input
+                                type="text"
+                                required
+                                value={newPersonName}
+                                onChange={(e) => setNewPersonName(e.target.value)}
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white text-sm font-semibold"
+                                placeholder="e.g. Rahul, Priya, Om"
+                            />
                         </div>
-
-                        <form onSubmit={handleSaveAssignment} className="p-6 space-y-4">
-                            <div>
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
-                                    Assignment Type
-                                </label>
-                                <div className="grid grid-cols-2 gap-2 p-1 bg-slate-950 rounded-xl border border-slate-800">
-                                    <button
-                                        type="button"
-                                        onClick={() => setAssignPersonType('new')}
-                                        className={`py-2 px-3 rounded-lg text-xs font-bold transition-all ${
-                                            assignPersonType === 'new'
-                                                ? 'bg-primary-600 text-white shadow'
-                                                : 'text-slate-400 hover:text-white'
-                                        }`}
-                                    >
-                                        + Add New Person
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setAssignPersonType('existing')}
-                                        className={`py-2 px-3 rounded-lg text-xs font-bold transition-all ${
-                                            assignPersonType === 'existing'
-                                                ? 'bg-primary-600 text-white shadow'
-                                                : 'text-slate-400 hover:text-white'
-                                        }`}
-                                    >
-                                        Select Existing
-                                    </button>
-                                </div>
-                            </div>
-
-                            {assignPersonType === 'new' ? (
-                                <div>
-                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
-                                        Person Name *
-                                    </label>
-                                    <input
-                                        type="text"
-                                        required
-                                        value={newPersonName}
-                                        onChange={(e) => setNewPersonName(e.target.value)}
-                                        className="w-full px-4 py-3 rounded-xl border border-slate-700 bg-slate-800 text-white focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-semibold"
-                                        placeholder="e.g. Rahul, Priya, Om"
-                                    />
-                                </div>
-                            ) : (
-                                <div>
-                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
-                                        Select Personnel *
-                                    </label>
-                                    <select
-                                        required
-                                        value={selectedPersonId}
-                                        onChange={(e) => setSelectedPersonId(e.target.value)}
-                                        className="w-full px-4 py-3 rounded-xl border border-slate-700 bg-slate-800 text-white focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-semibold"
-                                    >
-                                        <option value="">-- Choose Employee / Salesperson --</option>
-                                        <optgroup label="Employees">
-                                            {employees.map(emp => (
-                                                <option key={emp._id} value={emp._id}>
-                                                    {emp.name} ({emp.department || 'Unassigned'})
-                                                </option>
-                                            ))}
-                                        </optgroup>
-                                        <optgroup label="Salespersons">
-                                            {salespersons.map(sp => (
-                                                <option key={sp._id} value={sp._id}>
-                                                    {sp.name} ({sp.department || 'Unassigned'})
-                                                </option>
-                                            ))}
-                                        </optgroup>
-                                    </select>
-                                </div>
-                            )}
-
-                            <div className="flex gap-3 pt-4 border-t border-slate-800">
-                                <button
-                                    type="button"
-                                    onClick={() => setShowAssignModal(false)}
-                                    className="flex-1 py-3.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={savingAssign}
-                                    className="flex-1 py-3.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-primary-600/20 disabled:opacity-50"
-                                >
-                                    {savingAssign ? 'Saving...' : 'Assign Person'}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
+                    ) : (
+                        <div>
+                            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">
+                                Select Personnel *
+                            </label>
+                            <select
+                                required
+                                value={selectedPersonId}
+                                onChange={(e) => setSelectedPersonId(e.target.value)}
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white text-sm font-semibold"
+                            >
+                                <option value="">-- Choose Employee / Salesperson --</option>
+                                <optgroup label="Employees">
+                                    {employees.map(emp => (
+                                        <option key={emp._id} value={emp._id}>
+                                            {emp.name} ({emp.department || 'Unassigned'})
+                                        </option>
+                                    ))}
+                                </optgroup>
+                                <optgroup label="Salespersons">
+                                    {salespersons.map(sp => (
+                                        <option key={sp._id} value={sp._id}>
+                                            {sp.name} ({sp.department || 'Unassigned'})
+                                        </option>
+                                    ))}
+                                </optgroup>
+                            </select>
+                        </div>
+                    )}
+                </form>
+            </Modal>
         </div>
     );
 };
