@@ -17,7 +17,11 @@ import {
     MdFilterList as IconFilterList,
     MdSearch as IconSearch,
     MdExpandMore,
-    MdCheckCircle
+    MdCheckCircle,
+    MdGridOn as IconGridOn,
+    MdBusiness,
+    MdRefresh,
+    MdCheck
 } from 'react-icons/md';
 
 const DEFAULT_SAMPLE_PERSONNEL = {
@@ -114,17 +118,30 @@ const PayrollMasters = () => {
     const initialTab = queryParams.get('tab') || 'departments';
 
     const [activeTab, setActiveTab] = useState(initialTab);
+    const [deptSubTab, setDeptSubTab] = useState('overview'); // 'overview', 'master', 'column', 'list'
+
     const [loading, setLoading] = useState(false);
     const [items, setItems] = useState([]);
     const [employees, setEmployees] = useState([]);
     const [salespersons, setSalespersons] = useState([]);
 
+    // Overview Tab state
+    const [selectedOverviewDeptId, setSelectedOverviewDeptId] = useState(null);
+
+    // Master Form state
+    const [editingMasterDeptId, setEditingMasterDeptId] = useState(null);
+    const [masterForm, setMasterForm] = useState({
+        code: '',
+        name: '',
+        head: '',
+        status: 'Active',
+        description: '',
+        assignedEmpIds: []
+    });
+
     // Filter states
     const [selectedModule, setSelectedModule] = useState('All');
     const [searchQuery, setSearchQuery] = useState('');
-
-    // View toggle: 'column' (default for departments) or 'list'
-    const [viewMode, setViewMode] = useState('column');
 
     useEffect(() => {
         const tab = new URLSearchParams(location.search).get('tab');
@@ -141,7 +158,7 @@ const PayrollMasters = () => {
     // Assign Person modal
     const [showAssignModal, setShowAssignModal] = useState(false);
     const [assignDeptName, setAssignDeptName] = useState('');
-    const [assignPersonType, setAssignPersonType] = useState('new'); // 'new' or 'existing'
+    const [assignPersonType, setAssignPersonType] = useState('new');
     const [selectedPersonId, setSelectedPersonId] = useState('');
     const [newPersonName, setNewPersonName] = useState('');
     const [savingAssign, setSavingAssign] = useState(false);
@@ -162,11 +179,17 @@ const PayrollMasters = () => {
                 salespersonService.getAll().catch(() => ({ data: [] }))
             ]);
             
-            setItems(itemsRes.data || []);
+            const fetchedDepts = itemsRes.data || [];
+            setItems(fetchedDepts);
             setEmployees(empRes.data || []);
             
             const salesData = salesRes.data;
             setSalespersons(Array.isArray(salesData) ? salesData : salesData?.data || []);
+
+            // Default selected overview department if not set
+            if (fetchedDepts.length > 0 && !selectedOverviewDeptId) {
+                setSelectedOverviewDeptId(fetchedDepts[0]._id);
+            }
         } catch (error) {
             console.error('Fetch masters error:', error);
             toast.error('Failed to load payroll configuration masters');
@@ -261,7 +284,11 @@ const PayrollMasters = () => {
         matchedEmps.forEach(emp => {
             combinedMap.set(emp.name?.toLowerCase().trim(), {
                 id: emp._id,
+                code: emp.employeeId || emp._id?.slice(-6)?.toUpperCase() || 'EMP',
                 name: emp.name,
+                department: emp.department || deptName,
+                designation: emp.designation || 'Staff',
+                manager: emp.reportingManager || 'Manager',
                 type: 'Employee',
                 source: 'employee',
                 original: emp
@@ -273,7 +300,11 @@ const PayrollMasters = () => {
             if (!combinedMap.has(key)) {
                 combinedMap.set(key, {
                     id: sp._id,
+                    code: sp._id?.slice(-6)?.toUpperCase() || 'SP',
                     name: sp.name,
+                    department: sp.department || deptName,
+                    designation: 'Salesperson',
+                    manager: 'Sales Head',
                     type: 'Salesperson',
                     source: 'salesperson',
                     original: sp
@@ -283,18 +314,111 @@ const PayrollMasters = () => {
 
         const list = Array.from(combinedMap.values());
 
-        // Fallback to sample data matching screenshot if database has no entries for this department yet
         if (list.length === 0) {
             const samples = DEFAULT_SAMPLE_PERSONNEL[deptName] || DEFAULT_SAMPLE_PERSONNEL[normTarget] || [];
             return samples.map((name, idx) => ({
                 id: `sample_${deptName}_${idx}`,
+                code: `EMP00${idx + 1}`,
                 name,
-                type: 'Sales Person',
+                department: deptName,
+                designation: 'Executive',
+                manager: 'Department Head',
+                type: 'Staff',
                 isSample: true
             }));
         }
 
         return list;
+    };
+
+    // --- DEPARTMENT MASTER FORM HANDLERS ---
+    const handleSaveMasterDept = async () => {
+        if (!masterForm.name.trim()) {
+            toast.error('Department Name is required');
+            return;
+        }
+
+        try {
+            let deptName = masterForm.name.trim();
+            const payload = {
+                code: masterForm.code.trim() || undefined,
+                name: deptName,
+                head: masterForm.head.trim() || undefined,
+                isActive: masterForm.status === 'Active',
+                description: masterForm.description.trim() || undefined
+            };
+
+            if (editingMasterDeptId) {
+                await payrollService.updateDepartment(editingMasterDeptId, payload);
+                toast.success('Department updated successfully');
+            } else {
+                await payrollService.createDepartment(payload);
+                toast.success('Department created successfully');
+            }
+
+            // Sync employee assignments
+            const prevAssignedEmps = employees.filter(e => normalizeDept(e.department) === normalizeDept(deptName));
+            
+            // Unassign unchecked employees
+            for (const emp of prevAssignedEmps) {
+                if (!masterForm.assignedEmpIds.includes(emp._id)) {
+                    await payrollService.updateEmployee(emp._id, { ...emp, department: '' });
+                }
+            }
+
+            // Assign checked employees
+            for (const empId of masterForm.assignedEmpIds) {
+                const emp = employees.find(e => e._id === empId);
+                if (emp && normalizeDept(emp.department) !== normalizeDept(deptName)) {
+                    await payrollService.updateEmployee(empId, { ...emp, department: deptName });
+                }
+            }
+
+            handleResetMasterForm();
+            fetchItems();
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Failed to save department');
+        }
+    };
+
+    const handleEditMasterDept = (dept) => {
+        setEditingMasterDeptId(dept._id);
+        const assigned = employees
+            .filter(e => normalizeDept(e.department) === normalizeDept(dept.name))
+            .map(e => e._id);
+
+        setMasterForm({
+            code: dept.code || dept._id?.slice(-6)?.toUpperCase() || 'DEP',
+            name: dept.name,
+            head: dept.head || '',
+            status: dept.isActive === false ? 'Inactive' : 'Active',
+            description: dept.description || '',
+            assignedEmpIds: assigned
+        });
+    };
+
+    const handleResetMasterForm = () => {
+        setEditingMasterDeptId(null);
+        setMasterForm({
+            code: '',
+            name: '',
+            head: '',
+            status: 'Active',
+            description: '',
+            assignedEmpIds: []
+        });
+    };
+
+    const toggleEmpAssignment = (empId) => {
+        setMasterForm(prev => {
+            const exists = prev.assignedEmpIds.includes(empId);
+            return {
+                ...prev,
+                assignedEmpIds: exists 
+                    ? prev.assignedEmpIds.filter(id => id !== empId)
+                    : [...prev.assignedEmpIds, empId]
+            };
+        });
     };
 
     const handleOpenAssignModal = (deptName) => {
@@ -315,7 +439,6 @@ const PayrollMasters = () => {
                     setSavingAssign(false);
                     return;
                 }
-                // Create a new employee profile with assigned department
                 await payrollService.createEmployee({
                     name: newPersonName.trim(),
                     department: assignDeptName,
@@ -329,7 +452,6 @@ const PayrollMasters = () => {
                     setSavingAssign(false);
                     return;
                 }
-                // Check if selected is employee or salesperson
                 const emp = employees.find(e => e._id === selectedPersonId);
                 if (emp) {
                     await payrollService.updateEmployee(emp._id, { ...emp, department: assignDeptName });
@@ -371,7 +493,7 @@ const PayrollMasters = () => {
         }
     };
 
-    // Filter items based on typing search & module selection
+    // Filter items based on search
     const filteredItems = items.filter(item => {
         const query = searchQuery.trim().toLowerCase();
         if (!query) return true;
@@ -383,7 +505,6 @@ const PayrollMasters = () => {
         return matchesName || matchesDesc || matchesPerson;
     });
 
-    // Calculate maximum rows needed across all department columns
     const calculateMaxRows = () => {
         if (filteredItems.length === 0) return 3;
         const rowCounts = filteredItems.map(dept => getDepartmentPersonnel(dept.name).length);
@@ -392,45 +513,23 @@ const PayrollMasters = () => {
 
     const moduleOptions = ['All', 'CRM Core', 'Reports', 'Dashboard', 'System', 'Payroll'];
 
+    // Selected overview department object & personnel
+    const activeOverviewDept = filteredItems.find(d => d._id === selectedOverviewDeptId) || filteredItems[0];
+    const overviewPersonnel = activeOverviewDept ? getDepartmentPersonnel(activeOverviewDept.name) : [];
+
     return (
         <div className="space-y-6 max-w-7xl mx-auto animate-fade-in-up">
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-black tracking-tight text-slate-900 font-outfit uppercase">
-                        Department Master
+                        Department Management
                     </h1>
                     <p className="text-slate-500 font-semibold text-sm">
-                        View and manage organizational departments and assigned personnel in column-wise layout.
+                        Manage company departments, employee assignments, and organizational structure.
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
-                    {activeTab === 'departments' && (
-                        <div className="flex items-center bg-slate-100 p-1 rounded-2xl border border-slate-200">
-                            <button
-                                onClick={() => setViewMode('column')}
-                                className={`flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold text-xs transition-all ${
-                                    viewMode === 'column' 
-                                        ? 'bg-white text-primary-700 shadow-sm font-black' 
-                                        : 'text-slate-500 hover:text-slate-900'
-                                }`}
-                            >
-                                <IconViewColumn size={16} />
-                                Column-Wise
-                            </button>
-                            <button
-                                onClick={() => setViewMode('list')}
-                                className={`flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold text-xs transition-all ${
-                                    viewMode === 'list' 
-                                        ? 'bg-white text-primary-700 shadow-sm font-black' 
-                                        : 'text-slate-500 hover:text-slate-900'
-                                }`}
-                            >
-                                <IconList size={16} />
-                                List View
-                            </button>
-                        </div>
-                    )}
                     <button
                         onClick={() => handleOpenModal()}
                         className="flex items-center gap-2 px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-[10px] tracking-widest rounded-2xl transition-all shadow-lg shadow-primary-600/20 active:scale-95"
@@ -459,7 +558,57 @@ const PayrollMasters = () => {
                 ))}
             </div>
 
-            {/* Filters Section (Directly on Page layout matching Image 2) */}
+            {/* Department Sub-Navigation (Matching depart2 HTML layout format) */}
+            {activeTab === 'departments' && (
+                <div className="flex items-center gap-2 bg-slate-100 p-1.5 rounded-2xl border border-slate-200/80 w-fit">
+                    <button
+                        onClick={() => setDeptSubTab('overview')}
+                        className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs transition-all ${
+                            deptSubTab === 'overview'
+                                ? 'bg-primary-600 text-white shadow-md font-black'
+                                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                        }`}
+                    >
+                        <IconGridOn size={16} />
+                        Department Overview
+                    </button>
+                    <button
+                        onClick={() => setDeptSubTab('master')}
+                        className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs transition-all ${
+                            deptSubTab === 'master'
+                                ? 'bg-primary-600 text-white shadow-md font-black'
+                                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                        }`}
+                    >
+                        <MdBusiness size={16} />
+                        Department Master
+                    </button>
+                    <button
+                        onClick={() => setDeptSubTab('column')}
+                        className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs transition-all ${
+                            deptSubTab === 'column'
+                                ? 'bg-primary-600 text-white shadow-md font-black'
+                                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                        }`}
+                    >
+                        <IconViewColumn size={16} />
+                        Column-Wise Structure
+                    </button>
+                    <button
+                        onClick={() => setDeptSubTab('list')}
+                        className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs transition-all ${
+                            deptSubTab === 'list'
+                                ? 'bg-primary-600 text-white shadow-md font-black'
+                                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                        }`}
+                    >
+                        <IconList size={16} />
+                        List View
+                    </button>
+                </div>
+            )}
+
+            {/* Filters Section */}
             <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-100 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
                 <div className="flex items-center gap-2 text-slate-800 font-black text-xs uppercase tracking-wider shrink-0">
                     <IconFilterList size={18} className="text-primary-600" />
@@ -467,7 +616,6 @@ const PayrollMasters = () => {
                 </div>
 
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 flex-1 max-w-3xl">
-                    {/* Searchable Module Dropdown */}
                     <div className="min-w-[200px]">
                         <SearchableSelect
                             label="MODULE"
@@ -478,7 +626,6 @@ const PayrollMasters = () => {
                         />
                     </div>
 
-                    {/* Search Typing Option Filter */}
                     <div className="flex-1 min-w-[220px]">
                         <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
                             SEARCH
@@ -488,7 +635,7 @@ const PayrollMasters = () => {
                                 type="text"
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                placeholder="Type to search department or personnel..."
+                                placeholder="Search department or personnel..."
                                 className="w-full pl-9 pr-8 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all"
                             />
                             <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
@@ -505,20 +652,320 @@ const PayrollMasters = () => {
                 </div>
             </div>
 
-            {/* Content Container (Light Theme) */}
-            <div className="glass shadow-premium rounded-[2rem] p-6 bg-white border border-slate-100">
-                {loading && items.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-16 space-y-3">
-                        <div className="w-12 h-12 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin"></div>
-                        <p className="text-slate-400 font-bold uppercase text-xs tracking-widest">Loading Master Data...</p>
+            {/* Main Content Area */}
+            {loading && items.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 space-y-3 glass rounded-[2rem] bg-white border border-slate-100">
+                    <div className="w-12 h-12 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin"></div>
+                    <p className="text-slate-400 font-bold uppercase text-xs tracking-widest">Loading Department Data...</p>
+                </div>
+            ) : activeTab === 'departments' && deptSubTab === 'overview' ? (
+                /* TAB 1: DEPARTMENT OVERVIEW (Side-by-side Layout from depart2.html) */
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    {/* Left Column: Department Cards */}
+                    <div className="lg:col-span-4 space-y-4">
+                        <div className="flex items-center justify-between px-1">
+                            <h2 className="text-sm font-black text-slate-700 uppercase tracking-wider">Departments</h2>
+                            <span className="text-xs font-bold bg-primary-50 text-primary-700 px-3 py-1 rounded-full border border-primary-200">
+                                {filteredItems.length} Departments
+                            </span>
+                        </div>
+
+                        <div className="space-y-3">
+                            {filteredItems.map(dept => {
+                                const personnelCount = getDepartmentPersonnel(dept.name).length;
+                                const isSelected = activeOverviewDept?._id === dept._id;
+
+                                return (
+                                    <div
+                                        key={dept._id}
+                                        onClick={() => setSelectedOverviewDeptId(dept._id)}
+                                        className={`p-4 rounded-2xl border transition-all cursor-pointer shadow-sm ${
+                                            isSelected
+                                                ? 'bg-primary-50/80 border-primary-500 shadow-md ring-2 ring-primary-500/20'
+                                                : 'bg-white border-slate-200 hover:border-slate-300 hover:-translate-y-0.5'
+                                        }`}
+                                    >
+                                        <div className="flex items-start justify-between">
+                                            <div>
+                                                <h3 className="text-base font-black text-slate-900 font-outfit uppercase">
+                                                    {dept.name}
+                                                </h3>
+                                                <p className="text-xs font-semibold text-slate-500 mt-1">
+                                                    Head: <span className="text-slate-800 font-bold">{dept.head || 'Rohit Dixit'}</span>
+                                                </p>
+                                            </div>
+                                            <span className="bg-primary-600 text-white font-black text-xs px-3 py-1 rounded-full shadow-sm">
+                                                {personnelCount} Employees
+                                            </span>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
-                ) : filteredItems.length === 0 ? (
-                    <div className="text-center py-16">
-                        <p className="text-slate-400 font-bold text-lg mb-2">No records found.</p>
-                        <p className="text-slate-400 text-sm mb-4">Try clearing search inputs or click "Add New" to populate.</p>
+
+                    {/* Right Column: Employees in Selected Department */}
+                    <div className="lg:col-span-8">
+                        <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden h-full">
+                            <div className="bg-primary-600 text-white px-6 py-4 flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <IconPeople size={20} />
+                                    <h3 className="text-base font-black uppercase font-outfit">
+                                        Employees in {activeOverviewDept?.name || 'Department'}
+                                    </h3>
+                                </div>
+                                <span className="bg-white text-primary-700 font-black text-xs px-3 py-1 rounded-full shadow">
+                                    {overviewPersonnel.length} Employees
+                                </span>
+                            </div>
+
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="bg-slate-50 text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100">
+                                            <th className="px-6 py-3.5">Employee ID</th>
+                                            <th className="px-6 py-3.5">Name</th>
+                                            <th className="px-6 py-3.5">Department</th>
+                                            <th className="px-6 py-3.5">Designation</th>
+                                            <th className="px-6 py-3.5">Reporting Manager</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100 text-sm font-semibold text-slate-700">
+                                        {overviewPersonnel.length === 0 ? (
+                                            <tr>
+                                                <td colSpan="5" className="px-6 py-12 text-center text-slate-400 font-medium">
+                                                    No employees currently assigned to this department.
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            overviewPersonnel.map((emp) => (
+                                                <tr key={emp.id} className="hover:bg-slate-50/60 transition-colors">
+                                                    <td className="px-6 py-4 font-mono font-bold text-primary-700">{emp.code}</td>
+                                                    <td className="px-6 py-4 font-bold text-slate-900">{emp.name}</td>
+                                                    <td className="px-6 py-4">
+                                                        <span className="bg-primary-50 text-primary-700 text-xs font-bold px-2.5 py-1 rounded-lg border border-primary-100">
+                                                            {emp.department}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-slate-600">{emp.designation}</td>
+                                                    <td className="px-6 py-4 text-slate-500">{emp.manager}</td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
-                ) : activeTab === 'departments' && viewMode === 'column' ? (
-                    /* COLUMN-WISE LIGHT MODE TABLE FORMAT */
+                </div>
+            ) : activeTab === 'departments' && deptSubTab === 'master' ? (
+                /* TAB 2: DEPARTMENT MASTER (Form + Department List from depart2.html) */
+                <div className="space-y-6">
+                    {/* Add / Edit Department Card Form */}
+                    <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
+                        <div className="bg-emerald-600 text-white px-6 py-4 flex items-center justify-between">
+                            <h3 className="text-base font-black uppercase font-outfit flex items-center gap-2">
+                                <IconAdd size={20} />
+                                {editingMasterDeptId ? 'Edit Department' : 'Department Master'}
+                            </h3>
+                        </div>
+
+                        <div className="p-6 space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-700 mb-1.5">Department Code</label>
+                                    <input
+                                        type="text"
+                                        value={masterForm.code}
+                                        onChange={(e) => setMasterForm({ ...masterForm, code: e.target.value })}
+                                        placeholder="e.g. DEP005"
+                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-700 mb-1.5">Department Name *</label>
+                                    <input
+                                        type="text"
+                                        value={masterForm.name}
+                                        onChange={(e) => setMasterForm({ ...masterForm, name: e.target.value })}
+                                        placeholder="e.g. Human Resource"
+                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-700 mb-1.5">Department Head</label>
+                                    <select
+                                        value={masterForm.head}
+                                        onChange={(e) => setMasterForm({ ...masterForm, head: e.target.value })}
+                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white"
+                                    >
+                                        <option value="">Select Head...</option>
+                                        {employees.map(emp => (
+                                            <option key={emp._id} value={emp.name}>{emp.name} ({emp.designation || 'Staff'})</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-700 mb-1.5">Status</label>
+                                    <select
+                                        value={masterForm.status}
+                                        onChange={(e) => setMasterForm({ ...masterForm, status: e.target.value })}
+                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white"
+                                    >
+                                        <option value="Active">Active</option>
+                                        <option value="Inactive">Inactive</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-slate-700 mb-1.5">Description</label>
+                                <textarea
+                                    value={masterForm.description}
+                                    onChange={(e) => setMasterForm({ ...masterForm, description: e.target.value })}
+                                    placeholder="Brief description of department scope and responsibilities..."
+                                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white h-20"
+                                />
+                            </div>
+
+                            {/* Assign Employees Checkbox Box */}
+                            <div>
+                                <label className="block text-xs font-bold text-slate-700 mb-2">
+                                    Assign Employees to Department
+                                </label>
+                                <div className="max-h-44 overflow-y-auto border border-slate-200 rounded-xl p-3 bg-slate-50 space-y-2">
+                                    {employees.length === 0 ? (
+                                        <p className="text-xs text-slate-400 font-medium">No employees found. Add employees in Payroll &gt; Employees tab.</p>
+                                    ) : (
+                                        employees.map(emp => (
+                                            <label key={emp._id} className="flex items-center gap-2 text-xs font-semibold text-slate-800 cursor-pointer hover:bg-slate-100 p-1.5 rounded-lg transition-colors">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={masterForm.assignedEmpIds.includes(emp._id)}
+                                                    onChange={() => toggleEmpAssignment(emp._id)}
+                                                    className="rounded text-emerald-600 focus:ring-emerald-500 h-4 w-4"
+                                                />
+                                                <span>{emp.name} ({emp.designation || 'Staff'})</span>
+                                                {emp.department && (
+                                                    <span className="text-[10px] text-slate-400 bg-slate-200 px-2 py-0.5 rounded-full ml-auto">
+                                                        {emp.department}
+                                                    </span>
+                                                )}
+                                            </label>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Form Action Buttons */}
+                            <div className="flex items-center gap-3 pt-2">
+                                {!editingMasterDeptId ? (
+                                    <button
+                                        onClick={handleSaveMasterDept}
+                                        className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow transition-all"
+                                    >
+                                        <MdCheck size={16} /> Save
+                                    </button>
+                                ) : (
+                                    <>
+                                        <button
+                                            onClick={handleSaveMasterDept}
+                                            className="flex items-center gap-2 px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow transition-all"
+                                        >
+                                            <IconEdit size={16} /> Update
+                                        </button>
+                                        <button
+                                            onClick={() => handleDelete(editingMasterDeptId)}
+                                            className="flex items-center gap-2 px-6 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow transition-all"
+                                        >
+                                            <IconDelete size={16} /> Delete
+                                        </button>
+                                    </>
+                                )}
+                                <button
+                                    onClick={handleResetMasterForm}
+                                    className="flex items-center gap-2 px-6 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs uppercase tracking-wider rounded-xl transition-all"
+                                >
+                                    <MdRefresh size={16} /> Reset
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Department List Table */}
+                    <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
+                        <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between">
+                            <h3 className="text-base font-black uppercase font-outfit flex items-center gap-2">
+                                <IconList size={20} /> Department List
+                            </h3>
+                        </div>
+
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="bg-slate-50 text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100">
+                                        <th className="px-6 py-4">ID</th>
+                                        <th className="px-6 py-4">Department</th>
+                                        <th className="px-6 py-4">Head</th>
+                                        <th className="px-6 py-4 text-center">Employees</th>
+                                        <th className="px-6 py-4 text-center">Status</th>
+                                        <th className="px-6 py-4 text-center">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 text-sm font-semibold text-slate-700">
+                                    {filteredItems.map((dept, index) => {
+                                        const count = getDepartmentPersonnel(dept.name).length;
+                                        const deptCode = dept.code || `DEP00${index + 1}`;
+
+                                        return (
+                                            <tr key={dept._id} className="hover:bg-slate-50/60 transition-colors">
+                                                <td className="px-6 py-4 font-mono font-bold text-slate-500">{deptCode}</td>
+                                                <td className="px-6 py-4 font-bold text-slate-900">{dept.name}</td>
+                                                <td className="px-6 py-4 text-slate-600">{dept.head || 'Rohit Dixit'}</td>
+                                                <td className="px-6 py-4 text-center">
+                                                    <span className="bg-slate-100 text-slate-800 text-xs font-bold px-3 py-1 rounded-full border border-slate-200">
+                                                        {count} Employees
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 text-center">
+                                                    <span className={`text-xs font-bold px-3 py-1 rounded-full ${
+                                                        dept.isActive !== false 
+                                                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+                                                            : 'bg-rose-50 text-rose-700 border border-rose-200'
+                                                    }`}>
+                                                        {dept.isActive !== false ? 'Active' : 'Inactive'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 text-center">
+                                                    <div className="flex items-center justify-center gap-2">
+                                                        <button
+                                                            onClick={() => handleEditMasterDept(dept)}
+                                                            className="px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-xs font-bold transition-all shadow-sm"
+                                                        >
+                                                            Edit
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDelete(dept._id)}
+                                                            className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold transition-all shadow-sm"
+                                                        >
+                                                            Delete
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            ) : activeTab === 'departments' && deptSubTab === 'column' ? (
+                /* COLUMN-WISE STRUCTURE VIEW */
+                <div className="glass shadow-premium rounded-[2rem] p-6 bg-white border border-slate-100">
                     <div className="space-y-4">
                         <div className="flex items-center justify-between px-2">
                             <h2 className="text-xl font-black tracking-tight text-slate-900 font-outfit uppercase">
@@ -609,8 +1056,10 @@ const PayrollMasters = () => {
                             </table>
                         </div>
                     </div>
-                ) : (
-                    /* LIST VIEW LIGHT MODE FORMAT */
+                </div>
+            ) : (
+                /* LIST VIEW LIGHT MODE FORMAT / DESIGNATIONS */
+                <div className="glass shadow-premium rounded-[2rem] p-6 bg-white border border-slate-100">
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse">
                             <thead>
@@ -665,10 +1114,10 @@ const PayrollMasters = () => {
                             </tbody>
                         </table>
                     </div>
-                )}
-            </div>
+                </div>
+            )}
 
-            {/* Department / Designation Modal using Portal Modal */}
+            {/* Department / Designation Modal */}
             <Modal
                 isOpen={showModal}
                 onClose={() => setShowModal(false)}
@@ -719,7 +1168,7 @@ const PayrollMasters = () => {
                 </form>
             </Modal>
 
-            {/* Assign Person Modal using Portal Modal */}
+            {/* Assign Person Modal */}
             <Modal
                 isOpen={showAssignModal}
                 onClose={() => setShowAssignModal(false)}

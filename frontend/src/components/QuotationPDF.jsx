@@ -152,8 +152,37 @@ const QuotationPDF = ({ quotation, format = 'format1', images = {}, companySetti
 
     // Helper to get image source (prefer base64 from props, fallback to resolved URL)
     const resolveImage = (url) => {
-        if (!url) return null;
-        return images[url] || resolveImageUrl(url);
+        if (!url || typeof url !== 'string') return null;
+        const trimmed = url.trim();
+        if (!trimmed) return null;
+
+        // Check if pre-fetched in images object
+        if (images && images[trimmed]) {
+            const imgVal = images[trimmed];
+            if (typeof imgVal === 'string' && imgVal.startsWith('data:image/')) {
+                if (imgVal.startsWith('data:image/svg+xml')) return null;
+                return imgVal;
+            }
+        }
+
+        // SVG files & DiceBear SVGs cannot be parsed by @react-pdf/renderer
+        if (trimmed.includes('.svg') || trimmed.includes('/svg') || trimmed.includes('dicebear')) {
+            return null;
+        }
+
+        const resolved = resolveImageUrl(trimmed);
+        if (!resolved || typeof resolved !== 'string') return null;
+        if (resolved.includes('.svg') || resolved.includes('/svg') || resolved.includes('dicebear')) {
+            return null;
+        }
+
+        const lower = resolved.toLowerCase();
+        const hasValidExt = lower.endsWith('.png') || lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.webp') || lower.startsWith('data:image/');
+        if (!hasValidExt) {
+            return null;
+        }
+
+        return resolved;
     };
 
     // Normalize items to ensure all fields exist regardless of model type (Quotation or Voucher/Invoice)
@@ -231,7 +260,7 @@ const QuotationPDF = ({ quotation, format = 'format1', images = {}, companySetti
                     <View style={{ flexDirection: 'column' }}>
                         <View style={styles.mainHeader}>
                             <View style={styles.logoSection}>
-                                {companySettings?.logoUrl ? (
+                                {resolveImage(companySettings?.logoUrl) ? (
                                     <Image src={resolveImage(companySettings.logoUrl)} style={{ height: 50, objectFit: 'contain' }} />
                                 ) : (
                                     <View style={{ alignItems: 'center', justifyContent: 'center' }}>
@@ -292,14 +321,14 @@ const QuotationPDF = ({ quotation, format = 'format1', images = {}, companySetti
                         {/* To Customer Section */}
                         <View style={styles.customerBox}>
                             <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-                                {quotation.customerId?.logoUrl && (
+                                {resolveImage(quotation.customerId?.logoUrl) ? (
                                     <View style={{ width: 50, height: 50, marginRight: 10, borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 4, padding: 2, backgroundColor: '#fff' }}>
                                         <Image
                                             src={resolveImage(quotation.customerId.logoUrl)}
                                             style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                                         />
                                     </View>
-                                )}
+                                ) : null}
                                 <View style={{ flex: 1 }}>
                                     <Text style={styles.customerLabel}>To: {quotation.customerId?.companyName || quotation.customerId?.customerName}</Text>
                                     {quotation.customerId?.customerName && quotation.customerId?.companyName ? (
@@ -348,7 +377,7 @@ const QuotationPDF = ({ quotation, format = 'format1', images = {}, companySetti
                         <View style={styles.f2Header}>
                             {/* Logo */}
                             <View style={styles.f2LogoBox}>
-                                {companySettings?.logoUrl ? (
+                                {resolveImage(companySettings?.logoUrl) ? (
                                     <Image src={resolveImage(companySettings.logoUrl)} style={{ width: 80, height: 80, objectFit: 'contain' }} />
                                 ) : (
                                     <View style={{ width: 60, height: 40, backgroundColor: '#eee', alignItems: 'center', justifyContent: 'center' }}><Text>LOGO</Text></View>
@@ -496,7 +525,7 @@ const QuotationPDF = ({ quotation, format = 'format1', images = {}, companySetti
                                 <View key={idx} style={styles.tableRow}>
                                     <View style={[styles.tableCell, styles.colNo, styles.cellCenter]}><Text>{idx + 1}</Text></View>
                                     <View style={[styles.tableCell, styles.colImg, { alignItems: 'center' }]}>
-                                        {item.imageUrl ? (
+                                        {item.imageUrl && resolveImage(item.imageUrl) ? (
                                             <Image
                                                 src={resolveImage(item.imageUrl)}
                                                 style={{ width: 45, height: 45, objectFit: 'contain' }}
@@ -579,7 +608,7 @@ const QuotationPDF = ({ quotation, format = 'format1', images = {}, companySetti
                 {/* Authorized Signatory */}
                 <View style={styles.signatorySection}>
                     <Text style={styles.signatoryLabel}>Authorized Signatory</Text>
-                    {companySettings?.authorizedSignatory?.signatureImageUrl && (
+                    {companySettings?.authorizedSignatory?.signatureImageUrl && resolveImage(companySettings.authorizedSignatory.signatureImageUrl) && (
                         <Image
                             src={resolveImage(companySettings.authorizedSignatory.signatureImageUrl)}
                             style={{ height: 30, objectFit: 'contain', marginTop: 5 }}
