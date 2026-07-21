@@ -7,6 +7,11 @@ const initSocket = (server) => {
 
     wss.on('connection', (ws, req) => {
         console.log(`[WebSocket Server] Client connected from ${req.socket.remoteAddress}`);
+        ws.isAlive = true;
+
+        ws.on('pong', () => {
+            ws.isAlive = true;
+        });
 
         ws.on('message', (message) => {
             console.log('[WebSocket Server] Received message:', message.toString());
@@ -21,7 +26,25 @@ const initSocket = (server) => {
         });
     });
 
-    console.log('[WebSocket Server] WebSocket Server attached to HTTP server successfully.');
+    // 30-second ping interval to keep production reverse proxies (Nginx/Cloudflare/Coolify) from dropping idle connections
+    const pingInterval = setInterval(() => {
+        if (!wss) return;
+        wss.clients.forEach((ws) => {
+            if (ws.isAlive === false) {
+                return ws.terminate();
+            }
+            ws.isAlive = false;
+            try {
+                ws.ping();
+            } catch (_) {}
+        });
+    }, 30000);
+
+    wss.on('close', () => {
+        clearInterval(pingInterval);
+    });
+
+    console.log('[WebSocket Server] WebSocket Server attached to HTTP server successfully with keepalive enabled.');
     return wss;
 };
 

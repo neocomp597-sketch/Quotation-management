@@ -98,6 +98,16 @@ const Quotations = () => {
         fetchQuotations();
     }, [page, debouncedSearch, statusFilter, selectedTerritory]);
 
+    useEffect(() => {
+        const handleRealtimeUpdate = (e) => {
+            if (!e.detail?.entity || e.detail.entity === 'QUOTATION' || e.detail.entity === 'SYSTEM') {
+                fetchQuotations();
+            }
+        };
+        window.addEventListener('onCrmSocketUpdate', handleRealtimeUpdate);
+        return () => window.removeEventListener('onCrmSocketUpdate', handleRealtimeUpdate);
+    }, [page, debouncedSearch, statusFilter, selectedTerritory]);
+
     const fetchCompanySettings = async () => {
         try {
             const { companySettingsService } = await import('../services/api');

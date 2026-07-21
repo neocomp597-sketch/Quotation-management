@@ -160,6 +160,10 @@ export const AuthProvider = ({ children }) => {
         dispatch(setCredentials({ user: normalizedUser, permissions: nextPermissions }));
         dispatch(setReduxPermissions(nextPermissions));
 
+        // Dispatch events to trigger WebSocket reconnect and realtime data refresh
+        window.dispatchEvent(new CustomEvent('onAuthLogin', { detail: { user: normalizedUser } }));
+        window.dispatchEvent(new CustomEvent('onCrmSocketUpdate', { detail: { entity: 'SYSTEM', action: 'LOGIN_REFRESH' } }));
+
         return { user: normalizedUser, permissions: nextPermissions };
     }, [dispatch]);
 
@@ -170,6 +174,7 @@ export const AuthProvider = ({ children }) => {
             // Local cleanup still happens if the network request fails.
         }
         clearSession();
+        window.dispatchEvent(new Event('onAuthSessionChange'));
     }, [clearSession]);
 
     const hasAccess = useCallback((permissionKey) => {
