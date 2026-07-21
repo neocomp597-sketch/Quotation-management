@@ -165,7 +165,7 @@ const Quotations = () => {
                 fetchQuotations();
             } catch (err) {
                 console.error("Error finalizing:", err);
-                toast.error('Failed to finalize quotation');
+                toast.error(err.response?.data?.message || 'Failed to finalize quotation');
             }
         }
     };
@@ -330,21 +330,21 @@ const Quotations = () => {
                                                 {formatDate(q.quotationDate)}
                                             </div>
                                             <div className="flex gap-1">
-                                                {(q.status === 'draft' || q.status === 'rejected') && (
-                                                    <>
-                                                        <button
-                                                            onClick={() => navigate(`/quotations/${q._id}`)}
-                                                            className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
-                                                        >
-                                                            <MdEdit size={18} />
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleFinalize(q._id)}
-                                                            className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
-                                                        >
-                                                            <MdCheckCircle size={18} />
-                                                        </button>
-                                                    </>
+                                                <button
+                                                    onClick={() => navigate(`/quotations/${q._id}`)}
+                                                    className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
+                                                    title={q.status === 'draft' ? "Edit Draft" : q.status === 'rejected' ? "Edit & Revise Rejected Quote" : "Edit Quotation"}
+                                                >
+                                                    <MdEdit size={18} />
+                                                </button>
+                                                {(q.status === 'draft' || q.status === 'pending_approval') && (
+                                                    <button
+                                                        onClick={() => handleFinalize(q._id)}
+                                                        className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                                                        title="Finalize Quotation"
+                                                    >
+                                                        <MdCheckCircle size={18} />
+                                                    </button>
                                                 )}
                                                 {q.status === 'final' && (
                                                     <button
@@ -358,6 +358,7 @@ const Quotations = () => {
                                                 <button
                                                     onClick={() => handleViewDetails(q._id)}
                                                     className="p-2 text-primary-600 hover:bg-primary-50 rounded-lg transition-all"
+                                                    title="View Quotation"
                                                 >
                                                     <MdVisibility size={18} />
                                                 </button>
@@ -366,12 +367,19 @@ const Quotations = () => {
                                                         <button
                                                             disabled={loading}
                                                             className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-all disabled:opacity-50"
+                                                            title="Export PDF"
                                                         >
                                                             <MdPictureAsPdf size={18} />
                                                         </button>
                                                     )}
                                                 </PDFDownloadLink>
-
+                                                <button
+                                                    onClick={() => handleDelete(q._id)}
+                                                    className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                                                    title="Delete Quotation"
+                                                >
+                                                    <MdDelete size={18} />
+                                                </button>
                                             </div>
                                         </div>
                                     </div>
@@ -437,24 +445,24 @@ const Quotations = () => {
                                                 </td>
                                                 <td className="px-8 py-5 text-right">
                                                     <div className="flex items-center justify-end gap-2">
-                                                        {(q.status === 'draft' || q.status === 'rejected') && (
-                                                            <>
-                                                                <button
-                                                                    onClick={() => navigate(`/quotations/${q._id}`)}
-                                                                    className="p-2.5 text-amber-600 hover:bg-amber-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
-                                                                    title="Edit Draft"
-                                                                >
-                                                                    <MdEdit size={18} />
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => handleFinalize(q._id)}
-                                                                    className="p-2.5 text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
-                                                                    title="Finalize"
-                                                                >
-                                                                    <MdCheckCircle size={18} />
-                                                                </button>
-                                                            </>
+                                                        <button
+                                                            onClick={() => navigate(`/quotations/${q._id}`)}
+                                                            className="p-2.5 text-amber-600 hover:bg-amber-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
+                                                            title={q.status === 'draft' ? "Edit Draft" : q.status === 'rejected' ? "Edit & Revise Rejected Quote" : "Edit Quotation"}
+                                                        >
+                                                            <MdEdit size={18} />
+                                                        </button>
+
+                                                        {(q.status === 'draft' || q.status === 'pending_approval') && (
+                                                            <button
+                                                                onClick={() => handleFinalize(q._id)}
+                                                                className="p-2.5 text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
+                                                                title="Finalize Quotation"
+                                                            >
+                                                                <MdCheckCircle size={18} />
+                                                            </button>
                                                         )}
+
                                                         {q.status === 'final' && (
                                                             <button
                                                                 onClick={() => handleMarkAsOrdered(q._id)}
@@ -464,6 +472,7 @@ const Quotations = () => {
                                                                 <MdCheckCircle size={18} />
                                                             </button>
                                                         )}
+
                                                         <button
                                                             onClick={() => handleViewDetails(q._id)}
                                                             className="p-2.5 text-primary-600 hover:bg-primary-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
@@ -497,7 +506,13 @@ const Quotations = () => {
                                                             )}
                                                         </PDFDownloadLink>
 
-
+                                                        <button
+                                                            onClick={() => handleDelete(q._id)}
+                                                            className="p-2.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
+                                                            title="Delete Quotation"
+                                                        >
+                                                            <MdDelete size={18} />
+                                                        </button>
                                                     </div>
                                                 </td>
                                             </tr>

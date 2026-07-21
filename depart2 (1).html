@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Department Management</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: #f4f7fb;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .nav-tabs .nav-link {
+            font-weight: 600;
+            color: #555;
+            border-radius: 8px 8px 0 0;
+            padding: 10px 20px;
+        }
+
+        .nav-tabs .nav-link.active {
+            background: #0d6efd;
+            color: #fff;
+            border-color: #0d6efd;
+        }
+
+        .card {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,.06);
+            margin-bottom: 20px;
+        }
+
+        .dept-card {
+            cursor: pointer;
+            transition: all 0.25s ease;
+            border: 2px solid transparent;
+        }
+
+        .dept-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 18px rgba(0,0,0,.12);
+        }
+
+        .dept-card.active-dept {
+            border-color: #0d6efd;
+            background-color: #f0f6ff;
+        }
+
+        .badge-count {
+            font-size: 0.85rem;
+            background: #0d6efd;
+            padding: 6px 12px;
+            border-radius: 20px;
+        }
+
+        .table th {
+            background: #0d6efd;
+            color: white;
+            vertical-align: middle;
+        }
+
+        .table-master th {
+            background: #212529;
+        }
+
+        .assign-employee-box {
+            max-height: 180px;
+            overflow-y: auto;
+            border: 1px solid #ced4da;
+            border-radius: 8px;
+            padding: 10px;
+            background: #fff;
+        }
+
+        .form-check-label {
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="fw-bold text-dark m-0"><i class="bi bi-diagram-3-fill text-primary me-2"></i>Department Management</h3>
+    </div>
+
+    <ul class="nav nav-tabs border-bottom-0" id="deptTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <a class="nav-link active" id="overview-tab" data-bs-toggle="tab" href="#overview" role="tab">
+                <i class="bi bi-grid-fill me-2"></i>Department Overview
+            </a>
+        </li>
+        <li class="nav-item" role="presentation">
+            <a class="nav-link" id="master-tab" data-bs-toggle="tab" href="#master" role="tab">
+                <i class="bi bi-gear-fill me-2"></i>Department Master
+            </a>
+        </li>
+    </ul>
+
+    <div class="tab-content mt-3">
+
+        <!-- TAB 1: OVERVIEW -->
+        <div class="tab-pane fade show active" id="overview" role="tabpanel">
+            <div class="row">
+                <!-- Left Side: Department Selection List / Cards -->
+                <div class="col-md-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="fw-bold mb-0 text-secondary">Departments</h5>
+                        <span class="badge bg-secondary" id="totalDeptsBadge">4 Departments</span>
+                    </div>
+                    <div id="overviewDeptList">
+                        <!-- Dynamic Department Cards loaded by JS -->
+                    </div>
+                </div>
+
+                <!-- Right Side: Employee Details for Selected Department -->
+                <div class="col-md-8">
+                    <div class="card h-100">
+                        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center py-3">
+                            <h5 class="mb-0 fs-6 fw-bold" id="selectedDeptHeader">
+                                <i class="bi bi-people-fill me-2"></i>Employees in Department
+                            </h5>
+                            <span class="badge bg-light text-primary fw-bold fs-6" id="deptEmpCountBadge">0 Employees</span>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Emp ID</th>
+                                            <th>Name</th>
+                                            <th>Department</th>
+                                            <th>Designation</th>
+                                            <th>Reporting Manager</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="overviewEmpTableBody">
+                                        <!-- Dynamic Employees loaded by JS -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: DEPARTMENT MASTER -->
+        <div class="tab-pane fade" id="master" role="tabpanel">
+            <div class="card">
+                <div class="card-header bg-success text-white py-3 fw-bold">
+                    <i class="bi bi-plus-circle-fill me-2"></i>Add / Edit Department
+                </div>
+                <div class="card-body">
+                    <form id="deptForm" onsubmit="return false;">
+                        <input type="hidden" id="editDeptId" value="">
+
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">Department Code</label>
+                                <input type="text" id="deptCode" class="form-control" placeholder="e.g. DEP005" required>
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">Department Name</label>
+                                <input type="text" id="deptName" class="form-control" placeholder="e.g. Marketing" required>
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">Department Head</label>
+                                <select id="deptHead" class="form-select" required>
+                                    <option value="">Select Head...</option>
+                                </select>
+                            </div>
+
+                            <div class="col-md-8">
+                                <label class="form-label fw-semibold">Description</label>
+                                <input type="text" id="deptDescription" class="form-control" placeholder="Brief description of responsibilities">
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">Status</label>
+                                <select id="deptStatus" class="form-select">
+                                    <option value="Active">Active</option>
+                                    <option value="Inactive">Inactive</option>
+                                </select>
+                            </div>
+
+                            <!-- Assign Employees Section -->
+                            <div class="col-12 mt-3">
+                                <label class="form-label fw-semibold">Assign Employees to Department</label>
+                                <div class="assign-employee-box" id="assignEmployeeContainer">
+                                    <!-- Dynamic Checkboxes loaded by JS -->
+                                </div>
+                                <small class="text-muted">Select the employees to associate with this department.</small>
+                            </div>
+                        </div>
+
+                        <div class="mt-4 d-flex gap-2">
+                            <button type="button" id="btnSave" class="btn btn-success px-4" onclick="saveDepartment()">
+                                <i class="bi bi-check-circle me-1"></i> Save
+                            </button>
+                            <button type="button" id="btnUpdate" class="btn btn-warning px-4 d-none" onclick="updateDepartment()">
+                                <i class="bi bi-pencil-square me-1"></i> Update
+                            </button>
+                            <button type="button" id="btnDelete" class="btn btn-danger px-4 d-none" onclick="deleteDepartment()">
+                                <i class="bi bi-trash me-1"></i> Delete
+                            </button>
+                            <button type="button" class="btn btn-secondary px-4" onclick="resetForm()">
+                                <i class="bi bi-arrow-counterclockwise me-1"></i> Reset
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Department List -->
+            <div class="card">
+                <div class="card-header bg-dark text-white py-3 fw-bold">
+                    <i class="bi bi-list-task me-2"></i>Department List
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0 table-master">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Department</th>
+                                <th>Head</th>
+                                <th>Assigned Employees</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="masterDeptTableBody">
+                            <!-- Dynamic Table Content -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+    // Initial Data State
+    let employees = [
+        { id: "EMP001", name: "Rohit Dixit", deptId: "DEP001", designation: "HR Manager", manager: "Director" },
+        { id: "EMP002", name: "Amit Sharma", deptId: "DEP002", designation: "Account Executive", manager: "Finance Manager" },
+        { id: "EMP003", name: "Vijay Patil", deptId: "DEP003", designation: "Production Supervisor", manager: "Plant Manager" },
+        { id: "EMP004", name: "Rahul Singh", deptId: "DEP004", designation: "Sales Lead", manager: "VP Sales" },
+        { id: "EMP005", name: "Priya Mehta", deptId: "DEP001", designation: "HR Recruiter", manager: "Rohit Dixit" },
+        { id: "EMP006", name: "Suresh Gupta", deptId: "DEP002", designation: "Senior Accountant", manager: "Amit Sharma" },
+        { id: "EMP007", name: "Neha Verma", deptId: "DEP003", designation: "Quality Inspector", manager: "Vijay Patil" },
+        { id: "EMP008", name: "Karan Johar", deptId: "DEP004", designation: "Sales Representative", manager: "Rahul Singh" }
+    ];
+
+    let departments = [
+        { id: "DEP001", name: "Human Resource", head: "Rohit Dixit", status: "Active", description: "HR & Recruitment management" },
+        { id: "DEP002", name: "Accounts", head: "Amit Sharma", status: "Active", description: "Finance and accounting department" },
+        { id: "DEP003", name: "Production", head: "Vijay Patil", status: "Active", description: "Manufacturing & Assembly" },
+        { id: "DEP004", name: "Sales", head: "Rahul Singh", status: "Active", description: "Client sales and business growth" }
+    ];
+
+    let selectedDeptId = "DEP001";
+
+    // Initialize application
+    document.addEventListener("DOMContentLoaded", () => {
+        renderOverview();
+        renderMaster();
+        populateDeptHeadOptions();
+        populateAssignEmployeeCheckboxes();
+    });
+
+    // Populate Head Dropdown
+    function populateDeptHeadOptions() {
+        const headSelect = document.getElementById("deptHead");
+        headSelect.innerHTML = '<option value="">Select Head...</option>';
+        employees.forEach(emp => {
+            headSelect.innerHTML += `<option value="${emp.name}">${emp.name} (${emp.designation})</option>`;
+        });
+    }
+
+    // Populate Employee Checkboxes for Master Tab
+    function populateAssignEmployeeCheckboxes(currentDeptId = null) {
+        const container = document.getElementById("assignEmployeeContainer");
+        container.innerHTML = "";
+        employees.forEach(emp => {
+            const isChecked = currentDeptId && emp.deptId === currentDeptId ? "checked" : "";
+            const currentDept = departments.find(d => d.id === emp.deptId);
+            const deptLabel = currentDept ? ` <span class="badge bg-light text-dark">(${currentDept.name})</span>` : '';
+            
+            container.innerHTML += `
+                <div class="form-check">
+                    <input class="form-check-input emp-checkbox" type="checkbox" value="${emp.id}" id="chk_${emp.id}" ${isChecked}>
+                    <label class="form-check-label" for="chk_${emp.id}">
+                        ${emp.name} - ${emp.designation} ${deptLabel}
+                    </label>
+                </div>
+            `;
+        });
+    }
+
+    // Render Department Overview Tab
+    function renderOverview() {
+        const listContainer = document.getElementById("overviewDeptList");
+        const tableBody = document.getElementById("overviewEmpTableBody");
+        const totalBadge = document.getElementById("totalDeptsBadge");
+        
+        totalBadge.textContent = `${departments.length} Departments`;
+        listContainer.innerHTML = "";
+
+        departments.forEach(dept => {
+            const empCount = employees.filter(e => e.deptId === dept.id).length;
+            const isActive = dept.id === selectedDeptId ? "active-dept" : "";
+            
+            listContainer.innerHTML += `
+                <div class="card dept-card ${isActive}" onclick="selectOverviewDept('${dept.id}')">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h5 class="fw-bold mb-1">${dept.name}</h5>
+                            <span class="badge badge-count">${empCount} Emps</span>
+                        </div>
+                        <p class="text-muted small mb-0"><i class="bi bi-person-badge me-1"></i>Head: ${dept.head}</p>
+                    </div>
+                </div>
+            `;
+        });
+
+        // Render Table for Selected Department
+        const selectedDept = departments.find(d => d.id === selectedDeptId) || departments[0];
+        if (selectedDept) {
+            document.getElementById("selectedDeptHeader").innerHTML = `<i class="bi bi-people-fill me-2"></i>Employees in ${selectedDept.name}`;
+            const deptEmps = employees.filter(e => e.deptId === selectedDept.id);
+            document.getElementById("deptEmpCountBadge").textContent = `${deptEmps.length} Employees`;
+
+            if (deptEmps.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-4">No employees assigned to this department.</td></tr>`;
+            } else {
+                tableBody.innerHTML = deptEmps.map(emp => `
+                    <tr>
+                        <td class="fw-semibold">${emp.id}</td>
+                        <td>${emp.name}</td>
+                        <td><span class="badge bg-primary-subtle text-primary fw-medium">${selectedDept.name}</span></td>
+                        <td>${emp.designation}</td>
+                        <td>${emp.manager}</td>
+                    </tr>
+                `).join("");
+            }
+        }
+    }
+
+    function selectOverviewDept(deptId) {
+        selectedDeptId = deptId;
+        renderOverview();
+    }
+
+    // Render Department Master Tab
+    function renderMaster() {
+        const tableBody = document.getElementById("masterDeptTableBody");
+        tableBody.innerHTML = "";
+
+        departments.forEach(dept => {
+            const empCount = employees.filter(e => e.deptId === dept.id).length;
+            const statusBadge = dept.status === "Active" ? "bg-success" : "bg-danger";
+
+            tableBody.innerHTML += `
+                <tr>
+                    <td class="fw-semibold">${dept.id}</td>
+                    <td class="fw-bold">${dept.name}</td>
+                    <td>${dept.head}</td>
+                    <td><span class="badge bg-secondary">${empCount} Employees</span></td>
+                    <td><span class="badge ${statusBadge}">${dept.status}</span></td>
+                    <td>
+                        <button class="btn btn-sm btn-primary me-1" onclick="editDepartment('${dept.id}')">
+                            <i class="bi bi-pencil me-1"></i>Edit
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="quickDeleteDepartment('${dept.id}')">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+    }
+
+    // Save New Department
+    function saveDepartment() {
+        const code = document.getElementById("deptCode").value.trim();
+        const name = document.getElementById("deptName").value.trim();
+        const head = document.getElementById("deptHead").value;
+        const status = document.getElementById("deptStatus").value;
+        const description = document.getElementById("deptDescription").value.trim();
+
+        if (!code || !name || !head) {
+            alert("Please fill in Department Code, Name, and Select a Head.");
+            return;
+        }
+
+        if (departments.some(d => d.id === code)) {
+            alert("Department Code already exists! Please use a unique Code.");
+            return;
+        }
+
+        const newDept = { id: code, name, head, status, description };
+        departments.push(newDept);
+
+        // Assign selected employees
+        assignEmployeesToDept(code);
+
+        resetForm();
+        renderOverview();
+        renderMaster();
+        alert("Department created successfully!");
+    }
+
+    // Edit Department
+    function editDepartment(deptId) {
+        const dept = departments.find(d => d.id === deptId);
+        if (!dept) return;
+
+        document.getElementById("editDeptId").value = dept.id;
+        document.getElementById("deptCode").value = dept.id;
+        document.getElementById("deptCode").disabled = true;
+        document.getElementById("deptName").value = dept.name;
+        document.getElementById("deptHead").value = dept.head;
+        document.getElementById("deptStatus").value = dept.status;
+        document.getElementById("deptDescription").value = dept.description || "";
+
+        populateAssignEmployeeCheckboxes(dept.id);
+
+        document.getElementById("btnSave").classList.add("d-none");
+        document.getElementById("btnUpdate").classList.remove("d-none");
+        document.getElementById("btnDelete").classList.remove("d-none");
+    }
+
+    // Update Department
+    function updateDepartment() {
+        const deptId = document.getElementById("editDeptId").value;
+        const dept = departments.find(d => d.id === deptId);
+        if (!dept) return;
+
+        dept.name = document.getElementById("deptName").value.trim();
+        dept.head = document.getElementById("deptHead").value;
+        dept.status = document.getElementById("deptStatus").value;
+        dept.description = document.getElementById("deptDescription").value.trim();
+
+        assignEmployeesToDept(deptId);
+
+        resetForm();
+        renderOverview();
+        renderMaster();
+        alert("Department updated successfully!");
+    }
+
+    // Assign employees logic
+    function assignEmployeesToDept(deptId) {
+        const checkedBoxes = document.querySelectorAll(".emp-checkbox:checked");
+        const checkedEmpIds = Array.from(checkedBoxes).map(cb => cb.value);
+
+        employees.forEach(emp => {
+            if (checkedEmpIds.includes(emp.id)) {
+                emp.deptId = deptId;
+            } else if (emp.deptId === deptId) {
+                emp.deptId = ""; // Unassign if unchecked
+            }
+        });
+    }
+
+    // Delete Department
+    function deleteDepartment() {
+        const deptId = document.getElementById("editDeptId").value;
+        if (!deptId) return;
+        quickDeleteDepartment(deptId);
+    }
+
+    function quickDeleteDepartment(deptId) {
+        if (confirm(`Are you sure you want to delete department ${deptId}?`)) {
+            departments = departments.filter(d => d.id !== deptId);
+            employees.forEach(e => {
+                if (e.deptId === deptId) e.deptId = "";
+            });
+            if (selectedDeptId === deptId) {
+                selectedDeptId = departments.length > 0 ? departments[0].id : "";
+            }
+            resetForm();
+            renderOverview();
+            renderMaster();
+        }
+    }
+
+    // Reset Form
+    function resetForm() {
+        document.getElementById("editDeptId").value = "";
+        document.getElementById("deptCode").value = "";
+        document.getElementById("deptCode").disabled = false;
+        document.getElementById("deptName").value = "";
+        document.getElementById("deptHead").value = "";
+        document.getElementById("deptStatus").value = "Active";
+        document.getElementById("deptDescription").value = "";
+
+        populateAssignEmployeeCheckboxes();
+
+        document.getElementById("btnSave").classList.remove("d-none");
+        document.getElementById("btnUpdate").classList.add("d-none");
+        document.getElementById("btnDelete").classList.add("d-none");
+    }
+</script>
+</body>
+</html>

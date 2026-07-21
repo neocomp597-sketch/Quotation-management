@@ -21,6 +21,14 @@ const SystemUpdateSchema = new mongoose.Schema({
         required: true,
         default: []
     },
+    detailedChanges: [
+        {
+            date: { type: String, required: true },
+            module: { type: String, required: true },
+            submodule: { type: String, required: true },
+            changes: { type: String, required: true }
+        }
+    ],
     deployedAt: {
         type: Date,
         default: Date.now

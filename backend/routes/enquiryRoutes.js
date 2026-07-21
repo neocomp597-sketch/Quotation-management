@@ -4,6 +4,7 @@ const enquiryController = require('../controllers/enquiryController');
 const { protect } = require('../middlewares/authMiddleware');
 const { validateEnquiryUpdate, validateActivityDate, validateCriticalFields } = require('../middlewares/enquiryValidation');
 
+router.get('/search-hierarchical', protect, enquiryController.searchHierarchical);
 router.post('/', protect, enquiryController.createEnquiry);
 router.get('/', protect, enquiryController.getAllEnquiries);
 router.get('/:id', protect, enquiryController.getEnquiryById);

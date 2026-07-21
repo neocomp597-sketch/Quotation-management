@@ -165,7 +165,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
         },
         {
             type: 'group',
-            name: 'Catalog & Price Masters',
+            name: 'Catalog',
             key: 'cpq_masters',
             icon: <MdFolderOpen size={22} />,
             children: [
@@ -178,7 +178,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
         },
         {
             type: 'group',
-            name: 'Quotation Management',
+            name: 'Quotations',
             key: 'quotation',
             icon: <MdRequestQuote size={22} />,
             children: [
@@ -197,7 +197,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
         },
         {
             type: 'group',
-            name: 'Contract Management',
+            name: 'Contracts',
             key: 'clm',
             icon: <MdAssignment size={22} />,
             children: [
@@ -211,10 +211,9 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                 { key: 'sales_contracts', name: 'Settings', icon: <MdSettings size={18} />, path: '/sales/contracts/settings' },
             ]
         },
-
         {
             type: 'group',
-            name: 'Material Received',
+            name: 'Material',
             key: 'purchase',
             icon: <MdShoppingCart size={22} />,
             children: [
@@ -248,7 +247,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
         },
         {
             type: 'group',
-            name: 'Tender Management',
+            name: 'Tenders',
             key: 'tender',
             icon: <MdAssignment size={22} />,
             children: [
@@ -331,21 +330,21 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             />
 
             <div
-                className={`fixed top-0 left-0 h-full bg-white transition-all duration-300 z-50 shadow-2xl border-r border-slate-100 transform flex flex-col ${isOpen ? 'translate-x-0 w-64' : '-translate-x-full md:translate-x-0 md:w-20 w-64'}`}
+                className={`fixed top-0 left-0 h-full bg-white dark:bg-slate-900 transition-all duration-300 z-50 shadow-2xl border-r border-slate-100 dark:border-slate-800 transform flex flex-col ${isOpen ? 'translate-x-0 w-64' : '-translate-x-full md:translate-x-0 md:w-20 w-64'}`}
             >
-                <div className="flex items-center justify-between h-20 px-6 border-b border-slate-50 shrink-0">
+                <div className="flex items-center justify-between h-20 px-6 border-b border-slate-50 dark:border-slate-800 shrink-0">
                     <div className={`flex items-center gap-3 overflow-hidden transition-all duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 w-0 md:opacity-0 md:w-0'}`}>
                         <div className="w-10 h-10 bg-gradient-to-br from-primary-600 to-accent rounded-xl flex items-center justify-center shadow-lg shadow-primary-600/30 shrink-0">
                             <span className="text-white font-black text-xl">A</span>
                         </div>
-                        <div className="whitespace-nowrap text-slate-900 font-outfit uppercase">
+                        <div className="whitespace-nowrap text-slate-900 dark:text-slate-100 font-outfit uppercase">
                             <p className="text-lg font-black tracking-tighter">ARCRM</p>
-                            <p className="text-[10px] font-bold text-slate-500 -mt-1">Always Ready CRM</p>
+                            <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 -mt-1">Always Ready CRM</p>
                         </div>
                     </div>
                     <button
                         onClick={toggleSidebar}
-                        className="p-2 rounded-xl hover:bg-slate-50 text-slate-400 hover:text-primary-600 transition-all ml-auto md:ml-0"
+                        className="p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-400 dark:text-slate-400 hover:text-primary-600 dark:hover:text-primary-400 transition-all ml-auto md:ml-0"
                     >
                         <MdChevronLeft size={24} className={`transition-transform duration-300 ${!isOpen ? 'rotate-180' : ''}`} />
                     </button>

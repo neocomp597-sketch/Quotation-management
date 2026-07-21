@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CRM - Catalog & Price Book</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+<style>
+  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f6f9; margin: 0; padding: 25px; }
+  .container-custom { display: flex; gap: 20px; max-width: 1200px; margin: 0 auto; }
+  
+  .card { background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); border: none; }
+  
+  /* Left: Catalog */
+  .catalog { width: 32%; }
+  .catalog h3 { margin-top: 0; color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 12px; font-weight: 700; font-size: 1.25rem; }
+  .catalog-item { padding: 12px 16px; margin: 10px 0; border: 1px solid #e2e8f0; border-radius: 8px; cursor: pointer; transition: all 0.2s ease; display: flex; justify-content: space-between; align-items: center; font-weight: 600; }
+  .catalog-item:hover { background: #eaf4fb; border-color: #3498db; transform: translateX(3px); }
+  .catalog-item.active { background: #3498db; color: #fff; border-color: #3498db; }
+  
+  /* Right: Price Book */
+  .pricebook { width: 68%; }
+  .pricebook h3 { margin-top: 0; color: #2c3e50; border-bottom: 3px solid #27ae60; padding-bottom: 12px; font-weight: 700; font-size: 1.25rem; }
+  table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+  table th { background: #27ae60; color: #fff; padding: 12px; text-align: left; vertical-align: middle; }
+  table td { padding: 12px; border-bottom: 1px solid #e2e8f0; vertical-align: middle; }
+  table tr:hover { background: #f8fafc; }
+  
+  .btn-custom { background: #3498db; color: #fff; border: none; padding: 9px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; transition: background 0.2s; }
+  .btn-custom:hover { background: #2980b9; color: #fff; }
+  .btn-success-custom { background: #27ae60; color: #fff; border: none; padding: 9px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; }
+  .btn-success-custom:hover { background: #219150; }
+  
+  .discount { color: #e74c3c; font-weight: bold; background: #fdf2f2; padding: 4px 8px; border-radius: 4px; display: inline-block; }
+  .price-final { font-weight: bold; color: #27ae60; }
+</style>
+</head>
+<body>
+
+<div class="max-w-1200 mx-auto mb-4" style="max-width: 1200px; margin: 0 auto 20px auto;">
+  <h2 class="fw-bold text-dark mb-1"><i class="bi bi-book-half text-primary me-2"></i>CRM - Catalog & Price Book</h2>
+  <p class="text-muted small">Select a product catalog on the left to view and edit its price book and discounts.</p>
+</div>
+
+<div class="container-custom">
+  
+  <!-- Catalog Master -->
+  <div class="card catalog">
+    <h3>Product Catalog</h3>
+    <div id="catalogListContainer">
+      <!-- Dynamic Catalog List -->
+    </div>
+    <button class="btn-custom w-full mt-3" onclick="addNewCatalog()">+ Add Catalog</button>
+  </div>
+
+  <!-- Price Book -->
+  <div class="card pricebook">
+    <div class="d-flex justify-content-between align-items-center border-bottom pb-2">
+      <h3 class="mb-0 border-0 pb-0" id="pricebookHeader">Price Book - Power Transformers</h3>
+      <span class="badge bg-success" id="itemCountBadge">3 Items</span>
+    </div>
+
+    <div class="table-responsive">
+      <table>
+        <thead>
+          <tr>
+            <th>Product Code</th>
+            <th>Product Name</th>
+            <th class="text-end">Base Price (₹)</th>
+            <th class="text-center">Discount %</th>
+            <th class="text-end">Final Price (₹)</th>
+            <th class="text-center">Action</th>
+          </tr>
+        </thead>
+        <tbody id="pricebookTableBody">
+          <!-- Dynamic Price Book Rows -->
+        </tbody>
+      </table>
+    </div>
+
+    <div class="mt-3 d-flex gap-2">
+      <button class="btn-success-custom" onclick="openAddProductModal()">+ Add Product to Price Book</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- Modal for Adding/Editing Product in Price Book -->
+<div class="modal fade" id="productModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title fw-bold" id="modalTitle">Add Product to Price Book</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="productForm">
+          <input type="hidden" id="editIndex" value="-1">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Product Code</label>
+            <input type="text" id="prodCode" class="form-control" placeholder="e.g. TX-100KVA" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Product Name</label>
+            <input type="text" id="prodName" class="form-control" placeholder="e.g. 100 KVA Transformer" required>
+          </div>
+          <div class="row g-2 mb-3">
+            <div class="col-6">
+              <label class="form-label fw-semibold">Base Price (₹)</label>
+              <input type="number" id="basePrice" class="form-control" placeholder="250000" oninput="calculateFinal()" required>
+            </div>
+            <div class="col-6">
+              <label class="form-label fw-semibold">Discount %</label>
+              <input type="number" id="discountPercent" class="form-control" placeholder="5" value="0" oninput="calculateFinal()">
+            </div>
+          </div>
+          <div class="p-3 bg-light rounded text-end">
+            <span class="text-muted small d-block">Calculated Final Price:</span>
+            <span class="fs-4 fw-bold text-success" id="calcFinalPrice">₹0</span>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-success" onclick="saveProductRate()">Save Product Rate</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  let catalogs = [
+    { id: 'cat1', name: 'Power Transformers' },
+    { id: 'cat2', name: 'Distribution Panels' },
+    { id: 'cat3', name: 'Control Panels' },
+    { id: 'cat4', name: 'Switchgear' }
+  ];
+
+  let priceBookData = {
+    'cat1': [
+      { code: 'TX-100KVA', name: '100 KVA Transformer', basePrice: 250000, discount: 5 },
+      { code: 'TX-250KVA', name: '250 KVA Transformer', basePrice: 480000, discount: 8 },
+      { code: 'TX-500KVA', name: '500 KVA Transformer', basePrice: 890000, discount: 10 }
+    ],
+    'cat2': [
+      { code: 'DP-MAIN', name: 'Main Distribution Panel 800A', basePrice: 150000, discount: 5 },
+      { code: 'DP-SUB', name: 'Sub Distribution Panel 400A', basePrice: 85000, discount: 6 }
+    ],
+    'cat3': [
+      { code: 'CP-PLC', name: 'PLC Automation Control Panel', basePrice: 220000, discount: 7 }
+    ],
+    'cat4': [
+      { code: 'SG-HT11', name: '11KV HT Switchgear VCB', basePrice: 650000, discount: 12 }
+    ]
+  };
+
+  let activeCatalogId = 'cat1';
+  let bsModal;
+
+  document.addEventListener('DOMContentLoaded', () => {
+    bsModal = new bootstrap.Modal(document.getElementById('productModal'));
+    renderCatalogs();
+    renderPriceBook();
+  });
+
+  function renderCatalogs() {
+    const container = document.getElementById('catalogListContainer');
+    container.innerHTML = '';
+
+    catalogs.forEach((cat, idx) => {
+      const isActive = cat.id === activeCatalogId ? 'active' : '';
+      container.innerHTML += `
+        <div class="catalog-item ${isActive}" onclick="selectCatalog('${cat.id}')">
+          <span>${idx + 1}. ${cat.name}</span>
+          <i class="bi bi-chevron-right small"></i>
+        </div>
+      `;
+    });
+  }
+
+  function selectCatalog(catId) {
+    activeCatalogId = catId;
+    renderCatalogs();
+    renderPriceBook();
+  }
+
+  function renderPriceBook() {
+    const activeCat = catalogs.find(c => c.id === activeCatalogId) || catalogs[0];
+    document.getElementById('pricebookHeader').textContent = `Price Book - ${activeCat.name}`;
+
+    const items = priceBookData[activeCatalogId] || [];
+    document.getElementById('itemCountBadge').textContent = `${items.length} Items`;
+
+    const tbody = document.getElementById('pricebookTableBody');
+    if (items.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">No products in this catalog yet.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = items.map((item, idx) => {
+      const finalPrice = item.basePrice - (item.basePrice * (item.discount / 100));
+      return `
+        <tr>
+          <td class="fw-bold font-mono">${item.code}</td>
+          <td>${item.name}</td>
+          <td class="text-end">${item.basePrice.toLocaleString('en-IN')}</td>
+          <td class="text-center"><span class="discount">${item.discount}%</span></td>
+          <td class="text-end price-final">${Math.round(finalPrice).toLocaleString('en-IN')}</td>
+          <td class="text-center">
+            <button class="btn btn-sm btn-outline-primary me-1" onclick="editProduct(${idx})">Edit</button>
+            <button class="btn btn-sm btn-outline-danger" onclick="deleteProduct(${idx})"><i class="bi bi-trash"></i></button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  function calculateFinal() {
+    const baseP = parseFloat(document.getElementById('basePrice').value) || 0;
+    const disc = parseFloat(document.getElementById('discountPercent').value) || 0;
+    const finalP = Math.max(0, baseP - (baseP * (disc / 100)));
+    document.getElementById('calcFinalPrice').textContent = `₹${Math.round(finalP).toLocaleString('en-IN')}`;
+  }
+
+  function openAddProductModal() {
+    document.getElementById('editIndex').value = '-1';
+    document.getElementById('modalTitle').textContent = `Add Product to ${catalogs.find(c=>c.id===activeCatalogId).name}`;
+    document.getElementById('prodCode').value = '';
+    document.getElementById('prodName').value = '';
+    document.getElementById('basePrice').value = '';
+    document.getElementById('discountPercent').value = '0';
+    document.getElementById('calcFinalPrice').textContent = '₹0';
+    bsModal.show();
+  }
+
+  function editProduct(idx) {
+    const item = priceBookData[activeCatalogId][idx];
+    document.getElementById('editIndex').value = idx;
+    document.getElementById('modalTitle').textContent = `Edit Rate: ${item.name}`;
+    document.getElementById('prodCode').value = item.code;
+    document.getElementById('prodName').value = item.name;
+    document.getElementById('basePrice').value = item.basePrice;
+    document.getElementById('discountPercent').value = item.discount;
+    calculateFinal();
+    bsModal.show();
+  }
+
+  function saveProductRate() {
+    const code = document.getElementById('prodCode').value.trim();
+    const name = document.getElementById('prodName').value.trim();
+    const basePrice = parseFloat(document.getElementById('basePrice').value) || 0;
+    const discount = parseFloat(document.getElementById('discountPercent').value) || 0;
+    const idx = parseInt(document.getElementById('editIndex').value);
+
+    if (!code || !name || basePrice <= 0) {
+      alert('Please fill in Product Code, Name, and Base Price.');
+      return;
+    }
+
+    if (!priceBookData[activeCatalogId]) {
+      priceBookData[activeCatalogId] = [];
+    }
+
+    if (idx >= 0) {
+      priceBookData[activeCatalogId][idx] = { code, name, basePrice, discount };
+    } else {
+      priceBookData[activeCatalogId].push({ code, name, basePrice, discount });
+    }
+
+    bsModal.hide();
+    renderPriceBook();
+  }
+
+  function deleteProduct(idx) {
+    if (confirm('Remove this product rate from price book?')) {
+      priceBookData[activeCatalogId].splice(idx, 1);
+      renderPriceBook();
+    }
+  }
+
+  function addNewCatalog() {
+    const name = prompt('Enter new Catalog Name:');
+    if (name && name.trim()) {
+      const newId = 'cat_' + Date.now();
+      catalogs.push({ id: newId, name: name.trim() });
+      priceBookData[newId] = [];
+      activeCatalogId = newId;
+      renderCatalogs();
+      renderPriceBook();
+    }
+  }
+</script>
+</body>
+</html>

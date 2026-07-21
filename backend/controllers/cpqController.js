@@ -124,10 +124,14 @@ exports.deletePriceBook = async (req, res) => {
 // --- PRICE BOOK ITEMS CONTROLLERS ---
 exports.addItemToPriceBook = async (req, res) => {
     try {
-        const { priceBookId, productId, price, currency } = req.body;
+        const { priceBookId, productId, basePrice, discountPercent, price, currency } = req.body;
+        const updateData = { price, currency };
+        if (basePrice !== undefined) updateData.basePrice = basePrice;
+        if (discountPercent !== undefined) updateData.discountPercent = discountPercent;
+
         const item = await PriceBookItem.findOneAndUpdate(
             { priceBookId, productId },
-            { price, currency },
+            updateData,
             { upsert: true, new: true, setDefaultsOnInsert: true }
         );
         res.status(201).json(item);

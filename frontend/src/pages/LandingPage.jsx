@@ -1,6 +1,69 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import './LandingPage.css';
+
+const CounterItem = ({ 
+    targetValue, 
+    prefix = '', 
+    suffix = '', 
+    decimals = 0, 
+    duration = 2000,
+    intervalMs = 1500,
+    stepAmount = 1,
+    continuous = true
+}) => {
+    const [count, setCount] = useState(0);
+    const containerRef = useRef(null);
+    const [hasAnimated, setHasAnimated] = useState(false);
+
+    useEffect(() => {
+        let timer = null;
+
+        const observer = new IntersectionObserver((entries) => {
+            if (entries[0].isIntersecting && !hasAnimated) {
+                setHasAnimated(true);
+                let startTimestamp = null;
+
+                const step = (timestamp) => {
+                    if (!startTimestamp) startTimestamp = timestamp;
+                    const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+                    const easeProgress = 1 - (1 - progress) * (1 - progress);
+                    const currentCount = easeProgress * targetValue;
+                    setCount(currentCount);
+
+                    if (progress < 1) {
+                        window.requestAnimationFrame(step);
+                    } else if (continuous) {
+                        // Start continuous live increasing counter only if enabled
+                        timer = setInterval(() => {
+                            setCount(prev => prev + (decimals > 0 ? 0.01 : stepAmount));
+                        }, intervalMs);
+                    }
+                };
+                window.requestAnimationFrame(step);
+            }
+        }, { threshold: 0.2 });
+
+        if (containerRef.current) {
+            observer.observe(containerRef.current);
+        }
+
+        return () => {
+            if (timer) clearInterval(timer);
+            if (containerRef.current) {
+                observer.unobserve(containerRef.current);
+            }
+        };
+    }, [targetValue, duration, hasAnimated, intervalMs, stepAmount, decimals, continuous]);
+
+    const formattedValue = decimals > 0 ? count.toFixed(decimals) : Math.floor(count).toLocaleString();
+
+    return (
+        <div ref={containerRef} className="text-4xl text-white font-extrabold mb-1 tracking-tight font-outfit">
+            {prefix}{formattedValue}{suffix}
+        </div>
+    );
+};
 
 const LandingPage = () => {
     useEffect(() => {
@@ -48,72 +111,74 @@ const LandingPage = () => {
                         </div>
                     </div>
                     <div className="flex items-center gap-4">
-                        <Link to="/login" className="px-4 py-2 font-semibold text-xs text-[#3c4a42] hover:text-[#006c49] transition-all">Login</Link>
-                        <Link to="/register" className="primary-gradient-btn text-white px-6 py-2 rounded-lg font-semibold text-xs shadow-md hover:scale-105 transition-transform active:scale-95 text-center">Book a Demo</Link>
+                        <Link to="/login" className="px-5 py-2.5 rounded-full font-bold text-xs text-[#006c49] hover:bg-[#006c49]/10 transition-all">Sign In</Link>
+                        <Link to="/register" className="px-6 py-2.5 rounded-full font-bold text-xs text-white bg-[#006c49] hover:bg-[#005237] shadow-md shadow-[#006c49]/20 transition-all">Get Started</Link>
                     </div>
                 </nav>
             </header>
 
-            <main className="pt-20 overflow-x-hidden">
+            <main className="pt-32 overflow-x-hidden">
                 {/* Hero Section */}
-                <section className="relative pt-16 pb-24 px-6">
-                    <div className="max-w-[1280px] mx-auto grid lg:grid-cols-2 gap-16 items-center">
-                        <div className="z-10 text-left">
-                            <div className="inline-flex items-center gap-2 px-4 py-1 bg-[#006c49]/10 text-[#006c49] rounded-full mb-4 animate-pulse">
-                                <span className="material-symbols-outlined text-[16px]">spark</span>
-                                <span className="text-[11px] font-bold uppercase tracking-wider">New: AI-Powered Product Categorization</span>
+                <section className="px-6 pb-24 max-w-[1280px] mx-auto">
+                    <div className="grid lg:grid-cols-2 gap-16 items-center">
+                        <div className="space-y-6 text-left">
+                            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#006c49]/10 text-[#006c49] font-bold text-xs">
+                                <span className="material-symbols-outlined text-sm">auto_awesome</span> Next-Gen CRM Platform
                             </div>
-                            <h1 className="text-4xl lg:text-5xl font-black text-[#191c1e] mb-4 leading-tight">
-                                Win More Deals with <span className="emerald-gradient-text">Better Quotes.</span>
+                            <h1 className="text-4xl md:text-6xl font-extrabold text-[#191c1e] leading-tight tracking-tight">
+                                Streamline your sales from <span className="emerald-gradient-text">Enquiry to Invoice</span>
                             </h1>
-                            <p className="text-lg text-[#3c4a42] mb-10 max-w-lg leading-relaxed">
-                                ARCRM is the all-in-one enterprise quotation and CRM platform to create quotations, manage customers, automate approvals, track sales, and grow revenue.
+                            <p className="text-[#3c4a42] text-lg font-medium leading-relaxed">
+                                Accelerate your business with an integrated suite for quotations, CPQ, CSM ticketing, and automated payroll management.
                             </p>
-                            <div className="flex flex-wrap gap-4 mb-10">
-                                <Link to="/register" className="primary-gradient-btn text-white px-8 py-4 rounded-xl font-bold text-md shadow-lg hover:shadow-[#006c49]/20 transition-all text-center">Get Started Free</Link>
-                                <Link to="/login" className="bg-[#f7f9fb] border border-[#6c7a71] px-8 py-4 rounded-xl font-bold text-md text-[#006c49] hover:bg-[#f2f4f6] transition-all text-center">Book a Demo</Link>
-                            </div>
-                            <div className="flex gap-6 text-[#3c4a42]">
-                                <div className="flex items-center gap-2"><span className="material-symbols-outlined text-[#006c49] text-[18px]">verified_user</span> <span className="text-xs font-semibold">No credit card</span></div>
-                                <div className="flex items-center gap-2"><span className="material-symbols-outlined text-[#006c49] text-[18px]">group</span> <span className="text-xs font-semibold">Unlimited users</span></div>
-                                <div className="flex items-center gap-2"><span className="material-symbols-outlined text-[#006c49] text-[18px]">speed</span> <span className="text-xs font-semibold">Setup in minutes</span></div>
+                            <div className="flex flex-wrap gap-4 pt-2">
+                                <Link to="/register" className="px-8 py-4 rounded-full font-bold text-sm text-white bg-[#006c49] hover:bg-[#005237] shadow-lg shadow-[#006c49]/30 transition-all">
+                                    Start Free Trial
+                                </Link>
+                                <a href="#features" className="px-8 py-4 rounded-full font-bold text-sm text-[#006c49] bg-[#ffffff] border border-[#bbcabf]/50 hover:bg-[#f2f4f6] transition-all">
+                                    Book a Demo
+                                </a>
                             </div>
                         </div>
-                        <div className="relative lg:h-[600px] flex items-center justify-center">
-                            <div className="relative z-0 w-full max-w-2xl h-[420px] rounded-2xl overflow-hidden shadow-2xl border border-[#bbcabf]/30 bg-[#f7f9fb]">
-                                <img className="w-full h-full object-cover object-top" alt="A clean, high-fidelity CRM dashboard screenshot showcasing green data charts, emerald green analytics lines, and a minimalist enterprise interface in light mode." src="/screen.png" />
-                            </div>
-                            {/* Floating Glassmorphic Cards */}
-                            <div className="absolute -top-4 -right-4 z-20 glass-card p-4 rounded-xl w-48 floating" style={{ animationDelay: '0s' }}>
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-[11px] font-bold text-[#64748B] uppercase">Revenue</span>
-                                    <span className="material-symbols-outlined text-[#006c49]">trending_up</span>
+
+                        {/* Interactive Preview Box */}
+                        <div className="relative">
+                            <div className="bg-[#ffffff] rounded-3xl p-6 shadow-2xl border border-[#bbcabf]/30 space-y-4">
+                                <div className="flex items-center justify-between border-b border-[#bbcabf]/20 pb-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-3 h-3 rounded-full bg-[#ff5f56]"></div>
+                                        <div className="w-3 h-3 rounded-full bg-[#ffbd2e]"></div>
+                                        <div className="w-3 h-3 rounded-full bg-[#27c93f]"></div>
+                                    </div>
+                                    <div className="text-xs font-bold text-[#64748B] uppercase tracking-wider">Live Quotation Dashboard</div>
                                 </div>
-                                <div className="text-xl font-extrabold text-[#191c1e]">₹84,50,000</div>
-                            </div>
-                            <div className="absolute top-1/2 -left-12 z-20 glass-card p-4 rounded-xl w-44 floating" style={{ animationDelay: '0.5s' }}>
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-[11px] font-bold text-[#64748B] uppercase">Conversion</span>
-                                    <span className="material-symbols-outlined text-[#006c49]">percent</span>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="bg-[#f2f4f6] p-4 rounded-2xl">
+                                        <span className="text-[11px] font-bold text-[#64748B] uppercase">Total Revenue</span>
+                                        <div className="text-2xl font-extrabold text-[#006c49] mt-1">₹24,50,000</div>
+                                    </div>
+                                    <div className="bg-[#f2f4f6] p-4 rounded-2xl">
+                                        <span className="text-[11px] font-bold text-[#64748B] uppercase">Win Rate</span>
+                                        <div className="text-2xl font-extrabold text-[#006c49] mt-1">78.4%</div>
+                                    </div>
                                 </div>
-                                <div className="text-xl font-extrabold text-[#191c1e]">12.5%</div>
-                            </div>
-                            <div className="absolute bottom-12 -right-8 z-20 glass-card p-4 rounded-xl w-44 floating" style={{ animationDelay: '1s' }}>
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-[11px] font-bold text-[#64748B] uppercase">New Clients</span>
-                                    <span className="material-symbols-outlined text-[#006c49]">person_add</span>
+                                <div className="bg-[#f2f4f6] p-4 rounded-2xl flex items-center justify-between">
+                                    <div>
+                                        <span className="text-[11px] font-bold text-[#64748B] uppercase">Active Deals</span>
+                                        <div className="text-xl font-extrabold text-[#191c1e]">142 Proposals</div>
+                                    </div>
+                                    <span className="material-symbols-outlined text-[#006c49] text-3xl">trending_up</span>
                                 </div>
-                                <div className="text-xl font-extrabold text-[#191c1e]">1,420</div>
-                            </div>
-                            <div className="absolute -bottom-6 left-1/4 z-20 glass-card p-4 rounded-xl w-52 floating" style={{ animationDelay: '1.5s' }}>
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-[11px] font-bold text-[#64748B] uppercase">Unpaid Quotes</span>
-                                    <span className="material-symbols-outlined text-[#ba1a1a]">warning</span>
+                                <div className="bg-[#ba1a1a]/10 border border-[#ba1a1a]/20 p-4 rounded-2xl flex items-center justify-between">
+                                    <div>
+                                        <span className="text-[11px] font-bold text-[#64748B] uppercase">Unpaid Quotes</span>
+                                        <span className="material-symbols-outlined text-[#ba1a1a]">warning</span>
+                                    </div>
+                                    <div className="text-xl font-extrabold text-[#191c1e]">₹3,20,000</div>
                                 </div>
-                                <div className="text-xl font-extrabold text-[#191c1e]">₹3,20,000</div>
+                                {/* Decorative Element */}
+                                <div className="absolute -z-10 w-[120%] h-[120%] bg-[#006c49]/5 blur-3xl rounded-full"></div>
                             </div>
-                            {/* Decorative Element */}
-                            <div className="absolute -z-10 w-[120%] h-[120%] bg-[#006c49]/5 blur-3xl rounded-full"></div>
                         </div>
                     </div>
                 </section>
@@ -136,19 +201,19 @@ const LandingPage = () => {
                 <section className="bg-[#059669] py-16">
                     <div className="max-w-[1280px] mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-10 text-center">
                         <div>
-                            <div className="text-4xl text-white font-extrabold mb-1">10K+</div>
+                            <CounterItem targetValue={10480} suffix="+" intervalMs={1200} stepAmount={1} />
                             <div className="text-white/80 font-semibold text-[11px] uppercase tracking-wider">Quotations Created</div>
                         </div>
                         <div>
-                            <div className="text-4xl text-white font-extrabold mb-1">500+</div>
+                            <CounterItem targetValue={500} suffix="+" intervalMs={2000} stepAmount={1} />
                             <div className="text-white/80 font-semibold text-[11px] uppercase tracking-wider">Enterprises</div>
                         </div>
                         <div>
-                            <div className="text-4xl text-white font-extrabold mb-1">₹500Cr+</div>
+                            <CounterItem targetValue={500} prefix="₹" suffix="Cr+" intervalMs={2500} stepAmount={1} />
                             <div className="text-white/80 font-semibold text-[11px] uppercase tracking-wider">Deals Managed</div>
                         </div>
                         <div>
-                            <div className="text-4xl text-white font-extrabold mb-1">99.9%</div>
+                            <CounterItem targetValue={99.9} suffix="%" decimals={1} continuous={false} />
                             <div className="text-white/80 font-semibold text-[11px] uppercase tracking-wider">Uptime SLA</div>
                         </div>
                     </div>

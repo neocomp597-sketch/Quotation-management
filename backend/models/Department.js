@@ -2,9 +2,17 @@ const mongoose = require('mongoose');
 const tenantPlugin = require('./plugins/tenantPlugin');
 
 const DepartmentSchema = new mongoose.Schema({
+    code: {
+        type: String,
+        trim: true
+    },
     name: {
         type: String,
         required: true,
+        trim: true
+    },
+    head: {
+        type: String,
         trim: true
     },
     description: {

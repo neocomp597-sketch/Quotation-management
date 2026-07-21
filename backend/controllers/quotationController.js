@@ -812,8 +812,8 @@ const finalizeQuotation = async (req, res) => {
         const quotation = await Quotation.findById(id);
         if (!quotation) return res.status(404).json({ message: 'Quotation not found' });
 
-        if (quotation.status !== 'draft') {
-            return res.status(400).json({ message: 'Only draft quotations can be finalized' });
+        if (quotation.status !== 'draft' && quotation.status !== 'pending_approval') {
+            return res.status(400).json({ message: 'Only draft or pending quotations can be finalized. Rejected quotations must be edited first.' });
         }
 
         // Run validation checks
@@ -828,8 +828,14 @@ const finalizeQuotation = async (req, res) => {
             }
         });
 
+        const userRole = String(req.user?.role || '').toLowerCase();
+        const isApprover = ['admin', 'manager', 'super_admin', 'superadmin'].includes(userRole);
+
         if (minMargin < 0) {
-            return res.status(400).json({ message: "Margin is negative. Quote finalization blocked." });
+            if (!isApprover) {
+                return res.status(400).json({ message: "Margin is negative. Quote finalization requires Manager/Admin clearance." });
+            }
+            requiresApproval = true;
         } else if (minMargin < 10) {
             requiresApproval = true;
         }
@@ -837,9 +843,6 @@ const finalizeQuotation = async (req, res) => {
         if (quotation.grandTotal > 1000000) {
             requiresApproval = true;
         }
-
-        const userRole = String(req.user?.role || '').toLowerCase();
-        const isApprover = ['admin', 'manager', 'super_admin', 'superadmin'].includes(userRole);
 
         let targetStatus = 'final';
         let messageText = `Quotation ${quotation.quotationNo} for ${quotation.customerName} has been finalized by ${req.user?.name || 'a user'}.`;

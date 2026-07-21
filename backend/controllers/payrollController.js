@@ -706,11 +706,11 @@ exports.getDepartments = async (req, res) => {
         let departments = await Department.find().sort({ name: 1 }).lean();
         if (departments.length === 0) {
             const defaults = [
-                { name: 'Sales', description: 'Sales and business development' },
-                { name: 'Accounts', description: 'Finance, accounts, and tax' },
-                { name: 'HR', description: 'Human resources and recruitment' },
-                { name: 'Engineering', description: 'Product development and engineering' },
-                { name: 'Operations', description: 'Operations and logistics' }
+                { name: 'Sales Department', description: 'Sales and business development' },
+                { name: 'Support Department', description: 'Customer support and service' },
+                { name: 'Marketing Department', description: 'Marketing and brand management' },
+                { name: 'Accounts Department', description: 'Finance, accounts, and tax' },
+                { name: 'HR Department', description: 'Human resources and recruitment' }
             ];
             await Department.insertMany(defaults);
             departments = await Department.find().sort({ name: 1 }).lean();

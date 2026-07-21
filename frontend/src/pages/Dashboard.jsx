@@ -81,6 +81,14 @@ const Dashboard = () => {
         };
 
         fetchDashboardData();
+
+        const handleRealtimeUpdate = (e) => {
+            console.log('[Dashboard] Live real-time update received:', e.detail);
+            fetchDashboardData();
+        };
+
+        window.addEventListener('onCrmSocketUpdate', handleRealtimeUpdate);
+        return () => window.removeEventListener('onCrmSocketUpdate', handleRealtimeUpdate);
     }, []);
 
     const statItems = [
@@ -146,13 +154,13 @@ const Dashboard = () => {
         <div className="space-y-8 animate-fade-in-up">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-black text-slate-900 tracking-tight font-outfit uppercase">Dashboard Overview</h1>
-                    <p className="text-slate-500 font-semibold mt-1">Real-time performance metrics</p>
+                    <h1 className="text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight font-outfit uppercase">Dashboard Overview</h1>
+                    <p className="text-slate-500 dark:text-slate-400 font-semibold mt-1">Real-time performance metrics</p>
                 </div>
                 <div className="flex items-center gap-3">
                     <Link
                         to="/simulations"
-                        className="px-5 py-2.5 bg-slate-900 rounded-2xl text-sm font-bold text-white hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/10 flex items-center gap-2"
+                        className="px-5 py-2.5 bg-slate-900 dark:bg-slate-800 rounded-2xl text-sm font-bold text-white hover:bg-slate-800 dark:hover:bg-slate-700 transition-all shadow-lg shadow-slate-900/10 flex items-center gap-2"
                     >
                         <MdAutoGraph size={18} /> Pricing Simulator
                     </Link>
@@ -181,13 +189,13 @@ const Dashboard = () => {
                 ))}
             </div>
 
-            <div className="bg-white rounded-3xl border border-slate-100 overflow-hidden shadow-sm">
-                <div className="p-6 border-b border-slate-50 flex items-center justify-between bg-slate-50/30">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 overflow-hidden shadow-sm">
+                <div className="p-6 border-b border-slate-50 dark:border-slate-800 flex items-center justify-between bg-slate-50/30 dark:bg-slate-800/30">
                     <div>
-                        <h2 className="text-xl font-black text-slate-900">Recent Quotations</h2>
+                        <h2 className="text-xl font-black text-slate-900 dark:text-slate-100">Recent Quotations</h2>
                         <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mt-1">Last 5 activities</p>
                     </div>
-                    <Link to="/quotations" className="px-4 py-2 text-sm font-bold text-primary-600 hover:bg-white rounded-xl transition-all border border-slate-100 shadow-sm">
+                    <Link to="/quotations" className="px-4 py-2 text-sm font-bold text-primary-600 dark:text-primary-400 hover:bg-white dark:hover:bg-slate-800 rounded-xl transition-all border border-slate-100 dark:border-slate-700 shadow-sm">
                         View All
                     </Link>
                 </div>
@@ -201,7 +209,7 @@ const Dashboard = () => {
                     ) : (
                         <table className="w-full text-left border-collapse">
                             <thead>
-                                <tr className="bg-white">
+                                <tr className="bg-white dark:bg-slate-900">
                                     <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Ref Number</th>
                                     <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Customer</th>
                                     <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Amount</th>
@@ -209,21 +217,21 @@ const Dashboard = () => {
                                     <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Actions</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-50">
+                            <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
                                 {recentQuotations.length > 0 ? (
                                     recentQuotations.map((q) => (
-                                        <tr key={q._id} className="hover:bg-slate-50 transition-colors group">
-                                            <td className="px-6 py-4 text-sm font-black text-slate-900 uppercase">#{q.quotationNo}</td>
-                                            <td className="px-6 py-4 text-sm font-bold text-slate-700">
+                                        <tr key={q._id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
+                                            <td className="px-6 py-4 text-sm font-black text-slate-900 dark:text-slate-100 uppercase">#{q.quotationNo}</td>
+                                            <td className="px-6 py-4 text-sm font-bold text-slate-700 dark:text-slate-300">
                                                 {q.customerId?.companyName || 'N/A'}
                                                 <span className="block text-[10px] text-slate-400 font-bold uppercase mt-1">{q.customerId?.customerName}</span>
                                             </td>
-                                            <td className="px-6 py-4 text-sm font-black text-slate-900">{formatCurrency(q.grandTotal)}</td>
+                                            <td className="px-6 py-4 text-sm font-black text-slate-900 dark:text-slate-100">{formatCurrency(q.grandTotal)}</td>
                                             <td className="px-6 py-4 text-center">
                                                 <span className={`inline-flex px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                                                    q.status === 'final' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
-                                                    q.status === 'draft' ? 'bg-amber-50 text-amber-600 border border-amber-100' :
-                                                    'bg-blue-50 text-blue-600 border border-blue-100'
+                                                    q.status === 'final' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800' :
+                                                    q.status === 'draft' ? 'bg-amber-50 text-amber-600 border border-amber-100 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800' :
+                                                    'bg-blue-50 text-blue-600 border border-blue-100 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-800'
                                                 }`}>
                                                     {q.status}
                                                 </span>
@@ -231,11 +239,11 @@ const Dashboard = () => {
                                             <td className="px-6 py-4 text-right">
                                                 <div className="flex items-center justify-end gap-2">
                                                     <PDFDownloadLink document={<QuotationPDF quotation={q} />} fileName={`${q.quotationNo}.pdf`}>
-                                                        <button className="p-2 text-slate-400 hover:text-rose-600 hover:bg-white hover:ring-1 hover:ring-slate-100 rounded-xl transition-all">
+                                                        <button className="p-2 text-slate-400 hover:text-rose-600 hover:bg-white dark:hover:bg-slate-800 hover:ring-1 hover:ring-slate-100 dark:hover:ring-slate-700 rounded-xl transition-all">
                                                             <MdPictureAsPdf size={18} />
                                                         </button>
                                                     </PDFDownloadLink>
-                                                    <Link to={`/quotations?view=${q._id}`} className="p-2 text-slate-400 hover:text-primary-600 hover:bg-white hover:ring-1 hover:ring-slate-100 rounded-xl transition-all">
+                                                    <Link to={`/quotations?view=${q._id}`} className="p-2 text-slate-400 hover:text-primary-600 hover:bg-white dark:hover:bg-slate-800 hover:ring-1 hover:ring-slate-100 dark:hover:ring-slate-700 rounded-xl transition-all">
                                                         <MdVisibility size={18} />
                                                     </Link>
                                                 </div>
