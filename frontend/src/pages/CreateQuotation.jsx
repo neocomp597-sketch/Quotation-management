@@ -422,11 +422,19 @@ const CreateQuotation = () => {
     // Fetch quotation details if in edit mode
     useEffect(() => {
         if (id) {
+            let isSubscribed = true;
             const fetchQuotation = async () => {
                 setLoading(true);
                 try {
                     const res = await quotationService.getById(id);
+                    if (!isSubscribed) return;
                     const q = res.data;
+                    if (!q) {
+                        toast.error('Quotation not found');
+                        navigate('/quotations');
+                        return;
+                    }
+
                     if (q.customerId && typeof q.customerId === 'object') {
                         setCustomers(prev => (
                             prev.some(c => c._id === q.customerId._id)
@@ -435,46 +443,68 @@ const CreateQuotation = () => {
                         ));
                     }
 
+                    const custId = q.customerId?._id || q.customerId || '';
+
                     setHeader({
-                        quotationNo: q.quotationNo,
-                        quotationDate: new Date(q.quotationDate).toISOString().split('T')[0],
-                        validTill: new Date(q.validTill).toISOString().split('T')[0],
-                        customerId: q.customerId._id || q.customerId, // Handle populated or raw ID
+                        quotationNo: q.quotationNo || 'AUTO-GEN',
+                        quotationDate: (q.quotationDate && !isNaN(new Date(q.quotationDate))) 
+                            ? new Date(q.quotationDate).toISOString().split('T')[0] 
+                            : new Date().toISOString().split('T')[0],
+                        validTill: (q.validTill && !isNaN(new Date(q.validTill))) 
+                            ? new Date(q.validTill).toISOString().split('T')[0] 
+                            : '',
+                        customerId: custId,
                         salespersonName: q.salespersonName || '',
                         siteId: q.siteId?._id || q.siteId || '',
                         paymentTerms: q.paymentTerms || '15 Days Credit',
                         irnNo: q.irnNo || '',
                         ackNo: q.ackNo || '',
-                        ackDate: q.ackDate ? new Date(q.ackDate).toISOString().split('T')[0] : ''
+                        ackDate: (q.ackDate && !isNaN(new Date(q.ackDate))) 
+                            ? new Date(q.ackDate).toISOString().split('T')[0] 
+                            : ''
                     });
 
-                    const mappedItems = q.items.map(item => ({
-                        productId: item.productId._id || item.productId,
-                        productName: item.productSnapshot?.productName || '',
-                        productCode: item.productSnapshot?.productCode || '',
-                        productImageUrl: item.productSnapshot?.productImageUrl || '',
-                        hsnCode: item.productSnapshot?.hsnCode || '',
-                        uom: item.productSnapshot?.uom || '',
-                        gstPercentage: item.productSnapshot?.gstPercentage || 18,
-                        quantity: item.quantity,
-                        rate: item.unitPrice || item.rate,
-                        unitPrice: item.unitPrice || item.rate,
-                        discountPercent: item.discountPercent,
-                        siteId: item.siteId?._id || item.siteId || '',
-                        vendorId: item.vendorId?._id || item.vendorId || '',
-                        vendorName: item.vendorName || item.vendorId?.name || '',
-                        vendorPrice: item.vendorPrice || item.unitPrice || item.rate,
-                        vendorStockAtSelection: item.vendorStockAtSelection ?? 0,
-                        isVendorAutoSelected: item.isVendorAutoSelected !== false,
-                        vendorOptions: [],
-                        ...calculateLineItem(item.quantity, item.unitPrice || item.rate, item.discountPercent, item.productSnapshot?.gstPercentage || 18)
-                    }));
+                    const mappedItems = (q.items || []).map(item => {
+                        const pid = item.productId?._id || item.productId || '';
+                        const pName = item.productSnapshot?.productName || item.productId?.productName || '';
+                        const pCode = item.productSnapshot?.productCode || item.productId?.productCode || '';
+                        const pImg = item.productSnapshot?.productImageUrl || item.productId?.productImageUrl || '';
+                        const hsn = item.productSnapshot?.hsnCode || item.productId?.hsnCode || '';
+                        const uom = item.productSnapshot?.uom || item.productId?.uom || '';
+                        const gst = item.productSnapshot?.gstPercentage || item.productId?.gstPercentage || 18;
+                        const qty = Number(item.quantity || 1);
+                        const rate = Number(item.unitPrice || item.rate || 0);
+                        const disc = Number(item.discountPercent || 0);
+
+                        return {
+                            productId: pid,
+                            productName: pName,
+                            productCode: pCode,
+                            productImageUrl: pImg,
+                            hsnCode: hsn,
+                            uom: uom,
+                            gstPercentage: gst,
+                            quantity: qty,
+                            rate: rate,
+                            unitPrice: rate,
+                            discountPercent: disc,
+                            siteId: item.siteId?._id || item.siteId || '',
+                            vendorId: item.vendorId?._id || item.vendorId || '',
+                            vendorName: item.vendorName || item.vendorId?.name || '',
+                            vendorPrice: Number(item.vendorPrice || rate),
+                            vendorStockAtSelection: item.vendorStockAtSelection ?? 0,
+                            isVendorAutoSelected: item.isVendorAutoSelected !== false,
+                            vendorOptions: [],
+                            ...calculateLineItem(qty, rate, disc, gst)
+                        };
+                    });
 
                     const enrichedItems = await Promise.all(mappedItems.map(async (item) => {
+                        if (!item.productId) return item;
                         try {
                             const productRes = await productService.getById(item.productId);
                             const productWithVendors = productRes.data;
-                            const sortedVendorOptions = sortVendors(productWithVendors.vendors || []);
+                            const sortedVendorOptions = sortVendors(productWithVendors?.vendors || []);
 
                             let selectedVendor = sortedVendorOptions.find(v => String(v.vendorId?._id || v.vendorId) === String(item.vendorId));
                             if (!selectedVendor) selectedVendor = getBestVendor(sortedVendorOptions);
@@ -491,22 +521,28 @@ const CreateQuotation = () => {
                         }
                     }));
 
+                    if (!isSubscribed) return;
                     setItems(enrichedItems);
 
                     setSelectedTermsTemplateId(q.termsTemplateId?._id || q.termsTemplateId || '');
                     setTermsContent(q.customTerms || '');
-                    const totalItemDiscount = q.items.reduce((sum, i) => sum + (i.discountAmount || 0), 0);
+                    const totalItemDiscount = (q.items || []).reduce((sum, i) => sum + (i?.discountAmount || 0), 0);
                     setOverallDiscount(Math.max(0, (q.totalDiscount || 0) - totalItemDiscount));
 
                 } catch (err) {
                     console.error("Error fetching quotation:", err);
-                    toast.error('Failed to load quotation for editing');
-                    navigate('/quotations');
+                    if (isSubscribed) {
+                        toast.error('Failed to load quotation for editing');
+                        navigate('/quotations');
+                    }
                 } finally {
-                    setLoading(false);
+                    if (isSubscribed) {
+                        setLoading(false);
+                    }
                 }
             };
             fetchQuotation();
+            return () => { isSubscribed = false; };
         }
     }, [id, navigate]);
 

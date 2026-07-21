@@ -254,6 +254,15 @@ const PlanningScreen = () => {
 
   const [customers, setCustomers] = useState([]);
   const [products, setProducts] = useState([]);
+  const [customerPage, setCustomerPage] = useState(1);
+  const [customerTotalPages, setCustomerTotalPages] = useState(1);
+  const [isCustomerLoadingMore, setIsCustomerLoadingMore] = useState(false);
+  const isCustomerLoadingMoreRef = useRef(false);
+
+  const [productPage, setProductPage] = useState(1);
+  const [productTotalPages, setProductTotalPages] = useState(1);
+  const [isProductLoadingMore, setIsProductLoadingMore] = useState(false);
+  const isProductLoadingMoreRef = useRef(false);
   const [mgrList, setMgrList] = useState([]);
   const [mgrList2, setMgrList2] = useState([]);
   const [statusOptions, setStatusOptions] = useState([]);
@@ -372,21 +381,109 @@ const PlanningScreen = () => {
     }
   }, [financialYear, filters, offset, limit]);
 
+  const fetchMoreCustomers = useCallback(async (page, searchVal = "", append = false) => {
+    if (isCustomerLoadingMoreRef.current) return;
+    isCustomerLoadingMoreRef.current = true;
+    setIsCustomerLoadingMore(true);
+    try {
+      const res = await customerService.getAll({
+        page,
+        limit: 50,
+        search: searchVal.trim() || undefined,
+      });
+      const data = Array.isArray(res.data) ? res.data : res.data?.data || [];
+      const pagination = res.data?.pagination || {};
+      const totalPages = pagination.pages || Math.ceil((pagination.total || data.length) / 50) || 1;
+
+      setCustomerTotalPages(totalPages);
+      setCustomerPage(page);
+
+      if (append) {
+        setCustomers((prev) => {
+          const existingIds = new Set(prev.map((c) => c._id));
+          const uniqueNew = data.filter((c) => !existingIds.has(c._id));
+          return [...prev, ...uniqueNew];
+        });
+      } else {
+        setCustomers(data);
+      }
+    } catch (err) {
+      console.error("Error fetching customers:", err);
+    } finally {
+      isCustomerLoadingMoreRef.current = false;
+      setIsCustomerLoadingMore(false);
+    }
+  }, []);
+
+  const fetchMoreProducts = useCallback(async (page, searchVal = "", append = false) => {
+    if (isProductLoadingMoreRef.current) return;
+    isProductLoadingMoreRef.current = true;
+    setIsProductLoadingMore(true);
+    try {
+      const res = await productService.getAll({
+        page,
+        limit: 50,
+        search: searchVal.trim() || undefined,
+      });
+      const data = Array.isArray(res.data) ? res.data : res.data?.data || [];
+      const pagination = res.data?.pagination || {};
+      const totalPages = pagination.pages || Math.ceil((pagination.total || data.length) / 50) || 1;
+
+      setProductTotalPages(totalPages);
+      setProductPage(page);
+
+      if (append) {
+        setProducts((prev) => {
+          const existingIds = new Set(prev.map((p) => p._id));
+          const uniqueNew = data.filter((p) => !existingIds.has(p._id));
+          return [...prev, ...uniqueNew];
+        });
+      } else {
+        setProducts(data);
+      }
+    } catch (err) {
+      console.error("Error fetching products:", err);
+    } finally {
+      isProductLoadingMoreRef.current = false;
+      setIsProductLoadingMore(false);
+    }
+  }, []);
+
+  const handleCustomerScroll = useCallback(
+    (e) => {
+      const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+      if (scrollHeight - scrollTop - clientHeight < 50) {
+        if (!isCustomerLoadingMoreRef.current && customerPage < customerTotalPages) {
+          fetchMoreCustomers(customerPage + 1, customerSearch, true);
+        }
+      }
+    },
+    [customerPage, customerTotalPages, customerSearch, fetchMoreCustomers]
+  );
+
+  const handleProductScroll = useCallback(
+    (e) => {
+      const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+      if (scrollHeight - scrollTop - clientHeight < 50) {
+        if (!isProductLoadingMoreRef.current && productPage < productTotalPages) {
+          fetchMoreProducts(productPage + 1, productSearch, true);
+        }
+      }
+    },
+    [productPage, productTotalPages, productSearch, fetchMoreProducts]
+  );
+
   const fetchMasters = useCallback(async () => {
     try {
-      const [custRes, prodRes, mgrRes, mgr2Res, statusRes] = await Promise.all([
-        customerService.getAll({ limit: 50 }),
-        productService.getAll({ limit: 50 }),
+      const [mgrRes, mgr2Res, statusRes] = await Promise.all([
         mgrService.getAll("MGR1"),
         mgrService.getAll("MGR2"),
         statusService.getAll(),
       ]);
 
-      const custData = Array.isArray(custRes.data) ? custRes.data : custRes.data.data || [];
-      const prodData = Array.isArray(prodRes.data) ? prodRes.data : prodRes.data.data || [];
+      fetchMoreCustomers(1, "", false);
+      fetchMoreProducts(1, "", false);
 
-      setCustomers(custData);
-      setProducts(prodData);
       setMgrList(
         dedupeMgrOptions(
           mgrRes.data.filter((mgr) => mgr.status === "Active"),
@@ -407,7 +504,7 @@ const PlanningScreen = () => {
     } catch (err) {
       console.error("Failed to load master data:", err);
     }
-  }, []);
+  }, [fetchMoreCustomers, fetchMoreProducts]);
 
   useEffect(() => {
     fetchMasters();
@@ -416,38 +513,20 @@ const PlanningScreen = () => {
   // Debounced search for customers
   useEffect(() => {
     if (!showCustomerDropdown) return;
-    const timer = setTimeout(async () => {
-      try {
-        const res = await customerService.getAll({
-          limit: 50,
-          search: customerSearch.trim() || undefined,
-        });
-        const data = Array.isArray(res.data) ? res.data : res.data.data || [];
-        setCustomers(data);
-      } catch (err) {
-        console.error("Error searching customers:", err);
-      }
+    const timer = setTimeout(() => {
+      fetchMoreCustomers(1, customerSearch, false);
     }, 300);
     return () => clearTimeout(timer);
-  }, [customerSearch, showCustomerDropdown]);
+  }, [customerSearch, showCustomerDropdown, fetchMoreCustomers]);
 
   // Debounced search for products
   useEffect(() => {
     if (!showProductDropdown) return;
-    const timer = setTimeout(async () => {
-      try {
-        const res = await productService.getAll({
-          limit: 50,
-          search: productSearch.trim() || undefined,
-        });
-        const data = Array.isArray(res.data) ? res.data : res.data.data || [];
-        setProducts(data);
-      } catch (err) {
-        console.error("Error searching products:", err);
-      }
+    const timer = setTimeout(() => {
+      fetchMoreProducts(1, productSearch, false);
     }, 300);
     return () => clearTimeout(timer);
-  }, [productSearch, showProductDropdown]);
+  }, [productSearch, showProductDropdown, fetchMoreProducts]);
 
   // Reset pagination when filters change
   useEffect(() => {
@@ -513,12 +592,38 @@ const PlanningScreen = () => {
   }, [financialYear]);
 
   const filteredCustomers = useMemo(() => {
-    return (customers || []).slice(0, 10);
-  }, [customers]);
+    if (!customerSearch || !customerSearch.trim()) return customers || [];
+    const term = customerSearch.trim().toLowerCase();
+    return (customers || []).filter((c) => {
+      const company = (c.companyName || "").toLowerCase();
+      const customer = (c.customerName || "").toLowerCase();
+      const code = (c.externalCode || "").toLowerCase();
+      const gstin = (c.gstin || "").toLowerCase();
+      const mobile = (c.mobile || "").toLowerCase();
+      return (
+        company.includes(term) ||
+        customer.includes(term) ||
+        code.includes(term) ||
+        gstin.includes(term) ||
+        mobile.includes(term)
+      );
+    });
+  }, [customers, customerSearch]);
 
   const filteredProducts = useMemo(() => {
-    return (products || []).slice(0, 10);
-  }, [products]);
+    if (!productSearch || !productSearch.trim()) return products || [];
+    const term = productSearch.trim().toLowerCase();
+    return (products || []).filter((p) => {
+      const name = (p.productName || "").toLowerCase();
+      const code = (p.productCode || "").toLowerCase();
+      const hsn = (p.hsnCode || "").toLowerCase();
+      return (
+        name.includes(term) ||
+        code.includes(term) ||
+        hsn.includes(term)
+      );
+    });
+  }, [products, productSearch]);
 
   const filteredEntries = useMemo(() => {
     // The entries are already filtered by the backend
@@ -1739,88 +1844,156 @@ const PlanningScreen = () => {
                       )}
                     </td>
                     <td ref={customerAnchorRef} className="py-2 px-2 border border-slate-200">
-                      <input
-                        type="text"
-                        value={customerSearch}
-                        onChange={(e) => {
-                          setCustomerSearch(e.target.value);
-                          handleNewRowChange("customerId", "");
-                          handleNewRowChange("customerName", "");
-                          setShowCustomerDropdown(true);
-                        }}
-                        onFocus={() => {
-                          setShowCustomerDropdown(true);
-                          setShowProductDropdown(false);
-                        }}
-                        placeholder="Type customer name"
-                        className={compactFieldClass}
-                      />
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={customerSearch}
+                          onChange={(e) => {
+                            setCustomerSearch(e.target.value);
+                            handleNewRowChange("customerId", "");
+                            handleNewRowChange("customerName", "");
+                            setShowCustomerDropdown(true);
+                          }}
+                          onFocus={() => {
+                            setShowCustomerDropdown(true);
+                            setShowProductDropdown(false);
+                            setShowMgr1Dropdown(false);
+                            setShowMgr2Dropdown(false);
+                            setShowStatusDropdown(false);
+                          }}
+                          placeholder="Search / Select customer..."
+                          className={compactFieldClass}
+                        />
+                      </div>
                       <PortalDropdown
                         isOpen={showCustomerDropdown}
                         anchorRef={customerAnchorRef}
                       >
-                        <div className="portal-dropdown-content bg-white border border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto custom-scrollbar">
-                          {filteredCustomers.length > 0 ? (
-                            filteredCustomers.map((customer) => (
-                              <button
-                                key={customer._id}
-                                onClick={() => selectCustomer(customer)}
-                                className="w-full text-left px-3 py-2.5 text-sm font-bold hover:bg-primary-50 transition-colors border-b border-slate-50"
-                              >
-                                <div>
-                                  {customer.companyName || customer.customerName}
-                                </div>
-                                <div className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                                  {customer.externalCode ||
-                                    getFallbackCode("CUST", customer._id)}
-                                </div>
-                              </button>
-                            ))
-                          ) : (
-                            <div className="px-4 py-3 text-sm text-slate-500 font-bold text-center">
-                              No customers found
-                            </div>
-                          )}
+                        <div className="portal-dropdown-content bg-white border border-slate-200 rounded-xl shadow-2xl min-w-[300px] max-h-64 flex flex-col overflow-hidden">
+                          <div className="p-2 border-b border-slate-100 bg-slate-50">
+                            <input
+                              type="text"
+                              value={customerSearch}
+                              onChange={(e) => {
+                                setCustomerSearch(e.target.value);
+                                handleNewRowChange("customerId", "");
+                                handleNewRowChange("customerName", "");
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              placeholder="Search by name, GSTIN, code..."
+                              className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-primary-500 bg-white"
+                            />
+                          </div>
+                          <div
+                            onScroll={handleCustomerScroll}
+                            className="overflow-y-auto custom-scrollbar flex-1 max-h-52 divide-y divide-slate-50"
+                          >
+                            {filteredCustomers.length > 0 ? (
+                              filteredCustomers.map((customer) => (
+                                <button
+                                  key={customer._id}
+                                  type="button"
+                                  onClick={() => selectCustomer(customer)}
+                                  className="w-full text-left px-3 py-2.5 hover:bg-primary-50 transition-colors border-b border-slate-50 group"
+                                >
+                                  <div className="font-bold text-slate-900 text-xs truncate">
+                                    {customer.companyName || customer.customerName}
+                                  </div>
+                                  <div className="text-[10px] text-slate-500 font-medium truncate mt-0.5">
+                                    {customer.customerName && customer.companyName ? `${customer.customerName} • ` : ""}
+                                    {customer.externalCode || getFallbackCode("CUST", customer._id)}
+                                    {customer.gstin ? ` • GST: ${customer.gstin}` : ""}
+                                  </div>
+                                </button>
+                              ))
+                            ) : (
+                              <div className="px-4 py-3 text-xs text-slate-400 font-bold text-center">
+                                No customers found {customerSearch ? `matching "${customerSearch}"` : ""}
+                              </div>
+                            )}
+                            {isCustomerLoadingMore && (
+                              <div className="p-2 text-center text-[10px] font-bold text-primary-600 uppercase tracking-widest animate-pulse">
+                                Loading more customers...
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </PortalDropdown>
                     </td>
                     <td ref={productAnchorRef} className="py-2 px-2 border border-slate-200">
-                      <input
-                        type="text"
-                        value={productSearch}
-                        onChange={(e) => {
-                          setProductSearch(e.target.value);
-                          handleNewRowChange("productId", "");
-                          handleNewRowChange("productName", "");
-                          setShowProductDropdown(true);
-                        }}
-                        onFocus={() => {
-                          setShowProductDropdown(true);
-                          setShowCustomerDropdown(false);
-                        }}
-                        placeholder="Type product name"
-                        className={compactFieldClass}
-                      />
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={productSearch}
+                          onChange={(e) => {
+                            setProductSearch(e.target.value);
+                            handleNewRowChange("productId", "");
+                            handleNewRowChange("productName", "");
+                            setShowProductDropdown(true);
+                          }}
+                          onFocus={() => {
+                            setShowProductDropdown(true);
+                            setShowCustomerDropdown(false);
+                            setShowMgr1Dropdown(false);
+                            setShowMgr2Dropdown(false);
+                            setShowStatusDropdown(false);
+                          }}
+                          placeholder="Search / Select product..."
+                          className={compactFieldClass}
+                        />
+                      </div>
                       <PortalDropdown
                         isOpen={showProductDropdown}
                         anchorRef={productAnchorRef}
                       >
-                        <div className="portal-dropdown-content bg-white border border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto custom-scrollbar">
-                          {filteredProducts.length > 0 ? (
-                            filteredProducts.map((product) => (
-                              <button
-                                key={product._id}
-                                onClick={() => selectProduct(product)}
-                                className="w-full text-left px-3 py-2.5 text-sm font-bold hover:bg-primary-50 transition-colors border-b border-slate-50"
-                              >
-                                {product.productName}
-                              </button>
-                            ))
-                          ) : (
-                            <div className="px-4 py-3 text-sm text-slate-500 font-bold text-center">
-                              No products found
-                            </div>
-                          )}
+                        <div className="portal-dropdown-content bg-white border border-slate-200 rounded-xl shadow-2xl min-w-[300px] max-h-64 flex flex-col overflow-hidden">
+                          <div className="p-2 border-b border-slate-100 bg-slate-50">
+                            <input
+                              type="text"
+                              value={productSearch}
+                              onChange={(e) => {
+                                setProductSearch(e.target.value);
+                                handleNewRowChange("productId", "");
+                                handleNewRowChange("productName", "");
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              placeholder="Search by product name, code, HSN..."
+                              className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-primary-500 bg-white"
+                            />
+                          </div>
+                          <div
+                            onScroll={handleProductScroll}
+                            className="overflow-y-auto custom-scrollbar flex-1 max-h-52 divide-y divide-slate-50"
+                          >
+                            {filteredProducts.length > 0 ? (
+                              filteredProducts.map((product) => (
+                                <button
+                                  key={product._id}
+                                  type="button"
+                                  onClick={() => selectProduct(product)}
+                                  className="w-full text-left px-3 py-2.5 hover:bg-primary-50 transition-colors border-b border-slate-50 group"
+                                >
+                                  <div className="font-bold text-slate-900 text-xs truncate">
+                                    {product.productName}
+                                  </div>
+                                  <div className="text-[10px] text-slate-500 font-medium truncate mt-0.5">
+                                    {product.productCode ? `Code: ${product.productCode}` : ""}
+                                    {product.hsnCode ? ` • HSN: ${product.hsnCode}` : ""}
+                                    {product.basePrice ? ` • ₹${product.basePrice.toLocaleString('en-IN')}` : ""}
+                                  </div>
+                                </button>
+                              ))
+                            ) : (
+                              <div className="px-4 py-3 text-xs text-slate-400 font-bold text-center">
+                                No products found {productSearch ? `matching "${productSearch}"` : ""}
+                              </div>
+                            )}
+                            {isProductLoadingMore && (
+                              <div className="p-2 text-center text-[10px] font-bold text-primary-600 uppercase tracking-widest animate-pulse">
+                                Loading more products...
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </PortalDropdown>
                     </td>

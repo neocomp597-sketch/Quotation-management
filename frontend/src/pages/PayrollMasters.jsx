@@ -130,6 +130,7 @@ const PayrollMasters = () => {
 
     // Master Form state
     const [editingMasterDeptId, setEditingMasterDeptId] = useState(null);
+    const [assignEmpSearch, setAssignEmpSearch] = useState('');
     const [masterForm, setMasterForm] = useState({
         code: '',
         name: '',
@@ -399,6 +400,7 @@ const PayrollMasters = () => {
 
     const handleResetMasterForm = () => {
         setEditingMasterDeptId(null);
+        setAssignEmpSearch('');
         setMasterForm({
             code: '',
             name: '',
@@ -833,29 +835,103 @@ const PayrollMasters = () => {
 
                             {/* Assign Employees Checkbox Box */}
                             <div>
-                                <label className="block text-xs font-bold text-slate-700 mb-2">
-                                    Assign Employees to Department
-                                </label>
-                                <div className="max-h-44 overflow-y-auto border border-slate-200 rounded-xl p-3 bg-slate-50 space-y-2">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+                                    <label className="block text-xs font-bold text-slate-700">
+                                        Assign Employees to Department
+                                        {masterForm.assignedEmpIds.length > 0 && (
+                                            <span className="ml-2 text-[10px] font-black text-emerald-700 bg-emerald-100 border border-emerald-200 px-2 py-0.5 rounded-full">
+                                                {masterForm.assignedEmpIds.length} Selected
+                                            </span>
+                                        )}
+                                    </label>
+
+                                    {/* Search Bar for Assigning Employees */}
+                                    <div className="relative w-full sm:w-64">
+                                        <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                                        <input
+                                            type="text"
+                                            value={assignEmpSearch}
+                                            onChange={(e) => setAssignEmpSearch(e.target.value)}
+                                            placeholder="Search employee, designation..."
+                                            className="w-full pl-8 pr-7 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all shadow-sm"
+                                        />
+                                        {assignEmpSearch && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setAssignEmpSearch('')}
+                                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                                            >
+                                                <IconClose size={13} />
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="max-h-48 overflow-y-auto border border-slate-200 rounded-xl p-3 bg-slate-50 space-y-1.5 custom-scrollbar">
                                     {employees.length === 0 ? (
                                         <p className="text-xs text-slate-400 font-medium">No employees found. Add employees in Payroll &gt; Employees tab.</p>
                                     ) : (
-                                        employees.map(emp => (
-                                            <label key={emp._id} className="flex items-center gap-2 text-xs font-semibold text-slate-800 cursor-pointer hover:bg-slate-100 p-1.5 rounded-lg transition-colors">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={masterForm.assignedEmpIds.includes(emp._id)}
-                                                    onChange={() => toggleEmpAssignment(emp._id)}
-                                                    className="rounded text-emerald-600 focus:ring-emerald-500 h-4 w-4"
-                                                />
-                                                <span>{emp.name} ({emp.designation || 'Staff'})</span>
-                                                {emp.department && (
-                                                    <span className="text-[10px] text-slate-400 bg-slate-200 px-2 py-0.5 rounded-full ml-auto">
-                                                        {emp.department}
-                                                    </span>
-                                                )}
-                                            </label>
-                                        ))
+                                        (() => {
+                                            const filtered = employees.filter(emp => {
+                                                if (!assignEmpSearch.trim()) return true;
+                                                const q = assignEmpSearch.trim().toLowerCase();
+                                                const name = (emp.name || '').toLowerCase();
+                                                const desig = (emp.designation || '').toLowerCase();
+                                                const dept = (emp.department || '').toLowerCase();
+                                                const code = (emp.employeeId || emp.code || '').toLowerCase();
+                                                return name.includes(q) || desig.includes(q) || dept.includes(q) || code.includes(q);
+                                            });
+
+                                            if (filtered.length === 0) {
+                                                return (
+                                                    <p className="text-xs text-slate-400 font-medium text-center py-3">
+                                                        No employees match "{assignEmpSearch}"
+                                                    </p>
+                                                );
+                                            }
+
+                                            return (
+                                                <>
+                                                    {assignEmpSearch.trim() && (
+                                                        <div className="flex items-center justify-between pb-1 mb-1 border-b border-slate-200/60 text-[11px] font-bold text-slate-500">
+                                                            <span>Showing {filtered.length} of {employees.length} employees</span>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    const visibleIds = filtered.map(e => e._id);
+                                                                    const allSelected = visibleIds.every(id => masterForm.assignedEmpIds.includes(id));
+                                                                    setMasterForm(prev => ({
+                                                                        ...prev,
+                                                                        assignedEmpIds: allSelected
+                                                                            ? prev.assignedEmpIds.filter(id => !visibleIds.includes(id))
+                                                                            : Array.from(new Set([...prev.assignedEmpIds, ...visibleIds]))
+                                                                    }));
+                                                                }}
+                                                                className="text-emerald-700 hover:text-emerald-800 hover:underline font-black"
+                                                            >
+                                                                {filtered.every(e => masterForm.assignedEmpIds.includes(e._id)) ? 'Deselect Matches' : 'Select Matches'}
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                    {filtered.map(emp => (
+                                                        <label key={emp._id} className="flex items-center gap-2 text-xs font-semibold text-slate-800 cursor-pointer hover:bg-slate-100 p-1.5 rounded-lg transition-colors">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={masterForm.assignedEmpIds.includes(emp._id)}
+                                                                onChange={() => toggleEmpAssignment(emp._id)}
+                                                                className="rounded text-emerald-600 focus:ring-emerald-500 h-4 w-4"
+                                                            />
+                                                            <span>{emp.name} ({emp.designation || 'Staff'})</span>
+                                                            {emp.department && (
+                                                                <span className="text-[10px] text-slate-400 bg-slate-200 px-2 py-0.5 rounded-full ml-auto">
+                                                                    {emp.department}
+                                                                </span>
+                                                            )}
+                                                        </label>
+                                                    ))}
+                                                </>
+                                            );
+                                        })()
                                     )}
                                 </div>
                             </div>
