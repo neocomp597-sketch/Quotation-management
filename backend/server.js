@@ -590,6 +590,10 @@ const startBackgroundServices = async () => {
         ],
         deployedBy: "Super Admin",
         deployedAt: new Date("2026-07-13T21:30:00Z"),
+        isActive: true
+      },
+      { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
+    );
     await SystemUpdate.findOneAndUpdate(
       { version: "v3.9.0-csm-engineers" },
       {
