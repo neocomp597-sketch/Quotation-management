@@ -143,6 +143,22 @@ exports.createTicket = async (req, res) => {
     }
 };
 
+const Engineer = require('../models/Engineer');
+
+const isAdminOrManagerUser = (user) => {
+    if (!user || !user.role) return false;
+    const role = user.role.toLowerCase();
+    return role === 'admin' || role === 'manager' || role === 'super_admin' || role === 'superadmin';
+};
+
+const getEngineerForUser = async (user) => {
+    if (!user || !user.email) return null;
+    return await Engineer.findOne({
+        email: user.email,
+        companyId: user.companyId
+    }).lean();
+};
+
 exports.getTickets = async (req, res) => {
     try {
         const companyId = req.user?.companyId;
@@ -151,7 +167,18 @@ exports.getTickets = async (req, res) => {
         if (req.query.customerId) filter.customerId = req.query.customerId;
         if (req.query.status) filter.status = req.query.status;
         if (req.query.priorityId) filter.priorityId = req.query.priorityId;
-        if (req.query.assignedEngineerId) filter.assignedEngineerId = req.query.assignedEngineerId;
+        
+        // Access control filter for non-Admin/Manager users
+        if (!isAdminOrManagerUser(req.user)) {
+            const engineer = await getEngineerForUser(req.user);
+            if (engineer) {
+                filter.assignedEngineerId = engineer._id;
+            } else {
+                filter.assignedEngineerId = new mongoose.Types.ObjectId();
+            }
+        } else if (req.query.assignedEngineerId) {
+            filter.assignedEngineerId = req.query.assignedEngineerId;
+        }
         
         const andConditions = [];
 
@@ -258,6 +285,14 @@ exports.getTicketById = async (req, res) => {
             return res.status(404).json({ message: 'Ticket not found' });
         }
 
+        if (!isAdminOrManagerUser(req.user)) {
+            const engineer = await getEngineerForUser(req.user);
+            const ticketEngineerId = ticket.assignedEngineerId?._id?.toString() || ticket.assignedEngineerId?.toString();
+            if (!engineer || !ticketEngineerId || ticketEngineerId !== engineer._id.toString()) {
+                return res.status(403).json({ message: 'Access denied: You can only view complaints assigned to you.' });
+            }
+        }
+
         res.json(ticket);
     } catch (error) {
         console.error('Get ticket details error:', error);
@@ -269,6 +304,17 @@ exports.updateTicket = async (req, res) => {
     try {
         const ticketBody = { ...req.body };
         const companyId = req.user?.companyId;
+
+        const existingTicket = await Ticket.findOne({ _id: req.params.id, companyId });
+        if (!existingTicket) return res.status(404).json({ message: 'Ticket not found' });
+
+        if (!isAdminOrManagerUser(req.user)) {
+            const engineer = await getEngineerForUser(req.user);
+            const ticketEngineerId = existingTicket.assignedEngineerId?.toString();
+            if (!engineer || !ticketEngineerId || ticketEngineerId !== engineer._id.toString()) {
+                return res.status(403).json({ message: 'Access denied: You can only update complaints assigned to you.' });
+            }
+        }
 
         const optionalObjectIdFields = ['contactId', 'contactDesignationId', 'productId', 'assetId', 'invoiceId', 'assignedTeamId', 'assignedEngineerId', 'assignedSalespersonId'];
         for (const field of optionalObjectIdFields) {
@@ -346,6 +392,10 @@ exports.updateTicket = async (req, res) => {
 
 exports.assignTicket = async (req, res) => {
     try {
+        if (!isAdminOrManagerUser(req.user)) {
+            return res.status(403).json({ message: 'Access denied: Only Admin and Manager roles can reassign complaints.' });
+        }
+
         const { assignedTeamId, assignedEngineerId } = req.body;
         const companyId = req.user?.companyId;
 
@@ -390,6 +440,14 @@ exports.updateStatus = async (req, res) => {
 
         const ticket = await Ticket.findOne({ _id: req.params.id, companyId });
         if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
+
+        if (!isAdminOrManagerUser(req.user)) {
+            const engineer = await getEngineerForUser(req.user);
+            const ticketEngineerId = ticket.assignedEngineerId?.toString();
+            if (!engineer || !ticketEngineerId || ticketEngineerId !== engineer._id.toString()) {
+                return res.status(403).json({ message: 'Access denied: You can only update status for complaints assigned to you.' });
+            }
+        }
 
         const oldStatus = ticket.status;
         ticket.status = status;
@@ -440,6 +498,14 @@ exports.addComment = async (req, res) => {
         const ticket = await Ticket.findOne({ _id: req.params.id, companyId });
         if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
 
+        if (!isAdminOrManagerUser(req.user)) {
+            const engineer = await getEngineerForUser(req.user);
+            const ticketEngineerId = ticket.assignedEngineerId?.toString();
+            if (!engineer || !ticketEngineerId || ticketEngineerId !== engineer._id.toString()) {
+                return res.status(403).json({ message: 'Access denied: You can only add comments to complaints assigned to you.' });
+            }
+        }
+
         const authorName = req.user?.name || 'Support Executive';
         const comment = {
             text,
@@ -471,6 +537,14 @@ exports.escalateTicket = async (req, res) => {
         const companyId = req.user?.companyId;
         const ticket = await Ticket.findOne({ _id: req.params.id, companyId });
         if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
+
+        if (!isAdminOrManagerUser(req.user)) {
+            const engineer = await getEngineerForUser(req.user);
+            const ticketEngineerId = ticket.assignedEngineerId?.toString();
+            if (!engineer || !ticketEngineerId || ticketEngineerId !== engineer._id.toString()) {
+                return res.status(403).json({ message: 'Access denied: You can only escalate complaints assigned to you.' });
+            }
+        }
 
         ticket.escalationLevel += 1;
         ticket.status = 'Escalated';

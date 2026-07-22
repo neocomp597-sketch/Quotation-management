@@ -2427,6 +2427,14 @@ const importEmployees = async (req, res) => {
             }
         }
 
+        // Auto-sync imported employees with designation "Service Engineer" to Engineers Master
+        try {
+            const { syncAllEngineers } = require('../services/engineerSyncService');
+            await syncAllEngineers(companyId);
+        } catch (syncErr) {
+            console.error('Error auto-syncing engineers during import:', syncErr);
+        }
+
         res.json({
             message: `Import processed. Created: ${results.created}, Updated: ${results.updated}, Failed: ${results.failed}`,
             results

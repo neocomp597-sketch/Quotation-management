@@ -773,7 +773,14 @@ exports.engineers = {
     },
     getAll: async (req, res) => {
         try {
-            const docs = await Engineer.find({ companyId: req.user?.companyId })
+            const { syncAllEngineers } = require('../services/engineerSyncService');
+            const companyId = req.user?.companyId;
+
+            if (companyId) {
+                await syncAllEngineers(companyId);
+            }
+
+            const docs = await Engineer.find({ companyId })
                 .populate('employeeId')
                 .populate('territoryId', 'name rules')
                 .sort({ createdAt: -1 })

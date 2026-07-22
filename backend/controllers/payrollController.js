@@ -119,6 +119,11 @@ exports.getEmployee = async (req, res) => {
 exports.createEmployee = async (req, res) => {
     try {
         const employee = await EmployeeProfile.create(req.body);
+        
+        // Auto-sync Service Engineer to Engineers Master
+        const { syncEmployeeToEngineer } = require('../services/engineerSyncService');
+        await syncEmployeeToEngineer(employee);
+
         await writePayrollAudit(req, 'EMPLOYEE_CREATED', `Created employee profile for ${employee.name}`, employee._id, 'EmployeeProfile');
         res.status(201).json(employee);
     } catch (error) {
@@ -133,16 +138,9 @@ exports.updateEmployee = async (req, res) => {
             return res.status(404).json({ message: 'Employee not found' });
         }
         
-        // Sync details to CSM Engineers if this employee is registered as an engineer
-        const Engineer = require('../models/Engineer');
-        await Engineer.updateMany(
-            { employeeId: employee._id },
-            {
-                name: employee.name,
-                email: employee.email,
-                mobile: employee.mobile || ''
-            }
-        );
+        // Auto-sync details/status to CSM Engineers Master
+        const { syncEmployeeToEngineer } = require('../services/engineerSyncService');
+        await syncEmployeeToEngineer(employee);
 
         await writePayrollAudit(req, 'EMPLOYEE_UPDATED', `Updated details for employee ${employee.name}`, employee._id, 'EmployeeProfile');
         broadcastCrmUpdate('EMPLOYEE', 'UPDATE', employee);
@@ -187,6 +185,10 @@ exports.deleteEmployee = async (req, res) => {
 
         // Clean up pending summaries in draft runs
         await PayrollEmployeeSummary.deleteMany({ employeeId: req.params.id });
+
+        // Update corresponding Engineer record to Inactive if exists
+        const Engineer = require('../models/Engineer');
+        await Engineer.updateMany({ employeeId: req.params.id }, { status: 'Inactive' });
 
         await writePayrollAudit(req, 'EMPLOYEE_DELETED', `Deleted employee profile for ${employee.name}`, req.params.id, 'EmployeeProfile');
         res.json({ message: 'Employee profile deleted successfully' });

@@ -590,6 +590,22 @@ const startBackgroundServices = async () => {
         ],
         deployedBy: "Super Admin",
         deployedAt: new Date("2026-07-13T21:30:00Z"),
+    await SystemUpdate.findOneAndUpdate(
+      { version: "v3.9.0-csm-engineers" },
+      {
+        version: "v3.9.0-csm-engineers",
+        title: "Engineer-Wise Complaint Visibility & Service Engineer Auto-Sync",
+        message: "We have implemented engineer-wise access control for support complaints and auto-synchronization of Service Engineer employees to the Engineers Master module.",
+        releaseNotes: [
+          "Engineer-Wise Complaint Visibility: Support tickets/complaints are restricted so each service engineer only views and manages complaints assigned to them",
+          "Admin & Supervisor Oversight: Users with Admin or Manager roles retain full access to view, filter, and reassign all system complaints across engineers",
+          "Reassignment Protection: Restricted complaint reassignment privileges exclusively to Admin and Manager roles with 403 Forbidden enforcement",
+          "Service Engineer Auto-Sync: Employees created or updated in Employee Master with designation 'Service Engineer' automatically sync to Engineers Master with Name, Email, Mobile, and Status",
+          "Dynamic Inactive Sync: Changing an employee's designation away from 'Service Engineer' or marking them Inactive/Resigned automatically updates their status to Inactive in Engineers Master",
+          "Quotation Version Snapshot Fix: Resolved QuotationVersion snapshot creation during quotation edits to ensure smooth quotation revisions and zero HTTP 500 errors"
+        ],
+        deployedBy: "Super Admin",
+        deployedAt: new Date("2026-07-22T21:00:00Z"),
         isActive: true
       },
       { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }

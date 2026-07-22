@@ -244,6 +244,17 @@ const CSMMasters = () => {
 
             {/* List View */}
             <div className="glass shadow-premium rounded-[2rem] p-6 bg-white border border-slate-100">
+                {activeTab === 'engineers' && (
+                    <div className="mb-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl flex items-center justify-between gap-3 text-xs font-semibold text-blue-900 shadow-sm">
+                        <div className="flex items-center gap-2.5">
+                            <span className="flex h-2.5 w-2.5 relative">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-600"></span>
+                            </span>
+                            <span><strong>Auto-Sync Active:</strong> Employees saved with designation <em>"Service Engineer"</em> in Employee Master automatically appear here with Name, Email, and Mobile populated.</span>
+                        </div>
+                    </div>
+                )}
                 {loading ? (
                     <div className="flex flex-col items-center justify-center py-16 space-y-3">
                         <div className="w-12 h-12 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin"></div>

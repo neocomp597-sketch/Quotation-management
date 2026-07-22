@@ -1,4 +1,6 @@
+const mongoose = require('mongoose');
 const Quotation = require('../models/Quotation');
+const QuotationVersion = require('../models/QuotationVersion');
 const Counter = require('../models/Counter');
 const QuotationDraft = require('../models/QuotationDraft');
 const Customer = require('../models/Customer');
@@ -600,12 +602,18 @@ const updateQuotation = async (req, res) => {
         // Quotation Versioning: save snapshot if updating non-draft quote
         const existingQuote = await Quotation.findById(id).lean();
         if (existingQuote && existingQuote.status !== 'draft') {
-            const versionCount = await QuotationVersion.countDocuments({ quotationId: id });
+            const targetCompanyId = existingQuote.companyId || req.user?.companyId;
+            const versionCount = await QuotationVersion.countDocuments({ quotationId: id, companyId: targetCompanyId });
+            
+            let rawUser = req.user?.id || existingQuote.createdBy;
+            let validCreatedBy = mongoose.Types.ObjectId.isValid(rawUser) ? rawUser : null;
+
             await QuotationVersion.create({
+                companyId: targetCompanyId,
                 quotationId: id,
                 versionNumber: versionCount + 1,
                 snapshot: existingQuote,
-                createdBy: req.user?.id || existingQuote.createdBy,
+                createdBy: validCreatedBy,
                 changeSummary: req.body.changeSummary || 'Revision update'
             });
         }

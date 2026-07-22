@@ -5,7 +5,7 @@ const QuotationVersionSchema = new mongoose.Schema({
     quotationId: { type: mongoose.Schema.Types.ObjectId, ref: 'Quotation', required: true, index: true },
     versionNumber: { type: Number, required: true },
     snapshot: { type: mongoose.Schema.Types.Mixed, required: true },
-    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     changeSummary: { type: String, default: '' },
     createdAt: { type: Date, default: Date.now }
 });
