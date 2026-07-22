@@ -4,6 +4,7 @@ const SalesPipeline = require('../models/SalesPipeline');
 const SalesTarget = require('../models/SalesTarget');
 const DealSource = require('../models/DealSource');
 const mongoose = require('mongoose');
+const { broadcastCrmUpdate } = require('../config/socket');
 
 // GET /api/sales/deals
 exports.getAllDeals = async (req, res) => {
@@ -151,6 +152,7 @@ exports.createDeal = async (req, res) => {
             performedBy: req.user.id
         });
 
+        broadcastCrmUpdate('DEAL', 'CREATE', deal);
         res.status(201).json(deal);
     } catch (err) {
         console.error('[Deals] createDeal error:', err);
@@ -200,6 +202,7 @@ exports.updateDeal = async (req, res) => {
             .populate('ownerId', 'name email')
             .lean();
 
+        broadcastCrmUpdate('DEAL', 'UPDATE', populated);
         res.json(populated);
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -245,6 +248,7 @@ exports.updateDealStage = async (req, res) => {
             performedBy: req.user.id
         });
 
+        broadcastCrmUpdate('DEAL', 'UPDATE', deal);
         res.json(deal);
     } catch (err) {
         console.error('[Deals] updateDealStage error:', err);
@@ -274,6 +278,7 @@ exports.markDealLost = async (req, res) => {
             performedBy: req.user.id
         });
 
+        broadcastCrmUpdate('DEAL', 'UPDATE', deal);
         res.json(deal);
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -304,6 +309,7 @@ exports.reopenDeal = async (req, res) => {
             performedBy: req.user.id
         });
 
+        broadcastCrmUpdate('DEAL', 'UPDATE', deal);
         res.json(deal);
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -317,6 +323,7 @@ exports.deleteDeal = async (req, res) => {
         if (!deal) return res.status(404).json({ message: 'Deal not found' });
 
         await DealActivity.deleteMany({ dealId: req.params.id });
+        broadcastCrmUpdate('DEAL', 'DELETE', { id: req.params.id });
         res.json({ message: 'Deal deleted' });
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -346,6 +353,7 @@ exports.addActivity = async (req, res) => {
             .populate('performedBy', 'name')
             .lean();
 
+        broadcastCrmUpdate('DEAL', 'UPDATE', { _id: req.params.id, activity: populated });
         res.status(201).json(populated);
     } catch (err) {
         res.status(500).json({ message: err.message });

@@ -197,6 +197,17 @@ const Meetings = () => {
         fetchAuxiliaryData();
     }, [statusFilter, organizerFilter]);
 
+    useEffect(() => {
+        const handleRealtimeUpdate = (e) => {
+            const entity = e.detail?.entity;
+            if (!entity || entity === 'MEETING' || entity === 'SYSTEM') {
+                fetchMeetings();
+            }
+        };
+        window.addEventListener('onCrmSocketUpdate', handleRealtimeUpdate);
+        return () => window.removeEventListener('onCrmSocketUpdate', handleRealtimeUpdate);
+    }, [statusFilter, organizerFilter]);
+
     // Check query params to open drawer automatically
     useEffect(() => {
         const editId = searchParams.get('edit');

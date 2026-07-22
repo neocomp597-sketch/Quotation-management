@@ -10,6 +10,7 @@ const { getRedis } = require('../config/redis');
 const { invalidateQuotationCaches } = require('../utils/cacheInvalidation');
 const { getCachedJson, makeCacheKey, setCachedJson } = require('../utils/apiCache');
 const { createCompanyNotifications } = require('../utils/notificationHelper');
+const { broadcastCrmUpdate } = require('../config/socket');
 
 const DRAFT_TTL_SECONDS = 24 * 60 * 60;
 const DASHBOARD_TTL_SECONDS = 60;
@@ -537,6 +538,7 @@ const createQuotation = async (req, res) => {
 
         await newQuotation.save();
         await clearQuotationDashboardCache();
+        broadcastCrmUpdate('QUOTATION', 'CREATE', newQuotation);
         if (req.user?.id) {
             await QuotationDraft.deleteOne({ userId: req.user.id, draftKey: 'new' });
             await deleteDraftFromRedis(req.user.id, 'new');
@@ -706,6 +708,7 @@ const updateQuotation = async (req, res) => {
         }, { new: true, runValidators: true }).lean();
 
         await clearQuotationDashboardCache();
+        broadcastCrmUpdate('QUOTATION', 'UPDATE', updatedQuotation);
 
         // Trigger notification
         const updaterName = req.user?.name || 'A user';
@@ -738,6 +741,7 @@ const deleteQuotation = async (req, res) => {
         
         await Quotation.findByIdAndDelete(id);
         await clearQuotationDashboardCache();
+        broadcastCrmUpdate('QUOTATION', 'DELETE', { id });
 
         // Trigger notification
         const performerName = req.user?.name || 'A user';
@@ -787,6 +791,7 @@ const updateStatus = async (req, res) => {
         }
         await quotation.save();
         await clearQuotationDashboardCache();
+        broadcastCrmUpdate('QUOTATION', 'UPDATE', quotation);
 
         // Trigger notification
         const updaterName = req.user?.name || 'A user';
@@ -859,6 +864,7 @@ const finalizeQuotation = async (req, res) => {
         quotation.status = targetStatus;
         await quotation.save();
         await clearQuotationDashboardCache();
+        broadcastCrmUpdate('QUOTATION', 'UPDATE', quotation);
 
         // Trigger notification
         await createCompanyNotifications({

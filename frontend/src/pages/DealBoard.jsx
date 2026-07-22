@@ -177,6 +177,17 @@ const DealBoard = () => {
         if (selectedPipeline) loadBoard();
     }, [selectedPipeline, filterOwner]);
 
+    useEffect(() => {
+        const handleRealtimeUpdate = (e) => {
+            const entity = e.detail?.entity;
+            if (!entity || entity === 'DEAL' || entity === 'SYSTEM') {
+                if (selectedPipeline) loadBoard();
+            }
+        };
+        window.addEventListener('onCrmSocketUpdate', handleRealtimeUpdate);
+        return () => window.removeEventListener('onCrmSocketUpdate', handleRealtimeUpdate);
+    }, [selectedPipeline, filterOwner]);
+
     const loadPipelines = async () => {
         try {
             const res = await salesService.getPipelines();

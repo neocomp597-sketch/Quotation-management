@@ -458,6 +458,17 @@ const PlanningScreen = () => {
     fetchData();
   }, [fetchData]);
 
+  useEffect(() => {
+    const handleRealtimeUpdate = (e) => {
+      const entity = e.detail?.entity;
+      if (!entity || entity === 'PLANNING' || entity === 'SYSTEM') {
+        fetchData();
+      }
+    };
+    window.addEventListener('onCrmSocketUpdate', handleRealtimeUpdate);
+    return () => window.removeEventListener('onCrmSocketUpdate', handleRealtimeUpdate);
+  }, [fetchData]);
+
   // Click outside to close dropdown portals
   useEffect(() => {
     const handleClickOutside = (event) => {

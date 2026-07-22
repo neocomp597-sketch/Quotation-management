@@ -202,6 +202,17 @@ const PayrollMasters = () => {
         fetchItems();
     }, [activeTab]);
 
+    useEffect(() => {
+        const handleRealtimeUpdate = (e) => {
+            const entity = e.detail?.entity;
+            if (!entity || ['DEPARTMENT', 'DESIGNATION', 'EMPLOYEE', 'SYSTEM'].includes(entity)) {
+                fetchItems();
+            }
+        };
+        window.addEventListener('onCrmSocketUpdate', handleRealtimeUpdate);
+        return () => window.removeEventListener('onCrmSocketUpdate', handleRealtimeUpdate);
+    }, [activeTab, selectedOverviewDeptId]);
+
     const handleOpenModal = (item = null) => {
         if (item) {
             setEditId(item._id);

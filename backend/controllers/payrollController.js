@@ -7,6 +7,7 @@ const PayrollAuditLog = require('../models/PayrollAuditLog');
 const Department = require('../models/Department');
 const Designation = require('../models/Designation');
 const mongoose = require('mongoose');
+const { broadcastCrmUpdate } = require('../config/socket');
 
 // Helper to write to PayrollAuditLog
 const writePayrollAudit = async (req, action, details, targetId = null, targetType = null) => {
@@ -144,6 +145,7 @@ exports.updateEmployee = async (req, res) => {
         );
 
         await writePayrollAudit(req, 'EMPLOYEE_UPDATED', `Updated details for employee ${employee.name}`, employee._id, 'EmployeeProfile');
+        broadcastCrmUpdate('EMPLOYEE', 'UPDATE', employee);
         res.json(employee);
     } catch (error) {
         res.status(500).json({ message: 'Failed to update employee details', error: error.message });
@@ -728,6 +730,7 @@ exports.createDepartment = async (req, res) => {
             return res.status(400).json({ message: 'Department with this name already exists' });
         }
         const dept = await Department.create(req.body);
+        broadcastCrmUpdate('DEPARTMENT', 'CREATE', dept);
         res.status(201).json(dept);
     } catch (error) {
         res.status(500).json({ message: 'Failed to create department', error: error.message });
@@ -746,6 +749,7 @@ exports.updateDepartment = async (req, res) => {
             }
         }
         const dept = await Department.findByIdAndUpdate(req.params.id, { $set: req.body }, { new: true });
+        broadcastCrmUpdate('DEPARTMENT', 'UPDATE', dept);
         res.json(dept);
     } catch (error) {
         res.status(500).json({ message: 'Failed to update department', error: error.message });
@@ -763,6 +767,7 @@ exports.deleteDepartment = async (req, res) => {
             return res.status(400).json({ message: `Cannot delete department because it is currently assigned to ${empCount} employee(s)` });
         }
         await Department.findByIdAndDelete(req.params.id);
+        broadcastCrmUpdate('DEPARTMENT', 'DELETE', { id: req.params.id });
         res.json({ message: 'Department deleted successfully' });
     } catch (error) {
         res.status(500).json({ message: 'Failed to delete department', error: error.message });

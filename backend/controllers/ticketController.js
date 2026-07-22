@@ -5,6 +5,7 @@ const Priority = require('../models/Priority');
 const Customer = require('../models/Customer');
 const User = require('../models/User');
 const CustomerContact = require('../models/CustomerContact');
+const { broadcastCrmUpdate } = require('../config/socket');
 
 const generateTicketNumber = async (companyId) => {
     const year = new Date().getFullYear();
@@ -133,8 +134,9 @@ exports.createTicket = async (req, res) => {
             timeline: [timelineEntry]
         };
 
-        const ticket = await Ticket.create(ticketData);
-        res.status(201).json(ticket);
+        const populatedTicket = await Ticket.create(ticketData);
+        broadcastCrmUpdate('TICKET', 'CREATE', populatedTicket);
+        res.status(201).json(populatedTicket);
     } catch (error) {
         console.error('Create ticket error:', error);
         res.status(500).json({ message: error.message || 'Error creating ticket' });
@@ -335,6 +337,7 @@ exports.updateTicket = async (req, res) => {
             { new: true, runValidators: true }
         );
         if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
+        broadcastCrmUpdate('TICKET', 'UPDATE', ticket);
         res.json(ticket);
     } catch (error) {
         res.status(400).json({ message: error.message });
@@ -372,6 +375,7 @@ exports.assignTicket = async (req, res) => {
         });
 
         await ticket.save();
+        broadcastCrmUpdate('TICKET', 'UPDATE', ticket);
         res.json(ticket);
     } catch (error) {
         console.error('Assign ticket error:', error);
@@ -420,6 +424,7 @@ exports.updateStatus = async (req, res) => {
         });
 
         await ticket.save();
+        broadcastCrmUpdate('TICKET', 'UPDATE', ticket);
         res.json(ticket);
     } catch (error) {
         console.error('Update status error:', error);
@@ -453,6 +458,7 @@ exports.addComment = async (req, res) => {
         });
 
         await ticket.save();
+        broadcastCrmUpdate('TICKET', 'UPDATE', ticket);
         res.status(201).json(comment);
     } catch (error) {
         console.error('Add comment error:', error);
@@ -476,6 +482,7 @@ exports.escalateTicket = async (req, res) => {
         });
 
         await ticket.save();
+        broadcastCrmUpdate('TICKET', 'UPDATE', ticket);
         res.json(ticket);
     } catch (error) {
         console.error('Escalate ticket error:', error);
@@ -504,6 +511,7 @@ exports.submitFeedback = async (req, res) => {
         });
 
         await ticket.save();
+        broadcastCrmUpdate('TICKET', 'UPDATE', ticket);
         res.json(ticket);
     } catch (error) {
         console.error('Submit feedback error:', error);

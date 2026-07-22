@@ -4,6 +4,7 @@ const User = require('../models/User');
 const Customer = require('../models/Customer');
 const Enquiry = require('../models/Enquiry');
 const mongoose = require('mongoose');
+const { broadcastCrmUpdate } = require('../config/socket');
 
 const getOrganizerDefaultReportTo = async (organizerId, companyId) => {
     if (!organizerId) return null;
@@ -133,6 +134,7 @@ exports.createMeeting = async (req, res) => {
             });
         }
 
+        broadcastCrmUpdate('MEETING', 'CREATE', newMeeting);
         res.status(201).json(newMeeting);
     } catch (err) {
         if (/report-to senior/i.test(err.message)) {
@@ -314,6 +316,7 @@ exports.updateMeeting = async (req, res) => {
             }
         }
 
+        broadcastCrmUpdate('MEETING', 'UPDATE', meeting);
         res.json(meeting);
     } catch (err) {
         if (/report-to senior/i.test(err.message)) {
@@ -349,6 +352,7 @@ exports.deleteMeeting = async (req, res) => {
             });
         }
 
+        broadcastCrmUpdate('MEETING', 'DELETE', { id: req.params.id });
         res.json({ message: 'Meeting deleted successfully (soft-delete)' });
     } catch (err) {
         console.error('[Meeting Delete Error]', err);

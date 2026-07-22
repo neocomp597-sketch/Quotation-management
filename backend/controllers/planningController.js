@@ -7,6 +7,7 @@ const { getTenantId } = require('../middlewares/tenantContext');
 const RolePermission = require('../models/RolePermission');
 const { resolvePermissions } = require('../config/authorization');
 const { createCompanyNotifications } = require('../utils/notificationHelper');
+const { broadcastCrmUpdate } = require('../config/socket');
 
 const normalizeFinancialYear = (fy) => {
     if (!fy) return fy;
@@ -337,6 +338,7 @@ exports.createEntry = async (req, res) => {
             });
             await entry.save();
             await invalidateViaQueueOrNow('planning:*');
+            broadcastCrmUpdate('PLANNING', 'CREATE', entry);
 
             // Trigger notification
             const creatorName = req.user?.name || 'A user';
@@ -447,6 +449,7 @@ exports.updateEntry = async (req, res) => {
             runValidators: true
         });
         await invalidateViaQueueOrNow('planning:*');
+        broadcastCrmUpdate('PLANNING', 'UPDATE', updated);
 
         // Trigger notification
         const updaterName = req.user?.name || 'A user';
@@ -478,6 +481,7 @@ exports.deleteEntry = async (req, res) => {
 
         await Planning.findByIdAndDelete(id);
         await invalidateViaQueueOrNow('planning:*');
+        broadcastCrmUpdate('PLANNING', 'DELETE', { id });
 
         // Trigger notification
         const performerName = req.user?.name || 'A user';

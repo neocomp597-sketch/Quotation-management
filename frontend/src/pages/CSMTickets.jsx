@@ -284,6 +284,17 @@ const CSMTickets = () => {
     }, [page, filterStatus, filterPriority, filterInvoiceType, filterCustomer]);
 
     useEffect(() => {
+        const handleRealtimeUpdate = (e) => {
+            const entity = e.detail?.entity;
+            if (!entity || entity === 'TICKET' || entity === 'SYSTEM') {
+                fetchTickets();
+            }
+        };
+        window.addEventListener('onCrmSocketUpdate', handleRealtimeUpdate);
+        return () => window.removeEventListener('onCrmSocketUpdate', handleRealtimeUpdate);
+    }, [page, filterStatus, filterPriority, filterInvoiceType, filterCustomer]);
+
+    useEffect(() => {
         fetchTicketCustomers();
     }, []);
 
