@@ -255,6 +255,7 @@ export const authService = {
   logout: () => api.post("/auth/logout", {}, { skipAuthRefresh: true }),
   logoutAll: () => api.post("/auth/logout-all"),
   getMe: () => api.get("/auth/me"),
+  changePassword: (data) => api.post("/auth/change-password", data),
 };
 
 export const userService = {
@@ -738,6 +739,7 @@ export const csmService = {
   getAssets: (params = {}) => api.get("/csm/assets", { params }),
   createAsset: (data) => api.post("/csm/assets", data),
   getAssetSummary: (params = {}) => api.get("/csm/assets/summary", { params }),
+  searchSerialNumbers: (q) => api.get("/csm/assets/search-serials", { params: { q } }),
 
   getArticles: (params = {}) => api.get("/csm/kb", { params }),
   getArticleById: (id) => api.get(`/csm/kb/${id}`),

@@ -22,6 +22,7 @@ const normalizeUser = (user) => ({
     email: user.email,
     role: user.role,
     companyId: user.companyId,
+    mustChangePassword: !!user.mustChangePassword,
 });
 
 const ensureLoginAllowed = async (user) => {
@@ -404,10 +405,41 @@ exports.logoutAll = async (req, res) => {
 exports.getMe = async (req, res) => {
     try {
         const user = await User.findById(req.user.id)
-            .select('_id name email role status companyId createdAt updatedAt')
+            .select('_id name email role status companyId mustChangePassword createdAt updatedAt')
             .lean();
         res.json(user);
     } catch (error) {
         res.status(500).json({ message: 'Server Error' });
+    }
+};
+
+exports.changePassword = async (req, res) => {
+    try {
+        const { currentPassword, newPassword } = req.body;
+        if (!newPassword || newPassword.length < 6) {
+            return res.status(400).json({ message: 'New password must be at least 6 characters long' });
+        }
+
+        const user = await User.findById(req.user.id);
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        if (!user.mustChangePassword && currentPassword) {
+            const isMatch = await bcrypt.compare(currentPassword, user.passwordHash);
+            if (!isMatch) {
+                return res.status(400).json({ message: 'Incorrect current password' });
+            }
+        }
+
+        const salt = await bcrypt.genSalt(10);
+        user.passwordHash = await bcrypt.hash(newPassword, salt);
+        user.mustChangePassword = false;
+        user.passwordChangedAt = new Date();
+        await user.save();
+
+        res.json({ message: 'Password updated successfully', user: normalizeUser(user) });
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to change password', error: error.message });
     }
 };

@@ -27,7 +27,7 @@ const PayrollEmployees = () => {
 
     // Form states
     const [basicForm, setBasicForm] = useState({
-        name: '', email: '', mobile: '', dob: '', joiningDate: '', department: '', designation: '', status: 'Active',
+        name: '', email: '', mobile: '', reportingTo: '', dob: '', joiningDate: '', department: '', designation: '', status: 'Active',
         pan: '', aadhaar: '', uan: '', pfNumber: '', esiNumber: '',
         bankName: '', accountNumber: '', ifscCode: ''
     });
@@ -76,8 +76,9 @@ const PayrollEmployees = () => {
     }, []);
 
     const handleOpenAdd = () => {
+        setSelectedEmp(null);
         setBasicForm({
-            name: '', email: '', mobile: '', dob: '', joiningDate: new Date().toISOString().substring(0, 10), 
+            name: '', email: '', mobile: '', reportingTo: '', dob: '', joiningDate: new Date().toISOString().substring(0, 10), 
             department: '', designation: '', status: 'Active',
             pan: '', aadhaar: '', uan: '', pfNumber: '', esiNumber: '',
             bankName: '', accountNumber: '', ifscCode: ''
@@ -92,6 +93,7 @@ const PayrollEmployees = () => {
             name: emp.name || '',
             email: emp.email || '',
             mobile: emp.mobile || '',
+            reportingTo: emp.reportingTo?._id || emp.reportingTo || '',
             dob: emp.dob ? new Date(emp.dob).toISOString().substring(0, 10) : '',
             joiningDate: emp.joiningDate ? new Date(emp.joiningDate).toISOString().substring(0, 10) : '',
             department: emp.department || '',
@@ -330,6 +332,11 @@ const PayrollEmployees = () => {
                                             <td className="px-6 py-4">
                                                 <p className="text-slate-900 font-bold">{emp.name}</p>
                                                 <p className="text-xs text-slate-400">{emp.email || 'No email registered'}</p>
+                                                {emp.reportingTo?.name && (
+                                                    <p className="text-[11px] text-teal-600 font-medium mt-0.5">
+                                                        Supervisor: {emp.reportingTo.name}
+                                                    </p>
+                                                )}
                                             </td>
                                             <td className="px-6 py-4">
                                                 <p className="text-slate-800">{emp.designation || 'N/A'}</p>
@@ -410,6 +417,23 @@ const PayrollEmployees = () => {
                                                     className={inputClass}
                                                     placeholder="Rajesh Kumar"
                                                 />
+                                            </div>
+                                            <div>
+                                                <label className={labelClass}>Reporting To</label>
+                                                <select
+                                                    value={basicForm.reportingTo || ''}
+                                                    onChange={(e) => setBasicForm({ ...basicForm, reportingTo: e.target.value })}
+                                                    className={inputClass}
+                                                >
+                                                    <option value="">-- None (No Supervisor) --</option>
+                                                    {employees
+                                                        .filter(emp => (emp.status === 'Active' || !emp.status) && String(emp._id) !== String(selectedEmp?._id))
+                                                        .map(emp => (
+                                                            <option key={emp._id} value={emp._id}>
+                                                                {emp.name} {emp.designation ? `(${emp.designation})` : ''}
+                                                            </option>
+                                                        ))}
+                                                </select>
                                             </div>
                                             <div>
                                                 <label className={labelClass}>Email Address</label>

@@ -23,6 +23,7 @@ const EmployeeProfileSchema = new mongoose.Schema({
     name: { type: String, required: true },
     email: { type: String, trim: true },
     mobile: { type: String, trim: true },
+    reportingTo: { type: mongoose.Schema.Types.ObjectId, ref: 'EmployeeProfile', default: null },
     pan: { type: String, uppercase: true, trim: true },
     aadhaar: { type: String, trim: true },
     uan: { type: String, trim: true },

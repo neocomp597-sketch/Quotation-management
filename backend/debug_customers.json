@@ -18017,6 +18017,13 @@
     "logoUrl": ""
   },
   {
+    "_id": "6a187425ee2539b643385cf1",
+    "customerName": "45",
+    "companyName": "ALL IN 1 SERVICES",
+    "gstin": "",
+    "logoUrl": ""
+  },
+  {
     "_id": "6a19243b2da0e114dc8c88c7",
     "customerName": "ASDJ013",
     "companyName": "techgrove",
@@ -18042,6 +18049,83 @@
     "customerName": "test12345",
     "companyName": "test for demo",
     "gstin": "12345678QWS",
+    "logoUrl": ""
+  },
+  {
+    "_id": "6a2a9d7bf468981ddd69135a",
+    "customerName": "7464354",
+    "companyName": "Kiara Kulkarni ",
+    "gstin": "27NCBCQ7403OXZM",
+    "logoUrl": ""
+  },
+  {
+    "_id": "6a2a9e48f468981ddd69135b",
+    "customerName": "575",
+    "companyName": "rajat singh",
+    "gstin": "27CNIU532325",
+    "logoUrl": ""
+  },
+  {
+    "_id": "6a2aa254f468981ddd69135c",
+    "customerName": "John Doe",
+    "companyName": "SARA Enterprises Pvt Ltd",
+    "gstin": "27AABCU9603R1ZM",
+    "logoUrl": ""
+  },
+  {
+    "_id": "6a2aa2b2f468981ddd69135d",
+    "customerName": "ROHIT. D",
+    "companyName": "EKTA Enterprises Pvt Ltd",
+    "gstin": "27ADFGU9603R1ZM",
+    "logoUrl": ""
+  },
+  {
+    "_id": "6a2aa2b3f468981ddd69135e",
+    "customerName": "sapna",
+    "companyName": "BHARVI Pvt Ltd",
+    "gstin": "27AABFG0503R1ZM",
+    "logoUrl": ""
+  },
+  {
+    "_id": "6a2aa2b4f468981ddd69135f",
+    "customerName": "manoj mane",
+    "companyName": "JYOTSNA Enterprises Pvt Ltd",
+    "gstin": "27AABCU8903R1ZM",
+    "logoUrl": ""
+  },
+  {
+    "_id": "6a2aa2b5f468981ddd691360",
+    "customerName": "swapnil joshi",
+    "companyName": "SAIMA Pvt Ltd",
+    "gstin": "27MMKJU9603R1ZM",
+    "logoUrl": ""
+  },
+  {
+    "_id": "6a2aa2b6f468981ddd691361",
+    "customerName": "kunal soni",
+    "companyName": "ABC Enterprises Pvt Ltd",
+    "gstin": "22NABCU9603R1ZM",
+    "logoUrl": ""
+  },
+  {
+    "_id": "6a2aa2b7f468981ddd691362",
+    "customerName": "abrahim",
+    "companyName": "ABC Enterprises Pvt Ltd",
+    "gstin": "27AABCU9603R1OL",
+    "logoUrl": ""
+  },
+  {
+    "_id": "6a2aa2b8f468981ddd691363",
+    "customerName": "shaksham",
+    "companyName": "ABC Enterprises Pvt Ltd",
+    "gstin": "27AABCU9609B1ZM",
+    "logoUrl": ""
+  },
+  {
+    "_id": "6a2aa2b9f468981ddd691364",
+    "customerName": "sandip",
+    "companyName": "ABC Enterprises Pvt Ltd",
+    "gstin": "27AABCU7703R1ZM",
     "logoUrl": ""
   },
   {
@@ -18109,11 +18193,23 @@
     "logoUrl": "https://biswjczulbtwqufsviha.supabase.co/storage/v1/object/public/images/uploads/afca23bf-51a3-45f5-aa41-52182864b6a5-38399.jpg"
   },
   {
+    "_id": "6a3fc6dd059143bb496dc501",
+    "customerName": "TEST_CUST_CODE",
+    "companyName": "Test Enterprises Ltd",
+    "gstin": ""
+  },
+  {
     "_id": "6a4288617748fc13165fd8a6",
     "customerName": "E1007",
     "companyName": "SUYASH PVT.LMTD",
     "gstin": "45SFDG512546",
     "logoUrl": ""
+  },
+  {
+    "_id": "6a43eb30b6a79822d2273738",
+    "customerName": "Sonali Enterprises",
+    "companyName": "Sonali Enterprises",
+    "gstin": "27AABCS1234F1Z1"
   },
   {
     "_id": "6a43ebccd103dd14985389c7",
@@ -18253,5 +18349,18 @@
     "customerName": "SDFS",
     "companyName": "SDFS",
     "gstin": ""
+  },
+  {
+    "_id": "6a60e1b9c673d83f2cd6f3cd",
+    "customerName": "Test Customer",
+    "companyName": "Test Customer Pvt Ltd",
+    "gstin": ""
+  },
+  {
+    "_id": "6a623132680b3038931fd5c2",
+    "customerName": "ACME01",
+    "companyName": "Acme Corp",
+    "gstin": "",
+    "logoUrl": ""
   }
 ]

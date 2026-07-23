@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useSocket } from '../context/SocketContext';
 import SystemUpdatesModal from './SystemUpdatesModal';
+import ChangePasswordModal from './ChangePasswordModal';
 
 const formatNotificationType = (type) => {
     switch (type) {
@@ -414,6 +415,13 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [isNotifOpen, setIsNotifOpen] = useState(false);
     const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
+    const [mustChangePasswordModal, setMustChangePasswordModal] = useState(false);
+
+    useEffect(() => {
+        if (user?.mustChangePassword) {
+            setMustChangePasswordModal(true);
+        }
+    }, [user]);
 
     const [searchQuery, setSearchQuery] = useState('');
     const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -885,6 +893,12 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
                     </div>
                 </div>
             </header>
+
+            <ChangePasswordModal 
+                isOpen={mustChangePasswordModal} 
+                user={user} 
+                onPasswordChanged={() => setMustChangePasswordModal(false)} 
+            />
         </>
     );
 };

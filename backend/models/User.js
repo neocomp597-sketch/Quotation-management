@@ -5,6 +5,7 @@ const UserSchema = new mongoose.Schema({
     email: { type: String, required: true, unique: true },
     passwordHash: { type: String, required: true },
     passwordChangedAt: { type: Date },
+    mustChangePassword: { type: Boolean, default: false },
     refreshTokenHash: { type: String },
     refreshTokenExpiresAt: { type: Date },
     tokenVersion: { type: Number, default: 0 },

@@ -185,6 +185,40 @@ const CSMTickets = () => {
         serialNumber: ''
     });
 
+    const [serialSuggestions, setSerialSuggestions] = useState([]);
+    const [isSearchingSerials, setIsSearchingSerials] = useState(false);
+    const [showSerialDropdown, setShowSerialDropdown] = useState(false);
+
+    const handleSerialInputChange = async (val) => {
+        setFormData(prev => ({ ...prev, serialNumber: val }));
+        const query = val ? String(val).trim() : '';
+        if (query.length >= 1) {
+            setIsSearchingSerials(true);
+            setShowSerialDropdown(true);
+            try {
+                const res = await csmService.searchSerialNumbers(query);
+                setSerialSuggestions(res.data || []);
+            } catch (err) {
+                console.error('Serial search error:', err);
+                setSerialSuggestions([]);
+            } finally {
+                setIsSearchingSerials(false);
+            }
+        } else {
+            setSerialSuggestions([]);
+            setShowSerialDropdown(false);
+        }
+    };
+
+    const handleSelectSerialSuggestion = (asset) => {
+        setShowSerialDropdown(false);
+        setSerialSuggestions([]);
+        if (asset?.serialNumber) {
+            setFormData(prev => ({ ...prev, serialNumber: asset.serialNumber }));
+            handleSerialNoLookup(asset.serialNumber);
+        }
+    };
+
     const fetchTickets = async () => {
         setLoading(true);
         try {
@@ -873,12 +907,18 @@ const CSMTickets = () => {
                 
                 // Autofill
                 setFormData(prev => {
+                    const custPincode = asset.customerId?.billingAddress?.pincode || asset.pincode || asset.locationPincode || prev.pincode || '';
+                    const invList = invoiceRes.data?.data || invoiceRes.data || [];
+                    const matchedInvoice = asset.invoiceId?._id || asset.invoiceId || (invList.length > 0 ? invList[0]._id : '');
+
                     const nextData = {
                         ...prev,
-                        customerId: asset.customerId?._id || '',
-                        productId: asset.productId?._id || '',
+                        customerId: asset.customerId?._id || prev.customerId || '',
+                        productId: asset.productId?._id || prev.productId || '',
                         assetId: asset._id || '',
-                        serialNumber: asset.serialNumber || cleanSN
+                        serialNumber: asset.serialNumber || cleanSN,
+                        pincode: custPincode,
+                        invoiceId: matchedInvoice || prev.invoiceId || ''
                     };
                     
                     // Autofill contact if we have contacts and primary exists
@@ -1709,18 +1749,24 @@ const CSMTickets = () => {
                             />
                         </div>
                         <div>
-                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Product Serial No.</label>
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                                Product Serial No. <span className="text-[9px] text-teal-600 font-bold lowercase">(type partial e.g. 1002)</span>
+                            </label>
                             <div className="relative">
                                 <input
                                     type="text"
                                     value={formData.serialNumber || ''}
-                                    onChange={(e) => {
-                                        const val = e.target.value;
-                                        setFormData(prev => ({ ...prev, serialNumber: val }));
+                                    onChange={(e) => handleSerialInputChange(e.target.value)}
+                                    onFocus={() => {
+                                        if (formData.serialNumber && formData.serialNumber.trim().length >= 1) {
+                                            handleSerialInputChange(formData.serialNumber);
+                                        }
                                     }}
-                                    onBlur={() => handleSerialNoLookup(formData.serialNumber)}
-                                    className="w-full pl-4 pr-12 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
-                                    placeholder="Enter or scan Product Serial No."
+                                    onBlur={() => {
+                                        setTimeout(() => setShowSerialDropdown(false), 200);
+                                    }}
+                                    className="w-full pl-4 pr-12 py-3 rounded-xl border border-slate-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all"
+                                    placeholder="Enter or scan Serial No (e.g. 1002 or CE1002)..."
                                 />
                                 <button
                                     type="button"
@@ -1730,6 +1776,35 @@ const CSMTickets = () => {
                                 >
                                     <MdSearch size={20} />
                                 </button>
+
+                                {/* Dropdown Suggestions List */}
+                                {showSerialDropdown && (
+                                    <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-2xl shadow-xl max-h-60 overflow-y-auto divide-y divide-slate-100 animate-in fade-in slide-in-from-top-1">
+                                        {isSearchingSerials ? (
+                                            <div className="p-3 text-xs text-slate-400 font-bold text-center">Searching Serial Numbers...</div>
+                                        ) : serialSuggestions.length === 0 ? (
+                                            <div className="p-3 text-xs text-slate-400 font-bold text-center">No matching Serial Numbers found</div>
+                                        ) : (
+                                            serialSuggestions.map(asset => (
+                                                <div
+                                                    key={asset._id}
+                                                    onMouseDown={() => handleSelectSerialSuggestion(asset)}
+                                                    className="p-3 hover:bg-primary-50/70 cursor-pointer transition-colors"
+                                                >
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="font-mono font-bold text-slate-900 text-sm">{asset.serialNumber}</span>
+                                                        <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-slate-100 text-slate-600">
+                                                            {asset.status || 'ACTIVE'}
+                                                        </span>
+                                                    </div>
+                                                    <div className="text-xs text-slate-500 font-medium truncate mt-0.5">
+                                                        {asset.productId?.productName || 'Product'} &bull; {asset.customerId?.companyName || asset.customerId?.customerName || 'Stock Customer'}
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         </div>
 

@@ -44,6 +44,7 @@ router.patch('/visits/:id/reschedule', protect, serviceVisitController.reschedul
 // ─── ENTITLEMENTS (WARRANTY / AMC / ASSETS) ─────────────────────────────────
 router.get('/entitlements/verify', protect, warrantyAmcController.verifyEntitlements);
 router.get('/assets/summary', protect, warrantyAmcController.getAssetSummary);
+router.get('/assets/search-serials', protect, warrantyAmcController.searchSerialNumbers);
 router.post('/warranties', protect, warrantyAmcController.createWarranty);
 router.get('/warranties', protect, warrantyAmcController.getWarranties);
 router.post('/amcs', protect, warrantyAmcController.createAmc);

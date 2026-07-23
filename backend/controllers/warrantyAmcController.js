@@ -249,3 +249,31 @@ exports.getAssetSummary = async (req, res) => {
     }
 };
 
+exports.searchSerialNumbers = async (req, res) => {
+    try {
+        const { q } = req.query;
+        const companyId = req.user?.companyId;
+
+        if (!q || !String(q).trim()) {
+            return res.json([]);
+        }
+
+        const queryStr = String(q).trim();
+        const filter = {
+            companyId,
+            serialNumber: { $regex: queryStr.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), $options: 'i' }
+        };
+
+        const assets = await Asset.find(filter)
+            .populate('customerId', 'customerName companyName billingAddress mobile email')
+            .populate('productId', 'productName productCode')
+            .limit(20)
+            .lean();
+
+        res.json(assets);
+    } catch (error) {
+        console.error('searchSerialNumbers error:', error);
+        res.status(500).json({ message: error.message || 'Error searching serial numbers' });
+    }
+};
+

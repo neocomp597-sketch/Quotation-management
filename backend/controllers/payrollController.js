@@ -97,7 +97,10 @@ exports.getEmployees = async (req, res) => {
             query.name = { $regex: req.query.search, $options: 'i' };
         }
         
-        const employees = await EmployeeProfile.find(query).sort({ name: 1 }).lean();
+        const employees = await EmployeeProfile.find(query)
+            .populate('reportingTo', 'name email designation')
+            .sort({ name: 1 })
+            .lean();
         res.json(employees);
     } catch (error) {
         res.status(500).json({ message: 'Failed to load employees', error: error.message });
@@ -106,7 +109,9 @@ exports.getEmployees = async (req, res) => {
 
 exports.getEmployee = async (req, res) => {
     try {
-        const employee = await EmployeeProfile.findById(req.params.id).lean();
+        const employee = await EmployeeProfile.findById(req.params.id)
+            .populate('reportingTo', 'name email designation')
+            .lean();
         if (!employee) {
             return res.status(404).json({ message: 'Employee not found' });
         }
@@ -118,14 +123,47 @@ exports.getEmployee = async (req, res) => {
 
 exports.createEmployee = async (req, res) => {
     try {
-        const employee = await EmployeeProfile.create(req.body);
+        const employeeData = { ...req.body };
+        if (!employeeData.companyId && req.user?.companyId) {
+            employeeData.companyId = req.user.companyId;
+        }
+        const employee = await EmployeeProfile.create(employeeData);
         
+        // Requirement 1: Auto User Creation on Employee Addition
+        if (employee.email) {
+            const emailStr = String(employee.email).trim().toLowerCase();
+            if (emailStr) {
+                const User = require('../models/User');
+                const bcrypt = require('bcryptjs');
+                const existingUser = await User.findOne({ 
+                    email: { $regex: new RegExp("^" + emailStr.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + "$", "i") } 
+                }).lean();
+
+                if (!existingUser) {
+                    const salt = await bcrypt.genSalt(10);
+                    const passwordHash = await bcrypt.hash('123456', salt);
+                    await User.create({
+                        name: employee.name,
+                        email: emailStr,
+                        passwordHash,
+                        mustChangePassword: true,
+                        role: 'employee',
+                        companyId: employee.companyId
+                    });
+                }
+            }
+        }
+
         // Auto-sync Service Engineer to Engineers Master
         const { syncEmployeeToEngineer } = require('../services/engineerSyncService');
         await syncEmployeeToEngineer(employee);
 
         await writePayrollAudit(req, 'EMPLOYEE_CREATED', `Created employee profile for ${employee.name}`, employee._id, 'EmployeeProfile');
-        res.status(201).json(employee);
+        
+        const populatedEmployee = await EmployeeProfile.findById(employee._id)
+            .populate('reportingTo', 'name email designation')
+            .lean();
+        res.status(201).json(populatedEmployee || employee);
     } catch (error) {
         res.status(500).json({ message: 'Failed to create employee profile', error: error.message });
     }
@@ -133,7 +171,12 @@ exports.createEmployee = async (req, res) => {
 
 exports.updateEmployee = async (req, res) => {
     try {
-        const employee = await EmployeeProfile.findByIdAndUpdate(req.params.id, { $set: req.body }, { new: true });
+        const employee = await EmployeeProfile.findByIdAndUpdate(
+            req.params.id, 
+            { $set: req.body }, 
+            { new: true }
+        ).populate('reportingTo', 'name email designation');
+        
         if (!employee) {
             return res.status(404).json({ message: 'Employee not found' });
         }
