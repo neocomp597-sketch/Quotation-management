@@ -287,10 +287,11 @@ exports.searchSerialNumbers = async (req, res) => {
         };
 
         const assets = await Asset.find(filter)
+            .sort({ customerId: -1, status: -1, serialNumber: 1 })
+            .limit(100)
             .populate('customerId', 'customerName companyName billingAddress mobile email gstin')
             .populate('productId', 'productName productCode basePrice mrp')
             .populate('invoiceId', 'voucherNumber date')
-            .limit(100)
             .lean();
 
         // Sort priority: SOLD > ALLOCATED > RETURNED > IN_STOCK > SCRAPPED
