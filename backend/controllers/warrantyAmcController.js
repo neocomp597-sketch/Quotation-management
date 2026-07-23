@@ -150,19 +150,40 @@ exports.getAssetSummary = async (req, res) => {
         const Ticket = require('../models/Ticket');
         const ServiceVisit = require('../models/ServiceVisit');
 
-        const query = { companyId };
+        let asset = null;
         if (assetId) {
-            query._id = assetId;
+            asset = await Asset.findOne({ _id: assetId, companyId })
+                .populate('customerId', 'customerName companyName gstin billingAddress mobile email')
+                .populate('productId', 'productName productCode basePrice mrp catalogType')
+                .populate('invoiceId', 'voucherNumber date')
+                .lean();
         } else if (serialNumber) {
-            query.serialNumber = serialNumber;
+            const cleanSN = String(serialNumber).trim();
+            const escapedSN = cleanSN.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+            const matches = await Asset.find({
+                companyId,
+                serialNumber: { $regex: new RegExp("^" + escapedSN + "$", "i") }
+            })
+            .populate('customerId', 'customerName companyName gstin billingAddress mobile email')
+            .populate('productId', 'productName productCode basePrice mrp catalogType')
+            .populate('invoiceId', 'voucherNumber date')
+            .lean();
+
+            if (matches.length > 0) {
+                const statusPriority = { 'SOLD': 1, 'ALLOCATED': 2, 'RETURNED': 3, 'IN_STOCK': 4, 'SCRAPPED': 5 };
+                matches.sort((a, b) => {
+                    const pA = statusPriority[a.status] || (a.customerId ? 1 : 4);
+                    const pB = statusPriority[b.status] || (b.customerId ? 1 : 4);
+                    if (pA !== pB) return pA - pB;
+                    if (a.customerId && !b.customerId) return -1;
+                    if (!a.customerId && b.customerId) return 1;
+                    return 0;
+                });
+                asset = matches[0];
+            }
         } else {
             return res.status(400).json({ message: 'assetId or serialNumber is required' });
         }
-
-        const asset = await Asset.findOne(query)
-            .populate('customerId', 'customerName companyName gstin billingAddress mobile email')
-            .populate('productId', 'productName productCode basePrice mrp catalogType')
-            .lean();
 
         if (!asset) {
             return res.status(404).json({ message: 'Asset not found' });
@@ -259,18 +280,34 @@ exports.searchSerialNumbers = async (req, res) => {
         }
 
         const queryStr = String(q).trim();
+        const escapedQuery = queryStr.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
         const filter = {
             companyId,
-            serialNumber: { $regex: queryStr.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), $options: 'i' }
+            serialNumber: { $regex: escapedQuery, $options: 'i' }
         };
 
         const assets = await Asset.find(filter)
-            .populate('customerId', 'customerName companyName billingAddress mobile email')
-            .populate('productId', 'productName productCode')
-            .limit(20)
+            .populate('customerId', 'customerName companyName billingAddress mobile email gstin')
+            .populate('productId', 'productName productCode basePrice mrp')
+            .populate('invoiceId', 'voucherNumber date')
+            .limit(100)
             .lean();
 
-        res.json(assets);
+        // Sort priority: SOLD > ALLOCATED > RETURNED > IN_STOCK > SCRAPPED
+        const statusPriority = { 'SOLD': 1, 'ALLOCATED': 2, 'RETURNED': 3, 'IN_STOCK': 4, 'SCRAPPED': 5 };
+
+        assets.sort((a, b) => {
+            const pA = statusPriority[a.status] || (a.customerId ? 1 : 4);
+            const pB = statusPriority[b.status] || (b.customerId ? 1 : 4);
+            if (pA !== pB) return pA - pB;
+
+            if (a.customerId && !b.customerId) return -1;
+            if (!a.customerId && b.customerId) return 1;
+
+            return (a.serialNumber || '').localeCompare(b.serialNumber || '');
+        });
+
+        res.json(assets.slice(0, 30));
     } catch (error) {
         console.error('searchSerialNumbers error:', error);
         res.status(500).json({ message: error.message || 'Error searching serial numbers' });

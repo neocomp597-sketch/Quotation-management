@@ -44,6 +44,7 @@ router.use(protect);
 // ─── EMPLOYEE PROFILES (Admin only) ─────────────────────────────────────────
 router.get('/employees', checkAdmin, payrollController.getEmployees);
 router.post('/employees', checkAdmin, payrollController.createEmployee);
+router.post('/employees/sync-users', checkAdmin, payrollController.syncEmployeeUsers);
 router.get('/employees/:id', checkAdmin, payrollController.getEmployee);
 router.put('/employees/:id', checkAdmin, payrollController.updateEmployee);
 router.put('/employees/:id/structure', checkAdmin, payrollController.updateEmployeeStructure);

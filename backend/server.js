@@ -704,6 +704,13 @@ const startBackgroundServices = async () => {
       // Ignore if index doesn't exist
   }
 
+  try {
+      const { syncUsersForExistingEmployees } = require("./services/employeeUserService");
+      await syncUsersForExistingEmployees();
+  } catch (syncErr) {
+      console.error('[Auto User Sync Startup Error]:', syncErr.message);
+  }
+
   if (redisReady) {
     await startCacheInvalidationWorker();
     await startAuthSessionWorker();

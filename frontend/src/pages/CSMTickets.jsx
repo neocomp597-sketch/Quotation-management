@@ -215,7 +215,7 @@ const CSMTickets = () => {
         setSerialSuggestions([]);
         if (asset?.serialNumber) {
             setFormData(prev => ({ ...prev, serialNumber: asset.serialNumber }));
-            handleSerialNoLookup(asset.serialNumber);
+            handleSerialNoLookup(asset.serialNumber, asset);
         }
     };
 
@@ -887,43 +887,61 @@ const CSMTickets = () => {
         fetchTickets();
     };
 
-    const handleSerialNoLookup = async (serialNo) => {
+    const handleSerialNoLookup = async (serialNo, preloadedAsset = null) => {
         const cleanSN = String(serialNo || '').trim();
-        if (!cleanSN) return;
+        if (!cleanSN && !preloadedAsset) return;
         
         try {
-            const res = await csmService.getAssetSummary({ serialNumber: cleanSN });
-            if (res.data && res.data.asset) {
-                const asset = res.data.asset;
+            const summaryParams = preloadedAsset?._id ? { assetId: preloadedAsset._id } : { serialNumber: cleanSN };
+            const res = await csmService.getAssetSummary(summaryParams);
+            const asset = res.data?.asset || preloadedAsset;
+            
+            if (res.data) {
                 setAssetSummary(res.data);
-                setGeneratedSerial('');
+            }
+            setGeneratedSerial('');
+
+            if (asset) {
+                const targetCustId = asset.customerId?._id || asset.customerId || null;
                 
-                // Fetch invoices and contacts for this customer
-                const invoiceRes = await voucherService.getAll({ customerId: asset.customerId?._id, voucherType: 'Invoice' });
-                setInvoices(invoiceRes.data?.data || invoiceRes.data || []);
-                
-                const contactsRes = await csmService.getCustomerContacts({ customerId: asset.customerId?._id });
-                setCustomerContacts(contactsRes.data || []);
+                let invList = [];
+                let contactsList = [];
+
+                if (targetCustId) {
+                    try {
+                        const invoiceRes = await voucherService.getAll({ customerId: targetCustId, voucherType: 'Invoice' });
+                        invList = invoiceRes.data?.data || invoiceRes.data || [];
+                        setInvoices(invList);
+                    } catch (e) {
+                        console.error('Invoice fetch error:', e);
+                    }
+                    
+                    try {
+                        const contactsRes = await csmService.getCustomerContacts({ customerId: targetCustId });
+                        contactsList = contactsRes.data || [];
+                        setCustomerContacts(contactsList);
+                    } catch (e) {
+                        console.error('Contacts fetch error:', e);
+                    }
+                }
                 
                 // Autofill
                 setFormData(prev => {
                     const custPincode = asset.customerId?.billingAddress?.pincode || asset.pincode || asset.locationPincode || prev.pincode || '';
-                    const invList = invoiceRes.data?.data || invoiceRes.data || [];
                     const matchedInvoice = asset.invoiceId?._id || asset.invoiceId || (invList.length > 0 ? invList[0]._id : '');
 
                     const nextData = {
                         ...prev,
-                        customerId: asset.customerId?._id || prev.customerId || '',
-                        productId: asset.productId?._id || prev.productId || '',
+                        customerId: targetCustId || prev.customerId || '',
+                        productId: asset.productId?._id || asset.productId || prev.productId || '',
                         assetId: asset._id || '',
                         serialNumber: asset.serialNumber || cleanSN,
                         pincode: custPincode,
                         invoiceId: matchedInvoice || prev.invoiceId || ''
                     };
                     
-                    // Autofill contact if we have contacts and primary exists
-                    if (contactsRes.data && contactsRes.data.length > 0) {
-                        const primaryContact = contactsRes.data.find(c => c.isPrimary) || contactsRes.data[0];
+                    if (contactsList.length > 0) {
+                        const primaryContact = contactsList.find(c => c.isPrimary) || contactsList[0];
                         if (primaryContact) {
                             nextData.contactId = primaryContact._id;
                             nextData.contactName = primaryContact.contactName || '';
@@ -932,19 +950,27 @@ const CSMTickets = () => {
                             nextData.contactPhone = primaryContact.mobileNo || '';
                             nextData.contactEmail = primaryContact.email || '';
                         }
+                    } else if (asset.customerId) {
+                        if (asset.customerId.mobile && !nextData.contactPhone) {
+                            nextData.contactPhone = asset.customerId.mobile;
+                        }
+                        if (asset.customerId.email && !nextData.contactEmail) {
+                            nextData.contactEmail = asset.customerId.email;
+                        }
                     }
                     
                     return nextData;
                 });
                 
-                toast.success(`Asset found! Auto-filled details for Serial No: ${cleanSN}`);
+                toast.success(`Asset found! Auto-filled details for Serial No: ${asset.serialNumber || cleanSN}`);
                 
-                // Check coverage & adjust priority
-                const hasCoverage = res.data.warranty?.status === 'Active' || res.data.amc?.status === 'Active';
-                if (!hasCoverage) {
-                    const medPriority = priorities.find(p => p.name?.toLowerCase() === 'medium');
-                    if (medPriority) {
-                        setFormData(prev => ({ ...prev, priorityId: medPriority._id }));
+                if (res.data) {
+                    const hasCoverage = res.data.warranty?.status === 'Active' || res.data.amc?.status === 'Active';
+                    if (!hasCoverage) {
+                        const medPriority = priorities.find(p => p.name?.toLowerCase() === 'medium');
+                        if (medPriority) {
+                            setFormData(prev => ({ ...prev, priorityId: medPriority._id }));
+                        }
                     }
                 }
             } else {
@@ -1785,23 +1811,34 @@ const CSMTickets = () => {
                                         ) : serialSuggestions.length === 0 ? (
                                             <div className="p-3 text-xs text-slate-400 font-bold text-center">No matching Serial Numbers found</div>
                                         ) : (
-                                            serialSuggestions.map(asset => (
-                                                <div
-                                                    key={asset._id}
-                                                    onMouseDown={() => handleSelectSerialSuggestion(asset)}
-                                                    className="p-3 hover:bg-primary-50/70 cursor-pointer transition-colors"
-                                                >
-                                                    <div className="flex items-center justify-between">
-                                                        <span className="font-mono font-bold text-slate-900 text-sm">{asset.serialNumber}</span>
-                                                        <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-slate-100 text-slate-600">
-                                                            {asset.status || 'ACTIVE'}
-                                                        </span>
+                                            serialSuggestions.map(asset => {
+                                                const isSold = asset.status === 'SOLD' || asset.customerId;
+                                                const custName = asset.customerId?.companyName || asset.customerId?.customerName;
+                                                return (
+                                                    <div
+                                                        key={asset._id}
+                                                        onMouseDown={() => handleSelectSerialSuggestion(asset)}
+                                                        className="p-3 hover:bg-teal-50/70 cursor-pointer transition-colors"
+                                                    >
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="font-mono font-bold text-slate-900 text-sm">{asset.serialNumber}</span>
+                                                            <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${
+                                                                isSold
+                                                                    ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                                                                    : 'bg-amber-100 text-amber-700 border border-amber-200'
+                                                            }`}>
+                                                                {isSold ? '🛒 SOLD' : '📦 IN STOCK'}
+                                                            </span>
+                                                        </div>
+                                                        <div className="text-xs text-slate-600 font-medium truncate mt-1 flex items-center justify-between">
+                                                            <span className="truncate max-w-[55%]">{asset.productId?.productName || 'Product'}</span>
+                                                            <span className="font-bold text-slate-800 truncate max-w-[42%] text-right">
+                                                                {custName ? `👤 ${custName}` : 'Stock (Unsold)'}
+                                                            </span>
+                                                        </div>
                                                     </div>
-                                                    <div className="text-xs text-slate-500 font-medium truncate mt-0.5">
-                                                        {asset.productId?.productName || 'Product'} &bull; {asset.customerId?.companyName || asset.customerId?.customerName || 'Stock Customer'}
-                                                    </div>
-                                                </div>
-                                            ))
+                                                );
+                                            })
                                         )}
                                     </div>
                                 )}

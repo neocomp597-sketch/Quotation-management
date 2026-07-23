@@ -129,30 +129,9 @@ exports.createEmployee = async (req, res) => {
         }
         const employee = await EmployeeProfile.create(employeeData);
         
-        // Requirement 1: Auto User Creation on Employee Addition
-        if (employee.email) {
-            const emailStr = String(employee.email).trim().toLowerCase();
-            if (emailStr) {
-                const User = require('../models/User');
-                const bcrypt = require('bcryptjs');
-                const existingUser = await User.findOne({ 
-                    email: { $regex: new RegExp("^" + emailStr.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + "$", "i") } 
-                }).lean();
-
-                if (!existingUser) {
-                    const salt = await bcrypt.genSalt(10);
-                    const passwordHash = await bcrypt.hash('123456', salt);
-                    await User.create({
-                        name: employee.name,
-                        email: emailStr,
-                        passwordHash,
-                        mustChangePassword: true,
-                        role: 'employee',
-                        companyId: employee.companyId
-                    });
-                }
-            }
-        }
+        // Requirement: Auto User Creation on Employee Addition
+        const { syncUserForEmployee } = require('../services/employeeUserService');
+        await syncUserForEmployee(employee);
 
         // Auto-sync Service Engineer to Engineers Master
         const { syncEmployeeToEngineer } = require('../services/engineerSyncService');
@@ -181,6 +160,10 @@ exports.updateEmployee = async (req, res) => {
             return res.status(404).json({ message: 'Employee not found' });
         }
         
+        // Auto-sync User account if email present
+        const { syncUserForEmployee } = require('../services/employeeUserService');
+        await syncUserForEmployee(employee);
+
         // Auto-sync details/status to CSM Engineers Master
         const { syncEmployeeToEngineer } = require('../services/engineerSyncService');
         await syncEmployeeToEngineer(employee);
@@ -190,6 +173,17 @@ exports.updateEmployee = async (req, res) => {
         res.json(employee);
     } catch (error) {
         res.status(500).json({ message: 'Failed to update employee details', error: error.message });
+    }
+};
+
+exports.syncEmployeeUsers = async (req, res) => {
+    try {
+        const { syncUsersForExistingEmployees } = require('../services/employeeUserService');
+        const companyId = req.user?.companyId || null;
+        const result = await syncUsersForExistingEmployees(companyId);
+        res.json({ message: 'User sync complete for existing employees', ...result });
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to sync users for employees', error: error.message });
     }
 };
 
