@@ -45,8 +45,9 @@ const ChangePasswordModal = ({ isOpen, user, onPasswordChanged }) => {
                 }
             }
 
+            const updatedUser = res.data?.user || { ...user, mustChangePassword: false };
             if (onPasswordChanged) {
-                onPasswordChanged(res.data?.user);
+                onPasswordChanged(updatedUser);
             }
         } catch (error) {
             console.error('Password change error', error);

@@ -882,3 +882,48 @@ exports.deleteDesignation = async (req, res) => {
         res.status(500).json({ message: 'Failed to delete designation', error: error.message });
     }
 };
+
+// ─── EMPLOYEE MY PAYSLIPS (For logged-in employees) ───────────────────────
+
+exports.getMyPayslips = async (req, res) => {
+    try {
+        const userEmail = req.user?.email;
+        if (!userEmail) {
+            return res.json([]);
+        }
+
+        const emailStr = String(userEmail).trim().toLowerCase();
+        const escapedEmail = emailStr.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+
+        const summaries = await PayrollEmployeeSummary.find({
+            'basicDetails.email': { $regex: new RegExp("^" + escapedEmail + "$", "i") }
+        })
+        .populate({
+            path: 'payrollRunId',
+            select: 'month status totalNetSalary'
+        })
+        .sort({ createdAt: -1 })
+        .lean();
+
+        const validSummaries = summaries.filter(s => 
+            s.payrollRunId && ['approved', 'locked'].includes(s.payrollRunId.status)
+        );
+
+        res.json(validSummaries);
+    } catch (error) {
+        console.error('getMyPayslips error:', error);
+        res.status(500).json({ message: 'Failed to load employee payslips', error: error.message });
+    }
+};
+
+exports.getPublicSettings = async (req, res) => {
+    try {
+        let settings = await PayrollSettings.findOne().lean();
+        if (!settings) {
+            settings = { pfEnabled: true, esiEnabled: true, ptEnabled: true, tdsEnabled: true };
+        }
+        res.json(settings);
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to load payroll settings', error: error.message });
+    }
+};

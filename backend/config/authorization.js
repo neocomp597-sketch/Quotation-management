@@ -129,6 +129,7 @@ const MENU_GROUPS = [
         label: 'Payroll',
         description: 'Manage payroll settings, runs, calculations, and letters',
         children: [
+            { key: 'payroll_payslips', label: 'My Payslips', description: 'View and download monthly payslips' },
             { key: 'payroll_employees', label: 'Employee Profiles', description: 'Manage employee salary profiles and structures' },
             { key: 'payroll_runs', label: 'Run Payroll', description: 'Create and run monthly payroll batches' },
             { key: 'payroll_payments', label: 'Payments', description: 'Record payment slips and transaction references' },
@@ -162,12 +163,13 @@ const MENU_GROUPS = [
     }
 ];
 
-const ROLE_OPTIONS = ['admin', 'manager', 'sales'];
+const ROLE_OPTIONS = ['admin', 'manager', 'sales', 'employee'];
 
 const ROLE_LABELS = {
     admin: 'Admin',
     manager: 'Manager',
-    sales: 'Sales'
+    sales: 'Sales',
+    employee: 'Employee'
 };
 
 const getAllPermissionKeys = () => MENU_GROUPS.flatMap((group) => [
@@ -196,10 +198,12 @@ const FULL_ACCESS_KEYS = getAllPermissionKeys();
 
 // Manager: everything except the admin panel
 // Sales: lightweight access - dashboard, enquiry, quotation only
+// Employee: employee access - payslips, payroll, csm tickets, csm kb, dashboard
 const DEFAULT_ROLE_PERMISSIONS = {
     admin: buildPermissions(FULL_ACCESS_KEYS),
     manager: buildPermissions(['dashboard', 'master', 'enquiry', 'sales_pipeline', 'quotation', 'meetings', 'sale', 'purchase', 'planning', 'reports', 'settings', 'csm', 'tender']),
-    sales: buildPermissions(['dashboard', 'enquiry', 'sales_pipeline', 'quotation', 'meetings', 'csm_tickets', 'csm_kb', 'tender_dashboard', 'tender_register'])
+    sales: buildPermissions(['dashboard', 'enquiry', 'sales_pipeline', 'quotation', 'meetings', 'csm_tickets', 'csm_kb', 'tender_dashboard', 'tender_register']),
+    employee: buildPermissions(['dashboard', 'payroll_payslips', 'csm_tickets', 'csm_kb', 'settings_profile'])
 };
 
 /**

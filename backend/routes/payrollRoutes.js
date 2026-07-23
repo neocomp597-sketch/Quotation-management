@@ -50,6 +50,10 @@ router.put('/employees/:id', checkAdmin, payrollController.updateEmployee);
 router.put('/employees/:id/structure', checkAdmin, payrollController.updateEmployeeStructure);
 router.delete('/employees/:id', checkAdmin, payrollController.deleteEmployee);
 
+// ─── EMPLOYEE MY PAYSLIPS (Authenticated users) ────────────────────────────
+router.get('/my-payslips', payrollController.getMyPayslips);
+router.get('/settings/public', payrollController.getPublicSettings);
+
 // ─── SETTINGS (Admin only) ──────────────────────────────────────────────────
 router.get('/settings', checkAdmin, payrollController.getSettings);
 router.put('/settings', checkAdmin, payrollController.updateSettings);

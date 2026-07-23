@@ -613,7 +613,11 @@ export const payrollService = {
 
   // Settings
   getSettings: () => api.get("/payroll/settings"),
+  getPublicSettings: () => api.get("/payroll/settings/public"),
   updateSettings: (data) => api.put("/payroll/settings", data),
+
+  // Employee Self-Service
+  getMyPayslips: () => api.get("/payroll/my-payslips"),
 
   // Runs
   getRuns: () => api.get("/payroll/runs"),

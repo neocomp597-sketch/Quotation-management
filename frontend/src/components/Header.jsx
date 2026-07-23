@@ -408,7 +408,7 @@ const moduleSubmodulesMap = {
 
 const Header = ({ sidebarOpen, toggleSidebar }) => {
     const navigate = useNavigate();
-    const { user, logout, isAdmin, isSuperAdmin, hasAccess } = useAuth();
+    const { user, logout, isAdmin, isSuperAdmin, hasAccess, updateUser } = useAuth();
     const { isDarkMode, toggleTheme } = useTheme();
     const { isReconnecting } = useSocket();
 
@@ -420,8 +420,17 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
     useEffect(() => {
         if (user?.mustChangePassword) {
             setMustChangePasswordModal(true);
+        } else {
+            setMustChangePasswordModal(false);
         }
     }, [user]);
+
+    const handlePasswordChanged = (updatedUser) => {
+        setMustChangePasswordModal(false);
+        if (updateUser) {
+            updateUser(updatedUser || { ...user, mustChangePassword: false });
+        }
+    };
 
     const [searchQuery, setSearchQuery] = useState('');
     const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -897,7 +906,7 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
             <ChangePasswordModal 
                 isOpen={mustChangePasswordModal} 
                 user={user} 
-                onPasswordChanged={() => setMustChangePasswordModal(false)} 
+                onPasswordChanged={handlePasswordChanged} 
             />
         </>
     );
