@@ -197,7 +197,17 @@ const CSMTickets = () => {
             setShowSerialDropdown(true);
             try {
                 const res = await csmService.searchSerialNumbers(query);
-                setSerialSuggestions(res.data || []);
+                const rawList = res.data || [];
+                // Only include SOLD products and deduplicate by serialNumber
+                const soldList = rawList.filter(a => a.status === 'SOLD' || a.customerId);
+                const uniqueMap = new Map();
+                soldList.forEach(item => {
+                    const key = (item.serialNumber || '').trim().toLowerCase();
+                    if (key && !uniqueMap.has(key)) {
+                        uniqueMap.set(key, item);
+                    }
+                });
+                setSerialSuggestions(Array.from(uniqueMap.values()));
             } catch (err) {
                 console.error('Serial search error:', err);
                 setSerialSuggestions([]);
@@ -1809,10 +1819,9 @@ const CSMTickets = () => {
                                         {isSearchingSerials ? (
                                             <div className="p-3 text-xs text-slate-400 font-bold text-center">Searching Serial Numbers...</div>
                                         ) : serialSuggestions.length === 0 ? (
-                                            <div className="p-3 text-xs text-slate-400 font-bold text-center">No matching Serial Numbers found</div>
+                                            <div className="p-3 text-xs text-slate-400 font-bold text-center">No matching SOLD Serial Numbers found</div>
                                         ) : (
                                             serialSuggestions.map(asset => {
-                                                const isSold = asset.status === 'SOLD' || asset.customerId;
                                                 const custName = asset.customerId?.companyName || asset.customerId?.customerName;
                                                 return (
                                                     <div
@@ -1822,18 +1831,14 @@ const CSMTickets = () => {
                                                     >
                                                         <div className="flex items-center justify-between">
                                                             <span className="font-mono font-bold text-slate-900 text-sm">{asset.serialNumber}</span>
-                                                            <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${
-                                                                isSold
-                                                                    ? 'bg-blue-100 text-blue-700 border border-blue-200'
-                                                                    : 'bg-amber-100 text-amber-700 border border-amber-200'
-                                                            }`}>
-                                                                {isSold ? '🛒 SOLD' : '📦 IN STOCK'}
+                                                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-blue-100 text-blue-700 border border-blue-200">
+                                                                🛒 SOLD
                                                             </span>
                                                         </div>
                                                         <div className="text-xs text-slate-600 font-medium truncate mt-1 flex items-center justify-between">
                                                             <span className="truncate max-w-[55%]">{asset.productId?.productName || 'Product'}</span>
                                                             <span className="font-bold text-slate-800 truncate max-w-[42%] text-right">
-                                                                {custName ? `👤 ${custName}` : 'Stock (Unsold)'}
+                                                                {custName ? `👤 ${custName}` : 'Customer Asset'}
                                                             </span>
                                                         </div>
                                                     </div>

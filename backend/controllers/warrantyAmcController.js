@@ -281,14 +281,20 @@ exports.searchSerialNumbers = async (req, res) => {
 
         const queryStr = String(q).trim();
         const escapedQuery = queryStr.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+
+        // Only search for SOLD products (or assets with a customer assigned) when raising complaints/tickets
         const filter = {
             companyId,
+            $or: [
+                { status: 'SOLD' },
+                { customerId: { $ne: null } }
+            ],
             serialNumber: { $regex: escapedQuery, $options: 'i' }
         };
 
         const assets = await Asset.find(filter)
             .sort({ customerId: -1, status: -1, serialNumber: 1 })
-            .limit(100)
+            .limit(200)
             .populate('customerId', 'customerName companyName billingAddress mobile email gstin')
             .populate('productId', 'productName productCode basePrice mrp')
             .populate('invoiceId', 'voucherNumber date')
@@ -308,10 +314,23 @@ exports.searchSerialNumbers = async (req, res) => {
             return (a.serialNumber || '').localeCompare(b.serialNumber || '');
         });
 
-        res.json(assets.slice(0, 30));
+        // Deduplicate by serialNumber so each Serial No. appears only once
+        const uniqueAssets = [];
+        const seenSerials = new Set();
+
+        for (const asset of assets) {
+            const sn = (asset.serialNumber || '').trim().toLowerCase();
+            if (sn && !seenSerials.has(sn)) {
+                seenSerials.add(sn);
+                uniqueAssets.push(asset);
+            }
+        }
+
+        res.json(uniqueAssets.slice(0, 30));
     } catch (error) {
         console.error('searchSerialNumbers error:', error);
         res.status(500).json({ message: error.message || 'Error searching serial numbers' });
     }
 };
+
 
