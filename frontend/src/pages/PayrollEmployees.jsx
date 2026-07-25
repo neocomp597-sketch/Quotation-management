@@ -393,7 +393,7 @@ const PayrollEmployees = () => {
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
                 title={
-                    (modalMode === 'add' && 'Create Employee Salary Profile') ||
+                    (modalMode === 'add' && 'Employee Profile') ||
                     (modalMode === 'edit' && 'Edit Employee Details') ||
                     (modalMode === 'structure' && `Base Structure: ${selectedEmp?.name}`) ||
                     ''

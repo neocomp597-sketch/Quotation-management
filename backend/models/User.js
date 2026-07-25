@@ -13,6 +13,7 @@ const UserSchema = new mongoose.Schema({
     reportsTo: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     status: { type: Boolean, default: true },
     isActive: { type: Boolean, default: true },
+    personalNote: { type: String, default: '' },
     companyId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Company',

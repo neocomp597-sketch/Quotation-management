@@ -6,6 +6,8 @@ const { protect, admin } = require('../middlewares/authMiddleware');
 // Define user routes here
 router.get('/', protect, userController.getAllUsers);
 router.post('/', protect, admin, userController.createUser);
+router.get('/note', protect, userController.getUserNote);
+router.put('/note', protect, userController.updateUserNote);
 router.put('/profile', protect, userController.updateUserProfile);
 router.put('/:id', protect, admin, userController.updateUser);
 router.patch('/:id/role', protect, admin, userController.updateUserRole);

@@ -309,3 +309,33 @@ exports.deleteUser = async (req, res) => {
         res.status(500).json({ message: 'Failed to delete user', error: error.message });
     }
 };
+
+exports.getUserNote = async (req, res) => {
+    try {
+        const user = await User.findById(req.user.id).select('personalNote').lean();
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+        res.json({ note: user.personalNote || '' });
+    } catch (error) {
+        console.error('[getUserNote] Error:', error.message);
+        res.status(500).json({ message: 'Failed to fetch personal note', error: error.message });
+    }
+};
+
+exports.updateUserNote = async (req, res) => {
+    try {
+        const { note } = req.body;
+        const user = await User.findById(req.user.id);
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+        user.personalNote = typeof note === 'string' ? note : '';
+        await user.save();
+        res.json({ note: user.personalNote });
+    } catch (error) {
+        console.error('[updateUserNote] Error:', error.message);
+        res.status(500).json({ message: 'Failed to update personal note', error: error.message });
+    }
+};
+

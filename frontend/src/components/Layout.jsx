@@ -6,6 +6,7 @@ import { footerPageService, systemUpdateService, csmService } from '../services/
 import Modal from './Modal';
 import { MdCheckCircle, MdNewReleases } from 'react-icons/md';
 import { toast } from 'react-toastify';
+import FloatingNotepad from './FloatingNotepad';
 
 const Layout = ({ children }) => {
     const navigate = useNavigate();
@@ -208,6 +209,9 @@ const Layout = ({ children }) => {
                     </div>
                 )}
             </Modal>
+
+            {/* Draggable Floating Personal Notepad Button & Widget */}
+            <FloatingNotepad />
         </div>
     );
 };

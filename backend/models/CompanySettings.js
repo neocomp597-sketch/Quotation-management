@@ -9,6 +9,11 @@ const CompanySettingsSchema = new mongoose.Schema({
     // Company Logo
     logoUrl: { type: String },
 
+    // Dual Logo Branding & Whitelabeling
+    showDualBranding: { type: Boolean, default: true },
+    whitelabelAppTitle: { type: String, default: '' },
+    primaryBrandColor: { type: String, default: '' },
+
     // Contact Information
     email: { type: String },
     phone: { type: String },
