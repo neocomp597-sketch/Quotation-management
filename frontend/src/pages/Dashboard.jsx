@@ -22,7 +22,6 @@ import { Link } from 'react-router-dom';
 import { quotationService } from '../services/api';
 import { formatCurrency, formatDate } from '../utils/helpers';
 import { useAuth } from '../context/AuthContext';
-import NotepadWidget from '../components/NotepadWidget';
 
 const StatCard = ({ title, value, icon, trend, color, subValue, isTrendUp, to }) => (
     <Link to={to} className="group p-6 bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 hover:border-primary-600/20 transition-all duration-300 shadow-sm hover:shadow-xl hover:-translate-y-1 relative overflow-hidden block">
@@ -185,11 +184,6 @@ const Dashboard = () => {
                         ))}
                     </div>
                 </div>
-
-                {/* Personal Notepad Widget */}
-                <div className="pt-2">
-                    <NotepadWidget />
-                </div>
             </div>
         );
     }
@@ -293,75 +287,69 @@ const Dashboard = () => {
                 ))}
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 overflow-hidden shadow-sm">
-                    <div className="p-6 border-b border-slate-50 dark:border-slate-800 flex items-center justify-between bg-slate-50/30 dark:bg-slate-800/30">
-                        <div>
-                            <h2 className="text-xl font-black text-slate-900 dark:text-slate-100">Recent Quotations</h2>
-                            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mt-1">Last 5 activities</p>
-                        </div>
-                        <Link to="/quotations" className="px-4 py-2 text-sm font-bold text-primary-600 dark:text-primary-400 hover:bg-white dark:hover:bg-slate-800 rounded-xl transition-all border border-slate-100 dark:border-slate-700 shadow-sm">
-                            View All
-                        </Link>
+            <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 overflow-hidden shadow-sm">
+                <div className="p-6 border-b border-slate-50 dark:border-slate-800 flex items-center justify-between bg-slate-50/30 dark:bg-slate-800/30">
+                    <div>
+                        <h2 className="text-xl font-black text-slate-900 dark:text-slate-100">Recent Quotations</h2>
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mt-1">Last 5 activities</p>
                     </div>
-                    
-                    <div className="overflow-x-auto">
-                        {loading ? (
-                            <div className="p-20 text-center">
-                                <div className="inline-block w-8 h-8 border-4 border-slate-200 border-t-primary-600 rounded-full animate-spin"></div>
-                                <p className="mt-4 text-slate-400 font-bold uppercase text-xs tracking-widest">Loading Records...</p>
-                            </div>
-                        ) : (
-                            <table className="w-full text-left border-collapse">
-                                <thead>
-                                    <tr className="bg-white dark:bg-slate-900">
-                                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Ref Number</th>
-                                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Customer</th>
-                                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Amount</th>
-                                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Status</th>
-                                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Actions</th>
+                    <Link to="/quotations" className="px-4 py-2 text-sm font-bold text-primary-600 dark:text-primary-400 hover:bg-white dark:hover:bg-slate-800 rounded-xl transition-all border border-slate-100 dark:border-slate-700 shadow-sm">
+                        View All
+                    </Link>
+                </div>
+                
+                <div className="overflow-x-auto">
+                    {loading ? (
+                        <div className="p-20 text-center">
+                            <div className="inline-block w-8 h-8 border-4 border-slate-200 border-t-primary-600 rounded-full animate-spin"></div>
+                            <p className="mt-4 text-slate-400 font-bold uppercase text-xs tracking-widest">Loading Records...</p>
+                        </div>
+                    ) : (
+                        <table className="w-full text-left border-collapse">
+                            <thead>
+                                <tr className="bg-white dark:bg-slate-900">
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Ref Number</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Customer</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Amount</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Status</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
+                                {recentQuotations.length === 0 ? (
+                                    <tr>
+                                        <td colSpan="5" className="p-12 text-center text-slate-400 font-bold text-sm">
+                                            No recent quotations found.
+                                        </td>
                                     </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
-                                    {recentQuotations.length === 0 ? (
-                                        <tr>
-                                            <td colSpan="5" className="p-12 text-center text-slate-400 font-bold text-sm">
-                                                No recent quotations found.
+                                ) : (
+                                    recentQuotations.map((q) => (
+                                        <tr key={q._id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors">
+                                            <td className="px-6 py-4 text-sm font-bold text-slate-900 dark:text-slate-100">
+                                                {q.quotationNumber}
+                                            </td>
+                                            <td className="px-6 py-4 text-sm font-bold text-slate-700 dark:text-slate-300">
+                                                {q.customerName || q.customer?.name}
+                                            </td>
+                                            <td className="px-6 py-4 text-sm font-black text-teal-600">
+                                                {formatCurrency(q.grandTotal)}
+                                            </td>
+                                            <td className="px-6 py-4 text-center">
+                                                <span className="px-3 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-full text-xs font-bold uppercase tracking-wider">
+                                                    {q.status}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <Link to={`/quotations/${q._id}`} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl inline-block text-slate-600 dark:text-slate-400 transition-colors">
+                                                    <MdVisibility size={18} />
+                                                </Link>
                                             </td>
                                         </tr>
-                                    ) : (
-                                        recentQuotations.map((q) => (
-                                            <tr key={q._id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors">
-                                                <td className="px-6 py-4 text-sm font-bold text-slate-900 dark:text-slate-100">
-                                                    {q.quotationNumber}
-                                                </td>
-                                                <td className="px-6 py-4 text-sm font-bold text-slate-700 dark:text-slate-300">
-                                                    {q.customerName || q.customer?.name}
-                                                </td>
-                                                <td className="px-6 py-4 text-sm font-black text-teal-600">
-                                                    {formatCurrency(q.grandTotal)}
-                                                </td>
-                                                <td className="px-6 py-4 text-center">
-                                                    <span className="px-3 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-full text-xs font-bold uppercase tracking-wider">
-                                                        {q.status}
-                                                    </span>
-                                                </td>
-                                                <td className="px-6 py-4 text-right">
-                                                    <Link to={`/quotations/${q._id}`} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl inline-block text-slate-600 dark:text-slate-400 transition-colors">
-                                                        <MdVisibility size={18} />
-                                                    </Link>
-                                                </td>
-                                            </tr>
-                                        ))
-                                    )}
-                                </tbody>
-                            </table>
-                        )}
-                    </div>
-                </div>
-
-                <div className="lg:col-span-1">
-                    <NotepadWidget />
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    )}
                 </div>
             </div>
         </div>

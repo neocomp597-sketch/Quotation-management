@@ -347,27 +347,27 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             <div
                 className={`fixed top-0 left-0 h-full bg-white dark:bg-slate-900 transition-all duration-300 z-50 shadow-2xl border-r border-slate-100 dark:border-slate-800 transform flex flex-col ${isOpen ? 'translate-x-0 w-64' : '-translate-x-full md:translate-x-0 md:w-20 w-64'}`}
             >
-                <div className={`flex items-center justify-between px-5 border-b border-slate-50 dark:border-slate-800 shrink-0 ${brandSettings?.showDualBranding !== false && brandSettings?.logoUrl ? 'py-3' : 'h-20'}`}>
+                <div className={`flex items-center justify-between px-5 border-b border-slate-50 dark:border-slate-800 shrink-0 ${brandSettings?.showDualBranding !== false && brandSettings?.logoUrl ? 'py-4' : 'h-24'}`}>
                     <div className={`flex-1 min-w-0 overflow-hidden transition-all duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 w-0 md:opacity-0 md:w-0'}`}>
                         {/* Top row: ARCRM badge + App title */}
-                        <div className="flex items-center gap-2.5">
-                            <div className="w-9 h-9 rounded-xl flex items-center justify-center shadow-lg shadow-primary-600/30 shrink-0" style={{ background: brandSettings?.primaryBrandColor ? `linear-gradient(135deg, ${brandSettings.primaryBrandColor}, ${brandSettings.primaryBrandColor}cc)` : 'linear-gradient(135deg, var(--color-primary-600), var(--color-accent))' }}>
-                                <span className="text-white font-black text-lg">A</span>
+                        <div className="flex items-center gap-3">
+                            <div className="w-11 h-11 rounded-2xl flex items-center justify-center shadow-lg shadow-primary-600/30 shrink-0" style={{ background: brandSettings?.primaryBrandColor ? `linear-gradient(135deg, ${brandSettings.primaryBrandColor}, ${brandSettings.primaryBrandColor}cc)` : 'linear-gradient(135deg, var(--color-primary-600), var(--color-accent))' }}>
+                                <span className="text-white font-black text-2xl">A</span>
                             </div>
                             <div className="min-w-0 text-slate-900 dark:text-slate-100 font-outfit uppercase">
-                                <p className="text-base font-black tracking-tighter leading-tight truncate">{brandSettings?.whitelabelAppTitle || 'ARCRM'}</p>
-                                <p className="text-[9px] font-bold text-slate-400 dark:text-slate-500 -mt-0.5 truncate">{brandSettings?.tagline || 'Always Ready CRM'}</p>
+                                <p className="text-xl font-black tracking-tight leading-none truncate">{brandSettings?.whitelabelAppTitle || 'ARCRM'}</p>
+                                <p className="text-xs font-bold text-slate-400 dark:text-slate-500 mt-0.5 truncate tracking-wide">{brandSettings?.tagline || 'Always Ready CRM'}</p>
                             </div>
                         </div>
                         {/* Bottom row: Client company logo + name (dual branding) */}
                         {brandSettings?.showDualBranding !== false && brandSettings?.logoUrl && (
-                            <div className="flex items-center gap-2.5 mt-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                            <div className="flex items-center gap-3 mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
                                 <img
                                     src={resolveImageUrl(brandSettings.logoUrl)}
                                     alt={brandSettings.companyName || 'Company'}
-                                    className="h-7 w-7 object-contain rounded-lg border border-slate-100 dark:border-slate-700 shrink-0 bg-white"
+                                    className="h-11 w-11 object-contain rounded-2xl border border-slate-200 dark:border-slate-700 shrink-0 bg-white p-1 shadow-md"
                                 />
-                                <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400 truncate">{brandSettings.companyName || 'Your Company'}</span>
+                                <span className="text-base font-black text-slate-900 dark:text-slate-100 truncate tracking-tight">{brandSettings.companyName || 'Your Company'}</span>
                             </div>
                         )}
                     </div>
