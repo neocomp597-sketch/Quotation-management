@@ -11,6 +11,7 @@ const UserSchema = new mongoose.Schema({
     tokenVersion: { type: Number, default: 0 },
     role: { type: String, default: 'sales' },
     reportsTo: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null },
     status: { type: Boolean, default: true },
     isActive: { type: Boolean, default: true },
     personalNote: { type: String, default: '' },

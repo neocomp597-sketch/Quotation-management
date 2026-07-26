@@ -93,12 +93,16 @@ exports.getEmployees = async (req, res) => {
         if (req.query.status) {
             query.status = req.query.status;
         }
+        if (req.query.branchId) {
+            query.branchId = req.query.branchId;
+        }
         if (req.query.search) {
             query.name = { $regex: req.query.search, $options: 'i' };
         }
         
         const employees = await EmployeeProfile.find(query)
             .populate('reportingTo', 'name email designation')
+            .populate('branchId', 'name code branchPrefix')
             .sort({ name: 1 })
             .lean();
         res.json(employees);
@@ -111,6 +115,7 @@ exports.getEmployee = async (req, res) => {
     try {
         const employee = await EmployeeProfile.findById(req.params.id)
             .populate('reportingTo', 'name email designation')
+            .populate('branchId', 'name code branchPrefix')
             .lean();
         if (!employee) {
             return res.status(404).json({ message: 'Employee not found' });
@@ -127,6 +132,36 @@ exports.createEmployee = async (req, res) => {
         if (!employeeData.companyId && req.user?.companyId) {
             employeeData.companyId = req.user.companyId;
         }
+
+        if (employeeData.branchId) {
+            const Branch = require('../models/Branch');
+            const Counter = require('../models/Counter');
+            const branch = await Branch.findOne({ _id: employeeData.branchId, companyId: employeeData.companyId }).lean();
+            if (branch) {
+                employeeData.branchPrefix = branch.branchPrefix;
+                if (!employeeData.employeeId) {
+                    let counter = await Counter.findOne({ type: 'employee', prefix: branch.branchPrefix, year: 0, companyId: employeeData.companyId });
+                    if (!counter) {
+                        counter = await Counter.create({ type: 'employee', prefix: branch.branchPrefix, year: 0, companyId: employeeData.companyId, seq: 1001 });
+                    } else {
+                        counter = await Counter.findOneAndUpdate(
+                            { type: 'employee', prefix: branch.branchPrefix, year: 0, companyId: employeeData.companyId },
+                            { $inc: { seq: 1 } },
+                            { new: true }
+                        );
+                    }
+                    employeeData.employeeId = `${branch.branchPrefix}${counter.seq}`;
+                }
+            }
+        }
+
+        if (employeeData.employeeId) {
+            const existingEmp = await EmployeeProfile.findOne({ employeeId: employeeData.employeeId, companyId: employeeData.companyId }).lean();
+            if (existingEmp) {
+                return res.status(400).json({ message: `Duplicate Employee ID '${employeeData.employeeId}' is not allowed` });
+            }
+        }
+
         const employee = await EmployeeProfile.create(employeeData);
         
         // Requirement: Auto User Creation on Employee Addition
@@ -141,6 +176,7 @@ exports.createEmployee = async (req, res) => {
         
         const populatedEmployee = await EmployeeProfile.findById(employee._id)
             .populate('reportingTo', 'name email designation')
+            .populate('branchId', 'name code branchPrefix')
             .lean();
         res.status(201).json(populatedEmployee || employee);
     } catch (error) {
@@ -150,11 +186,16 @@ exports.createEmployee = async (req, res) => {
 
 exports.updateEmployee = async (req, res) => {
     try {
+        const updateData = { ...req.body };
+        delete updateData.employeeId; // Rule 4: If branch is changed later, Employee ID should NOT change.
+
         const employee = await EmployeeProfile.findByIdAndUpdate(
             req.params.id, 
-            { $set: req.body }, 
+            { $set: updateData }, 
             { new: true }
-        ).populate('reportingTo', 'name email designation');
+        )
+        .populate('reportingTo', 'name email designation')
+        .populate('branchId', 'name code branchPrefix');
         
         if (!employee) {
             return res.status(404).json({ message: 'Employee not found' });

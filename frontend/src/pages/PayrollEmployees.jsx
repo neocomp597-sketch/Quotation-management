@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { payrollService, importService } from '../services/api';
+import { payrollService, importService, branchService } from '../services/api';
 import { toast } from 'react-toastify';
 import Modal from '../components/Modal';
 import ImportModal from '../components/ImportModal';
@@ -8,13 +8,15 @@ import { formatDate } from '../utils/helpers';
 import * as XLSX from 'xlsx';
 import { 
     MdPeople, MdAdd, MdSearch, MdEdit, MdDelete, 
-    MdSave, MdAccountBalance, MdAssignment, MdUploadFile, MdDownload
+    MdSave, MdAccountBalance, MdAssignment, MdUploadFile, MdDownload, MdBusiness
 } from 'react-icons/md';
 
 const PayrollEmployees = () => {
     const [employees, setEmployees] = useState([]);
+    const [branches, setBranches] = useState([]);
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState('');
+    const [branchFilter, setBranchFilter] = useState('');
     const [loading, setLoading] = useState(true);
     const [departments, setDepartments] = useState([]);
     const [designations, setDesignations] = useState([]);
@@ -27,7 +29,7 @@ const PayrollEmployees = () => {
 
     // Form states
     const [basicForm, setBasicForm] = useState({
-        name: '', email: '', mobile: '', reportingTo: '', dob: '', joiningDate: '', department: '', designation: '', status: 'Active',
+        branchId: '', employeeId: '', name: '', email: '', mobile: '', reportingTo: '', dob: '', joiningDate: '', department: '', designation: '', status: 'Active',
         pan: '', aadhaar: '', uan: '', pfNumber: '', esiNumber: '',
         bankName: '', accountNumber: '', ifscCode: ''
     });
@@ -42,6 +44,7 @@ const PayrollEmployees = () => {
             setLoading(true);
             const params = {};
             if (statusFilter) params.status = statusFilter;
+            if (branchFilter) params.branchId = branchFilter;
             if (search) params.search = search;
             
             const res = await payrollService.getEmployees(params);
@@ -56,18 +59,20 @@ const PayrollEmployees = () => {
 
     useEffect(() => {
         fetchEmployees();
-    }, [statusFilter, search]);
+    }, [statusFilter, branchFilter, search]);
 
     const fetchMasters = async () => {
         try {
-            const [deptRes, desRes] = await Promise.all([
+            const [deptRes, desRes, branchRes] = await Promise.all([
                 payrollService.getDepartments(),
-                payrollService.getDesignations()
+                payrollService.getDesignations(),
+                branchService.getAll()
             ]);
             setDepartments(deptRes.data || []);
             setDesignations(desRes.data || []);
+            setBranches(branchRes.data || []);
         } catch (error) {
-            console.error('Failed to load department or designation masters', error);
+            console.error('Failed to load department, designation, or branch masters', error);
         }
     };
 
@@ -75,10 +80,22 @@ const PayrollEmployees = () => {
         fetchMasters();
     }, []);
 
+    const handleBranchSelect = async (branchId) => {
+        setBasicForm(prev => ({ ...prev, branchId }));
+        if (modalMode === 'add' && branchId) {
+            try {
+                const res = await branchService.getNextEmployeeId(branchId);
+                setBasicForm(prev => ({ ...prev, branchId, employeeId: res.data?.employeeId || '' }));
+            } catch (err) {
+                console.error('Failed to fetch next Employee ID', err);
+            }
+        }
+    };
+
     const handleOpenAdd = () => {
         setSelectedEmp(null);
         setBasicForm({
-            name: '', email: '', mobile: '', reportingTo: '', dob: '', joiningDate: new Date().toISOString().substring(0, 10), 
+            branchId: '', employeeId: '', name: '', email: '', mobile: '', reportingTo: '', dob: '', joiningDate: new Date().toISOString().substring(0, 10), 
             department: '', designation: '', status: 'Active',
             pan: '', aadhaar: '', uan: '', pfNumber: '', esiNumber: '',
             bankName: '', accountNumber: '', ifscCode: ''
@@ -90,6 +107,8 @@ const PayrollEmployees = () => {
     const handleOpenEdit = (emp) => {
         setSelectedEmp(emp);
         setBasicForm({
+            branchId: emp.branchId?._id || emp.branchId || '',
+            employeeId: emp.employeeId || '',
             name: emp.name || '',
             email: emp.email || '',
             mobile: emp.mobile || '',
@@ -330,7 +349,14 @@ const PayrollEmployees = () => {
                                     return (
                                         <tr key={emp._id} className="hover:bg-slate-50/50 transition-colors">
                                             <td className="px-6 py-4">
-                                                <p className="text-slate-900 font-bold">{emp.name}</p>
+                                                <div className="flex items-center gap-2">
+                                                    <p className="text-slate-900 font-bold">{emp.name}</p>
+                                                    {emp.employeeId && (
+                                                        <span className="px-2 py-0.5 bg-primary-100 dark:bg-primary-950 text-primary-700 dark:text-primary-300 font-black text-[10px] rounded-lg">
+                                                            {emp.employeeId}
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 <p className="text-xs text-slate-400">{emp.email || 'No email registered'}</p>
                                                 {emp.reportingTo?.name && (
                                                     <p className="text-[11px] text-teal-600 font-medium mt-0.5">
@@ -340,7 +366,14 @@ const PayrollEmployees = () => {
                                             </td>
                                             <td className="px-6 py-4">
                                                 <p className="text-slate-800">{emp.designation || 'N/A'}</p>
-                                                <p className="text-xs text-slate-400">{emp.department || 'N/A'}</p>
+                                                <div className="flex items-center gap-2 mt-0.5">
+                                                    <span className="text-xs text-slate-400">{emp.department || 'N/A'}</span>
+                                                    {emp.branchId?.name && (
+                                                        <span className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-bold text-[10px] rounded">
+                                                            📍 {emp.branchId.name}
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </td>
                                             <td className="px-6 py-4 text-sm text-slate-500">
                                                 {emp.joiningDate ? formatDate(emp.joiningDate) : 'N/A'}
@@ -407,6 +440,32 @@ const PayrollEmployees = () => {
                                     <div>
                                         <h4 className="text-xs font-black text-teal-600 uppercase tracking-widest mb-4 border-b border-slate-50 pb-1.5">1. Basic Info</h4>
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            <div>
+                                                <label className={labelClass}>Branch *</label>
+                                                <select
+                                                    required
+                                                    value={basicForm.branchId || ''}
+                                                    onChange={(e) => handleBranchSelect(e.target.value)}
+                                                    className={inputClass}
+                                                >
+                                                    <option value="">-- Select Branch First --</option>
+                                                    {branches.map(b => (
+                                                        <option key={b._id} value={b._id}>
+                                                            {b.name} ({b.branchPrefix || b.code})
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className={labelClass}>Employee ID (Auto Generated)</label>
+                                                <input
+                                                    type="text"
+                                                    readOnly
+                                                    value={basicForm.employeeId || ''}
+                                                    className={`${inputClass} bg-slate-100 text-primary-600 font-black cursor-not-allowed`}
+                                                    placeholder="Select Branch First"
+                                                />
+                                            </div>
                                             <div>
                                                 <label className={labelClass}>Employee Name *</label>
                                                 <input

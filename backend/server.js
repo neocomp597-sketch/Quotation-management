@@ -123,9 +123,11 @@ const cpqRoutes = require("./routes/cpqRoutes");
 const orderRoutes = require("./routes/orderRoutes");
 const clmRoutes = require("./routes/clmRoutes");
 const tenderRoutes = require("./routes/tenderRoutes");
+const branchRoutes = require("./routes/branchRoutes");
 const scheduler = require("./utils/scheduler");
 
 // API Routes (Reload triggered)
+app.use("/api/branches", branchRoutes);
 app.use("/api/tenders", tenderRoutes);
 app.use("/api/quotations", quotationRoutes);
 app.use("/api/customers", customerRoutes);

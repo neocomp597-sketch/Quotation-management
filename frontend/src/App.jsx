@@ -32,6 +32,7 @@ import CreateVoucher from './pages/CreateVoucher';
 import Authorization from './pages/Authorization';
 import StatusMaster from './pages/StatusMaster';
 import TerritoryMaster from './pages/TerritoryMaster';
+import BranchMaster from './pages/BranchMaster';
 import SerialNoMaster from './pages/SerialNoMaster';
 import Contacts from './pages/Contacts';
 import SuperAdmin from './pages/SuperAdmin';
@@ -158,6 +159,7 @@ function App() {
             <Route path="/quotations/:id" element={<PermissionRoute permissionKey="quotation_list"><Layout><CreateQuotation /></Layout></PermissionRoute>} />
             <Route path="/terms" element={<PermissionRoute permissionKey="master_terms"><Layout><Terms /></Layout></PermissionRoute>} />
             <Route path="/territory-master" element={<PermissionRoute permissionKey="master_territories"><Layout><TerritoryMaster /></Layout></PermissionRoute>} />
+            <Route path="/branches" element={<PermissionRoute permissionKey="master_branches"><Layout><BranchMaster /></Layout></PermissionRoute>} />
             <Route path="/serial-no-master" element={<PermissionRoute permissionKey="master_serials"><Layout><SerialNoMaster /></Layout></PermissionRoute>} />
             <Route path="/settings" element={<PermissionRoute permissionKey="settings_profile"><Layout><Settings /></Layout></PermissionRoute>} />
             <Route path="/status-master" element={<PermissionRoute adminOnly={true}><Layout><StatusMaster /></Layout></PermissionRoute>} />

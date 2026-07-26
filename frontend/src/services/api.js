@@ -269,6 +269,15 @@ export const userService = {
   delete: (id, params) => api.delete(`/users/${id}`, { params }),
 };
 
+export const branchService = {
+  getAll: (params) => api.get("/branches", { params }),
+  getById: (id) => api.get(`/branches/${id}`),
+  create: (data) => api.post("/branches", data),
+  update: (id, data) => api.put(`/branches/${id}`, data),
+  delete: (id) => api.delete(`/branches/${id}`),
+  getNextEmployeeId: (branchId) => api.get(`/branches/${branchId}/next-emp-id`),
+};
+
 export const authorizationService = {
   getAll: (params) => api.get("/authorization", { params }),
   getMy: () => api.get("/authorization/me"),

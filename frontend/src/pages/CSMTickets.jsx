@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { csmService, customerService, productService, voucherService, userService, importService, uploadService } from '../services/api';
+import { csmService, customerService, productService, voucherService, userService, importService, uploadService, branchService } from '../services/api';
 import { toast } from 'react-toastify';
 import { MdAdd, MdSearch, MdFilterList, MdArrowForward, MdEdit, MdDelete, MdPublish, MdFileDownload, MdWarning, MdInfoOutline, MdPhotoCamera, MdCloudUpload } from 'react-icons/md';
 import * as XLSX from 'xlsx';
@@ -73,7 +73,9 @@ const CSMTickets = () => {
     const [filterPriority, setFilterPriority] = useState('');
     const [filterInvoiceType, setFilterInvoiceType] = useState('');
     const [filterCustomer, setFilterCustomer] = useState('');
+    const [filterBranch, setFilterBranch] = useState('');
     const [ticketCustomers, setTicketCustomers] = useState([]);
+    const [branches, setBranches] = useState([]);
 
     // Masters lists for creation
     const [customers, setCustomers] = useState([]);
@@ -242,6 +244,9 @@ const CSMTickets = () => {
             if (filterCustomer) {
                 queryParams.customerId = filterCustomer;
             }
+            if (filterBranch) {
+                queryParams.branchId = filterBranch;
+            }
             if (filterInvoiceType === 'manual') {
                 queryParams.isManual = 'true';
             } else if (filterInvoiceType === 'standard') {
@@ -268,7 +273,7 @@ const CSMTickets = () => {
 
     const loadCreationData = async () => {
         try {
-            const [custRes, priRes, catRes, typRes, prodRes, srcRes, desRes, assetRes] = await Promise.allSettled([
+            const [custRes, priRes, catRes, typRes, prodRes, srcRes, desRes, assetRes, branchRes] = await Promise.allSettled([
                 customerService.getAll({ limit: 500 }),
                 csmService.getPriorities(),
                 csmService.getCategories(),
@@ -276,7 +281,8 @@ const CSMTickets = () => {
                 productService.getAll({ limit: 500 }),
                 csmService.getSources(),
                 csmService.getDesignations(),
-                csmService.getAssets()
+                csmService.getAssets(),
+                branchService.getAll()
             ]);
 
             const valueOf = (result) => result.status === 'fulfilled' ? result.value : null;
@@ -286,6 +292,8 @@ const CSMTickets = () => {
             const typesRes = valueOf(typRes);
             const productsRes = valueOf(prodRes);
             const sourcesRes = valueOf(srcRes);
+            const branchesRes = valueOf(branchRes);
+            if (branchesRes?.data) setBranches(branchesRes.data);
             const designationsRes = valueOf(desRes);
             const assetsRes = valueOf(assetRes);
 
@@ -325,7 +333,7 @@ const CSMTickets = () => {
 
     useEffect(() => {
         fetchTickets();
-    }, [page, filterStatus, filterPriority, filterInvoiceType, filterCustomer]);
+    }, [page, filterStatus, filterPriority, filterInvoiceType, filterCustomer, filterBranch]);
 
     useEffect(() => {
         const handleRealtimeUpdate = (e) => {
@@ -336,7 +344,7 @@ const CSMTickets = () => {
         };
         window.addEventListener('onCrmSocketUpdate', handleRealtimeUpdate);
         return () => window.removeEventListener('onCrmSocketUpdate', handleRealtimeUpdate);
-    }, [page, filterStatus, filterPriority, filterInvoiceType, filterCustomer]);
+    }, [page, filterStatus, filterPriority, filterInvoiceType, filterCustomer, filterBranch]);
 
     useEffect(() => {
         fetchTicketCustomers();
@@ -1477,6 +1485,24 @@ const CSMTickets = () => {
                         />
                     </div>
 
+                    {/* Branch Filter */}
+                    {branches.length > 0 && (
+                        <div className="flex items-center gap-2 bg-slate-50 border border-slate-100 rounded-2xl px-4 py-1.5">
+                            <MdFilterList className="text-slate-400" />
+                            <span className="text-xs font-black uppercase tracking-wider text-slate-400">Branch</span>
+                            <select
+                                value={filterBranch}
+                                onChange={(e) => { setFilterBranch(e.target.value); setPage(1); }}
+                                className="bg-transparent border-none focus:outline-none text-xs font-bold text-slate-700 cursor-pointer"
+                            >
+                                <option value="">All Branches</option>
+                                {branches.map(b => (
+                                    <option key={b._id} value={b._id}>{b.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+
                     {/* Invoice Type Filter */}
                     <div className="flex items-center gap-2 bg-slate-50 border border-slate-100 rounded-2xl px-4 py-1.5">
                         <MdFilterList className="text-slate-400" />
@@ -1555,6 +1581,11 @@ const CSMTickets = () => {
                                                     }`}>
                                                         {isManual ? 'Manual' : 'System'}
                                                     </span>
+                                                    {t.branchId?.name && (
+                                                        <span className="inline-block mt-1 ml-1 text-[9px] px-2 py-0.5 rounded-full font-black tracking-wider bg-purple-50 text-purple-700 border border-purple-200">
+                                                            📍 {t.branchId.name}
+                                                        </span>
+                                                    )}
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <p className="font-bold text-slate-900">{t.customerId?.customerName || 'N/A'}</p>

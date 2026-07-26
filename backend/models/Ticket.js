@@ -35,6 +35,8 @@ const TicketSchema = new mongoose.Schema({
     priorityId: { type: mongoose.Schema.Types.ObjectId, ref: 'Priority', required: true },
     pincode: { type: String, required: true },
     assignedSalespersonId: { type: mongoose.Schema.Types.ObjectId, ref: 'Salesperson', default: null },
+    branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null, index: true },
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     isManual: { type: Boolean, default: false },
     manualInvoiceNo: { type: String, default: '' },
     manualInvoiceDate: { type: Date },

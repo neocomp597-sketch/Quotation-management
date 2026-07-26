@@ -29,8 +29,9 @@ exports.getAllUsers = async (req, res) => {
         }
 
         const users = await User.find({ companyId: req.user.companyId })
-            .select('_id name email role reportsTo status companyId createdAt')
+            .select('_id name email role reportsTo branchId status companyId createdAt')
             .populate('reportsTo', 'name email')
+            .populate('branchId', 'name code branchPrefix')
             .sort({ createdAt: -1 })
             .lean();
 
@@ -43,7 +44,7 @@ exports.getAllUsers = async (req, res) => {
 
 exports.createUser = async (req, res) => {
     try {
-        const { name, email, password, role = 'sales', status = true, reportsTo } = req.body;
+        const { name, email, password, role = 'sales', status = true, reportsTo, branchId } = req.body;
 
         const companyId = req.user?.companyId || getTenantId?.();
         if (!companyId) {
@@ -89,6 +90,7 @@ exports.createUser = async (req, res) => {
             passwordHash,
             role,
             reportsTo: validatedReportsTo,
+            branchId: branchId || null,
             status,
             companyId,
         });
@@ -99,6 +101,7 @@ exports.createUser = async (req, res) => {
             email: user.email,
             role: user.role,
             reportsTo: user.reportsTo,
+            branchId: user.branchId,
             status: user.status,
             companyId: user.companyId,
             createdAt: user.createdAt,
@@ -199,7 +202,7 @@ exports.updateUserRole = async (req, res) => {
 exports.updateUser = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, email, password, role, reportsTo } = req.body;
+        const { name, email, password, role, reportsTo, branchId } = req.body;
 
         const user = await User.findOne({ _id: id, companyId: req.user.companyId });
         if (!user) {
@@ -219,6 +222,7 @@ exports.updateUser = async (req, res) => {
         }
 
         if (name) user.name = name;
+        if (branchId !== undefined) user.branchId = branchId || null;
         if (password) {
             const salt = await bcrypt.genSalt(10);
             user.passwordHash = await bcrypt.hash(password, salt);
@@ -267,6 +271,7 @@ exports.updateUser = async (req, res) => {
             email: updatedUser.email,
             role: updatedUser.role,
             reportsTo: updatedUser.reportsTo,
+            branchId: updatedUser.branchId,
             status: updatedUser.status,
             createdAt: updatedUser.createdAt
         });

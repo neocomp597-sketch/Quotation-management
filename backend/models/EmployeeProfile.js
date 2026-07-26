@@ -20,6 +20,9 @@ const SalaryStructureSchema = new mongoose.Schema({
 }, { _id: false });
 
 const EmployeeProfileSchema = new mongoose.Schema({
+    employeeId: { type: String, trim: true, index: true },
+    branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null },
+    branchPrefix: { type: String, trim: true, uppercase: true },
     name: { type: String, required: true },
     email: { type: String, trim: true },
     mobile: { type: String, trim: true },

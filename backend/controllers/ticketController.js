@@ -125,6 +125,8 @@ exports.createTicket = async (req, res) => {
             ...ticketBody,
             ticketNo,
             companyId,
+            createdBy: req.user?.id,
+            branchId: ticketBody.branchId || req.user?.branchId || null,
             pincode: cleanPincode,
             assignedSalespersonId: null, // Stop salesperson auto-assignment
             assignedEngineerId,
@@ -159,6 +161,54 @@ const getEngineerForUser = async (user) => {
     }).lean();
 };
 
+const getSubordinateUserIds = async (userId, companyId) => {
+    if (!userId) return [];
+    const allIds = [userId.toString()];
+    let currentLevel = [userId];
+
+    while (currentLevel.length > 0) {
+        const subs = await User.find({
+            companyId,
+            reportsTo: { $in: currentLevel }
+        }).select('_id').lean();
+
+        if (subs.length === 0) break;
+        const nextLevel = subs.map(u => u._id);
+        nextLevel.forEach(id => {
+            const sStr = id.toString();
+            if (!allIds.includes(sStr)) {
+                allIds.push(sStr);
+            }
+        });
+        currentLevel = nextLevel;
+    }
+
+    return allIds;
+};
+
+const getVisibleUserAndStaffIds = async (user) => {
+    if (!user) return { userIds: [], engineerIds: [], salespersonIds: [] };
+
+    const companyId = user.companyId;
+    const userIds = await getSubordinateUserIds(user.id || user._id, companyId);
+    
+    const users = await User.find({ _id: { $in: userIds }, companyId }).select('email').lean();
+    const emails = users.map(u => u.email).filter(Boolean);
+
+    const Engineer = require('../models/Engineer');
+    const Salesperson = require('../models/Salesperson');
+
+    const [engineers, salespeople] = await Promise.all([
+        Engineer.find({ companyId, email: { $in: emails } }).select('_id').lean(),
+        Salesperson.find({ companyId, email: { $in: emails } }).select('_id').lean()
+    ]);
+
+    const engineerIds = engineers.map(e => e._id);
+    const salespersonIds = salespeople.map(s => s._id);
+
+    return { userIds, engineerIds, salespersonIds };
+};
+
 exports.getTickets = async (req, res) => {
     try {
         const companyId = req.user?.companyId;
@@ -167,20 +217,31 @@ exports.getTickets = async (req, res) => {
         if (req.query.customerId) filter.customerId = req.query.customerId;
         if (req.query.status) filter.status = req.query.status;
         if (req.query.priorityId) filter.priorityId = req.query.priorityId;
+        if (req.query.branchId) filter.branchId = req.query.branchId;
+
+        const andConditions = [];
         
-        // Access control filter for non-Admin/Manager users
+        // Cascading Ticket Visibility & Access Control filter
         if (!isAdminOrManagerUser(req.user)) {
-            const engineer = await getEngineerForUser(req.user);
-            if (engineer) {
-                filter.assignedEngineerId = engineer._id;
-            } else {
-                filter.assignedEngineerId = new mongoose.Types.ObjectId();
+            const { userIds, engineerIds, salespersonIds } = await getVisibleUserAndStaffIds(req.user);
+            const userObjectIds = userIds.map(id => new mongoose.Types.ObjectId(id));
+            
+            const visibilityCondition = {
+                $or: [
+                    { createdBy: { $in: userObjectIds } },
+                    { assignedEngineerId: { $in: engineerIds } },
+                    { assignedSalespersonId: { $in: salespersonIds } }
+                ]
+            };
+
+            if (req.user.branchId && !req.query.branchId) {
+                filter.branchId = req.user.branchId;
             }
+
+            andConditions.push(visibilityCondition);
         } else if (req.query.assignedEngineerId) {
             filter.assignedEngineerId = req.query.assignedEngineerId;
         }
-        
-        const andConditions = [];
 
         if (req.query.isManual === 'true') {
             andConditions.push({
@@ -235,6 +296,7 @@ exports.getTickets = async (req, res) => {
                 .populate('productId', 'productName productCode')
                 .populate('assetId', 'serialNumber')
                 .populate('assignedSalespersonId', 'name email mobile')
+                .populate('branchId', 'name code branchPrefix')
                 .sort({ createdAt: -1 })
                 .skip(skip)
                 .limit(limit)
