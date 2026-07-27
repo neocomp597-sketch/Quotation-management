@@ -134,24 +134,11 @@ exports.createEmployee = async (req, res) => {
         }
 
         if (employeeData.branchId) {
-            const Branch = require('../models/Branch');
-            const Counter = require('../models/Counter');
-            const branch = await Branch.findOne({ _id: employeeData.branchId, companyId: employeeData.companyId }).lean();
-            if (branch) {
-                employeeData.branchPrefix = branch.branchPrefix;
-                if (!employeeData.employeeId) {
-                    let counter = await Counter.findOne({ type: 'employee', prefix: branch.branchPrefix, year: 0, companyId: employeeData.companyId });
-                    if (!counter) {
-                        counter = await Counter.create({ type: 'employee', prefix: branch.branchPrefix, year: 0, companyId: employeeData.companyId, seq: 1001 });
-                    } else {
-                        counter = await Counter.findOneAndUpdate(
-                            { type: 'employee', prefix: branch.branchPrefix, year: 0, companyId: employeeData.companyId },
-                            { $inc: { seq: 1 } },
-                            { new: true }
-                        );
-                    }
-                    employeeData.employeeId = `${branch.branchPrefix}${counter.seq}`;
-                }
+            const { generateNextUniqueEmployeeId } = require('../utils/employeeIdHelper');
+            const { employeeId, branchPrefix } = await generateNextUniqueEmployeeId(employeeData.companyId, employeeData.branchId);
+            employeeData.branchPrefix = branchPrefix;
+            if (!employeeData.employeeId) {
+                employeeData.employeeId = employeeId;
             }
         }
 
@@ -1002,17 +989,9 @@ exports.batchAssignBranchAndEmployeeId = async (req, res) => {
             if (item.customEmployeeId) {
                 emp.employeeId = item.customEmployeeId.trim();
             } else if (!emp.employeeId) {
-                let counter = await Counter.findOne({ type: 'employee', prefix: branch.branchPrefix, year: 0, companyId });
-                if (!counter) {
-                    counter = await Counter.create({ type: 'employee', prefix: branch.branchPrefix, year: 0, companyId, seq: 1001 });
-                } else {
-                    counter = await Counter.findOneAndUpdate(
-                        { type: 'employee', prefix: branch.branchPrefix, year: 0, companyId },
-                        { $inc: { seq: 1 } },
-                        { new: true }
-                    );
-                }
-                emp.employeeId = `${branch.branchPrefix}${counter.seq}`;
+                const { generateNextUniqueEmployeeId } = require('../utils/employeeIdHelper');
+                const { employeeId } = await generateNextUniqueEmployeeId(companyId, branch._id);
+                emp.employeeId = employeeId;
             }
 
             await emp.save();

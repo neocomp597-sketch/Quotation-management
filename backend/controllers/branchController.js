@@ -159,27 +159,14 @@ exports.getNextEmployeeId = async (req, res) => {
         const companyId = req.user?.companyId;
         const { id: branchId } = req.params;
 
-        const branch = await Branch.findOne({ _id: branchId, companyId }).lean();
-        if (!branch) {
-            return res.status(404).json({ message: 'Selected branch not found' });
-        }
-
-        const prefix = branch.branchPrefix;
-        const counter = await Counter.findOne({
-            type: 'employee',
-            companyId,
-            prefix
-        }).lean();
-
-        const currentSeq = counter ? counter.seq : 1000;
-        const nextSeq = currentSeq + 1;
-        const empId = `${prefix}${nextSeq}`;
+        const { generateNextUniqueEmployeeId } = require('../utils/employeeIdHelper');
+        const { employeeId, branchPrefix, seq } = await generateNextUniqueEmployeeId(companyId, branchId);
 
         res.json({
-            branchId: branch._id,
-            branchPrefix: prefix,
-            nextSeq,
-            employeeId: empId
+            branchId,
+            branchPrefix,
+            nextSeq: seq,
+            employeeId
         });
     } catch (error) {
         console.error('[getNextEmployeeId] Error:', error);
