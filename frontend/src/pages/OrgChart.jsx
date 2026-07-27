@@ -62,6 +62,7 @@ const OrgChart = () => {
     const [isSavingKra, setIsSavingKra] = useState(false);
 
     const chartContainerRef = useRef(null);
+    const scrollContainerRef = useRef(null);
 
     // Load initial data
     const fetchData = async () => {
@@ -127,6 +128,23 @@ const OrgChart = () => {
 
         return { roots, empMap };
     }, [employees]);
+
+    // Auto center horizontal scroll for tree view
+    const centerScroll = () => {
+        if (scrollContainerRef.current) {
+            const { scrollWidth, clientWidth } = scrollContainerRef.current;
+            if (scrollWidth > clientWidth) {
+                scrollContainerRef.current.scrollLeft = (scrollWidth - clientWidth) / 2;
+            }
+        }
+    };
+
+    useEffect(() => {
+        if (viewMode === 'tree' && !loading) {
+            const timer = setTimeout(centerScroll, 100);
+            return () => clearTimeout(timer);
+        }
+    }, [treeData, viewMode, zoomLevel, loading]);
 
     // Level styling helper matching reference image
     const getLevelMeta = (emp, depth = 0) => {
@@ -648,7 +666,10 @@ const OrgChart = () => {
                 <>
                     {/* VIEW 1: TREE VIEW */}
                     {viewMode === 'tree' && (
-                        <div className="bg-slate-50 dark:bg-slate-900 rounded-3xl p-8 shadow-xl border border-slate-200 dark:border-slate-800 overflow-x-auto min-h-[600px] relative">
+                        <div
+                            ref={scrollContainerRef}
+                            className="bg-slate-50 dark:bg-slate-900 rounded-3xl p-8 shadow-xl border border-slate-200 dark:border-slate-800 overflow-x-auto min-h-[600px] relative scroll-smooth"
+                        >
                             {/* Floating Zoom Controls */}
                             <div className="absolute top-4 right-4 z-10 flex items-center space-x-2 bg-slate-900/80 backdrop-blur-md text-white p-1.5 rounded-2xl shadow-xl border border-slate-700">
                                 <button
@@ -667,9 +688,12 @@ const OrgChart = () => {
                                     <MdZoomOut size={20} />
                                 </button>
                                 <button
-                                    onClick={() => setZoomLevel(1)}
+                                    onClick={() => {
+                                        setZoomLevel(1);
+                                        setTimeout(centerScroll, 50);
+                                    }}
                                     className="p-2 hover:bg-slate-700 rounded-xl transition-colors"
-                                    title="Reset Fit"
+                                    title="Reset Fit & Center"
                                 >
                                     <MdCenterFocusStrong size={20} />
                                 </button>
@@ -690,21 +714,24 @@ const OrgChart = () => {
                                 </div>
                             )}
 
-                            {/* Hierarchy Tree Container */}
-                            <div
-                                ref={chartContainerRef}
-                                style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top center' }}
-                                className="flex justify-center pt-6 transition-transform duration-200"
-                            >
-                                {treeData.roots.length === 0 ? (
-                                    <div className="text-center py-20">
-                                        <p className="text-slate-400 font-medium">No employees found matching the current filters.</p>
-                                    </div>
-                                ) : (
-                                    <div className="flex space-x-12">
-                                        {treeData.roots.map(root => renderTreeNode(root, 0))}
-                                    </div>
-                                )}
+                            {/* Hierarchy Tree Outer Wrapper (w-max min-w-full ensures no negative scroll cutoff while keeping centering when small) */}
+                            <div className="w-max min-w-full flex justify-center px-16 pt-6 pb-12 transition-all duration-200">
+                                {/* Hierarchy Tree Scaled Container */}
+                                <div
+                                    ref={chartContainerRef}
+                                    style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top center' }}
+                                    className="flex justify-center min-w-max transition-transform duration-200"
+                                >
+                                    {treeData.roots.length === 0 ? (
+                                        <div className="text-center py-20">
+                                            <p className="text-slate-400 font-medium">No employees found matching the current filters.</p>
+                                        </div>
+                                    ) : (
+                                        <div className="flex space-x-12 px-8">
+                                            {treeData.roots.map(root => renderTreeNode(root, 0))}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     )}
