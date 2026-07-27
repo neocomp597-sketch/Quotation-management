@@ -19,6 +19,14 @@ const SalaryStructureSchema = new mongoose.Schema({
     otherDeduction: { type: Number, default: 0 }
 }, { _id: false });
 
+const KraSchema = new mongoose.Schema({
+    title: { type: String, required: true },
+    weightage: { type: Number, default: 0 },
+    target: { type: String, default: '' },
+    achievement: { type: String, default: '' },
+    status: { type: String, enum: ['On Track', 'Needs Attention', 'Exceeded', 'Behind'], default: 'On Track' }
+}, { _id: true });
+
 const EmployeeProfileSchema = new mongoose.Schema({
     employeeId: { type: String, trim: true, index: true },
     branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null },
@@ -39,7 +47,9 @@ const EmployeeProfileSchema = new mongoose.Schema({
     dob: { type: Date },
     department: { type: String, trim: true },
     designation: { type: String, trim: true },
-    status: { type: String, enum: ['Active', 'Hold', 'Resigned'], default: 'Active' },
+    status: { type: String, enum: ['Active', 'Hold', 'Resigned', 'Vacant'], default: 'Active' },
+    isVacant: { type: Boolean, default: false },
+    kraList: [KraSchema],
     salaryStructure: { type: SalaryStructureSchema, default: () => ({}) }
 }, { timestamps: true });
 

@@ -15,6 +15,7 @@ export const MENU_PERMISSION_GROUPS = [
         defaultRoute: '/customers',
         children: [
             { key: 'master_customers', label: 'Customers', description: 'Customer master records', defaultRoute: '/customers' },
+            { key: 'payroll_org_chart', label: 'Org Chart', description: 'Employee hierarchy and org chart module', defaultRoute: '/payroll/org-chart' },
             { key: 'master_vendors', label: 'Vendors', description: 'Vendor master records', defaultRoute: '/vendors' },
             { key: 'master_contacts', label: 'Contacts', description: 'Contact management records', defaultRoute: '/contacts' },
             { key: 'master_products', label: 'Products', description: 'Product master records', defaultRoute: '/products' },
@@ -141,6 +142,7 @@ export const MENU_PERMISSION_GROUPS = [
         children: [
             { key: 'payroll_payslips', label: 'My Payslips', description: 'View and download monthly payslips', defaultRoute: '/payroll/payslips' },
             { key: 'payroll_employees', label: 'Employees', description: 'Employee salary profiles and base structures', defaultRoute: '/payroll/employees' },
+            { key: 'payroll_org_chart', label: 'Org Chart', description: 'Employee hierarchy and org chart module', defaultRoute: '/payroll/org-chart' },
             { key: 'payroll_runs', label: 'Run Payroll', description: 'Run and calculate monthly payroll', defaultRoute: '/payroll/runs' },
             { key: 'payroll_payments', label: 'Payments', description: 'Record employee payments', defaultRoute: '/payroll/payments' },
             { key: 'payroll_settings', label: 'Settings', description: 'Manage lock dates and settings', defaultRoute: '/payroll/settings' },

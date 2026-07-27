@@ -196,7 +196,7 @@ export const AuthProvider = ({ children }) => {
 
         const roleStr = String(user.role || '').toLowerCase();
         if (roleStr === 'employee') {
-            if (['dashboard', 'dashboard_overview', 'payroll', 'payroll_payslips', 'csm', 'csm_tickets', 'csm_kb', 'settings', 'settings_profile'].includes(permissionKey)) {
+            if (['dashboard', 'dashboard_overview', 'payroll', 'payroll_payslips', 'payroll_org_chart', 'csm', 'csm_tickets', 'csm_kb', 'settings', 'settings_profile'].includes(permissionKey)) {
                 return true;
             }
         }

@@ -607,6 +607,10 @@ export const payrollService = {
   getEmployee: (id) => api.get(`/payroll/employees/${id}`),
   createEmployee: (data) => api.post("/payroll/employees", data),
   updateEmployee: (id, data) => api.put(`/payroll/employees/${id}`, data),
+  updateReportingManager: (id, reportingTo) => api.put(`/payroll/employees/${id}/reporting`, { reportingTo }),
+  batchAssignBranchAndId: (assignments) => api.post("/payroll/employees/batch-assign-branch-id", { assignments }),
+  createVacantPosition: (data) => api.post("/payroll/employees/vacant-position", data),
+  updateKra: (id, kraList) => api.put(`/payroll/employees/${id}/kra`, { kraList }),
   updateEmployeeStructure: (id, data) => api.put(`/payroll/employees/${id}/structure`, data),
   deleteEmployee: (id) => api.delete(`/payroll/employees/${id}`),
 
