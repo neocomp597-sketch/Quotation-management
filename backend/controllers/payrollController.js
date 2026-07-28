@@ -1019,9 +1019,25 @@ exports.updateReportingManager = async (req, res) => {
             return res.status(404).json({ message: 'Employee not found' });
         }
 
-        // Prevent circular reporting loop
-        if (reportingTo && String(reportingTo) === String(id)) {
-            return res.status(400).json({ message: 'An employee cannot report to themselves' });
+        // Prevent circular reporting loop (direct and transitive)
+        if (reportingTo) {
+            if (String(reportingTo) === String(id)) {
+                return res.status(400).json({ message: 'An employee cannot report to themselves' });
+            }
+
+            // Traverse up from the target manager to see if they report to the current employee
+            let currentManagerId = reportingTo;
+            const visited = new Set([String(id)]);
+            while (currentManagerId) {
+                if (visited.has(String(currentManagerId))) {
+                    return res.status(400).json({ message: 'Circular reporting loop detected: The selected manager reports back to this employee' });
+                }
+                visited.add(String(currentManagerId));
+
+                const manager = await EmployeeProfile.findById(currentManagerId).select('reportingTo').lean();
+                if (!manager) break;
+                currentManagerId = manager.reportingTo;
+            }
         }
 
         emp.reportingTo = reportingTo || null;

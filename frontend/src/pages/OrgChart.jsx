@@ -116,11 +116,54 @@ const OrgChart = () => {
         });
 
         const roots = [];
+        const parentRelations = new Map(); // childId -> parentId
+
         employees.forEach(emp => {
-            const current = empMap.get(String(emp._id));
             const parentId = emp.reportingTo?._id || emp.reportingTo;
             if (parentId && empMap.has(String(parentId))) {
-                empMap.get(String(parentId)).children.push(current);
+                parentRelations.set(String(emp._id), String(parentId));
+            }
+        });
+
+        // Detect and break cycles using DFS path tracking
+        const visitedGlobal = new Set();
+        
+        employees.forEach(emp => {
+            const empIdStr = String(emp._id);
+            if (visitedGlobal.has(empIdStr)) return;
+
+            const path = [];
+            const pathSet = new Set();
+            let curr = empIdStr;
+            
+            while (curr && empMap.has(curr)) {
+                if (pathSet.has(curr)) {
+                    // Cycle detected! Break it at this edge.
+                    parentRelations.delete(curr);
+                    const currEmp = empMap.get(curr);
+                    if (currEmp) {
+                        currEmp.reportingTo = null;
+                    }
+                    break;
+                }
+                if (visitedGlobal.has(curr)) {
+                    break;
+                }
+                path.push(curr);
+                pathSet.add(curr);
+                curr = parentRelations.get(curr);
+            }
+            
+            path.forEach(id => visitedGlobal.add(id));
+        });
+
+        // Now reconstruct children and roots using the updated parentRelations
+        employees.forEach(emp => {
+            const empIdStr = String(emp._id);
+            const current = empMap.get(empIdStr);
+            const parentId = parentRelations.get(empIdStr);
+            if (parentId && empMap.has(parentId)) {
+                empMap.get(parentId).children.push(current);
             } else {
                 roots.push(current);
             }
