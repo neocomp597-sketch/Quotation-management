@@ -134,24 +134,11 @@ exports.createEmployee = async (req, res) => {
         }
 
         if (employeeData.branchId) {
-            const Branch = require('../models/Branch');
-            const Counter = require('../models/Counter');
-            const branch = await Branch.findOne({ _id: employeeData.branchId, companyId: employeeData.companyId }).lean();
-            if (branch) {
-                employeeData.branchPrefix = branch.branchPrefix;
-                if (!employeeData.employeeId) {
-                    let counter = await Counter.findOne({ type: 'employee', prefix: branch.branchPrefix, year: 0, companyId: employeeData.companyId });
-                    if (!counter) {
-                        counter = await Counter.create({ type: 'employee', prefix: branch.branchPrefix, year: 0, companyId: employeeData.companyId, seq: 1001 });
-                    } else {
-                        counter = await Counter.findOneAndUpdate(
-                            { type: 'employee', prefix: branch.branchPrefix, year: 0, companyId: employeeData.companyId },
-                            { $inc: { seq: 1 } },
-                            { new: true }
-                        );
-                    }
-                    employeeData.employeeId = `${branch.branchPrefix}${counter.seq}`;
-                }
+            const { generateNextUniqueEmployeeId } = require('../utils/employeeIdHelper');
+            const { employeeId, branchPrefix } = await generateNextUniqueEmployeeId(employeeData.companyId, employeeData.branchId);
+            employeeData.branchPrefix = branchPrefix;
+            if (!employeeData.employeeId) {
+                employeeData.employeeId = employeeId;
             }
         }
 
@@ -968,3 +955,142 @@ exports.getPublicSettings = async (req, res) => {
         res.status(500).json({ message: 'Failed to load payroll settings', error: error.message });
     }
 };
+
+// ─── BATCH ASSIGN BRANCH & EMPLOYEE ID ──────────────────────────────────────
+exports.batchAssignBranchAndEmployeeId = async (req, res) => {
+    try {
+        const { assignments } = req.body; // Array of { employeeId_db: string, branchId: string, customEmployeeId?: string }
+        if (!assignments || !Array.isArray(assignments) || assignments.length === 0) {
+            return res.status(400).json({ message: 'No employee assignments provided' });
+        }
+
+        const Branch = require('../models/Branch');
+        const Counter = require('../models/Counter');
+        const { syncUserForEmployee } = require('../services/employeeUserService');
+        const { syncEmployeeToEngineer } = require('../services/engineerSyncService');
+
+        const companyId = req.user?.companyId;
+        const updatedEmployees = [];
+
+        for (const item of assignments) {
+            const emp = await EmployeeProfile.findById(item.employeeId_db);
+            if (!emp) continue;
+
+            let targetBranchId = item.branchId || emp.branchId;
+            if (!targetBranchId) continue;
+
+            const branch = await Branch.findById(targetBranchId).lean();
+            if (!branch) continue;
+
+            emp.branchId = branch._id;
+            emp.branchPrefix = branch.branchPrefix;
+
+            // Generate Employee ID if empty or custom requested
+            if (item.customEmployeeId) {
+                emp.employeeId = item.customEmployeeId.trim();
+            } else if (!emp.employeeId) {
+                const { generateNextUniqueEmployeeId } = require('../utils/employeeIdHelper');
+                const { employeeId } = await generateNextUniqueEmployeeId(companyId, branch._id);
+                emp.employeeId = employeeId;
+            }
+
+            await emp.save();
+            await syncUserForEmployee(emp);
+            await syncEmployeeToEngineer(emp);
+            updatedEmployees.push(emp);
+        }
+
+        await writePayrollAudit(req, 'EMPLOYEE_BATCH_BRANCH_ASSIGN', `Assigned branch and employee ID for ${updatedEmployees.length} employees`, null, 'EmployeeProfile');
+        res.json({ message: `Successfully updated ${updatedEmployees.length} employees`, count: updatedEmployees.length });
+    } catch (error) {
+        console.error('batchAssignBranchAndEmployeeId error:', error);
+        res.status(500).json({ message: 'Failed to batch assign branch and employee IDs', error: error.message });
+    }
+};
+
+// ─── REASSIGN REPORTING MANAGER (DRAG & DROP) ────────────────────────────────
+exports.updateReportingManager = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { reportingTo } = req.body; // Can be ObjectId or null
+
+        const emp = await EmployeeProfile.findById(id);
+        if (!emp) {
+            return res.status(404).json({ message: 'Employee not found' });
+        }
+
+        // Prevent circular reporting loop
+        if (reportingTo && String(reportingTo) === String(id)) {
+            return res.status(400).json({ message: 'An employee cannot report to themselves' });
+        }
+
+        emp.reportingTo = reportingTo || null;
+        await emp.save();
+
+        const populated = await EmployeeProfile.findById(id)
+            .populate('reportingTo', 'name email designation')
+            .populate('branchId', 'name code branchPrefix')
+            .lean();
+
+        await writePayrollAudit(req, 'REPORTING_MANAGER_UPDATED', `Reassigned reporting manager for ${emp.name}`, emp._id, 'EmployeeProfile');
+        broadcastCrmUpdate('EMPLOYEE', 'UPDATE', populated);
+        res.json(populated);
+    } catch (error) {
+        console.error('updateReportingManager error:', error);
+        res.status(500).json({ message: 'Failed to update reporting manager', error: error.message });
+    }
+};
+
+// ─── VACANT POSITION MANAGE ────────────────────────────────────────────────
+exports.createVacantPosition = async (req, res) => {
+    try {
+        const { name, designation, department, branchId, reportingTo } = req.body;
+        const companyId = req.user?.companyId;
+
+        const vacantEmp = await EmployeeProfile.create({
+            name: name || `Vacant - ${designation || 'Position'}`,
+            designation: designation || 'Open Position',
+            department: department || 'General',
+            branchId: branchId || null,
+            reportingTo: reportingTo || null,
+            joiningDate: new Date(),
+            status: 'Vacant',
+            isVacant: true,
+            companyId
+        });
+
+        const populated = await EmployeeProfile.findById(vacantEmp._id)
+            .populate('reportingTo', 'name email designation')
+            .populate('branchId', 'name code branchPrefix')
+            .lean();
+
+        await writePayrollAudit(req, 'VACANT_POSITION_CREATED', `Created vacant position ${vacantEmp.name}`, vacantEmp._id, 'EmployeeProfile');
+        broadcastCrmUpdate('EMPLOYEE', 'CREATE', populated);
+        res.status(201).json(populated);
+    } catch (error) {
+        console.error('createVacantPosition error:', error);
+        res.status(500).json({ message: 'Failed to create vacant position', error: error.message });
+    }
+};
+
+// ─── UPDATE KRA & PERFORMANCE METRICS ──────────────────────────────────────
+exports.updateEmployeeKra = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { kraList } = req.body; // Array of KRA items
+
+        const emp = await EmployeeProfile.findById(id);
+        if (!emp) {
+            return res.status(404).json({ message: 'Employee not found' });
+        }
+
+        emp.kraList = kraList || [];
+        await emp.save();
+
+        res.json({ message: 'KRA updated successfully', kraList: emp.kraList });
+    } catch (error) {
+        console.error('updateEmployeeKra error:', error);
+        res.status(500).json({ message: 'Failed to update KRA', error: error.message });
+    }
+};
+

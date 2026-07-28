@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { payrollService, importService, branchService } from '../services/api';
 import { toast } from 'react-toastify';
 import Modal from '../components/Modal';
@@ -8,10 +9,11 @@ import { formatDate } from '../utils/helpers';
 import * as XLSX from 'xlsx';
 import { 
     MdPeople, MdAdd, MdSearch, MdEdit, MdDelete, 
-    MdSave, MdAccountBalance, MdAssignment, MdUploadFile, MdDownload, MdBusiness
+    MdSave, MdAccountBalance, MdAssignment, MdUploadFile, MdDownload, MdBusiness, MdAccountTree
 } from 'react-icons/md';
 
 const PayrollEmployees = () => {
+    const navigate = useNavigate();
     const [employees, setEmployees] = useState([]);
     const [branches, setBranches] = useState([]);
     const [search, setSearch] = useState('');
@@ -261,6 +263,14 @@ const PayrollEmployees = () => {
                     <p className="text-slate-500 font-medium">Register basic details and configure monthly base salary structures.</p>
                 </div>
                 <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => navigate('/payroll/org-chart')}
+                        className="flex items-center justify-center gap-2 px-5 py-3 bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-bold transition-all shadow-md shadow-teal-600/20"
+                        title="View Org Chart Module"
+                    >
+                        <MdAccountTree size={20} />
+                        Org Chart
+                    </button>
                     <button
                         onClick={handleExport}
                         className="flex items-center justify-center gap-2 px-5 py-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-bold transition-all shadow-sm"

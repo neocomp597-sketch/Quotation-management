@@ -52,6 +52,7 @@ import PayrollLetters from './pages/PayrollLetters';
 import PayrollReports from './pages/PayrollReports';
 import PayrollSettingsPage from './pages/PayrollSettingsPage';
 import PayrollMasters from './pages/PayrollMasters';
+import OrgChart from './pages/OrgChart';
 
 import CSMDashboard from './pages/CSMDashboard';
 import CSMTickets from './pages/CSMTickets';
@@ -214,6 +215,8 @@ function App() {
             {/* Payroll Routes */}
             <Route path="/payroll/dashboard" element={<PermissionRoute permissionKey="payroll_runs"><Layout><PayrollDashboard /></Layout></PermissionRoute>} />
             <Route path="/payroll/employees" element={<PermissionRoute permissionKey="payroll_employees"><Layout><PayrollEmployees /></Layout></PermissionRoute>} />
+            <Route path="/payroll/org-chart" element={<PermissionRoute permissionKey="payroll_org_chart"><Layout><OrgChart /></Layout></PermissionRoute>} />
+            <Route path="/org-chart" element={<PermissionRoute permissionKey="payroll_org_chart"><Layout><OrgChart /></Layout></PermissionRoute>} />
             <Route path="/payroll/runs" element={<PermissionRoute permissionKey="payroll_runs"><Layout><PayrollRuns /></Layout></PermissionRoute>} />
             <Route path="/payroll/payments" element={<PermissionRoute permissionKey="payroll_payments"><Layout><PayrollPayments /></Layout></PermissionRoute>} />
             <Route path="/payroll/payslips" element={<PermissionRoute permissionKey="payroll_runs"><Layout><PayrollPayslips /></Layout></PermissionRoute>} />

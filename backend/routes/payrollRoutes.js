@@ -41,13 +41,17 @@ const checkEmployeeSelfOrAdmin = async (req, res, next) => {
 // All routes are protected by auth token verification
 router.use(protect);
 
-// ─── EMPLOYEE PROFILES (Admin only) ─────────────────────────────────────────
-router.get('/employees', checkAdmin, payrollController.getEmployees);
+// ─── EMPLOYEE PROFILES ─────────────────────────────────────────
+router.get('/employees', payrollController.getEmployees);
 router.post('/employees', checkAdmin, payrollController.createEmployee);
 router.post('/employees/sync-users', checkAdmin, payrollController.syncEmployeeUsers);
+router.post('/employees/batch-assign-branch-id', checkAdmin, payrollController.batchAssignBranchAndEmployeeId);
+router.post('/employees/vacant-position', checkAdmin, payrollController.createVacantPosition);
+router.put('/employees/:id/reporting', payrollController.updateReportingManager);
+router.put('/employees/:id/kra', payrollController.updateEmployeeKra);
+router.put('/employees/:id/structure', checkAdmin, payrollController.updateEmployeeStructure);
 router.get('/employees/:id', checkAdmin, payrollController.getEmployee);
 router.put('/employees/:id', checkAdmin, payrollController.updateEmployee);
-router.put('/employees/:id/structure', checkAdmin, payrollController.updateEmployeeStructure);
 router.delete('/employees/:id', checkAdmin, payrollController.deleteEmployee);
 
 // ─── EMPLOYEE MY PAYSLIPS (Authenticated users) ────────────────────────────

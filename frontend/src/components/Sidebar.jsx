@@ -6,6 +6,7 @@ import {
     MdInventory,
     MdDescription,
     MdSettings,
+    MdAccountTree,
     MdChevronLeft,
     MdExpandMore,
     MdExpandLess,
@@ -116,6 +117,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             children: [
                 { key: 'master_customers', name: 'Customers', icon: <MdPeople size={18} />, path: '/customers' },
                 { key: 'payroll_employees', name: 'Employees', icon: <MdPeople size={18} />, path: '/payroll/employees' },
+                { key: 'payroll_org_chart', name: 'Org Chart', icon: <MdAccountTree size={18} />, path: '/payroll/org-chart' },
                 { key: 'payroll_employees', name: 'Department Master', icon: <MdCategory size={18} />, path: '/payroll/masters?tab=departments' },
                 { key: 'payroll_employees', name: 'Designation Master', icon: <MdAssignment size={18} />, path: '/payroll/masters?tab=designations' },
                 { key: 'master_vendors', name: 'Vendors', icon: <MdStorefront size={18} />, path: '/vendors' },
@@ -139,6 +141,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             icon: <MdCalendarMonth size={22} />,
             children: [
                 { key: 'payroll_runs', name: 'Overview', icon: <MdDashboard size={18} />, path: '/payroll/dashboard' },
+                { key: 'payroll_org_chart', name: 'Org Chart', icon: <MdAccountTree size={18} />, path: '/payroll/org-chart' },
                 { key: 'payroll_runs', name: 'Run Payroll', icon: <MdReceipt size={18} />, path: '/payroll/runs' },
                 { key: 'payroll_payments', name: 'Payments', icon: <MdReceipt size={18} />, path: '/payroll/payments' },
                 { key: 'payroll_runs', name: 'Payslips', icon: <MdReceipt size={18} />, path: '/payroll/payslips' },
