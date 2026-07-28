@@ -53,6 +53,7 @@ const QuotationSchema = new mongoose.Schema({
     status: { type: String, enum: ['draft', 'final', 'ordered', 'pending_approval', 'rejected'], default: 'draft' },
     convertedAt: { type: Date },
     territory: { type: mongoose.Schema.Types.ObjectId, ref: 'Territory' },
+    branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null, index: true },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     clientRequestId: { type: String },
     createdAt: { type: Date, default: Date.now },

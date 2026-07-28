@@ -82,7 +82,7 @@ const Login = () => {
         const isSuperAdmin = role === "SUPER_ADMIN" || role === "super_admin";
         const fallbackTarget = isSuperAdmin
           ? "/dashboard"
-          : getFallbackRoute(session.permissions) || "/dashboard";
+          : getFallbackRoute(session.permissions, session.user) || "/dashboard";
         const target = storedReturnTo && storedReturnTo !== "/login"
           ? storedReturnTo
           : location.state?.from?.pathname || fallbackTarget;

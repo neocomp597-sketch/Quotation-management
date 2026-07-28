@@ -93,11 +93,18 @@ exports.getEmployees = async (req, res) => {
         if (req.query.status) {
             query.status = req.query.status;
         }
+        if (req.query.branchId) {
+            query.branchId = req.query.branchId;
+        }
         if (req.query.search) {
             query.name = { $regex: req.query.search, $options: 'i' };
         }
         
-        const employees = await EmployeeProfile.find(query).sort({ name: 1 }).lean();
+        const employees = await EmployeeProfile.find(query)
+            .populate('reportingTo', 'name email designation')
+            .populate('branchId', 'name code branchPrefix')
+            .sort({ name: 1 })
+            .lean();
         res.json(employees);
     } catch (error) {
         res.status(500).json({ message: 'Failed to load employees', error: error.message });
@@ -106,7 +113,10 @@ exports.getEmployees = async (req, res) => {
 
 exports.getEmployee = async (req, res) => {
     try {
-        const employee = await EmployeeProfile.findById(req.params.id).lean();
+        const employee = await EmployeeProfile.findById(req.params.id)
+            .populate('reportingTo', 'name email designation')
+            .populate('branchId', 'name code branchPrefix')
+            .lean();
         if (!employee) {
             return res.status(404).json({ message: 'Employee not found' });
         }
@@ -118,9 +128,57 @@ exports.getEmployee = async (req, res) => {
 
 exports.createEmployee = async (req, res) => {
     try {
-        const employee = await EmployeeProfile.create(req.body);
+        const employeeData = { ...req.body };
+        if (!employeeData.companyId && req.user?.companyId) {
+            employeeData.companyId = req.user.companyId;
+        }
+
+        if (employeeData.branchId) {
+            const Branch = require('../models/Branch');
+            const Counter = require('../models/Counter');
+            const branch = await Branch.findOne({ _id: employeeData.branchId, companyId: employeeData.companyId }).lean();
+            if (branch) {
+                employeeData.branchPrefix = branch.branchPrefix;
+                if (!employeeData.employeeId) {
+                    let counter = await Counter.findOne({ type: 'employee', prefix: branch.branchPrefix, year: 0, companyId: employeeData.companyId });
+                    if (!counter) {
+                        counter = await Counter.create({ type: 'employee', prefix: branch.branchPrefix, year: 0, companyId: employeeData.companyId, seq: 1001 });
+                    } else {
+                        counter = await Counter.findOneAndUpdate(
+                            { type: 'employee', prefix: branch.branchPrefix, year: 0, companyId: employeeData.companyId },
+                            { $inc: { seq: 1 } },
+                            { new: true }
+                        );
+                    }
+                    employeeData.employeeId = `${branch.branchPrefix}${counter.seq}`;
+                }
+            }
+        }
+
+        if (employeeData.employeeId) {
+            const existingEmp = await EmployeeProfile.findOne({ employeeId: employeeData.employeeId, companyId: employeeData.companyId }).lean();
+            if (existingEmp) {
+                return res.status(400).json({ message: `Duplicate Employee ID '${employeeData.employeeId}' is not allowed` });
+            }
+        }
+
+        const employee = await EmployeeProfile.create(employeeData);
+        
+        // Requirement: Auto User Creation on Employee Addition
+        const { syncUserForEmployee } = require('../services/employeeUserService');
+        await syncUserForEmployee(employee);
+
+        // Auto-sync Service Engineer to Engineers Master
+        const { syncEmployeeToEngineer } = require('../services/engineerSyncService');
+        await syncEmployeeToEngineer(employee);
+
         await writePayrollAudit(req, 'EMPLOYEE_CREATED', `Created employee profile for ${employee.name}`, employee._id, 'EmployeeProfile');
-        res.status(201).json(employee);
+        
+        const populatedEmployee = await EmployeeProfile.findById(employee._id)
+            .populate('reportingTo', 'name email designation')
+            .populate('branchId', 'name code branchPrefix')
+            .lean();
+        res.status(201).json(populatedEmployee || employee);
     } catch (error) {
         res.status(500).json({ message: 'Failed to create employee profile', error: error.message });
     }
@@ -128,27 +186,45 @@ exports.createEmployee = async (req, res) => {
 
 exports.updateEmployee = async (req, res) => {
     try {
-        const employee = await EmployeeProfile.findByIdAndUpdate(req.params.id, { $set: req.body }, { new: true });
+        const updateData = { ...req.body };
+        delete updateData.employeeId; // Rule 4: If branch is changed later, Employee ID should NOT change.
+
+        const employee = await EmployeeProfile.findByIdAndUpdate(
+            req.params.id, 
+            { $set: updateData }, 
+            { new: true }
+        )
+        .populate('reportingTo', 'name email designation')
+        .populate('branchId', 'name code branchPrefix');
+        
         if (!employee) {
             return res.status(404).json({ message: 'Employee not found' });
         }
         
-        // Sync details to CSM Engineers if this employee is registered as an engineer
-        const Engineer = require('../models/Engineer');
-        await Engineer.updateMany(
-            { employeeId: employee._id },
-            {
-                name: employee.name,
-                email: employee.email,
-                mobile: employee.mobile || ''
-            }
-        );
+        // Auto-sync User account if email present
+        const { syncUserForEmployee } = require('../services/employeeUserService');
+        await syncUserForEmployee(employee);
+
+        // Auto-sync details/status to CSM Engineers Master
+        const { syncEmployeeToEngineer } = require('../services/engineerSyncService');
+        await syncEmployeeToEngineer(employee);
 
         await writePayrollAudit(req, 'EMPLOYEE_UPDATED', `Updated details for employee ${employee.name}`, employee._id, 'EmployeeProfile');
         broadcastCrmUpdate('EMPLOYEE', 'UPDATE', employee);
         res.json(employee);
     } catch (error) {
         res.status(500).json({ message: 'Failed to update employee details', error: error.message });
+    }
+};
+
+exports.syncEmployeeUsers = async (req, res) => {
+    try {
+        const { syncUsersForExistingEmployees } = require('../services/employeeUserService');
+        const companyId = req.user?.companyId || null;
+        const result = await syncUsersForExistingEmployees(companyId);
+        res.json({ message: 'User sync complete for existing employees', ...result });
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to sync users for employees', error: error.message });
     }
 };
 
@@ -187,6 +263,10 @@ exports.deleteEmployee = async (req, res) => {
 
         // Clean up pending summaries in draft runs
         await PayrollEmployeeSummary.deleteMany({ employeeId: req.params.id });
+
+        // Update corresponding Engineer record to Inactive if exists
+        const Engineer = require('../models/Engineer');
+        await Engineer.updateMany({ employeeId: req.params.id }, { status: 'Inactive' });
 
         await writePayrollAudit(req, 'EMPLOYEE_DELETED', `Deleted employee profile for ${employee.name}`, req.params.id, 'EmployeeProfile');
         res.json({ message: 'Employee profile deleted successfully' });
@@ -841,5 +921,50 @@ exports.deleteDesignation = async (req, res) => {
         res.json({ message: 'Designation deleted successfully' });
     } catch (error) {
         res.status(500).json({ message: 'Failed to delete designation', error: error.message });
+    }
+};
+
+// ─── EMPLOYEE MY PAYSLIPS (For logged-in employees) ───────────────────────
+
+exports.getMyPayslips = async (req, res) => {
+    try {
+        const userEmail = req.user?.email;
+        if (!userEmail) {
+            return res.json([]);
+        }
+
+        const emailStr = String(userEmail).trim().toLowerCase();
+        const escapedEmail = emailStr.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+
+        const summaries = await PayrollEmployeeSummary.find({
+            'basicDetails.email': { $regex: new RegExp("^" + escapedEmail + "$", "i") }
+        })
+        .populate({
+            path: 'payrollRunId',
+            select: 'month status totalNetSalary'
+        })
+        .sort({ createdAt: -1 })
+        .lean();
+
+        const validSummaries = summaries.filter(s => 
+            s.payrollRunId && ['approved', 'locked'].includes(s.payrollRunId.status)
+        );
+
+        res.json(validSummaries);
+    } catch (error) {
+        console.error('getMyPayslips error:', error);
+        res.status(500).json({ message: 'Failed to load employee payslips', error: error.message });
+    }
+};
+
+exports.getPublicSettings = async (req, res) => {
+    try {
+        let settings = await PayrollSettings.findOne().lean();
+        if (!settings) {
+            settings = { pfEnabled: true, esiEnabled: true, ptEnabled: true, tdsEnabled: true };
+        }
+        res.json(settings);
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to load payroll settings', error: error.message });
     }
 };

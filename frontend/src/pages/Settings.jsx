@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { toast } from 'react-toastify';
-import { MdBusiness, MdPerson, MdLocationOn, MdAccountBalance, MdDescription, MdCloudUpload, MdSave, MdEdit } from 'react-icons/md';
+import { MdBusiness, MdPerson, MdLocationOn, MdAccountBalance, MdDescription, MdCloudUpload, MdSave, MdEdit, MdVisibility, MdVisibilityOff, MdColorLens } from 'react-icons/md';
 import { userService, companySettingsService, uploadService, footerPageService } from '../services/api';
 import { resolveImageUrl } from '../utils/helpers';
 import { useAuth } from '../context/AuthContext';
@@ -16,6 +16,7 @@ const Settings = () => {
     // Profile State
     const [user, setUser] = useState({ name: '', email: '', role: '' });
     const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
 
     // Company Settings State
     const [companySettings, setCompanySettings] = useState({
@@ -49,7 +50,10 @@ const Settings = () => {
             signatureImageUrl: ''
         },
         defaultTerms: '',
-        quotationPrefix: 'ARM/QTN'
+        quotationPrefix: 'ARM/QTN',
+        showDualBranding: true,
+        whitelabelAppTitle: '',
+        primaryBrandColor: ''
     });
 
 const [logoUploading, setLogoUploading] = useState(false);
@@ -118,9 +122,15 @@ const [logoUploading, setLogoUploading] = useState(false);
         }
     }, []);
 
+    const isEmployee = String(authUser?.role || user.role || '').toLowerCase() === 'employee';
+
     useEffect(() => {
-        fetchCompanySettings();
-    }, [fetchCompanySettings]);
+        if (!isEmployee) {
+            fetchCompanySettings();
+        } else if (activeTab !== 'profile') {
+            setActiveTab('profile');
+        }
+    }, [fetchCompanySettings, isEmployee, activeTab]);
 
     useEffect(() => {
         if (authUser) {
@@ -248,14 +258,21 @@ const [logoUploading, setLogoUploading] = useState(false);
     };
 
     const tabs = [
-        { id: 'profile', label: 'Profile', icon: MdPerson },
-        { id: 'company', label: 'Company Info', icon: MdBusiness },
-        { id: 'address', label: 'Address', icon: MdLocationOn },
-        { id: 'banking', label: 'Banking', icon: MdAccountBalance },
-        { id: 'terms', label: 'Terms & Signatory', icon: MdDescription }
+        { id: 'profile', label: 'Profile', icon: MdPerson }
     ];
-    if (authUser?.role === 'admin') {
-        tabs.push({ id: 'footer-pages', label: 'Footer Pages', icon: MdDescription });
+    if (!isEmployee) {
+        tabs.push(
+            { id: 'company', label: 'Company Info', icon: MdBusiness },
+            { id: 'address', label: 'Address', icon: MdLocationOn },
+            { id: 'banking', label: 'Banking', icon: MdAccountBalance },
+            { id: 'terms', label: 'Terms & Signatory', icon: MdDescription }
+        );
+        if (authUser?.role === 'admin') {
+            tabs.push(
+                { id: 'branding', label: 'Branding', icon: MdColorLens },
+                { id: 'footer-pages', label: 'Footer Pages', icon: MdDescription }
+            );
+        }
     }
 
     const inputClass = "w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-700 font-medium focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all";
@@ -331,14 +348,24 @@ const [logoUploading, setLogoUploading] = useState(false);
                         </div>
                         <div>
                             <label className={labelClass}>New Password (Optional)</label>
-                            <input
-                                type="password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                placeholder="Leave blank to keep current"
-                                className={inputClass}
-                                autoComplete="new-password"
-                            />
+                            <div className="relative">
+                                <input
+                                    type={showPassword ? 'text' : 'password'}
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    placeholder="Leave blank to keep current"
+                                    className={`${inputClass} pr-12`}
+                                    autoComplete="new-password"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1"
+                                    title={showPassword ? 'Hide password' : 'Show password'}
+                                >
+                                    {showPassword ? <MdVisibilityOff size={20} /> : <MdVisibility size={20} />}
+                                </button>
+                            </div>
                         </div>
 
                         <div className="pt-4 border-t border-slate-100">
@@ -800,6 +827,109 @@ const [logoUploading, setLogoUploading] = useState(false);
                             >
                                 <MdSave size={18} />
                                 {loading ? 'Saving...' : 'Save Settings'}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            )}
+
+            {/* Branding & Whitelabeling Tab (Admin Only) */}
+            {activeTab === 'branding' && authUser?.role === 'admin' && (
+                <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden p-6 md:p-8 max-w-3xl">
+                    <h2 className="text-xl font-bold text-slate-800 mb-2 flex items-center gap-2">
+                        <MdColorLens className="text-primary-500" />
+                        Company Branding & Whitelabeling
+                    </h2>
+                    <p className="text-sm text-slate-500 mb-6">Customize how your company brand appears across the CRM. Upload your logo in Company Info tab to enable dual branding.</p>
+
+                    <form onSubmit={handleCompanySettingsUpdate} className="space-y-6">
+                        {/* Dual Branding Toggle */}
+                        <div className="p-5 bg-gradient-to-r from-primary-50 to-blue-50 rounded-2xl border border-primary-100">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h3 className="font-bold text-slate-800 text-sm">Show Dual Branding</h3>
+                                    <p className="text-xs text-slate-500 mt-0.5">Display your company logo alongside ARCRM logo in the sidebar</p>
+                                </div>
+                                <label className="relative inline-flex items-center cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        className="sr-only peer"
+                                        checked={companySettings.showDualBranding !== false}
+                                        onChange={(e) => setCompanySettings({ ...companySettings, showDualBranding: e.target.checked })}
+                                    />
+                                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+                                </label>
+                            </div>
+                        </div>
+
+                        {/* Preview */}
+                        <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100">
+                            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Sidebar Preview</p>
+                            <div className="bg-white rounded-xl p-4 border border-slate-100 shadow-sm max-w-[240px]">
+                                {/* Top row: ARCRM badge + title */}
+                                <div className="flex items-center gap-2.5">
+                                    <div className="w-9 h-9 rounded-xl flex items-center justify-center shadow-lg shrink-0" style={{ background: companySettings.primaryBrandColor ? `linear-gradient(135deg, ${companySettings.primaryBrandColor}, ${companySettings.primaryBrandColor}cc)` : 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
+                                        <span className="text-white font-black text-lg">A</span>
+                                    </div>
+                                    <div className="min-w-0 uppercase">
+                                        <p className="text-base font-black tracking-tighter text-slate-900 leading-tight truncate">{companySettings.whitelabelAppTitle || 'ARCRM'}</p>
+                                        <p className="text-[9px] font-bold text-slate-400 -mt-0.5 truncate">{companySettings.tagline || 'Always Ready CRM'}</p>
+                                    </div>
+                                </div>
+                                {/* Bottom row: Client company logo + name */}
+                                {companySettings.showDualBranding !== false && companySettings.logoUrl && (
+                                    <div className="flex items-center gap-2.5 mt-2.5 pt-2.5 border-t border-slate-100">
+                                        <img src={resolveImageUrl(companySettings.logoUrl)} alt="Company" className="h-7 w-7 object-contain rounded-lg border border-slate-100 shrink-0 bg-white" />
+                                        <span className="text-[11px] font-bold text-slate-600 truncate">{companySettings.companyName || 'Your Company'}</span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Custom App Title */}
+                        <div>
+                            <label className={labelClass}>Custom App Title</label>
+                            <input
+                                type="text"
+                                name="whitelabelAppTitle"
+                                value={companySettings.whitelabelAppTitle || ''}
+                                onChange={handleCompanyChange}
+                                className={inputClass}
+                                placeholder="e.g., MyCRM (leave blank for ARCRM)"
+                            />
+                            <p className="text-[10px] text-slate-400 mt-1 font-bold">Replaces "ARCRM" text in the sidebar header. Leave empty to use default.</p>
+                        </div>
+
+                        {/* Primary Brand Color */}
+                        <div>
+                            <label className={labelClass}>Primary Brand Color</label>
+                            <div className="flex items-center gap-3">
+                                <input
+                                    type="color"
+                                    value={companySettings.primaryBrandColor || '#6366f1'}
+                                    onChange={(e) => setCompanySettings({ ...companySettings, primaryBrandColor: e.target.value })}
+                                    className="w-12 h-12 rounded-xl border-2 border-slate-200 cursor-pointer p-1"
+                                />
+                                <input
+                                    type="text"
+                                    name="primaryBrandColor"
+                                    value={companySettings.primaryBrandColor || ''}
+                                    onChange={handleCompanyChange}
+                                    className={`${inputClass} flex-1`}
+                                    placeholder="#6366f1 (leave blank for default)"
+                                />
+                            </div>
+                            <p className="text-[10px] text-slate-400 mt-1 font-bold">Used for the sidebar logo badge accent color.</p>
+                        </div>
+
+                        <div className="pt-4 border-t border-slate-100">
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className="flex items-center gap-2 px-8 py-3 bg-primary-600 text-white rounded-xl font-bold hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <MdSave size={18} />
+                                {loading ? 'Saving...' : 'Save Branding'}
                             </button>
                         </div>
                     </form>

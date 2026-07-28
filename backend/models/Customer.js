@@ -31,6 +31,7 @@ const CustomerSchema = new mongoose.Schema({
     status: { type: String, default: 'Prospect' },
     segment: { type: String, default: 'Retail' },
     owner: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null, index: true },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     createdAt: { type: Date, default: Date.now },
 });

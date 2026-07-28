@@ -55,7 +55,10 @@ exports.updateCompanySettings = async (req, res) => {
             bankDetails,
             authorizedSignatory,
             defaultTerms,
-            quotationPrefix
+            quotationPrefix,
+            showDualBranding,
+            whitelabelAppTitle,
+            primaryBrandColor
         } = req.body;
 
         // Validate required fields
@@ -99,6 +102,9 @@ exports.updateCompanySettings = async (req, res) => {
             };
             settings.defaultTerms = defaultTerms;
             settings.quotationPrefix = (quotationPrefix && quotationPrefix.toUpperCase().startsWith('ARM')) ? quotationPrefix : 'ARM/QTN';
+            if (typeof showDualBranding === 'boolean') settings.showDualBranding = showDualBranding;
+            if (typeof whitelabelAppTitle === 'string') settings.whitelabelAppTitle = whitelabelAppTitle;
+            if (typeof primaryBrandColor === 'string') settings.primaryBrandColor = primaryBrandColor;
             settings.companyId = req.user.companyId;
             settings.userId = settings.userId || req.user.id;
 
@@ -134,7 +140,10 @@ exports.updateCompanySettings = async (req, res) => {
                     signatureImageUrl: authorizedSignatory?.signatureImageUrl || ''
                 },
                 defaultTerms,
-                quotationPrefix: (quotationPrefix && quotationPrefix.toUpperCase().startsWith('ARM')) ? quotationPrefix : 'ARM/QTN'
+                quotationPrefix: (quotationPrefix && quotationPrefix.toUpperCase().startsWith('ARM')) ? quotationPrefix : 'ARM/QTN',
+                showDualBranding: typeof showDualBranding === 'boolean' ? showDualBranding : true,
+                whitelabelAppTitle: whitelabelAppTitle || '',
+                primaryBrandColor: primaryBrandColor || ''
             });
         }
 

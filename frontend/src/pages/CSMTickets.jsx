@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { csmService, customerService, productService, voucherService, userService, importService, uploadService } from '../services/api';
+import { csmService, customerService, productService, voucherService, userService, importService, uploadService, branchService } from '../services/api';
 import { toast } from 'react-toastify';
 import { MdAdd, MdSearch, MdFilterList, MdArrowForward, MdEdit, MdDelete, MdPublish, MdFileDownload, MdWarning, MdInfoOutline, MdPhotoCamera, MdCloudUpload } from 'react-icons/md';
 import * as XLSX from 'xlsx';
@@ -73,7 +73,9 @@ const CSMTickets = () => {
     const [filterPriority, setFilterPriority] = useState('');
     const [filterInvoiceType, setFilterInvoiceType] = useState('');
     const [filterCustomer, setFilterCustomer] = useState('');
+    const [filterBranch, setFilterBranch] = useState('');
     const [ticketCustomers, setTicketCustomers] = useState([]);
+    const [branches, setBranches] = useState([]);
 
     // Masters lists for creation
     const [customers, setCustomers] = useState([]);
@@ -185,6 +187,50 @@ const CSMTickets = () => {
         serialNumber: ''
     });
 
+    const [serialSuggestions, setSerialSuggestions] = useState([]);
+    const [isSearchingSerials, setIsSearchingSerials] = useState(false);
+    const [showSerialDropdown, setShowSerialDropdown] = useState(false);
+
+    const handleSerialInputChange = async (val) => {
+        setFormData(prev => ({ ...prev, serialNumber: val }));
+        const query = val ? String(val).trim() : '';
+        if (query.length >= 1) {
+            setIsSearchingSerials(true);
+            setShowSerialDropdown(true);
+            try {
+                const res = await csmService.searchSerialNumbers(query);
+                const rawList = res.data || [];
+                // Only include SOLD products and deduplicate by serialNumber
+                const soldList = rawList.filter(a => a.status === 'SOLD' || a.customerId);
+                const uniqueMap = new Map();
+                soldList.forEach(item => {
+                    const key = (item.serialNumber || '').trim().toLowerCase();
+                    if (key && !uniqueMap.has(key)) {
+                        uniqueMap.set(key, item);
+                    }
+                });
+                setSerialSuggestions(Array.from(uniqueMap.values()));
+            } catch (err) {
+                console.error('Serial search error:', err);
+                setSerialSuggestions([]);
+            } finally {
+                setIsSearchingSerials(false);
+            }
+        } else {
+            setSerialSuggestions([]);
+            setShowSerialDropdown(false);
+        }
+    };
+
+    const handleSelectSerialSuggestion = (asset) => {
+        setShowSerialDropdown(false);
+        setSerialSuggestions([]);
+        if (asset?.serialNumber) {
+            setFormData(prev => ({ ...prev, serialNumber: asset.serialNumber }));
+            handleSerialNoLookup(asset.serialNumber, asset);
+        }
+    };
+
     const fetchTickets = async () => {
         setLoading(true);
         try {
@@ -197,6 +243,9 @@ const CSMTickets = () => {
             };
             if (filterCustomer) {
                 queryParams.customerId = filterCustomer;
+            }
+            if (filterBranch) {
+                queryParams.branchId = filterBranch;
             }
             if (filterInvoiceType === 'manual') {
                 queryParams.isManual = 'true';
@@ -224,7 +273,7 @@ const CSMTickets = () => {
 
     const loadCreationData = async () => {
         try {
-            const [custRes, priRes, catRes, typRes, prodRes, srcRes, desRes, assetRes] = await Promise.allSettled([
+            const [custRes, priRes, catRes, typRes, prodRes, srcRes, desRes, assetRes, branchRes] = await Promise.allSettled([
                 customerService.getAll({ limit: 500 }),
                 csmService.getPriorities(),
                 csmService.getCategories(),
@@ -232,7 +281,8 @@ const CSMTickets = () => {
                 productService.getAll({ limit: 500 }),
                 csmService.getSources(),
                 csmService.getDesignations(),
-                csmService.getAssets()
+                csmService.getAssets(),
+                branchService.getAll()
             ]);
 
             const valueOf = (result) => result.status === 'fulfilled' ? result.value : null;
@@ -242,6 +292,8 @@ const CSMTickets = () => {
             const typesRes = valueOf(typRes);
             const productsRes = valueOf(prodRes);
             const sourcesRes = valueOf(srcRes);
+            const branchesRes = valueOf(branchRes);
+            if (branchesRes?.data) setBranches(branchesRes.data);
             const designationsRes = valueOf(desRes);
             const assetsRes = valueOf(assetRes);
 
@@ -281,7 +333,7 @@ const CSMTickets = () => {
 
     useEffect(() => {
         fetchTickets();
-    }, [page, filterStatus, filterPriority, filterInvoiceType, filterCustomer]);
+    }, [page, filterStatus, filterPriority, filterInvoiceType, filterCustomer, filterBranch]);
 
     useEffect(() => {
         const handleRealtimeUpdate = (e) => {
@@ -292,7 +344,7 @@ const CSMTickets = () => {
         };
         window.addEventListener('onCrmSocketUpdate', handleRealtimeUpdate);
         return () => window.removeEventListener('onCrmSocketUpdate', handleRealtimeUpdate);
-    }, [page, filterStatus, filterPriority, filterInvoiceType, filterCustomer]);
+    }, [page, filterStatus, filterPriority, filterInvoiceType, filterCustomer, filterBranch]);
 
     useEffect(() => {
         fetchTicketCustomers();
@@ -853,37 +905,61 @@ const CSMTickets = () => {
         fetchTickets();
     };
 
-    const handleSerialNoLookup = async (serialNo) => {
+    const handleSerialNoLookup = async (serialNo, preloadedAsset = null) => {
         const cleanSN = String(serialNo || '').trim();
-        if (!cleanSN) return;
+        if (!cleanSN && !preloadedAsset) return;
         
         try {
-            const res = await csmService.getAssetSummary({ serialNumber: cleanSN });
-            if (res.data && res.data.asset) {
-                const asset = res.data.asset;
+            const summaryParams = preloadedAsset?._id ? { assetId: preloadedAsset._id } : { serialNumber: cleanSN };
+            const res = await csmService.getAssetSummary(summaryParams);
+            const asset = res.data?.asset || preloadedAsset;
+            
+            if (res.data) {
                 setAssetSummary(res.data);
-                setGeneratedSerial('');
+            }
+            setGeneratedSerial('');
+
+            if (asset) {
+                const targetCustId = asset.customerId?._id || asset.customerId || null;
                 
-                // Fetch invoices and contacts for this customer
-                const invoiceRes = await voucherService.getAll({ customerId: asset.customerId?._id, voucherType: 'Invoice' });
-                setInvoices(invoiceRes.data?.data || invoiceRes.data || []);
-                
-                const contactsRes = await csmService.getCustomerContacts({ customerId: asset.customerId?._id });
-                setCustomerContacts(contactsRes.data || []);
+                let invList = [];
+                let contactsList = [];
+
+                if (targetCustId) {
+                    try {
+                        const invoiceRes = await voucherService.getAll({ customerId: targetCustId, voucherType: 'Invoice' });
+                        invList = invoiceRes.data?.data || invoiceRes.data || [];
+                        setInvoices(invList);
+                    } catch (e) {
+                        console.error('Invoice fetch error:', e);
+                    }
+                    
+                    try {
+                        const contactsRes = await csmService.getCustomerContacts({ customerId: targetCustId });
+                        contactsList = contactsRes.data || [];
+                        setCustomerContacts(contactsList);
+                    } catch (e) {
+                        console.error('Contacts fetch error:', e);
+                    }
+                }
                 
                 // Autofill
                 setFormData(prev => {
+                    const custPincode = asset.customerId?.billingAddress?.pincode || asset.pincode || asset.locationPincode || prev.pincode || '';
+                    const matchedInvoice = asset.invoiceId?._id || asset.invoiceId || (invList.length > 0 ? invList[0]._id : '');
+
                     const nextData = {
                         ...prev,
-                        customerId: asset.customerId?._id || '',
-                        productId: asset.productId?._id || '',
+                        customerId: targetCustId || prev.customerId || '',
+                        productId: asset.productId?._id || asset.productId || prev.productId || '',
                         assetId: asset._id || '',
-                        serialNumber: asset.serialNumber || cleanSN
+                        serialNumber: asset.serialNumber || cleanSN,
+                        pincode: custPincode,
+                        invoiceId: matchedInvoice || prev.invoiceId || ''
                     };
                     
-                    // Autofill contact if we have contacts and primary exists
-                    if (contactsRes.data && contactsRes.data.length > 0) {
-                        const primaryContact = contactsRes.data.find(c => c.isPrimary) || contactsRes.data[0];
+                    if (contactsList.length > 0) {
+                        const primaryContact = contactsList.find(c => c.isPrimary) || contactsList[0];
                         if (primaryContact) {
                             nextData.contactId = primaryContact._id;
                             nextData.contactName = primaryContact.contactName || '';
@@ -892,19 +968,27 @@ const CSMTickets = () => {
                             nextData.contactPhone = primaryContact.mobileNo || '';
                             nextData.contactEmail = primaryContact.email || '';
                         }
+                    } else if (asset.customerId) {
+                        if (asset.customerId.mobile && !nextData.contactPhone) {
+                            nextData.contactPhone = asset.customerId.mobile;
+                        }
+                        if (asset.customerId.email && !nextData.contactEmail) {
+                            nextData.contactEmail = asset.customerId.email;
+                        }
                     }
                     
                     return nextData;
                 });
                 
-                toast.success(`Asset found! Auto-filled details for Serial No: ${cleanSN}`);
+                toast.success(`Asset found! Auto-filled details for Serial No: ${asset.serialNumber || cleanSN}`);
                 
-                // Check coverage & adjust priority
-                const hasCoverage = res.data.warranty?.status === 'Active' || res.data.amc?.status === 'Active';
-                if (!hasCoverage) {
-                    const medPriority = priorities.find(p => p.name?.toLowerCase() === 'medium');
-                    if (medPriority) {
-                        setFormData(prev => ({ ...prev, priorityId: medPriority._id }));
+                if (res.data) {
+                    const hasCoverage = res.data.warranty?.status === 'Active' || res.data.amc?.status === 'Active';
+                    if (!hasCoverage) {
+                        const medPriority = priorities.find(p => p.name?.toLowerCase() === 'medium');
+                        if (medPriority) {
+                            setFormData(prev => ({ ...prev, priorityId: medPriority._id }));
+                        }
                     }
                 }
             } else {
@@ -1401,6 +1485,24 @@ const CSMTickets = () => {
                         />
                     </div>
 
+                    {/* Branch Filter */}
+                    {branches.length > 0 && (
+                        <div className="flex items-center gap-2 bg-slate-50 border border-slate-100 rounded-2xl px-4 py-1.5">
+                            <MdFilterList className="text-slate-400" />
+                            <span className="text-xs font-black uppercase tracking-wider text-slate-400">Branch</span>
+                            <select
+                                value={filterBranch}
+                                onChange={(e) => { setFilterBranch(e.target.value); setPage(1); }}
+                                className="bg-transparent border-none focus:outline-none text-xs font-bold text-slate-700 cursor-pointer"
+                            >
+                                <option value="">All Branches</option>
+                                {branches.map(b => (
+                                    <option key={b._id} value={b._id}>{b.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+
                     {/* Invoice Type Filter */}
                     <div className="flex items-center gap-2 bg-slate-50 border border-slate-100 rounded-2xl px-4 py-1.5">
                         <MdFilterList className="text-slate-400" />
@@ -1479,6 +1581,11 @@ const CSMTickets = () => {
                                                     }`}>
                                                         {isManual ? 'Manual' : 'System'}
                                                     </span>
+                                                    {t.branchId?.name && (
+                                                        <span className="inline-block mt-1 ml-1 text-[9px] px-2 py-0.5 rounded-full font-black tracking-wider bg-purple-50 text-purple-700 border border-purple-200">
+                                                            📍 {t.branchId.name}
+                                                        </span>
+                                                    )}
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <p className="font-bold text-slate-900">{t.customerId?.customerName || 'N/A'}</p>
@@ -1709,18 +1816,24 @@ const CSMTickets = () => {
                             />
                         </div>
                         <div>
-                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Product Serial No.</label>
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                                Product Serial No. <span className="text-[9px] text-teal-600 font-bold lowercase">(type partial e.g. 1002)</span>
+                            </label>
                             <div className="relative">
                                 <input
                                     type="text"
                                     value={formData.serialNumber || ''}
-                                    onChange={(e) => {
-                                        const val = e.target.value;
-                                        setFormData(prev => ({ ...prev, serialNumber: val }));
+                                    onChange={(e) => handleSerialInputChange(e.target.value)}
+                                    onFocus={() => {
+                                        if (formData.serialNumber && formData.serialNumber.trim().length >= 1) {
+                                            handleSerialInputChange(formData.serialNumber);
+                                        }
                                     }}
-                                    onBlur={() => handleSerialNoLookup(formData.serialNumber)}
-                                    className="w-full pl-4 pr-12 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
-                                    placeholder="Enter or scan Product Serial No."
+                                    onBlur={() => {
+                                        setTimeout(() => setShowSerialDropdown(false), 200);
+                                    }}
+                                    className="w-full pl-4 pr-12 py-3 rounded-xl border border-slate-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all"
+                                    placeholder="Enter or scan Serial No (e.g. 1002 or CE1002)..."
                                 />
                                 <button
                                     type="button"
@@ -1730,6 +1843,41 @@ const CSMTickets = () => {
                                 >
                                     <MdSearch size={20} />
                                 </button>
+
+                                {/* Dropdown Suggestions List */}
+                                {showSerialDropdown && (
+                                    <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-2xl shadow-xl max-h-60 overflow-y-auto divide-y divide-slate-100 animate-in fade-in slide-in-from-top-1">
+                                        {isSearchingSerials ? (
+                                            <div className="p-3 text-xs text-slate-400 font-bold text-center">Searching Serial Numbers...</div>
+                                        ) : serialSuggestions.length === 0 ? (
+                                            <div className="p-3 text-xs text-slate-400 font-bold text-center">No matching SOLD Serial Numbers found</div>
+                                        ) : (
+                                            serialSuggestions.map(asset => {
+                                                const custName = asset.customerId?.companyName || asset.customerId?.customerName;
+                                                return (
+                                                    <div
+                                                        key={asset._id}
+                                                        onMouseDown={() => handleSelectSerialSuggestion(asset)}
+                                                        className="p-3 hover:bg-teal-50/70 cursor-pointer transition-colors"
+                                                    >
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="font-mono font-bold text-slate-900 text-sm">{asset.serialNumber}</span>
+                                                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-blue-100 text-blue-700 border border-blue-200">
+                                                                🛒 SOLD
+                                                            </span>
+                                                        </div>
+                                                        <div className="text-xs text-slate-600 font-medium truncate mt-1 flex items-center justify-between">
+                                                            <span className="truncate max-w-[55%]">{asset.productId?.productName || 'Product'}</span>
+                                                            <span className="font-bold text-slate-800 truncate max-w-[42%] text-right">
+                                                                {custName ? `👤 ${custName}` : 'Customer Asset'}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         </div>
 

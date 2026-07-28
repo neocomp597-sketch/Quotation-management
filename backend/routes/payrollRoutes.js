@@ -44,10 +44,15 @@ router.use(protect);
 // ─── EMPLOYEE PROFILES (Admin only) ─────────────────────────────────────────
 router.get('/employees', checkAdmin, payrollController.getEmployees);
 router.post('/employees', checkAdmin, payrollController.createEmployee);
+router.post('/employees/sync-users', checkAdmin, payrollController.syncEmployeeUsers);
 router.get('/employees/:id', checkAdmin, payrollController.getEmployee);
 router.put('/employees/:id', checkAdmin, payrollController.updateEmployee);
 router.put('/employees/:id/structure', checkAdmin, payrollController.updateEmployeeStructure);
 router.delete('/employees/:id', checkAdmin, payrollController.deleteEmployee);
+
+// ─── EMPLOYEE MY PAYSLIPS (Authenticated users) ────────────────────────────
+router.get('/my-payslips', payrollController.getMyPayslips);
+router.get('/settings/public', payrollController.getPublicSettings);
 
 // ─── SETTINGS (Admin only) ──────────────────────────────────────────────────
 router.get('/settings', checkAdmin, payrollController.getSettings);

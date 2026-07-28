@@ -89,6 +89,7 @@ const EnquirySchema = new mongoose.Schema({
     }],
 
     assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null, index: true },
     lastActivityDate: { type: Date, default: Date.now },
     lossReason: {
         type: String,

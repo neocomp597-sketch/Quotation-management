@@ -29,8 +29,9 @@ exports.getAllUsers = async (req, res) => {
         }
 
         const users = await User.find({ companyId: req.user.companyId })
-            .select('_id name email role reportsTo status companyId createdAt')
+            .select('_id name email role reportsTo branchId status companyId createdAt')
             .populate('reportsTo', 'name email')
+            .populate('branchId', 'name code branchPrefix')
             .sort({ createdAt: -1 })
             .lean();
 
@@ -43,7 +44,7 @@ exports.getAllUsers = async (req, res) => {
 
 exports.createUser = async (req, res) => {
     try {
-        const { name, email, password, role = 'sales', status = true, reportsTo } = req.body;
+        const { name, email, password, role = 'sales', status = true, reportsTo, branchId } = req.body;
 
         const companyId = req.user?.companyId || getTenantId?.();
         if (!companyId) {
@@ -89,6 +90,7 @@ exports.createUser = async (req, res) => {
             passwordHash,
             role,
             reportsTo: validatedReportsTo,
+            branchId: branchId || null,
             status,
             companyId,
         });
@@ -99,6 +101,7 @@ exports.createUser = async (req, res) => {
             email: user.email,
             role: user.role,
             reportsTo: user.reportsTo,
+            branchId: user.branchId,
             status: user.status,
             companyId: user.companyId,
             createdAt: user.createdAt,
@@ -199,7 +202,7 @@ exports.updateUserRole = async (req, res) => {
 exports.updateUser = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, email, password, role, reportsTo } = req.body;
+        const { name, email, password, role, reportsTo, branchId } = req.body;
 
         const user = await User.findOne({ _id: id, companyId: req.user.companyId });
         if (!user) {
@@ -219,6 +222,7 @@ exports.updateUser = async (req, res) => {
         }
 
         if (name) user.name = name;
+        if (branchId !== undefined) user.branchId = branchId || null;
         if (password) {
             const salt = await bcrypt.genSalt(10);
             user.passwordHash = await bcrypt.hash(password, salt);
@@ -267,6 +271,7 @@ exports.updateUser = async (req, res) => {
             email: updatedUser.email,
             role: updatedUser.role,
             reportsTo: updatedUser.reportsTo,
+            branchId: updatedUser.branchId,
             status: updatedUser.status,
             createdAt: updatedUser.createdAt
         });
@@ -309,3 +314,33 @@ exports.deleteUser = async (req, res) => {
         res.status(500).json({ message: 'Failed to delete user', error: error.message });
     }
 };
+
+exports.getUserNote = async (req, res) => {
+    try {
+        const user = await User.findById(req.user.id).select('personalNote').lean();
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+        res.json({ note: user.personalNote || '' });
+    } catch (error) {
+        console.error('[getUserNote] Error:', error.message);
+        res.status(500).json({ message: 'Failed to fetch personal note', error: error.message });
+    }
+};
+
+exports.updateUserNote = async (req, res) => {
+    try {
+        const { note } = req.body;
+        const user = await User.findById(req.user.id);
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+        user.personalNote = typeof note === 'string' ? note : '';
+        await user.save();
+        res.json({ note: user.personalNote });
+    } catch (error) {
+        console.error('[updateUserNote] Error:', error.message);
+        res.status(500).json({ message: 'Failed to update personal note', error: error.message });
+    }
+};
+

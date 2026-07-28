@@ -23,6 +23,7 @@ export const MENU_PERMISSION_GROUPS = [
             { key: 'master_statuses', label: 'Status Master', description: 'Status master definitions for planning', defaultRoute: '/status-master' },
             { key: 'master_terms', label: 'Terms', description: 'Terms and conditions master', defaultRoute: '/terms' },
             { key: 'master_territories', label: 'Territories', description: 'Territory master management', defaultRoute: '/territory-master' },
+            { key: 'master_branches', label: 'Branch Master', description: 'Branch master management', defaultRoute: '/branches' },
             { key: 'master_serials', label: 'Serial No. Master', description: 'Serial number and asset master record management', defaultRoute: '/serial-no-master' }
         ]
     },
@@ -138,6 +139,7 @@ export const MENU_PERMISSION_GROUPS = [
         description: 'Manage employee salary profiles, payroll settings, monthly runs, payments, payslips, letters and reports',
         defaultRoute: '/payroll/dashboard',
         children: [
+            { key: 'payroll_payslips', label: 'My Payslips', description: 'View and download monthly payslips', defaultRoute: '/payroll/payslips' },
             { key: 'payroll_employees', label: 'Employees', description: 'Employee salary profiles and base structures', defaultRoute: '/payroll/employees' },
             { key: 'payroll_runs', label: 'Run Payroll', description: 'Run and calculate monthly payroll', defaultRoute: '/payroll/runs' },
             { key: 'payroll_payments', label: 'Payments', description: 'Record employee payments', defaultRoute: '/payroll/payments' },
@@ -176,10 +178,16 @@ export const MENU_PERMISSION_GROUPS = [
 export const ROLE_LABELS = {
     admin: 'Admin',
     manager: 'Manager',
-    sales: 'Sales'
+    sales: 'Sales',
+    employee: 'Employee'
 };
 
-export const getFallbackRoute = (permissions = {}) => {
+export const getFallbackRoute = (permissions = {}, user = null) => {
+    const roleStr = String(user?.role || '').toLowerCase();
+    if (roleStr === 'employee') {
+        return '/dashboard';
+    }
+
     for (const group of MENU_PERMISSION_GROUPS) {
         const firstAccessibleChild = (group.children || []).find(
             (child) => {
@@ -197,5 +205,5 @@ export const getFallbackRoute = (permissions = {}) => {
         }
     }
 
-    return '/';
+    return '/dashboard';
 };

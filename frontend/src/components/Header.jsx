@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useSocket } from '../context/SocketContext';
 import SystemUpdatesModal from './SystemUpdatesModal';
+import ChangePasswordModal from './ChangePasswordModal';
 
 const formatNotificationType = (type) => {
     switch (type) {
@@ -45,6 +46,7 @@ const searchablePages = [
     { label: 'Quotations', path: '/quotations', permissionKey: 'quotation_list', keywords: ['quotes', 'quote'] },
     { label: 'Terms & Conditions', path: '/terms', permissionKey: 'master_terms', keywords: ['terms', 'conditions'] },
     { label: 'Territory Master', path: '/territory-master', permissionKey: 'master_territories', keywords: ['territory'] },
+    { label: 'Branch Master', path: '/branches', keywords: ['branch', 'office', 'branches', 'branch master'] },
     { label: 'Serial No. Master', path: '/serial-no-master', permissionKey: 'master_serials', keywords: ['serial number', 'assets', 'stock serials'] },
     { label: 'Settings', path: '/settings', permissionKey: 'settings_profile', keywords: ['profile'] },
     { label: 'Authorization', path: '/admin/authorization', permissionKey: 'admin_authorization', keywords: ['permissions', 'roles'] },
@@ -407,13 +409,29 @@ const moduleSubmodulesMap = {
 
 const Header = ({ sidebarOpen, toggleSidebar }) => {
     const navigate = useNavigate();
-    const { user, logout, isAdmin, isSuperAdmin, hasAccess } = useAuth();
+    const { user, logout, isAdmin, isSuperAdmin, hasAccess, updateUser } = useAuth();
     const { isDarkMode, toggleTheme } = useTheme();
     const { isReconnecting } = useSocket();
 
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [isNotifOpen, setIsNotifOpen] = useState(false);
     const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
+    const [mustChangePasswordModal, setMustChangePasswordModal] = useState(false);
+
+    useEffect(() => {
+        if (user?.mustChangePassword) {
+            setMustChangePasswordModal(true);
+        } else {
+            setMustChangePasswordModal(false);
+        }
+    }, [user]);
+
+    const handlePasswordChanged = (updatedUser) => {
+        setMustChangePasswordModal(false);
+        if (updateUser) {
+            updateUser(updatedUser || { ...user, mustChangePassword: false });
+        }
+    };
 
     const [searchQuery, setSearchQuery] = useState('');
     const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -885,6 +903,12 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
                     </div>
                 </div>
             </header>
+
+            <ChangePasswordModal 
+                isOpen={mustChangePasswordModal} 
+                user={user} 
+                onPasswordChanged={handlePasswordChanged} 
+            />
         </>
     );
 };

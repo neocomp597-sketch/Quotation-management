@@ -255,15 +255,27 @@ export const authService = {
   logout: () => api.post("/auth/logout", {}, { skipAuthRefresh: true }),
   logoutAll: () => api.post("/auth/logout-all"),
   getMe: () => api.get("/auth/me"),
+  changePassword: (data) => api.post("/auth/change-password", data),
 };
 
 export const userService = {
   getAll: (params) => api.get("/users", { params }),
   create: (data) => api.post("/users", data),
   updateProfile: (data) => api.put("/users/profile", data),
+  getNote: () => api.get("/users/note"),
+  updateNote: (note) => api.put("/users/note", { note }),
   updateRole: (id, role, params) => api.patch(`/users/${id}/role`, { role }, { params }),
   update: (id, data, params) => api.put(`/users/${id}`, data, { params }),
   delete: (id, params) => api.delete(`/users/${id}`, { params }),
+};
+
+export const branchService = {
+  getAll: (params) => api.get("/branches", { params }),
+  getById: (id) => api.get(`/branches/${id}`),
+  create: (data) => api.post("/branches", data),
+  update: (id, data) => api.put(`/branches/${id}`, data),
+  delete: (id) => api.delete(`/branches/${id}`),
+  getNextEmployeeId: (branchId) => api.get(`/branches/${branchId}/next-emp-id`),
 };
 
 export const authorizationService = {
@@ -612,7 +624,11 @@ export const payrollService = {
 
   // Settings
   getSettings: () => api.get("/payroll/settings"),
+  getPublicSettings: () => api.get("/payroll/settings/public"),
   updateSettings: (data) => api.put("/payroll/settings", data),
+
+  // Employee Self-Service
+  getMyPayslips: () => api.get("/payroll/my-payslips"),
 
   // Runs
   getRuns: () => api.get("/payroll/runs"),
@@ -738,6 +754,7 @@ export const csmService = {
   getAssets: (params = {}) => api.get("/csm/assets", { params }),
   createAsset: (data) => api.post("/csm/assets", data),
   getAssetSummary: (params = {}) => api.get("/csm/assets/summary", { params }),
+  searchSerialNumbers: (q) => api.get("/csm/assets/search-serials", { params: { q } }),
 
   getArticles: (params = {}) => api.get("/csm/kb", { params }),
   getArticleById: (id) => api.get(`/csm/kb/${id}`),

@@ -194,6 +194,13 @@ export const AuthProvider = ({ children }) => {
             return true;
         }
 
+        const roleStr = String(user.role || '').toLowerCase();
+        if (roleStr === 'employee') {
+            if (['dashboard', 'dashboard_overview', 'payroll', 'payroll_payslips', 'csm', 'csm_tickets', 'csm_kb', 'settings', 'settings_profile'].includes(permissionKey)) {
+                return true;
+            }
+        }
+
         if (Object.prototype.hasOwnProperty.call(permissions || {}, permissionKey)) {
             return Boolean(permissions?.[permissionKey]);
         }
@@ -213,6 +220,15 @@ export const AuthProvider = ({ children }) => {
         return Boolean(permissions?.[group.key]);
     }, [permissions, user]);
 
+    const updateUser = useCallback((updatedUserData) => {
+        if (!updatedUserData) return;
+        setUser((prev) => {
+            const next = { ...(prev || {}), ...updatedUserData };
+            localStorage.setItem("user", JSON.stringify(next));
+            return next;
+        });
+    }, []);
+
     return (
         <AuthContext.Provider
             value={{
@@ -222,6 +238,7 @@ export const AuthProvider = ({ children }) => {
                 login,
                 logout,
                 refreshSession,
+                updateUser,
                 hasAccess,
                 isAdmin: user?.role === "admin" || user?.role === "Admin",
                 isSuperAdmin: user?.role === "SUPER_ADMIN" || user?.role === "super_admin",
