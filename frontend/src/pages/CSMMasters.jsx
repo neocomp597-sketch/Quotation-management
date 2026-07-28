@@ -1,16 +1,18 @@
 import React, { useEffect, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { csmService, territoryService, payrollService } from '../services/api';
 import { toast } from 'react-toastify';
 import { 
     MdCategory, MdSettings, MdPriorityHigh, 
     MdAssignmentTurnedIn, MdPeople, MdAdd, 
-    MdDelete, MdEdit, MdCloudDownload, MdBuild
+    MdDelete, MdEdit, MdCloudDownload, MdBuild, MdArrowBack
 } from 'react-icons/md';
 import Modal from '../components/Modal';
 import SearchableSelect from '../components/SearchableSelect';
 
-const CSMMasters = () => {
+const CSMMasters = ({ isCreatePage, isEditPage }) => {
+    const navigate = useNavigate();
+    const { id: routeId } = useParams();
     const location = useLocation();
     const queryParams = new URLSearchParams(location.search);
     const defaultTab = queryParams.get('tab') || 'categories';
@@ -111,6 +113,45 @@ const CSMMasters = () => {
         }
     };
 
+    useEffect(() => {
+        if (isCreatePage) {
+            setEditId(null);
+            setFormData({ 
+                name: '', 
+                description: '', 
+                responseSlaHours: '', 
+                resolutionSlaHours: '', 
+                color: '#64748b',
+                employeeId: '',
+                email: '',
+                mobile: '',
+                status: 'Active',
+                territoryId: '',
+                pincodes: ''
+            });
+            setShowModal(true);
+        } else if (isEditPage && routeId) {
+            setShowModal(true);
+            const found = items.find(i => i._id === routeId);
+            if (found) {
+                setEditId(found._id);
+                setFormData({
+                    name: found.name,
+                    description: found.description || '',
+                    responseSlaHours: found.responseSlaHours || '',
+                    resolutionSlaHours: found.resolutionSlaHours || '',
+                    color: found.color || '#64748b',
+                    employeeId: found.employeeId?._id || found.employeeId || '',
+                    email: found.email || '',
+                    mobile: found.mobile || '',
+                    status: found.status || 'Active',
+                    territoryId: found.territoryId?._id || found.territoryId || '',
+                    pincodes: found.pincodes ? found.pincodes.join(', ') : ''
+                });
+            }
+        }
+    }, [isCreatePage, isEditPage, routeId, items]);
+
     const handleOpenModal = (item = null) => {
         if (item) {
             setEditId(item._id);
@@ -127,23 +168,10 @@ const CSMMasters = () => {
                 territoryId: item.territoryId?._id || item.territoryId || '',
                 pincodes: item.pincodes ? item.pincodes.join(', ') : ''
             });
+            setShowModal(true);
         } else {
-            setEditId(null);
-            setFormData({ 
-                name: '', 
-                description: '', 
-                responseSlaHours: '', 
-                resolutionSlaHours: '', 
-                color: '#64748b',
-                employeeId: '',
-                email: '',
-                mobile: '',
-                status: 'Active',
-                territoryId: '',
-                pincodes: ''
-            });
+            navigate('/csm/masters/new');
         }
-        setShowModal(true);
     };
 
     const handleSubmit = async (e) => {
@@ -174,6 +202,7 @@ const CSMMasters = () => {
             toast.success('Saved successfully');
             setShowModal(false);
             fetchItems();
+            navigate('/csm/masters');
         } catch (error) {
             toast.error(error.response?.data?.message || 'Save failed');
         }
@@ -355,173 +384,194 @@ const CSMMasters = () => {
                 )}
             </div>
 
-            {/* Modal */}
-            <Modal
-                isOpen={showModal}
-                onClose={() => setShowModal(false)}
-                title={editId ? (activeTab === 'engineers' ? 'Edit Engineer' : 'Edit Configuration') : (activeTab === 'engineers' ? 'Create Engineer' : 'Create Configuration')}
-                maxWidth="max-w-md"
-                footer={
-                    <>
-                        <button
-                            type="button"
-                            onClick={() => setShowModal(false)}
-                            className="px-6 py-2.5 text-slate-500 font-black hover:text-slate-900 transition-all uppercase text-[10px] tracking-widest"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="button"
-                            onClick={handleSubmit}
-                            className="bg-primary-600 hover:bg-primary-700 text-white px-8 py-3 rounded-2xl font-black transition-all shadow-xl shadow-primary-600/20 uppercase text-[10px] tracking-widest"
-                        >
-                            Save
-                        </button>
-                    </>
-                }
-            >
-                <form onSubmit={handleSubmit} className="space-y-4 py-2">
-                    {activeTab !== 'engineers' && (
-                        <div>
-                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Name *</label>
-                            <input
-                                type="text"
-                                required
-                                value={formData.name}
-                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-bold transition-all"
-                            />
+            {/* Form Page View */}
+            {(showModal || isCreatePage || isEditPage) && (
+                <div className="fixed inset-0 z-[100] bg-slate-50 overflow-y-auto p-6 md:p-10 flex flex-col items-center">
+                    <div className="max-w-3xl w-full my-2 space-y-6">
+                        {/* Header bar */}
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+                            <div className="flex items-center gap-4">
+                                <button
+                                    type="button"
+                                    onClick={() => { setShowModal(false); navigate('/csm/masters'); }}
+                                    className="p-3 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-2xl transition-all border border-slate-200"
+                                >
+                                    <MdArrowBack size={20} />
+                                </button>
+                                <div>
+                                    <h1 className="text-xl font-black text-slate-900">
+                                        {editId ? (activeTab === 'engineers' ? 'Edit Engineer' : 'Edit Configuration') : (activeTab === 'engineers' ? 'Create Engineer' : 'Create Configuration')}
+                                    </h1>
+                                    <p className="text-xs text-slate-500 font-medium mt-0.5">
+                                        {editId ? 'Update master configuration details' : `Add new ${activeTab} item`}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => { setShowModal(false); navigate('/csm/masters'); }}
+                                    className="px-6 py-3 rounded-2xl border border-slate-200 text-slate-600 font-black uppercase text-xs tracking-widest hover:bg-slate-50 transition-all"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleSubmit}
+                                    className="bg-primary-600 hover:bg-primary-700 text-white px-8 py-3 rounded-2xl font-black transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
+                                >
+                                    Save
+                                </button>
+                            </div>
                         </div>
-                    )}
-                    {activeTab !== 'engineers' && (
-                        <div>
-                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Description</label>
-                            <textarea
-                                value={formData.description}
-                                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-semibold h-24"
-                            />
-                        </div>
-                    )}
-                    {activeTab === 'engineers' && (
-                        <>
-                            <div className="space-y-1">
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Select Employee *</label>
-                                <SearchableSelect
-                                    options={employeesList.map(emp => ({
-                                        value: emp._id,
-                                        label: `${emp.name}${emp.email ? ` (${emp.email})` : ''}`
-                                    }))}
-                                    value={formData.employeeId}
-                                    onChange={(val) => {
-                                        const selectedEmp = employeesList.find(e => e._id === val);
-                                        setFormData({
-                                            ...formData,
-                                            employeeId: val,
-                                            name: selectedEmp?.name || '',
-                                            email: selectedEmp?.email || '',
-                                            mobile: selectedEmp?.mobile || ''
-                                        });
-                                    }}
-                                    placeholder="Search & Select Employee..."
-                                />
-                                {formData.employeeId && (
-                                    <div className="mt-2 p-3 bg-teal-50/80 border border-teal-100 rounded-xl space-y-1 animate-fade-in">
-                                        <p className="text-[8px] font-black uppercase tracking-wider text-teal-600">Employee Details (Auto-Synced)</p>
-                                        <p className="text-sm font-bold text-slate-900">{formData.name || '—'}</p>
-                                        <p className="text-xs text-slate-500 font-semibold">{formData.email || 'No email'} • {formData.mobile || 'No mobile'}</p>
+
+                        {/* Form Card Body */}
+                        <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
+                            <form onSubmit={handleSubmit} className="space-y-6">
+                                {activeTab !== 'engineers' && (
+                                    <div>
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Name *</label>
+                                        <input
+                                            type="text"
+                                            required
+                                            value={formData.name}
+                                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                            className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-bold transition-all"
+                                        />
                                     </div>
                                 )}
-                            </div>
-                            <div className="space-y-1">
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Territory</label>
-                                <select
-                                    value={formData.territoryId}
-                                    onChange={(e) => setFormData({ ...formData, territoryId: e.target.value })}
-                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-semibold cursor-pointer"
-                                >
-                                    <option value="">-- No Assigned Territory --</option>
-                                    {territories.map(t => (
-                                        <option key={t._id} value={t._id}>{t.name}</option>
-                                    ))}
-                                </select>
-                                {(() => {
-                                    const selectedTerritory = territories.find(t => t._id === formData.territoryId);
-                                    if (selectedTerritory && selectedTerritory.rules?.pincodes?.length > 0) {
-                                        return (
-                                            <div className="mt-1.5 px-3 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs text-slate-500 font-semibold flex flex-col gap-0.5 animate-fade-in">
-                                                <span className="text-[8px] font-black uppercase tracking-wider text-slate-400">Territory Pincodes (Auto-Covered)</span>
-                                                <p className="text-slate-700">{selectedTerritory.rules.pincodes.join(', ')}</p>
-                                            </div>
-                                        );
-                                    }
-                                    return null;
-                                })()}
-                            </div>
-                            <div className="space-y-1">
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Additional Direct Pincodes (Optional)</label>
-                                <input
-                                    type="text"
-                                    value={formData.pincodes}
-                                    onChange={(e) => setFormData({ ...formData, pincodes: e.target.value })}
-                                    placeholder="e.g. 400074, 422209"
-                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-semibold"
-                                />
-                                <p className="text-[9px] text-slate-400 font-semibold leading-normal mt-1 pl-1">
-                                    Only specify extra pincodes here if they are outside the selected territory.
-                                </p>
-                            </div>
-                            <div className="space-y-1">
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Status</label>
-                                <select
-                                    value={formData.status}
-                                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-semibold cursor-pointer"
-                                >
-                                    <option value="Active">Active</option>
-                                    <option value="Inactive">Inactive</option>
-                                </select>
-                            </div>
-                        </>
-                    )}
-                    {activeTab === 'priorities' && (
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-1">
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Response SLA (Hrs) *</label>
-                                <input
-                                    type="number"
-                                    required
-                                    min="1"
-                                    value={formData.responseSlaHours}
-                                    onChange={(e) => setFormData({ ...formData, responseSlaHours: e.target.value })}
-                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-semibold"
-                                />
-                            </div>
-                            <div className="space-y-1">
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Resolution SLA (Hrs) *</label>
-                                <input
-                                    type="number"
-                                    required
-                                    min="1"
-                                    value={formData.resolutionSlaHours}
-                                    onChange={(e) => setFormData({ ...formData, resolutionSlaHours: e.target.value })}
-                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-semibold"
-                                />
-                            </div>
-                            <div className="col-span-2 space-y-1">
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Color Tag *</label>
-                                <input
-                                    type="color"
-                                    required
-                                    value={formData.color}
-                                    onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                                    className="w-full h-12 p-1 rounded-xl border border-slate-200 cursor-pointer"
-                                />
-                            </div>
+                                {activeTab !== 'engineers' && (
+                                    <div>
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Description</label>
+                                        <textarea
+                                            value={formData.description}
+                                            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                            className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-semibold h-32"
+                                        />
+                                    </div>
+                                )}
+                                {activeTab === 'engineers' && (
+                                    <>
+                                        <div className="space-y-1">
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Select Employee *</label>
+                                            <SearchableSelect
+                                                options={employeesList.map(emp => ({
+                                                    value: emp._id,
+                                                    label: `${emp.name}${emp.email ? ` (${emp.email})` : ''}`
+                                                }))}
+                                                value={formData.employeeId}
+                                                onChange={(val) => {
+                                                    const selectedEmp = employeesList.find(e => e._id === val);
+                                                    setFormData({
+                                                        ...formData,
+                                                        employeeId: val,
+                                                        name: selectedEmp?.name || '',
+                                                        email: selectedEmp?.email || '',
+                                                        mobile: selectedEmp?.mobile || ''
+                                                    });
+                                                }}
+                                                placeholder="Search & Select Employee..."
+                                            />
+                                            {formData.employeeId && (
+                                                <div className="mt-2 p-3 bg-teal-50/80 border border-teal-100 rounded-xl space-y-1 animate-fade-in">
+                                                    <p className="text-[8px] font-black uppercase tracking-wider text-teal-600">Employee Details (Auto-Synced)</p>
+                                                    <p className="text-sm font-bold text-slate-900">{formData.name || '—'}</p>
+                                                    <p className="text-xs text-slate-500 font-semibold">{formData.email || 'No email'} • {formData.mobile || 'No mobile'}</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Territory</label>
+                                            <select
+                                                value={formData.territoryId}
+                                                onChange={(e) => setFormData({ ...formData, territoryId: e.target.value })}
+                                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-semibold cursor-pointer"
+                                            >
+                                                <option value="">-- No Assigned Territory --</option>
+                                                {territories.map(t => (
+                                                    <option key={t._id} value={t._id}>{t.name}</option>
+                                                ))}
+                                            </select>
+                                            {(() => {
+                                                const selectedTerritory = territories.find(t => t._id === formData.territoryId);
+                                                if (selectedTerritory && selectedTerritory.rules?.pincodes?.length > 0) {
+                                                    return (
+                                                        <div className="mt-1.5 px-3 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs text-slate-500 font-semibold flex flex-col gap-0.5 animate-fade-in">
+                                                            <span className="text-[8px] font-black uppercase tracking-wider text-slate-400">Territory Pincodes (Auto-Covered)</span>
+                                                            <p className="text-slate-700">{selectedTerritory.rules.pincodes.join(', ')}</p>
+                                                        </div>
+                                                    );
+                                                }
+                                                return null;
+                                            })()}
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Additional Direct Pincodes (Optional)</label>
+                                            <input
+                                                type="text"
+                                                value={formData.pincodes}
+                                                onChange={(e) => setFormData({ ...formData, pincodes: e.target.value })}
+                                                placeholder="e.g. 400074, 422209"
+                                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-semibold"
+                                            />
+                                            <p className="text-[9px] text-slate-400 font-semibold leading-normal mt-1 pl-1">
+                                                Only specify extra pincodes here if they are outside the selected territory.
+                                            </p>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Status</label>
+                                            <select
+                                                value={formData.status}
+                                                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-semibold cursor-pointer"
+                                            >
+                                                <option value="Active">Active</option>
+                                                <option value="Inactive">Inactive</option>
+                                            </select>
+                                        </div>
+                                    </>
+                                )}
+                                {activeTab === 'priorities' && (
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-1">
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Response SLA (Hrs) *</label>
+                                            <input
+                                                type="number"
+                                                required
+                                                min="1"
+                                                value={formData.responseSlaHours}
+                                                onChange={(e) => setFormData({ ...formData, responseSlaHours: e.target.value })}
+                                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-semibold"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Resolution SLA (Hrs) *</label>
+                                            <input
+                                                type="number"
+                                                required
+                                                min="1"
+                                                value={formData.resolutionSlaHours}
+                                                onChange={(e) => setFormData({ ...formData, resolutionSlaHours: e.target.value })}
+                                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-semibold"
+                                            />
+                                        </div>
+                                        <div className="col-span-2 space-y-1">
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Color Tag *</label>
+                                            <input
+                                                type="color"
+                                                required
+                                                value={formData.color}
+                                                onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                                                className="w-full h-12 p-1 rounded-xl border border-slate-200 cursor-pointer"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                            </form>
                         </div>
-                    )}
-                </form>
-            </Modal>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

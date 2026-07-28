@@ -411,9 +411,23 @@ const OrgChart = () => {
         }
     };
 
-    // Export PDF/PNG Print
+    const [printScale, setPrintScale] = useState(0.55);
+
+    // Export PDF/PNG Print with Dynamic Auto-Fit 1-Page Scaling
     const handleExportChart = () => {
-        window.print();
+        let fitScale = 0.55;
+        if (chartContainerRef.current) {
+            const chartWidth = chartContainerRef.current.scrollWidth || 1600;
+            const printableWidth = 1020;
+            fitScale = Math.min(0.95, Math.max(0.25, printableWidth / chartWidth));
+            setPrintScale(fitScale);
+            document.documentElement.style.setProperty('--print-scale', fitScale.toString());
+        } else {
+            document.documentElement.style.setProperty('--print-scale', '0.55');
+        }
+        setTimeout(() => {
+            window.print();
+        }, 100);
     };
 
     // Recursive Tree Node Renderer matching Reference Image Layout & Card Badges Exactly
@@ -425,7 +439,7 @@ const OrgChart = () => {
         const isDraggedOver = dragOverEmpId === node._id;
 
         return (
-            <div key={node._id} className="flex flex-col items-center relative transition-all duration-300 my-2.5">
+            <div key={node._id} className="flex flex-col items-center relative transition-all duration-300 my-2.5 pt-2">
                 {/* Node Card */}
                 {meta.isTopTier ? (
                     /* Tier 0 / Leadership Style: Diamond Frame on Left + Teal Pill Container */
@@ -560,8 +574,54 @@ const OrgChart = () => {
 
     return (
         <div className="p-4 md:p-8 max-w-[1700px] mx-auto space-y-6">
+            <style>{`
+                @media print {
+                    @page {
+                        size: A4 landscape;
+                        margin: 4mm;
+                    }
+                    html, body {
+                        width: 100% !important;
+                        height: 100% !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        overflow: visible !important;
+                        background: #ffffff !important;
+                        color: #000000 !important;
+                    }
+                    body * {
+                        visibility: hidden !important;
+                    }
+                    .no-print, header, nav, aside, footer, button, select, input {
+                        display: none !important;
+                    }
+                    .print-org-chart-area, .print-org-chart-area * {
+                        visibility: visible !important;
+                    }
+                    .print-org-chart-area {
+                        position: relative !important;
+                        left: 0 !important;
+                        top: 0 !important;
+                        width: 100% !important;
+                        max-width: 100% !important;
+                        margin: 0 auto !important;
+                        padding: 0 !important;
+                        background: #ffffff !important;
+                        box-shadow: none !important;
+                        border: none !important;
+                        display: flex !important;
+                        justify-content: center !important;
+                    }
+                    .org-chart-scaled-tree {
+                        transform: scale(var(--print-scale, ${printScale})) !important;
+                        transform-origin: top center !important;
+                        margin: 0 auto !important;
+                        padding-top: 10px !important;
+                    }
+                }
+            `}</style>
             {/* Top Title & Header Actions Bar */}
-            <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-xl border border-slate-100 dark:border-slate-800 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+            <div className="no-print bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-xl border border-slate-100 dark:border-slate-800 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
                 <div>
                     <div className="flex items-center space-x-3">
                         <div className="p-3 bg-gradient-to-tr from-teal-500 to-emerald-500 rounded-2xl text-white shadow-lg shadow-teal-500/30">
@@ -627,7 +687,7 @@ const OrgChart = () => {
             </div>
 
             {/* Filter & View Switcher Bar */}
-            <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-lg border border-slate-100 dark:border-slate-800 flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="no-print bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-lg border border-slate-100 dark:border-slate-800 flex flex-col md:flex-row items-center justify-between gap-4">
                 {/* Search Bar */}
                 <div className="relative w-full md:w-80">
                     <MdSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xl" />
@@ -711,10 +771,10 @@ const OrgChart = () => {
                     {viewMode === 'tree' && (
                         <div
                             ref={scrollContainerRef}
-                            className="bg-slate-50 dark:bg-slate-900 rounded-3xl p-8 shadow-xl border border-slate-200 dark:border-slate-800 overflow-x-auto min-h-[600px] relative scroll-smooth"
+                            className="print-org-chart-area bg-slate-50 dark:bg-slate-900 rounded-3xl p-8 shadow-xl border border-slate-200 dark:border-slate-800 overflow-x-auto min-h-[600px] relative scroll-smooth"
                         >
                             {/* Floating Zoom Controls */}
-                            <div className="absolute top-4 right-4 z-10 flex items-center space-x-2 bg-slate-900/80 backdrop-blur-md text-white p-1.5 rounded-2xl shadow-xl border border-slate-700">
+                            <div className="no-print absolute top-4 right-4 z-10 flex items-center space-x-2 bg-slate-900/80 backdrop-blur-md text-white p-1.5 rounded-2xl shadow-xl border border-slate-700">
                                 <button
                                     onClick={() => setZoomLevel(prev => Math.min(prev + 0.15, 1.8))}
                                     className="p-2 hover:bg-slate-700 rounded-xl transition-colors"
@@ -763,7 +823,7 @@ const OrgChart = () => {
                                 <div
                                     ref={chartContainerRef}
                                     style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top center' }}
-                                    className="flex justify-center min-w-max transition-transform duration-200"
+                                    className="org-chart-scaled-tree flex justify-center min-w-max transition-transform duration-200"
                                 >
                                     {treeData.roots.length === 0 ? (
                                         <div className="text-center py-20">

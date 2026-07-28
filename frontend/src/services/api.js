@@ -921,4 +921,11 @@ export const tenderService = {
   getDashboard: (params) => api.get("/tenders/dashboard/data", { params }),
 };
 
+export const stateMasterService = {
+  getAll: () => api.get("/state-master"),
+  create: (data) => api.post("/state-master", data),
+  update: (id, data) => api.put(`/state-master/${id}`, data),
+  delete: (id) => api.delete(`/state-master/${id}`),
+};
+
 export default api;

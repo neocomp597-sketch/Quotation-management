@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { payrollService, salespersonService } from '../services/api';
 import Modal from '../components/Modal';
 import { toast } from 'react-toastify';
@@ -21,7 +21,8 @@ import {
     MdGridOn as IconGridOn,
     MdBusiness,
     MdRefresh,
-    MdCheck
+    MdCheck,
+    MdArrowBack
 } from 'react-icons/md';
 
 const DEFAULT_SAMPLE_PERSONNEL = {
@@ -112,7 +113,9 @@ const SearchableSelect = ({ label, options, value, onChange, placeholder = "Sear
     );
 };
 
-const PayrollMasters = () => {
+const PayrollMasters = ({ isCreatePage, isEditPage }) => {
+    const navigate = useNavigate();
+    const { id: routeId } = useParams();
     const location = useLocation();
     const queryParams = new URLSearchParams(location.search);
     const initialTab = queryParams.get('tab') || 'departments';
@@ -214,6 +217,24 @@ const PayrollMasters = () => {
         return () => window.removeEventListener('onCrmSocketUpdate', handleRealtimeUpdate);
     }, [activeTab, selectedOverviewDeptId]);
 
+    useEffect(() => {
+        if (isCreatePage) {
+            setEditId(null);
+            setFormData({ name: '', description: '' });
+            setShowModal(true);
+        } else if (isEditPage && routeId) {
+            setShowModal(true);
+            const found = items.find(i => i._id === routeId);
+            if (found) {
+                setEditId(found._id);
+                setFormData({
+                    name: found.name,
+                    description: found.description || ''
+                });
+            }
+        }
+    }, [isCreatePage, isEditPage, routeId, items]);
+
     const handleOpenModal = (item = null) => {
         if (item) {
             setEditId(item._id);
@@ -221,11 +242,10 @@ const PayrollMasters = () => {
                 name: item.name,
                 description: item.description || ''
             });
+            setShowModal(true);
         } else {
-            setEditId(null);
-            setFormData({ name: '', description: '' });
+            navigate('/payroll/masters/new');
         }
-        setShowModal(true);
     };
 
     const handleSubmit = async (e) => {
@@ -255,6 +275,7 @@ const PayrollMasters = () => {
             }
             setShowModal(false);
             fetchItems();
+            navigate('/payroll/masters');
         } catch (error) {
             toast.error(error.response?.data?.message || 'Failed to save configuration');
         }
@@ -1204,56 +1225,77 @@ const PayrollMasters = () => {
                 </div>
             )}
 
-            {/* Department / Designation Modal */}
-            <Modal
-                isOpen={showModal}
-                onClose={() => setShowModal(false)}
-                title={editId ? 'EDIT MASTER RECORD' : 'CREATE MASTER RECORD'}
-                maxWidth="max-w-md"
-                footer={
-                    <>
-                        <button
-                            type="button"
-                            onClick={() => setShowModal(false)}
-                            className="w-full md:w-auto px-6 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            form="master-record-form"
-                            className="w-full md:w-auto px-6 py-3.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-primary-600/20"
-                        >
-                            Save Record
-                        </button>
-                    </>
-                }
-            >
-                <form id="master-record-form" onSubmit={handleSubmit} className="space-y-4">
-                    <div>
-                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">
-                            {activeTab === 'departments' ? 'Department Name' : 'Designation Name'} *
-                        </label>
-                        <input
-                            type="text"
-                            required
-                            value={formData.name}
-                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                            className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white text-sm font-semibold"
-                            placeholder={activeTab === 'departments' ? 'e.g. Sales Department' : 'e.g. Sales Executive'}
-                        />
+            {/* Department / Designation Form Page View */}
+            {(showModal || isCreatePage || isEditPage) && (
+                <div className="fixed inset-0 z-[100] bg-slate-50 overflow-y-auto p-6 md:p-10 flex flex-col items-center">
+                    <div className="max-w-3xl w-full my-2 space-y-6">
+                        {/* Header bar */}
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+                            <div className="flex items-center gap-4">
+                                <button
+                                    type="button"
+                                    onClick={() => { setShowModal(false); navigate('/payroll/masters'); }}
+                                    className="p-3 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-2xl transition-all border border-slate-200"
+                                >
+                                    <MdArrowBack size={20} />
+                                </button>
+                                <div>
+                                    <h1 className="text-xl font-black text-slate-900">
+                                        {editId ? 'EDIT MASTER RECORD' : 'CREATE MASTER RECORD'}
+                                    </h1>
+                                    <p className="text-xs text-slate-500 font-medium mt-0.5">
+                                        {editId ? `Update parameters for ${formData.name}` : `Add a new ${activeTab === 'departments' ? 'department' : 'designation'} entry`}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => { setShowModal(false); navigate('/payroll/masters'); }}
+                                    className="px-6 py-3 rounded-2xl border border-slate-200 text-slate-600 font-black uppercase text-xs tracking-widest hover:bg-slate-50 transition-all"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    form="master-record-form"
+                                    className="bg-primary-600 hover:bg-primary-700 text-white px-8 py-3 rounded-2xl font-black transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
+                                >
+                                    Save Record
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Form Card Body */}
+                        <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
+                            <form id="master-record-form" onSubmit={handleSubmit} className="space-y-6">
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">
+                                        {activeTab === 'departments' ? 'Department Name' : 'Designation Name'} *
+                                    </label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={formData.name}
+                                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                        className="w-full px-4 py-3.5 rounded-2xl border border-slate-200 bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white text-sm font-semibold"
+                                        placeholder={activeTab === 'departments' ? 'e.g. Sales Department' : 'e.g. Sales Executive'}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Description</label>
+                                    <textarea
+                                        value={formData.description}
+                                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                        className="w-full px-4 py-3.5 rounded-2xl border border-slate-200 bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white text-sm font-semibold h-32"
+                                        placeholder="Optional description of roles and responsibilities"
+                                    />
+                                </div>
+                            </form>
+                        </div>
                     </div>
-                    <div>
-                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Description</label>
-                        <textarea
-                            value={formData.description}
-                            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                            className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white text-sm font-semibold h-24"
-                            placeholder="Optional description of roles and responsibilities"
-                        />
-                    </div>
-                </form>
-            </Modal>
+                </div>
+            )}
 
             {/* Assign Person Modal */}
             <Modal

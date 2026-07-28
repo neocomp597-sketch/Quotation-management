@@ -4,63 +4,79 @@ const EmployeeProfile = require('../models/EmployeeProfile');
 
 /**
  * Generates a guaranteed unique sequential Employee ID for a given branch and company.
- * Auto-detects existing employee IDs in DB to prevent any duplicate/repeat IDs.
+ * Supports configurable starting sequence (e.g., 5001, 6001, 1001).
  * 
  * @param {String|ObjectId} companyId 
  * @param {String|ObjectId} branchId 
  * @returns {Promise<{ employeeId: String, branchPrefix: String, seq: Number }>}
  */
 const generateNextUniqueEmployeeId = async (companyId, branchId) => {
-    const branch = await Branch.findOne({ _id: branchId, companyId }).lean();
+    const branchQuery = { _id: branchId };
+    if (companyId) branchQuery.companyId = companyId;
+
+    const branch = await Branch.findOne(branchQuery).lean();
     if (!branch) {
         throw new Error('Selected branch not found');
     }
 
     const prefix = branch.branchPrefix || branch.code || 'EMP';
+    const startSeq = Number(branch.startEmployeeSeq) || 1001;
 
-    // 1. Scan existing EmployeeProfile records for highest numeric suffix matching this prefix
-    const existingEmployees = await EmployeeProfile.find({
-        companyId,
+    // 1. Scan existing EmployeeProfile records for highest numeric suffix >= startSeq matching this prefix
+    const empQuery = {
         employeeId: new RegExp(`^${prefix}\\d+`, 'i')
-    }).select('employeeId').lean();
+    };
+    if (companyId) empQuery.companyId = companyId;
 
-    let maxExistingSeq = 1000;
+    const existingEmployees = await EmployeeProfile.find(empQuery).select('employeeId').lean();
+
+    let maxExistingSeq = startSeq - 1;
     existingEmployees.forEach(emp => {
         if (emp.employeeId) {
             const numPart = emp.employeeId.replace(new RegExp(`^${prefix}`, 'i'), '');
             const parsed = parseInt(numPart, 10);
-            if (!isNaN(parsed) && parsed > maxExistingSeq) {
+            // Only consider existing IDs that are >= startSeq
+            if (!isNaN(parsed) && parsed >= startSeq && parsed > maxExistingSeq) {
                 maxExistingSeq = parsed;
             }
         }
     });
 
     // 2. Fetch current counter sequence
-    let counter = await Counter.findOne({
+    const counterQuery = {
         type: 'employee',
-        prefix,
-        companyId
-    });
+        prefix
+    };
+    if (companyId) counterQuery.companyId = companyId;
 
-    let currentCounterSeq = counter ? counter.seq : 1000;
+    let counter = await Counter.findOne(counterQuery);
 
-    // 3. Next sequence must be > max existing in DB and > current counter
-    let candidateSeq = Math.max(currentCounterSeq + 1, maxExistingSeq + 1, 1001);
-
-    // 4. Verify candidate isn't already taken in EmployeeProfile (loop collision protection)
-    let candidateEmpId = `${prefix}${candidateSeq}`;
-    while (await EmployeeProfile.exists({ companyId, employeeId: candidateEmpId })) {
-        candidateSeq++;
-        candidateEmpId = `${prefix}${candidateSeq}`;
+    let currentCounterSeq = counter ? counter.seq : (startSeq - 1);
+    if (currentCounterSeq < startSeq - 1) {
+        currentCounterSeq = startSeq - 1;
     }
 
-    // 5. Atomically update or create Counter
+    // 3. Candidate sequence must be >= startSeq, > currentCounterSeq, and > maxExistingSeq
+    let candidateSeq = Math.max(currentCounterSeq + 1, maxExistingSeq + 1, startSeq);
+
+    // 4. Verify candidate isn't already taken in EmployeeProfile (loop collision protection)
+    const checkExists = async (seq) => {
+        const q = { employeeId: `${prefix}${seq}` };
+        if (companyId) q.companyId = companyId;
+        return await EmployeeProfile.exists(q);
+    };
+
+    while (await checkExists(candidateSeq)) {
+        candidateSeq++;
+    }
+
+    // 5. Update or create Counter
     if (!counter) {
         await Counter.create({
             type: 'employee',
             prefix,
             year: 0,
-            companyId,
+            ...(companyId && { companyId }),
             seq: candidateSeq
         });
     } else {
@@ -69,7 +85,7 @@ const generateNextUniqueEmployeeId = async (companyId, branchId) => {
     }
 
     return {
-        employeeId: candidateEmpId,
+        employeeId: `${prefix}${candidateSeq}`,
         branchPrefix: prefix,
         seq: candidateSeq
     };

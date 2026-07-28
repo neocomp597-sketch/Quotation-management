@@ -6,10 +6,11 @@ import { mgrService, attributeService, importService } from '../services/api';
 import Modal from '../components/Modal';
 import ImportModal from '../components/ImportModal';
 
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 
-const Attributes = () => {
+const Attributes = ({ isCreatePage, isEditPage }) => {
     const navigate = useNavigate();
+    const { id: routeId } = useParams();
     const [mgr3s, setMgr3s] = useState([]);
     const [selectedMgr3, setSelectedMgr3] = useState('');
     const [attributes, setAttributes] = useState([]);
@@ -64,23 +65,44 @@ const Attributes = () => {
         }
     };
 
+    useEffect(() => {
+        if (isCreatePage) {
+            setEditingAttribute(null);
+            setFormData({ code: '', description: '', status: 'Active' });
+            setIsModalOpen(true);
+        } else if (isEditPage && routeId) {
+            setIsModalOpen(true);
+            const found = attributes.find(a => a._id === routeId);
+            if (found) {
+                setEditingAttribute(found);
+                setFormData({
+                    code: found.code,
+                    description: found.description,
+                    status: found.status
+                });
+            } else if (selectedMgr3) {
+                attributeService.getByMGR3(selectedMgr3).then(res => {
+                    const list = res.data || [];
+                    const item = list.find(a => a._id === routeId);
+                    if (item) {
+                        setEditingAttribute(item);
+                        setFormData({
+                            code: item.code,
+                            description: item.description,
+                            status: item.status
+                        });
+                    }
+                }).catch(err => console.error("Failed to load attribute", err));
+            }
+        }
+    }, [isCreatePage, isEditPage, routeId, attributes, selectedMgr3]);
+
     const handleOpenModal = (attr = null) => {
         if (attr) {
-            setEditingAttribute(attr);
-            setFormData({
-                code: attr.code,
-                description: attr.description,
-                status: attr.status
-            });
+            navigate(`/attributes/edit/${attr._id}`);
         } else {
-            setEditingAttribute(null);
-            setFormData({
-                code: '',
-                description: '',
-                status: 'Active'
-            });
+            navigate('/attributes/new');
         }
-        setIsModalOpen(true);
     };
 
     const handleSubmit = async (e) => {
@@ -105,6 +127,7 @@ const Attributes = () => {
             }
             fetchAttributes();
             setIsModalOpen(false);
+            navigate('/attributes');
         } catch (err) {
             toast.error(err.response?.data?.message || 'Error saving attribute');
         }
@@ -263,71 +286,95 @@ const Attributes = () => {
                 </div>
             </div>
 
-            <Modal
-                isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-                title={editingAttribute ? "Edit Attribute" : "Add Attribute"}
-                maxWidth="max-w-md"
-                footer={
-                    <>
-                        <button
-                            onClick={() => setIsModalOpen(false)}
-                            className="px-6 py-2.5 text-slate-500 font-black hover:text-slate-900 transition-all uppercase text-[10px] tracking-widest"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            onClick={handleSubmit}
-                            className="bg-primary-600 hover:bg-primary-700 text-white px-8 py-3 rounded-2xl font-black transition-all shadow-xl shadow-primary-600/20 uppercase text-[10px] tracking-widest"
-                        >
-                            {editingAttribute ? "Update" : "Save"}
-                        </button>
-                    </>
-                }
-            >
-                <form className="space-y-4 py-2">
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Attribute Name / Code <span className="text-rose-500">*</span></label>
-                        <input
-                            type="text"
-                            value={formData.code}
-                            onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-bold uppercase transition-all"
-                            placeholder="e.g. BRAND"
-                            required
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Description <span className="text-rose-500">*</span></label>
-                        <input
-                            type="text"
-                            value={formData.description}
-                            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-medium transition-all"
-                            placeholder="e.g. Product Brand"
-                            required
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Status</label>
-                        <div className="flex gap-4">
-                            {['Active', 'Inactive'].map((st) => (
-                                <label key={st} className="flex-1 flex items-center justify-center gap-2 cursor-pointer group bg-slate-50 py-3 rounded-2xl border border-slate-200 transition-all has-[:checked]:bg-primary-50 has-[:checked]:border-primary-200">
+            {/* Form Page View */}
+            {(isModalOpen || isCreatePage || isEditPage) && (
+                <div className="fixed inset-0 z-[100] bg-slate-50 overflow-y-auto p-6 md:p-10 flex flex-col items-center">
+                    <div className="max-w-3xl w-full my-2 space-y-6">
+                        {/* Header bar */}
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+                            <div className="flex items-center gap-4">
+                                <button
+                                    type="button"
+                                    onClick={() => { setIsModalOpen(false); navigate('/attributes'); }}
+                                    className="p-3 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-2xl transition-all border border-slate-200"
+                                >
+                                    <MdArrowBack size={20} />
+                                </button>
+                                <div>
+                                    <h1 className="text-xl font-black text-slate-900">
+                                        {editingAttribute ? "Edit Attribute" : "Add Attribute"}
+                                    </h1>
+                                    <p className="text-xs text-slate-500 font-medium mt-0.5">
+                                        {editingAttribute ? `Update details for ${editingAttribute.code}` : 'Add a new attribute definition'}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => { setIsModalOpen(false); navigate('/attributes'); }}
+                                    className="px-6 py-3 rounded-2xl border border-slate-200 text-slate-600 font-black uppercase text-xs tracking-widest hover:bg-slate-50 transition-all"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleSubmit}
+                                    className="bg-primary-600 hover:bg-primary-700 text-white px-8 py-3 rounded-2xl font-black transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
+                                >
+                                    {editingAttribute ? "Update" : "Save"}
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Form Card Body */}
+                        <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
+                            <form onSubmit={handleSubmit} className="space-y-6">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Attribute Name / Code <span className="text-rose-500">*</span></label>
                                     <input
-                                        type="radio"
-                                        name="status"
-                                        value={st}
-                                        checked={formData.status === st}
-                                        onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                                        className="sr-only"
+                                        type="text"
+                                        value={formData.code}
+                                        onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                                        className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-bold uppercase transition-all"
+                                        placeholder="e.g. BRAND"
+                                        required
                                     />
-                                    <span className={`text-[10px] font-black uppercase tracking-widest ${formData.status === st ? 'text-primary-600' : 'text-slate-400'}`}>{st}</span>
-                                </label>
-                            ))}
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Description <span className="text-rose-500">*</span></label>
+                                    <input
+                                        type="text"
+                                        value={formData.description}
+                                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                        className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-medium transition-all"
+                                        placeholder="e.g. Product Brand"
+                                        required
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Status</label>
+                                    <div className="flex gap-4">
+                                        {['Active', 'Inactive'].map((st) => (
+                                            <label key={st} className="flex-1 flex items-center justify-center gap-2 cursor-pointer group bg-slate-50 py-3 rounded-2xl border border-slate-200 transition-all has-[:checked]:bg-primary-50 has-[:checked]:border-primary-200">
+                                                <input
+                                                    type="radio"
+                                                    name="status"
+                                                    value={st}
+                                                    checked={formData.status === st}
+                                                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                                                    className="sr-only"
+                                                />
+                                                <span className={`text-[10px] font-black uppercase tracking-widest ${formData.status === st ? 'text-primary-600' : 'text-slate-400'}`}>{st}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+                            </form>
                         </div>
                     </div>
-                </form>
-            </Modal>
+                </div>
+            )}
 
             <ImportModal
                 isOpen={isImportModalOpen}

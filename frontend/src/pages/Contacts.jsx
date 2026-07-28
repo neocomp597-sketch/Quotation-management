@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { MdAdd, MdDelete, MdEdit, MdSearch, MdContactPhone, MdFileDownload } from 'react-icons/md';
+import { useNavigate, useParams } from 'react-router-dom';
+import { MdAdd, MdDelete, MdEdit, MdSearch, MdContactPhone, MdFileDownload, MdArrowBack } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
 import Modal from '../components/Modal';
@@ -45,7 +46,9 @@ const customerTypeBadge = (type) => {
     );
 };
 
-const Contacts = () => {
+const Contacts = ({ isCreatePage, isEditPage }) => {
+    const navigate = useNavigate();
+    const { id: routeId } = useParams();
     const [contacts, setContacts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -267,19 +270,54 @@ const Contacts = () => {
 
     const filteredContacts = useMemo(() => contacts, [contacts]);
 
+    useEffect(() => {
+        if (isCreatePage) {
+            setEditingContact(null);
+            setFormData(defaultForm);
+            setIsModalOpen(true);
+        } else if (isEditPage && routeId) {
+            setIsModalOpen(true);
+            const found = contacts.find(c => c._id === routeId);
+            if (found) {
+                setEditingContact(found);
+                setFormData({
+                    contactName: found.contactName || '',
+                    company: found.company || '',
+                    email: found.email || '',
+                    phone: found.phone || '',
+                    designation: found.designation || '',
+                    customerType: found.customerType || '',
+                    lastInteractionDate: found.lastInteractionDate ? found.lastInteractionDate.substring(0, 10) : '',
+                    notes: found.notes || ''
+                });
+            } else {
+                contactService.getAll({ limit: 1000 }).then(res => {
+                    const list = Array.isArray(res.data) ? res.data : res.data?.data || [];
+                    const item = list.find(c => c._id === routeId);
+                    if (item) {
+                        setEditingContact(item);
+                        setFormData({
+                            contactName: item.contactName || '',
+                            company: item.company || '',
+                            email: item.email || '',
+                            phone: item.phone || '',
+                            designation: item.designation || '',
+                            customerType: item.customerType || '',
+                            lastInteractionDate: item.lastInteractionDate ? item.lastInteractionDate.substring(0, 10) : '',
+                            notes: item.notes || ''
+                        });
+                    }
+                }).catch(err => console.error("Failed to load contact", err));
+            }
+        }
+    }, [isCreatePage, isEditPage, routeId]);
+
     const openModal = (contact = null) => {
-        setEditingContact(contact);
-        setFormData(contact ? {
-            contactName: contact.contactName || '',
-            company: contact.company || '',
-            email: contact.email || '',
-            phone: contact.phone || '',
-            designation: contact.designation || '',
-            customerType: contact.customerType || '',
-            lastInteractionDate: contact.lastInteractionDate ? contact.lastInteractionDate.substring(0, 10) : '',
-            notes: contact.notes || ''
-        } : defaultForm);
-        setIsModalOpen(true);
+        if (contact) {
+            navigate(`/contacts/edit/${contact._id}`);
+        } else {
+            navigate('/contacts/new');
+        }
     };
 
     const onChange = (e) => {
@@ -304,6 +342,7 @@ const Contacts = () => {
             }
             setIsModalOpen(false);
             fetchContacts();
+            navigate('/contacts');
         } catch (err) {
             console.error('Error saving contact:', err);
             toast.error(err.response?.data?.message || 'Error saving contact');
@@ -496,138 +535,162 @@ const Contacts = () => {
                 )}
             </div>
 
-            <Modal
-                isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-                title={editingContact ? 'Edit Contact' : 'Create Contact'}
-                maxWidth="max-w-2xl"
-                footer={(
-                    <>
-                        <button
-                            onClick={() => setIsModalOpen(false)}
-                            className="px-6 py-2.5 text-slate-500 font-black hover:text-slate-900 transition-all uppercase text-[10px] tracking-widest"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            onClick={onSubmit}
-                            className="bg-primary-600 hover:bg-primary-700 text-white px-10 py-3.5 rounded-2xl font-black transition-all shadow-xl shadow-primary-600/20 uppercase text-[10px] tracking-widest active:scale-95"
-                        >
-                            {editingContact ? 'Update Contact' : 'Save Contact'}
-                        </button>
-                    </>
-                )}
-            >
-                <form onSubmit={onSubmit} className="space-y-5">
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Contact Name *</label>
-                        <input
-                            type="text"
-                            name="contactName"
-                            value={formData.contactName}
-                            onChange={onChange}
-                            className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all"
-                            placeholder="Enter contact name"
-                            required
-                        />
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Company Name</label>
-                            <SearchableSelect
-                                options={customerOptions}
-                                value={formData.company}
-                                onChange={(val) => setFormData(prev => ({ ...prev, company: val }))}
-                                placeholder="Search & Select Company..."
-                                onAddOption={handleAddCompany}
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <div className="flex justify-between items-center mb-1">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Designation</label>
-                                <button 
-                                    type="button" 
-                                    onClick={() => handleOpenMiniMaster('designation')}
-                                    className="text-[10px] font-black uppercase text-primary-600 hover:text-primary-700 tracking-wider flex items-center gap-0.5"
+            {/* Form Page View */}
+            {(isModalOpen || isCreatePage || isEditPage) && (
+                <div className="fixed inset-0 z-[100] bg-slate-50 overflow-y-auto p-6 md:p-10 flex flex-col items-center">
+                    <div className="max-w-4xl w-full my-2 space-y-6">
+                        {/* Header bar */}
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+                            <div className="flex items-center gap-4">
+                                <button
+                                    type="button"
+                                    onClick={() => { setIsModalOpen(false); navigate('/contacts'); }}
+                                    className="p-3 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-2xl transition-all border border-slate-200"
                                 >
-                                    + Quick Add
+                                    <MdArrowBack size={20} />
+                                </button>
+                                <div>
+                                    <h1 className="text-xl font-black text-slate-900">
+                                        {editingContact ? 'Edit Contact' : 'Create Contact'}
+                                    </h1>
+                                    <p className="text-xs text-slate-500 font-medium mt-0.5">
+                                        {editingContact ? `Update contact details for ${editingContact.contactName}` : 'Add a new contact to directory'}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => { setIsModalOpen(false); navigate('/contacts'); }}
+                                    className="px-6 py-3 rounded-2xl border border-slate-200 text-slate-600 font-black uppercase text-xs tracking-widest hover:bg-slate-50 transition-all"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={onSubmit}
+                                    className="bg-primary-600 hover:bg-primary-700 text-white px-8 py-3 rounded-2xl font-black transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
+                                >
+                                    {editingContact ? 'Update Contact' : 'Save Contact'}
                                 </button>
                             </div>
-                            <select
-                                name="designation"
-                                value={formData.designation}
-                                onChange={onChange}
-                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all"
-                            >
-                                <option value="">Select Designation</option>
-                                {designations.map(d => (
-                                    <option key={d._id} value={d.name}>{d.name}</option>
-                                ))}
-                            </select>
+                        </div>
+
+                        {/* Form Card Body */}
+                        <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
+                            <form onSubmit={onSubmit} className="space-y-6">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Contact Name *</label>
+                                    <input
+                                        type="text"
+                                        name="contactName"
+                                        value={formData.contactName}
+                                        onChange={onChange}
+                                        className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all"
+                                        placeholder="Enter contact name"
+                                        required
+                                    />
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Company Name</label>
+                                        <SearchableSelect
+                                            options={customerOptions}
+                                            value={formData.company}
+                                            onChange={(val) => setFormData(prev => ({ ...prev, company: val }))}
+                                            placeholder="Search & Select Company..."
+                                            onAddOption={handleAddCompany}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between items-center mb-1">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Designation</label>
+                                            <button 
+                                                type="button" 
+                                                onClick={() => handleOpenMiniMaster('designation')}
+                                                className="text-[10px] font-black uppercase text-primary-600 hover:text-primary-700 tracking-wider flex items-center gap-0.5"
+                                            >
+                                                + Quick Add
+                                            </button>
+                                        </div>
+                                        <select
+                                            name="designation"
+                                            value={formData.designation}
+                                            onChange={onChange}
+                                            className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all"
+                                        >
+                                            <option value="">Select Designation</option>
+                                            {designations.map(d => (
+                                                <option key={d._id} value={d.name}>{d.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Email</label>
+                                        <input
+                                            type="email"
+                                            name="email"
+                                            value={formData.email}
+                                            onChange={onChange}
+                                            className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none"
+                                            placeholder="contact@company.com"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Phone Number</label>
+                                        <input
+                                            type="text"
+                                            name="phone"
+                                            value={formData.phone}
+                                            onChange={onChange}
+                                            className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none"
+                                            placeholder="+91"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Customer Type</label>
+                                        <select
+                                            name="customerType"
+                                            value={formData.customerType}
+                                            onChange={onChange}
+                                            className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all"
+                                        >
+                                            <option value="">Select Type</option>
+                                            {CUSTOMER_TYPES.map((t) => (
+                                                <option key={t} value={t}>{t}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Last Interaction Date</label>
+                                        <input
+                                            type="date"
+                                            name="lastInteractionDate"
+                                            value={formData.lastInteractionDate}
+                                            onChange={onChange}
+                                            className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Notes</label>
+                                    <textarea
+                                        name="notes"
+                                        value={formData.notes}
+                                        onChange={onChange}
+                                        className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none min-h-24"
+                                        placeholder="Any notes or remarks"
+                                    />
+                                </div>
+                            </form>
                         </div>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Email</label>
-                            <input
-                                type="email"
-                                name="email"
-                                value={formData.email}
-                                onChange={onChange}
-                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none"
-                                placeholder="contact@company.com"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Phone Number</label>
-                            <input
-                                type="text"
-                                name="phone"
-                                value={formData.phone}
-                                onChange={onChange}
-                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none"
-                                placeholder="+91"
-                            />
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Customer Type</label>
-                            <select
-                                name="customerType"
-                                value={formData.customerType}
-                                onChange={onChange}
-                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all"
-                            >
-                                <option value="">Select Type</option>
-                                {CUSTOMER_TYPES.map((t) => (
-                                    <option key={t} value={t}>{t}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Last Interaction Date</label>
-                            <input
-                                type="date"
-                                name="lastInteractionDate"
-                                value={formData.lastInteractionDate}
-                                onChange={onChange}
-                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none"
-                            />
-                        </div>
-                    </div>
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Notes</label>
-                        <textarea
-                            name="notes"
-                            value={formData.notes}
-                            onChange={onChange}
-                            className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none min-h-24"
-                            placeholder="Any notes or remarks"
-                        />
-                    </div>
-                </form>
-            </Modal>
+                </div>
+            )}
             {/* Mini Master Modal */}
             <Modal
                 isOpen={activeMiniMaster !== null}

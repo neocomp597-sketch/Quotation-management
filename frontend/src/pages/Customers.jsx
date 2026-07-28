@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { MdAdd, MdSearch, MdEdit, MdDelete, MdPerson, MdEmail, MdPhone, MdLocationOn, MdBusiness, MdCloudUpload, MdVisibility, MdFileUpload, MdCheckBox, MdCheckBoxOutlineBlank, MdDeleteSweep, MdFileDownload } from 'react-icons/md';
+import { useNavigate, useParams } from 'react-router-dom';
+import { MdAdd, MdSearch, MdEdit, MdDelete, MdPerson, MdEmail, MdPhone, MdLocationOn, MdBusiness, MdCloudUpload, MdVisibility, MdFileUpload, MdCheckBox, MdCheckBoxOutlineBlank, MdDeleteSweep, MdFileDownload, MdArrowBack } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
 import { customerService, uploadService, importService, territoryService, userService, csmService } from '../services/api';
@@ -13,8 +13,9 @@ import { useSubmitGuard } from '../hooks/useSubmitGuard';
 
 const LIST_PAGE_SIZE = 20;
 
-const Customers = () => {
+const Customers = ({ isCreatePage, isEditPage }) => {
     const navigate = useNavigate();
+    const { id: routeId } = useParams();
     const [customers, setCustomers] = useState([]);
     const [activeProfileTab, setActiveProfileTab] = useState('details');
     const [loading, setLoading] = useState(true);
@@ -121,21 +122,8 @@ const Customers = () => {
         }
     };
 
-    const handleOpenModal = (customer = null) => {
-        if (customer) {
-            setEditingCustomer(customer);
-            setFormData({
-                ...customer,
-                billingAddress: { ...customer.billingAddress },
-                territory: customer.territory?._id || customer.territory || '',
-                owner: customer.owner?._id || customer.owner || '',
-                pan: customer.pan || '',
-                outstanding: customer.outstanding || 0,
-                industry: customer.industry || 'Other',
-                status: customer.status || 'Prospect',
-                segment: customer.segment || 'Retail'
-            });
-        } else {
+    useEffect(() => {
+        if (isCreatePage) {
             setEditingCustomer(null);
             setFormData({
                 customerName: '',
@@ -143,12 +131,7 @@ const Customers = () => {
                 mobile: '',
                 email: '',
                 gstin: '',
-                billingAddress: {
-                    line1: '',
-                    city: '',
-                    state: '',
-                    pincode: ''
-                },
+                billingAddress: { line1: '', city: '', state: '', pincode: '' },
                 defaultDiscount: 0,
                 logoUrl: '',
                 territory: '',
@@ -160,8 +143,52 @@ const Customers = () => {
                 owner: '',
                 notes: ''
             });
+            setIsModalOpen(true);
+        } else if (isEditPage && routeId) {
+            setIsModalOpen(true);
+            const found = customers.find(c => c._id === routeId);
+            if (found) {
+                setEditingCustomer(found);
+                setFormData({
+                    ...found,
+                    billingAddress: { ...found.billingAddress },
+                    territory: found.territory?._id || found.territory || '',
+                    owner: found.owner?._id || found.owner || '',
+                    pan: found.pan || '',
+                    outstanding: found.outstanding || 0,
+                    industry: found.industry || 'Other',
+                    status: found.status || 'Prospect',
+                    segment: found.segment || 'Retail'
+                });
+            } else {
+                customerService.getAll({ limit: 1000 }).then(res => {
+                    const list = Array.isArray(res.data) ? res.data : res.data?.data || [];
+                    const item = list.find(c => c._id === routeId);
+                    if (item) {
+                        setEditingCustomer(item);
+                        setFormData({
+                            ...item,
+                            billingAddress: { ...item.billingAddress },
+                            territory: item.territory?._id || item.territory || '',
+                            owner: item.owner?._id || item.owner || '',
+                            pan: item.pan || '',
+                            outstanding: item.outstanding || 0,
+                            industry: item.industry || 'Other',
+                            status: item.status || 'Prospect',
+                            segment: item.segment || 'Retail'
+                        });
+                    }
+                }).catch(err => console.error("Failed to load customer", err));
+            }
         }
-        setIsModalOpen(true);
+    }, [isCreatePage, isEditPage, routeId]);
+
+    const handleOpenModal = (customer = null) => {
+        if (customer) {
+            navigate(`/customers/edit/${customer._id}`);
+        } else {
+            navigate('/customers/new');
+        }
     };
 
     const handleFormChange = (e) => {
@@ -224,6 +251,7 @@ const Customers = () => {
             }
             fetchCustomers();
             setIsModalOpen(false);
+            navigate('/customers');
         } catch (err) {
             console.error("Error saving customer:", err);
             toast.error(err.response?.data?.message || 'Error saving customer data');
@@ -629,368 +657,391 @@ const Customers = () => {
                 )}
             </div>
 
-            {/* Form Modal */}
-            <Modal
-                isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-                title={editingCustomer ? "Update Records" : "New Customer"}
-                maxWidth="max-w-4xl"
-                footer={
-                    <>
-                        <button
-                            onClick={() => setIsModalOpen(false)}
-                            className="px-6 py-2.5 text-slate-500 font-black hover:text-slate-900 transition-all uppercase text-[10px] tracking-widest"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            onClick={handleSubmit}
-                            disabled={isSaving}
-                            className="bg-primary-600 hover:bg-primary-700 text-white px-10 py-3.5 rounded-2xl font-black transition-all shadow-xl shadow-primary-600/20 uppercase text-[10px] tracking-widest active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100"
-                        >
-                            {isSaving ? "Saving..." : editingCustomer ? "Commit Changes" : "Register Customer"}
-                        </button>
-                    </>
-                }
-            >
-                <form className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8 py-2">
-                    <div className="space-y-8">
-                        <div>
-                            <h4 className="text-[10px] font-black text-primary-600 uppercase tracking-[0.2em] mb-6 flex items-center gap-3">
-                                <span className="h-px flex-1 bg-primary-100"></span>
-                                Identity & Branding
-                                <span className="h-px flex-1 bg-primary-100"></span>
-                            </h4>
-                            <div className="space-y-6">
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Company Trade Name <span className="text-rose-500">*</span></label>
-                                    <div className="relative">
-                                        <MdBusiness className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-                                        <input
-                                            type="text"
-                                            name="companyName"
-                                            value={formData.companyName}
-                                            onChange={handleFormChange}
-                                            className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all outline-none text-sm font-bold placeholder:font-normal placeholder:text-slate-300"
-                                            placeholder="Enter registered company name"
-                                            required
-                                        />
-                                    </div>
+            {/* Create/Edit Form Page View */}
+            {(isModalOpen || isCreatePage || isEditPage) && (
+                <div className="fixed inset-0 z-[100] bg-slate-50 overflow-y-auto p-6 md:p-10 flex flex-col items-center">
+                    <div className="max-w-5xl w-full my-2 space-y-6">
+                        {/* Header bar */}
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+                            <div className="flex items-center gap-4">
+                                <button
+                                    type="button"
+                                    onClick={() => { setIsModalOpen(false); navigate('/customers'); }}
+                                    className="p-3 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-2xl transition-all border border-slate-200"
+                                >
+                                    <MdArrowBack size={20} />
+                                </button>
+                                <div>
+                                    <h1 className="text-xl font-black text-slate-900">
+                                        {editingCustomer ? "Update Customer" : "New Customer"}
+                                    </h1>
+                                    <p className="text-xs text-slate-500 font-medium mt-0.5">
+                                        {editingCustomer ? `Edit details for ${editingCustomer.companyName || 'customer'}` : "Register a new customer account"}
+                                    </p>
                                 </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Customer Code <span className="text-rose-500">*</span></label>
-                                    <div className="relative">
-                                        <MdPerson className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-                                        <input
-                                            type="text"
-                                            name="customerName"
-                                            value={formData.customerName}
-                                            onChange={handleFormChange}
-                                            className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all outline-none text-sm font-bold placeholder:font-normal placeholder:text-slate-300"
-                                            placeholder="Enter customer code"
-                                            required
-                                        />
-                                    </div>
-                                </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => { setIsModalOpen(false); navigate('/customers'); }}
+                                    className="px-6 py-3 rounded-2xl border border-slate-200 text-slate-600 font-black uppercase text-xs tracking-widest hover:bg-slate-50 transition-all"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleSubmit}
+                                    disabled={isSaving}
+                                    className="bg-primary-600 hover:bg-primary-700 text-white px-8 py-3 rounded-2xl font-black transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95 disabled:opacity-60"
+                                >
+                                    {isSaving ? "Saving..." : editingCustomer ? "Commit Changes" : "Register Customer"}
+                                </button>
+                            </div>
+                        </div>
 
-                                <div className="space-y-3">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Brand Logo (Upload or URL)</label>
-                                    <div className="flex flex-col gap-4">
-                                        <div className="flex gap-4">
-                                            <label className="flex-1 flex items-center justify-center gap-2 px-4 py-3.5 bg-primary-50 border-2 border-dashed border-primary-200 rounded-2xl cursor-pointer hover:bg-primary-100 transition-all group">
-                                                <input type="file" className="hidden" accept="image/*" onChange={handleFileUpload} disabled={isUploading} />
-                                                <MdCloudUpload className={`text-primary-600 ${isUploading ? 'animate-bounce' : 'group-hover:scale-110 transition-transform'}`} size={20} />
-                                                <span className="text-xs font-black text-primary-700 uppercase tracking-widest">
-                                                    {isUploading ? 'Uploading...' : 'Upload Image'}
-                                                </span>
-                                            </label>
-
-                                            {formData.logoUrl && (
-                                                <div className="relative group/img h-[52px] w-[52px]">
-                                                    <div className="h-full w-full rounded-2xl bg-white border border-slate-200 p-1.5 shadow-sm overflow-hidden">
-                                                        <img src={resolveImageUrl(formData.logoUrl)} alt="" className="h-full w-full object-contain" />
-                                                    </div>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setViewCustomer(formData)} // Just for previewing logo
-                                                        className="absolute inset-0 bg-primary-600/60 rounded-2xl flex items-center justify-center text-white opacity-0 group-hover/img:opacity-100 transition-opacity"
-                                                    >
-                                                        <MdVisibility size={20} />
-                                                    </button>
+                        {/* Form Card Body */}
+                        <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
+                            <form className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8 py-2">
+                                <div className="space-y-8">
+                                    <div>
+                                        <h4 className="text-[10px] font-black text-primary-600 uppercase tracking-[0.2em] mb-6 flex items-center gap-3">
+                                            <span className="h-px flex-1 bg-primary-100"></span>
+                                            Identity & Branding
+                                            <span className="h-px flex-1 bg-primary-100"></span>
+                                        </h4>
+                                        <div className="space-y-6">
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Company Trade Name <span className="text-rose-500">*</span></label>
+                                                <div className="relative">
+                                                    <MdBusiness className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                                                    <input
+                                                        type="text"
+                                                        name="companyName"
+                                                        value={formData.companyName}
+                                                        onChange={handleFormChange}
+                                                        className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all outline-none text-sm font-bold placeholder:font-normal placeholder:text-slate-300"
+                                                        placeholder="Enter registered company name"
+                                                        required
+                                                    />
                                                 </div>
-                                            )}
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Customer Code <span className="text-rose-500">*</span></label>
+                                                <div className="relative">
+                                                    <MdPerson className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                                                    <input
+                                                        type="text"
+                                                        name="customerName"
+                                                        value={formData.customerName}
+                                                        onChange={handleFormChange}
+                                                        className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all outline-none text-sm font-bold placeholder:font-normal placeholder:text-slate-300"
+                                                        placeholder="Enter customer code"
+                                                        required
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-3">
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Brand Logo (Upload or URL)</label>
+                                                <div className="flex flex-col gap-4">
+                                                    <div className="flex gap-4">
+                                                        <label className="flex-1 flex items-center justify-center gap-2 px-4 py-3.5 bg-primary-50 border-2 border-dashed border-primary-200 rounded-2xl cursor-pointer hover:bg-primary-100 transition-all group">
+                                                            <input type="file" className="hidden" accept="image/*" onChange={handleFileUpload} disabled={isUploading} />
+                                                            <MdCloudUpload className={`text-primary-600 ${isUploading ? 'animate-bounce' : 'group-hover:scale-110 transition-transform'}`} size={20} />
+                                                            <span className="text-xs font-black text-primary-700 uppercase tracking-widest">
+                                                                {isUploading ? 'Uploading...' : 'Upload Image'}
+                                                            </span>
+                                                        </label>
+
+                                                        {formData.logoUrl && (
+                                                            <div className="relative group/img h-[52px] w-[52px]">
+                                                                <div className="h-full w-full rounded-2xl bg-white border border-slate-200 p-1.5 shadow-sm overflow-hidden">
+                                                                    <img src={resolveImageUrl(formData.logoUrl)} alt="" className="h-full w-full object-contain" />
+                                                                </div>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setViewCustomer(formData)} // Just for previewing logo
+                                                                    className="absolute inset-0 bg-primary-600/60 rounded-2xl flex items-center justify-center text-white opacity-0 group-hover/img:opacity-100 transition-opacity"
+                                                                >
+                                                                    <MdVisibility size={20} />
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <input
+                                                        type="text"
+                                                        name="logoUrl"
+                                                        value={formData.logoUrl || ''}
+                                                        onChange={handleFormChange}
+                                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-medium focus:ring-2 focus:ring-primary-500/10 outline-none"
+                                                        placeholder="Or paste external image URL..."
+                                                    />
+                                                </div>
+                                            </div>
                                         </div>
-                                        <input
-                                            type="text"
-                                            name="logoUrl"
-                                            value={formData.logoUrl || ''}
-                                            onChange={handleFormChange}
-                                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-medium focus:ring-2 focus:ring-primary-500/10 outline-none"
-                                            placeholder="Or paste external image URL..."
-                                        />
                                     </div>
-                                </div>
-                            </div>
-                        </div>
 
-                        <div>
-                            <h4 className="text-[10px] font-black text-primary-600 uppercase tracking-[0.2em] mb-6 flex items-center gap-3">
-                                <span className="h-px flex-1 bg-primary-100"></span>
-                                Contact Protocols
-                                <span className="h-px flex-1 bg-primary-100"></span>
-                            </h4>
-                            <div className="space-y-6">
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Secure Mobile Number</label>
-                                    <div className="relative">
-                                        <MdPhone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-                                        <input
-                                            type="text"
-                                            name="mobile"
-                                            value={formData.mobile}
-                                            onChange={handleFormChange}
-                                            className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-bold"
-                                            placeholder="+91"
-                                        />
+                                    <div>
+                                        <h4 className="text-[10px] font-black text-primary-600 uppercase tracking-[0.2em] mb-6 flex items-center gap-3">
+                                            <span className="h-px flex-1 bg-primary-100"></span>
+                                            Contact Protocols
+                                            <span className="h-px flex-1 bg-primary-100"></span>
+                                        </h4>
+                                        <div className="space-y-6">
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Secure Mobile Number</label>
+                                                <div className="relative">
+                                                    <MdPhone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                                                    <input
+                                                        type="text"
+                                                        name="mobile"
+                                                        value={formData.mobile}
+                                                        onChange={handleFormChange}
+                                                        className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-bold"
+                                                        placeholder="+91"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Primary Email Address</label>
+                                                <div className="relative">
+                                                    <MdEmail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                                                    <input
+                                                        type="email"
+                                                        name="email"
+                                                        value={formData.email}
+                                                        onChange={handleFormChange}
+                                                        className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-bold"
+                                                        placeholder="operations@company.com"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Primary Email Address</label>
-                                    <div className="relative">
-                                        <MdEmail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-                                        <input
-                                            type="email"
-                                            name="email"
-                                            value={formData.email}
-                                            onChange={handleFormChange}
-                                            className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-bold"
-                                            placeholder="operations@company.com"
-                                        />
+
+                                <div className="space-y-8">
+                                    <div>
+                                        <h4 className="text-[10px] font-black text-primary-600 uppercase tracking-[0.2em] mb-6 flex items-center gap-3">
+                                            <span className="h-px flex-1 bg-primary-100"></span>
+                                            Statutory Compliance
+                                            <span className="h-px flex-1 bg-primary-100"></span>
+                                        </h4>
+                                        <div className="grid grid-cols-2 gap-6">
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">GSTIN (Optional)</label>
+                                                <input
+                                                    type="text"
+                                                    name="gstin"
+                                                    value={formData.gstin || ''}
+                                                    onChange={handleFormChange}
+                                                    className="w-full px-4 py-3.5 bg-primary-50/50 border border-primary-100 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-mono font-black text-primary-700 uppercase"
+                                                    placeholder="15-Digit Code"
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Default Discount</label>
+                                                <div className="relative">
+                                                    <input
+                                                        type="number"
+                                                        name="defaultDiscount"
+                                                        value={formData.defaultDiscount}
+                                                        onChange={handleFormChange}
+                                                        className="w-full pr-10 pl-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-bold"
+                                                        placeholder="0"
+                                                    />
+                                                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">%</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <h4 className="text-[10px] font-black text-primary-600 uppercase tracking-[0.2em] mb-6 flex items-center gap-3">
+                                            <span className="h-px flex-1 bg-primary-100"></span>
+                                            Registered Premises
+                                            <span className="h-px flex-1 bg-primary-100"></span>
+                                        </h4>
+                                        <div className="space-y-6">
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Street / Block Details</label>
+                                                <div className="relative">
+                                                    <MdLocationOn className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                                                    <input
+                                                        type="text"
+                                                        name="billingAddress.line1"
+                                                        value={formData.billingAddress.line1}
+                                                        onChange={handleFormChange}
+                                                        className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-medium"
+                                                        placeholder="Unit/Plot Number"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-6">
+                                                <div className="space-y-2">
+                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">City</label>
+                                                    <input
+                                                        type="text"
+                                                        name="billingAddress.city"
+                                                        value={formData.billingAddress.city}
+                                                        onChange={handleFormChange}
+                                                        className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold"
+                                                        placeholder="City"
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">State Jurisidiction</label>
+                                                    <select
+                                                        name="billingAddress.state"
+                                                        value={formData.billingAddress.state}
+                                                        onChange={handleFormChange}
+                                                        className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold appearance-none"
+                                                    >
+                                                        <option value="">Select State</option>
+                                                        <option value="Maharashtra">Maharashtra</option>
+                                                        <option value="Gujarat">Gujarat</option>
+                                                        <option value="Karnataka">Karnataka</option>
+                                                        <option value="Delhi">Delhi</option>
+                                                        <option value="Tamil Nadu">Tamil Nadu</option>
+                                                        <option value="Uttar Pradesh">Uttar Pradesh</option>
+                                                        <option value="Telangana">Telangana</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-6">
+                                                <div className="space-y-2">
+                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Billing Pincode</label>
+                                                    <input
+                                                        type="text"
+                                                        name="billingAddress.pincode"
+                                                        value={formData.billingAddress?.pincode || ''}
+                                                        onChange={handleFormChange}
+                                                        className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold"
+                                                        placeholder="Pincode"
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Territory Override</label>
+                                                    <select
+                                                        name="territory"
+                                                        value={formData.territory?._id || formData.territory || ''}
+                                                        onChange={handleFormChange}
+                                                        className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold"
+                                                    >
+                                                        <option value="">Auto-Assign (Based on Rules)</option>
+                                                        {territories.map(t => (
+                                                            <option key={t._id} value={t._id}>{t.name} ({t.type})</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="pt-6 border-t border-slate-100">
+                                        <h4 className="text-[10px] font-black text-primary-600 uppercase tracking-[0.2em] mb-6 flex items-center gap-3">
+                                            <span className="h-px flex-1 bg-primary-100"></span>
+                                            CRM & Ownership
+                                            <span className="h-px flex-1 bg-primary-100"></span>
+                                        </h4>
+                                        <div className="grid grid-cols-2 gap-6">
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">PAN Number</label>
+                                                <input
+                                                    type="text"
+                                                    name="pan"
+                                                    value={formData.pan || ''}
+                                                    onChange={handleFormChange}
+                                                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-mono font-bold uppercase"
+                                                    placeholder="10-Digit PAN"
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Account Owner</label>
+                                                <select
+                                                    name="owner"
+                                                    value={formData.owner || ''}
+                                                    onChange={handleFormChange}
+                                                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold"
+                                                >
+                                                    <option value="">Select Owner</option>
+                                                    {users.map(u => (
+                                                        <option key={u._id} value={u._id}>{u.name} ({u.role})</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-4 mt-6">
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Industry</label>
+                                                <select
+                                                    name="industry"
+                                                    value={formData.industry || 'Other'}
+                                                    onChange={handleFormChange}
+                                                    className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-xs font-bold"
+                                                >
+                                                    <option value="Manufacturing">Manufacturing</option>
+                                                    <option value="Healthcare">Healthcare</option>
+                                                    <option value="Retail">Retail</option>
+                                                    <option value="Education">Education</option>
+                                                    <option value="Government">Government</option>
+                                                    <option value="Other">Other</option>
+                                                </select>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Segment</label>
+                                                <select
+                                                    name="segment"
+                                                    value={formData.segment || 'Retail'}
+                                                    onChange={handleFormChange}
+                                                    className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-xs font-bold"
+                                                >
+                                                    <option value="VIP Customers">VIP Customers</option>
+                                                    <option value="High Value">High Value</option>
+                                                    <option value="Medium Value">Medium Value</option>
+                                                    <option value="Low Value">Low Value</option>
+                                                    <option value="Retail">Retail</option>
+                                                    <option value="Wholesale">Wholesale</option>
+                                                    <option value="Corporate">Corporate</option>
+                                                    <option value="Government">Government</option>
+                                                </select>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Status</label>
+                                                <select
+                                                    name="status"
+                                                    value={formData.status || 'Prospect'}
+                                                    onChange={handleFormChange}
+                                                    className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-xs font-bold"
+                                                >
+                                                    <option value="Active">Active</option>
+                                                    <option value="New">New</option>
+                                                    <option value="VIP">VIP</option>
+                                                    <option value="Inactive">Inactive</option>
+                                                    <option value="High Value">High Value</option>
+                                                    <option value="Lost">Lost</option>
+                                                    <option value="Prospect">Prospect</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2 mt-6">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Outstanding Balance</label>
+                                            <input
+                                                type="number"
+                                                name="outstanding"
+                                                value={formData.outstanding || 0}
+                                                onChange={handleFormChange}
+                                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold"
+                                                placeholder="0"
+                                            />
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
+                            </form>
                         </div>
                     </div>
-
-                    <div className="space-y-8">
-                        <div>
-                            <h4 className="text-[10px] font-black text-primary-600 uppercase tracking-[0.2em] mb-6 flex items-center gap-3">
-                                <span className="h-px flex-1 bg-primary-100"></span>
-                                Statutory Compliance
-                                <span className="h-px flex-1 bg-primary-100"></span>
-                            </h4>
-                            <div className="grid grid-cols-2 gap-6">
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">GSTIN (Optional)</label>
-                                    <input
-                                        type="text"
-                                        name="gstin"
-                                        value={formData.gstin || ''}
-                                        onChange={handleFormChange}
-                                        className="w-full px-4 py-3.5 bg-primary-50/50 border border-primary-100 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-mono font-black text-primary-700 uppercase"
-                                        placeholder="15-Digit Code"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Default Discount</label>
-                                    <div className="relative">
-                                        <input
-                                            type="number"
-                                            name="defaultDiscount"
-                                            value={formData.defaultDiscount}
-                                            onChange={handleFormChange}
-                                            className="w-full pr-10 pl-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-bold"
-                                            placeholder="0"
-                                        />
-                                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">%</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div>
-                            <h4 className="text-[10px] font-black text-primary-600 uppercase tracking-[0.2em] mb-6 flex items-center gap-3">
-                                <span className="h-px flex-1 bg-primary-100"></span>
-                                Registered Premises
-                                <span className="h-px flex-1 bg-primary-100"></span>
-                            </h4>
-                            <div className="space-y-6">
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Street / Block Details</label>
-                                    <div className="relative">
-                                        <MdLocationOn className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-                                        <input
-                                            type="text"
-                                            name="billingAddress.line1"
-                                            value={formData.billingAddress.line1}
-                                            onChange={handleFormChange}
-                                            className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-medium"
-                                            placeholder="Unit/Plot Number"
-                                        />
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-6">
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">City</label>
-                                        <input
-                                            type="text"
-                                            name="billingAddress.city"
-                                            value={formData.billingAddress.city}
-                                            onChange={handleFormChange}
-                                            className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold"
-                                            placeholder="City"
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">State Jurisidiction</label>
-                                        <select
-                                            name="billingAddress.state"
-                                            value={formData.billingAddress.state}
-                                            onChange={handleFormChange}
-                                            className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold appearance-none"
-                                        >
-                                            <option value="">Select State</option>
-                                            <option value="Maharashtra">Maharashtra</option>
-                                            <option value="Gujarat">Gujarat</option>
-                                            <option value="Karnataka">Karnataka</option>
-                                            <option value="Delhi">Delhi</option>
-                                            <option value="Tamil Nadu">Tamil Nadu</option>
-                                            <option value="Uttar Pradesh">Uttar Pradesh</option>
-                                            <option value="Telangana">Telangana</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-6">
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Billing Pincode</label>
-                                        <input
-                                            type="text"
-                                            name="billingAddress.pincode"
-                                            value={formData.billingAddress?.pincode || ''}
-                                            onChange={handleFormChange}
-                                            className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold"
-                                            placeholder="Pincode"
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Territory Override</label>
-                                        <select
-                                            name="territory"
-                                            value={formData.territory?._id || formData.territory || ''}
-                                            onChange={handleFormChange}
-                                            className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold"
-                                        >
-                                            <option value="">Auto-Assign (Based on Rules)</option>
-                                            {territories.map(t => (
-                                                <option key={t._id} value={t._id}>{t.name} ({t.type})</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="pt-6 border-t border-slate-100">
-                            <h4 className="text-[10px] font-black text-primary-600 uppercase tracking-[0.2em] mb-6 flex items-center gap-3">
-                                <span className="h-px flex-1 bg-primary-100"></span>
-                                CRM & Ownership
-                                <span className="h-px flex-1 bg-primary-100"></span>
-                            </h4>
-                            <div className="grid grid-cols-2 gap-6">
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">PAN Number</label>
-                                    <input
-                                        type="text"
-                                        name="pan"
-                                        value={formData.pan || ''}
-                                        onChange={handleFormChange}
-                                        className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-mono font-bold uppercase"
-                                        placeholder="10-Digit PAN"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Account Owner</label>
-                                    <select
-                                        name="owner"
-                                        value={formData.owner || ''}
-                                        onChange={handleFormChange}
-                                        className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold"
-                                    >
-                                        <option value="">Select Owner</option>
-                                        {users.map(u => (
-                                            <option key={u._id} value={u._id}>{u.name} ({u.role})</option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-3 gap-4 mt-6">
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Industry</label>
-                                    <select
-                                        name="industry"
-                                        value={formData.industry || 'Other'}
-                                        onChange={handleFormChange}
-                                        className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-xs font-bold"
-                                    >
-                                        <option value="Manufacturing">Manufacturing</option>
-                                        <option value="Healthcare">Healthcare</option>
-                                        <option value="Retail">Retail</option>
-                                        <option value="Education">Education</option>
-                                        <option value="Government">Government</option>
-                                        <option value="Other">Other</option>
-                                    </select>
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Segment</label>
-                                    <select
-                                        name="segment"
-                                        value={formData.segment || 'Retail'}
-                                        onChange={handleFormChange}
-                                        className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-xs font-bold"
-                                    >
-                                        <option value="VIP Customers">VIP Customers</option>
-                                        <option value="High Value">High Value</option>
-                                        <option value="Medium Value">Medium Value</option>
-                                        <option value="Low Value">Low Value</option>
-                                        <option value="Retail">Retail</option>
-                                        <option value="Wholesale">Wholesale</option>
-                                        <option value="Corporate">Corporate</option>
-                                        <option value="Government">Government</option>
-                                    </select>
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Status</label>
-                                    <select
-                                        name="status"
-                                        value={formData.status || 'Prospect'}
-                                        onChange={handleFormChange}
-                                        className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-xs font-bold"
-                                    >
-                                        <option value="Active">Active</option>
-                                        <option value="New">New</option>
-                                        <option value="VIP">VIP</option>
-                                        <option value="Inactive">Inactive</option>
-                                        <option value="High Value">High Value</option>
-                                        <option value="Lost">Lost</option>
-                                        <option value="Prospect">Prospect</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div className="space-y-2 mt-6">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Outstanding Balance</label>
-                                <input
-                                    type="number"
-                                    name="outstanding"
-                                    value={formData.outstanding || 0}
-                                    onChange={handleFormChange}
-                                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold"
-                                    placeholder="0"
-                                />
-                            </div>
-                        </div>
-                    </div>
-                </form>
-            </Modal>
+                </div>
+            )}
 
             {/* View Customer Details Modal */}
             <Modal

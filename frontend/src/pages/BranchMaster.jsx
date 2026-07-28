@@ -1,14 +1,18 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { 
     MdAdd, MdSearch, MdEdit, MdDelete, MdBusiness, 
-    MdLocationOn, MdPhone, MdEmail, MdReceipt, MdPerson, MdImage, MdCheckCircle, MdCancel 
+    MdLocationOn, MdPhone, MdEmail, MdReceipt, MdPerson, MdImage, MdCheckCircle, MdCancel, MdArrowBack 
 } from 'react-icons/md';
 import { toast } from 'react-toastify';
-import { branchService } from '../services/api';
+import { branchService, stateMasterService } from '../services/api';
 import Modal from '../components/Modal';
 
-const BranchMaster = () => {
+const BranchMaster = ({ isCreatePage, isEditPage }) => {
+    const navigate = useNavigate();
+    const { id: routeId } = useParams();
     const [branches, setBranches] = useState([]);
+    const [stateList, setStateList] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     
@@ -21,9 +25,11 @@ const BranchMaster = () => {
         name: '',
         code: '',
         branchPrefix: '',
+        startEmployeeSeq: 1001,
         address: '',
         city: '',
         state: '',
+        stateShortCode: '',
         pincode: '',
         contactNo: '',
         email: '',
@@ -38,8 +44,12 @@ const BranchMaster = () => {
     const fetchBranches = async () => {
         setLoading(true);
         try {
-            const res = await branchService.getAll();
-            setBranches(res.data || []);
+            const [branchRes, stateRes] = await Promise.all([
+                branchService.getAll(),
+                stateMasterService.getAll()
+            ]);
+            setBranches(branchRes.data || []);
+            setStateList(stateRes.data?.data || []);
         } catch (err) {
             toast.error(err.response?.data?.message || 'Failed to load branches');
         } finally {
@@ -51,35 +61,74 @@ const BranchMaster = () => {
         fetchBranches();
     }, []);
 
-    const handleOpenModal = (branch = null) => {
-        if (branch) {
-            setEditingBranch(branch);
-            setFormData({
-                name: branch.name || '',
-                code: branch.code || '',
-                branchPrefix: branch.branchPrefix || '',
-                address: branch.address || '',
-                city: branch.city || '',
-                state: branch.state || '',
-                pincode: branch.pincode || '',
-                contactNo: branch.contactNo || '',
-                email: branch.email || '',
-                gstNo: branch.gstNo || '',
-                logoUrl: branch.logoUrl || '',
-                managerName: branch.managerName || '',
-                status: branch.status || 'Active'
-            });
-        } else {
+    useEffect(() => {
+        if (isCreatePage) {
             setEditingBranch(null);
             setFormData(initialFormState);
+            setIsModalOpen(true);
+        } else if (isEditPage && routeId) {
+            setIsModalOpen(true);
+            const found = branches.find(b => b._id === routeId);
+            if (found) {
+                setEditingBranch(found);
+                setFormData({
+                    name: found.name || '',
+                    code: found.code || '',
+                    branchPrefix: found.branchPrefix || '',
+                    startEmployeeSeq: found.startEmployeeSeq || 1001,
+                    address: found.address || '',
+                    city: found.city || '',
+                    state: found.state || '',
+                    stateShortCode: found.stateShortCode || '',
+                    pincode: found.pincode || '',
+                    contactNo: found.contactNo || '',
+                    email: found.email || '',
+                    gstNo: found.gstNo || '',
+                    logoUrl: found.logoUrl || '',
+                    managerName: found.managerName || '',
+                    status: found.status || 'Active'
+                });
+            } else {
+                branchService.getAll().then(res => {
+                    const list = res.data || [];
+                    const item = list.find(b => b._id === routeId);
+                    if (item) {
+                        setEditingBranch(item);
+                        setFormData({
+                            name: item.name || '',
+                            code: item.code || '',
+                            branchPrefix: item.branchPrefix || '',
+                            address: item.address || '',
+                            city: item.city || '',
+                            state: item.state || '',
+                            stateShortCode: item.stateShortCode || '',
+                            pincode: item.pincode || '',
+                            contactNo: item.contactNo || '',
+                            email: item.email || '',
+                            gstNo: item.gstNo || '',
+                            logoUrl: item.logoUrl || '',
+                            managerName: item.managerName || '',
+                            status: item.status || 'Active'
+                        });
+                    }
+                }).catch(err => console.error(err));
+            }
         }
-        setIsModalOpen(true);
+    }, [isCreatePage, isEditPage, routeId, branches]);
+
+    const handleOpenModal = (branch = null) => {
+        if (branch) {
+            navigate(`/branches/edit/${branch._id}`);
+        } else {
+            navigate('/branches/new');
+        }
     };
 
     const handleCloseModal = () => {
         setIsModalOpen(false);
         setEditingBranch(null);
         setFormData(initialFormState);
+        navigate('/branches');
     };
 
     const handleSubmit = async (e) => {
@@ -292,208 +341,268 @@ const BranchMaster = () => {
                 </div>
             )}
 
-            {/* Modal for Create / Edit Branch */}
-            <Modal
-                isOpen={isModalOpen}
-                onClose={handleCloseModal}
-                title={editingBranch ? 'Edit Branch Master' : 'Create New Branch'}
-                maxWidth="max-w-3xl"
-                footer={
-                    <>
-                        <button
-                            type="button"
-                            onClick={handleCloseModal}
-                            className="w-full sm:w-auto px-5 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold rounded-xl text-sm transition-colors"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            form="branch-master-form"
-                            disabled={submitting}
-                            className="w-full sm:w-auto px-6 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl text-sm shadow-md shadow-primary-600/30 transition-all disabled:opacity-50"
-                        >
-                            {submitting ? 'Saving...' : editingBranch ? 'Update Branch' : 'Create Branch'}
-                        </button>
-                    </>
-                }
-            >
-                <form id="branch-master-form" onSubmit={handleSubmit} className="space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <div className="sm:col-span-1">
-                            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                                Branch Name <span className="text-rose-500">*</span>
-                            </label>
-                            <input
-                                type="text"
-                                required
-                                placeholder="e.g. Nashik Office"
-                                value={formData.name}
-                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl border-none text-sm font-semibold text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                                Branch Code <span className="text-rose-500">*</span>
-                            </label>
-                            <input
-                                type="text"
-                                required
-                                placeholder="e.g. NSK-01"
-                                value={formData.code}
-                                onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
-                                className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl border-none text-sm font-semibold uppercase text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                                Branch Prefix <span className="text-rose-500">*</span>
-                            </label>
-                            <input
-                                type="text"
-                                required
-                                maxLength={5}
-                                placeholder="e.g. NSK, PN, MUM"
-                                value={formData.branchPrefix}
-                                onChange={(e) => setFormData({ ...formData, branchPrefix: e.target.value.toUpperCase() })}
-                                className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl border-none text-sm font-black uppercase tracking-wider text-primary-600 dark:text-primary-400 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20"
-                            />
-                            <span className="text-[10px] font-semibold text-slate-400">Used for Auto Emp IDs (NSK1001)</span>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                                Address
-                            </label>
-                            <input
-                                type="text"
-                                placeholder="Office Street Address"
-                                value={formData.address}
-                                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                                className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl border-none text-sm font-semibold text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20"
-                            />
-                        </div>
-
-                        <div className="grid grid-cols-3 gap-2">
-                            <div>
-                                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">City</label>
-                                <input
-                                    type="text"
-                                    placeholder="City"
-                                    value={formData.city}
-                                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                                    className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl border-none text-sm font-semibold text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20"
-                                />
+            {/* Form Page View */}
+            {(isModalOpen || isCreatePage || isEditPage) && (
+                <div className="fixed inset-0 z-[100] bg-slate-50 overflow-y-auto p-6 md:p-10 flex flex-col items-center">
+                    <div className="max-w-4xl w-full my-2 space-y-6">
+                        {/* Header bar */}
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+                            <div className="flex items-center gap-4">
+                                <button
+                                    type="button"
+                                    onClick={() => handleCloseModal()}
+                                    className="p-3 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-2xl transition-all border border-slate-200"
+                                >
+                                    <MdArrowBack size={20} />
+                                </button>
+                                <div>
+                                    <h1 className="text-xl font-black text-slate-900">
+                                        {editingBranch ? 'Edit Branch Master' : 'Create New Branch'}
+                                    </h1>
+                                    <p className="text-xs text-slate-500 font-medium mt-0.5">
+                                        {editingBranch ? `Update branch parameters for ${editingBranch.name}` : 'Add a new office branch location'}
+                                    </p>
+                                </div>
                             </div>
-                            <div>
-                                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">State</label>
-                                <input
-                                    type="text"
-                                    placeholder="State"
-                                    value={formData.state}
-                                    onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-                                    className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl border-none text-sm font-semibold text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Pincode</label>
-                                <input
-                                    type="text"
-                                    placeholder="400001"
-                                    value={formData.pincode}
-                                    onChange={(e) => setFormData({ ...formData, pincode: e.target.value })}
-                                    className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl border-none text-sm font-semibold text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20"
-                                />
+                            <div className="flex items-center gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => handleCloseModal()}
+                                    className="px-6 py-3 rounded-2xl border border-slate-200 text-slate-600 font-black uppercase text-xs tracking-widest hover:bg-slate-50 transition-all"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    form="branch-master-form"
+                                    disabled={submitting}
+                                    className="bg-primary-600 hover:bg-primary-700 text-white px-8 py-3 rounded-2xl font-black transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95 disabled:opacity-50"
+                                >
+                                    {submitting ? 'Saving...' : editingBranch ? 'Update Branch' : 'Create Branch'}
+                                </button>
                             </div>
                         </div>
-                    </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <div>
-                            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                                Contact Phone
-                            </label>
-                            <input
-                                type="text"
-                                placeholder="+91 9876543210"
-                                value={formData.contactNo}
-                                onChange={(e) => setFormData({ ...formData, contactNo: e.target.value })}
-                                className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl border-none text-sm font-semibold text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                                Email Address
-                            </label>
-                            <input
-                                type="email"
-                                placeholder="branch@company.com"
-                                value={formData.email}
-                                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl border-none text-sm font-semibold text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                                GST Number
-                            </label>
-                            <input
-                                type="text"
-                                placeholder="27AAAAA0000A1Z5"
-                                value={formData.gstNo}
-                                onChange={(e) => setFormData({ ...formData, gstNo: e.target.value.toUpperCase() })}
-                                className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl border-none text-sm font-semibold uppercase text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20"
-                            />
-                        </div>
-                    </div>
+                        {/* Form Card Body */}
+                        <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
+                            <form id="branch-master-form" onSubmit={handleSubmit} className="space-y-6">
+                                <div className="grid grid-cols-1 sm:grid-cols-4 gap-6">
+                                    <div className="sm:col-span-1">
+                                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                                            Branch Name <span className="text-rose-500">*</span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            required
+                                            placeholder="e.g. Nashik Office"
+                                            value={formData.name}
+                                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                            className="w-full px-3.5 py-3 bg-slate-50 rounded-xl border border-slate-200 text-sm font-semibold text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20 outline-none"
+                                        />
+                                    </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <div className="sm:col-span-2">
-                            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                                Branch Logo URL (For Invoices/Quotes Branding)
-                            </label>
-                            <input
-                                type="text"
-                                placeholder="https://example.com/logo.png"
-                                value={formData.logoUrl}
-                                onChange={(e) => setFormData({ ...formData, logoUrl: e.target.value })}
-                                className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl border-none text-sm font-semibold text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                                Branch Manager
-                            </label>
-                            <input
-                                type="text"
-                                placeholder="Manager Name"
-                                value={formData.managerName}
-                                onChange={(e) => setFormData({ ...formData, managerName: e.target.value })}
-                                className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl border-none text-sm font-semibold text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20"
-                            />
-                        </div>
-                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                                            Branch Code <span className="text-rose-500">*</span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            required
+                                            placeholder="e.g. NSK-01"
+                                            value={formData.code}
+                                            onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
+                                            className="w-full px-3.5 py-3 bg-slate-50 rounded-xl border border-slate-200 text-sm font-semibold uppercase text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20 outline-none"
+                                        />
+                                    </div>
 
-                    <div>
-                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                            Status
-                        </label>
-                        <select
-                            value={formData.status}
-                            onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                            className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl border-none text-sm font-semibold text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-primary-500/20"
-                        >
-                            <option value="Active">Active</option>
-                            <option value="Inactive">Inactive</option>
-                        </select>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                                            Branch Prefix <span className="text-rose-500">*</span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            required
+                                            maxLength={5}
+                                            placeholder="e.g. NSK, PN, MUM"
+                                            value={formData.branchPrefix}
+                                            onChange={(e) => setFormData({ ...formData, branchPrefix: e.target.value.toUpperCase() })}
+                                            className="w-full px-3.5 py-3 bg-slate-50 rounded-xl border border-slate-200 text-sm font-black uppercase tracking-wider text-primary-600 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20 outline-none"
+                                        />
+                                        <span className="text-[10px] font-semibold text-slate-400">Prefix for Auto IDs (e.g. MUM)</span>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                                            Emp ID Starting Number
+                                        </label>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            placeholder="e.g. 5001, 6001"
+                                            value={formData.startEmployeeSeq || 1001}
+                                            onChange={(e) => setFormData({ ...formData, startEmployeeSeq: e.target.value })}
+                                            className="w-full px-3.5 py-3 bg-slate-50 rounded-xl border border-slate-200 text-sm font-bold text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20 outline-none"
+                                        />
+                                        <span className="text-[10px] font-semibold text-slate-400">Sequence start (e.g. 5001 ➔ MUM5001)</span>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                                            Address
+                                        </label>
+                                        <input
+                                            type="text"
+                                            placeholder="Office Street Address"
+                                            value={formData.address}
+                                            onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                                            className="w-full px-3.5 py-3 bg-slate-50 rounded-xl border border-slate-200 text-sm font-semibold text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20 outline-none"
+                                        />
+                                    </div>
+
+                                    <div className="grid grid-cols-3 gap-2">
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-700 mb-1">City</label>
+                                            <input
+                                                type="text"
+                                                placeholder="City"
+                                                value={formData.city}
+                                                onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                                                className="w-full px-3 py-3 bg-slate-50 rounded-xl border border-slate-200 text-sm font-semibold text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20 outline-none"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-700 mb-1">State</label>
+                                            <select
+                                                value={formData.state}
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    const matched = stateList.find(s => s.state === val);
+                                                    setFormData({
+                                                        ...formData,
+                                                        state: val,
+                                                        stateShortCode: matched ? matched.shortCode : formData.stateShortCode
+                                                    });
+                                                }}
+                                                className="w-full px-3 py-3 bg-slate-50 rounded-xl border border-slate-200 text-sm font-semibold text-slate-900 focus:ring-2 focus:ring-primary-500/20 outline-none cursor-pointer"
+                                            >
+                                                <option value="">-- Select State --</option>
+                                                {stateList.map(st => (
+                                                    <option key={st._id} value={st.state}>{st.state} ({st.shortCode})</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-700 mb-1">Short Code</label>
+                                            <input
+                                                type="text"
+                                                placeholder="MH"
+                                                maxLength={5}
+                                                value={formData.stateShortCode}
+                                                onChange={(e) => setFormData({ ...formData, stateShortCode: e.target.value.toUpperCase() })}
+                                                className="w-full px-3 py-3 bg-slate-50 rounded-xl border border-slate-200 text-sm font-mono font-bold uppercase text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20 outline-none"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-4 gap-6">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                                            Pincode
+                                        </label>
+                                        <input
+                                            type="text"
+                                            placeholder="400001"
+                                            value={formData.pincode}
+                                            onChange={(e) => setFormData({ ...formData, pincode: e.target.value })}
+                                            className="w-full px-3.5 py-3 bg-slate-50 rounded-xl border border-slate-200 text-sm font-semibold text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20 outline-none"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                                            Contact Phone
+                                        </label>
+                                        <input
+                                            type="text"
+                                            placeholder="+91 9876543210"
+                                            value={formData.contactNo}
+                                            onChange={(e) => setFormData({ ...formData, contactNo: e.target.value })}
+                                            className="w-full px-3.5 py-3 bg-slate-50 rounded-xl border border-slate-200 text-sm font-semibold text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20 outline-none"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                                            Email Address
+                                        </label>
+                                        <input
+                                            type="email"
+                                            placeholder="branch@company.com"
+                                            value={formData.email}
+                                            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                            className="w-full px-3.5 py-3 bg-slate-50 rounded-xl border border-slate-200 text-sm font-semibold text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20 outline-none"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                                            GST Number
+                                        </label>
+                                        <input
+                                            type="text"
+                                            placeholder="27AAAAA0000A1Z5"
+                                            value={formData.gstNo}
+                                            onChange={(e) => setFormData({ ...formData, gstNo: e.target.value.toUpperCase() })}
+                                            className="w-full px-3.5 py-3 bg-slate-50 rounded-xl border border-slate-200 text-sm font-semibold uppercase text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20 outline-none"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                                    <div className="sm:col-span-2">
+                                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                                            Branch Logo URL (For Invoices/Quotes Branding)
+                                        </label>
+                                        <input
+                                            type="text"
+                                            placeholder="https://example.com/logo.png"
+                                            value={formData.logoUrl}
+                                            onChange={(e) => setFormData({ ...formData, logoUrl: e.target.value })}
+                                            className="w-full px-3.5 py-3 bg-slate-50 rounded-xl border border-slate-200 text-sm font-semibold text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20 outline-none"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                                            Branch Manager
+                                        </label>
+                                        <input
+                                            type="text"
+                                            placeholder="Manager Name"
+                                            value={formData.managerName}
+                                            onChange={(e) => setFormData({ ...formData, managerName: e.target.value })}
+                                            className="w-full px-3.5 py-3 bg-slate-50 rounded-xl border border-slate-200 text-sm font-semibold text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20 outline-none"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                                        Status
+                                    </label>
+                                    <select
+                                        value={formData.status}
+                                        onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                                        className="w-full px-3.5 py-3 bg-slate-50 rounded-xl border border-slate-200 text-sm font-semibold text-slate-900 focus:ring-2 focus:ring-primary-500/20 outline-none"
+                                    >
+                                        <option value="Active">Active</option>
+                                        <option value="Inactive">Inactive</option>
+                                    </select>
+                                </div>
+                            </form>
+                        </div>
                     </div>
-                </form>
-            </Modal>
+                </div>
+            )}
         </div>
     );
 };

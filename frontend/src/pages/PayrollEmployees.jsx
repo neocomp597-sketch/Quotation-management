@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { payrollService, importService, branchService } from '../services/api';
 import { toast } from 'react-toastify';
 import Modal from '../components/Modal';
@@ -9,11 +9,12 @@ import { formatDate } from '../utils/helpers';
 import * as XLSX from 'xlsx';
 import { 
     MdPeople, MdAdd, MdSearch, MdEdit, MdDelete, 
-    MdSave, MdAccountBalance, MdAssignment, MdUploadFile, MdDownload, MdBusiness, MdAccountTree
+    MdSave, MdAccountBalance, MdAssignment, MdUploadFile, MdDownload, MdBusiness, MdAccountTree, MdArrowBack, MdSettings 
 } from 'react-icons/md';
 
-const PayrollEmployees = () => {
+const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
     const navigate = useNavigate();
+    const { id: routeId } = useParams();
     const [employees, setEmployees] = useState([]);
     const [branches, setBranches] = useState([]);
     const [search, setSearch] = useState('');
@@ -31,7 +32,7 @@ const PayrollEmployees = () => {
 
     // Form states
     const [basicForm, setBasicForm] = useState({
-        branchId: '', employeeId: '', name: '', email: '', mobile: '', reportingTo: '', dob: '', joiningDate: '', department: '', designation: '', status: 'Active',
+        branchId: '', employeeId: '', externalEmployeeCode: '', gender: 'Male', name: '', email: '', mobile: '', reportingTo: '', dob: '', joiningDate: '', lastWorkingDate: '', department: '', designation: '', status: 'Active',
         pan: '', aadhaar: '', uan: '', pfNumber: '', esiNumber: '',
         bankName: '', accountNumber: '', ifscCode: ''
     });
@@ -40,6 +41,10 @@ const PayrollEmployees = () => {
         basic: 0, hra: 0, da: 0, specialAllowance: 0, bonus: 0, incentive: 0, reimbursement: 0,
         pf: 0, esi: 0, pt: 0, tds: 0, loan: 0, advance: 0, otherDeduction: 0
     });
+
+    const [seqModalOpen, setSeqModalOpen] = useState(false);
+    const [customSeqValue, setCustomSeqValue] = useState(5001);
+    const [savingSeq, setSavingSeq] = useState(false);
 
     const fetchEmployees = async () => {
         try {
@@ -94,43 +99,99 @@ const PayrollEmployees = () => {
         }
     };
 
+    const handleOpenSeqModal = () => {
+        if (!basicForm.branchId) {
+            toast.warn('Please select a branch first');
+            return;
+        }
+        const selectedBranch = branches.find(b => b._id === basicForm.branchId);
+        setCustomSeqValue(selectedBranch?.startEmployeeSeq || 5001);
+        setSeqModalOpen(true);
+    };
+
+    const handleSaveSeq = async (e) => {
+        if (e) e.preventDefault();
+        const parsed = parseInt(customSeqValue, 10);
+        if (isNaN(parsed) || parsed < 1) {
+            toast.error('Please enter a valid positive sequence number');
+            return;
+        }
+        try {
+            setSavingSeq(true);
+            await branchService.update(basicForm.branchId, { startEmployeeSeq: parsed });
+            toast.success(`Sequence number for branch updated to start at ${parsed}!`);
+            const res = await branchService.getNextEmployeeId(basicForm.branchId);
+            setBasicForm(prev => ({ ...prev, employeeId: res.data?.employeeId || '' }));
+            setSeqModalOpen(false);
+            fetchMasters();
+        } catch (err) {
+            console.error('Failed to update sequence', err);
+            toast.error(err.response?.data?.message || 'Failed to update starting sequence');
+        } finally {
+            setSavingSeq(false);
+        }
+    };
+
+    useEffect(() => {
+        if (isCreatePage) {
+            setSelectedEmp(null);
+            setBasicForm({
+                branchId: '', employeeId: '', externalEmployeeCode: '', gender: 'Male', name: '', email: '', mobile: '', reportingTo: '', dob: '', joiningDate: new Date().toISOString().substring(0, 10), lastWorkingDate: '',
+                department: '', designation: '', status: 'Active',
+                pan: '', aadhaar: '', uan: '', pfNumber: '', esiNumber: '',
+                bankName: '', accountNumber: '', ifscCode: ''
+            });
+            setModalMode('add');
+            setIsModalOpen(true);
+        } else if (isEditPage && routeId) {
+            setIsModalOpen(true);
+            setModalMode('edit');
+            const populateForm = (emp) => {
+                setSelectedEmp(emp);
+                setBasicForm({
+                    branchId: emp.branchId?._id || emp.branchId || '',
+                    employeeId: emp.employeeId || '',
+                    externalEmployeeCode: emp.externalEmployeeCode || '',
+                    gender: emp.gender || 'Male',
+                    name: emp.name || '',
+                    email: emp.email || '',
+                    mobile: emp.mobile || '',
+                    reportingTo: emp.reportingTo?._id || emp.reportingTo || '',
+                    dob: emp.dob ? new Date(emp.dob).toISOString().substring(0, 10) : '',
+                    joiningDate: emp.joiningDate ? new Date(emp.joiningDate).toISOString().substring(0, 10) : '',
+                    lastWorkingDate: emp.lastWorkingDate ? new Date(emp.lastWorkingDate).toISOString().substring(0, 10) : '',
+                    department: emp.department || '',
+                    designation: emp.designation || '',
+                    status: emp.status || 'Active',
+                    pan: emp.pan || '',
+                    aadhaar: emp.aadhaar || '',
+                    uan: emp.uan || '',
+                    pfNumber: emp.pfNumber || '',
+                    esiNumber: emp.esiNumber || '',
+                    bankName: emp.bankName || '',
+                    accountNumber: emp.accountNumber || '',
+                    ifscCode: emp.ifscCode || ''
+                });
+            };
+            const found = employees.find(e => e._id === routeId);
+            if (found) {
+                populateForm(found);
+            } else {
+                payrollService.getEmployees({ limit: 1000 }).then(res => {
+                    const list = res.data || [];
+                    const item = list.find(e => e._id === routeId);
+                    if (item) populateForm(item);
+                }).catch(err => console.error("Failed to load employee", err));
+            }
+        }
+    }, [isCreatePage, isEditPage, routeId, employees]);
+
     const handleOpenAdd = () => {
-        setSelectedEmp(null);
-        setBasicForm({
-            branchId: '', employeeId: '', name: '', email: '', mobile: '', reportingTo: '', dob: '', joiningDate: new Date().toISOString().substring(0, 10), 
-            department: '', designation: '', status: 'Active',
-            pan: '', aadhaar: '', uan: '', pfNumber: '', esiNumber: '',
-            bankName: '', accountNumber: '', ifscCode: ''
-        });
-        setModalMode('add');
-        setIsModalOpen(true);
+        navigate('/payroll/employees/new');
     };
 
     const handleOpenEdit = (emp) => {
-        setSelectedEmp(emp);
-        setBasicForm({
-            branchId: emp.branchId?._id || emp.branchId || '',
-            employeeId: emp.employeeId || '',
-            name: emp.name || '',
-            email: emp.email || '',
-            mobile: emp.mobile || '',
-            reportingTo: emp.reportingTo?._id || emp.reportingTo || '',
-            dob: emp.dob ? new Date(emp.dob).toISOString().substring(0, 10) : '',
-            joiningDate: emp.joiningDate ? new Date(emp.joiningDate).toISOString().substring(0, 10) : '',
-            department: emp.department || '',
-            designation: emp.designation || '',
-            status: emp.status || 'Active',
-            pan: emp.pan || '',
-            aadhaar: emp.aadhaar || '',
-            uan: emp.uan || '',
-            pfNumber: emp.pfNumber || '',
-            esiNumber: emp.esiNumber || '',
-            bankName: emp.bankName || '',
-            accountNumber: emp.accountNumber || '',
-            ifscCode: emp.ifscCode || ''
-        });
-        setModalMode('edit');
-        setIsModalOpen(true);
+        navigate(`/payroll/employees/edit/${emp._id}`);
     };
 
     const handleOpenStructure = (emp) => {
@@ -168,6 +229,7 @@ const PayrollEmployees = () => {
             }
             setIsModalOpen(false);
             fetchEmployees();
+            navigate('/payroll/employees');
         } catch (error) {
             console.error('Save employee error', error);
             toast.error(error.response?.data?.message || 'Failed to save employee profile');
@@ -177,7 +239,6 @@ const PayrollEmployees = () => {
     const handleStructureSubmit = async (e) => {
         e.preventDefault();
         try {
-            // Convert strings to floats
             const structPayload = Object.keys(structureForm).reduce((acc, curr) => {
                 acc[curr] = parseFloat(structureForm[curr]) || 0;
                 return acc;
@@ -187,9 +248,10 @@ const PayrollEmployees = () => {
             toast.success('Base salary structure updated successfully!');
             setIsModalOpen(false);
             fetchEmployees();
+            navigate('/payroll/employees');
         } catch (error) {
-            console.error('Save structure error', error);
-            toast.error('Failed to update salary structure');
+            console.error('Save salary structure error', error);
+            toast.error(error.response?.data?.message || 'Failed to save base salary structure');
         }
     };
 
@@ -260,7 +322,6 @@ const PayrollEmployees = () => {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-black text-slate-900 tracking-tight">Employee Profiles</h1>
-                    <p className="text-slate-500 font-medium">Register basic details and configure monthly base salary structures.</p>
                 </div>
                 <div className="flex items-center gap-3">
                     <button
@@ -359,11 +420,21 @@ const PayrollEmployees = () => {
                                     return (
                                         <tr key={emp._id} className="hover:bg-slate-50/50 transition-colors">
                                             <td className="px-6 py-4">
-                                                <div className="flex items-center gap-2">
+                                                <div className="flex items-center gap-2 flex-wrap">
                                                     <p className="text-slate-900 font-bold">{emp.name}</p>
                                                     {emp.employeeId && (
                                                         <span className="px-2 py-0.5 bg-primary-100 dark:bg-primary-950 text-primary-700 dark:text-primary-300 font-black text-[10px] rounded-lg">
                                                             {emp.employeeId}
+                                                        </span>
+                                                    )}
+                                                    {emp.externalEmployeeCode && (
+                                                        <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 font-mono font-bold text-[10px] rounded-lg border border-indigo-100">
+                                                            Ext: {emp.externalEmployeeCode}
+                                                        </span>
+                                                    )}
+                                                    {emp.gender && (
+                                                        <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 font-bold text-[10px] rounded-lg">
+                                                            {emp.gender}
                                                         </span>
                                                     )}
                                                 </div>
@@ -431,21 +502,57 @@ const PayrollEmployees = () => {
                 )}
             </div>
 
-            {/* Modal Add/Edit Profile */}
-            <Modal
-                isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-                title={
-                    (modalMode === 'add' && 'Employee Profile') ||
-                    (modalMode === 'edit' && 'Edit Employee Details') ||
-                    (modalMode === 'structure' && `Base Structure: ${selectedEmp?.name}`) ||
-                    ''
-                }
-                maxWidth="max-w-4xl"
-            >
+            {/* Form Page View */}
+            {(isModalOpen || isCreatePage || isEditPage) && (
+                <div className="fixed inset-0 z-[100] bg-slate-50 overflow-y-auto p-6 md:p-10 flex flex-col items-center">
+                    <div className="max-w-5xl w-full my-2 space-y-6">
+                        {/* Header bar */}
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+                            <div className="flex items-center gap-4">
+                                <button
+                                    type="button"
+                                    onClick={() => { setIsModalOpen(false); navigate('/payroll/employees'); }}
+                                    className="p-3 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-2xl transition-all border border-slate-200"
+                                >
+                                    <MdArrowBack size={20} />
+                                </button>
+                                <div>
+                                    <h1 className="text-xl font-black text-slate-900">
+                                        {(modalMode === 'add' && 'Employee Profile') ||
+                                        (modalMode === 'edit' && 'Edit Employee Details') ||
+                                        (modalMode === 'structure' && `Base Structure: ${selectedEmp?.name}`) ||
+                                        ''}
+                                    </h1>
+                                    <p className="text-xs text-slate-500 font-medium mt-0.5">
+                                        {modalMode === 'structure' ? 'Manage base salary components & statutory setup' : 'Enter personal, statutory, and bank details for payroll'}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => { setIsModalOpen(false); navigate('/payroll/employees'); }}
+                                    className="px-6 py-3 rounded-2xl border border-slate-200 text-slate-600 font-black uppercase text-xs tracking-widest hover:bg-slate-50 transition-all"
+                                >
+                                    Cancel
+                                </button>
+                                {modalMode !== 'structure' && (
+                                    <button
+                                        type="submit"
+                                        form="employee-profile-form"
+                                        className="bg-primary-600 hover:bg-primary-700 text-white px-8 py-3 rounded-2xl font-black transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
+                                    >
+                                        {modalMode === 'add' ? 'Save Profile' : 'Update Profile'}
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Form Card Body */}
+                        <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
                             {/* Forms */}
                             {modalMode !== 'structure' ? (
-                                <form onSubmit={handleBasicSubmit} className="space-y-6">
+                                <form id="employee-profile-form" onSubmit={handleBasicSubmit} className="space-y-6">
                                     {/* Section 1: Basic Details */}
                                     <div>
                                         <h4 className="text-xs font-black text-teal-600 uppercase tracking-widest mb-4 border-b border-slate-50 pb-1.5">1. Basic Info</h4>
@@ -467,7 +574,20 @@ const PayrollEmployees = () => {
                                                 </select>
                                             </div>
                                             <div>
-                                                <label className={labelClass}>Employee ID (Auto Generated)</label>
+                                                <div className="flex items-center justify-between gap-2 mb-1.5">
+                                                    <label className={labelClass} style={{ marginBottom: 0 }}>Employee ID (Auto Generated)</label>
+                                                    {modalMode === 'add' && basicForm.branchId && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={handleOpenSeqModal}
+                                                            className="inline-flex items-center gap-1.5 text-[11px] font-bold text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200/80 px-2.5 py-1 rounded-lg transition-all whitespace-nowrap active:scale-95 shadow-xs"
+                                                            title="Set starting sequence number (e.g. 5001, 6001)"
+                                                        >
+                                                            <MdSettings size={13} className="text-teal-600" />
+                                                            <span>Set Start Code</span>
+                                                        </button>
+                                                    )}
+                                                </div>
                                                 <input
                                                     type="text"
                                                     readOnly
@@ -475,6 +595,28 @@ const PayrollEmployees = () => {
                                                     className={`${inputClass} bg-slate-100 text-primary-600 font-black cursor-not-allowed`}
                                                     placeholder="Select Branch First"
                                                 />
+                                            </div>
+                                            <div>
+                                                <label className={labelClass}>* External Employee Code</label>
+                                                <input
+                                                    type="text"
+                                                    value={basicForm.externalEmployeeCode || ''}
+                                                    onChange={(e) => setBasicForm({ ...basicForm, externalEmployeeCode: e.target.value })}
+                                                    className={inputClass}
+                                                    placeholder="e.g. EXT-102"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className={labelClass}>Gender</label>
+                                                <select
+                                                    value={basicForm.gender || 'Male'}
+                                                    onChange={(e) => setBasicForm({ ...basicForm, gender: e.target.value })}
+                                                    className={inputClass}
+                                                >
+                                                    <option value="Male">Male</option>
+                                                    <option value="Female">Female</option>
+                                                    <option value="Other">Other</option>
+                                                </select>
                                             </div>
                                             <div>
                                                 <label className={labelClass}>Employee Name *</label>
@@ -544,6 +686,15 @@ const PayrollEmployees = () => {
                                                 />
                                             </div>
                                             <div>
+                                                <label className={labelClass}>Last Working Date</label>
+                                                <input
+                                                    type="date"
+                                                    value={basicForm.lastWorkingDate || ''}
+                                                    onChange={(e) => setBasicForm({ ...basicForm, lastWorkingDate: e.target.value })}
+                                                    className={inputClass}
+                                                />
+                                            </div>
+                                            <div>
                                                 <label className={labelClass}>Department</label>
                                                 <SearchableSelect
                                                     options={departments.map((d) => d.name)}
@@ -601,41 +752,41 @@ const PayrollEmployees = () => {
                                                 />
                                             </div>
                                             <div>
-                                                <label className={labelClass}>UAN (EPFO)</label>
+                                                <label className={labelClass}>UAN Number (PF)</label>
                                                 <input
                                                     type="text"
                                                     value={basicForm.uan}
                                                     onChange={(e) => setBasicForm({ ...basicForm, uan: e.target.value })}
                                                     className={inputClass}
-                                                    placeholder="100XXXXXXXXX"
+                                                    placeholder="100123456789"
                                                 />
                                             </div>
                                             <div>
-                                                <label className={labelClass}>Provident Fund (PF) No.</label>
+                                                <label className={labelClass}>PF Account No</label>
                                                 <input
                                                     type="text"
                                                     value={basicForm.pfNumber}
                                                     onChange={(e) => setBasicForm({ ...basicForm, pfNumber: e.target.value })}
                                                     className={inputClass}
-                                                    placeholder="MH/NGP/12345/PF"
+                                                    placeholder="MH/BAN/0012345/000/0001234"
                                                 />
                                             </div>
                                             <div>
-                                                <label className={labelClass}>ESI Number</label>
+                                                <label className={labelClass}>ESI Insurance IP</label>
                                                 <input
                                                     type="text"
                                                     value={basicForm.esiNumber}
                                                     onChange={(e) => setBasicForm({ ...basicForm, esiNumber: e.target.value })}
                                                     className={inputClass}
-                                                    placeholder="31XXXXXXXXXXXXXX"
+                                                    placeholder="3100123456789001"
                                                 />
                                             </div>
                                         </div>
                                     </div>
 
-                                    {/* Section 3: Bank Details */}
+                                    {/* Section 3: Banking Info */}
                                     <div>
-                                        <h4 className="text-xs font-black text-teal-600 uppercase tracking-widest mb-4 border-b border-slate-50 pb-1.5">3. Banking & Payment Details</h4>
+                                        <h4 className="text-xs font-black text-teal-600 uppercase tracking-widest mb-4 border-b border-slate-50 pb-1.5">3. Bank Account Setup</h4>
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                             <div>
                                                 <label className={labelClass}>Bank Name</label>
@@ -644,7 +795,7 @@ const PayrollEmployees = () => {
                                                     value={basicForm.bankName}
                                                     onChange={(e) => setBasicForm({ ...basicForm, bankName: e.target.value })}
                                                     className={inputClass}
-                                                    placeholder="e.g. HDFC Bank"
+                                                    placeholder="HDFC Bank"
                                                 />
                                             </div>
                                             <div>
@@ -654,7 +805,7 @@ const PayrollEmployees = () => {
                                                     value={basicForm.accountNumber}
                                                     onChange={(e) => setBasicForm({ ...basicForm, accountNumber: e.target.value })}
                                                     className={inputClass}
-                                                    placeholder="1234567890"
+                                                    placeholder="50100012345678"
                                                 />
                                             </div>
                                             <div>
@@ -673,7 +824,7 @@ const PayrollEmployees = () => {
                                     <div className="pt-5 border-t border-slate-100 flex justify-end gap-3">
                                         <button
                                             type="button"
-                                            onClick={() => setIsModalOpen(false)}
+                                            onClick={() => { setIsModalOpen(false); navigate('/payroll/employees'); }}
                                             className="px-6 py-2.5 border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 transition-colors"
                                         >
                                             Cancel
@@ -683,152 +834,155 @@ const PayrollEmployees = () => {
                                             className="flex items-center gap-2 px-6 py-2.5 bg-primary-600 text-white font-bold rounded-xl hover:bg-primary-700 transition-colors shadow-lg shadow-primary-600/20"
                                         >
                                             <MdSave size={18} />
-                                            Save Profile
+                                            {modalMode === 'add' ? 'Save Profile Details' : 'Update Basic Info'}
                                         </button>
                                     </div>
                                 </form>
                             ) : (
-                                <form onSubmit={handleStructureSubmit} className="p-6 space-y-6">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                        {/* Earnings Allowances */}
-                                        <div className="space-y-4">
-                                            <h4 className="text-xs font-black text-emerald-600 uppercase tracking-widest mb-2 border-b border-slate-50 pb-1.5">Earnings Allowances</h4>
-                                            
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div>
-                                                    <label className={labelClass}>Basic Salary *</label>
-                                                    <input
-                                                        type="number"
-                                                        value={structureForm.basic}
-                                                        onChange={(e) => setStructureForm({ ...structureForm, basic: e.target.value })}
-                                                        className={inputClass}
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className={labelClass}>HRA Allowances</label>
-                                                    <input
-                                                        type="number"
-                                                        value={structureForm.hra}
-                                                        onChange={(e) => setStructureForm({ ...structureForm, hra: e.target.value })}
-                                                        className={inputClass}
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className={labelClass}>DA Allowances</label>
-                                                    <input
-                                                        type="number"
-                                                        value={structureForm.da}
-                                                        onChange={(e) => setStructureForm({ ...structureForm, da: e.target.value })}
-                                                        className={inputClass}
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className={labelClass}>Special Allowance</label>
-                                                    <input
-                                                        type="number"
-                                                        value={structureForm.specialAllowance}
-                                                        onChange={(e) => setStructureForm({ ...structureForm, specialAllowance: e.target.value })}
-                                                        className={inputClass}
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className={labelClass}>Base Bonus</label>
-                                                    <input
-                                                        type="number"
-                                                        value={structureForm.bonus}
-                                                        onChange={(e) => setStructureForm({ ...structureForm, bonus: e.target.value })}
-                                                        className={inputClass}
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className={labelClass}>Base Incentive</label>
-                                                    <input
-                                                        type="number"
-                                                        value={structureForm.incentive}
-                                                        onChange={(e) => setStructureForm({ ...structureForm, incentive: e.target.value })}
-                                                        className={inputClass}
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className={labelClass}>Reimbursement</label>
-                                                    <input
-                                                        type="number"
-                                                        value={structureForm.reimbursement}
-                                                        onChange={(e) => setStructureForm({ ...structureForm, reimbursement: e.target.value })}
-                                                        className={inputClass}
-                                                    />
-                                                </div>
+                                <form onSubmit={handleStructureSubmit} className="space-y-6">
+                                    {/* Component Section: Earnings */}
+                                    <div>
+                                        <h4 className="text-xs font-black text-emerald-600 uppercase tracking-widest mb-4 border-b border-slate-50 pb-1.5 flex items-center justify-between">
+                                            <span>1. Fixed Gross Earnings (Monthly)</span>
+                                            <span className="text-[10px] text-slate-400 font-medium lowercase">calculated automatically into payslip</span>
+                                        </h4>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                            <div>
+                                                <label className={labelClass}>Basic Pay *</label>
+                                                <input
+                                                    type="number"
+                                                    required
+                                                    value={structureForm.basic}
+                                                    onChange={(e) => setStructureForm({ ...structureForm, basic: e.target.value })}
+                                                    className={inputClass}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className={labelClass}>HRA (House Rent)</label>
+                                                <input
+                                                    type="number"
+                                                    value={structureForm.hra}
+                                                    onChange={(e) => setStructureForm({ ...structureForm, hra: e.target.value })}
+                                                    className={inputClass}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className={labelClass}>Dearness Allowance (DA)</label>
+                                                <input
+                                                    type="number"
+                                                    value={structureForm.da}
+                                                    onChange={(e) => setStructureForm({ ...structureForm, da: e.target.value })}
+                                                    className={inputClass}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className={labelClass}>Special Allowance</label>
+                                                <input
+                                                    type="number"
+                                                    value={structureForm.specialAllowance}
+                                                    onChange={(e) => setStructureForm({ ...structureForm, specialAllowance: e.target.value })}
+                                                    className={inputClass}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className={labelClass}>Statutory Bonus Component</label>
+                                                <input
+                                                    type="number"
+                                                    value={structureForm.bonus}
+                                                    onChange={(e) => setStructureForm({ ...structureForm, bonus: e.target.value })}
+                                                    className={inputClass}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className={labelClass}>Sales Incentive Base</label>
+                                                <input
+                                                    type="number"
+                                                    value={structureForm.incentive}
+                                                    onChange={(e) => setStructureForm({ ...structureForm, incentive: e.target.value })}
+                                                    className={inputClass}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className={labelClass}>Fixed Reimbursements</label>
+                                                <input
+                                                    type="number"
+                                                    value={structureForm.reimbursement}
+                                                    onChange={(e) => setStructureForm({ ...structureForm, reimbursement: e.target.value })}
+                                                    className={inputClass}
+                                                />
                                             </div>
                                         </div>
+                                    </div>
 
-                                        {/* Standard Deductions */}
-                                        <div className="space-y-4">
-                                            <h4 className="text-xs font-black text-rose-600 uppercase tracking-widest mb-2 border-b border-slate-50 pb-1.5">Monthly Deductions</h4>
-                                            
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div>
-                                                    <label className={labelClass}>Provident Fund (PF)</label>
-                                                    <input
-                                                        type="number"
-                                                        value={structureForm.pf}
-                                                        onChange={(e) => setStructureForm({ ...structureForm, pf: e.target.value })}
-                                                        className={inputClass}
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className={labelClass}>ESI Deduction</label>
-                                                    <input
-                                                        type="number"
-                                                        value={structureForm.esi}
-                                                        onChange={(e) => setStructureForm({ ...structureForm, esi: e.target.value })}
-                                                        className={inputClass}
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className={labelClass}>Professional Tax (PT)</label>
-                                                    <input
-                                                        type="number"
-                                                        value={structureForm.pt}
-                                                        onChange={(e) => setStructureForm({ ...structureForm, pt: e.target.value })}
-                                                        className={inputClass}
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className={labelClass}>Income Tax (TDS)</label>
-                                                    <input
-                                                        type="number"
-                                                        value={structureForm.tds}
-                                                        onChange={(e) => setStructureForm({ ...structureForm, tds: e.target.value })}
-                                                        className={inputClass}
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className={labelClass}>Active Loan Payback</label>
-                                                    <input
-                                                        type="number"
-                                                        value={structureForm.loan}
-                                                        onChange={(e) => setStructureForm({ ...structureForm, loan: e.target.value })}
-                                                        className={inputClass}
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className={labelClass}>Advance Deduct</label>
-                                                    <input
-                                                        type="number"
-                                                        value={structureForm.advance}
-                                                        onChange={(e) => setStructureForm({ ...structureForm, advance: e.target.value })}
-                                                        className={inputClass}
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className={labelClass}>Other Deduct</label>
-                                                    <input
-                                                        type="number"
-                                                        value={structureForm.otherDeduction}
-                                                        onChange={(e) => setStructureForm({ ...structureForm, otherDeduction: e.target.value })}
-                                                        className={inputClass}
-                                                    />
-                                                </div>
+                                    {/* Component Section: Deductions */}
+                                    <div>
+                                        <h4 className="text-xs font-black text-rose-600 uppercase tracking-widest mb-4 border-b border-slate-50 pb-1.5 flex items-center justify-between">
+                                            <span>2. Standard Deductions (Monthly)</span>
+                                            <span className="text-[10px] text-slate-400 font-medium lowercase">statutory and operational deductions</span>
+                                        </h4>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                            <div>
+                                                <label className={labelClass}>PF Deduction (Employee)</label>
+                                                <input
+                                                    type="number"
+                                                    value={structureForm.pf}
+                                                    onChange={(e) => setStructureForm({ ...structureForm, pf: e.target.value })}
+                                                    className={inputClass}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className={labelClass}>ESI Contribution</label>
+                                                <input
+                                                    type="number"
+                                                    value={structureForm.esi}
+                                                    onChange={(e) => setStructureForm({ ...structureForm, esi: e.target.value })}
+                                                    className={inputClass}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className={labelClass}>Professional Tax (PT)</label>
+                                                <input
+                                                    type="number"
+                                                    value={structureForm.pt}
+                                                    onChange={(e) => setStructureForm({ ...structureForm, pt: e.target.value })}
+                                                    className={inputClass}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className={labelClass}>TDS / Income Tax</label>
+                                                <input
+                                                    type="number"
+                                                    value={structureForm.tds}
+                                                    onChange={(e) => setStructureForm({ ...structureForm, tds: e.target.value })}
+                                                    className={inputClass}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className={labelClass}>Loan EMI Repayment</label>
+                                                <input
+                                                    type="number"
+                                                    value={structureForm.loan}
+                                                    onChange={(e) => setStructureForm({ ...structureForm, loan: e.target.value })}
+                                                    className={inputClass}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className={labelClass}>Salary Advance Dues</label>
+                                                <input
+                                                    type="number"
+                                                    value={structureForm.advance}
+                                                    onChange={(e) => setStructureForm({ ...structureForm, advance: e.target.value })}
+                                                    className={inputClass}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className={labelClass}>Other Recurring Deduction</label>
+                                                <input
+                                                    type="number"
+                                                    value={structureForm.otherDeduction}
+                                                    onChange={(e) => setStructureForm({ ...structureForm, otherDeduction: e.target.value })}
+                                                    className={inputClass}
+                                                />
                                             </div>
                                         </div>
                                     </div>
@@ -836,7 +990,7 @@ const PayrollEmployees = () => {
                                     <div className="pt-5 border-t border-slate-100 flex justify-end gap-3">
                                         <button
                                             type="button"
-                                            onClick={() => setIsModalOpen(false)}
+                                            onClick={() => { setIsModalOpen(false); navigate('/payroll/employees'); }}
                                             className="px-6 py-2.5 border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 transition-colors"
                                         >
                                             Cancel
@@ -851,7 +1005,10 @@ const PayrollEmployees = () => {
                                     </div>
                                 </form>
                             )}
-            </Modal>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Import Modal */}
             <ImportModal
@@ -866,6 +1023,72 @@ const PayrollEmployees = () => {
                 }}
                 onDownloadTemplate={importService.getEmployeeTemplate}
             />
+
+            {/* Custom Sequence Setup Modal using Modal.jsx Portal */}
+            <Modal
+                isOpen={seqModalOpen}
+                onClose={() => setSeqModalOpen(false)}
+                title="Configure Starting Sequence"
+                maxWidth="max-w-md"
+                footer={
+                    <>
+                        <button
+                            type="button"
+                            onClick={() => setSeqModalOpen(false)}
+                            className="px-6 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs uppercase tracking-wider hover:bg-slate-50 transition-all"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleSaveSeq}
+                            disabled={savingSeq}
+                            className="px-6 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-black text-xs uppercase tracking-wider transition-all shadow-lg shadow-teal-600/20 active:scale-95"
+                        >
+                            {savingSeq ? 'Saving...' : 'Save & Update Sequence'}
+                        </button>
+                    </>
+                }
+            >
+                {(() => {
+                    const selBranch = branches.find(b => b._id === basicForm.branchId);
+                    const prefix = selBranch?.branchPrefix || selBranch?.code || 'EMP';
+                    const seqNum = parseInt(customSeqValue, 10) || 1;
+                    const previewId = `${prefix}${seqNum}`;
+                    return (
+                        <form onSubmit={handleSaveSeq} className="space-y-5">
+                            <div className="p-4 bg-teal-50 border border-teal-100 rounded-2xl flex items-center justify-between">
+                                <div>
+                                    <span className="text-[10px] font-bold text-teal-600 uppercase tracking-wider block">Branch Selected</span>
+                                    <span className="text-sm font-black text-teal-950">{selBranch?.name || 'Branch'} ({prefix})</span>
+                                </div>
+                                <div className="text-right">
+                                    <span className="text-[10px] font-bold text-teal-600 uppercase tracking-wider block">Next Auto ID Preview</span>
+                                    <span className="text-base font-black text-teal-700 font-mono">{previewId}</span>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-black text-slate-700 uppercase tracking-wider mb-2">
+                                    Starting Sequence Number *
+                                </label>
+                                <input
+                                    type="number"
+                                    required
+                                    min="1"
+                                    value={customSeqValue}
+                                    onChange={(e) => setCustomSeqValue(e.target.value)}
+                                    placeholder="e.g. 5001, 6001, 10001, 101"
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-slate-900 font-black text-lg focus:ring-2 focus:ring-teal-500 focus:bg-white outline-none transition-all"
+                                />
+                                <p className="text-[11px] font-semibold text-slate-500 mt-2">
+                                    Tip: You can set <strong>any</strong> starting sequence number (e.g. 5001 ➔ {prefix}5001, 6001 ➔ {prefix}6001, 10001 ➔ {prefix}10001, 101 ➔ {prefix}101).
+                                </p>
+                            </div>
+                        </form>
+                    );
+                })()}
+            </Modal>
         </div>
     );
 };

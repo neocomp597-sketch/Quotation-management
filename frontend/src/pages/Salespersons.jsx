@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { MdEmail, MdPhone, MdEdit, MdAdd, MdLocationOn, MdClose } from 'react-icons/md';
+import { useNavigate, useParams } from 'react-router-dom';
+import { MdEmail, MdPhone, MdEdit, MdAdd, MdLocationOn, MdClose, MdArrowBack } from 'react-icons/md';
 import PaginationControls from '../components/PaginationControls';
 import { salespersonService, territoryService } from '../services/api';
 import Modal from '../components/Modal';
@@ -7,7 +8,9 @@ import { toast } from 'react-toastify';
 
 const LIST_PAGE_SIZE = 20;
 
-const Salespersons = () => {
+const Salespersons = ({ isCreatePage, isEditPage }) => {
+    const navigate = useNavigate();
+    const { id: routeId } = useParams();
     const [salespersons, setSalespersons] = useState([]);
     const [territories, setTerritories] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -61,6 +64,48 @@ const Salespersons = () => {
         }
     };
 
+    useEffect(() => {
+        if (isCreatePage) {
+            setEditingSalesperson(null);
+            setFormData({
+                name: '',
+                email: '',
+                mobile: '',
+                territoryId: '',
+                status: 'Active'
+            });
+            setShowModal(true);
+        } else if (isEditPage && routeId) {
+            setShowModal(true);
+            const found = salespersons.find(sp => sp._id === routeId);
+            if (found) {
+                setEditingSalesperson(found);
+                setFormData({
+                    name: found.name || '',
+                    email: found.email || '',
+                    mobile: found.mobile || '',
+                    territoryId: found.territoryId?._id || found.territoryId || '',
+                    status: found.status || 'Active'
+                });
+            } else {
+                salespersonService.getAll({ limit: 1000 }).then(res => {
+                    const list = Array.isArray(res.data) ? res.data : res.data?.data || [];
+                    const item = list.find(sp => sp._id === routeId);
+                    if (item) {
+                        setEditingSalesperson(item);
+                        setFormData({
+                            name: item.name || '',
+                            email: item.email || '',
+                            mobile: item.mobile || '',
+                            territoryId: item.territoryId?._id || item.territoryId || '',
+                            status: item.status || 'Active'
+                        });
+                    }
+                }).catch(err => console.error("Failed to load salesperson", err));
+            }
+        }
+    }, [isCreatePage, isEditPage, routeId, salespersons]);
+
     const handleFormSubmit = async (e) => {
         e.preventDefault();
         if (!formData.name.trim()) {
@@ -78,6 +123,7 @@ const Salespersons = () => {
             }
             setShowModal(false);
             fetchSalespersons();
+            navigate('/salespersons');
         } catch (err) {
             console.error('Failed to save salesperson:', err);
             toast.error(err.response?.data?.message || 'Error saving salesperson');
@@ -97,17 +143,7 @@ const Salespersons = () => {
                     </p>
                 </div>
                 <button
-                    onClick={() => {
-                        setEditingSalesperson(null);
-                        setFormData({
-                            name: '',
-                            email: '',
-                            mobile: '',
-                            territoryId: '',
-                            status: 'Active'
-                        });
-                        setShowModal(true);
-                    }}
+                    onClick={() => navigate('/salespersons/new')}
                     className="flex items-center gap-2 px-6 py-4 bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-[10px] tracking-widest rounded-2xl transition-all shadow-lg shadow-primary-600/20 active:scale-95 self-start md:self-auto animate-fade-in-up"
                 >
                     <MdAdd size={18} />
@@ -164,17 +200,7 @@ const Salespersons = () => {
                                 </div>
                                 
                                 <button
-                                    onClick={() => {
-                                        setEditingSalesperson(user);
-                                        setFormData({
-                                            name: user.name || '',
-                                            email: user.email || '',
-                                            mobile: user.mobile || '',
-                                            territoryId: user.territoryId?._id || user.territoryId || '',
-                                            status: user.status || 'Active'
-                                        });
-                                        setShowModal(true);
-                                    }}
+                                    onClick={() => navigate(`/salespersons/edit/${user._id}`)}
                                     className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-xl transition-all"
                                     title="Edit Salesperson"
                                 >
@@ -188,89 +214,114 @@ const Salespersons = () => {
                 )}
             </div>
 
-            {/* Create/Edit Modal */}
-            <Modal
-                isOpen={showModal}
-                onClose={() => setShowModal(false)}
-                title={editingSalesperson ? 'Edit Salesperson' : 'Create Salesperson'}
-                maxWidth="max-w-md"
-                footer={
-                    <>
-                        <button
-                            type="button"
-                            onClick={() => setShowModal(false)}
-                            className="w-full md:w-auto px-6 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            form="salesperson-form"
-                            className="w-full md:w-auto px-6 py-3.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-primary-600/10"
-                        >
-                            {editingSalesperson ? 'Save Changes' : 'Create'}
-                        </button>
-                    </>
-                }
-            >
-                <form id="salesperson-form" onSubmit={handleFormSubmit} className="space-y-4">
-                    <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Name *</label>
-                        <input
-                            type="text"
-                            required
-                            placeholder="Full Name"
-                            value={formData.name}
-                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500"
-                        />
+            {/* Create/Edit Form Page View */}
+            {(showModal || isCreatePage || isEditPage) && (
+                <div className="fixed inset-0 z-[100] bg-slate-50 overflow-y-auto p-6 md:p-10 flex flex-col items-center">
+                    <div className="max-w-3xl w-full my-2 space-y-6">
+                        {/* Header bar */}
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+                            <div className="flex items-center gap-4">
+                                <button
+                                    type="button"
+                                    onClick={() => { setShowModal(false); navigate('/salespersons'); }}
+                                    className="p-3 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-2xl transition-all border border-slate-200"
+                                >
+                                    <MdArrowBack size={20} />
+                                </button>
+                                <div>
+                                    <h1 className="text-xl font-black text-slate-900">
+                                        {editingSalesperson ? 'Edit Salesperson' : 'Create Salesperson'}
+                                    </h1>
+                                    <p className="text-xs text-slate-500 font-medium mt-0.5">
+                                        {editingSalesperson ? `Update details for ${editingSalesperson.name}` : 'Add a new sales team member profile'}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => { setShowModal(false); navigate('/salespersons'); }}
+                                    className="px-6 py-3 rounded-2xl border border-slate-200 text-slate-600 font-black uppercase text-xs tracking-widest hover:bg-slate-50 transition-all"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    form="salesperson-form"
+                                    className="bg-primary-600 hover:bg-primary-700 text-white px-8 py-3 rounded-2xl font-black transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
+                                >
+                                    {editingSalesperson ? 'Save Changes' : 'Create'}
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Form Card Body */}
+                        <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
+                            <form id="salesperson-form" onSubmit={handleFormSubmit} className="space-y-6">
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Name *</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        placeholder="Full Name"
+                                        value={formData.name}
+                                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                        className="w-full px-4 py-3.5 rounded-2xl border border-slate-200 bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-semibold"
+                                    />
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Email</label>
+                                        <input
+                                            type="email"
+                                            placeholder="Email Address"
+                                            value={formData.email}
+                                            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                            className="w-full px-4 py-3.5 rounded-2xl border border-slate-200 bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-semibold"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Mobile</label>
+                                        <input
+                                            type="text"
+                                            placeholder="Mobile number"
+                                            value={formData.mobile}
+                                            onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
+                                            className="w-full px-4 py-3.5 rounded-2xl border border-slate-200 bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-semibold"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Assign Territory</label>
+                                        <select
+                                            value={formData.territoryId}
+                                            onChange={(e) => setFormData({ ...formData, territoryId: e.target.value })}
+                                            className="w-full px-4 py-3.5 rounded-2xl border border-slate-200 bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-semibold"
+                                        >
+                                            <option value="">Select Territory (Unmapped)</option>
+                                            {territories.map(t => (
+                                                <option key={t._id} value={t._id}>{t.name} ({t.type})</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Status</label>
+                                        <select
+                                            value={formData.status}
+                                            onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                                            className="w-full px-4 py-3.5 rounded-2xl border border-slate-200 bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-semibold"
+                                        >
+                                            <option value="Active">Active</option>
+                                            <option value="Inactive">Inactive</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
                     </div>
-                    <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Email</label>
-                        <input
-                            type="email"
-                            placeholder="Email Address"
-                            value={formData.email}
-                            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Mobile</label>
-                        <input
-                            type="text"
-                            placeholder="Mobile number"
-                            value={formData.mobile}
-                            onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
-                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Assign Territory</label>
-                        <select
-                            value={formData.territoryId}
-                            onChange={(e) => setFormData({ ...formData, territoryId: e.target.value })}
-                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500"
-                        >
-                            <option value="">Select Territory (Unmapped)</option>
-                            {territories.map(t => (
-                                <option key={t._id} value={t._id}>{t.name} ({t.type})</option>
-                            ))}
-                        </select>
-                    </div>
-                    <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Status</label>
-                        <select
-                            value={formData.status}
-                            onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500"
-                        >
-                            <option value="Active">Active</option>
-                            <option value="Inactive">Inactive</option>
-                        </select>
-                    </div>
-                </form>
-            </Modal>
+                </div>
+            )}
         </div>
     );
 };

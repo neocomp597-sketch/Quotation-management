@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { MdAdd, MdEdit, MdDelete, MdDescription, MdCheckCircle } from 'react-icons/md';
+import { useNavigate, useParams } from 'react-router-dom';
+import { MdAdd, MdEdit, MdDelete, MdDescription, MdCheckCircle, MdArrowBack } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import { termsService } from '../services/api';
 import Modal from '../components/Modal';
@@ -8,7 +9,9 @@ import { formatDate } from '../utils/helpers';
 
 const LIST_PAGE_SIZE = 20;
 
-const Terms = () => {
+const Terms = ({ isCreatePage, isEditPage }) => {
+    const navigate = useNavigate();
+    const { id: routeId } = useParams();
     const [templates, setTemplates] = useState([]);
     const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(1);
@@ -21,11 +24,61 @@ const Terms = () => {
         isDefault: false
     });
 
+    const defaultContent = `Mandatory Terms & Conditions
+1. Quotation Validity: Valid for 30 days.
+2. PO Issuance: Must be issued within validity period by authorized person.
+3. Price Validity: Agreed rate valid for 6 months.
+4. Price Escalation: 6% increase if not lifted within validity.
+5. Delivery Schedule: Within 6 months from PO. Reschedule with 15 days notice.
+6. Terms of Supply: Goods delivered at site by authorized dealers.
+7. Terms of Payment: 100% advance with PO.
+8. Communication: All in writing to Project Head.
+9. Modification: Modified products may be provided.
+10. Product Discontinuance: 6 months to order discontinued products.
+11. Warranty: Covered under company policy.
+12. Installation: Authorized service provider only.`;
+
     const pagedTemplates = templates;
 
     useEffect(() => {
         fetchTemplates();
     }, [page]);
+
+    useEffect(() => {
+        if (isCreatePage) {
+            setEditingTemplate(null);
+            setFormData({
+                templateName: '',
+                content: defaultContent,
+                isDefault: false
+            });
+            setIsModalOpen(true);
+        } else if (isEditPage && routeId) {
+            setIsModalOpen(true);
+            const found = templates.find(t => t._id === routeId);
+            if (found) {
+                setEditingTemplate(found);
+                setFormData({
+                    templateName: found.templateName,
+                    content: found.content,
+                    isDefault: found.isDefault
+                });
+            } else {
+                termsService.getAll({ limit: 1000 }).then(res => {
+                    const list = Array.isArray(res.data) ? res.data : res.data?.data || [];
+                    const item = list.find(t => t._id === routeId);
+                    if (item) {
+                        setEditingTemplate(item);
+                        setFormData({
+                            templateName: item.templateName,
+                            content: item.content,
+                            isDefault: item.isDefault
+                        });
+                    }
+                }).catch(err => console.error("Failed to load terms template", err));
+            }
+        }
+    }, [isCreatePage, isEditPage, routeId, templates]);
 
     const fetchTemplates = async () => {
         try {
@@ -47,39 +100,15 @@ const Terms = () => {
 
     const handleOpenModal = (template = null) => {
         if (template) {
-            setEditingTemplate(template);
-            setFormData({
-                templateName: template.templateName,
-                content: template.content,
-                isDefault: template.isDefault
-            });
+            navigate(`/terms/edit/${template._id}`);
         } else {
-            setEditingTemplate(null);
-            setFormData({
-                templateName: '',
-                content: `Mandatory Terms & Conditions
-1. Quotation Validity: Valid for 30 days.
-2. PO Issuance: Must be issued within validity period by authorized person.
-3. Price Validity: Agreed rate valid for 6 months.
-4. Price Escalation: 6% increase if not lifted within validity.
-5. Delivery Schedule: Within 6 months from PO. Reschedule with 15 days notice.
-6. Terms of Supply: Goods delivered at site by authorized dealers.
-7. Terms of Payment: 100% advance with PO.
-8. Communication: All in writing to Project Head.
-9. Modification: Modified products may be provided.
-10. Product Discontinuance: 6 months to order discontinued products.
-11. Warranty: Covered under company policy.
-12. Installation: Authorized service provider only.`,
-                isDefault: false
-            });
+            navigate('/terms/new');
         }
-        setIsModalOpen(true);
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
 
-        // Validate required fields
         if (!formData.templateName?.trim()) {
             toast.error('Template Name is required');
             return;
@@ -99,6 +128,7 @@ const Terms = () => {
             }
             fetchTemplates();
             setIsModalOpen(false);
+            navigate('/terms');
         } catch (err) {
             console.error("Error saving template:", err);
             toast.error(err.response?.data?.message || 'Error saving template');
@@ -119,7 +149,8 @@ const Terms = () => {
     };
 
     return (
-        <div className="space-y-6">
+        <div className="p-6 md:p-8 space-y-8 max-w-7xl mx-auto">
+            {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-black text-slate-900 tracking-tight">Terms & Conditions</h1>
@@ -190,69 +221,93 @@ const Terms = () => {
                 </>
             )}
 
-            <Modal
-                isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-                title={editingTemplate ? "Edit Template" : "Draft New Template"}
-                maxWidth="max-w-4xl"
-                footer={
-                    <>
-                        <button
-                            onClick={() => setIsModalOpen(false)}
-                            className="px-6 py-2.5 text-slate-500 font-black hover:text-slate-900 transition-all uppercase text-[10px] tracking-widest"
-                        >
-                            Discard
-                        </button>
-                        <button
-                            onClick={handleSubmit}
-                            className="bg-primary-600 hover:bg-primary-700 text-white px-10 py-3.5 rounded-2xl font-black transition-all shadow-xl shadow-primary-600/20 uppercase text-[10px] tracking-widest active:scale-95"
-                        >
-                            {editingTemplate ? "Update Template" : "Save Template"}
-                        </button>
-                    </>
-                }
-            >
-                <form className="space-y-6 py-2">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Template Name <span className="text-rose-500">*</span></label>
-                            <input
-                                type="text"
-                                value={formData.templateName}
-                                onChange={(e) => setFormData({ ...formData, templateName: e.target.value })}
-                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-bold"
-                                placeholder="e.g. Standard Terms 2024"
-                                required
-                            />
-                        </div>
-                        <div className="space-y-2 flex flex-col justify-end pb-2">
-                            <label className="flex items-center gap-3 cursor-pointer group">
-                                <div className={`w-12 h-6 md:w-14 md:h-8 flex items-center bg-slate-200 rounded-full p-1 transition-colors duration-300 ${formData.isDefault ? 'bg-emerald-500' : ''}`}>
-                                    <div className={`bg-white w-4 h-4 md:w-6 md:h-6 rounded-full shadow-md transform duration-300 ${formData.isDefault ? 'translate-x-6' : ''}`}></div>
+            {/* Form Page View */}
+            {(isModalOpen || isCreatePage || isEditPage) && (
+                <div className="fixed inset-0 z-[100] bg-slate-50 overflow-y-auto p-6 md:p-10 flex flex-col items-center">
+                    <div className="max-w-3xl w-full my-2 space-y-6">
+                        {/* Header bar */}
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+                            <div className="flex items-center gap-4">
+                                <button
+                                    type="button"
+                                    onClick={() => { setIsModalOpen(false); navigate('/terms'); }}
+                                    className="p-3 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-2xl transition-all border border-slate-200"
+                                >
+                                    <MdArrowBack size={20} />
+                                </button>
+                                <div>
+                                    <h1 className="text-xl font-black text-slate-900">
+                                        {editingTemplate ? "Edit Template" : "Draft New Template"}
+                                    </h1>
+                                    <p className="text-xs text-slate-500 font-medium mt-0.5">
+                                        {editingTemplate ? `Update parameters for ${editingTemplate.templateName}` : 'Create a new quotation terms & conditions template'}
+                                    </p>
                                 </div>
-                                <span className="text-sm font-bold text-slate-600 group-hover:text-emerald-600 transition-colors">Set as Default Template</span>
-                                <input
-                                    type="checkbox"
-                                    checked={formData.isDefault}
-                                    onChange={(e) => setFormData({ ...formData, isDefault: e.target.checked })}
-                                    className="hidden"
-                                />
-                            </label>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => { setIsModalOpen(false); navigate('/terms'); }}
+                                    className="px-6 py-3 rounded-2xl border border-slate-200 text-slate-600 font-black uppercase text-xs tracking-widest hover:bg-slate-50 transition-all"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleSubmit}
+                                    className="bg-primary-600 hover:bg-primary-700 text-white px-8 py-3 rounded-2xl font-black transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
+                                >
+                                    {editingTemplate ? "Update Template" : "Save Template"}
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Form Card Body */}
+                        <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
+                            <form onSubmit={handleSubmit} className="space-y-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Template Name <span className="text-rose-500">*</span></label>
+                                        <input
+                                            type="text"
+                                            value={formData.templateName}
+                                            onChange={(e) => setFormData({ ...formData, templateName: e.target.value })}
+                                            className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-bold"
+                                            placeholder="e.g. Standard Terms 2024"
+                                            required
+                                        />
+                                    </div>
+                                    <div className="space-y-2 flex flex-col justify-end pb-2">
+                                        <label className="flex items-center gap-3 cursor-pointer group">
+                                            <div className={`w-12 h-6 md:w-14 md:h-8 flex items-center bg-slate-200 rounded-full p-1 transition-colors duration-300 ${formData.isDefault ? 'bg-emerald-500' : ''}`}>
+                                                <div className={`bg-white w-4 h-4 md:w-6 md:h-6 rounded-full shadow-md transform duration-300 ${formData.isDefault ? 'translate-x-6' : ''}`}></div>
+                                            </div>
+                                            <span className="text-sm font-bold text-slate-600 group-hover:text-emerald-600 transition-colors">Set as Default Template</span>
+                                            <input
+                                                type="checkbox"
+                                                checked={formData.isDefault}
+                                                onChange={(e) => setFormData({ ...formData, isDefault: e.target.checked })}
+                                                className="hidden"
+                                            />
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Terms Content <span className="text-rose-500">*</span></label>
+                                    <textarea
+                                        value={formData.content}
+                                        onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+                                        className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-xs font-mono leading-relaxed h-64 md:h-96 resize-none"
+                                        placeholder="Enter the detailed terms and conditions here..."
+                                        required
+                                    />
+                                </div>
+                            </form>
                         </div>
                     </div>
-
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Terms Content <span className="text-rose-500">*</span></label>
-                        <textarea
-                            value={formData.content}
-                            onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                            className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-xs font-mono leading-relaxed h-64 md:h-96 resize-none"
-                            placeholder="Enter the detailed terms and conditions here..."
-                            required
-                        />
-                    </div>
-                </form>
-            </Modal>
+                </div>
+            )}
         </div>
     );
 };

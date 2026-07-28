@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { MdAdd, MdDelete, MdEdit, MdSearch, MdStorefront, MdFileDownload, MdFileUpload } from 'react-icons/md';
+import { useNavigate, useParams } from 'react-router-dom';
+import { MdAdd, MdDelete, MdEdit, MdSearch, MdStorefront, MdFileDownload, MdFileUpload, MdArrowBack } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
 import Modal from '../components/Modal';
@@ -19,7 +20,9 @@ const defaultForm = {
     isActive: true
 };
 
-const Vendors = () => {
+const Vendors = ({ isCreatePage, isEditPage }) => {
+    const navigate = useNavigate();
+    const { id: routeId } = useParams();
     const [vendors, setVendors] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -107,18 +110,52 @@ const Vendors = () => {
     const filteredVendors = useMemo(() => vendors, [vendors]);
     const pagedVendors = filteredVendors;
 
+    useEffect(() => {
+        if (isCreatePage) {
+            setEditingVendor(null);
+            setFormData(defaultForm);
+            setIsModalOpen(true);
+        } else if (isEditPage && routeId) {
+            setIsModalOpen(true);
+            const found = vendors.find(v => v._id === routeId);
+            if (found) {
+                setEditingVendor(found);
+                setFormData({
+                    name: found.name || '',
+                    contactPerson: found.contactPerson || '',
+                    phone: found.phone || '',
+                    email: found.email || '',
+                    address: found.address || '',
+                    gstin: found.gstin || '',
+                    isActive: found.isActive !== false
+                });
+            } else {
+                vendorService.getAll(false, { limit: 1000 }).then(res => {
+                    const list = Array.isArray(res.data) ? res.data : res.data?.data || [];
+                    const item = list.find(v => v._id === routeId);
+                    if (item) {
+                        setEditingVendor(item);
+                        setFormData({
+                            name: item.name || '',
+                            contactPerson: item.contactPerson || '',
+                            phone: item.phone || '',
+                            email: item.email || '',
+                            address: item.address || '',
+                            gstin: item.gstin || '',
+                            isActive: item.isActive !== false
+                        });
+                    }
+                }).catch(err => console.error("Failed to load vendor", err));
+            }
+        }
+    }, [isCreatePage, isEditPage, routeId]);
+
     const openModal = (vendor = null) => {
-        setEditingVendor(vendor);
-        setFormData(vendor ? {
-            name: vendor.name || '',
-            contactPerson: vendor.contactPerson || '',
-            phone: vendor.phone || '',
-            email: vendor.email || '',
-            address: vendor.address || '',
-            gstin: vendor.gstin || '',
-            isActive: vendor.isActive !== false
-        } : defaultForm);
-        setIsModalOpen(true);
+        if (vendor) {
+            navigate(`/vendors/edit/${vendor._id}`);
+        } else {
+            navigate('/vendors/new');
+        }
     };
 
     const onChange = (e) => {
@@ -146,6 +183,7 @@ const Vendors = () => {
             }
             setIsModalOpen(false);
             fetchVendors();
+            navigate('/vendors');
         } catch (err) {
             console.error('Error saving vendor:', err);
             toast.error(err.response?.data?.message || 'Error saving vendor');
@@ -290,110 +328,135 @@ const Vendors = () => {
                 )}
             </div>
 
-            <Modal
-                isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-                title={editingVendor ? 'Edit Vendor' : 'Create Vendor'}
-                maxWidth="max-w-xl"
-                footer={(
-                    <>
-                        <button
-                            onClick={() => setIsModalOpen(false)}
-                            className="px-6 py-2.5 text-slate-500 font-black hover:text-slate-900 transition-all uppercase text-[10px] tracking-widest"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            onClick={onSubmit}
-                            className="bg-primary-600 hover:bg-primary-700 text-white px-10 py-3.5 rounded-2xl font-black transition-all shadow-xl shadow-primary-600/20 uppercase text-[10px] tracking-widest active:scale-95"
-                        >
-                            {editingVendor ? 'Update Vendor' : 'Save Vendor'}
-                        </button>
-                    </>
-                )}
-            >
-                <form onSubmit={onSubmit} className="space-y-5">
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Vendor Name *</label>
-                        <input
-                            type="text"
-                            name="name"
-                            value={formData.name}
-                            onChange={onChange}
-                            className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all"
-                            placeholder="Enter vendor name"
-                            required
-                        />
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Contact Person</label>
-                            <input
-                                type="text"
-                                name="contactPerson"
-                                value={formData.contactPerson}
-                                onChange={onChange}
-                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none"
-                                placeholder="Contact person"
-                            />
+            {/* Form Page View */}
+            {(isModalOpen || isCreatePage || isEditPage) && (
+                <div className="fixed inset-0 z-[100] bg-slate-50 overflow-y-auto p-6 md:p-10 flex flex-col items-center">
+                    <div className="max-w-4xl w-full my-2 space-y-6">
+                        {/* Header bar */}
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+                            <div className="flex items-center gap-4">
+                                <button
+                                    type="button"
+                                    onClick={() => { setIsModalOpen(false); navigate('/vendors'); }}
+                                    className="p-3 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-2xl transition-all border border-slate-200"
+                                >
+                                    <MdArrowBack size={20} />
+                                </button>
+                                <div>
+                                    <h1 className="text-xl font-black text-slate-900">
+                                        {editingVendor ? 'Edit Vendor' : 'Create Vendor'}
+                                    </h1>
+                                    <p className="text-xs text-slate-500 font-medium mt-0.5">
+                                        {editingVendor ? `Update information for ${editingVendor.name}` : 'Add a new supplier to master data'}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => { setIsModalOpen(false); navigate('/vendors'); }}
+                                    className="px-6 py-3 rounded-2xl border border-slate-200 text-slate-600 font-black uppercase text-xs tracking-widest hover:bg-slate-50 transition-all"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={onSubmit}
+                                    className="bg-primary-600 hover:bg-primary-700 text-white px-8 py-3 rounded-2xl font-black transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
+                                >
+                                    {editingVendor ? 'Update Vendor' : 'Save Vendor'}
+                                </button>
+                            </div>
                         </div>
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Phone</label>
-                            <input
-                                type="text"
-                                name="phone"
-                                value={formData.phone}
-                                onChange={onChange}
-                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none"
-                                placeholder="+91"
-                            />
+
+                        {/* Form Card Body */}
+                        <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
+                            <form onSubmit={onSubmit} className="space-y-6">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Vendor Name *</label>
+                                    <input
+                                        type="text"
+                                        name="name"
+                                        value={formData.name}
+                                        onChange={onChange}
+                                        className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all"
+                                        placeholder="Enter vendor name"
+                                        required
+                                    />
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Contact Person</label>
+                                        <input
+                                            type="text"
+                                            name="contactPerson"
+                                            value={formData.contactPerson}
+                                            onChange={onChange}
+                                            className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none"
+                                            placeholder="Contact person"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Phone</label>
+                                        <input
+                                            type="text"
+                                            name="phone"
+                                            value={formData.phone}
+                                            onChange={onChange}
+                                            className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none"
+                                            placeholder="+91"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Email</label>
+                                        <input
+                                            type="email"
+                                            name="email"
+                                            value={formData.email}
+                                            onChange={onChange}
+                                            className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none"
+                                            placeholder="vendor@company.com"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">GSTIN</label>
+                                        <input
+                                            type="text"
+                                            name="gstin"
+                                            value={formData.gstin}
+                                            onChange={onChange}
+                                            className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none"
+                                            placeholder="GST Number"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Address</label>
+                                    <textarea
+                                        name="address"
+                                        value={formData.address}
+                                        onChange={onChange}
+                                        className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none min-h-24"
+                                        placeholder="Address"
+                                    />
+                                </div>
+                                <label className="flex items-center gap-2 text-xs font-bold text-slate-600 pt-2">
+                                    <input
+                                        type="checkbox"
+                                        name="isActive"
+                                        checked={formData.isActive}
+                                        onChange={onChange}
+                                        className="w-4 h-4 text-primary-600 rounded"
+                                    />
+                                    Vendor is active
+                                </label>
+                            </form>
                         </div>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Email</label>
-                            <input
-                                type="email"
-                                name="email"
-                                value={formData.email}
-                                onChange={onChange}
-                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none"
-                                placeholder="vendor@company.com"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">GSTIN</label>
-                            <input
-                                type="text"
-                                name="gstin"
-                                value={formData.gstin}
-                                onChange={onChange}
-                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none"
-                                placeholder="GST Number"
-                            />
-                        </div>
-                    </div>
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Address</label>
-                        <textarea
-                            name="address"
-                            value={formData.address}
-                            onChange={onChange}
-                            className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none min-h-24"
-                            placeholder="Address"
-                        />
-                    </div>
-                    <label className="flex items-center gap-2 text-xs font-bold text-slate-600">
-                        <input
-                            type="checkbox"
-                            name="isActive"
-                            checked={formData.isActive}
-                            onChange={onChange}
-                        />
-                        Vendor is active
-                    </label>
-                </form>
-            </Modal>
+                </div>
+            )}
 
             {/* Import Modal */}
             <ImportModal

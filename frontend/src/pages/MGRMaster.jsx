@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MdAdd, MdEdit, MdDelete, MdSync } from 'react-icons/md';
+import { MdAdd, MdEdit, MdDelete } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import { mgrService } from '../services/api';
 import Modal from '../components/Modal';
@@ -198,7 +198,7 @@ const MGRMaster = () => {
                                             <td className="p-4 text-sm font-medium text-slate-600">{mgr.description}</td>
                                             {activeTab === 'MGR3' && (
                                                 <td className="p-4">
-                                                    <button 
+                                                    <button
                                                         onClick={() => navigate('/attributes')}
                                                         className="text-[10px] font-black uppercase tracking-widest text-primary-600 hover:text-primary-700 hover:underline"
                                                     >
@@ -239,7 +239,7 @@ const MGRMaster = () => {
                                     ))}
                                     {mgrs.length === 0 && (
                                         <tr>
-                                            <td colSpan={4} className="p-8 text-center text-slate-400 text-sm font-medium">
+                                            <td colSpan={activeTab === 'MGR3' ? 5 : 4} className="p-8 text-center text-slate-400 text-sm font-medium">
                                                 No {activeTab} items found.
                                             </td>
                                         </tr>
@@ -253,73 +253,97 @@ const MGRMaster = () => {
                 </div>
             </div>
 
-            <Modal
-                isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-                title={editingMGR ? `Edit ${activeTab}` : `Add ${activeTab}`}
-                maxWidth="max-w-md"
-                footer={
-                    <>
-                        <button
-                            onClick={() => setIsModalOpen(false)}
-                            className="px-6 py-2.5 text-slate-500 font-black hover:text-slate-900 transition-all uppercase text-[10px] tracking-widest"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            onClick={handleSubmit}
-                            className="bg-primary-600 hover:bg-primary-700 text-white px-8 py-3 rounded-2xl font-black transition-all shadow-xl shadow-primary-600/20 uppercase text-[10px] tracking-widest"
-                        >
-                            {editingMGR ? "Update" : "Save"}
-                        </button>
-                    </>
-                }
-            >
-                <form className="space-y-4 py-2">
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Code <span className="text-rose-500">*</span></label>
-                        <input
-                            type="text"
-                            name="code"
-                            value={formData.code}
-                            onChange={handleFormChange}
-                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-bold uppercase transition-all"
-                            placeholder="e.g. DKT"
-                            required
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Description <span className="text-rose-500">*</span></label>
-                        <input
-                            type="text"
-                            name="description"
-                            value={formData.description}
-                            onChange={handleFormChange}
-                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-medium transition-all"
-                            placeholder="e.g. Desktop"
-                            required
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Status</label>
-                        <div className="flex gap-4 p-1">
-                            {['Active', 'Inactive'].map((st) => (
-                                <label key={st} className="flex-1 flex items-center justify-center gap-2 cursor-pointer group bg-slate-50 py-3 rounded-2xl border border-slate-200 transition-all has-[:checked]:bg-primary-50 has-[:checked]:border-primary-200">
+            {/* Form Page View */}
+            {(isModalOpen || isCreatePage || isEditPage) && (
+                <div className="fixed inset-0 z-[100] bg-slate-50 overflow-y-auto p-6 md:p-10 flex flex-col items-center">
+                    <div className="max-w-3xl w-full my-2 space-y-6">
+                        {/* Header bar */}
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+                            <div className="flex items-center gap-4">
+                                <button
+                                    type="button"
+                                    onClick={() => { setIsModalOpen(false); navigate('/mgrs'); }}
+                                    className="p-3 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-2xl transition-all border border-slate-200"
+                                >
+                                    <MdArrowBack size={20} />
+                                </button>
+                                <div>
+                                    <h1 className="text-xl font-black text-slate-900">
+                                        {editingMGR ? `Edit ${activeTab}` : `Add ${activeTab}`}
+                                    </h1>
+                                    <p className="text-xs text-slate-500 font-medium mt-0.5">
+                                        {editingMGR ? `Update parameters for ${editingMGR.code}` : `Create a new ${activeTab} item`}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => { setIsModalOpen(false); navigate('/mgrs'); }}
+                                    className="px-6 py-3 rounded-2xl border border-slate-200 text-slate-600 font-black uppercase text-xs tracking-widest hover:bg-slate-50 transition-all"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleSubmit}
+                                    className="bg-primary-600 hover:bg-primary-700 text-white px-8 py-3 rounded-2xl font-black transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
+                                >
+                                    {editingMGR ? "Update" : "Save"}
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Form Card Body */}
+                        <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
+                            <form className="space-y-6">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Code <span className="text-rose-500">*</span></label>
                                     <input
-                                        type="radio"
-                                        name="status"
-                                        value={st}
-                                        checked={formData.status === st}
+                                        type="text"
+                                        name="code"
+                                        value={formData.code}
                                         onChange={handleFormChange}
-                                        className="sr-only"
+                                        className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-bold uppercase transition-all"
+                                        placeholder="e.g. DKT"
+                                        required
                                     />
-                                    <span className={`text-[10px] font-black uppercase tracking-widest ${formData.status === st ? 'text-primary-600' : 'text-slate-400'}`}>{st}</span>
-                                </label>
-                            ))}
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Description <span className="text-rose-500">*</span></label>
+                                    <input
+                                        type="text"
+                                        name="description"
+                                        value={formData.description}
+                                        onChange={handleFormChange}
+                                        className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-medium transition-all"
+                                        placeholder="e.g. Desktop"
+                                        required
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Status</label>
+                                    <div className="flex gap-4 p-1">
+                                        {['Active', 'Inactive'].map((st) => (
+                                            <label key={st} className="flex-1 flex items-center justify-center gap-2 cursor-pointer group bg-slate-50 py-3.5 rounded-2xl border border-slate-200 transition-all has-[:checked]:bg-primary-50 has-[:checked]:border-primary-200">
+                                                <input
+                                                    type="radio"
+                                                    name="status"
+                                                    value={st}
+                                                    checked={formData.status === st}
+                                                    onChange={handleFormChange}
+                                                    className="sr-only"
+                                                />
+                                                <span className={`text-[10px] font-black uppercase tracking-widest ${formData.status === st ? 'text-primary-600' : 'text-slate-400'}`}>{st}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+                            </form>
                         </div>
                     </div>
-                </form>
-            </Modal>
+                </div>
+            )}
         </div>
     );
 };

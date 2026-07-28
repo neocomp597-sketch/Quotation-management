@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { MdAdd, MdSearch, MdEdit, MdDelete, MdInventory, MdCategory, MdQrCode, MdPayments, MdProductionQuantityLimits, MdCloudUpload, MdVisibility, MdFileUpload, MdCheckBox, MdCheckBoxOutlineBlank, MdDeleteSweep, MdSync, MdImage, MdFileDownload } from 'react-icons/md';
+import { useNavigate, useParams } from 'react-router-dom';
+import { MdAdd, MdSearch, MdEdit, MdDelete, MdInventory, MdCategory, MdQrCode, MdPayments, MdProductionQuantityLimits, MdCloudUpload, MdVisibility, MdFileUpload, MdCheckBox, MdCheckBoxOutlineBlank, MdDeleteSweep, MdSync, MdImage, MdFileDownload, MdArrowBack } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
 import { productService, uploadService, importService, mgrService, attributeService, productAttributeService, vendorService, categoryService } from '../services/api';
@@ -19,7 +20,9 @@ const emptyVendorRow = () => ({
     isPrimary: false
 });
 
-const Products = ({ initialTab = 'products' }) => {
+const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
+    const navigate = useNavigate();
+    const { id: routeId } = useParams();
     const [activeTab, setActiveTab] = useState(initialTab);
     const [products, setProducts] = useState([]);
     const [vendors, setVendors] = useState([]);
@@ -239,8 +242,100 @@ const Products = ({ initialTab = 'products' }) => {
             });
         } catch (err) {
             console.error("Error fetching products:", err);
+            toast.error('Failed to load products');
         } finally {
             setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (isCreatePage) {
+            setEditingProduct(null);
+            setFormData({
+                productName: '',
+                productCode: '',
+                categoryId: '',
+                description: '',
+                hsnCode: '',
+                gstPercentage: 18,
+                basePrice: 0,
+                mrp: 0,
+                uom: 'Nos',
+                productImageUrl: '',
+                status: 'Active',
+                mgr1: '',
+                mgr2: '',
+                mgr3: '',
+                mgr4: '',
+                mgr5: '',
+                attributes: [],
+                vendors: [emptyVendorRow()],
+                catalogType: 'Product',
+                subscriptionDetails: { billingCycle: 'Monthly', setupFee: 0, renewalPrice: 0 },
+                rentalDetails: { minLeaseTerm: 1, securityDeposit: 0, baseRatePerDay: 0, baseRatePerMonth: 0 },
+                pricing: { baseCost: 0, minPrice: 0, maxPrice: 0, marginPercent: 0, currency: 'INR' }
+            });
+            setIsModalOpen(true);
+        } else if (isEditPage && routeId) {
+            setIsModalOpen(true);
+            const found = products.find(p => p._id === routeId);
+            if (found) {
+                setEditingProduct(found);
+                setFormData({
+                    ...found,
+                    categoryId: found.categoryId?._id || found.categoryId || '',
+                    mgr1: found.mgr1?._id || found.mgr1 || '',
+                    mgr2: found.mgr2?._id || found.mgr2 || '',
+                    mgr3: found.mgr3?._id || found.mgr3 || '',
+                    mgr4: found.mgr4?._id || found.mgr4 || '',
+                    mgr5: found.mgr5?._id || found.mgr5 || '',
+                    attributes: (found.attributes || []).map(a => a._id || a),
+                    vendors: found.vendors?.length ? found.vendors.map(v => ({
+                        vendorId: v.vendorId?._id || v.vendorId,
+                        price: v.price || '',
+                        stock: v.stock || 0,
+                        isPrimary: v.isPrimary || false
+                    })) : [emptyVendorRow()]
+                });
+                if (found.mgr3?._id || found.mgr3) {
+                    fetchAvailableAttributes(found.mgr3?._id || found.mgr3);
+                }
+            } else {
+                productService.getAll({ limit: 1000 }).then(res => {
+                    const list = Array.isArray(res.data) ? res.data : res.data?.data || [];
+                    const item = list.find(p => p._id === routeId);
+                    if (item) {
+                        setEditingProduct(item);
+                        setFormData({
+                            ...item,
+                            categoryId: item.categoryId?._id || item.categoryId || '',
+                            mgr1: item.mgr1?._id || item.mgr1 || '',
+                            mgr2: item.mgr2?._id || item.mgr2 || '',
+                            mgr3: item.mgr3?._id || item.mgr3 || '',
+                            mgr4: item.mgr4?._id || item.mgr4 || '',
+                            mgr5: item.mgr5?._id || item.mgr5 || '',
+                            attributes: (item.attributes || []).map(a => a._id || a),
+                            vendors: item.vendors?.length ? item.vendors.map(v => ({
+                                vendorId: v.vendorId?._id || v.vendorId,
+                                price: v.price || '',
+                                stock: v.stock || 0,
+                                isPrimary: v.isPrimary || false
+                            })) : [emptyVendorRow()]
+                        });
+                        if (item.mgr3?._id || item.mgr3) {
+                            fetchAvailableAttributes(item.mgr3?._id || item.mgr3);
+                        }
+                    }
+                }).catch(err => console.error("Failed to load product", err));
+            }
+        }
+    }, [isCreatePage, isEditPage, routeId]);
+
+    const handleOpenModal = (product = null) => {
+        if (product) {
+            navigate(`/products/edit/${product._id}`);
+        } else {
+            navigate('/products/new');
         }
     };
 
@@ -410,6 +505,7 @@ const Products = ({ initialTab = 'products' }) => {
             fetchProducts();
             fetchAllAttributes();
             setIsModalOpen(false);
+            navigate('/products');
         } catch (err) {
             console.error("Error saving product:", err);
             toast.error(err.response?.data?.message || 'Error saving product data');
@@ -1145,29 +1241,50 @@ const Products = ({ initialTab = 'products' }) => {
                 </div>
             </div>
 
-            <Modal
-                isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-                title={editingProduct ? "Maintain Product" : "Expand Catalog"}
-                maxWidth="max-w-4xl"
-                footer={
-                    <>
-                        <button
-                            onClick={() => setIsModalOpen(false)}
-                            className="px-6 py-2.5 text-slate-500 font-black hover:text-slate-900 transition-all uppercase text-[10px] tracking-widest"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            onClick={handleSubmit}
-                            disabled={isSaving}
-                            className="bg-primary-600 hover:bg-primary-700 text-white px-10 py-3.5 rounded-2xl font-black transition-all shadow-xl shadow-primary-600/20 uppercase text-[10px] tracking-widest active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100"
-                        >
-                            {isSaving ? "Saving..." : editingProduct ? "Update Product" : "Enlist Product"}
-                        </button>
-                    </>
-                }
-            >
+            {/* Form Page View */}
+            {(isModalOpen || isCreatePage || isEditPage) && (
+                <div className="fixed inset-0 z-[100] bg-slate-50 overflow-y-auto p-6 md:p-10 flex flex-col items-center">
+                    <div className="max-w-5xl w-full my-2 space-y-6">
+                        {/* Header bar */}
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+                            <div className="flex items-center gap-4">
+                                <button
+                                    type="button"
+                                    onClick={() => { setIsModalOpen(false); navigate('/products'); }}
+                                    className="p-3 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-2xl transition-all border border-slate-200"
+                                >
+                                    <MdArrowBack size={20} />
+                                </button>
+                                <div>
+                                    <h1 className="text-xl font-black text-slate-900">
+                                        {editingProduct ? 'Maintain Product' : 'Expand Catalog'}
+                                    </h1>
+                                    <p className="text-xs text-slate-500 font-medium mt-0.5">
+                                        {editingProduct ? `Update details for ${editingProduct.productName}` : 'Add a new product to master catalog'}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => { setIsModalOpen(false); navigate('/products'); }}
+                                    className="px-6 py-3 rounded-2xl border border-slate-200 text-slate-600 font-black uppercase text-xs tracking-widest hover:bg-slate-50 transition-all"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleSubmit}
+                                    disabled={isSaving}
+                                    className="bg-primary-600 hover:bg-primary-700 text-white px-8 py-3 rounded-2xl font-black transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100"
+                                >
+                                    {isSaving ? "Saving..." : editingProduct ? "Update Product" : "Enlist Product"}
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Form Body Card */}
+                        <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
                 <form className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8 py-2">
                     <div className="space-y-8">
                         <div>
@@ -1530,7 +1647,10 @@ const Products = ({ initialTab = 'products' }) => {
                         </div>
                     </div>
                 </form>
-            </Modal>
+            </div>
+        </div>
+    </div>
+)}
 
             {/* View Image Modal */}
             <Modal

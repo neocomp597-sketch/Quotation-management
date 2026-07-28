@@ -29,6 +29,8 @@ const KraSchema = new mongoose.Schema({
 
 const EmployeeProfileSchema = new mongoose.Schema({
     employeeId: { type: String, trim: true, index: true },
+    externalEmployeeCode: { type: String, trim: true, default: '' },
+    gender: { type: String, enum: ['Male', 'Female', 'Other'], default: 'Male' },
     branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null },
     branchPrefix: { type: String, trim: true, uppercase: true },
     name: { type: String, required: true },
@@ -44,6 +46,7 @@ const EmployeeProfileSchema = new mongoose.Schema({
     accountNumber: { type: String, trim: true },
     ifscCode: { type: String, uppercase: true, trim: true },
     joiningDate: { type: Date, required: true },
+    lastWorkingDate: { type: Date, default: null },
     dob: { type: Date },
     department: { type: String, trim: true },
     designation: { type: String, trim: true },

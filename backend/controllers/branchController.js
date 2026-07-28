@@ -37,7 +37,7 @@ exports.createBranch = async (req, res) => {
             return res.status(400).json({ message: 'Company context missing' });
         }
 
-        const { name, code, branchPrefix, address, city, state, pincode, contactNo, email, gstNo, logoUrl, managerName, status } = req.body;
+        const { name, code, branchPrefix, address, city, state, stateShortCode, pincode, contactNo, email, gstNo, logoUrl, managerName, status, startEmployeeSeq } = req.body;
 
         if (!name || !code || !branchPrefix) {
             return res.status(400).json({ message: 'Branch Name, Branch Code, and Branch Prefix are required' });
@@ -45,6 +45,7 @@ exports.createBranch = async (req, res) => {
 
         const cleanCode = String(code).trim().toUpperCase();
         const cleanPrefix = String(branchPrefix).trim().toUpperCase();
+        const parsedStartSeq = parseInt(startEmployeeSeq, 10) || 1001;
 
         if (cleanPrefix.length < 2 || cleanPrefix.length > 5) {
             return res.status(400).json({ message: 'Branch Prefix should be 2 to 5 characters (e.g., NSK, PN, MUM)' });
@@ -67,12 +68,14 @@ exports.createBranch = async (req, res) => {
             address: address || '',
             city: city || '',
             state: state || '',
+            stateShortCode: stateShortCode || '',
             pincode: pincode || '',
             contactNo: contactNo || '',
             email: email || '',
             gstNo: gstNo || '',
             logoUrl: logoUrl || '',
             managerName: managerName || '',
+            startEmployeeSeq: parsedStartSeq,
             status: status || 'Active',
             companyId
         });
@@ -88,16 +91,21 @@ exports.updateBranch = async (req, res) => {
     try {
         const companyId = req.user?.companyId;
         const { id } = req.params;
-        const { name, code, branchPrefix, address, city, state, pincode, contactNo, email, gstNo, logoUrl, managerName, status } = req.body;
+        const { name, code, branchPrefix, address, city, state, stateShortCode, pincode, contactNo, email, gstNo, logoUrl, managerName, status, startEmployeeSeq } = req.body;
 
-        const branch = await Branch.findOne({ _id: id, companyId });
+        const query = { _id: id };
+        if (companyId) query.companyId = companyId;
+
+        const branch = await Branch.findOne(query);
         if (!branch) {
             return res.status(404).json({ message: 'Branch not found' });
         }
 
         if (code && code.trim().toUpperCase() !== branch.code) {
             const cleanCode = code.trim().toUpperCase();
-            const existing = await Branch.findOne({ companyId, code: cleanCode, _id: { $ne: id } }).lean();
+            const q = { code: cleanCode, _id: { $ne: id } };
+            if (companyId) q.companyId = companyId;
+            const existing = await Branch.findOne(q).lean();
             if (existing) {
                 return res.status(400).json({ message: 'Branch Code already exists' });
             }
@@ -109,7 +117,9 @@ exports.updateBranch = async (req, res) => {
             if (cleanPrefix.length < 2 || cleanPrefix.length > 5) {
                 return res.status(400).json({ message: 'Branch Prefix should be 2 to 5 characters' });
             }
-            const existing = await Branch.findOne({ companyId, branchPrefix: cleanPrefix, _id: { $ne: id } }).lean();
+            const q = { branchPrefix: cleanPrefix, _id: { $ne: id } };
+            if (companyId) q.companyId = companyId;
+            const existing = await Branch.findOne(q).lean();
             if (existing) {
                 return res.status(400).json({ message: 'Branch Prefix already exists' });
             }
@@ -120,6 +130,7 @@ exports.updateBranch = async (req, res) => {
         if (address !== undefined) branch.address = address;
         if (city !== undefined) branch.city = city;
         if (state !== undefined) branch.state = state;
+        if (stateShortCode !== undefined) branch.stateShortCode = stateShortCode;
         if (pincode !== undefined) branch.pincode = pincode;
         if (contactNo !== undefined) branch.contactNo = contactNo;
         if (email !== undefined) branch.email = email;
@@ -127,6 +138,28 @@ exports.updateBranch = async (req, res) => {
         if (logoUrl !== undefined) branch.logoUrl = logoUrl;
         if (managerName !== undefined) branch.managerName = managerName;
         if (status) branch.status = status;
+
+        if (startEmployeeSeq !== undefined && startEmployeeSeq !== null) {
+            const parsedSeq = parseInt(startEmployeeSeq, 10);
+            if (!isNaN(parsedSeq) && parsedSeq > 0) {
+                branch.startEmployeeSeq = parsedSeq;
+                // Reset Counter for this branch prefix to parsedSeq - 1 so the next code auto-starts from parsedSeq
+                const Counter = require('../models/Counter');
+                const counterQuery = { type: 'employee', prefix: branch.branchPrefix };
+                if (companyId) counterQuery.companyId = companyId;
+
+                await Counter.findOneAndUpdate(
+                    counterQuery,
+                    { 
+                        ...(companyId && { companyId }),
+                        type: 'employee',
+                        prefix: branch.branchPrefix,
+                        seq: parsedSeq - 1 
+                    },
+                    { upsert: true, new: true }
+                );
+            }
+        }
 
         const updatedBranch = await branch.save();
         res.json(updatedBranch);

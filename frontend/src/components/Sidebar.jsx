@@ -126,6 +126,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                 { key: 'master_products', name: 'Products', icon: <MdInventory size={18} />, path: '/products' },
                 { key: 'master_territories', name: 'Territory Master', icon: <MdMap size={18} />, path: '/territory-master' },
                 { key: 'master_branches', name: 'Branch Master', icon: <MdBusiness size={18} />, path: '/branches' },
+                { key: 'master_branches', name: 'State Master', icon: <MdMap size={18} />, path: '/state-master' },
                 { key: 'csm_masters', name: 'Engineers Master', icon: <MdBuildCircle size={18} />, path: '/csm/masters?tab=engineers' },
                 { key: 'master_mgrs', name: 'MGR Master', icon: <MdCategory size={18} />, path: '/mgrs' },
                 { key: 'master_attributes', name: 'Attributes', icon: <MdAssignment size={18} />, path: '/attributes' },

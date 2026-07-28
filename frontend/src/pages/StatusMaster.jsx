@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { MdAdd, MdEdit, MdDelete } from 'react-icons/md';
+import { useNavigate, useParams } from 'react-router-dom';
+import { MdAdd, MdEdit, MdDelete, MdArrowBack } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import { statusService } from '../services/api';
 import Modal from '../components/Modal';
@@ -7,7 +8,9 @@ import PaginationControls from '../components/PaginationControls';
 
 const LIST_PAGE_SIZE = 20;
 
-const StatusMaster = () => {
+const StatusMaster = ({ isCreatePage, isEditPage }) => {
+    const navigate = useNavigate();
+    const { id: routeId } = useParams();
     const [statuses, setStatuses] = useState([]);
     const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(1);
@@ -46,21 +49,42 @@ const StatusMaster = () => {
         }
     };
 
+    useEffect(() => {
+        if (isCreatePage) {
+            setEditingStatus(null);
+            setFormData({ name: '', isActive: true });
+            setIsModalOpen(true);
+        } else if (isEditPage && routeId) {
+            setIsModalOpen(true);
+            const found = statuses.find(s => s._id === routeId);
+            if (found) {
+                setEditingStatus(found);
+                setFormData({
+                    name: found.name,
+                    isActive: found.isActive
+                });
+            } else {
+                statusService.getAll({ limit: 1000 }).then(res => {
+                    const list = Array.isArray(res.data) ? res.data : res.data?.data || [];
+                    const item = list.find(s => s._id === routeId);
+                    if (item) {
+                        setEditingStatus(item);
+                        setFormData({
+                            name: item.name,
+                            isActive: item.isActive
+                        });
+                    }
+                }).catch(err => console.error("Failed to load status", err));
+            }
+        }
+    }, [isCreatePage, isEditPage, routeId, statuses]);
+
     const handleOpenModal = (status = null) => {
         if (status) {
-            setEditingStatus(status);
-            setFormData({
-                name: status.name,
-                isActive: status.isActive
-            });
+            navigate(`/status-master/edit/${status._id}`);
         } else {
-            setEditingStatus(null);
-            setFormData({
-                name: '',
-                isActive: true
-            });
+            navigate('/status-master/new');
         }
-        setIsModalOpen(true);
     };
 
     const handleFormChange = (e) => {
@@ -89,6 +113,7 @@ const StatusMaster = () => {
             }
             fetchStatuses();
             setIsModalOpen(false);
+            navigate('/status-master');
         } catch (err) {
             console.error("Error saving status:", err);
             toast.error(err.response?.data?.message || 'Error saving data');
@@ -192,49 +217,73 @@ const StatusMaster = () => {
                 </div>
             </div>
 
-            <Modal
-                isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-                title={editingStatus ? "Edit Status" : "Add Status"}
-                maxWidth="max-w-md"
-                footer={
-                    <>
-                        <button
-                            onClick={() => setIsModalOpen(false)}
-                            className="px-6 py-2.5 text-slate-500 font-black hover:text-slate-900 transition-all uppercase text-[10px] tracking-widest"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            onClick={handleSubmit}
-                            className="bg-primary-600 hover:bg-primary-700 text-white px-8 py-3 rounded-2xl font-black transition-all shadow-xl shadow-primary-600/20 uppercase text-[10px] tracking-widest"
-                        >
-                            {editingStatus ? "Update" : "Save"}
-                        </button>
-                    </>
-                }
-            >
-                <form className="space-y-4 py-2">
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Status Name <span className="text-rose-500">*</span></label>
-                        <input
-                            type="text"
-                            name="name"
-                            value={formData.name}
-                            onChange={handleFormChange}
-                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-bold transition-all"
-                            placeholder="e.g. In Progress"
-                            required
-                        />
-                    </div>
-                    <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-200 cursor-pointer" onClick={() => setFormData(prev => ({ ...prev, isActive: !prev.isActive }))}>
-                        <div className={`w-12 h-6 rounded-full p-1 transition-colors duration-300 ${formData.isActive ? 'bg-emerald-500' : 'bg-slate-300'}`}>
-                            <div className={`w-4 h-4 bg-white rounded-full transition-transform duration-300 ${formData.isActive ? 'translate-x-6' : 'translate-x-0'}`} />
+            {/* Form Page View */}
+            {(isModalOpen || isCreatePage || isEditPage) && (
+                <div className="fixed inset-0 z-[100] bg-slate-50 overflow-y-auto p-6 md:p-10 flex flex-col items-center">
+                    <div className="max-w-3xl w-full my-2 space-y-6">
+                        {/* Header bar */}
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+                            <div className="flex items-center gap-4">
+                                <button
+                                    type="button"
+                                    onClick={() => { setIsModalOpen(false); navigate('/status-master'); }}
+                                    className="p-3 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-2xl transition-all border border-slate-200"
+                                >
+                                    <MdArrowBack size={20} />
+                                </button>
+                                <div>
+                                    <h1 className="text-xl font-black text-slate-900">
+                                        {editingStatus ? "Edit Status" : "Add Status"}
+                                    </h1>
+                                    <p className="text-xs text-slate-500 font-medium mt-0.5">
+                                        {editingStatus ? `Update parameters for ${editingStatus.name}` : 'Create a new quotation status entry'}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => { setIsModalOpen(false); navigate('/status-master'); }}
+                                    className="px-6 py-3 rounded-2xl border border-slate-200 text-slate-600 font-black uppercase text-xs tracking-widest hover:bg-slate-50 transition-all"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleSubmit}
+                                    className="bg-primary-600 hover:bg-primary-700 text-white px-8 py-3 rounded-2xl font-black transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
+                                >
+                                    {editingStatus ? "Update" : "Save"}
+                                </button>
+                            </div>
                         </div>
-                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-600">Active Status</span>
+
+                        {/* Form Card Body */}
+                        <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
+                            <form onSubmit={handleSubmit} className="space-y-6">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Status Name <span className="text-rose-500">*</span></label>
+                                    <input
+                                        type="text"
+                                        name="name"
+                                        value={formData.name}
+                                        onChange={handleFormChange}
+                                        className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-bold transition-all"
+                                        placeholder="e.g. In Progress"
+                                        required
+                                    />
+                                </div>
+                                <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-200 cursor-pointer" onClick={() => setFormData(prev => ({ ...prev, isActive: !prev.isActive }))}>
+                                    <div className={`w-12 h-6 rounded-full p-1 transition-colors duration-300 ${formData.isActive ? 'bg-emerald-500' : 'bg-slate-300'}`}>
+                                        <div className={`w-4 h-4 bg-white rounded-full transition-transform duration-300 ${formData.isActive ? 'translate-x-6' : 'translate-x-0'}`} />
+                                    </div>
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-600">Active Status</span>
+                                </div>
+                            </form>
+                        </div>
                     </div>
-                </form>
-            </Modal>
+                </div>
+            )}
         </div>
     );
 };
