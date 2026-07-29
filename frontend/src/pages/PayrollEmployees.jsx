@@ -9,7 +9,8 @@ import { formatDate } from '../utils/helpers';
 import * as XLSX from 'xlsx';
 import { 
     MdPeople, MdAdd, MdSearch, MdEdit, MdDelete, 
-    MdSave, MdAccountBalance, MdAssignment, MdUploadFile, MdDownload, MdBusiness, MdAccountTree, MdArrowBack, MdSettings 
+    MdSave, MdAccountBalance, MdAssignment, MdUploadFile, MdDownload, MdBusiness, MdAccountTree, MdArrowBack, MdSettings,
+    MdPhotoCamera, MdContactPhone 
 } from 'react-icons/md';
 
 const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
@@ -33,9 +34,54 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
     // Form states
     const [basicForm, setBasicForm] = useState({
         branchId: '', employeeId: '', externalEmployeeCode: '', gender: 'Male', name: '', email: '', mobile: '', reportingTo: '', dob: '', joiningDate: '', lastWorkingDate: '', department: '', designation: '', status: 'Active',
+        photo: '', familyDetails: [],
         pan: '', aadhaar: '', uan: '', pfNumber: '', esiNumber: '',
         bankName: '', accountNumber: '', ifscCode: ''
     });
+
+    const handlePhotoUpload = (e) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            if (file.size > 5 * 1024 * 1024) {
+                toast.error('Image size should be less than 5MB');
+                return;
+            }
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setBasicForm(prev => ({ ...prev, photo: reader.result }));
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const handleRemovePhoto = () => {
+        setBasicForm(prev => ({ ...prev, photo: '' }));
+    };
+
+    const handleAddFamilyMember = () => {
+        setBasicForm(prev => ({
+            ...prev,
+            familyDetails: [
+                ...(prev.familyDetails || []),
+                { relation: 'Father', name: '', contactNumber: '', isEmergencyContact: false }
+            ]
+        }));
+    };
+
+    const handleUpdateFamilyMember = (index, field, value) => {
+        setBasicForm(prev => {
+            const updated = [...(prev.familyDetails || [])];
+            updated[index] = { ...updated[index], [field]: value };
+            return { ...prev, familyDetails: updated };
+        });
+    };
+
+    const handleRemoveFamilyMember = (index) => {
+        setBasicForm(prev => ({
+            ...prev,
+            familyDetails: (prev.familyDetails || []).filter((_, i) => i !== index)
+        }));
+    };
 
     const [structureForm, setStructureForm] = useState({
         basic: 0, hra: 0, da: 0, specialAllowance: 0, bonus: 0, incentive: 0, reimbursement: 0,
@@ -138,6 +184,7 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
             setBasicForm({
                 branchId: '', employeeId: '', externalEmployeeCode: '', gender: 'Male', name: '', email: '', mobile: '', reportingTo: '', dob: '', joiningDate: new Date().toISOString().substring(0, 10), lastWorkingDate: '',
                 department: '', designation: '', status: 'Active',
+                photo: '', familyDetails: [],
                 pan: '', aadhaar: '', uan: '', pfNumber: '', esiNumber: '',
                 bankName: '', accountNumber: '', ifscCode: ''
             });
@@ -163,6 +210,8 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                     department: emp.department || '',
                     designation: emp.designation || '',
                     status: emp.status || 'Active',
+                    photo: emp.photo || '',
+                    familyDetails: Array.isArray(emp.familyDetails) ? emp.familyDetails : [],
                     pan: emp.pan || '',
                     aadhaar: emp.aadhaar || '',
                     uan: emp.uan || '',
@@ -420,30 +469,41 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                     return (
                                         <tr key={emp._id} className="hover:bg-slate-50/50 transition-colors">
                                             <td className="px-6 py-4">
-                                                <div className="flex items-center gap-2 flex-wrap">
-                                                    <p className="text-slate-900 font-bold">{emp.name}</p>
-                                                    {emp.employeeId && (
-                                                        <span className="px-2 py-0.5 bg-primary-100 dark:bg-primary-950 text-primary-700 dark:text-primary-300 font-black text-[10px] rounded-lg">
-                                                            {emp.employeeId}
-                                                        </span>
+                                                <div className="flex items-center gap-3">
+                                                    {emp.photo ? (
+                                                        <img src={emp.photo} alt={emp.name} className="w-10 h-10 rounded-full object-cover border-2 border-teal-500 shadow-sm shrink-0" />
+                                                    ) : (
+                                                        <div className="w-10 h-10 rounded-full bg-teal-100 text-teal-700 font-black text-sm flex items-center justify-center shrink-0 border border-teal-200">
+                                                            {emp.name ? emp.name.charAt(0).toUpperCase() : 'E'}
+                                                        </div>
                                                     )}
-                                                    {emp.externalEmployeeCode && (
-                                                        <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 font-mono font-bold text-[10px] rounded-lg border border-indigo-100">
-                                                            Ext: {emp.externalEmployeeCode}
-                                                        </span>
-                                                    )}
-                                                    {emp.gender && (
-                                                        <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 font-bold text-[10px] rounded-lg">
-                                                            {emp.gender}
-                                                        </span>
-                                                    )}
+                                                    <div>
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <p className="text-slate-900 font-bold">{emp.name}</p>
+                                                            {emp.employeeId && (
+                                                                <span className="px-2 py-0.5 bg-primary-100 dark:bg-primary-950 text-primary-700 dark:text-primary-300 font-black text-[10px] rounded-lg">
+                                                                    {emp.employeeId}
+                                                                </span>
+                                                            )}
+                                                            {emp.externalEmployeeCode && (
+                                                                <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 font-mono font-bold text-[10px] rounded-lg border border-indigo-100">
+                                                                    Ext: {emp.externalEmployeeCode}
+                                                                </span>
+                                                            )}
+                                                            {emp.gender && (
+                                                                <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 font-bold text-[10px] rounded-lg">
+                                                                    {emp.gender}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <p className="text-xs text-slate-400">{emp.email || 'No email registered'}</p>
+                                                        {emp.reportingTo?.name && (
+                                                            <p className="text-[11px] text-teal-600 font-medium mt-0.5">
+                                                                Supervisor: {emp.reportingTo.name}
+                                                            </p>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                                <p className="text-xs text-slate-400">{emp.email || 'No email registered'}</p>
-                                                {emp.reportingTo?.name && (
-                                                    <p className="text-[11px] text-teal-600 font-medium mt-0.5">
-                                                        Supervisor: {emp.reportingTo.name}
-                                                    </p>
-                                                )}
                                             </td>
                                             <td className="px-6 py-4">
                                                 <p className="text-slate-800">{emp.designation || 'N/A'}</p>
@@ -556,6 +616,52 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                     {/* Section 1: Basic Details */}
                                     <div>
                                         <h4 className="text-xs font-black text-teal-600 uppercase tracking-widest mb-4 border-b border-slate-50 pb-1.5">1. Basic Info</h4>
+
+                                        {/* Employee Photo Upload Widget */}
+                                        <div className="flex items-center gap-6 p-4 bg-slate-50 border border-slate-200 rounded-2xl mb-6">
+                                            <div className="relative shrink-0">
+                                                {basicForm.photo ? (
+                                                    <img
+                                                        src={basicForm.photo}
+                                                        alt="Employee Photo"
+                                                        className="w-20 h-20 rounded-2xl object-cover border-2 border-teal-500 shadow-md"
+                                                    />
+                                                ) : (
+                                                    <div className="w-20 h-20 rounded-2xl bg-teal-50 border-2 border-dashed border-teal-300 flex flex-col items-center justify-center text-teal-600">
+                                                        <MdPhotoCamera size={28} />
+                                                        <span className="text-[10px] font-bold mt-1">Photo</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider">
+                                                    Employee Profile Photo
+                                                </label>
+                                                <div className="flex items-center gap-3">
+                                                    <label className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-bold text-xs cursor-pointer transition-all shadow-sm flex items-center gap-1.5">
+                                                        <MdUploadFile size={16} />
+                                                        <span>{basicForm.photo ? 'Change Photo' : 'Upload Photo'}</span>
+                                                        <input
+                                                            type="file"
+                                                            accept="image/*"
+                                                            onChange={handlePhotoUpload}
+                                                            className="hidden"
+                                                        />
+                                                    </label>
+                                                    {basicForm.photo && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={handleRemovePhoto}
+                                                            className="px-4 py-2 border border-rose-200 text-rose-600 hover:bg-rose-50 rounded-xl font-bold text-xs transition-all"
+                                                        >
+                                                            Remove Photo
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                <p className="text-[11px] text-slate-400 font-medium">Supports JPG, PNG or WEBP (Max size 5MB)</p>
+                                            </div>
+                                        </div>
+
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                             <div>
                                                 <label className={labelClass}>Branch *</label>
@@ -820,6 +926,100 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                             </div>
                                         </div>
                                     </div>
+
+                                     {/* Section 4: Family Information */}
+                                     <div>
+                                         <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-4">
+                                             <h4 className="text-xs font-black text-teal-600 uppercase tracking-widest flex items-center gap-2">
+                                                 <MdContactPhone size={16} />
+                                                 <span>4. Family Information</span>
+                                             </h4>
+                                             <button
+                                                 type="button"
+                                                 onClick={handleAddFamilyMember}
+                                                 className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-50 hover:bg-teal-100 text-teal-700 rounded-xl text-xs font-bold transition-all border border-teal-200"
+                                             >
+                                                 <MdAdd size={16} />
+                                                 <span>Add Family Member</span>
+                                             </button>
+                                         </div>
+
+                                         {(!basicForm.familyDetails || basicForm.familyDetails.length === 0) ? (
+                                             <div className="p-6 bg-slate-50 border border-dashed border-slate-200 rounded-2xl text-center">
+                                                 <p className="text-xs font-semibold text-slate-500">No family details added yet.</p>
+                                                 <button
+                                                     type="button"
+                                                     onClick={handleAddFamilyMember}
+                                                     className="mt-2 text-xs font-black text-teal-600 hover:underline"
+                                                 >
+                                                     + Click to add a family member
+                                                 </button>
+                                             </div>
+                                         ) : (
+                                             <div className="space-y-3">
+                                                 {basicForm.familyDetails.map((fam, idx) => (
+                                                     <div key={idx} className="grid grid-cols-1 md:grid-cols-12 gap-3 p-4 bg-slate-50 border border-slate-200 rounded-2xl items-center">
+                                                         <div className="md:col-span-3">
+                                                             <label className={labelClass}>Relation *</label>
+                                                             <select
+                                                                 value={fam.relation || 'Father'}
+                                                                 onChange={(e) => handleUpdateFamilyMember(idx, 'relation', e.target.value)}
+                                                                 className={inputClass}
+                                                             >
+                                                                 <option value="Father">Father</option>
+                                                                 <option value="Mother">Mother</option>
+                                                                 <option value="Spouse">Spouse</option>
+                                                                 <option value="Child">Child</option>
+                                                                 <option value="Sibling">Sibling</option>
+                                                                 <option value="Other">Other</option>
+                                                             </select>
+                                                         </div>
+                                                         <div className="md:col-span-4">
+                                                             <label className={labelClass}>Name *</label>
+                                                             <input
+                                                                 type="text"
+                                                                 placeholder="Family member full name"
+                                                                 value={fam.name || ''}
+                                                                 onChange={(e) => handleUpdateFamilyMember(idx, 'name', e.target.value)}
+                                                                 className={inputClass}
+                                                             />
+                                                         </div>
+                                                         <div className="md:col-span-3">
+                                                             <label className={labelClass}>Contact Number</label>
+                                                             <input
+                                                                 type="text"
+                                                                 placeholder="e.g. 9876543210"
+                                                                 value={fam.contactNumber || ''}
+                                                                 onChange={(e) => handleUpdateFamilyMember(idx, 'contactNumber', e.target.value)}
+                                                                 className={inputClass}
+                                                             />
+                                                         </div>
+                                                         <div className="md:col-span-2 flex flex-col justify-end">
+                                                             <div className="flex items-center justify-between gap-2 mt-4 md:mt-0">
+                                                                 <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-slate-700 select-none">
+                                                                     <input
+                                                                         type="checkbox"
+                                                                         checked={fam.isEmergencyContact || false}
+                                                                         onChange={(e) => handleUpdateFamilyMember(idx, 'isEmergencyContact', e.target.checked)}
+                                                                         className="w-4 h-4 text-teal-600 rounded focus:ring-teal-500"
+                                                                     />
+                                                                     <span>Emergency</span>
+                                                                 </label>
+                                                                 <button
+                                                                     type="button"
+                                                                     onClick={() => handleRemoveFamilyMember(idx)}
+                                                                     className="p-2 text-rose-500 hover:bg-rose-100 rounded-xl transition-all"
+                                                                     title="Remove family member"
+                                                                 >
+                                                                     <MdDelete size={18} />
+                                                                 </button>
+                                                             </div>
+                                                         </div>
+                                                     </div>
+                                                 ))}
+                                             </div>
+                                         )}
+                                     </div>
 
                                     <div className="pt-5 border-t border-slate-100 flex justify-end gap-3">
                                         <button

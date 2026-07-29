@@ -37,7 +37,7 @@ exports.createBranch = async (req, res) => {
             return res.status(400).json({ message: 'Company context missing' });
         }
 
-        const { name, code, branchPrefix, address, city, state, stateShortCode, pincode, contactNo, email, gstNo, logoUrl, managerName, status, startEmployeeSeq } = req.body;
+        const { name, code, branchPrefix, address, country, city, state, stateShortCode, countryDialCode, pincode, contactNo, email, gstNo, logoUrl, managerName, status, startEmployeeSeq } = req.body;
 
         if (!name || !code || !branchPrefix) {
             return res.status(400).json({ message: 'Branch Name, Branch Code, and Branch Prefix are required' });
@@ -66,9 +66,11 @@ exports.createBranch = async (req, res) => {
             code: cleanCode,
             branchPrefix: cleanPrefix,
             address: address || '',
+            country: country || 'India',
             city: city || '',
             state: state || '',
             stateShortCode: stateShortCode || '',
+            countryDialCode: countryDialCode || '+91',
             pincode: pincode || '',
             contactNo: contactNo || '',
             email: email || '',
@@ -91,7 +93,7 @@ exports.updateBranch = async (req, res) => {
     try {
         const companyId = req.user?.companyId;
         const { id } = req.params;
-        const { name, code, branchPrefix, address, city, state, stateShortCode, pincode, contactNo, email, gstNo, logoUrl, managerName, status, startEmployeeSeq } = req.body;
+        const { name, code, branchPrefix, address, country, city, state, stateShortCode, countryDialCode, pincode, contactNo, email, gstNo, logoUrl, managerName, status, startEmployeeSeq } = req.body;
 
         const query = { _id: id };
         if (companyId) query.companyId = companyId;
@@ -128,9 +130,11 @@ exports.updateBranch = async (req, res) => {
 
         if (name) branch.name = name.trim();
         if (address !== undefined) branch.address = address;
+        if (country !== undefined) branch.country = country || 'India';
         if (city !== undefined) branch.city = city;
         if (state !== undefined) branch.state = state;
         if (stateShortCode !== undefined) branch.stateShortCode = stateShortCode;
+        if (countryDialCode !== undefined) branch.countryDialCode = countryDialCode || '+91';
         if (pincode !== undefined) branch.pincode = pincode;
         if (contactNo !== undefined) branch.contactNo = contactNo;
         if (email !== undefined) branch.email = email;

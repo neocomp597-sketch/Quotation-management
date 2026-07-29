@@ -27,10 +27,18 @@ const KraSchema = new mongoose.Schema({
     status: { type: String, enum: ['On Track', 'Needs Attention', 'Exceeded', 'Behind'], default: 'On Track' }
 }, { _id: true });
 
+const FamilyMemberSchema = new mongoose.Schema({
+    relation: { type: String, enum: ['Father', 'Mother', 'Spouse', 'Child', 'Sibling', 'Other'], default: 'Other' },
+    name: { type: String, trim: true, default: '' },
+    contactNumber: { type: String, trim: true, default: '' },
+    isEmergencyContact: { type: Boolean, default: false }
+}, { _id: true });
+
 const EmployeeProfileSchema = new mongoose.Schema({
     employeeId: { type: String, trim: true, index: true },
     externalEmployeeCode: { type: String, trim: true, default: '' },
     gender: { type: String, enum: ['Male', 'Female', 'Other'], default: 'Male' },
+    photo: { type: String, default: '' },
     branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null },
     branchPrefix: { type: String, trim: true, uppercase: true },
     name: { type: String, required: true },
@@ -52,6 +60,7 @@ const EmployeeProfileSchema = new mongoose.Schema({
     designation: { type: String, trim: true },
     status: { type: String, enum: ['Active', 'Hold', 'Resigned', 'Vacant'], default: 'Active' },
     isVacant: { type: Boolean, default: false },
+    familyDetails: [FamilyMemberSchema],
     kraList: [KraSchema],
     salaryStructure: { type: SalaryStructureSchema, default: () => ({}) }
 }, { timestamps: true });

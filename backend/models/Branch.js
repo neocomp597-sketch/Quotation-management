@@ -13,9 +13,11 @@ const BranchSchema = new mongoose.Schema({
         maxlength: 5
     },
     address: { type: String, default: '' },
+    country: { type: String, default: 'India', trim: true },
     city: { type: String, default: '' },
     state: { type: String, default: '' },
     stateShortCode: { type: String, uppercase: true, default: '' },
+    countryDialCode: { type: String, default: '+91', trim: true },
     pincode: { type: String, default: '' },
     contactNo: { type: String, default: '' },
     email: { type: String, default: '' },

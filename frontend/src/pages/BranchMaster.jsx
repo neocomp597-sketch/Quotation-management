@@ -7,6 +7,7 @@ import {
 import { toast } from 'react-toastify';
 import { branchService, stateMasterService } from '../services/api';
 import Modal from '../components/Modal';
+import CascadingLocationSelector from '../components/CascadingLocationSelector';
 
 const BranchMaster = ({ isCreatePage, isEditPage }) => {
     const navigate = useNavigate();
@@ -27,9 +28,11 @@ const BranchMaster = ({ isCreatePage, isEditPage }) => {
         branchPrefix: '',
         startEmployeeSeq: 1001,
         address: '',
+        country: 'India',
         city: '',
         state: '',
         stateShortCode: '',
+        countryDialCode: '+91',
         pincode: '',
         contactNo: '',
         email: '',
@@ -77,9 +80,11 @@ const BranchMaster = ({ isCreatePage, isEditPage }) => {
                     branchPrefix: found.branchPrefix || '',
                     startEmployeeSeq: found.startEmployeeSeq || 1001,
                     address: found.address || '',
+                    country: found.country || 'India',
                     city: found.city || '',
                     state: found.state || '',
                     stateShortCode: found.stateShortCode || '',
+                    countryDialCode: found.countryDialCode || '+91',
                     pincode: found.pincode || '',
                     contactNo: found.contactNo || '',
                     email: found.email || '',
@@ -99,9 +104,11 @@ const BranchMaster = ({ isCreatePage, isEditPage }) => {
                             code: item.code || '',
                             branchPrefix: item.branchPrefix || '',
                             address: item.address || '',
+                            country: item.country || 'India',
                             city: item.city || '',
                             state: item.state || '',
                             stateShortCode: item.stateShortCode || '',
+                            countryDialCode: item.countryDialCode || '+91',
                             pincode: item.pincode || '',
                             contactNo: item.contactNo || '',
                             email: item.email || '',
@@ -460,51 +467,23 @@ const BranchMaster = ({ isCreatePage, isEditPage }) => {
                                             className="w-full px-3.5 py-3 bg-slate-50 rounded-xl border border-slate-200 text-sm font-semibold text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20 outline-none"
                                         />
                                     </div>
-
-                                    <div className="grid grid-cols-3 gap-2">
-                                        <div>
-                                            <label className="block text-xs font-bold text-slate-700 mb-1">City</label>
-                                            <input
-                                                type="text"
-                                                placeholder="City"
-                                                value={formData.city}
-                                                onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                                                className="w-full px-3 py-3 bg-slate-50 rounded-xl border border-slate-200 text-sm font-semibold text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20 outline-none"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-bold text-slate-700 mb-1">State</label>
-                                            <select
-                                                value={formData.state}
-                                                onChange={(e) => {
-                                                    const val = e.target.value;
-                                                    const matched = stateList.find(s => s.state === val);
-                                                    setFormData({
-                                                        ...formData,
-                                                        state: val,
-                                                        stateShortCode: matched ? matched.shortCode : formData.stateShortCode
-                                                    });
-                                                }}
-                                                className="w-full px-3 py-3 bg-slate-50 rounded-xl border border-slate-200 text-sm font-semibold text-slate-900 focus:ring-2 focus:ring-primary-500/20 outline-none cursor-pointer"
-                                            >
-                                                <option value="">-- Select State --</option>
-                                                {stateList.map(st => (
-                                                    <option key={st._id} value={st.state}>{st.state} ({st.shortCode})</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-bold text-slate-700 mb-1">Short Code</label>
-                                            <input
-                                                type="text"
-                                                placeholder="MH"
-                                                maxLength={5}
-                                                value={formData.stateShortCode}
-                                                onChange={(e) => setFormData({ ...formData, stateShortCode: e.target.value.toUpperCase() })}
-                                                className="w-full px-3 py-3 bg-slate-50 rounded-xl border border-slate-200 text-sm font-mono font-bold uppercase text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20 outline-none"
-                                            />
-                                        </div>
-                                    </div>
+                                    <CascadingLocationSelector
+                                        country={formData.country || 'India'}
+                                        state={formData.state || ''}
+                                        city={formData.city || ''}
+                                        dialCode={formData.countryDialCode || '+91'}
+                                        masterStateList={stateList}
+                                        onChange={({ country, state, city, dialCode, shortCode }) => {
+                                            setFormData(prev => ({
+                                                ...prev,
+                                                country,
+                                                state,
+                                                city,
+                                                countryDialCode: dialCode,
+                                                stateShortCode: shortCode || prev.stateShortCode
+                                            }));
+                                        }}
+                                    />
                                 </div>
 
                                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-6">

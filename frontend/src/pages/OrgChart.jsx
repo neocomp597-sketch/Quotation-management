@@ -460,6 +460,8 @@ const OrgChart = () => {
                                 <div className="-rotate-45 w-full h-full flex items-center justify-center font-black text-lg">
                                     {node.isVacant ? (
                                         <MdPersonAdd className="text-amber-400 text-xl" />
+                                    ) : node.photo ? (
+                                        <img src={node.photo} alt={node.name} className="w-full h-full object-cover rounded-xl" />
                                     ) : (
                                         <span>{node.name ? node.name.charAt(0).toUpperCase() : 'E'}</span>
                                     )}
@@ -505,9 +507,11 @@ const OrgChart = () => {
                         }`}
                     >
                         {/* Floating Small Circular Photo Badge on Top-Right Edge */}
-                        <div className={`absolute -top-1 -right-1 z-20 w-8 h-8 rounded-full border-2 flex items-center justify-center font-extrabold text-xs shadow-md ${meta.badgeClass}`}>
+                        <div className={`absolute -top-1 -right-1 z-20 w-8 h-8 rounded-full border-2 flex items-center justify-center font-extrabold text-xs shadow-md overflow-hidden ${meta.badgeClass}`}>
                             {node.isVacant ? (
                                 <MdPersonAdd className="text-amber-400 text-xs" />
+                            ) : node.photo ? (
+                                <img src={node.photo} alt={node.name} className="w-full h-full object-cover" />
                             ) : (
                                 <span>{node.name ? node.name.charAt(0).toUpperCase() : 'E'}</span>
                             )}
@@ -539,15 +543,15 @@ const OrgChart = () => {
 
                 {/* Vertical Line Connector Down */}
                 {hasChildren && !isCollapsed && (
-                    <div className="w-0.5 h-6 bg-slate-400 dark:bg-slate-600 my-0.5" />
+                    <div className="w-1 h-7 bg-emerald-500 border-l-2 border-emerald-500 my-0.5 org-connector-line shrink-0" style={{ backgroundColor: '#10b981', borderColor: '#10b981' }} />
                 )}
 
                 {/* Sub-Children Hierarchy Rendering: Vertical Stack for 1 child vs Horizontal Spanner for >1 children */}
                 {hasChildren && !isCollapsed && (
-                    <div className="relative flex justify-center pt-1">
+                    <div className="relative flex justify-center pt-1 w-full">
                         {/* If more than 1 child: Horizontal Connector Spanner Bar */}
                         {!isSingleChild && (
-                            <div className="absolute top-0 left-12 right-12 h-0.5 bg-slate-400 dark:bg-slate-600" />
+                            <div className="absolute top-0 left-6 right-6 h-1 bg-emerald-500 border-t-2 border-emerald-500 org-connector-line" style={{ backgroundColor: '#10b981', borderColor: '#10b981' }} />
                         )}
 
                         {/* If single child: Direct Vertical Stack Chain (1-to-1 down) */}
@@ -560,7 +564,7 @@ const OrgChart = () => {
                             <div className="flex space-x-8">
                                 {node.children.map(child => (
                                     <div key={child._id} className="relative flex flex-col items-center">
-                                        <div className="w-0.5 h-3.5 bg-slate-400 dark:bg-slate-600" />
+                                        <div className="w-1 h-4 bg-emerald-500 border-l-2 border-emerald-500 org-connector-line shrink-0" style={{ backgroundColor: '#10b981', borderColor: '#10b981' }} />
                                         {renderTreeNode(child, depth + 1)}
                                     </div>
                                 ))}
@@ -575,7 +579,19 @@ const OrgChart = () => {
     return (
         <div className="p-4 md:p-8 max-w-[1700px] mx-auto space-y-6">
             <style>{`
+                .org-connector-line {
+                    -webkit-print-color-adjust: exact !important;
+                    print-color-adjust: exact !important;
+                    color-adjust: exact !important;
+                    background-color: #10b981 !important;
+                    border-color: #10b981 !important;
+                }
                 @media print {
+                    * {
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                        color-adjust: exact !important;
+                    }
                     @page {
                         size: A4 landscape;
                         margin: 4mm;
@@ -617,6 +633,13 @@ const OrgChart = () => {
                         transform-origin: top center !important;
                         margin: 0 auto !important;
                         padding-top: 10px !important;
+                    }
+                    .org-connector-line {
+                        display: block !important;
+                        visibility: visible !important;
+                        background-color: #10b981 !important;
+                        border-color: #10b981 !important;
+                        opacity: 1 !important;
                     }
                 }
             `}</style>
