@@ -28,8 +28,8 @@ export const DEFAULT_STATES = {
         { state: 'Chhattisgarh', shortCode: 'CG', gstCode: '22' },
         { state: 'Goa', shortCode: 'GA', gstCode: '30' },
         { state: 'Gujarat', shortCode: 'GJ', gstCode: '24' },
-        { state: 'Haryana', shortCode: 'HR', gstCode: '6' },
-        { state: 'Himachal Pradesh', shortCode: 'HP', gstCode: '2' },
+        { state: 'Haryana', shortCode: 'HR', gstCode: '06' },
+        { state: 'Himachal Pradesh', shortCode: 'HP', gstCode: '02' },
         { state: 'Jharkhand', shortCode: 'JH', gstCode: '20' },
         { state: 'Karnataka', shortCode: 'KA', gstCode: '29' },
         { state: 'Kerala', shortCode: 'KL', gstCode: '32' },
@@ -40,20 +40,20 @@ export const DEFAULT_STATES = {
         { state: 'Mizoram', shortCode: 'MZ', gstCode: '15' },
         { state: 'Nagaland', shortCode: 'NL', gstCode: '13' },
         { state: 'Odisha', shortCode: 'OD', gstCode: '21' },
-        { state: 'Punjab', shortCode: 'PB', gstCode: '3' },
-        { state: 'Rajasthan', shortCode: 'RJ', gstCode: '8' },
+        { state: 'Punjab', shortCode: 'PB', gstCode: '03' },
+        { state: 'Rajasthan', shortCode: 'RJ', gstCode: '08' },
         { state: 'Sikkim', shortCode: 'SK', gstCode: '11' },
         { state: 'Tamil Nadu', shortCode: 'TN', gstCode: '33' },
         { state: 'Telangana', shortCode: 'TS', gstCode: '36' },
         { state: 'Tripura', shortCode: 'TR', gstCode: '16' },
-        { state: 'Uttar Pradesh', shortCode: 'UP', gstCode: '9' },
-        { state: 'Uttarakhand', shortCode: 'UK', gstCode: '5' },
+        { state: 'Uttar Pradesh', shortCode: 'UP', gstCode: '09' },
+        { state: 'Uttarakhand', shortCode: 'UK', gstCode: '05' },
         { state: 'West Bengal', shortCode: 'WB', gstCode: '19' },
         { state: 'Andaman & Nicobar Islands', shortCode: 'AN', gstCode: '35' },
-        { state: 'Chandigarh', shortCode: 'CH', gstCode: '4' },
+        { state: 'Chandigarh', shortCode: 'CH', gstCode: '04' },
         { state: 'Dadra & Nagar Haveli and Daman & Diu', shortCode: 'DH', gstCode: '26' },
-        { state: 'Delhi (NCT)', shortCode: 'DL', gstCode: '7' },
-        { state: 'Jammu & Kashmir', shortCode: 'JK', gstCode: '1' },
+        { state: 'Delhi (NCT)', shortCode: 'DL', gstCode: '07' },
+        { state: 'Jammu & Kashmir', shortCode: 'JK', gstCode: '01' },
         { state: 'Ladakh', shortCode: 'LA', gstCode: '38' },
         { state: 'Lakshadweep', shortCode: 'LD', gstCode: '31' },
         { state: 'Puducherry', shortCode: 'PY', gstCode: '34' }
@@ -82,6 +82,7 @@ export const DEFAULT_CITIES = {
     'Maharashtra': ['Mumbai', 'Pune', 'Nashik', 'Nagpur', 'Thane', 'Aurangabad', 'Solapur', 'Kolhapur'],
     'Gujarat': ['Ahmedabad', 'Surat', 'Vadodara', 'Rajkot', 'Bhavnagar', 'Jamnagar'],
     'Delhi': ['New Delhi', 'North Delhi', 'South Delhi', 'East Delhi', 'West Delhi'],
+    'Delhi (NCT)': ['New Delhi', 'North Delhi', 'South Delhi', 'East Delhi', 'West Delhi'],
     'Karnataka': ['Bengaluru', 'Mysuru', 'Mangaluru', 'Hubballi', 'Belagavi'],
     'Tamil Nadu': ['Chennai', 'Coimbatore', 'Madurai', 'Tiruchirappalli', 'Salem'],
     'California': ['Los Angeles', 'San Francisco', 'San Diego', 'San Jose', 'Sacramento'],
@@ -108,6 +109,7 @@ export const getStatesForCountry = (countryName, masterStateList = []) => {
     ).map(s => ({
         state: s.state,
         shortCode: s.shortCode || 'ST',
+        gstCode: s.gstCode || '',
         country: s.country || 'India',
         _id: s._id
     }));
@@ -130,5 +132,7 @@ export const getStatesForCountry = (countryName, masterStateList = []) => {
 
 export const getCitiesForState = (stateName) => {
     if (!stateName) return [];
-    return DEFAULT_CITIES[stateName] || ['Central', 'North', 'South', 'East', 'West'];
+    if (DEFAULT_CITIES[stateName]) return DEFAULT_CITIES[stateName];
+    const key = Object.keys(DEFAULT_CITIES).find(k => k.toLowerCase() === stateName.toLowerCase());
+    return key ? DEFAULT_CITIES[key] : ['Central', 'North', 'South', 'East', 'West'];
 };

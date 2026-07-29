@@ -16,6 +16,9 @@ const CascadingLocationSelector = ({
     const [selectedCity, setSelectedCity] = useState(city || '');
     const [selectedDialCode, setSelectedDialCode] = useState(dialCode || '+91');
 
+    const [isCustomState, setIsCustomState] = useState(false);
+    const [isCustomCity, setIsCustomCity] = useState(false);
+
     const [availableStates, setAvailableStates] = useState([]);
     const [availableCities, setAvailableCities] = useState([]);
 
@@ -47,35 +50,75 @@ const CascadingLocationSelector = ({
         setAvailableStates(newStates);
         setSelectedState('');
         setSelectedCity('');
+        setIsCustomState(false);
+        setIsCustomCity(false);
 
         onChange({
             country: newCountry,
             state: '',
             city: '',
             dialCode: newDial,
-            shortCode: ''
+            shortCode: '',
+            gstCode: ''
         });
     };
 
     const handleStateSelect = (newStateName) => {
+        if (newStateName === '__CUSTOM_STATE__') {
+            setIsCustomState(true);
+            setSelectedState('');
+            setSelectedCity('');
+            onChange({
+                country: selectedCountry,
+                state: '',
+                city: '',
+                dialCode: selectedDialCode,
+                shortCode: '',
+                gstCode: ''
+            });
+            return;
+        }
+
+        setIsCustomState(false);
         setSelectedState(newStateName);
         const matched = availableStates.find(s => s.state.toLowerCase() === newStateName.toLowerCase());
         const shortCode = matched ? matched.shortCode : '';
+        const gstCode = matched ? matched.gstCode : '';
 
         const cities = getCitiesForState(newStateName);
         setAvailableCities(cities);
-        setSelectedCity('');
+        const defaultCity = cities.length > 0 ? cities[0] : '';
+        setSelectedCity(defaultCity);
 
         onChange({
             country: selectedCountry,
             state: newStateName,
-            city: '',
+            city: defaultCity,
             dialCode: selectedDialCode,
-            shortCode
+            shortCode,
+            gstCode
+        });
+    };
+
+    const handleCustomStateInput = (val) => {
+        setSelectedState(val);
+        onChange({
+            country: selectedCountry,
+            state: val,
+            city: selectedCity,
+            dialCode: selectedDialCode,
+            shortCode: '',
+            gstCode: ''
         });
     };
 
     const handleCitySelect = (newCity) => {
+        if (newCity === '__CUSTOM_CITY__') {
+            setIsCustomCity(true);
+            setSelectedCity('');
+            return;
+        }
+        setIsCustomCity(false);
         setSelectedCity(newCity);
         const matched = availableStates.find(s => s.state.toLowerCase() === selectedState.toLowerCase());
 
@@ -84,7 +127,22 @@ const CascadingLocationSelector = ({
             state: selectedState,
             city: newCity,
             dialCode: selectedDialCode,
-            shortCode: matched ? matched.shortCode : ''
+            shortCode: matched ? matched.shortCode : '',
+            gstCode: matched ? (matched.gstCode || '') : ''
+        });
+    };
+
+    const handleCustomCityInput = (val) => {
+        setSelectedCity(val);
+        const matched = availableStates.find(s => s.state.toLowerCase() === selectedState.toLowerCase());
+
+        onChange({
+            country: selectedCountry,
+            state: selectedState,
+            city: val,
+            dialCode: selectedDialCode,
+            shortCode: matched ? matched.shortCode : '',
+            gstCode: matched ? (matched.gstCode || '') : ''
         });
     };
 
@@ -97,7 +155,8 @@ const CascadingLocationSelector = ({
             state: selectedState,
             city: selectedCity,
             dialCode: newCode,
-            shortCode: matched ? matched.shortCode : ''
+            shortCode: matched ? matched.shortCode : '',
+            gstCode: matched ? (matched.gstCode || '') : ''
         });
     };
 
@@ -123,42 +182,88 @@ const CascadingLocationSelector = ({
                 </select>
             </div>
 
-            {/* State Dropdown */}
+            {/* State Dropdown / Input */}
             <div>
-                <label className={labelClass}>
-                    State {required && <span className="text-rose-500">*</span>}
-                </label>
-                <select
-                    value={selectedState}
-                    onChange={(e) => handleStateSelect(e.target.value)}
-                    className={inputClass}
-                    required={required}
-                >
-                    <option value="">Select State</option>
-                    {availableStates.map(st => (
-                        <option key={st.state} value={st.state}>
-                            {st.state} {st.shortCode ? `(${st.shortCode})` : ''}
-                        </option>
-                    ))}
-                </select>
+                <div className="flex items-center justify-between mb-1.5">
+                    <label className={labelClass}>
+                        State {required && <span className="text-rose-500">*</span>}
+                    </label>
+                    {availableStates.length > 0 && (
+                        <button
+                            type="button"
+                            onClick={() => setIsCustomState(!isCustomState)}
+                            className="text-[10px] text-primary-600 font-bold hover:underline"
+                        >
+                            {isCustomState ? 'Select List' : '+ Custom'}
+                        </button>
+                    )}
+                </div>
+                {!isCustomState && availableStates.length > 0 ? (
+                    <select
+                        value={selectedState}
+                        onChange={(e) => handleStateSelect(e.target.value)}
+                        className={inputClass}
+                        required={required}
+                    >
+                        <option value="">Select State</option>
+                        {availableStates.map(st => (
+                            <option key={st.state} value={st.state}>
+                                {st.state} {st.shortCode ? `(${st.shortCode})` : ''} {st.gstCode ? `- GST: ${st.gstCode}` : ''}
+                            </option>
+                        ))}
+                        <option value="__CUSTOM_STATE__" className="font-bold text-primary-600">+ Enter Custom State...</option>
+                    </select>
+                ) : (
+                    <input
+                        type="text"
+                        placeholder="State name"
+                        value={selectedState}
+                        onChange={(e) => handleCustomStateInput(e.target.value)}
+                        className={inputClass}
+                        required={required}
+                    />
+                )}
             </div>
 
-            {/* City Dropdown */}
+            {/* City Dropdown / Input */}
             <div>
-                <label className={labelClass}>
-                    City {required && <span className="text-rose-500">*</span>}
-                </label>
-                <select
-                    value={selectedCity}
-                    onChange={(e) => handleCitySelect(e.target.value)}
-                    className={inputClass}
-                    required={required}
-                >
-                    <option value="">Select City</option>
-                    {availableCities.map(ct => (
-                        <option key={ct} value={ct}>{ct}</option>
-                    ))}
-                </select>
+                <div className="flex items-center justify-between mb-1.5">
+                    <label className={labelClass}>
+                        City {required && <span className="text-rose-500">*</span>}
+                    </label>
+                    {availableCities.length > 0 && (
+                        <button
+                            type="button"
+                            onClick={() => setIsCustomCity(!isCustomCity)}
+                            className="text-[10px] text-primary-600 font-bold hover:underline"
+                        >
+                            {isCustomCity ? 'Select List' : '+ Custom'}
+                        </button>
+                    )}
+                </div>
+                {!isCustomCity && availableCities.length > 0 ? (
+                    <select
+                        value={selectedCity}
+                        onChange={(e) => handleCitySelect(e.target.value)}
+                        className={inputClass}
+                        required={required}
+                    >
+                        <option value="">Select City</option>
+                        {availableCities.map(ct => (
+                            <option key={ct} value={ct}>{ct}</option>
+                        ))}
+                        <option value="__CUSTOM_CITY__" className="font-bold text-primary-600">+ Custom City...</option>
+                    </select>
+                ) : (
+                    <input
+                        type="text"
+                        placeholder="City name"
+                        value={selectedCity}
+                        onChange={(e) => handleCustomCityInput(e.target.value)}
+                        className={inputClass}
+                        required={required}
+                    />
+                )}
             </div>
 
             {/* Country Dial Code */}

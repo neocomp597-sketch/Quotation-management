@@ -268,13 +268,18 @@ const BranchMaster = ({ isCreatePage, isEditPage }) => {
                                             <h3 className="font-black text-slate-900 dark:text-slate-100 text-lg leading-snug">
                                                 {branch.name}
                                             </h3>
-                                            <div className="flex items-center gap-2 mt-1">
+                                            <div className="flex flex-wrap items-center gap-2 mt-1">
                                                 <span className="px-2 py-0.5 bg-primary-50 dark:bg-primary-950/60 text-primary-700 dark:text-primary-300 font-bold text-[11px] rounded-lg">
                                                     Code: {branch.code}
                                                 </span>
                                                 <span className="px-2 py-0.5 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-bold text-[11px] rounded-lg">
                                                     Prefix: {branch.branchPrefix}
                                                 </span>
+                                                {branch.stateShortCode && (
+                                                    <span className="px-2 py-0.5 bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-mono font-bold text-[11px] rounded-lg">
+                                                        State Code: {branch.stateShortCode}
+                                                    </span>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
@@ -288,11 +293,17 @@ const BranchMaster = ({ isCreatePage, isEditPage }) => {
                                 </div>
 
                                 <div className="space-y-2 text-xs font-semibold text-slate-600 dark:text-slate-300 pt-2 border-t border-slate-100 dark:border-slate-800">
-                                    {(branch.city || branch.state || branch.address) && (
+                                    {(branch.city || branch.state || branch.address || branch.country) && (
                                         <div className="flex items-start gap-2">
                                             <MdLocationOn className="text-slate-400 shrink-0 mt-0.5" size={15} />
                                             <span>
-                                                {[branch.address, branch.city, branch.state, branch.pincode].filter(Boolean).join(', ')}
+                                                {[
+                                                    branch.address,
+                                                    branch.city,
+                                                    branch.state ? `${branch.state}${branch.stateShortCode ? ` (${branch.stateShortCode})` : ''}` : '',
+                                                    branch.country ? `${branch.country} (${branch.countryDialCode || '+91'})` : '',
+                                                    branch.pincode
+                                                ].filter(Boolean).join(', ')}
                                             </span>
                                         </div>
                                     )}
@@ -473,15 +484,27 @@ const BranchMaster = ({ isCreatePage, isEditPage }) => {
                                         city={formData.city || ''}
                                         dialCode={formData.countryDialCode || '+91'}
                                         masterStateList={stateList}
-                                        onChange={({ country, state, city, dialCode, shortCode }) => {
-                                            setFormData(prev => ({
-                                                ...prev,
-                                                country,
-                                                state,
-                                                city,
-                                                countryDialCode: dialCode,
-                                                stateShortCode: shortCode || prev.stateShortCode
-                                            }));
+                                        onChange={({ country, state, city, dialCode, shortCode, gstCode }) => {
+                                            setFormData(prev => {
+                                                let nextGstNo = prev.gstNo || '';
+                                                if (gstCode) {
+                                                    const cleanCode = String(gstCode).padStart(2, '0');
+                                                    if (!nextGstNo) {
+                                                        nextGstNo = cleanCode;
+                                                    } else if (/^\d{2}/.test(nextGstNo)) {
+                                                        nextGstNo = cleanCode + nextGstNo.slice(2);
+                                                    }
+                                                }
+                                                return {
+                                                    ...prev,
+                                                    country,
+                                                    state,
+                                                    city,
+                                                    countryDialCode: dialCode,
+                                                    stateShortCode: shortCode || prev.stateShortCode,
+                                                    gstNo: nextGstNo
+                                                };
+                                            });
                                         }}
                                     />
                                 </div>

@@ -3,9 +3,11 @@ const tenantPlugin = require('./plugins/tenantPlugin');
 
 const StateMasterSchema = new mongoose.Schema({
     country: { type: String, default: 'India', trim: true },
+    dialCode: { type: String, trim: true, default: '+91' },
     state: { type: String, required: true, trim: true },
     shortCode: { type: String, required: true, trim: true, uppercase: true },
     gstCode: { type: String, trim: true, default: '' },
+    city: { type: String, trim: true, default: '' },
     status: { type: String, enum: ['Active', 'Inactive'], default: 'Active' },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }

@@ -126,11 +126,66 @@ exports.getEmployee = async (req, res) => {
     }
 };
 
+const validateEmployeeFieldsBackend = (data) => {
+    if (data.mobile && data.mobile.trim()) {
+        const mobileRegex = /^(?:\+91|0)?[6-9]\d{9}$/;
+        if (!mobileRegex.test(data.mobile.trim())) {
+            return 'Invalid Mobile Number. Must be a valid 10-digit number starting with 6-9';
+        }
+    }
+    if (data.pan && data.pan.trim()) {
+        const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+        if (!panRegex.test(data.pan.trim().toUpperCase())) {
+            return 'Invalid PAN format. Must be 5 uppercase letters, 4 digits, 1 uppercase letter (e.g. ABCDE1234F)';
+        }
+    }
+    if (data.aadhaar && data.aadhaar.trim()) {
+        const cleanAadhaar = data.aadhaar.trim().replace(/[\s-]/g, '');
+        const aadhaarRegex = /^\d{12}$/;
+        if (!aadhaarRegex.test(cleanAadhaar)) {
+            return 'Invalid Aadhaar number. Must be a 12-digit numeric code.';
+        }
+    }
+    if (data.uan && data.uan.trim()) {
+        const cleanUan = data.uan.trim().replace(/[\s-]/g, '');
+        const uanRegex = /^\d{12}$/;
+        if (!uanRegex.test(cleanUan)) {
+            return 'Invalid UAN number. Must be a 12-digit numeric code.';
+        }
+    }
+    if (data.pfNumber && data.pfNumber.trim()) {
+        const pfRegex = /^([A-Z]{2}\/?[A-Z]{3}\/?[0-9]{7}\/?[0-9]{3}\/?[0-9]{7}|[A-Z0-9\/]{10,25})$/i;
+        if (!pfRegex.test(data.pfNumber.trim())) {
+            return 'Invalid PF Account No format (e.g. MH/BAN/0012345/000/0000123)';
+        }
+    }
+    if (data.esiNumber && data.esiNumber.trim()) {
+        const cleanEsi = data.esiNumber.trim().replace(/[\s-]/g, '');
+        const esiRegex = /^\d{17}$/;
+        if (!esiRegex.test(cleanEsi)) {
+            return 'Invalid ESI Number. Must be a 17-digit numeric code.';
+        }
+    }
+    if (data.ifscCode && data.ifscCode.trim()) {
+        const ifscRegex = /^[A-Z]{4}0[A-Z0-9]{6}$/;
+        if (!ifscRegex.test(data.ifscCode.trim().toUpperCase())) {
+            return 'Invalid IFSC Code format (e.g. SBIN0001234)';
+        }
+    }
+    return null;
+};
+
 exports.createEmployee = async (req, res) => {
     try {
         const employeeData = { ...req.body };
         if (!employeeData.companyId && req.user?.companyId) {
             employeeData.companyId = req.user.companyId;
+        }
+
+        // Validate formats
+        const validationError = validateEmployeeFieldsBackend(employeeData);
+        if (validationError) {
+            return res.status(400).json({ message: validationError });
         }
 
         if (employeeData.branchId) {
@@ -175,6 +230,12 @@ exports.updateEmployee = async (req, res) => {
     try {
         const updateData = { ...req.body };
         delete updateData.employeeId; // Rule 4: If branch is changed later, Employee ID should NOT change.
+
+        // Validate formats
+        const validationError = validateEmployeeFieldsBackend(updateData);
+        if (validationError) {
+            return res.status(400).json({ message: validationError });
+        }
 
         const employee = await EmployeeProfile.findByIdAndUpdate(
             req.params.id, 

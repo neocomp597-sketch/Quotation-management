@@ -2,21 +2,40 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { payrollService, branchService } from '../services/api';
 import { toast } from 'react-toastify';
 import Modal from '../components/Modal';
+import { useAuth } from '../context/AuthContext';
 import { 
     MdAccountTree, MdGridView, MdFormatListBulleted, MdSearch,
     MdAdd, MdDownload, MdZoomIn, MdZoomOut, MdCenterFocusStrong,
     MdEmail, MdPhone, MdShare, MdPersonAdd, MdWork,
     MdCheckCircle, MdWarning, MdStar, MdEdit, MdDelete, MdChevronRight,
     MdExpandMore, MdExpandLess, MdAssignment, MdSpeed, MdCorporateFare,
-    MdOutlineSwapVert, MdAutoFixHigh
+    MdOutlineSwapVert, MdAutoFixHigh, MdPerson, MdLock
 } from 'react-icons/md';
 import { FaWhatsapp } from 'react-icons/fa';
 
 const OrgChart = () => {
+    const { user, isAdmin, isSuperAdmin, hasAccess } = useAuth();
+
     const [employees, setEmployees] = useState([]);
     const [branches, setBranches] = useState([]);
     const [departments, setDepartments] = useState([]);
     const [loading, setLoading] = useState(true);
+
+    // Authorization & View Scope: 'my' | 'full'
+    const canViewFullChart = useMemo(() => {
+        if (!user) return false;
+        const roleLower = String(user.role || '').toLowerCase();
+        if (isAdmin || isSuperAdmin || roleLower === 'admin' || roleLower === 'super_admin') return true;
+        return hasAccess('payroll_org_chart') || hasAccess('admin') || hasAccess('payroll');
+    }, [user, isAdmin, isSuperAdmin, hasAccess]);
+
+    const [orgViewMode, setOrgViewMode] = useState(() => (canViewFullChart ? 'full' : 'my'));
+
+    useEffect(() => {
+        if (!canViewFullChart) {
+            setOrgViewMode('my');
+        }
+    }, [canViewFullChart]);
 
     // View state: 'tree' | 'department' | 'flat'
     const [viewMode, setViewMode] = useState('tree');
@@ -88,9 +107,76 @@ const OrgChart = () => {
         fetchData();
     }, []);
 
+    // Resolve Logged-In User Employee Record
+    const currentEmployee = useMemo(() => {
+        if (!user || !employees.length) return null;
+        const uEmail = (user.email || '').toLowerCase().trim();
+        const uEmpId = (user.employeeId || '').toLowerCase().trim();
+        const uId = String(user.id || user._id || '').trim();
+        const uName = (user.name || '').toLowerCase().trim();
+
+        return employees.find(emp => {
+            if (uEmail && emp.email && emp.email.toLowerCase().trim() === uEmail) return true;
+            if (uEmpId && emp.employeeId && emp.employeeId.toLowerCase().trim() === uEmpId) return true;
+            if (uId && (String(emp.userId || '') === uId || String(emp._id || '') === uId)) return true;
+            if (uName && emp.name && emp.name.toLowerCase().trim() === uName) return true;
+            return false;
+        }) || employees[0] || null;
+    }, [user, employees]);
+
+    // Compute "My View" Employee IDs: Upward Chain + Current User + Downward Chain
+    const myViewEmpIds = useMemo(() => {
+        if (!currentEmployee || !employees.length) return new Set();
+
+        const empMap = new Map();
+        employees.forEach(e => empMap.set(String(e._id), e));
+
+        const allowed = new Set();
+        const currentIdStr = String(currentEmployee._id);
+        allowed.add(currentIdStr);
+
+        // 1. Upward chain: Ancestor managers up to top leadership
+        let curr = currentEmployee;
+        const visitedUp = new Set([currentIdStr]);
+        while (curr && curr.reportingTo) {
+            const managerId = String(curr.reportingTo._id || curr.reportingTo);
+            if (!managerId || visitedUp.has(managerId) || !empMap.has(managerId)) break;
+            allowed.add(managerId);
+            visitedUp.add(managerId);
+            curr = empMap.get(managerId);
+        }
+
+        // 2. Downward chain: Direct & indirect reportees under current user
+        const queue = [currentIdStr];
+        const visitedDown = new Set([currentIdStr]);
+        while (queue.length > 0) {
+            const parentId = queue.shift();
+            employees.forEach(emp => {
+                const empIdStr = String(emp._id);
+                const empParentId = emp.reportingTo ? String(emp.reportingTo._id || emp.reportingTo) : null;
+                if (empParentId === parentId && !visitedDown.has(empIdStr)) {
+                    allowed.add(empIdStr);
+                    visitedDown.add(empIdStr);
+                    queue.push(empIdStr);
+                }
+            });
+        }
+
+        return allowed;
+    }, [currentEmployee, employees]);
+
+    // Effective Employees list according to active Org View Scope ('my' vs 'full')
+    const activeEmployees = useMemo(() => {
+        if (orgViewMode === 'my') {
+            if (!myViewEmpIds || myViewEmpIds.size === 0) return employees;
+            return employees.filter(emp => myViewEmpIds.has(String(emp._id)));
+        }
+        return employees;
+    }, [employees, orgViewMode, myViewEmpIds]);
+
     // Filter employees
     const filteredEmployees = useMemo(() => {
-        return employees.filter(emp => {
+        return activeEmployees.filter(emp => {
             if (searchQuery) {
                 const q = searchQuery.toLowerCase();
                 const nameMatch = emp.name?.toLowerCase().includes(q);
@@ -106,19 +192,19 @@ const OrgChart = () => {
             }
             return true;
         });
-    }, [employees, searchQuery, selectedDepartment, selectedBranch]);
+    }, [activeEmployees, searchQuery, selectedDepartment, selectedBranch]);
 
     // Build hierarchy tree map
     const treeData = useMemo(() => {
         const empMap = new Map();
-        employees.forEach(emp => {
+        activeEmployees.forEach(emp => {
             empMap.set(String(emp._id), { ...emp, children: [] });
         });
 
         const roots = [];
         const parentRelations = new Map(); // childId -> parentId
 
-        employees.forEach(emp => {
+        activeEmployees.forEach(emp => {
             const parentId = emp.reportingTo?._id || emp.reportingTo;
             if (parentId && empMap.has(String(parentId))) {
                 parentRelations.set(String(emp._id), String(parentId));
@@ -128,7 +214,7 @@ const OrgChart = () => {
         // Detect and break cycles using DFS path tracking
         const visitedGlobal = new Set();
         
-        employees.forEach(emp => {
+        activeEmployees.forEach(emp => {
             const empIdStr = String(emp._id);
             if (visitedGlobal.has(empIdStr)) return;
 
@@ -158,7 +244,7 @@ const OrgChart = () => {
         });
 
         // Now reconstruct children and roots using the updated parentRelations
-        employees.forEach(emp => {
+        activeEmployees.forEach(emp => {
             const empIdStr = String(emp._id);
             const current = empMap.get(empIdStr);
             const parentId = parentRelations.get(empIdStr);
@@ -170,7 +256,7 @@ const OrgChart = () => {
         });
 
         return { roots, empMap };
-    }, [employees]);
+    }, [activeEmployees]);
 
     // Auto center horizontal scroll for tree view
     const centerScroll = () => {
@@ -437,6 +523,7 @@ const OrgChart = () => {
         const isSingleChild = node.children && node.children.length === 1;
         const meta = getLevelMeta(node, depth);
         const isDraggedOver = dragOverEmpId === node._id;
+        const isSelf = currentEmployee && String(node._id) === String(currentEmployee._id);
 
         return (
             <div key={node._id} className="flex flex-col items-center relative transition-all duration-300 my-2.5 pt-2">
@@ -454,6 +541,12 @@ const OrgChart = () => {
                             isDraggedOver ? 'scale-105 ring-4 ring-teal-400' : ''
                         }`}
                     >
+                        {isSelf && (
+                            <span className="absolute -top-3 left-1/2 -translate-x-1/2 z-30 bg-teal-500 text-white text-[9px] font-black uppercase px-2.5 py-0.5 rounded-full shadow-lg tracking-widest border border-white">
+                                YOU
+                            </span>
+                        )}
+
                         {/* Diamond Avatar Container on Left */}
                         <div className="relative z-10 -mr-4 shrink-0">
                             <div className={`w-14 h-14 rounded-2xl rotate-45 flex items-center justify-center overflow-hidden ${meta.diamondClass}`}>
@@ -506,6 +599,12 @@ const OrgChart = () => {
                             isDraggedOver ? 'ring-4 ring-teal-400 scale-105' : ''
                         }`}
                     >
+                        {isSelf && (
+                            <span className="absolute -top-3 left-1/2 -translate-x-1/2 z-30 bg-teal-500 text-white text-[9px] font-black uppercase px-2.5 py-0.5 rounded-full shadow-lg tracking-widest border border-white">
+                                YOU
+                            </span>
+                        )}
+
                         {/* Floating Small Circular Photo Badge on Top-Right Edge */}
                         <div className={`absolute -top-1 -right-1 z-20 w-8 h-8 rounded-full border-2 flex items-center justify-center font-extrabold text-xs shadow-md overflow-hidden ${meta.badgeClass}`}>
                             {node.isVacant ? (
@@ -663,6 +762,49 @@ const OrgChart = () => {
 
                 {/* Action Controls */}
                 <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-end">
+                    {/* View Scope Toggle (My View vs Full Org Chart) */}
+                    <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-inner">
+                        <button
+                            type="button"
+                            onClick={() => setOrgViewMode('my')}
+                            className={`flex items-center space-x-2 px-4 py-2 rounded-xl font-black text-xs transition-all ${
+                                orgViewMode === 'my'
+                                    ? 'bg-gradient-to-r from-teal-500 to-emerald-500 text-white shadow-md'
+                                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                            }`}
+                        >
+                            <MdPerson size={16} />
+                            <span>My View</span>
+                            {currentEmployee && (
+                                <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded-md font-mono">
+                                    {myViewEmpIds.size}
+                                </span>
+                            )}
+                        </button>
+
+                        {canViewFullChart ? (
+                            <button
+                                type="button"
+                                onClick={() => setOrgViewMode('full')}
+                                className={`flex items-center space-x-2 px-4 py-2 rounded-xl font-black text-xs transition-all ${
+                                    orgViewMode === 'full'
+                                        ? 'bg-gradient-to-r from-teal-500 to-emerald-500 text-white shadow-md'
+                                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                                }`}
+                            >
+                                <MdCorporateFare size={16} />
+                                <span>Full Org Chart</span>
+                                <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded-md font-mono">
+                                    {employees.length}
+                                </span>
+                            </button>
+                        ) : (
+                            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold px-3 py-1.5 inline-flex items-center gap-1">
+                                <MdLock size={12} /> Full Chart Admin Only
+                            </span>
+                        )}
+                    </div>
+
                     {treeData.roots.length > 1 && (
                         <button
                             onClick={handleAutoOrganizeHierarchy}

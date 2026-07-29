@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { stateMasterService } from '../services/api';
 import { toast } from 'react-toastify';
-import { MdMap, MdAdd, MdSearch, MdEdit, MdDelete, MdArrowBack, MdPublic } from 'react-icons/md';
-import { DEFAULT_COUNTRIES } from '../constants/locationData';
+import { MdAdd, MdSearch, MdEdit, MdDelete, MdArrowBack, MdPublic, MdLocationCity, MdPhoneInTalk } from 'react-icons/md';
+import { DEFAULT_COUNTRIES, DEFAULT_STATES, getCitiesForState, getDialCodeForCountry } from '../constants/locationData';
 
 const StateMaster = ({ isCreatePage, isEditPage }) => {
     const navigate = useNavigate();
@@ -18,13 +18,17 @@ const StateMaster = ({ isCreatePage, isEditPage }) => {
 
     const [countryList, setCountryList] = useState(DEFAULT_COUNTRIES.map(c => c.country));
     const [isCustomCountry, setIsCustomCountry] = useState(false);
+    const [isCustomState, setIsCustomState] = useState(false);
+    const [isCustomCity, setIsCustomCity] = useState(false);
 
     const [formData, setFormData] = useState({
         country: 'India',
         customCountry: '',
+        dialCode: '+91',
         state: '',
         shortCode: '',
         gstCode: '',
+        city: '',
         status: 'Active'
     });
 
@@ -51,41 +55,72 @@ const StateMaster = ({ isCreatePage, isEditPage }) => {
         }
     };
 
+    const populateForm = (item) => {
+        if (!item) {
+            setEditingState(null);
+            setFormData({
+                country: 'India',
+                customCountry: '',
+                dialCode: '+91',
+                state: '',
+                shortCode: '',
+                gstCode: '',
+                city: '',
+                status: 'Active'
+            });
+            setIsCustomCountry(false);
+            setIsCustomState(false);
+            setIsCustomCity(false);
+            return;
+        }
+
+        setEditingState(item);
+        const ctry = item.country || 'India';
+        const isInd = ctry.toLowerCase() === 'india';
+        
+        setFormData({
+            country: ctry,
+            customCountry: '',
+            dialCode: item.dialCode || getDialCodeForCountry(ctry),
+            state: item.state || '',
+            shortCode: item.shortCode || '',
+            gstCode: item.gstCode || '',
+            city: item.city || '',
+            status: item.status || 'Active'
+        });
+        setIsCustomCountry(false);
+
+        if (isInd && item.state) {
+            const inList = (DEFAULT_STATES['India'] || []).some(s => s.state.toLowerCase() === item.state.toLowerCase());
+            setIsCustomState(!inList);
+        } else {
+            setIsCustomState(true);
+        }
+
+        if (item.state && item.city) {
+            const knownCities = getCitiesForState(item.state);
+            const inCityList = knownCities.some(c => c.toLowerCase() === item.city.toLowerCase());
+            setIsCustomCity(!inCityList);
+        } else {
+            setIsCustomCity(false);
+        }
+    };
+
     useEffect(() => {
         if (isCreatePage) {
-            setEditingState(null);
-            setFormData({ country: 'India', customCountry: '', state: '', shortCode: '', gstCode: '', status: 'Active' });
-            setIsCustomCountry(false);
+            populateForm(null);
             setShowModal(true);
         } else if (isEditPage && routeId) {
             setShowModal(true);
             const found = states.find(s => s._id === routeId);
             if (found) {
-                setEditingState(found);
-                setFormData({
-                    country: found.country || 'India',
-                    customCountry: '',
-                    state: found.state || '',
-                    shortCode: found.shortCode || '',
-                    gstCode: found.gstCode || '',
-                    status: found.status || 'Active'
-                });
-                setIsCustomCountry(false);
+                populateForm(found);
             } else {
                 stateMasterService.getAll().then(res => {
                     const list = Array.isArray(res.data) ? res.data : (res.data?.data || []);
                     const item = list.find(s => s._id === routeId);
                     if (item) {
-                        setEditingState(item);
-                        setFormData({
-                            country: item.country || 'India',
-                            customCountry: '',
-                            state: item.state || '',
-                            shortCode: item.shortCode || '',
-                            gstCode: item.gstCode || '',
-                            status: item.status || 'Active'
-                        });
-                        setIsCustomCountry(false);
+                        populateForm(item);
                     }
                 }).catch(err => console.error(err));
             }
@@ -96,10 +131,72 @@ const StateMaster = ({ isCreatePage, isEditPage }) => {
         const val = e.target.value;
         if (val === '__ADD_NEW__') {
             setIsCustomCountry(true);
-            setFormData({ ...formData, country: '', customCountry: '' });
+            setIsCustomState(true);
+            setIsCustomCity(false);
+            setFormData(prev => ({
+                ...prev,
+                country: '',
+                customCountry: '',
+                dialCode: '+91',
+                state: '',
+                shortCode: '',
+                gstCode: '',
+                city: ''
+            }));
         } else {
             setIsCustomCountry(false);
-            setFormData({ ...formData, country: val, customCountry: '' });
+            const dial = getDialCodeForCountry(val);
+            setIsCustomState(val !== 'India');
+            setIsCustomCity(false);
+            setFormData(prev => ({
+                ...prev,
+                country: val,
+                customCountry: '',
+                dialCode: dial,
+                state: '',
+                shortCode: '',
+                gstCode: '',
+                city: ''
+            }));
+        }
+    };
+
+    const handleIndianStateSelect = (e) => {
+        const val = e.target.value;
+        if (val === '__CUSTOM__') {
+            setIsCustomState(true);
+            setIsCustomCity(false);
+            setFormData(prev => ({
+                ...prev,
+                state: '',
+                shortCode: '',
+                gstCode: '',
+                city: ''
+            }));
+        } else {
+            setIsCustomState(false);
+            setIsCustomCity(false);
+            const indianStates = DEFAULT_STATES['India'] || [];
+            const match = indianStates.find(s => s.state === val);
+            const cities = getCitiesForState(val);
+            setFormData(prev => ({
+                ...prev,
+                state: val,
+                shortCode: match ? match.shortCode : '',
+                gstCode: match ? (match.gstCode || '') : '',
+                city: cities.length > 0 ? cities[0] : ''
+            }));
+        }
+    };
+
+    const handleCitySelect = (e) => {
+        const val = e.target.value;
+        if (val === '__CUSTOM_CITY__') {
+            setIsCustomCity(true);
+            setFormData(prev => ({ ...prev, city: '' }));
+        } else {
+            setIsCustomCity(false);
+            setFormData(prev => ({ ...prev, city: val }));
         }
     };
 
@@ -118,9 +215,11 @@ const StateMaster = ({ isCreatePage, isEditPage }) => {
 
         const payload = {
             country: selectedCountry,
+            dialCode: formData.dialCode.trim(),
             state: formData.state.trim(),
             shortCode: formData.shortCode.trim().toUpperCase(),
             gstCode: formData.gstCode.trim(),
+            city: formData.city.trim(),
             status: formData.status
         };
 
@@ -153,10 +252,16 @@ const StateMaster = ({ isCreatePage, isEditPage }) => {
 
     const filteredStates = states.filter(s =>
         (s.country || 'India').toLowerCase().includes(search.toLowerCase()) ||
-        s.state?.toLowerCase().includes(search.toLowerCase()) ||
-        s.shortCode?.toLowerCase().includes(search.toLowerCase()) ||
-        s.gstCode?.toLowerCase().includes(search.toLowerCase())
+        (s.dialCode || '').toLowerCase().includes(search.toLowerCase()) ||
+        (s.state || '').toLowerCase().includes(search.toLowerCase()) ||
+        (s.city || '').toLowerCase().includes(search.toLowerCase()) ||
+        (s.shortCode || '').toLowerCase().includes(search.toLowerCase()) ||
+        (s.gstCode || '').toLowerCase().includes(search.toLowerCase())
     );
+
+    const activeCountry = isCustomCountry ? formData.customCountry : formData.country;
+    const isIndiaSelected = activeCountry === 'India';
+    const knownCitiesForState = getCitiesForState(formData.state);
 
     return (
         <div className="p-6 md:p-8 space-y-8 max-w-7xl mx-auto">
@@ -167,7 +272,7 @@ const StateMaster = ({ isCreatePage, isEditPage }) => {
                         State Master
                     </h1>
                     <p className="text-slate-500 font-semibold text-sm">
-                        Manage Country & State Mappings, Union Territories & 2-Letter Short Codes.
+                        Manage Country, Dial Codes, State & Short Codes, GST Codes & Cities.
                     </p>
                 </div>
                 <button
@@ -185,7 +290,7 @@ const StateMaster = ({ isCreatePage, isEditPage }) => {
                     <MdSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
                     <input
                         type="text"
-                        placeholder="Search country, state name, short code or GST code..."
+                        placeholder="Search country, dial code, state, city, short code or GST code..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
@@ -207,7 +312,9 @@ const StateMaster = ({ isCreatePage, isEditPage }) => {
                             <thead>
                                 <tr className="border-b border-slate-100 bg-slate-50/50 text-[10px] font-black uppercase text-slate-400 tracking-widest">
                                     <th className="py-4 px-6">Country</th>
+                                    <th className="py-4 px-6">Dial Code</th>
                                     <th className="py-4 px-6">State / Union Territory</th>
+                                    <th className="py-4 px-6">City</th>
                                     <th className="py-4 px-6">Short Code</th>
                                     <th className="py-4 px-6">GST Code</th>
                                     <th className="py-4 px-6">Status</th>
@@ -223,7 +330,13 @@ const StateMaster = ({ isCreatePage, isEditPage }) => {
                                                 {item.country || 'India'}
                                             </span>
                                         </td>
+                                        <td className="py-4 px-6">
+                                            <span className="font-mono bg-blue-50 text-blue-700 px-2.5 py-1 rounded-xl text-xs font-bold border border-blue-100">
+                                                {item.dialCode || '+91'}
+                                            </span>
+                                        </td>
                                         <td className="py-4 px-6 font-bold text-slate-900">{item.state}</td>
+                                        <td className="py-4 px-6 font-bold text-slate-700">{item.city || '-'}</td>
                                         <td className="py-4 px-6">
                                             <span className="font-mono bg-primary-50 text-primary-700 px-3 py-1 rounded-xl text-xs font-black border border-primary-100">
                                                 {item.shortCode}
@@ -286,7 +399,7 @@ const StateMaster = ({ isCreatePage, isEditPage }) => {
                                         {editingState ? 'Edit State Entry' : 'Create State Entry'}
                                     </h1>
                                     <p className="text-xs text-slate-500 font-medium mt-0.5">
-                                        {editingState ? `Update code mapping for ${editingState.state}` : 'Add a new State & Short Code pair for a Country'}
+                                        {editingState ? `Update mapping for ${editingState.state}` : 'Add a new Country, State, Short Code & GST Code pair'}
                                     </p>
                                 </div>
                             </div>
@@ -352,16 +465,100 @@ const StateMaster = ({ isCreatePage, isEditPage }) => {
                                     )}
                                 </div>
 
+                                {/* Dial Code & City Row */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Country Dial Code</label>
+                                        <div className="relative">
+                                            <input
+                                                type="text"
+                                                placeholder="e.g. +91"
+                                                value={formData.dialCode}
+                                                onChange={(e) => setFormData({ ...formData, dialCode: e.target.value })}
+                                                className="w-full px-4 py-3.5 rounded-2xl border border-slate-200 bg-slate-50 text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-bold"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">City Option</label>
+                                        {!isCustomCity && knownCitiesForState.length > 0 ? (
+                                            <select
+                                                value={formData.city}
+                                                onChange={handleCitySelect}
+                                                className="w-full px-4 py-3.5 rounded-2xl border border-slate-200 bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-semibold cursor-pointer"
+                                            >
+                                                <option value="">Select City (Optional)</option>
+                                                {knownCitiesForState.map(ct => (
+                                                    <option key={ct} value={ct}>{ct}</option>
+                                                ))}
+                                                <option value="__CUSTOM_CITY__" className="font-bold text-primary-600">+ Enter Custom City...</option>
+                                            </select>
+                                        ) : (
+                                            <div className="space-y-1">
+                                                <input
+                                                    type="text"
+                                                    placeholder="e.g. Mumbai, Pune, Ahmedabad"
+                                                    value={formData.city}
+                                                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                                                    className="w-full px-4 py-3.5 rounded-2xl border border-slate-200 bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-semibold"
+                                                />
+                                                {knownCitiesForState.length > 0 && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setIsCustomCity(false)}
+                                                        className="text-[11px] text-primary-600 font-bold hover:underline"
+                                                    >
+                                                        Select from list
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* State / Union Territory Selector */}
                                 <div>
-                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">State / Union Territory *</label>
-                                    <input
-                                        type="text"
-                                        required
-                                        placeholder="e.g. Maharashtra, Gujarat, California, Ontario"
-                                        value={formData.state}
-                                        onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-                                        className="w-full px-4 py-3.5 rounded-2xl border border-slate-200 bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-semibold"
-                                    />
+                                    <div className="flex items-center justify-between mb-1">
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">State / Union Territory *</label>
+                                        {isIndiaSelected && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsCustomState(!isCustomState)}
+                                                className="text-[11px] text-primary-600 font-bold hover:underline"
+                                            >
+                                                {isCustomState ? 'Select from Predefined Indian States' : '+ Enter Custom State Name'}
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    {isIndiaSelected && !isCustomState ? (
+                                        <select
+                                            value={formData.state}
+                                            onChange={handleIndianStateSelect}
+                                            required
+                                            className="w-full px-4 py-3.5 rounded-2xl border border-slate-200 bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-semibold cursor-pointer"
+                                        >
+                                            <option value="">-- Select Indian State / UT --</option>
+                                            {(DEFAULT_STATES['India'] || []).map(st => (
+                                                <option key={st.state} value={st.state}>
+                                                    {st.state} ({st.shortCode}) {st.gstCode ? `- GST: ${st.gstCode}` : ''}
+                                                </option>
+                                            ))}
+                                            <option value="__CUSTOM__" className="font-bold text-primary-600">
+                                                + Custom State / UT Name...
+                                            </option>
+                                        </select>
+                                    ) : (
+                                        <input
+                                            type="text"
+                                            required
+                                            placeholder="e.g. Maharashtra, Gujarat, California, Ontario"
+                                            value={formData.state}
+                                            onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                                            className="w-full px-4 py-3.5 rounded-2xl border border-slate-200 bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-semibold"
+                                        />
+                                    )}
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -378,7 +575,7 @@ const StateMaster = ({ isCreatePage, isEditPage }) => {
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">GST Code</label>
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">GST Code / Number Prefix</label>
                                         <input
                                             type="text"
                                             maxLength={2}

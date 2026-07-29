@@ -131,6 +131,7 @@ const MENU_GROUPS = [
         children: [
             { key: 'payroll_payslips', label: 'My Payslips', description: 'View and download monthly payslips' },
             { key: 'payroll_employees', label: 'Employee Profiles', description: 'Manage employee salary profiles and structures' },
+            { key: 'payroll_org_chart', label: 'Org Chart', description: 'Employee hierarchy and org chart module' },
             { key: 'payroll_runs', label: 'Run Payroll', description: 'Create and run monthly payroll batches' },
             { key: 'payroll_payments', label: 'Payments', description: 'Record payment slips and transaction references' },
             { key: 'payroll_settings', label: 'Payroll Settings', description: 'Manage payroll month and calculation configuration' },
