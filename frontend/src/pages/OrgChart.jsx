@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { payrollService, branchService } from '../services/api';
 import { toast } from 'react-toastify';
 import Modal from '../components/Modal';
@@ -14,6 +15,7 @@ import {
 import { FaWhatsapp } from 'react-icons/fa';
 
 const OrgChart = () => {
+    const navigate = useNavigate();
     const { user, isAdmin, isSuperAdmin, hasAccess } = useAuth();
 
     const [employees, setEmployees] = useState([]);
@@ -1168,17 +1170,38 @@ const OrgChart = () => {
                 >
                     <div className="space-y-6">
                         {/* Header Banner */}
-                        <div className="bg-gradient-to-r from-slate-900 via-teal-950 to-slate-900 rounded-2xl p-6 text-white flex items-center justify-between">
-                            <div className="flex items-center space-x-4">
-                                <div className="w-16 h-16 rounded-2xl bg-teal-500 text-slate-950 font-black text-2xl flex items-center justify-center shadow-lg">
-                                    {selectedEmp.name ? selectedEmp.name.charAt(0) : 'E'}
+                        <div className="bg-gradient-to-r from-slate-900 via-teal-950 to-slate-900 rounded-2xl p-6 text-white flex items-center justify-between gap-4">
+                            <div className="flex items-center space-x-4 min-w-0">
+                                <div className="w-16 h-16 rounded-2xl bg-teal-500 text-slate-950 font-black text-2xl flex items-center justify-center shadow-lg overflow-hidden shrink-0 border-2 border-teal-400">
+                                    {(selectedEmp.photo || selectedEmp.profilePicture || selectedEmp.avatar) ? (
+                                        <img 
+                                            src={selectedEmp.photo || selectedEmp.profilePicture || selectedEmp.avatar} 
+                                            alt={selectedEmp.name} 
+                                            className="w-full h-full object-cover" 
+                                        />
+                                    ) : (
+                                        <span>{selectedEmp.name ? selectedEmp.name.charAt(0).toUpperCase() : 'E'}</span>
+                                    )}
                                 </div>
-                                <div>
-                                    <h3 className="text-xl font-extrabold">{selectedEmp.name}</h3>
-                                    <p className="text-teal-300 font-medium text-sm">{selectedEmp.designation || 'Employee'}</p>
-                                    <p className="text-xs opacity-75">{selectedEmp.department} • ID: {selectedEmp.employeeId || 'Pending'}</p>
+                                <div className="min-w-0">
+                                    <h3 className="text-xl font-extrabold truncate">{selectedEmp.name}</h3>
+                                    <p className="text-teal-300 font-medium text-sm truncate">{selectedEmp.designation || 'Employee'}</p>
+                                    <p className="text-xs opacity-75 truncate">{selectedEmp.department} • ID: {selectedEmp.employeeId || 'Pending'}</p>
                                 </div>
                             </div>
+
+                            <button
+                                onClick={() => {
+                                    const empId = selectedEmp._id;
+                                    setSelectedEmp(null);
+                                    navigate(`/payroll/employees/edit/${empId}`);
+                                }}
+                                className="px-4 py-2.5 bg-teal-500 hover:bg-teal-400 text-slate-950 font-black text-xs rounded-xl shadow-lg transition-all flex items-center space-x-1.5 shrink-0 hover:scale-105 active:scale-95"
+                                title="View & Edit Full Employee Profile"
+                            >
+                                <MdPerson size={18} />
+                                <span>View Profile</span>
+                            </button>
                         </div>
 
                         {/* Modal Navigation Tabs */}

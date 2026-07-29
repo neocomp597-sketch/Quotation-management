@@ -24,16 +24,29 @@ const CascadingLocationSelector = ({
 
     useEffect(() => {
         if (country) setSelectedCountry(country);
-        if (state) setSelectedState(state);
         if (city) setSelectedCity(city);
         if (dialCode) setSelectedDialCode(dialCode);
-    }, [country, state, city, dialCode]);
+    }, [country, city, dialCode]);
 
     // Recalculate available states when country or master list changes
     useEffect(() => {
         const states = getStatesForCountry(selectedCountry, masterStateList);
         setAvailableStates(states);
-    }, [selectedCountry, masterStateList]);
+
+        if (state) {
+            const matched = states.find(s => 
+                s.state.toLowerCase() === state.toLowerCase() || 
+                (s.shortCode && s.shortCode.toLowerCase() === state.toLowerCase())
+            );
+            if (matched) {
+                setSelectedState(matched.state);
+            } else {
+                setSelectedState(state);
+            }
+        } else {
+            setSelectedState('');
+        }
+    }, [selectedCountry, masterStateList, state]);
 
     // Recalculate available cities when state changes
     useEffect(() => {
@@ -80,19 +93,24 @@ const CascadingLocationSelector = ({
         }
 
         setIsCustomState(false);
-        setSelectedState(newStateName);
-        const matched = availableStates.find(s => s.state.toLowerCase() === newStateName.toLowerCase());
+        const matched = availableStates.find(s => 
+            s.state.toLowerCase() === newStateName.toLowerCase() ||
+            (s.shortCode && s.shortCode.toLowerCase() === newStateName.toLowerCase())
+        );
+        const fullStateName = matched ? matched.state : newStateName;
         const shortCode = matched ? matched.shortCode : '';
         const gstCode = matched ? matched.gstCode : '';
 
-        const cities = getCitiesForState(newStateName);
+        setSelectedState(fullStateName);
+
+        const cities = getCitiesForState(fullStateName);
         setAvailableCities(cities);
-        const defaultCity = cities.length > 0 ? cities[0] : '';
+        const defaultCity = cities.length > 0 ? (selectedCity && cities.includes(selectedCity) ? selectedCity : cities[0]) : selectedCity;
         setSelectedCity(defaultCity);
 
         onChange({
             country: selectedCountry,
-            state: newStateName,
+            state: fullStateName,
             city: defaultCity,
             dialCode: selectedDialCode,
             shortCode,

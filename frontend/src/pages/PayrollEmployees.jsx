@@ -820,20 +820,20 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                             </div>
                                             <div>
                                                 <label className={labelClass}>Reporting To</label>
-                                                <select
-                                                    value={basicForm.reportingTo || ''}
-                                                    onChange={(e) => setBasicForm({ ...basicForm, reportingTo: e.target.value })}
-                                                    className={inputClass}
-                                                >
-                                                    <option value="">-- None (No Supervisor) --</option>
-                                                    {employees
+                                                <SearchableSelect
+                                                    options={employees
                                                         .filter(emp => (emp.status === 'Active' || !emp.status) && String(emp._id) !== String(selectedEmp?._id))
-                                                        .map(emp => (
-                                                            <option key={emp._id} value={emp._id}>
-                                                                {emp.name} {emp.designation ? `(${emp.designation})` : ''}
-                                                            </option>
-                                                        ))}
-                                                </select>
+                                                        .map(emp => ({
+                                                            value: emp._id,
+                                                            label: `${emp.name}${emp.designation ? ` (${emp.designation})` : ''}${emp.employeeId ? ` - ID: ${emp.employeeId}` : ''}`
+                                                        }))
+                                                    }
+                                                    value={basicForm.reportingTo || ''}
+                                                    onChange={(val) => setBasicForm({ ...basicForm, reportingTo: val })}
+                                                    placeholder="-- None (No Supervisor) --"
+                                                    noResultsText="No active employee found"
+                                                    inputClass="w-full px-3.5 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all cursor-pointer"
+                                                />
                                             </div>
                                             <div>
                                                 <label className={labelClass}>Email Address</label>
