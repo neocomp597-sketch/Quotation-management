@@ -71,7 +71,11 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
     const handleUpdateFamilyMember = (index, field, value) => {
         setBasicForm(prev => {
             const updated = [...(prev.familyDetails || [])];
-            updated[index] = { ...updated[index], [field]: value };
+            let val = value;
+            if (field === 'contactNumber') {
+                val = value.replace(/\D/g, '').slice(0, 10);
+            }
+            updated[index] = { ...updated[index], [field]: val };
             return { ...prev, familyDetails: updated };
         });
     };
@@ -274,8 +278,8 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
 
         // 1. Mobile Number validation
         if (form.mobile && form.mobile.trim()) {
-            const cleanMobile = form.mobile.trim();
-            const mobileRegex = /^(?:\+91|0)?[6-9]\d{9}$/;
+            const cleanMobile = form.mobile.trim().replace(/\D/g, '');
+            const mobileRegex = /^[6-9]\d{9}$/;
             if (!mobileRegex.test(cleanMobile)) {
                 errors.mobile = 'Mobile Number must be a valid 10-digit number starting with 6-9 (e.g. 9876543210)';
             }
@@ -292,7 +296,7 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
 
         // 3. Aadhaar Number validation
         if (form.aadhaar && form.aadhaar.trim()) {
-            const cleanAadhaar = form.aadhaar.trim().replace(/[\s-]/g, '');
+            const cleanAadhaar = form.aadhaar.trim().replace(/\D/g, '');
             const aadhaarRegex = /^\d{12}$/;
             if (!aadhaarRegex.test(cleanAadhaar)) {
                 errors.aadhaar = 'Invalid Aadhaar number. Must be a 12-digit numeric code.';
@@ -301,7 +305,7 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
 
         // 4. UAN Number validation
         if (form.uan && form.uan.trim()) {
-            const cleanUan = form.uan.trim().replace(/[\s-]/g, '');
+            const cleanUan = form.uan.trim().replace(/\D/g, '');
             const uanRegex = /^\d{12}$/;
             if (!uanRegex.test(cleanUan)) {
                 errors.uan = 'Invalid UAN number. Must be a 12-digit numeric code.';
@@ -310,7 +314,7 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
 
         // 5. PF Number validation
         if (form.pfNumber && form.pfNumber.trim()) {
-            const cleanPf = form.pfNumber.trim();
+            const cleanPf = form.pfNumber.trim().toUpperCase();
             const pfRegex = /^([A-Z]{2}\/?[A-Z]{3}\/?[0-9]{7}\/?[0-9]{3}\/?[0-9]{7}|[A-Z0-9\/]{10,25})$/i;
             if (!pfRegex.test(cleanPf)) {
                 errors.pfNumber = 'Invalid PF Account No format (e.g. MH/BAN/0012345/000/0000123)';
@@ -319,7 +323,7 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
 
         // 6. ESI Number validation
         if (form.esiNumber && form.esiNumber.trim()) {
-            const cleanEsi = form.esiNumber.trim().replace(/[\s-]/g, '');
+            const cleanEsi = form.esiNumber.trim().replace(/\D/g, '');
             const esiRegex = /^\d{17}$/;
             if (!esiRegex.test(cleanEsi)) {
                 errors.esiNumber = 'Invalid ESI Number. Must be a 17-digit numeric code.';
@@ -849,9 +853,11 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                                 <label className={labelClass}>Mobile Number</label>
                                                 <input
                                                     type="text"
+                                                    maxLength={10}
                                                     value={basicForm.mobile}
                                                     onChange={(e) => {
-                                                        setBasicForm({ ...basicForm, mobile: e.target.value });
+                                                        const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                                                        setBasicForm({ ...basicForm, mobile: val });
                                                         if (formErrors.mobile) setFormErrors({ ...formErrors, mobile: null });
                                                     }}
                                                     className={`${inputClass} ${formErrors.mobile ? 'border-rose-500 ring-2 ring-rose-500/20 bg-rose-50/20' : ''}`}
@@ -930,9 +936,11 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                                 <label className={labelClass}>PAN (Income Tax)</label>
                                                 <input
                                                     type="text"
+                                                    maxLength={10}
                                                     value={basicForm.pan}
                                                     onChange={(e) => {
-                                                        setBasicForm({ ...basicForm, pan: e.target.value.toUpperCase() });
+                                                        const val = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10);
+                                                        setBasicForm({ ...basicForm, pan: val });
                                                         if (formErrors.pan) setFormErrors({ ...formErrors, pan: null });
                                                     }}
                                                     className={`${inputClass} uppercase ${formErrors.pan ? 'border-rose-500 ring-2 ring-rose-500/20 bg-rose-50/20' : ''}`}
@@ -946,13 +954,15 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                                 <label className={labelClass}>Aadhaar Number</label>
                                                 <input
                                                     type="text"
+                                                    maxLength={12}
                                                     value={basicForm.aadhaar}
                                                     onChange={(e) => {
-                                                        setBasicForm({ ...basicForm, aadhaar: e.target.value });
+                                                        const val = e.target.value.replace(/\D/g, '').slice(0, 12);
+                                                        setBasicForm({ ...basicForm, aadhaar: val });
                                                         if (formErrors.aadhaar) setFormErrors({ ...formErrors, aadhaar: null });
                                                     }}
                                                     className={`${inputClass} ${formErrors.aadhaar ? 'border-rose-500 ring-2 ring-rose-500/20 bg-rose-50/20' : ''}`}
-                                                    placeholder="1234 5678 9012"
+                                                    placeholder="123456789012"
                                                 />
                                                 {formErrors.aadhaar && (
                                                     <p className="text-[11px] font-semibold text-rose-500 mt-1">{formErrors.aadhaar}</p>
@@ -962,9 +972,11 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                                 <label className={labelClass}>UAN Number (PF)</label>
                                                 <input
                                                     type="text"
+                                                    maxLength={12}
                                                     value={basicForm.uan}
                                                     onChange={(e) => {
-                                                        setBasicForm({ ...basicForm, uan: e.target.value });
+                                                        const val = e.target.value.replace(/\D/g, '').slice(0, 12);
+                                                        setBasicForm({ ...basicForm, uan: val });
                                                         if (formErrors.uan) setFormErrors({ ...formErrors, uan: null });
                                                     }}
                                                     className={`${inputClass} ${formErrors.uan ? 'border-rose-500 ring-2 ring-rose-500/20 bg-rose-50/20' : ''}`}
@@ -978,9 +990,11 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                                 <label className={labelClass}>PF Account No</label>
                                                 <input
                                                     type="text"
+                                                    maxLength={25}
                                                     value={basicForm.pfNumber}
                                                     onChange={(e) => {
-                                                        setBasicForm({ ...basicForm, pfNumber: e.target.value.toUpperCase() });
+                                                        const val = e.target.value.toUpperCase().replace(/[^A-Z0-9\/]/g, '').slice(0, 25);
+                                                        setBasicForm({ ...basicForm, pfNumber: val });
                                                         if (formErrors.pfNumber) setFormErrors({ ...formErrors, pfNumber: null });
                                                     }}
                                                     className={`${inputClass} uppercase ${formErrors.pfNumber ? 'border-rose-500 ring-2 ring-rose-500/20 bg-rose-50/20' : ''}`}
@@ -994,9 +1008,11 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                                 <label className={labelClass}>ESI Insurance IP</label>
                                                 <input
                                                     type="text"
+                                                    maxLength={17}
                                                     value={basicForm.esiNumber}
                                                     onChange={(e) => {
-                                                        setBasicForm({ ...basicForm, esiNumber: e.target.value });
+                                                        const val = e.target.value.replace(/\D/g, '').slice(0, 17);
+                                                        setBasicForm({ ...basicForm, esiNumber: val });
                                                         if (formErrors.esiNumber) setFormErrors({ ...formErrors, esiNumber: null });
                                                     }}
                                                     className={`${inputClass} ${formErrors.esiNumber ? 'border-rose-500 ring-2 ring-rose-500/20 bg-rose-50/20' : ''}`}
@@ -1037,9 +1053,11 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                                 <label className={labelClass}>IFSC Code</label>
                                                 <input
                                                     type="text"
+                                                    maxLength={11}
                                                     value={basicForm.ifscCode}
                                                     onChange={(e) => {
-                                                        setBasicForm({ ...basicForm, ifscCode: e.target.value.toUpperCase() });
+                                                        const val = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 11);
+                                                        setBasicForm({ ...basicForm, ifscCode: val });
                                                         if (formErrors.ifscCode) setFormErrors({ ...formErrors, ifscCode: null });
                                                     }}
                                                     className={`${inputClass} uppercase ${formErrors.ifscCode ? 'border-rose-500 ring-2 ring-rose-500/20 bg-rose-50/20' : ''}`}
