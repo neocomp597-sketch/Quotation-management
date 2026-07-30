@@ -213,10 +213,23 @@ const StateMaster = ({ isCreatePage, isEditPage }) => {
             return;
         }
 
+        // Space & Case Normalized Duplicate Check
+        const normalizeState = (name) => name ? name.trim().replace(/\s+/g, ' ').toLowerCase() : '';
+        const normalizedInput = normalizeState(formData.state);
+        const duplicate = states.find(s => 
+            (!editingState || s._id !== editingState._id) && 
+            normalizeState(s.state) === normalizedInput
+        );
+
+        if (duplicate) {
+            toast.error(`State '${formData.state.trim()}' already exists (matches '${duplicate.state}'). Duplicates are prohibited.`);
+            return;
+        }
+
         const payload = {
             country: selectedCountry,
             dialCode: formData.dialCode.trim(),
-            state: formData.state.trim(),
+            state: formData.state.trim().replace(/\s+/g, ' '),
             shortCode: formData.shortCode.trim().toUpperCase(),
             gstCode: formData.gstCode.trim(),
             city: formData.city.trim(),
@@ -246,7 +259,7 @@ const StateMaster = ({ isCreatePage, isEditPage }) => {
             toast.success('State deleted successfully');
             fetchStates();
         } catch (error) {
-            toast.error('Deletion failed');
+            toast.error(error.response?.data?.message || 'Deletion failed');
         }
     };
 

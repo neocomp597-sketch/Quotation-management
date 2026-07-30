@@ -1,4 +1,7 @@
 const StateMaster = require('../models/StateMaster');
+const Customer = require('../models/Customer');
+const Vendor = require('../models/Vendor');
+const Branch = require('../models/Branch');
 
 const DEFAULT_INDIAN_STATES = [
     { state: 'Andhra Pradesh', shortCode: 'AP', gstCode: '37' },
@@ -39,6 +42,12 @@ const DEFAULT_INDIAN_STATES = [
     { state: 'Puducherry', shortCode: 'PY', gstCode: '34' }
 ];
 
+// Helper to normalize state name for space & case insensitive comparison
+const normalizeStateName = (name) => {
+    if (!name || typeof name !== 'string') return '';
+    return name.trim().replace(/\s+/g, ' ').toLowerCase();
+};
+
 exports.getAll = async (req, res) => {
     try {
         const companyId = req.user?.companyId;
@@ -73,11 +82,26 @@ exports.create = async (req, res) => {
         if (!state || !shortCode) {
             return res.status(400).json({ success: false, message: 'State and Short Code are required' });
         }
+
+        const normalizedInput = normalizeStateName(state);
+
+        // Check duplicate state name (case and space insensitive)
+        const query = companyId ? { companyId } : {};
+        const existingStates = await StateMaster.find(query).lean();
+        const duplicate = existingStates.find(s => normalizeStateName(s.state) === normalizedInput);
+
+        if (duplicate) {
+            return res.status(400).json({ 
+                success: false, 
+                message: `State record '${state.trim()}' already exists (matches existing '${duplicate.state}'). Duplicate states are not allowed.` 
+            });
+        }
+
         const newState = new StateMaster({
             ...(companyId && { companyId }),
             country: country?.trim() || 'India',
             dialCode: dialCode?.trim() || '+91',
-            state: state.trim(),
+            state: state.trim().replace(/\s+/g, ' '),
             shortCode: shortCode.trim().toUpperCase(),
             gstCode: gstCode?.trim() || '',
             city: city?.trim() || '',
@@ -99,12 +123,50 @@ exports.update = async (req, res) => {
         const query = { _id: id };
         if (companyId) query.companyId = companyId;
 
+        const existingDoc = await StateMaster.findOne(query);
+        if (!existingDoc) {
+            return res.status(404).json({ success: false, message: 'State not found' });
+        }
+
+        let newCleanState = existingDoc.state;
+        if (state && state.trim()) {
+            newCleanState = state.trim().replace(/\s+/g, ' ');
+            const normalizedNew = normalizeStateName(newCleanState);
+            const normalizedOld = normalizeStateName(existingDoc.state);
+
+            if (normalizedNew !== normalizedOld) {
+                // 1. Check duplicate against other records
+                const allStates = await StateMaster.find(companyId ? { companyId } : {}).lean();
+                const duplicate = allStates.find(s => s._id.toString() !== id && normalizeStateName(s.state) === normalizedNew);
+                if (duplicate) {
+                    return res.status(400).json({ 
+                        success: false, 
+                        message: `State name '${newCleanState}' conflicts with existing record '${duplicate.state}'.` 
+                    });
+                }
+
+                // 2. Check Business Rules: restrict rename if state is referenced in system records
+                const [custCount, vendCount, branchCount] = await Promise.all([
+                    Customer.countDocuments({ state: existingDoc.state }),
+                    Vendor.countDocuments({ state: existingDoc.state }),
+                    Branch.countDocuments({ state: existingDoc.state })
+                ]);
+
+                if (custCount > 0 || vendCount > 0 || branchCount > 0) {
+                    return res.status(400).json({
+                        success: false,
+                        message: `State name '${existingDoc.state}' cannot be renamed because it is actively bound to ${custCount} customer(s), ${vendCount} vendor(s), and ${branchCount} branch(es).`
+                    });
+                }
+            }
+        }
+
         const updated = await StateMaster.findOneAndUpdate(
             query,
             { 
                 ...(country && { country: country.trim() }),
                 ...(dialCode !== undefined && { dialCode: dialCode.trim() }),
-                ...(state && { state: state.trim() }),
+                state: newCleanState,
                 ...(shortCode && { shortCode: shortCode.trim().toUpperCase() }),
                 ...(gstCode !== undefined && { gstCode: gstCode.trim() }),
                 ...(city !== undefined && { city: city.trim() }),
@@ -113,9 +175,6 @@ exports.update = async (req, res) => {
             },
             { new: true }
         );
-        if (!updated) {
-            return res.status(404).json({ success: false, message: 'State not found' });
-        }
         res.json({ success: true, data: updated, message: 'State updated successfully' });
     } catch (error) {
         console.error('Error updating state:', error);
@@ -130,10 +189,26 @@ exports.delete = async (req, res) => {
         const query = { _id: id };
         if (companyId) query.companyId = companyId;
 
-        const deleted = await StateMaster.findOneAndDelete(query);
-        if (!deleted) {
+        const targetState = await StateMaster.findOne(query);
+        if (!targetState) {
             return res.status(404).json({ success: false, message: 'State not found' });
         }
+
+        // Check if state is in active use
+        const [custCount, vendCount, branchCount] = await Promise.all([
+            Customer.countDocuments({ state: targetState.state }),
+            Vendor.countDocuments({ state: targetState.state }),
+            Branch.countDocuments({ state: targetState.state })
+        ]);
+
+        if (custCount > 0 || vendCount > 0 || branchCount > 0) {
+            return res.status(400).json({
+                success: false,
+                message: `Cannot delete State '${targetState.state}' because it is actively referenced by system records (${custCount} customer(s), ${vendCount} vendor(s), ${branchCount} branch(es)).`
+            });
+        }
+
+        await StateMaster.findOneAndDelete(query);
         res.json({ success: true, message: 'State deleted successfully' });
     } catch (error) {
         console.error('Error deleting state:', error);

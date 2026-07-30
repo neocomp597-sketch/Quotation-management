@@ -928,4 +928,16 @@ export const stateMasterService = {
   delete: (id) => api.delete(`/state-master/${id}`),
 };
 
+export const flowchartService = {
+  getAll: (params) => api.get("/flowcharts", { params }),
+  getById: (id) => api.get(`/flowcharts/${id}`),
+  create: (data) => api.post("/flowcharts", data),
+  update: (id, data) => api.put(`/flowcharts/${id}`, data),
+  delete: (id) => api.delete(`/flowcharts/${id}`),
+  generate: (text) => api.post("/flowcharts/generate", { text }),
+  importJson: (data) => api.post("/flowcharts/import", data),
+  getVersions: (id) => api.get(`/flowcharts/${id}/versions`),
+  restoreVersion: (id, versionId) => api.post(`/flowcharts/${id}/restore/${versionId}`),
+};
+
 export default api;

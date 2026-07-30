@@ -89,17 +89,16 @@ const OrgChart = () => {
     const fetchData = async () => {
         try {
             setLoading(true);
-            const [empRes, branchRes, deptRes] = await Promise.all([
+            const [empRes, branchRes, deptRes] = await Promise.allSettled([
                 payrollService.getEmployees(),
                 branchService.getAll(),
                 payrollService.getDepartments()
             ]);
-            setEmployees(empRes.data || []);
-            setBranches(branchRes.data || []);
-            setDepartments(deptRes.data || []);
+            setEmployees(empRes.status === 'fulfilled' ? (empRes.value?.data || []) : []);
+            setBranches(branchRes.status === 'fulfilled' ? (branchRes.value?.data || []) : []);
+            setDepartments(deptRes.status === 'fulfilled' ? (deptRes.value?.data || []) : []);
         } catch (err) {
             console.error('Failed to load Org Chart data:', err);
-            toast.error('Failed to load Org Chart data');
         } finally {
             setLoading(false);
         }

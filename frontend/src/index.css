@@ -469,4 +469,19 @@ html.dark table tr:hover {
   background-color: #1e293b !important;
 }
 
+/* Centralized Responsive Layout Auto-Adjust: Expand page containers to fill full screen width without blank side margins */
+main > div > div,
+main .max-w-7xl,
+main .max-w-6xl,
+main .max-w-5xl,
+main .max-w-4xl {
+  max-width: 100% !important;
+  width: 100% !important;
+}
+
+html, body {
+  overflow-x: hidden;
+}
+
+
 

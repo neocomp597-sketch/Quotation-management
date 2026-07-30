@@ -25,7 +25,22 @@ export const MENU_PERMISSION_GROUPS = [
             { key: 'master_terms', label: 'Terms', description: 'Terms and conditions master', defaultRoute: '/terms' },
             { key: 'master_territories', label: 'Territories', description: 'Territory master management', defaultRoute: '/territory-master' },
             { key: 'master_branches', label: 'Branch Master', description: 'Branch master management', defaultRoute: '/branches' },
-            { key: 'master_serials', label: 'Serial No. Master', description: 'Serial number and asset master record management', defaultRoute: '/serial-no-master' }
+            { key: 'master_serials', label: 'Serial No. Master', description: 'Serial number and asset master record management', defaultRoute: '/serial-no-master' },
+            { key: 'state_master_create', label: 'Create State Master', description: 'Create state records', defaultRoute: '/state-master' },
+            { key: 'state_master_edit', label: 'Edit State Master', description: 'Modify state records', defaultRoute: '/state-master' },
+            { key: 'state_master_delete', label: 'Delete State Master', description: 'Delete state records', defaultRoute: '/state-master' }
+        ]
+    },
+    {
+        key: 'flowchart',
+        label: 'Flowchart Builder',
+        description: 'Visual process flowchart builder, auto-generation, versioning and templates',
+        defaultRoute: '/flowcharts',
+        children: [
+            { key: 'flowchart_view', label: 'View Flowcharts', description: 'Access flowchart builder and diagrams', defaultRoute: '/flowcharts' },
+            { key: 'flowchart_create', label: 'Create Flowcharts', description: 'Create and auto-generate new flowcharts', defaultRoute: '/flowcharts' },
+            { key: 'flowchart_edit', label: 'Edit Flowcharts', description: 'Modify canvas nodes, edges and versions', defaultRoute: '/flowcharts' },
+            { key: 'flowchart_delete', label: 'Delete Flowcharts', description: 'Delete flowchart diagrams', defaultRoute: '/flowcharts' }
         ]
     },
     {

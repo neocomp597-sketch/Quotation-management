@@ -125,9 +125,11 @@ const clmRoutes = require("./routes/clmRoutes");
 const tenderRoutes = require("./routes/tenderRoutes");
 const branchRoutes = require("./routes/branchRoutes");
 const stateMasterRoutes = require("./routes/stateMasterRoutes");
+const flowchartRoutes = require("./routes/flowchartRoutes");
 const scheduler = require("./utils/scheduler");
 
 // API Routes (Reload triggered)
+app.use("/api/flowcharts", flowchartRoutes);
 app.use("/api/state-master", stateMasterRoutes);
 app.use("/api/branches", branchRoutes);
 app.use("/api/tenders", tenderRoutes);
@@ -878,4 +880,4 @@ if (require.main === module) {
 
 // Trigger nodemon reload - force reload csm routes
 module.exports = app;
-// Force nodemon reload: 2026-07-01T22:45:00
+// Force nodemon reload: 2026-07-30T23:21:00 (Flowchart centering X=500 updated)

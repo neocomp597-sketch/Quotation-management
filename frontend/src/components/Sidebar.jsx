@@ -133,6 +133,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                 { key: 'master_terms', name: 'Terms & Conditions', icon: <MdDescription size={18} />, path: '/terms' },
                 { key: 'master_statuses', name: 'Status Master', icon: <MdBarChart size={18} />, path: '/status-master', adminOnly: true },
                 { key: 'master_serials', name: 'Serial No. Master', icon: <MdTag size={18} />, path: '/serial-no-master' },
+                { key: 'flowchart_view', name: 'Flowchart Builder', icon: <MdAccountTree size={18} />, path: '/flowcharts' },
             ]
         },
         {
@@ -142,7 +143,6 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             icon: <MdCalendarMonth size={22} />,
             children: [
                 { key: 'payroll_runs', name: 'Overview', icon: <MdDashboard size={18} />, path: '/payroll/dashboard' },
-                { key: 'payroll_org_chart', name: 'Org Chart', icon: <MdAccountTree size={18} />, path: '/payroll/org-chart' },
                 { key: 'payroll_runs', name: 'Run Payroll', icon: <MdReceipt size={18} />, path: '/payroll/runs' },
                 { key: 'payroll_payments', name: 'Payments', icon: <MdReceipt size={18} />, path: '/payroll/payments' },
                 { key: 'payroll_runs', name: 'Payslips', icon: <MdReceipt size={18} />, path: '/payroll/payslips' },

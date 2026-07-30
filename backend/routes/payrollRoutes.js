@@ -91,14 +91,14 @@ router.get('/reports', checkAdmin, payrollController.getReports);
 // ─── AUDIT LOGS (Admin only) ────────────────────────────────────────────────
 router.get('/audit-logs', checkAdmin, payrollController.getAuditLogs);
 
-// ─── DEPARTMENTS (Admin only) ────────────────────────────────────────────────
-router.get('/departments', checkAdmin, payrollController.getDepartments);
+// ─── DEPARTMENTS ────────────────────────────────────────────────────────────
+router.get('/departments', payrollController.getDepartments);
 router.post('/departments', checkAdmin, payrollController.createDepartment);
 router.put('/departments/:id', checkAdmin, payrollController.updateDepartment);
 router.delete('/departments/:id', checkAdmin, payrollController.deleteDepartment);
 
-// ─── DESIGNATIONS (Admin only) ────────────────────────────────────────────────
-router.get('/designations', checkAdmin, payrollController.getDesignations);
+// ─── DESIGNATIONS ───────────────────────────────────────────────────────────
+router.get('/designations', payrollController.getDesignations);
 router.post('/designations', checkAdmin, payrollController.createDesignation);
 router.put('/designations/:id', checkAdmin, payrollController.updateDesignation);
 router.delete('/designations/:id', checkAdmin, payrollController.deleteDesignation);

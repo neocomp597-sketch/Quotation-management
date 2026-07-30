@@ -54,6 +54,7 @@ import PayrollReports from './pages/PayrollReports';
 import PayrollSettingsPage from './pages/PayrollSettingsPage';
 import PayrollMasters from './pages/PayrollMasters';
 import OrgChart from './pages/OrgChart';
+import Flowcharts from './pages/Flowcharts';
 
 import CSMDashboard from './pages/CSMDashboard';
 import CSMTickets from './pages/CSMTickets';
@@ -186,6 +187,7 @@ function App() {
             <Route path="/state-master/new" element={<PermissionRoute permissionKey="master_branches"><Layout><StateMaster isCreatePage={true} /></Layout></PermissionRoute>} />
             <Route path="/state-master/edit/:id" element={<PermissionRoute permissionKey="master_branches"><Layout><StateMaster isEditPage={true} /></Layout></PermissionRoute>} />
             <Route path="/serial-no-master" element={<PermissionRoute permissionKey="master_serials"><Layout><SerialNoMaster /></Layout></PermissionRoute>} />
+            <Route path="/flowcharts" element={<PermissionRoute permissionKey="flowchart_view"><Layout><Flowcharts /></Layout></PermissionRoute>} />
             <Route path="/settings" element={<PermissionRoute permissionKey="settings_profile"><Layout><Settings /></Layout></PermissionRoute>} />
             <Route path="/status-master" element={<PermissionRoute adminOnly={true}><Layout><StatusMaster /></Layout></PermissionRoute>} />
             <Route path="/status-master/new" element={<PermissionRoute adminOnly={true}><Layout><StatusMaster isCreatePage={true} /></Layout></PermissionRoute>} />
