@@ -85,6 +85,22 @@ export const DEFAULT_CITIES = {
     'Delhi (NCT)': ['New Delhi', 'North Delhi', 'South Delhi', 'East Delhi', 'West Delhi'],
     'Karnataka': ['Bengaluru', 'Mysuru', 'Mangaluru', 'Hubballi', 'Belagavi'],
     'Tamil Nadu': ['Chennai', 'Coimbatore', 'Madurai', 'Tiruchirappalli', 'Salem'],
+    'Rajasthan': ['Jaipur', 'Jodhpur', 'Udaipur', 'Kota', 'Bikaner', 'Ajmer'],
+    'Uttar Pradesh': ['Lucknow', 'Kanpur', 'Varanasi', 'Agra', 'Noida', 'Prayagraj', 'Ghaziabad'],
+    'Madhya Pradesh': ['Bhopal', 'Indore', 'Gwalior', 'Jabalpur', 'Ujjain'],
+    'West Bengal': ['Kolkata', 'Howrah', 'Durgapur', 'Siliguri', 'Asansol'],
+    'Punjab': ['Ludhiana', 'Amritsar', 'Jalandhar', 'Patiala', 'Mohali'],
+    'Haryana': ['Gurugram', 'Faridabad', 'Panipat', 'Ambala', 'Karnal'],
+    'Kerala': ['Kochi', 'Thiruvananthapuram', 'Kozhikode', 'Thrissur', 'Kollam'],
+    'Telangana': ['Hyderabad', 'Warangal', 'Nizamabad', 'Karimnagar'],
+    'Andhra Pradesh': ['Visakhapatnam', 'Vijayawada', 'Guntur', 'Nellore', 'Tirupati'],
+    'Bihar': ['Patna', 'Gaya', 'Bhagalpur', 'Muzaffarpur'],
+    'Assam': ['Guwahati', 'Silchar', 'Dibrugarh', 'Jorhat'],
+    'Jharkhand': ['Ranchi', 'Jamshedpur', 'Dhanbad', 'Bokaro'],
+    'Chhattisgarh': ['Raipur', 'Bhilai', 'Bilaspur', 'Korba'],
+    'Goa': ['Panaji', 'Margao', 'Vasco da Gama', 'Mapusa'],
+    'Uttarakhand': ['Dehradun', 'Haridwar', 'Roorkee', 'Haldwani'],
+    'Himachal Pradesh': ['Shimla', 'Dharamshala', 'Mandi', 'Solan'],
     'California': ['Los Angeles', 'San Francisco', 'San Diego', 'San Jose', 'Sacramento'],
     'New York': ['New York City', 'Buffalo', 'Rochester', 'Syracuse', 'Albany'],
     'Texas': ['Houston', 'Dallas', 'Austin', 'San Antonio', 'Fort Worth'],
@@ -134,5 +150,5 @@ export const getCitiesForState = (stateName) => {
     if (!stateName) return [];
     if (DEFAULT_CITIES[stateName]) return DEFAULT_CITIES[stateName];
     const key = Object.keys(DEFAULT_CITIES).find(k => k.toLowerCase() === stateName.toLowerCase());
-    return key ? DEFAULT_CITIES[key] : ['Central', 'North', 'South', 'East', 'West'];
+    return key ? DEFAULT_CITIES[key] : [];
 };

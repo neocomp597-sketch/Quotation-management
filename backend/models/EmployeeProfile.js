@@ -31,6 +31,7 @@ const FamilyMemberSchema = new mongoose.Schema({
     relation: { type: String, enum: ['Father', 'Mother', 'Spouse', 'Child', 'Sibling', 'Other'], default: 'Other' },
     name: { type: String, trim: true, default: '' },
     contactNumber: { type: String, trim: true, default: '' },
+    aadhaarNumber: { type: String, trim: true, default: '' },
     isEmergencyContact: { type: Boolean, default: false }
 }, { _id: true });
 

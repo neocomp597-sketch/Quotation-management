@@ -161,6 +161,19 @@ const StateMaster = ({ isCreatePage, isEditPage }) => {
         }
     };
 
+    const handleStateInputChange = (val) => {
+        const activeCtry = isCustomCountry ? formData.customCountry : formData.country;
+        const countryStates = DEFAULT_STATES[activeCtry] || DEFAULT_STATES['India'] || [];
+        const match = countryStates.find(s => s.state.toLowerCase() === val.trim().toLowerCase());
+        setFormData(prev => ({
+            ...prev,
+            state: val,
+            shortCode: match ? match.shortCode : prev.shortCode,
+            gstCode: match ? (match.gstCode || '') : prev.gstCode,
+            city: ''
+        }));
+    };
+
     const handleIndianStateSelect = (e) => {
         const val = e.target.value;
         if (val === '__CUSTOM__') {
@@ -178,13 +191,12 @@ const StateMaster = ({ isCreatePage, isEditPage }) => {
             setIsCustomCity(false);
             const indianStates = DEFAULT_STATES['India'] || [];
             const match = indianStates.find(s => s.state === val);
-            const cities = getCitiesForState(val);
             setFormData(prev => ({
                 ...prev,
                 state: val,
                 shortCode: match ? match.shortCode : '',
                 gstCode: match ? (match.gstCode || '') : '',
-                city: cities.length > 0 ? cities[0] : ''
+                city: ''
             }));
         }
     };
@@ -437,146 +449,111 @@ const StateMaster = ({ isCreatePage, isEditPage }) => {
                         {/* Form Card Body */}
                         <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
                             <form id="state-master-form" onSubmit={handleSubmit} className="space-y-6">
-                                {/* Country Field with Add Option */}
-                                <div>
-                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Country *</label>
-                                    {!isCustomCountry ? (
-                                        <select
-                                            value={formData.country}
-                                            onChange={handleCountryChange}
-                                            className="w-full px-4 py-3.5 rounded-2xl border border-slate-200 bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-semibold cursor-pointer"
-                                        >
-                                            {countryList.map(c => (
-                                                <option key={c} value={c}>{c}</option>
-                                            ))}
-                                            <option value="__ADD_NEW__" className="font-bold text-primary-600">
-                                                + Add New Country...
-                                            </option>
-                                        </select>
-                                    ) : (
-                                        <div className="space-y-2">
-                                            <div className="flex items-center gap-2">
-                                                <input
-                                                    type="text"
-                                                    required
-                                                    autoFocus
-                                                    placeholder="Enter New Country Name (e.g. Canada, Germany, UAE)"
-                                                    value={formData.customCountry}
-                                                    onChange={(e) => setFormData({ ...formData, customCountry: e.target.value })}
-                                                    className="w-full px-4 py-3.5 rounded-2xl border border-primary-300 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-semibold"
-                                                />
-                                                <button
-                                                    type="button"
-                                                    onClick={() => { setIsCustomCountry(false); setFormData({ ...formData, country: countryList[0] || 'India' }); }}
-                                                    className="px-4 py-3.5 bg-slate-100 text-slate-600 rounded-2xl text-xs font-bold whitespace-nowrap hover:bg-slate-200 transition-all"
-                                                >
-                                                    Select Existing
-                                                </button>
-                                            </div>
-                                            <p className="text-[11px] text-primary-600 font-medium">Entering new country name inline</p>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Dial Code & City Row */}
+                                {/* Row 1: Country & Country Dial Code */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    {/* Field 1: Country */}
                                     <div>
-                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Country Dial Code</label>
-                                        <div className="relative">
-                                            <input
-                                                type="text"
-                                                placeholder="e.g. +91"
-                                                value={formData.dialCode}
-                                                onChange={(e) => setFormData({ ...formData, dialCode: e.target.value })}
-                                                className="w-full px-4 py-3.5 rounded-2xl border border-slate-200 bg-slate-50 text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-bold"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">City Option</label>
-                                        {!isCustomCity && knownCitiesForState.length > 0 ? (
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Country *</label>
+                                        {!isCustomCountry ? (
                                             <select
-                                                value={formData.city}
-                                                onChange={handleCitySelect}
+                                                value={formData.country}
+                                                onChange={handleCountryChange}
                                                 className="w-full px-4 py-3.5 rounded-2xl border border-slate-200 bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-semibold cursor-pointer"
                                             >
-                                                <option value="">Select City (Optional)</option>
-                                                {knownCitiesForState.map(ct => (
-                                                    <option key={ct} value={ct}>{ct}</option>
+                                                {countryList.map(c => (
+                                                    <option key={c} value={c}>{c}</option>
                                                 ))}
-                                                <option value="__CUSTOM_CITY__" className="font-bold text-primary-600">+ Enter Custom City...</option>
+                                                <option value="__ADD_NEW__" className="font-bold text-primary-600">
+                                                    + Add New Country...
+                                                </option>
                                             </select>
                                         ) : (
-                                            <div className="space-y-1">
-                                                <input
-                                                    type="text"
-                                                    placeholder="e.g. Mumbai, Pune, Ahmedabad"
-                                                    value={formData.city}
-                                                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                                                    className="w-full px-4 py-3.5 rounded-2xl border border-slate-200 bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-semibold"
-                                                />
-                                                {knownCitiesForState.length > 0 && (
+                                            <div className="space-y-2">
+                                                <div className="flex items-center gap-2">
+                                                    <input
+                                                        type="text"
+                                                        required
+                                                        autoFocus
+                                                        placeholder="Enter New Country Name (e.g. Canada, Germany, UAE)"
+                                                        value={formData.customCountry}
+                                                        onChange={(e) => setFormData({ ...formData, customCountry: e.target.value })}
+                                                        className="w-full px-4 py-3.5 rounded-2xl border border-primary-300 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-semibold"
+                                                    />
                                                     <button
                                                         type="button"
-                                                        onClick={() => setIsCustomCity(false)}
-                                                        className="text-[11px] text-primary-600 font-bold hover:underline"
+                                                        onClick={() => { setIsCustomCountry(false); setFormData({ ...formData, country: countryList[0] || 'India' }); }}
+                                                        className="px-4 py-3.5 bg-slate-100 text-slate-600 rounded-2xl text-xs font-bold whitespace-nowrap hover:bg-slate-200 transition-all"
                                                     >
-                                                        Select from list
+                                                        Select Existing
                                                     </button>
-                                                )}
+                                                </div>
+                                                <p className="text-[11px] text-primary-600 font-medium">Entering new country name inline</p>
                                             </div>
                                         )}
                                     </div>
+
+                                    {/* Field 2: Country Dial Code */}
+                                    <div>
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Country Dial Code</label>
+                                        <input
+                                            type="text"
+                                            placeholder="e.g. +91"
+                                            value={formData.dialCode}
+                                            onChange={(e) => setFormData({ ...formData, dialCode: e.target.value })}
+                                            className="w-full px-4 py-3.5 rounded-2xl border border-slate-200 bg-slate-50 text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-bold"
+                                        />
+                                    </div>
                                 </div>
 
-                                {/* State / Union Territory Selector */}
-                                <div>
-                                    <div className="flex items-center justify-between mb-1">
-                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">State / Union Territory *</label>
-                                        {isIndiaSelected && (
-                                            <button
-                                                type="button"
-                                                onClick={() => setIsCustomState(!isCustomState)}
-                                                className="text-[11px] text-primary-600 font-bold hover:underline"
+                                {/* Row 2: State / UT & Short Code */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    {/* Field 3: State / Union Territory */}
+                                    <div>
+                                        <div className="flex items-center justify-between mb-1.5">
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">State / Union Territory *</label>
+                                            {isIndiaSelected && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setIsCustomState(!isCustomState)}
+                                                    className="text-[11px] text-primary-600 font-bold hover:underline"
+                                                >
+                                                    {isCustomState ? 'Select from List' : '+ Enter Custom State Name'}
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        {isIndiaSelected && !isCustomState ? (
+                                            <select
+                                                value={formData.state}
+                                                onChange={handleIndianStateSelect}
+                                                required
+                                                className="w-full px-4 py-3.5 rounded-2xl border border-slate-200 bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-semibold cursor-pointer"
                                             >
-                                                {isCustomState ? 'Select from Predefined Indian States' : '+ Enter Custom State Name'}
-                                            </button>
+                                                <option value="">-- Select State / UT --</option>
+                                                {(DEFAULT_STATES['India'] || []).map(st => (
+                                                    <option key={st.state} value={st.state}>
+                                                        {st.state} ({st.shortCode}) {st.gstCode ? `- GST: ${st.gstCode}` : ''}
+                                                    </option>
+                                                ))}
+                                                <option value="__CUSTOM__" className="font-bold text-primary-600">
+                                                    + Custom State / UT Name...
+                                                </option>
+                                            </select>
+                                        ) : (
+                                            <input
+                                                type="text"
+                                                required
+                                                placeholder="e.g. Maharashtra, Gujarat, California, Ontario"
+                                                value={formData.state}
+                                                onChange={(e) => handleStateInputChange(e.target.value)}
+                                                className="w-full px-4 py-3.5 rounded-2xl border border-slate-200 bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-semibold"
+                                            />
                                         )}
                                     </div>
 
-                                    {isIndiaSelected && !isCustomState ? (
-                                        <select
-                                            value={formData.state}
-                                            onChange={handleIndianStateSelect}
-                                            required
-                                            className="w-full px-4 py-3.5 rounded-2xl border border-slate-200 bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-semibold cursor-pointer"
-                                        >
-                                            <option value="">-- Select Indian State / UT --</option>
-                                            {(DEFAULT_STATES['India'] || []).map(st => (
-                                                <option key={st.state} value={st.state}>
-                                                    {st.state} ({st.shortCode}) {st.gstCode ? `- GST: ${st.gstCode}` : ''}
-                                                </option>
-                                            ))}
-                                            <option value="__CUSTOM__" className="font-bold text-primary-600">
-                                                + Custom State / UT Name...
-                                            </option>
-                                        </select>
-                                    ) : (
-                                        <input
-                                            type="text"
-                                            required
-                                            placeholder="e.g. Maharashtra, Gujarat, California, Ontario"
-                                            value={formData.state}
-                                            onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-                                            className="w-full px-4 py-3.5 rounded-2xl border border-slate-200 bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-semibold"
-                                        />
-                                    )}
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    {/* Field 4: Short Code (2-letter) */}
                                     <div>
-                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Short Code (2-Letter) *</label>
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Short Code (2-letter) *</label>
                                         <input
                                             type="text"
                                             required
@@ -587,8 +564,13 @@ const StateMaster = ({ isCreatePage, isEditPage }) => {
                                             className="w-full px-4 py-3.5 rounded-2xl border border-slate-200 bg-slate-50 text-slate-900 uppercase font-mono focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-bold"
                                         />
                                     </div>
+                                </div>
+
+                                {/* Row 3: GST Code & City Name */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    {/* Field 5: GST Code / Number Prefix */}
                                     <div>
-                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">GST Code / Number Prefix</label>
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">GST Code / Number Prefix</label>
                                         <input
                                             type="text"
                                             maxLength={2}
@@ -598,11 +580,52 @@ const StateMaster = ({ isCreatePage, isEditPage }) => {
                                             className="w-full px-4 py-3.5 rounded-2xl border border-slate-200 bg-slate-50 text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-bold"
                                         />
                                     </div>
+
+                                    {/* Field 6: City Name */}
+                                    <div>
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">City Name</label>
+                                        {!isCustomCity ? (
+                                            <select
+                                                disabled={!formData.state.trim()}
+                                                value={formData.city}
+                                                onChange={handleCitySelect}
+                                                className="w-full px-4 py-3.5 rounded-2xl border border-slate-200 bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-semibold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100"
+                                            >
+                                                <option value="">
+                                                    {!formData.state.trim() ? '-- Select State First --' : '-- Select City Name --'}
+                                                </option>
+                                                {knownCitiesForState.map(ct => (
+                                                    <option key={ct} value={ct}>{ct}</option>
+                                                ))}
+                                                {formData.state.trim() && (
+                                                    <option value="__CUSTOM_CITY__" className="font-bold text-primary-600">+ Enter Custom City...</option>
+                                                )}
+                                            </select>
+                                        ) : (
+                                            <div className="space-y-1">
+                                                <input
+                                                    type="text"
+                                                    placeholder="e.g. Mumbai, Pune, Ahmedabad"
+                                                    value={formData.city}
+                                                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                                                    className="w-full px-4 py-3.5 rounded-2xl border border-slate-200 bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-semibold"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setIsCustomCity(false)}
+                                                    className="text-[11px] text-primary-600 font-bold hover:underline"
+                                                >
+                                                    Select from list
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
 
+                                {/* Row 4: Status */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div>
-                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Status</label>
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Status</label>
                                         <select
                                             value={formData.status}
                                             onChange={(e) => setFormData({ ...formData, status: e.target.value })}

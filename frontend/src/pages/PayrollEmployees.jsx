@@ -58,14 +58,27 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
         setBasicForm(prev => ({ ...prev, photo: '' }));
     };
 
-    const handleAddFamilyMember = () => {
-        setBasicForm(prev => ({
+    // Collapsible states for Family Information section & cards
+    const [isFamilySectionOpen, setIsFamilySectionOpen] = useState(true);
+    const [openFamilyCards, setOpenFamilyCards] = useState({});
+
+    const toggleFamilyCard = (index) => {
+        setOpenFamilyCards(prev => ({
             ...prev,
-            familyDetails: [
-                ...(prev.familyDetails || []),
-                { relation: 'Father', name: '', contactNumber: '', isEmergencyContact: false }
-            ]
+            [index]: prev[index] === undefined ? false : !prev[index]
         }));
+    };
+
+    const handleAddFamilyMember = () => {
+        setBasicForm(prev => {
+            const newDetails = [
+                ...(prev.familyDetails || []),
+                { relation: 'Father', name: '', contactNumber: '', aadhaarNumber: '', isEmergencyContact: false }
+            ];
+            const newIdx = newDetails.length - 1;
+            setOpenFamilyCards(cardPrev => ({ ...cardPrev, [newIdx]: true }));
+            return { ...prev, familyDetails: newDetails };
+        });
     };
 
     const handleUpdateFamilyMember = (index, field, value) => {
@@ -74,6 +87,8 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
             let val = value;
             if (field === 'contactNumber') {
                 val = value.replace(/\D/g, '').slice(0, 10);
+            } else if (field === 'aadhaarNumber') {
+                val = value.replace(/\D/g, '').slice(0, 12);
             }
             updated[index] = { ...updated[index], [field]: val };
             return { ...prev, familyDetails: updated };
@@ -337,6 +352,18 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
             if (!ifscRegex.test(cleanIfsc)) {
                 errors.ifscCode = 'Invalid IFSC Code format (e.g. SBIN0001234 - 4 letters, 0, 6 characters)';
             }
+        }
+
+        // 8. Family Member Aadhaar validation
+        if (Array.isArray(form.familyDetails)) {
+            form.familyDetails.forEach((fam, idx) => {
+                if (fam.aadhaarNumber && fam.aadhaarNumber.trim()) {
+                    const cleanFamAadhaar = fam.aadhaarNumber.trim().replace(/\D/g, '');
+                    if (cleanFamAadhaar.length !== 12) {
+                        errors[`family_aadhaar_${idx}`] = `Aadhaar number for ${fam.name || fam.relation || 'Family Member ' + (idx + 1)} must be exactly 12 digits.`;
+                    }
+                }
+            });
         }
 
         return errors;
@@ -1070,99 +1097,179 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                         </div>
                                     </div>
 
-                                     {/* Section 4: Family Information */}
-                                     <div>
-                                         <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-4">
-                                             <h4 className="text-xs font-black text-teal-600 uppercase tracking-widest flex items-center gap-2">
-                                                 <MdContactPhone size={16} />
-                                                 <span>4. Family Information</span>
-                                             </h4>
-                                             <button
-                                                 type="button"
-                                                 onClick={handleAddFamilyMember}
-                                                 className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-50 hover:bg-teal-100 text-teal-700 rounded-xl text-xs font-bold transition-all border border-teal-200"
-                                             >
-                                                 <MdAdd size={16} />
-                                                 <span>Add Family Member</span>
-                                             </button>
-                                         </div>
+                                    {/* Section 4: Family Information (Collapsible Panel) */}
+                                    <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-xs">
+                                        <div 
+                                            onClick={() => setIsFamilySectionOpen(!isFamilySectionOpen)}
+                                            className="flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-100/80 cursor-pointer transition-all border-b border-slate-200/60 select-none"
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <span className="text-slate-600 font-bold text-base">
+                                                    {isFamilySectionOpen ? '▼' : '▶'}
+                                                </span>
+                                                <h4 className="text-xs font-black text-teal-600 uppercase tracking-widest flex items-center gap-2">
+                                                    <MdContactPhone size={16} />
+                                                    <span>4. Family Information</span>
+                                                </h4>
+                                                {basicForm.familyDetails?.length > 0 && (
+                                                    <span className="bg-teal-100 text-teal-800 text-[11px] font-bold px-2.5 py-0.5 rounded-full">
+                                                        {basicForm.familyDetails.length} {basicForm.familyDetails.length === 1 ? 'member' : 'members'}
+                                                    </span>
+                                                )}
+                                            </div>
 
-                                         {(!basicForm.familyDetails || basicForm.familyDetails.length === 0) ? (
-                                             <div className="p-6 bg-slate-50 border border-dashed border-slate-200 rounded-2xl text-center">
-                                                 <p className="text-xs font-semibold text-slate-500">No family details added yet.</p>
-                                                 <button
-                                                     type="button"
-                                                     onClick={handleAddFamilyMember}
-                                                     className="mt-2 text-xs font-black text-teal-600 hover:underline"
-                                                 >
-                                                     + Click to add a family member
-                                                 </button>
-                                             </div>
-                                         ) : (
-                                             <div className="space-y-3">
-                                                 {basicForm.familyDetails.map((fam, idx) => (
-                                                     <div key={idx} className="grid grid-cols-1 md:grid-cols-12 gap-3 p-4 bg-slate-50 border border-slate-200 rounded-2xl items-center">
-                                                         <div className="md:col-span-3">
-                                                             <label className={labelClass}>Relation *</label>
-                                                             <select
-                                                                 value={fam.relation || 'Father'}
-                                                                 onChange={(e) => handleUpdateFamilyMember(idx, 'relation', e.target.value)}
-                                                                 className={inputClass}
-                                                             >
-                                                                 <option value="Father">Father</option>
-                                                                 <option value="Mother">Mother</option>
-                                                                 <option value="Spouse">Spouse</option>
-                                                                 <option value="Child">Child</option>
-                                                                 <option value="Sibling">Sibling</option>
-                                                                 <option value="Other">Other</option>
-                                                             </select>
-                                                         </div>
-                                                         <div className="md:col-span-4">
-                                                             <label className={labelClass}>Name *</label>
-                                                             <input
-                                                                 type="text"
-                                                                 placeholder="Family member full name"
-                                                                 value={fam.name || ''}
-                                                                 onChange={(e) => handleUpdateFamilyMember(idx, 'name', e.target.value)}
-                                                                 className={inputClass}
-                                                             />
-                                                         </div>
-                                                         <div className="md:col-span-3">
-                                                             <label className={labelClass}>Contact Number</label>
-                                                             <input
-                                                                 type="text"
-                                                                 placeholder="e.g. 9876543210"
-                                                                 value={fam.contactNumber || ''}
-                                                                 onChange={(e) => handleUpdateFamilyMember(idx, 'contactNumber', e.target.value)}
-                                                                 className={inputClass}
-                                                             />
-                                                         </div>
-                                                         <div className="md:col-span-2 flex flex-col justify-end">
-                                                             <div className="flex items-center justify-between gap-2 mt-4 md:mt-0">
-                                                                 <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-slate-700 select-none">
-                                                                     <input
-                                                                         type="checkbox"
-                                                                         checked={fam.isEmergencyContact || false}
-                                                                         onChange={(e) => handleUpdateFamilyMember(idx, 'isEmergencyContact', e.target.checked)}
-                                                                         className="w-4 h-4 text-teal-600 rounded focus:ring-teal-500"
-                                                                     />
-                                                                     <span>Emergency</span>
-                                                                 </label>
-                                                                 <button
-                                                                     type="button"
-                                                                     onClick={() => handleRemoveFamilyMember(idx)}
-                                                                     className="p-2 text-rose-500 hover:bg-rose-100 rounded-xl transition-all"
-                                                                     title="Remove family member"
-                                                                 >
-                                                                     <MdDelete size={18} />
-                                                                 </button>
-                                                             </div>
-                                                         </div>
-                                                     </div>
-                                                 ))}
-                                             </div>
-                                         )}
-                                     </div>
+                                            <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+                                                <button
+                                                    type="button"
+                                                    onClick={handleAddFamilyMember}
+                                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs"
+                                                >
+                                                    <MdAdd size={16} />
+                                                    <span>Add Family Member</span>
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {isFamilySectionOpen && (
+                                            <div className="p-5 space-y-4 bg-white">
+                                                {(!basicForm.familyDetails || basicForm.familyDetails.length === 0) ? (
+                                                    <div className="p-6 bg-slate-50 border border-dashed border-slate-200 rounded-2xl text-center">
+                                                        <p className="text-xs font-semibold text-slate-500">No family details added yet.</p>
+                                                        <button
+                                                            type="button"
+                                                            onClick={handleAddFamilyMember}
+                                                            className="mt-2 text-xs font-black text-teal-600 hover:underline"
+                                                        >
+                                                            + Click to add a family member
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <div className="space-y-3">
+                                                        {basicForm.familyDetails.map((fam, idx) => {
+                                                            const isCardOpen = openFamilyCards[idx] !== false;
+                                                            return (
+                                                                <div key={idx} className="border border-slate-200 rounded-2xl overflow-hidden bg-slate-50/50">
+                                                                    {/* Per-Entry Accordion Header */}
+                                                                    <div 
+                                                                        onClick={() => toggleFamilyCard(idx)}
+                                                                        className="flex items-center justify-between px-4 py-3 bg-slate-100/70 hover:bg-slate-100 cursor-pointer select-none border-b border-slate-200/50"
+                                                                    >
+                                                                        <div className="flex items-center gap-2.5">
+                                                                            <span className="text-slate-500 font-bold text-xs">
+                                                                                {isCardOpen ? '▼' : '▶'}
+                                                                            </span>
+                                                                            <span className="font-bold text-xs text-slate-800">
+                                                                                {fam.relation || 'Member'} {fam.name ? `- ${fam.name}` : ''}
+                                                                            </span>
+                                                                            {fam.isEmergencyContact && (
+                                                                                <span className="bg-rose-100 text-rose-700 text-[10px] font-black uppercase px-2 py-0.5 rounded-md">
+                                                                                    Emergency Contact
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => handleRemoveFamilyMember(idx)}
+                                                                                className="p-1.5 text-rose-500 hover:bg-rose-100 rounded-lg transition-all"
+                                                                                title="Remove family member"
+                                                                            >
+                                                                                <MdDelete size={16} />
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+
+                                                                    {/* Per-Entry Form Card Content */}
+                                                                    {isCardOpen && (
+                                                                        <div className="p-4 space-y-4 bg-white">
+                                                                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                                                                <div>
+                                                                                    <label className={labelClass}>Relation *</label>
+                                                                                    <select
+                                                                                        value={fam.relation || 'Father'}
+                                                                                        onChange={(e) => handleUpdateFamilyMember(idx, 'relation', e.target.value)}
+                                                                                        className={inputClass}
+                                                                                    >
+                                                                                        <option value="Father">Father</option>
+                                                                                        <option value="Mother">Mother</option>
+                                                                                        <option value="Spouse">Spouse</option>
+                                                                                        <option value="Child">Child</option>
+                                                                                        <option value="Sibling">Sibling</option>
+                                                                                        <option value="Other">Other</option>
+                                                                                    </select>
+                                                                                </div>
+
+                                                                                <div>
+                                                                                    <label className={labelClass}>Name *</label>
+                                                                                    <input
+                                                                                        type="text"
+                                                                                        placeholder="Family member full name"
+                                                                                        value={fam.name || ''}
+                                                                                        onChange={(e) => handleUpdateFamilyMember(idx, 'name', e.target.value)}
+                                                                                        className={inputClass}
+                                                                                    />
+                                                                                </div>
+
+                                                                                <div>
+                                                                                    <label className={labelClass}>Contact Number</label>
+                                                                                    <input
+                                                                                        type="text"
+                                                                                        maxLength={10}
+                                                                                        placeholder="e.g. 9876543210"
+                                                                                        value={fam.contactNumber || ''}
+                                                                                        onChange={(e) => handleUpdateFamilyMember(idx, 'contactNumber', e.target.value)}
+                                                                                        className={inputClass}
+                                                                                    />
+                                                                                </div>
+
+                                                                                <div>
+                                                                                    <label className={labelClass}>Aadhaar Number</label>
+                                                                                    <input
+                                                                                        type="text"
+                                                                                        maxLength={12}
+                                                                                        placeholder="e.g. 123456789012"
+                                                                                        value={fam.aadhaarNumber || ''}
+                                                                                        onChange={(e) => handleUpdateFamilyMember(idx, 'aadhaarNumber', e.target.value)}
+                                                                                        className={`${inputClass} ${formErrors[`family_aadhaar_${idx}`] ? 'border-rose-500 ring-2 ring-rose-500/20 bg-rose-50/20' : ''}`}
+                                                                                    />
+                                                                                    {formErrors[`family_aadhaar_${idx}`] && (
+                                                                                        <p className="text-[11px] font-semibold text-rose-500 mt-1">
+                                                                                            {formErrors[`family_aadhaar_${idx}`]}
+                                                                                        </p>
+                                                                                    )}
+                                                                                </div>
+                                                                            </div>
+
+                                                                            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                                                                                <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700 select-none">
+                                                                                    <input
+                                                                                        type="checkbox"
+                                                                                        checked={fam.isEmergencyContact || false}
+                                                                                        onChange={(e) => handleUpdateFamilyMember(idx, 'isEmergencyContact', e.target.checked)}
+                                                                                        className="w-4 h-4 text-teal-600 rounded focus:ring-teal-500"
+                                                                                    />
+                                                                                    <span>Emergency Contact</span>
+                                                                                </label>
+
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => handleRemoveFamilyMember(idx)}
+                                                                                    className="text-xs font-bold text-rose-500 hover:underline flex items-center gap-1"
+                                                                                >
+                                                                                    <MdDelete size={14} />
+                                                                                    <span>Remove Member</span>
+                                                                                </button>
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
 
                                     <div className="pt-5 border-t border-slate-100 flex justify-end gap-3">
                                         <button
