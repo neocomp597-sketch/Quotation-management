@@ -882,8 +882,53 @@ exports.getCustomer360Data = async (req, res) => {
                 const dealIds = deals.map(d => d._id);
                 return mongoose.model('DealActivity').find({ dealId: { $in: dealIds } }).populate('performedBy', 'name').sort({ activityDate: -1 }).lean();
             })(),
-            mongoose.model('Asset').find({ customerId: custId }).populate('productId', 'productName productCode').sort({ createdAt: -1 }).lean()
+            mongoose.model('Asset').find({
+                customerId: custId,
+                $or: [
+                    { status: 'SOLD' },
+                    { invoiceId: { $exists: true, $ne: null } }
+                ]
+            }).populate('productId', 'productName productCode').sort({ createdAt: -1 }).lean()
         ]);
+
+        // Build list of sold products directly from customer invoices
+        const soldAssetSerials = new Set(assets.map(a => a.serialNumber).filter(Boolean));
+        const invoiceProducts = [];
+
+        (invoices || []).forEach(inv => {
+            (inv.items || []).forEach(item => {
+                if (item.serialNumbers && item.serialNumbers.length > 0) {
+                    item.serialNumbers.forEach(sn => {
+                        if (sn.serialNumber && !soldAssetSerials.has(sn.serialNumber)) {
+                            soldAssetSerials.add(sn.serialNumber);
+                            invoiceProducts.push({
+                                _id: sn.assetId || `${inv._id}-${sn.serialNumber}`,
+                                productId: { productName: item.productName },
+                                customProductName: item.productName,
+                                serialNumber: sn.serialNumber,
+                                status: 'SOLD',
+                                installationDate: inv.date,
+                                warrantyEndDate: null
+                            });
+                        }
+                    });
+                } else {
+                    const itemKey = `${inv._id}-${item.productId || item.productName}`;
+                    invoiceProducts.push({
+                        _id: itemKey,
+                        productId: { productName: item.productName },
+                        customProductName: item.productName,
+                        serialNumber: item.qty > 1 ? `Qty: ${item.qty}` : '-',
+                        status: 'SOLD',
+                        installationDate: inv.date,
+                        warrantyEndDate: null
+                    });
+                }
+            });
+        });
+
+        // Combine sold asset records and invoice product items
+        const allSoldProducts = [...assets, ...invoiceProducts];
 
         // Health Score calculation
         const stats = await getCustomerStats(id);
@@ -1017,7 +1062,7 @@ exports.getCustomer360Data = async (req, res) => {
             tickets,
             meetings,
             activities,
-            assets,
+            assets: allSoldProducts,
             timeline: paginatedTimeline,
             timelinePagination: {
                 page: timelinePage,

@@ -122,15 +122,16 @@ const [logoUploading, setLogoUploading] = useState(false);
         }
     }, []);
 
-    const isEmployee = String(authUser?.role || user.role || '').toLowerCase() === 'employee';
+    const userRole = String(authUser?.role || user.role || '').toLowerCase();
+    const isAdminOrManager = ['admin', 'super_admin', 'manager'].includes(userRole);
 
     useEffect(() => {
-        if (!isEmployee) {
+        if (isAdminOrManager) {
             fetchCompanySettings();
         } else if (activeTab !== 'profile') {
             setActiveTab('profile');
         }
-    }, [fetchCompanySettings, isEmployee, activeTab]);
+    }, [fetchCompanySettings, isAdminOrManager, activeTab]);
 
     useEffect(() => {
         if (authUser) {
@@ -260,14 +261,14 @@ const [logoUploading, setLogoUploading] = useState(false);
     const tabs = [
         { id: 'profile', label: 'Profile', icon: MdPerson }
     ];
-    if (!isEmployee) {
+    if (isAdminOrManager) {
         tabs.push(
             { id: 'company', label: 'Company Info', icon: MdBusiness },
             { id: 'address', label: 'Address', icon: MdLocationOn },
             { id: 'banking', label: 'Banking', icon: MdAccountBalance },
             { id: 'terms', label: 'Terms & Signatory', icon: MdDescription }
         );
-        if (authUser?.role === 'admin') {
+        if (userRole === 'admin' || userRole === 'super_admin') {
             tabs.push(
                 { id: 'branding', label: 'Branding', icon: MdColorLens },
                 { id: 'footer-pages', label: 'Footer Pages', icon: MdDescription }

@@ -277,7 +277,12 @@ const Vendors = ({ isCreatePage, isEditPage }) => {
                                                     <MdStorefront size={20} />
                                                 </div>
                                                 <div>
-                                                    <div className="font-black text-slate-900">{vendor.name}</div>
+                                                    <div
+                                                        className="font-black text-primary-600 hover:text-primary-800 cursor-pointer hover:underline text-sm"
+                                                        onClick={() => navigate(`/vendors/${vendor._id}/360`)}
+                                                    >
+                                                        {vendor.name}
+                                                    </div>
                                                     <div className="text-[10px] text-slate-400 uppercase font-bold mt-1">{vendor.contactPerson || 'No contact person'}</div>
                                                 </div>
                                             </div>

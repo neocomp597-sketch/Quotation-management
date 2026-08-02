@@ -585,11 +585,11 @@ const Customer360Workspace = () => {
                                             <td className="px-6 py-4 font-mono">{asset.serialNumber || '-'}</td>
                                             <td className="px-6 py-4">
                                                 <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded border ${
-                                                    asset.status === 'Active' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                                                    asset.status === 'Active' || asset.status === 'SOLD' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
                                                     asset.status === 'Under Repair' ? 'bg-amber-50 text-amber-700 border-amber-100' :
                                                     'bg-slate-50 text-slate-600 border-slate-100'
                                                 }`}>
-                                                    {asset.status || 'Active'}
+                                                    {asset.status || 'SOLD'}
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4 text-slate-500">

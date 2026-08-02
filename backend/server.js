@@ -711,6 +711,31 @@ const startBackgroundServices = async () => {
       },
       { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
     );
+    await SystemUpdate.findOneAndUpdate(
+      { version: "v4.4.0-360-workspaces-role-controls" },
+      {
+        version: "v4.4.0-360-workspaces-role-controls",
+        title: "Vendor & Contact 360 Workspaces, Invoiced Product Filtering & Settings Role Access Controls",
+        message: "We have introduced dedicated Vendor 360 and Contact 360 Workspaces, invoice-based product filtering in Customer 360, and role-based access restrictions on Company Settings.",
+        releaseNotes: [
+          "Vendor 360 Workspace: Full interactive 360° profile view for vendors featuring overview, supplied catalog products, purchase vouchers, linked quotations, and interaction timeline.",
+          "Contact 360 Workspace: Interactive 360° profile view for contact persons featuring contact details, scheduled meetings, support tickets, and interaction history.",
+          "Customer 360 Product Details Filter: Refined the Product Details list in Customer 360 to display only products included in the customer's billing invoices (excluding unassigned in-stock inventory).",
+          "Settings Role-Based Access Control: Restricted access to Company Settings configuration tabs (Company Info, Address, Banking, Terms & Signatory, Branding, Footer Pages) exclusively to Admin and Manager roles.",
+          "Clickable Vendor & Contact Names: Made vendor and contact names in master list tables interactive links navigating directly to their respective 360 degree workspace pages."
+        ],
+        detailedChanges: [
+          { date: "2026-08-02", module: "Master Management", submodule: "Vendor 360 Workspace", changes: "Created Vendor360Workspace component and getVendor360Data API endpoint (/api/vendors/:id/360)." },
+          { date: "2026-08-02", module: "Master Management", submodule: "Contact 360 Workspace", changes: "Created Contact360Workspace component and getContact360Data API endpoint (/api/contacts/:id/360)." },
+          { date: "2026-08-02", module: "Customer 360", submodule: "Product Details Filter", changes: "Updated getCustomer360Data backend controller to filter sold items directly from customer billing invoices." },
+          { date: "2026-08-02", module: "Settings & System", submodule: "Role Access Control", changes: "Restricted company settings tabs to Admin and Manager roles only in Settings page." }
+        ],
+        deployedBy: "Super Admin",
+        deployedAt: new Date("2026-08-02T22:42:00Z"),
+        isActive: true
+      },
+      { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
+    );
   } catch (err) {
     console.error("[Release Seed Error] Failed to seed system update:", err.message);
   }

@@ -1,4 +1,9 @@
+const mongoose = require('mongoose');
 const Vendor = require('../models/Vendor');
+const Product = require('../models/Product');
+const Voucher = require('../models/Voucher');
+const Quotation = require('../models/Quotation');
+const Contact = require('../models/Contact');
 
 const escapeRegex = (value = '') => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -146,10 +151,103 @@ const deleteVendor = async (req, res) => {
     }
 };
 
+const getVendor360Data = async (req, res) => {
+    try {
+        const { id } = req.params;
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ message: 'Invalid Vendor ID' });
+        }
+        const vendorId = new mongoose.Types.ObjectId(id);
+
+        const vendor = await Vendor.findById(id).lean();
+        if (!vendor) {
+            return res.status(404).json({ message: 'Vendor not found' });
+        }
+
+        const vendorNameRegex = vendor.name ? new RegExp('^' + escapeRegex(vendor.name) + '$', 'i') : null;
+
+        const [products, purchases, quotations, contacts] = await Promise.all([
+            Product.find({ 'vendors.vendorId': vendorId }).lean(),
+            Voucher.find({
+                $or: [
+                    { vendorId: vendorId },
+                    ...(vendorNameRegex ? [{ vendorName: vendorNameRegex }] : [])
+                ]
+            }).sort({ date: -1 }).lean(),
+            Quotation.find({
+                $or: [
+                    { 'items.vendorId': vendorId },
+                    ...(vendorNameRegex ? [{ 'items.vendorName': vendorNameRegex }] : [])
+                ]
+            }).sort({ createdAt: -1 }).lean(),
+            Contact.find(vendorNameRegex ? { company: vendorNameRegex } : { _id: null }).sort({ createdAt: -1 }).lean()
+        ]);
+
+        const timeline = [];
+        timeline.push({
+            id: `create-${vendor._id}`,
+            type: 'system',
+            title: 'Vendor Master Registered',
+            description: `Vendor profile "${vendor.name}" was registered in system.`,
+            date: vendor.createdAt,
+            icon: 'MdStorefront'
+        });
+
+        purchases.forEach(p => {
+            timeline.push({
+                id: `purchase-${p._id}`,
+                type: 'purchase',
+                title: `Purchase Voucher (${p.voucherNumber})`,
+                description: `Billed total ₹${(p.grandTotal || 0).toLocaleString()} with ${p.totalQty || 0} items.`,
+                date: p.date,
+                icon: 'MdShoppingCart'
+            });
+        });
+
+        quotations.forEach(q => {
+            timeline.push({
+                id: `quote-${q._id}`,
+                type: 'quotation',
+                title: `Quotation Linked (${q.quotationNumber || q.quotationNo})`,
+                description: `Quotation created with items from vendor ${vendor.name}. Grand Total ₹${(q.grandTotal || 0).toLocaleString()}.`,
+                date: q.createdAt,
+                icon: 'MdRequestQuote'
+            });
+        });
+
+        timeline.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        const totalPurchases = purchases.reduce((acc, p) => acc + (p.grandTotal || 0), 0);
+        const totalItemsPurchased = purchases.reduce((acc, p) => acc + (p.totalQty || 0), 0);
+        const stats = {
+            totalPurchases,
+            totalItemsPurchased,
+            purchaseCount: purchases.length,
+            productCount: products.length,
+            quotationCount: quotations.length,
+            contactCount: contacts.length
+        };
+
+        res.json({
+            vendor,
+            products,
+            purchases,
+            quotations,
+            contacts,
+            timeline,
+            stats
+        });
+    } catch (error) {
+        console.error('Get vendor 360 error:', error);
+        res.status(500).json({ message: error.message || 'Error fetching vendor 360 data' });
+    }
+};
+
 module.exports = {
     createVendor,
     getAllVendors,
     getVendorById,
     updateVendor,
-    deleteVendor
+    deleteVendor,
+    getVendor360Data
 };

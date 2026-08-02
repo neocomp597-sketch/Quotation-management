@@ -1,4 +1,8 @@
+const mongoose = require('mongoose');
 const Contact = require('../models/Contact');
+const Customer = require('../models/Customer');
+const Ticket = require('../models/Ticket');
+const Meeting = require('../models/Meeting');
 
 const escapeRegex = (value = '') => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -161,10 +165,111 @@ const deleteContact = async (req, res) => {
     }
 };
 
+const getContact360Data = async (req, res) => {
+    try {
+        const { id } = req.params;
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ message: 'Invalid Contact ID' });
+        }
+        const contactId = new mongoose.Types.ObjectId(id);
+
+        const contact = await Contact.findById(id).lean();
+        if (!contact) {
+            return res.status(404).json({ message: 'Contact not found' });
+        }
+
+        const emailMatch = contact.email ? contact.email : null;
+
+        const [customer, tickets, meetings] = await Promise.all([
+            contact.company
+                ? Customer.findOne({
+                    $or: [
+                        { companyName: new RegExp('^' + escapeRegex(contact.company) + '$', 'i') },
+                        { customerName: new RegExp('^' + escapeRegex(contact.company) + '$', 'i') }
+                    ]
+                }).lean()
+                : null,
+            Ticket.find({
+                $or: [
+                    { contactId: contactId },
+                    ...(emailMatch ? [{ customerEmail: emailMatch }] : [])
+                ]
+            }).sort({ createdAt: -1 }).lean(),
+            Meeting.find({
+                $or: [
+                    { relatedRecordId: contactId },
+                    ...(emailMatch ? [{ 'attendees.email': emailMatch }] : [])
+                ]
+            }).sort({ startDateTime: -1 }).lean()
+        ]);
+
+        const timeline = [];
+        timeline.push({
+            id: `create-${contact._id}`,
+            type: 'system',
+            title: 'Contact Profile Created',
+            description: `Contact ${contact.contactName} (${contact.designation || 'No Designation'}) registered.`,
+            date: contact.createdAt,
+            icon: 'MdContactPhone'
+        });
+
+        if (contact.lastInteractionDate) {
+            timeline.push({
+                id: `interaction-${contact._id}`,
+                type: 'interaction',
+                title: 'Last Interaction Logged',
+                description: `Interaction noted: ${contact.notes || 'No notes'}`,
+                date: contact.lastInteractionDate,
+                icon: 'MdMessage'
+            });
+        }
+
+        meetings.forEach(m => {
+            timeline.push({
+                id: `meeting-${m._id}`,
+                type: 'meeting',
+                title: `Meeting: ${m.title}`,
+                description: `Status: ${m.status || 'Scheduled'}. Agenda: ${m.agenda || 'N/A'}`,
+                date: m.startDateTime || m.createdAt,
+                icon: 'MdCalendarMonth'
+            });
+        });
+
+        tickets.forEach(t => {
+            timeline.push({
+                id: `ticket-${t._id}`,
+                type: 'ticket',
+                title: `Ticket #${t.ticketNo}`,
+                description: `Issue: ${t.issueTitle}. Status: ${t.status}`,
+                date: t.createdAt,
+                icon: 'MdBuildCircle'
+            });
+        });
+
+        timeline.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        res.json({
+            contact,
+            customer,
+            tickets,
+            meetings,
+            timeline,
+            stats: {
+                ticketCount: tickets.length,
+                meetingCount: meetings.length
+            }
+        });
+    } catch (error) {
+        console.error('Get contact 360 error:', error);
+        res.status(500).json({ message: error.message || 'Error fetching contact 360 data' });
+    }
+};
+
 module.exports = {
     createContact,
     getAllContacts,
     getContactById,
     updateContact,
-    deleteContact
+    deleteContact,
+    getContact360Data
 };

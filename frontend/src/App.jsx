@@ -27,6 +27,7 @@ import Simulations from './pages/Simulations';
 import PlanningScreen from './pages/PlanningScreen';
 import Reports from './pages/Reports';
 import Vendors from './pages/Vendors';
+import Vendor360Workspace from './pages/Vendor360Workspace';
 import Vouchers from './pages/Vouchers';
 import CreateVoucher from './pages/CreateVoucher';
 import Authorization from './pages/Authorization';
@@ -36,6 +37,7 @@ import BranchMaster from './pages/BranchMaster';
 import StateMaster from './pages/StateMaster';
 import SerialNoMaster from './pages/SerialNoMaster';
 import Contacts from './pages/Contacts';
+import Contact360Workspace from './pages/Contact360Workspace';
 import SuperAdmin from './pages/SuperAdmin';
 import ErrorBoundary from './components/ErrorBoundary';
 import { AuthProvider } from './context/AuthContext';
@@ -137,9 +139,11 @@ function App() {
             <Route path="/vendors" element={<PermissionRoute permissionKey="master_vendors"><Layout><Vendors /></Layout></PermissionRoute>} />
             <Route path="/vendors/new" element={<PermissionRoute permissionKey="master_vendors"><Layout><Vendors isCreatePage={true} /></Layout></PermissionRoute>} />
             <Route path="/vendors/edit/:id" element={<PermissionRoute permissionKey="master_vendors"><Layout><Vendors isEditPage={true} /></Layout></PermissionRoute>} />
+            <Route path="/vendors/:id/360" element={<PermissionRoute permissionKey="master_vendors"><Layout><Vendor360Workspace /></Layout></PermissionRoute>} />
             <Route path="/contacts" element={<PermissionRoute permissionKey="master_contacts"><Layout><Contacts /></Layout></PermissionRoute>} />
             <Route path="/contacts/new" element={<PermissionRoute permissionKey="master_contacts"><Layout><Contacts isCreatePage={true} /></Layout></PermissionRoute>} />
             <Route path="/contacts/edit/:id" element={<PermissionRoute permissionKey="master_contacts"><Layout><Contacts isEditPage={true} /></Layout></PermissionRoute>} />
+            <Route path="/contacts/:id/360" element={<PermissionRoute permissionKey="master_contacts"><Layout><Contact360Workspace /></Layout></PermissionRoute>} />
             <Route path="/enquiries" element={<PermissionRoute permissionKey="enquiry_leads"><Layout><Enquiries /></Layout></PermissionRoute>} />
             <Route path="/enquiries/analytics" element={<PermissionRoute permissionKey="enquiry_analytics"><Layout><EnquiryAnalytics /></Layout></PermissionRoute>} />
             <Route path="/enquiries/create" element={<PermissionRoute permissionKey="enquiry_leads"><Layout><CreateEnquiry /></Layout></PermissionRoute>} />

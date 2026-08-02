@@ -478,7 +478,12 @@ const Contacts = ({ isCreatePage, isEditPage }) => {
                                                 <div className="h-9 w-9 rounded-xl bg-primary-50 flex items-center justify-center text-primary-600 shrink-0">
                                                     <MdContactPhone size={18} />
                                                 </div>
-                                                <div className="font-black text-slate-900 text-sm">{contact.contactName}</div>
+                                                <div
+                                                     className="font-black text-primary-600 hover:text-primary-800 cursor-pointer hover:underline text-sm"
+                                                     onClick={() => navigate(`/contacts/${contact._id}/360`)}
+                                                 >
+                                                     {contact.contactName}
+                                                 </div>
                                             </div>
                                         </td>
                                         <td className="px-6 py-5">

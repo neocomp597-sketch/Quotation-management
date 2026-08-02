@@ -211,6 +211,7 @@ export const vendorService = {
   getAll: (activeOnly = false, params = {}) =>
     api.get("/vendors", { params: { ...(activeOnly ? { active: true } : {}), ...params } }),
   getById: (id) => api.get(`/vendors/${id}`),
+  get360Data: (id) => api.get(`/vendors/${id}/360`),
   create: (data) => api.post("/vendors", data),
   update: (id, data) => api.patch(`/vendors/${id}`, data),
   delete: (id) => api.delete(`/vendors/${id}`),
@@ -673,6 +674,7 @@ export const meetingService = {
 export const contactService = {
   getAll: (params = {}) => api.get("/contacts", { params }),
   getById: (id) => api.get(`/contacts/${id}`),
+  get360Data: (id) => api.get(`/contacts/${id}/360`),
   create: (data) => api.post("/contacts", data),
   update: (id, data) => api.put(`/contacts/${id}`, data),
   delete: (id) => api.delete(`/contacts/${id}`),
