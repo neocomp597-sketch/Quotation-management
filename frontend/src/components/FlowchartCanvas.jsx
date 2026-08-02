@@ -1,8 +1,10 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import {
     MdAddCircle,
     MdSave,
-    MdFileDownload,
+    MdPictureAsPdf,
     MdFileUpload,
     MdHistory,
     MdZoomIn,
@@ -408,22 +410,134 @@ const FlowchartCanvas = ({
         }).catch(() => setSaveStatus('unsaved'));
     };
 
-    // Export Handler
-    const handleExportJSON = () => {
-        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({
-            title,
-            description,
-            nodes,
-            edges,
-            rawSteps
-        }, null, 2));
-        const downloadAnchor = document.createElement('a');
-        downloadAnchor.setAttribute("href", dataStr);
-        downloadAnchor.setAttribute("download", `${title.replace(/\s+/g, '_')}_flowchart.json`);
-        document.body.appendChild(downloadAnchor);
-        downloadAnchor.click();
-        downloadAnchor.remove();
-        toast.success('Exported JSON file');
+    // Export as PDF Handler
+    const handleExportPDF = async () => {
+        const svgEl = document.getElementById('canvas-bg');
+        if (!svgEl) {
+            toast.error('Canvas not found');
+            return;
+        }
+
+        toast.info('Generating PDF, please wait...');
+
+        try {
+            // Clone the SVG and prepare it for rendering
+            const svgClone = svgEl.cloneNode(true);
+            const svgRect = svgEl.getBoundingClientRect();
+
+            // Set explicit dimensions on the clone
+            svgClone.setAttribute('width', svgRect.width);
+            svgClone.setAttribute('height', svgRect.height);
+            svgClone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+
+            // Set a white background on the clone
+            svgClone.style.backgroundColor = '#ffffff';
+
+            // Create an offscreen container
+            const container = document.createElement('div');
+            container.style.position = 'fixed';
+            container.style.left = '-99999px';
+            container.style.top = '0';
+            container.style.width = svgRect.width + 'px';
+            container.style.height = svgRect.height + 'px';
+            container.style.backgroundColor = '#ffffff';
+            container.appendChild(svgClone);
+            document.body.appendChild(container);
+
+            // Use html2canvas to capture the SVG container
+            const canvas = await html2canvas(container, {
+                backgroundColor: '#ffffff',
+                scale: 2,
+                useCORS: true,
+                logging: false
+            });
+
+            document.body.removeChild(container);
+
+            const imgData = canvas.toDataURL('image/png');
+
+            // Create PDF (landscape for flowcharts)
+            const pdf = new jsPDF({
+                orientation: 'landscape',
+                unit: 'mm',
+                format: 'a4'
+            });
+
+            const pageWidth = pdf.internal.pageSize.getWidth();
+            const pageHeight = pdf.internal.pageSize.getHeight();
+            const margin = 15;
+
+            // Add title header
+            pdf.setFontSize(20);
+            pdf.setFont('helvetica', 'bold');
+            pdf.setTextColor(30, 41, 59); // slate-800
+            pdf.text(title || 'Flowchart', margin, margin + 5);
+
+            // Add description if present
+            let yOffset = margin + 12;
+            if (description) {
+                pdf.setFontSize(10);
+                pdf.setFont('helvetica', 'normal');
+                pdf.setTextColor(100, 116, 139); // slate-500
+                const descLines = pdf.splitTextToSize(description, pageWidth - margin * 2);
+                pdf.text(descLines, margin, yOffset);
+                yOffset += descLines.length * 5 + 3;
+            }
+
+            // Add metadata line
+            pdf.setFontSize(8);
+            pdf.setTextColor(148, 163, 184); // slate-400
+            pdf.text(
+                `Generated on ${new Date().toLocaleDateString()} • ${nodes.length} nodes • ${edges.length} connectors`,
+                margin,
+                yOffset
+            );
+            yOffset += 6;
+
+            // Draw a separator line
+            pdf.setDrawColor(226, 232, 240); // slate-200
+            pdf.setLineWidth(0.3);
+            pdf.line(margin, yOffset, pageWidth - margin, yOffset);
+            yOffset += 4;
+
+            // Calculate image dimensions to fit remaining page space
+            const availableWidth = pageWidth - margin * 2;
+            const availableHeight = pageHeight - yOffset - margin;
+
+            const imgAspect = canvas.width / canvas.height;
+            const areaAspect = availableWidth / availableHeight;
+
+            let imgW, imgH;
+            if (imgAspect > areaAspect) {
+                imgW = availableWidth;
+                imgH = availableWidth / imgAspect;
+            } else {
+                imgH = availableHeight;
+                imgW = availableHeight * imgAspect;
+            }
+
+            // Center the image horizontally
+            const imgX = margin + (availableWidth - imgW) / 2;
+
+            pdf.addImage(imgData, 'PNG', imgX, yOffset, imgW, imgH);
+
+            // Add footer
+            pdf.setFontSize(7);
+            pdf.setTextColor(180, 180, 180);
+            pdf.text(
+                'Process Flowchart Builder — Quotation Management System',
+                pageWidth / 2,
+                pageHeight - 5,
+                { align: 'center' }
+            );
+
+            // Download the PDF
+            pdf.save(`${title.replace(/\s+/g, '_')}_flowchart.pdf`);
+            toast.success('PDF exported successfully!');
+        } catch (err) {
+            console.error('PDF export error:', err);
+            toast.error('Failed to export PDF. Please try again.');
+        }
     };
 
     // Load version list
@@ -596,12 +710,12 @@ const FlowchartCanvas = ({
                         </button>
                     )}
 
-                    {/* Export JSON */}
+                    {/* Export PDF */}
                     <button
-                        onClick={handleExportJSON}
+                        onClick={handleExportPDF}
                         className="px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold text-xs hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors flex items-center gap-1.5"
                     >
-                        <MdFileDownload size={16} /> Export
+                        <MdPictureAsPdf size={16} /> Export PDF
                     </button>
 
                     {/* Save Button */}
