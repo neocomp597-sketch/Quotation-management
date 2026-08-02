@@ -79,28 +79,43 @@ export const DEFAULT_STATES = {
 };
 
 export const DEFAULT_CITIES = {
-    'Maharashtra': ['Mumbai', 'Pune', 'Nashik', 'Nagpur', 'Thane', 'Aurangabad', 'Solapur', 'Kolhapur'],
-    'Gujarat': ['Ahmedabad', 'Surat', 'Vadodara', 'Rajkot', 'Bhavnagar', 'Jamnagar'],
-    'Delhi': ['New Delhi', 'North Delhi', 'South Delhi', 'East Delhi', 'West Delhi'],
-    'Delhi (NCT)': ['New Delhi', 'North Delhi', 'South Delhi', 'East Delhi', 'West Delhi'],
-    'Karnataka': ['Bengaluru', 'Mysuru', 'Mangaluru', 'Hubballi', 'Belagavi'],
-    'Tamil Nadu': ['Chennai', 'Coimbatore', 'Madurai', 'Tiruchirappalli', 'Salem'],
-    'Rajasthan': ['Jaipur', 'Jodhpur', 'Udaipur', 'Kota', 'Bikaner', 'Ajmer'],
-    'Uttar Pradesh': ['Lucknow', 'Kanpur', 'Varanasi', 'Agra', 'Noida', 'Prayagraj', 'Ghaziabad'],
-    'Madhya Pradesh': ['Bhopal', 'Indore', 'Gwalior', 'Jabalpur', 'Ujjain'],
-    'West Bengal': ['Kolkata', 'Howrah', 'Durgapur', 'Siliguri', 'Asansol'],
-    'Punjab': ['Ludhiana', 'Amritsar', 'Jalandhar', 'Patiala', 'Mohali'],
-    'Haryana': ['Gurugram', 'Faridabad', 'Panipat', 'Ambala', 'Karnal'],
-    'Kerala': ['Kochi', 'Thiruvananthapuram', 'Kozhikode', 'Thrissur', 'Kollam'],
-    'Telangana': ['Hyderabad', 'Warangal', 'Nizamabad', 'Karimnagar'],
-    'Andhra Pradesh': ['Visakhapatnam', 'Vijayawada', 'Guntur', 'Nellore', 'Tirupati'],
-    'Bihar': ['Patna', 'Gaya', 'Bhagalpur', 'Muzaffarpur'],
-    'Assam': ['Guwahati', 'Silchar', 'Dibrugarh', 'Jorhat'],
-    'Jharkhand': ['Ranchi', 'Jamshedpur', 'Dhanbad', 'Bokaro'],
-    'Chhattisgarh': ['Raipur', 'Bhilai', 'Bilaspur', 'Korba'],
-    'Goa': ['Panaji', 'Margao', 'Vasco da Gama', 'Mapusa'],
-    'Uttarakhand': ['Dehradun', 'Haridwar', 'Roorkee', 'Haldwani'],
-    'Himachal Pradesh': ['Shimla', 'Dharamshala', 'Mandi', 'Solan'],
+    'Maharashtra': ['Mumbai', 'Pune', 'Nagpur', 'Nashik', 'Thane', 'Chhatrapati Sambhajinagar', 'Solapur', 'Kolhapur', 'Amravati', 'Nanded', 'Sangli', 'Jalgaon', 'Akola', 'Latur', 'Dhule', 'Ahmednagar', 'Satara', 'Beed', 'Yavatmal', 'Chandrapur', 'Parbhani', 'Ichalkaranji', 'Jalna', 'Bhusawal', 'Navi Mumbai', 'Panvel', 'Kalyan-Dombivli', 'Vasai-Virar', 'Mira-Bhayandar', 'Pimpri-Chinchwad', 'Baramati', 'Ratnagiri', 'Sindhudurg', 'Gondia', 'Bhandara', 'Wardha', 'Washim', 'Hingoli', 'Gadchiroli', 'Palghar', 'Nandurbar', 'Buldhana', 'Dharashiv', 'Karad', 'Malegaon', 'Ambernath', 'Badlapur', 'Bhiwandi'],
+    'Gujarat': ['Ahmedabad', 'Surat', 'Vadodara', 'Rajkot', 'Bhavnagar', 'Jamnagar', 'Junagadh', 'Gandhinagar', 'Anand', 'Navsari', 'Morbi', 'Nadiad', 'Surendranagar', 'Bharuch', 'Mehsana', 'Bhuj', 'Porbandar', 'Palanpur', 'Valsad', 'Vapi', 'Gondal', 'Veraval', 'Godhra', 'Patan', 'Dahod', 'Botad', 'Amreli', 'Ankleshwar', 'Gandhidham', 'Deesa', 'Jetpur'],
+    'Delhi': ['New Delhi', 'North Delhi', 'South Delhi', 'East Delhi', 'West Delhi', 'Central Delhi', 'North East Delhi', 'North West Delhi', 'South East Delhi', 'South West Delhi', 'Shahdara', 'Dwarka', 'Rohini', 'Connaught Place', 'Janakpuri', 'Saket', 'Pitampura', 'Vasant Kunj', 'Lajpat Nagar', 'Karol Bagh'],
+    'Delhi (NCT)': ['New Delhi', 'North Delhi', 'South Delhi', 'East Delhi', 'West Delhi', 'Central Delhi', 'North East Delhi', 'North West Delhi', 'South East Delhi', 'South West Delhi', 'Shahdara', 'Dwarka', 'Rohini', 'Connaught Place', 'Janakpuri', 'Saket', 'Pitampura', 'Vasant Kunj', 'Lajpat Nagar', 'Karol Bagh'],
+    'Karnataka': ['Bengaluru', 'Mysuru', 'Hubballi-Dharwad', 'Mangaluru', 'Belagavi', 'Kalaburagi', 'Davanagere', 'Ballari', 'Vijayapura', 'Shivamogga', 'Tumakuru', 'Raichur', 'Bidar', 'Hospet', 'Hassan', 'Udupi', 'Robertsonpet', 'Ranebennuru', 'Mandya', 'Chikkamagaluru', 'Chitradurga', 'Kolar', 'Bagalkot', 'Karwar', 'Sirsi', 'Chikkaballapur', 'Ramanagara', 'Yadgir'],
+    'Tamil Nadu': ['Chennai', 'Coimbatore', 'Madurai', 'Tiruchirappalli', 'Salem', 'Tiruppur', 'Erode', 'Vellore', 'Tirunelveli', 'Thanjavur', 'Thoothukudi', 'Dindigul', 'Nagercoil', 'Kanchipuram', 'Kumarapalayam', 'Karaikudi', 'Neyveli', 'Cuddalore', 'Kumbakonam', 'Tiruvannamalai', 'Pollachi', 'Rajapalayam', 'Gudiyatham', 'Pudukkottai', 'Hosur', 'Ambur', 'Nagapattinam', 'Namakkal', 'Viluppuram', 'Tiruvarur', 'Sivaganga'],
+    'Rajasthan': ['Jaipur', 'Jodhpur', 'Kota', 'Bikaner', 'Ajmer', 'Udaipur', 'Bhilwara', 'Alwar', 'Bharatpur', 'Sanganer', 'Pali', 'Sikar', 'Tonk', 'Hanumangarh', 'Beawar', 'Kishangarh', 'Jhunjhunu', 'Churu', 'Gangapur City', 'Sawai Madhopur', 'Suratgarh', 'Jaisalmer', 'Mount Abu', 'Barmer', 'Dholpur', 'Nagaur', 'Banswara', 'Chittorgarh', 'Dungarpur', 'Jalor', 'Pratapgarh'],
+    'Uttar Pradesh': ['Lucknow', 'Kanpur', 'Ghaziabad', 'Agra', 'Varanasi', 'Meerut', 'Prayagraj', 'Bareilly', 'Aligarh', 'Moradabad', 'Saharanpur', 'Gorakhpur', 'Noida', 'Firozabad', 'Jhansi', 'Muzaffarnagar', 'Mathura', 'Badaun', 'Rampur', 'Shahjahanpur', 'Farrukhabad', 'Ayodhya', 'Jaunpur', 'Lakhimpur', 'Hapur', 'Etawah', 'Mirzapur', 'Bulandshahr', 'Sambhal', 'Amroha', 'Hardoi', 'Fatehpur', 'Raebareli', 'Orai', 'Sitapur', 'Bahraich', 'Modinagar', 'Unnao', 'Baghpat', 'Greater Noida', 'Azamgarh', 'Deoria', 'Gonda', 'Basti', 'Sultanpur', 'Bhadohi', 'Barabanki'],
+    'Madhya Pradesh': ['Bhopal', 'Indore', 'Jabalpur', 'Gwalior', 'Ujjain', 'Sagar', 'Dewas', 'Satna', 'Ratlam', 'Rewa', 'Katni', 'Singrauli', 'Burhanpur', 'Khandwa', 'Bhind', 'Chhatarpur', 'Damoh', 'Mandsaur', 'Khargone', 'Neemuch', 'Pithampur', 'Narmadapuram', 'Itarsi', 'Sehore', 'Vidisha', 'Shivpuri', 'Nagda', 'Guna', 'Betul', 'Seoni', 'Datia'],
+    'West Bengal': ['Kolkata', 'Howrah', 'Asansol', 'Siliguri', 'Durgapur', 'Bardhaman', 'Malda', 'Baharampur', 'Habra', 'Kharagpur', 'Shantipur', 'Dankuni', 'Dhulian', 'Ranaghat', 'Haldia', 'Raiganj', 'Krishnanagar', 'Nabadwip', 'Medinipur', 'Jalpaiguri', 'Balurghat', 'Basirhat', 'Bankura', 'Purulia', 'Cooch Behar', 'Darjeeling', 'Kalimpong', 'Bangarh', 'Bolpur', 'Suri'],
+    'Punjab': ['Ludhiana', 'Amritsar', 'Jalandhar', 'Patiala', 'Bathinda', 'Mohali', 'Hoshiarpur', 'Batala', 'Pathankot', 'Moga', 'Abohar', 'Khanna', 'Phagwara', 'Muktsar', 'Barnala', 'Rajpura', 'Firozpur', 'Kapurthala', 'Faridkot', 'Sangrur', 'Fazilka', 'Gurdaspur', 'Tarn Taran', 'Rupnagar', 'Malerkotla'],
+    'Haryana': ['Gurugram', 'Faridabad', 'Panipat', 'Ambala', 'Yamunanagar', 'Rohtak', 'Hisar', 'Karnal', 'Sonipat', 'Panchkula', 'Bhiwani', 'Sirsa', 'Bahadurgarh', 'Jind', 'Thanesar', 'Kaithal', 'Rewari', 'Palwal', 'Narnaul', 'Fatehabad', 'Kurukshetra', 'Jhajjhar', 'Charkhi Dadri'],
+    'Kerala': ['Kochi', 'Thiruvananthapuram', 'Kozhikode', 'Thrissur', 'Kollam', 'Palakkad', 'Alappuzha', 'Kannur', 'Kottayam', 'Kasaragod', 'Malappuram', 'Pathanamthitta', 'Idukki', 'Wayanad', 'Vatakara', 'Kanhangad', 'Thalassery', 'Kayamkulam', 'Nedumangad', 'Guruvayur'],
+    'Telangana': ['Hyderabad', 'Warangal', 'Nizamabad', 'Karimnagar', 'Ramagundam', 'Khammam', 'Mahbubnagar', 'Nalgonda', 'Adilabad', 'Siddipet', 'Suryapet', 'Miryalaguda', 'Jagtial', 'Mancherial', 'Kothagudem', 'Kamareddy', 'Wanaparthy'],
+    'Andhra Pradesh': ['Visakhapatnam', 'Vijayawada', 'Guntur', 'Nellore', 'Kurnool', 'Rajahmundry', 'Tirupati', 'Kakinada', 'Kadapa', 'Anantapur', 'Eluru', 'Vizianagaram', 'Ongole', 'Nandyal', 'Machilipatnam', 'Adoni', 'Tenali', 'Proddatur', 'Chittoor', 'Hindupur', 'Bhimavaram', 'Madanapalle', 'Srikakulam', 'Narasaraopet'],
+    'Bihar': ['Patna', 'Gaya', 'Bhagalpur', 'Muzaffarpur', 'Purnia', 'Darbhanga', 'Bihar Sharif', 'Arrah', 'Begusarai', 'Katihar', 'Munger', 'Chhapra', 'Danapur', 'Bettiah', 'Saharsa', 'Sasaram', 'Hajipur', 'Dehri', 'Siwan', 'Motihari', 'Nawada', 'Bagaha', 'Buxar', 'Kishanganj', 'Sitamarhi', 'Jamui', 'Jehanabad'],
+    'Assam': ['Guwahati', 'Silchar', 'Dibrugarh', 'Jorhat', 'Nagaon', 'Tinsukia', 'Tezpur', 'Bongaigaon', 'Dhubri', 'Diphu', 'North Lakhimpur', 'Karimganj', 'Sivasagar', 'Goalpara', 'Barpeta', 'Haflong', 'Hailakandi', 'Hojai', 'Lumding'],
+    'Jharkhand': ['Ranchi', 'Jamshedpur', 'Dhanbad', 'Bokaro Steel City', 'Deoghar', 'Phusro', 'Hazaribagh', 'Giridih', 'Ramgarh', 'Medininagar', 'Chas', 'Chaibasa', 'Jhumri Telaiya', 'Sahibganj', 'Dumka', 'Ghatshila'],
+    'Chhattisgarh': ['Raipur', 'Bhilai', 'Bilaspur', 'Korba', 'Rajnandgaon', 'Raigarh', 'Jagdalpur', 'Ambikapur', 'Dhamtari', 'Chirmiri', 'Bhatapara', 'Mahasamund', 'Kanker', 'Kawardha', 'Durg'],
+    'Goa': ['Panaji', 'Margao', 'Vasco da Gama', 'Mapusa', 'Ponda', 'Bicholim', 'Curchorem', 'Cuncolim', 'Pernem', 'Valpoi', 'Quepem'],
+    'Uttarakhand': ['Dehradun', 'Haridwar', 'Roorkee', 'Haldwani', 'Rudrapur', 'Kashipur', 'Rishikesh', 'Pithoragarh', 'Nainital', 'Mussoorie', 'Kotdwar', 'Ramnagar', 'Tehri', 'Uttarkashi', 'Chamoli', 'Almora'],
+    'Himachal Pradesh': ['Shimla', 'Dharamshala', 'Mandi', 'Solan', 'Baddi', 'Palampur', 'Kullu', 'Manali', 'Bilaspur', 'Hamirpur', 'Una', 'Chamba', 'Nahan', 'Paonta Sahib', 'Dalhousie', 'Keylong'],
+    'Odisha': ['Bhubaneswar', 'Cuttack', 'Rourkela', 'Berhampur', 'Sambalpur', 'Puri', 'Balasore', 'Bhadrak', 'Baripada', 'Jharsuguda', 'Jeypore', 'Bargarh', 'Rayagada', 'Bolangir', 'Keonjhar', 'Paradip', 'Dhenkanal'],
+    'Jammu & Kashmir': ['Srinagar', 'Jammu', 'Anantnag', 'Baramulla', 'Kathua', 'Udhampur', 'Sopore', 'Rajouri', 'Poonch', 'Kupwara', 'Pulwama', 'Ganderbal', 'Budgam', 'Kishtwar', 'Ramban', 'Reasi'],
+    'Ladakh': ['Leh', 'Kargil', 'Diskit', 'Padum'],
+    'Chandigarh': ['Chandigarh', 'Manimajra'],
+    'Puducherry': ['Puducherry', 'Karaikal', 'Mahe', 'Yanam', 'Oulgaret'],
+    'Andaman & Nicobar Islands': ['Port Blair', 'Garacharma', 'Havelock Island', 'Mayabunder', 'Diglipur'],
+    'Dadra & Nagar Haveli and Daman & Diu': ['Daman', 'Diu', 'Silvassa', 'Dadra'],
+    'Tripura': ['Agartala', 'Dharmanagar', 'Udaipur', 'Kailashahar', 'Belonia', 'Ambassa', 'Khowai'],
+    'Meghalaya': ['Shillong', 'Tura', 'Jowai', 'Nongpoh', 'Baghmara', 'Williamnagar', 'Resubelpara'],
+    'Manipur': ['Imphal', 'Thoubal', 'Bishnupur', 'Churachandpur', 'Ukhrul', 'Senapati', 'Kakching'],
+    'Nagaland': ['Dimapur', 'Kohima', 'Mokokchung', 'Tuensang', 'Wokha', 'Zunheboto', 'Mon', 'Phek'],
+    'Arunachal Pradesh': ['Itanagar', 'Naharlagun', 'Pasighat', 'Tawang', 'Ziro', 'Tezu', 'Bomdila', 'Aalo'],
+    'Mizoram': ['Aizawl', 'Lunglei', 'Saiha', 'Champhai', 'Kolasib', 'Serchhip', 'Lawngtlai'],
+    'Sikkim': ['Gangtok', 'Namchi', 'Gyalshing', 'Mangan', 'Rangpo', 'Jorethang', 'Singtam'],
+    'Lakshadweep': ['Kavaratti', 'Agatti', 'Amini', 'Andrott', 'Minicoy'],
     'California': ['Los Angeles', 'San Francisco', 'San Diego', 'San Jose', 'Sacramento'],
     'New York': ['New York City', 'Buffalo', 'Rochester', 'Syracuse', 'Albany'],
     'Texas': ['Houston', 'Dallas', 'Austin', 'San Antonio', 'Fort Worth'],
@@ -146,9 +161,64 @@ export const getStatesForCountry = (countryName, masterStateList = []) => {
     return Array.from(stateMap.values());
 };
 
+const STATE_SHORTCODE_MAP = {
+    'MH': 'Maharashtra',
+    'GJ': 'Gujarat',
+    'DL': 'Delhi (NCT)',
+    'KA': 'Karnataka',
+    'TN': 'Tamil Nadu',
+    'RJ': 'Rajasthan',
+    'UP': 'Uttar Pradesh',
+    'MP': 'Madhya Pradesh',
+    'WB': 'West Bengal',
+    'PB': 'Punjab',
+    'HR': 'Haryana',
+    'KL': 'Kerala',
+    'TS': 'Telangana',
+    'AP': 'Andhra Pradesh',
+    'BR': 'Bihar',
+    'AS': 'Assam',
+    'JH': 'Jharkhand',
+    'CG': 'Chhattisgarh',
+    'GA': 'Goa',
+    'UK': 'Uttarakhand',
+    'HP': 'Himachal Pradesh',
+    'OD': 'Odisha',
+    'JK': 'Jammu & Kashmir',
+    'LA': 'Ladakh',
+    'CH': 'Chandigarh',
+    'PY': 'Puducherry',
+    'AN': 'Andaman & Nicobar Islands',
+    'DH': 'Dadra & Nagar Haveli and Daman & Diu',
+    'TR': 'Tripura',
+    'ML': 'Meghalaya',
+    'MN': 'Manipur',
+    'NL': 'Nagaland',
+    'AR': 'Arunachal Pradesh',
+    'MZ': 'Mizoram',
+    'SK': 'Sikkim',
+    'LD': 'Lakshadweep'
+};
+
 export const getCitiesForState = (stateName) => {
     if (!stateName) return [];
+    
+    // Direct match
     if (DEFAULT_CITIES[stateName]) return DEFAULT_CITIES[stateName];
+    
+    // Case-insensitive match
     const key = Object.keys(DEFAULT_CITIES).find(k => k.toLowerCase() === stateName.toLowerCase());
-    return key ? DEFAULT_CITIES[key] : [];
+    if (key) return DEFAULT_CITIES[key];
+    
+    // ShortCode match (e.g. "MH", "GJ", "DL")
+    const uppercaseCode = stateName.trim().toUpperCase();
+    if (STATE_SHORTCODE_MAP[uppercaseCode] && DEFAULT_CITIES[STATE_SHORTCODE_MAP[uppercaseCode]]) {
+        return DEFAULT_CITIES[STATE_SHORTCODE_MAP[uppercaseCode]];
+    }
+
+    // Contains / Partial match (e.g. "Delhi" matching "Delhi (NCT)")
+    const partialKey = Object.keys(DEFAULT_CITIES).find(k => 
+        k.toLowerCase().includes(stateName.toLowerCase()) || stateName.toLowerCase().includes(k.toLowerCase())
+    );
+    return partialKey ? DEFAULT_CITIES[partialKey] : [];
 };

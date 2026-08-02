@@ -27,7 +27,8 @@ const modulePathMap = {
     'Payroll & HR': '/payroll/employees',
     'Employee Master': '/payroll/employees',
     'Org Chart': '/payroll/org-chart',
-    'Master Management': '/master/branches',
+    'Master Management': '/state-master',
+    'State Master': '/state-master',
     'Branch Master': '/master/branches',
     'CSM': '/csm/dashboard',
     'CSM Support': '/csm/tickets',
@@ -176,6 +177,12 @@ const SystemUpdates = () => {
         // Sample fallback updates if none in DB yet
         if (list.length === 0) {
             return [
+                { id: 'u1', date: '01.08.2026', module: 'State Master', submodule: 'Field Sequence & Layout', changes: 'Rearranged field order to Country -> Country Dial Code -> State / UT -> Short Code -> GST Code -> City Name with balanced 2-column grid layout.', version: 'v2.5.0', deployedBy: 'GitHub main (569278f)' },
+                { id: 'u2', date: '01.08.2026', module: 'State Master', submodule: 'Dependent City Dropdown', changes: 'Implemented state-wise dependent City dropdown with auto-reset on State change and disabled state validation.', version: 'v2.5.0', deployedBy: 'GitHub main (569278f)' },
+                { id: 'u3', date: '01.08.2026', module: 'State Master', submodule: 'Auto-Fill Logic', changes: 'Added auto-fill for Country Dial Code (+91, +1, etc.), State Short Code (MH, GJ, etc.) and GST Code (27, 24, etc.).', version: 'v2.5.0', deployedBy: 'GitHub main (569278f)' },
+                { id: 'u4', date: '01.08.2026', module: 'Employee Master', submodule: 'Family Information', changes: 'Added Aadhaar Number field in Family Information with numeric-only input and 12-digit validation.', version: 'v2.5.0', deployedBy: 'GitHub main (569278f)' },
+                { id: 'u5', date: '01.08.2026', module: 'Employee Master', submodule: 'Accordion Panel', changes: 'Converted Family Information section into a collapsible/expandable accordion panel with independent per-entry toggle.', version: 'v2.5.0', deployedBy: 'GitHub main (569278f)' },
+                { id: 'u6', date: '01.08.2026', module: 'Employee Master', submodule: 'Backend Schema', changes: 'Updated Mongoose FamilyMemberSchema in EmployeeProfile model to persist family member Aadhaar numbers.', version: 'v2.5.0', deployedBy: 'GitHub main (569278f)' },
                 { id: 's1', date: '17.07.2026', module: 'Reports', submodule: 'Sales target', changes: 'Alignment modified', version: 'v2.1.0', deployedBy: 'System Admin' },
                 { id: 's2', date: '18.07.2026', module: 'Reports', submodule: 'added new report', changes: 'Added new report', version: 'v2.1.0', deployedBy: 'System Admin' },
                 { id: 's3', date: '19.07.2026', module: 'Reports', submodule: 'design', changes: 'redesign', version: 'v2.2.0', deployedBy: 'System Admin' },

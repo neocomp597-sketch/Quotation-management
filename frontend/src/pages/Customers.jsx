@@ -353,7 +353,9 @@ const Customers = ({ isCreatePage, isEditPage }) => {
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            {!(isModalOpen || isCreatePage || isEditPage) ? (
+                <>
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-black text-slate-900 tracking-tight font-outfit uppercase">Customer Master</h1>
                     <p className="text-slate-500 font-medium">Manage your distributor and retail partners.</p>
@@ -656,11 +658,9 @@ const Customers = ({ isCreatePage, isEditPage }) => {
                     </>
                 )}
             </div>
-
-            {/* Create/Edit Form Page View */}
-            {(isModalOpen || isCreatePage || isEditPage) && (
-                <div className="fixed inset-0 z-[100] bg-slate-50 overflow-y-auto p-6 md:p-10 flex flex-col items-center">
-                    <div className="max-w-5xl w-full my-2 space-y-6">
+            </>
+            ) : (
+                <div className="max-w-5xl mx-auto space-y-6 animate-in fade-in duration-200">
                         {/* Header bar */}
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
                             <div className="flex items-center gap-4">
@@ -1039,7 +1039,6 @@ const Customers = ({ isCreatePage, isEditPage }) => {
                                 </div>
                             </form>
                         </div>
-                    </div>
                 </div>
             )}
 

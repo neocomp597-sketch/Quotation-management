@@ -98,29 +98,34 @@ exports.getAllUpdates = async (req, res) => {
             .sort({ deployedAt: -1 })
             .lean();
         
-        if (!updates || updates.length === 0 || !updates.some(u => u.detailedChanges && u.detailedChanges.length > 0)) {
-            // Seed a initial update record with granular changes matching user mockup
-            const defaultUpdate = new SystemUpdate({
-                version: 'v2.4.0',
-                title: 'Daily CRM Enhancements & Reports Update',
-                message: 'Latest daily module and submodule improvements across CRM.',
-                releaseNotes: [
-                    'Updated sales target alignment under Reports',
-                    'Added new custom report creation in Reports module',
-                    'Redesigned reports dashboard layout for enhanced visibility'
-                ],
-                detailedChanges: [
-                    { date: '17.07.2026', module: 'Reports', submodule: 'Sales target', changes: 'Alignment modified' },
-                    { date: '18.07.2026', module: 'Reports', submodule: 'added new report', changes: 'Added new report' },
-                    { date: '19.07.2026', module: 'Reports', submodule: 'design', changes: 'redesign' },
-                    { date: '19.07.2026', module: 'Dashboard', submodule: 'Theme Management', changes: 'Added dark/light mode toggle' },
-                    { date: '19.07.2026', module: 'Dashboard', submodule: 'Global Search', changes: 'Enquiry submodule hierarchy search' },
-                    { date: '19.07.2026', module: 'CRM Core', submodule: 'Real-Time Synchronization', changes: 'Socket.io live data synchronization' }
-                ],
-                deployedBy: 'System Admin'
-            });
-            await defaultUpdate.save();
-            updates = [defaultUpdate.toObject()];
+        if (!updates || updates.length === 0 || !updates.some(u => u.version === 'v2.5.0')) {
+            // Seed / update v2.5.0 update record with granular changes matching GitHub commit 569278f
+            let v250 = await SystemUpdate.findOne({ version: 'v2.5.0' });
+            if (!v250) {
+                v250 = new SystemUpdate({
+                    version: 'v2.5.0',
+                    title: 'State Master Dependent City Flow & Employee Family Aadhaar Accordion',
+                    message: 'GitHub Commit 569278f (Ghotkoper): Rearranged State Master fields with dependent City dropdown & auto-fill logic. Added Aadhaar field & collapsible accordion panel to Employee Master Family Info.',
+                    releaseNotes: [
+                        'State Master field order reordered to Country -> Dial Code -> State -> Short Code -> GST Code -> City Name',
+                        'State-wise dependent City dropdown with auto-reset on State change and disabled state before State selection',
+                        'Auto-fill for Country Dial Code, State Short Code (MH, GJ, CA, etc.) and GST Code (27, 24, etc.)',
+                        'Added Aadhaar Number field in Employee Master Family Information with numeric-only and 12-digit validation',
+                        'Converted Family Information into a collapsible/expandable accordion panel with per-member independent toggle'
+                    ],
+                    detailedChanges: [
+                        { date: '01.08.2026', module: 'State Master', submodule: 'Field Sequence & Layout', changes: 'Rearranged field order to Country -> Country Dial Code -> State / UT -> Short Code -> GST Code -> City Name with balanced 2-column grid layout.' },
+                        { date: '01.08.2026', module: 'State Master', submodule: 'Dependent City Dropdown', changes: 'Implemented state-wise dependent City dropdown with auto-reset on State change and disabled state validation.' },
+                        { date: '01.08.2026', module: 'State Master', submodule: 'Auto-Fill Logic', changes: 'Added auto-fill for Country Dial Code (+91, +1, etc.), State Short Code (MH, GJ, etc.) and GST Code (27, 24, etc.).' },
+                        { date: '01.08.2026', module: 'Employee Master', submodule: 'Family Information', changes: 'Added Aadhaar Number field in Family Information with numeric-only input and 12-digit validation.' },
+                        { date: '01.08.2026', module: 'Employee Master', submodule: 'Accordion Panel', changes: 'Converted Family Information section into a collapsible/expandable accordion panel with independent per-entry toggle.' },
+                        { date: '01.08.2026', module: 'Employee Master', submodule: 'Backend Schema', changes: 'Updated Mongoose FamilyMemberSchema in EmployeeProfile model to persist family member Aadhaar numbers.' }
+                    ],
+                    deployedBy: 'GitHub main (569278f)'
+                });
+                await v250.save();
+            }
+            updates = await SystemUpdate.find({ isActive: true }).sort({ deployedAt: -1 }).lean();
         }
         res.json(updates);
     } catch (err) {

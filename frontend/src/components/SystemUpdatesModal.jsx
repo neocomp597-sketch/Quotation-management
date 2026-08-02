@@ -13,6 +13,9 @@ const modulePathMap = {
     'Customers': '/customers',
     'Quotation': '/quotations',
     'Payroll': '/payroll/dashboard',
+    'Employee Master': '/payroll/employees',
+    'State Master': '/state-master',
+    'Master Management': '/state-master',
     'CSM': '/csm/dashboard',
     'Tenders': '/tenders'
 };

@@ -58,6 +58,7 @@ const OrgChart = () => {
     // Card Click Drawer / Detail Modal
     const [selectedEmp, setSelectedEmp] = useState(null);
     const [drawerTab, setDrawerTab] = useState('profile'); // 'profile' | 'reports' | 'contact' | 'kra'
+    const [previewImage, setPreviewImage] = useState(null);
 
     // Vacant Position Modal
     const [isVacantModalOpen, setIsVacantModalOpen] = useState(false);
@@ -1163,7 +1164,10 @@ const OrgChart = () => {
             {selectedEmp && (
                 <Modal
                     isOpen={!!selectedEmp}
-                    onClose={() => setSelectedEmp(null)}
+                    onClose={() => {
+                        setSelectedEmp(null);
+                        setPreviewImage(null);
+                    }}
                     title={`${selectedEmp.name} - Profile & Actions`}
                     maxWidth="max-w-3xl"
                 >
@@ -1171,17 +1175,42 @@ const OrgChart = () => {
                         {/* Header Banner */}
                         <div className="bg-gradient-to-r from-slate-900 via-teal-950 to-slate-900 rounded-2xl p-6 text-white flex items-center justify-between gap-4">
                             <div className="flex items-center space-x-4 min-w-0">
-                                <div className="w-16 h-16 rounded-2xl bg-teal-500 text-slate-950 font-black text-2xl flex items-center justify-center shadow-lg overflow-hidden shrink-0 border-2 border-teal-400">
-                                    {(selectedEmp.photo || selectedEmp.profilePicture || selectedEmp.avatar) ? (
+                                {(selectedEmp.photo || selectedEmp.profilePicture || selectedEmp.avatar) ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => setPreviewImage({
+                                            src: selectedEmp.photo || selectedEmp.profilePicture || selectedEmp.avatar,
+                                            alt: selectedEmp.name || 'Employee profile picture',
+                                            name: selectedEmp.name,
+                                            designation: selectedEmp.designation,
+                                            department: selectedEmp.department,
+                                            employeeId: selectedEmp.employeeId
+                                        })}
+                                        className="w-16 h-16 rounded-2xl bg-teal-500 text-slate-950 font-black text-2xl flex items-center justify-center shadow-lg overflow-hidden shrink-0 border-2 border-teal-400 transition-all hover:scale-105 focus:outline-none focus:ring-4 focus:ring-teal-300/60 cursor-pointer group"
+                                        title="Click to maximize profile picture"
+                                    >
                                         <img 
                                             src={selectedEmp.photo || selectedEmp.profilePicture || selectedEmp.avatar} 
                                             alt={selectedEmp.name} 
-                                            className="w-full h-full object-cover" 
+                                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300" 
                                         />
-                                    ) : (
+                                    </button>
+                                ) : (
+                                    <button
+                                        type="button"
+                                        onClick={() => setPreviewImage({
+                                            initials: selectedEmp.name ? selectedEmp.name.charAt(0).toUpperCase() : 'E',
+                                            name: selectedEmp.name,
+                                            designation: selectedEmp.designation,
+                                            department: selectedEmp.department,
+                                            employeeId: selectedEmp.employeeId
+                                        })}
+                                        className="w-16 h-16 rounded-2xl bg-teal-500 text-slate-950 font-black text-2xl flex items-center justify-center shadow-lg overflow-hidden shrink-0 border-2 border-teal-400 transition-all hover:scale-105 focus:outline-none cursor-pointer"
+                                        title="Click to view full avatar"
+                                    >
                                         <span>{selectedEmp.name ? selectedEmp.name.charAt(0).toUpperCase() : 'E'}</span>
-                                    )}
-                                </div>
+                                    </button>
+                                )}
                                 <div className="min-w-0">
                                     <h3 className="text-xl font-extrabold truncate">{selectedEmp.name}</h3>
                                     <p className="text-teal-300 font-medium text-sm truncate">{selectedEmp.designation || 'Employee'}</p>
@@ -1193,6 +1222,7 @@ const OrgChart = () => {
                                 onClick={() => {
                                     const empId = selectedEmp._id;
                                     setSelectedEmp(null);
+                                    setPreviewImage(null);
                                     navigate(`/payroll/employees/edit/${empId}`);
                                 }}
                                 className="px-4 py-2.5 bg-teal-500 hover:bg-teal-400 text-slate-950 font-black text-xs rounded-xl shadow-lg transition-all flex items-center space-x-1.5 shrink-0 hover:scale-105 active:scale-95"
@@ -1583,6 +1613,47 @@ const OrgChart = () => {
                                 className="px-5 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl text-xs font-extrabold shadow-md"
                             >
                                 Save & Generate IDs
+                            </button>
+                        </div>
+                    </div>
+                </Modal>
+            )}
+
+
+            {/* MAXIMIZED PROFILE PICTURE PREVIEW MODAL */}
+            {previewImage && (
+                <Modal
+                    isOpen={!!previewImage}
+                    onClose={() => setPreviewImage(null)}
+                    title={previewImage.title || `${previewImage.name || 'Employee'} - Profile Picture`}
+                    maxWidth="max-w-xl"
+                >
+                    <div className="flex flex-col items-center justify-center p-3 space-y-5">
+                        {previewImage.src ? (
+                            <div className="relative group overflow-hidden rounded-3xl border-4 border-slate-100 dark:border-slate-800 shadow-2xl bg-slate-950 max-h-[70vh] w-full flex items-center justify-center">
+                                <img
+                                    src={previewImage.src}
+                                    alt={previewImage.alt || 'Profile Picture'}
+                                    className="max-h-[65vh] max-w-full object-contain rounded-2xl transition-transform duration-300 group-hover:scale-105"
+                                />
+                            </div>
+                        ) : (
+                            <div className="w-48 h-48 rounded-full bg-gradient-to-tr from-teal-600 via-teal-500 to-emerald-400 text-slate-950 font-black text-7xl flex items-center justify-center shadow-2xl border-4 border-white dark:border-slate-800">
+                                <span>{previewImage.initials || 'E'}</span>
+                            </div>
+                        )}
+
+                        <div className="flex items-center justify-between w-full px-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-xs font-bold text-slate-500 dark:text-slate-400">
+                            <div>
+                                <p className="text-sm font-extrabold text-slate-900 dark:text-white">{previewImage.name || previewImage.alt || 'Employee Profile'}</p>
+                                {previewImage.designation && <p className="text-xs text-teal-600 dark:text-teal-400 font-semibold">{previewImage.designation} {previewImage.department ? `• ${previewImage.department}` : ''}</p>}
+                                {previewImage.employeeId && <p className="text-[11px] text-slate-400 font-mono">ID: {previewImage.employeeId}</p>}
+                            </div>
+                            <button
+                                onClick={() => setPreviewImage(null)}
+                                className="px-5 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl font-extrabold uppercase text-[10px] tracking-wider transition-all shadow-sm"
+                            >
+                                Close Preview
                             </button>
                         </div>
                     </div>
