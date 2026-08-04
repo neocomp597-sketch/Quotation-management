@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useState, useMemo } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { csmService, customerService, productService, voucherService, userService, importService, uploadService, branchService } from '../services/api';
 import { toast } from 'react-toastify';
-import { MdAdd, MdSearch, MdFilterList, MdArrowForward, MdEdit, MdDelete, MdPublish, MdFileDownload, MdWarning, MdInfoOutline, MdPhotoCamera, MdCloudUpload } from 'react-icons/md';
+import { MdAdd, MdSearch, MdFilterList, MdArrowForward, MdEdit, MdDelete, MdPublish, MdFileDownload, MdWarning, MdInfoOutline, MdPhotoCamera, MdCloudUpload, MdPeople, MdAccountTree, MdCorporateFare } from 'react-icons/md';
 import * as XLSX from 'xlsx';
 import PaginationControls from '../components/PaginationControls';
 import PortalDropdown from '../components/PortalDropdown';
@@ -62,6 +63,21 @@ const getManualImagesForTicket = (ticket) => {
 
 const CSMTickets = () => {
     const navigate = useNavigate();
+    const { user, isAdmin, isSuperAdmin } = useAuth();
+    const isManagerOrAdmin = useMemo(() => {
+        if (!user) return false;
+        const role = String(user.role || '').toLowerCase();
+        return isAdmin || isSuperAdmin || role === 'admin' || role === 'manager' || role === 'super_admin' || role === 'superadmin';
+    }, [user, isAdmin, isSuperAdmin]);
+
+    const [searchParams, setSearchParams] = useSearchParams();
+    const activeTab = searchParams.get('tab') || (isManagerOrAdmin ? 'all' : 'my');
+
+    const handleTabChange = (newTab) => {
+        setPage(1);
+        setSearchParams({ tab: newTab });
+    };
+
     const [loading, setLoading] = useState(false);
     const [tickets, setTickets] = useState([]);
     
@@ -239,7 +255,8 @@ const CSMTickets = () => {
                 limit: 10,
                 search,
                 status: filterStatus,
-                priorityId: filterPriority
+                priorityId: filterPriority,
+                tab: activeTab
             };
             if (filterCustomer) {
                 queryParams.customerId = filterCustomer;
@@ -298,14 +315,7 @@ const CSMTickets = () => {
             const assetsRes = valueOf(assetRes);
 
             setCustomers(customersRes?.data?.data || customersRes?.data || []);
-            
-            const prioritiesData = prioritiesRes?.data || [];
-            setPriorities(prioritiesData);
-            const lowPriority = prioritiesData.find(p => p.name?.toLowerCase() === 'low');
-            if (lowPriority && !formData.priorityId) {
-                setFormData(prev => ({ ...prev, priorityId: lowPriority._id }));
-            }
-
+            setPriorities(prioritiesRes?.data || []);
             setCategories(categoriesRes?.data || []);
             setTypes(typesRes?.data || []);
             setProducts(productsRes?.data?.data || productsRes?.data || []);
@@ -333,7 +343,7 @@ const CSMTickets = () => {
 
     useEffect(() => {
         fetchTickets();
-    }, [page, filterStatus, filterPriority, filterInvoiceType, filterCustomer, filterBranch]);
+    }, [page, filterStatus, filterPriority, filterInvoiceType, filterCustomer, filterBranch, activeTab]);
 
     useEffect(() => {
         const handleRealtimeUpdate = (e) => {
@@ -344,7 +354,7 @@ const CSMTickets = () => {
         };
         window.addEventListener('onCrmSocketUpdate', handleRealtimeUpdate);
         return () => window.removeEventListener('onCrmSocketUpdate', handleRealtimeUpdate);
-    }, [page, filterStatus, filterPriority, filterInvoiceType, filterCustomer, filterBranch]);
+    }, [page, filterStatus, filterPriority, filterInvoiceType, filterCustomer, filterBranch, activeTab]);
 
     useEffect(() => {
         fetchTicketCustomers();
@@ -681,6 +691,8 @@ const CSMTickets = () => {
             await csmService.createTicket(cleanedFormData);
             toast.success('Support ticket generated successfully!');
             setShowModal(false);
+            setPageView('list');
+            navigate('/csm/tickets');
             fetchTickets();
             fetchTicketCustomers();
             setGeneratedSerial('');
@@ -856,6 +868,8 @@ const CSMTickets = () => {
 
             toast.success('Manual Support ticket registered successfully!');
             setShowManualModal(false);
+            setPageView('list');
+            navigate('/csm/tickets');
             fetchTickets();
             fetchTicketCustomers();
             
@@ -1453,6 +1467,47 @@ const CSMTickets = () => {
                         Template
                     </button>
                 </div>
+            </div>
+
+            {/* Ticket Register Hierarchy Tabs */}
+            <div className="flex items-center gap-3 border-b border-slate-200/80 pb-3 relative z-20">
+                <button
+                    onClick={() => handleTabChange('my')}
+                    className={`flex items-center gap-2 px-5 py-3 rounded-2xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer ${
+                        activeTab === 'my'
+                            ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/30 active:scale-95'
+                            : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                    }`}
+                >
+                    <MdPeople size={18} />
+                    My Complaints
+                </button>
+
+                <button
+                    onClick={() => handleTabChange('team')}
+                    className={`flex items-center gap-2 px-5 py-3 rounded-2xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer ${
+                        activeTab === 'team'
+                            ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/30 active:scale-95'
+                            : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                    }`}
+                >
+                    <MdAccountTree size={18} />
+                    My Team Complaints
+                </button>
+
+                {isManagerOrAdmin && (
+                    <button
+                        onClick={() => handleTabChange('all')}
+                        className={`flex items-center gap-2 px-5 py-3 rounded-2xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer ${
+                            activeTab === 'all'
+                                ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/30 active:scale-95'
+                                : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                        }`}
+                    >
+                        <MdCorporateFare size={18} />
+                        All Complaints
+                    </button>
+                )}
             </div>
 
             {/* Filters Toolbar */}

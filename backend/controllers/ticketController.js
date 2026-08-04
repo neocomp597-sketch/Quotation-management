@@ -161,52 +161,123 @@ const getEngineerForUser = async (user) => {
     }).lean();
 };
 
-const getSubordinateUserIds = async (userId, companyId) => {
-    if (!userId) return [];
-    const allIds = [userId.toString()];
-    let currentLevel = [userId];
+const EmployeeProfile = require('../models/EmployeeProfile');
 
-    while (currentLevel.length > 0) {
-        const subs = await User.find({
-            companyId,
-            reportsTo: { $in: currentLevel }
-        }).select('_id').lean();
-
-        if (subs.length === 0) break;
-        const nextLevel = subs.map(u => u._id);
-        nextLevel.forEach(id => {
-            const sStr = id.toString();
-            if (!allIds.includes(sStr)) {
-                allIds.push(sStr);
-            }
-        });
-        currentLevel = nextLevel;
+const getHierarchyUserAndStaffIds = async (user) => {
+    if (!user) {
+        return {
+            selfUserIds: [], selfEngineerIds: [], selfSalespersonIds: [],
+            teamUserIds: [], teamEngineerIds: [], teamSalespersonIds: []
+        };
     }
 
-    return allIds;
-};
-
-const getVisibleUserAndStaffIds = async (user) => {
-    if (!user) return { userIds: [], engineerIds: [], salespersonIds: [] };
-
     const companyId = user.companyId;
-    const userIds = await getSubordinateUserIds(user.id || user._id, companyId);
-    
-    const users = await User.find({ _id: { $in: userIds }, companyId }).select('email').lean();
-    const emails = users.map(u => u.email).filter(Boolean);
+    const currentUserIdStr = (user.id || user._id || '').toString();
+    const currentUserEmail = (user.email || '').toLowerCase().trim();
+
+    const [allUsers, allEmployees] = await Promise.all([
+        User.find({ companyId }).select('_id email reportsTo').lean(),
+        EmployeeProfile.find({ companyId }).select('_id email reportingTo userId').lean()
+    ]);
+
+    const userIdByEmail = new Map();
+    allUsers.forEach(u => {
+        if (u.email) userIdByEmail.set(u.email.toLowerCase().trim(), u._id.toString());
+    });
+
+    const empIdByEmail = new Map();
+    const empIdByUserId = new Map();
+    allEmployees.forEach(e => {
+        const eIdStr = e._id.toString();
+        if (e.email) empIdByEmail.set(e.email.toLowerCase().trim(), eIdStr);
+        if (e.userId) empIdByUserId.set(e.userId.toString(), eIdStr);
+    });
+
+    let currentEmpIdStr = empIdByUserId.get(currentUserIdStr);
+    if (!currentEmpIdStr && currentUserEmail) {
+        currentEmpIdStr = empIdByEmail.get(currentUserEmail);
+    }
+
+    const teamUserIdsSet = new Set();
+    const teamEmailsSet = new Set();
+
+    const userQueue = [currentUserIdStr];
+    const empQueue = currentEmpIdStr ? [currentEmpIdStr] : [];
+
+    const visitedUsers = new Set([currentUserIdStr]);
+    const visitedEmps = currentEmpIdStr ? new Set([currentEmpIdStr]) : new Set();
+
+    while (userQueue.length > 0) {
+        const parentUserId = userQueue.shift();
+        allUsers.forEach(u => {
+            const uIdStr = u._id.toString();
+            const parentId = u.reportsTo ? u.reportsTo.toString() : null;
+            if (parentId === parentUserId && !visitedUsers.has(uIdStr)) {
+                visitedUsers.add(uIdStr);
+                teamUserIdsSet.add(uIdStr);
+                if (u.email) teamEmailsSet.add(u.email.toLowerCase().trim());
+                userQueue.push(uIdStr);
+
+                const linkedEmpId = empIdByUserId.get(uIdStr) || (u.email ? empIdByEmail.get(u.email.toLowerCase().trim()) : null);
+                if (linkedEmpId && !visitedEmps.has(linkedEmpId)) {
+                    visitedEmps.add(linkedEmpId);
+                    empQueue.push(linkedEmpId);
+                }
+            }
+        });
+    }
+
+    while (empQueue.length > 0) {
+        const parentEmpId = empQueue.shift();
+        allEmployees.forEach(e => {
+            const eIdStr = e._id.toString();
+            const parentId = e.reportingTo ? (e.reportingTo._id || e.reportingTo).toString() : null;
+            if (parentId === parentEmpId && !visitedEmps.has(eIdStr)) {
+                visitedEmps.add(eIdStr);
+                if (e.email) teamEmailsSet.add(e.email.toLowerCase().trim());
+                if (e.userId) teamUserIdsSet.add(e.userId.toString());
+                
+                if (e.email && userIdByEmail.has(e.email.toLowerCase().trim())) {
+                    const matchedUserId = userIdByEmail.get(e.email.toLowerCase().trim());
+                    teamUserIdsSet.add(matchedUserId);
+                    if (!visitedUsers.has(matchedUserId)) {
+                        visitedUsers.add(matchedUserId);
+                        userQueue.push(matchedUserId);
+                    }
+                }
+
+                empQueue.push(eIdStr);
+            }
+        });
+    }
+
+    teamUserIdsSet.delete(currentUserIdStr);
+    if (currentUserEmail) teamEmailsSet.delete(currentUserEmail);
+
+    const selfUserIds = [currentUserIdStr];
+    const selfEmails = currentUserEmail ? [currentUserEmail] : [];
+
+    const teamUserIds = Array.from(teamUserIdsSet);
+    const teamEmails = Array.from(teamEmailsSet);
 
     const Engineer = require('../models/Engineer');
     const Salesperson = require('../models/Salesperson');
 
-    const [engineers, salespeople] = await Promise.all([
-        Engineer.find({ companyId, email: { $in: emails } }).select('_id').lean(),
-        Salesperson.find({ companyId, email: { $in: emails } }).select('_id').lean()
+    const [selfEngineers, selfSalespeople, teamEngineers, teamSalespeople] = await Promise.all([
+        selfEmails.length ? Engineer.find({ companyId, email: { $in: selfEmails } }).select('_id').lean() : [],
+        selfEmails.length ? Salesperson.find({ companyId, email: { $in: selfEmails } }).select('_id').lean() : [],
+        teamEmails.length ? Engineer.find({ companyId, email: { $in: teamEmails } }).select('_id').lean() : [],
+        teamEmails.length ? Salesperson.find({ companyId, email: { $in: teamEmails } }).select('_id').lean() : []
     ]);
 
-    const engineerIds = engineers.map(e => e._id);
-    const salespersonIds = salespeople.map(s => s._id);
-
-    return { userIds, engineerIds, salespersonIds };
+    return {
+        selfUserIds,
+        selfEngineerIds: selfEngineers.map(e => e._id),
+        selfSalespersonIds: selfSalespeople.map(s => s._id),
+        teamUserIds,
+        teamEngineerIds: teamEngineers.map(e => e._id),
+        teamSalespersonIds: teamSalespeople.map(s => s._id)
+    };
 };
 
 exports.getTickets = async (req, res) => {
@@ -221,26 +292,63 @@ exports.getTickets = async (req, res) => {
 
         const andConditions = [];
         
-        // Cascading Ticket Visibility & Access Control filter
-        if (!isAdminOrManagerUser(req.user)) {
-            const { userIds, engineerIds, salespersonIds } = await getVisibleUserAndStaffIds(req.user);
-            const userObjectIds = userIds.map(id => new mongoose.Types.ObjectId(id));
-            
-            const visibilityCondition = {
-                $or: [
-                    { createdBy: { $in: userObjectIds } },
-                    { assignedEngineerId: { $in: engineerIds } },
-                    { assignedSalespersonId: { $in: salespersonIds } }
-                ]
-            };
+        // Cascading Reporting Hierarchy & Ticket Visibility Filter
+        const tab = (req.query.tab || '').toLowerCase().trim();
+        const hierarchyInfo = await getHierarchyUserAndStaffIds(req.user);
 
-            if (req.user.branchId && !req.query.branchId) {
-                filter.branchId = req.user.branchId;
+        if (tab === 'my') {
+            const selfUserObjIds = hierarchyInfo.selfUserIds.map(id => new mongoose.Types.ObjectId(id));
+            const myOr = [{ createdBy: { $in: selfUserObjIds } }];
+            if (hierarchyInfo.selfEngineerIds.length > 0) {
+                myOr.push({ assignedEngineerId: { $in: hierarchyInfo.selfEngineerIds } });
             }
-
-            andConditions.push(visibilityCondition);
-        } else if (req.query.assignedEngineerId) {
-            filter.assignedEngineerId = req.query.assignedEngineerId;
+            if (hierarchyInfo.selfSalespersonIds.length > 0) {
+                myOr.push({ assignedSalespersonId: { $in: hierarchyInfo.selfSalespersonIds } });
+            }
+            andConditions.push({ $or: myOr });
+        } else if (tab === 'team') {
+            const teamUserObjIds = hierarchyInfo.teamUserIds.map(id => new mongoose.Types.ObjectId(id));
+            const teamOr = [];
+            if (teamUserObjIds.length > 0) {
+                teamOr.push({ createdBy: { $in: teamUserObjIds } });
+            }
+            if (hierarchyInfo.teamEngineerIds.length > 0) {
+                teamOr.push({ assignedEngineerId: { $in: hierarchyInfo.teamEngineerIds } });
+            }
+            if (hierarchyInfo.teamSalespersonIds.length > 0) {
+                teamOr.push({ assignedSalespersonId: { $in: hierarchyInfo.teamSalespersonIds } });
+            }
+            if (teamOr.length > 0) {
+                andConditions.push({ $or: teamOr });
+            } else {
+                // User has no reportees in hierarchy -> 0 team tickets
+                andConditions.push({ _id: null });
+            }
+        } else if (tab === 'all') {
+            if (!isAdminOrManagerUser(req.user)) {
+                const allUserObjIds = [...hierarchyInfo.selfUserIds, ...hierarchyInfo.teamUserIds].map(id => new mongoose.Types.ObjectId(id));
+                const allEngIds = [...hierarchyInfo.selfEngineerIds, ...hierarchyInfo.teamEngineerIds];
+                const allSalesIds = [...hierarchyInfo.selfSalespersonIds, ...hierarchyInfo.teamSalespersonIds];
+                const allOr = [{ createdBy: { $in: allUserObjIds } }];
+                if (allEngIds.length > 0) allOr.push({ assignedEngineerId: { $in: allEngIds } });
+                if (allSalesIds.length > 0) allOr.push({ assignedSalespersonId: { $in: allSalesIds } });
+                andConditions.push({ $or: allOr });
+            } else if (req.query.assignedEngineerId) {
+                filter.assignedEngineerId = req.query.assignedEngineerId;
+            }
+        } else {
+            // Default handling when no tab specified
+            if (!isAdminOrManagerUser(req.user)) {
+                const allUserObjIds = [...hierarchyInfo.selfUserIds, ...hierarchyInfo.teamUserIds].map(id => new mongoose.Types.ObjectId(id));
+                const allEngIds = [...hierarchyInfo.selfEngineerIds, ...hierarchyInfo.teamEngineerIds];
+                const allSalesIds = [...hierarchyInfo.selfSalespersonIds, ...hierarchyInfo.teamSalespersonIds];
+                const visibilityOr = [{ createdBy: { $in: allUserObjIds } }];
+                if (allEngIds.length > 0) visibilityOr.push({ assignedEngineerId: { $in: allEngIds } });
+                if (allSalesIds.length > 0) visibilityOr.push({ assignedSalespersonId: { $in: allSalesIds } });
+                andConditions.push({ $or: visibilityOr });
+            } else if (req.query.assignedEngineerId) {
+                filter.assignedEngineerId = req.query.assignedEngineerId;
+            }
         }
 
         if (req.query.isManual === 'true') {

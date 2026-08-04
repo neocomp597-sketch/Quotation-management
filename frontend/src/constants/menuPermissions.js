@@ -158,6 +158,7 @@ export const MENU_PERMISSION_GROUPS = [
             { key: 'payroll_payslips', label: 'My Payslips', description: 'View and download monthly payslips', defaultRoute: '/payroll/payslips' },
             { key: 'payroll_employees', label: 'Employees', description: 'Employee salary profiles and base structures', defaultRoute: '/payroll/employees' },
             { key: 'payroll_org_chart', label: 'Org Chart', description: 'Employee hierarchy and org chart module', defaultRoute: '/payroll/org-chart' },
+            { key: 'payroll_masters', label: 'Department & Designation Masters', description: 'Manage departments and designations', defaultRoute: '/payroll/masters' },
             { key: 'payroll_runs', label: 'Run Payroll', description: 'Run and calculate monthly payroll', defaultRoute: '/payroll/runs' },
             { key: 'payroll_payments', label: 'Payments', description: 'Record employee payments', defaultRoute: '/payroll/payments' },
             { key: 'payroll_settings', label: 'Settings', description: 'Manage lock dates and settings', defaultRoute: '/payroll/settings' },
@@ -176,7 +177,8 @@ export const MENU_PERMISSION_GROUPS = [
             { key: 'csm_visits', label: 'Field Service Visits', description: 'Schedule and manage service engineer visits', defaultRoute: '/csm/visits' },
             { key: 'csm_warranties_amc', label: 'Warranty & AMC', description: 'Manage customer warranty details and AMC contracts', defaultRoute: '/csm/warranties-amc' },
             { key: 'csm_kb', label: 'Knowledge Base', description: 'Manage troubleshooting articles and FAQs', defaultRoute: '/csm/kb' },
-            { key: 'csm_masters', label: 'CSM Masters', description: 'Configure categories, priorities, teams, and SLAs', defaultRoute: '/csm/masters' }
+            { key: 'csm_masters', label: 'CSM Masters', description: 'Configure categories, priorities, teams, and SLAs', defaultRoute: '/csm/masters' },
+            { key: 'csm_reports', label: 'Service Reports', description: 'Customer service analytics and resolution reports', defaultRoute: '/csm/reports' }
         ]
     },
     {

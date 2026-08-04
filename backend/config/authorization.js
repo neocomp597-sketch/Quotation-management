@@ -20,7 +20,22 @@ const MENU_GROUPS = [
             { key: 'master_statuses', label: 'Status Master', description: 'Status master definitions for planning' },
             { key: 'master_terms', label: 'Terms', description: 'Terms and conditions master' },
             { key: 'master_territories', label: 'Territories', description: 'Territory master management' },
-            { key: 'master_serials', label: 'Serial No. Master', description: 'Serial number and asset master record management' }
+            { key: 'master_branches', label: 'Branch Master', description: 'Branch master management' },
+            { key: 'master_serials', label: 'Serial No. Master', description: 'Serial number and asset master record management' },
+            { key: 'state_master_create', label: 'Create State Master', description: 'Create state records' },
+            { key: 'state_master_edit', label: 'Edit State Master', description: 'Modify state records' },
+            { key: 'state_master_delete', label: 'Delete State Master', description: 'Delete state records' }
+        ]
+    },
+    {
+        key: 'flowchart',
+        label: 'Flowchart Builder',
+        description: 'Visual process flowchart builder, auto-generation, versioning and templates',
+        children: [
+            { key: 'flowchart_view', label: 'View Flowcharts', description: 'Access flowchart builder and diagrams' },
+            { key: 'flowchart_create', label: 'Create Flowcharts', description: 'Create and auto-generate new flowcharts' },
+            { key: 'flowchart_edit', label: 'Edit Flowcharts', description: 'Modify canvas nodes, edges and versions' },
+            { key: 'flowchart_delete', label: 'Delete Flowcharts', description: 'Delete flowchart diagrams' }
         ]
     },
     {
@@ -132,6 +147,7 @@ const MENU_GROUPS = [
             { key: 'payroll_payslips', label: 'My Payslips', description: 'View and download monthly payslips' },
             { key: 'payroll_employees', label: 'Employee Profiles', description: 'Manage employee salary profiles and structures' },
             { key: 'payroll_org_chart', label: 'Org Chart', description: 'Employee hierarchy and org chart module' },
+            { key: 'payroll_masters', label: 'Department & Designation Masters', description: 'Manage departments and designations' },
             { key: 'payroll_runs', label: 'Run Payroll', description: 'Create and run monthly payroll batches' },
             { key: 'payroll_payments', label: 'Payments', description: 'Record payment slips and transaction references' },
             { key: 'payroll_settings', label: 'Payroll Settings', description: 'Manage payroll month and calculation configuration' },
@@ -149,7 +165,8 @@ const MENU_GROUPS = [
             { key: 'csm_visits', label: 'Field Service Visits', description: 'Schedule and manage service engineer visits' },
             { key: 'csm_warranties_amc', label: 'Warranty & AMC', description: 'Manage customer warranty details and AMC contracts' },
             { key: 'csm_kb', label: 'Knowledge Base', description: 'Manage troubleshooting articles and FAQs' },
-            { key: 'csm_masters', label: 'CSM Masters', description: 'Configure categories, priorities, teams, and SLAs' }
+            { key: 'csm_masters', label: 'CSM Masters', description: 'Configure categories, priorities, teams, and SLAs' },
+            { key: 'csm_reports', label: 'Service Reports', description: 'Customer service analytics and resolution reports' }
         ]
     },
     {
