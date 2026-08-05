@@ -340,7 +340,16 @@ const StateMaster = ({ isCreatePage, isEditPage }) => {
                 ) : (
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse">
-                            {/* Table headers removed as requested */}
+                            <thead>
+                                <tr className="border-b border-slate-100 bg-slate-50/50 text-[10px] font-black uppercase text-slate-400 tracking-widest">
+                                    <th className="py-4 px-6">Country</th>
+                                    <th className="py-4 px-6">State / Union Territory</th>
+                                    <th className="py-4 px-6">Short Code</th>
+                                    <th className="py-4 px-6">GST Code</th>
+                                    <th className="py-4 px-6">Status</th>
+                                    <th className="py-4 px-6 text-center">Actions</th>
+                                </tr>
+                            </thead>
                             <tbody className="divide-y divide-slate-100 text-sm font-semibold">
                                 {filteredStates.map((item) => (
                                     <tr key={item._id} className="hover:bg-slate-50/60 transition-all">
@@ -350,13 +359,7 @@ const StateMaster = ({ isCreatePage, isEditPage }) => {
                                                 {item.country || 'India'}
                                             </span>
                                         </td>
-                                        <td className="py-4 px-6">
-                                            <span className="font-mono bg-blue-50 text-blue-700 px-2.5 py-1 rounded-xl text-xs font-bold border border-blue-100">
-                                                {item.dialCode || '+91'}
-                                            </span>
-                                        </td>
                                         <td className="py-4 px-6 font-bold text-slate-900">{item.state}</td>
-                                        <td className="py-4 px-6 font-bold text-slate-700">{item.city || '-'}</td>
                                         <td className="py-4 px-6">
                                             <span className="font-mono bg-primary-50 text-primary-700 px-3 py-1 rounded-xl text-xs font-black border border-primary-100">
                                                 {item.shortCode}
