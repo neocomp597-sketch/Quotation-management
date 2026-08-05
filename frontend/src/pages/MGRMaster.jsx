@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { MdAdd, MdEdit, MdDelete } from 'react-icons/md';
+import { MdAdd, MdEdit, MdDelete, MdArrowBack } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import { mgrService } from '../services/api';
 import Modal from '../components/Modal';
 import PaginationControls from '../components/PaginationControls';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 
 const LIST_PAGE_SIZE = 20;
 
-const MGRMaster = () => {
+const MGRMaster = ({ isCreatePage = false, isEditPage = false }) => {
     const navigate = useNavigate();
+    const { id } = useParams();
     const [mgrs, setMgrs] = useState([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('MGR1');
@@ -23,6 +24,26 @@ const MGRMaster = () => {
         description: '',
         status: 'Active'
     });
+
+    useEffect(() => {
+        if (isEditPage && id) {
+            mgrService.getById(id).then(res => {
+                const item = res.data;
+                if (item) {
+                    setEditingMGR(item);
+                    setFormData({
+                        code: item.code || '',
+                        description: item.description || '',
+                        status: item.status || 'Active'
+                    });
+                    if (item.mgrType) setActiveTab(item.mgrType);
+                }
+            }).catch(err => {
+                console.error("Error fetching MGR detail:", err);
+                toast.error('Failed to load item details');
+            });
+        }
+    }, [isEditPage, id]);
 
     useEffect(() => {
         setPage(1);
@@ -92,15 +113,20 @@ const MGRMaster = () => {
         };
 
         try {
-            if (editingMGR) {
-                await mgrService.update(editingMGR._id, payload);
+            const targetId = editingMGR?._id || (isEditPage ? id : null);
+            if (targetId) {
+                await mgrService.update(targetId, payload);
                 toast.success(`${activeTab} updated successfully!`);
             } else {
                 await mgrService.create(payload);
                 toast.success(`${activeTab} created successfully!`);
             }
-            fetchMGRs();
-            setIsModalOpen(false);
+            if (isCreatePage || isEditPage) {
+                navigate('/mgrs');
+            } else {
+                fetchMGRs();
+                setIsModalOpen(false);
+            }
         } catch (err) {
             console.error("Error saving MGR:", err);
             toast.error(err.response?.data?.message || 'Error saving data');

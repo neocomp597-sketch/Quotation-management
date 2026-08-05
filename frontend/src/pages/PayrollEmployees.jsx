@@ -10,7 +10,7 @@ import * as XLSX from 'xlsx';
 import { 
     MdPeople, MdAdd, MdSearch, MdEdit, MdDelete, 
     MdSave, MdAccountBalance, MdAssignment, MdUploadFile, MdDownload, MdBusiness, MdAccountTree, MdArrowBack, MdSettings,
-    MdPhotoCamera, MdContactPhone 
+    MdPhotoCamera, MdContactPhone, MdCheck
 } from 'react-icons/md';
 
 const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
@@ -63,10 +63,15 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
     const [openFamilyCards, setOpenFamilyCards] = useState({});
 
     const toggleFamilyCard = (index) => {
-        setOpenFamilyCards(prev => ({
-            ...prev,
-            [index]: prev[index] === undefined ? false : !prev[index]
-        }));
+        setOpenFamilyCards(prev => {
+            const isCurrentlyOpen = prev[index] !== undefined 
+                ? prev[index] 
+                : !(basicForm.familyDetails?.[index]?.name);
+            return {
+                ...prev,
+                [index]: !isCurrentlyOpen
+            };
+        });
     };
 
     const handleAddFamilyMember = () => {
@@ -1171,7 +1176,7 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                                 ) : (
                                                     <div className="space-y-3">
                                                         {basicForm.familyDetails.map((fam, idx) => {
-                                                            const isCardOpen = openFamilyCards[idx] !== false;
+                                                            const isCardOpen = openFamilyCards[idx] !== undefined ? openFamilyCards[idx] : !fam.name;
                                                             return (
                                                                 <div key={idx} className="border border-slate-200 rounded-2xl overflow-hidden bg-slate-50/50">
                                                                     {/* Per-Entry Accordion Header */}
@@ -1341,13 +1346,23 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                                                                     />
                                                                                     <span>Emergency Contact</span>
                                                                                 </label>
-                                                                                <button
-                                                                                    type="button"
-                                                                                    onClick={() => handleRemoveFamilyMember(idx)}
-                                                                                    className="text-xs font-bold text-rose-500 hover:underline"
-                                                                                >
-                                                                                    Remove
-                                                                                </button>
+                                                                                <div className="flex items-center gap-3">
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() => toggleFamilyCard(idx)}
+                                                                                        className="flex items-center gap-1 px-3.5 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs"
+                                                                                    >
+                                                                                        <MdCheck size={16} />
+                                                                                        <span>Done / Collapse</span>
+                                                                                    </button>
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() => handleRemoveFamilyMember(idx)}
+                                                                                        className="text-xs font-bold text-rose-500 hover:underline"
+                                                                                    >
+                                                                                        Remove
+                                                                                    </button>
+                                                                                </div>
                                                                             </div>
                                                                         </div>
                                                                     )}
