@@ -20,7 +20,7 @@ const voucherItemSchema = new mongoose.Schema({
 });
 
 const voucherSchema = new mongoose.Schema({
-    voucherType: { type: String, enum: ['Invoice', 'Purchase', 'Sale Return'], required: true },
+    voucherType: { type: String, enum: ['Invoice', 'Purchase', 'Invoice Voucher', 'Purchase Voucher', 'Sale Return'], required: true },
     voucherNumber: { type: String, required: true },
     date: { type: Date, required: true },
     vendorName: { type: String },

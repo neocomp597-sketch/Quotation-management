@@ -125,10 +125,12 @@ const clmRoutes = require("./routes/clmRoutes");
 const tenderRoutes = require("./routes/tenderRoutes");
 const branchRoutes = require("./routes/branchRoutes");
 const stateMasterRoutes = require("./routes/stateMasterRoutes");
+const cityMasterRoutes = require("./routes/cityMasterRoutes");
 const flowchartRoutes = require("./routes/flowchartRoutes");
 const scheduler = require("./utils/scheduler");
 
 // API Routes (Reload triggered)
+app.use("/api/city-master", cityMasterRoutes);
 app.use("/api/flowcharts", flowchartRoutes);
 app.use("/api/state-master", stateMasterRoutes);
 app.use("/api/branches", branchRoutes);
@@ -732,6 +734,38 @@ const startBackgroundServices = async () => {
         ],
         deployedBy: "Super Admin",
         deployedAt: new Date("2026-08-02T22:42:00Z"),
+        isActive: true
+      },
+      { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
+    );
+    await SystemUpdate.findOneAndUpdate(
+      { version: "v4.5.0-arc-crm-enhancements" },
+      {
+        version: "v4.5.0-arc-crm-enhancements",
+        title: "ARC CRM Enhancements: Family Info Accordions, City Master, Complaint Reassignment, Vendor Portal, Contacts Redesign & GST Formatting",
+        message: "We have released major CRM updates including Family Info accordions, City Master, Service Engineer complaint reassignment, Vendor portal isolation, Contacts redesign with Anniversary Date, and standardized GST formatting.",
+        releaseNotes: [
+          "Employee Family Information Enhancement: Redesigned Family Details into a compact collapsible accordion view with 2-column grid layout (Relation, Name, Mobile, Aadhaar, PAN, Email, DOB, Gender, Emergency Contact) and strict validations.",
+          "New City Master Module: Integrated complete City Master under Master Management with country, state, district, area, city, 6-digit numeric pincode validation, and duplicate district checks.",
+          "Org Chart Universal Employee Access: Enabled Org Chart view for all authenticated employee accounts to view reporting hierarchy, managers, subordinates, and reporting chains.",
+          "Complaint Reassignment for Service Engineers: Service Engineers can reassign support complaints when absent or unavailable with select reasons (Leave, Sick, Emergency, Workload, Other), transfer notes, history audit log, and automated notifications.",
+          "Purchase Voucher Renamed to Invoice Voucher: Standardized Purchase Voucher naming to 'Invoice Voucher' globally across models, UI tabs, breadcrumbs, vouchers register, and reports.",
+          "Dedicated Vendor Login Portal & Scoping: Provided vendor login access scoped strictly to Product Catalog management (CRUD) and Read-Only Invoice Vouchers view with full CRM isolation.",
+          "GST Code Formatting: Formatted single-digit state GST prefix codes with leading zeroes (e.g. 01, 02, 04, 07, 09, 27) with auto-population in State Master.",
+          "Contacts Module Redesign & Validations: Redesigned Create/Edit Contact form into 5 structured sections matching contacts.html with Anniversary Date next to DOB, 10-digit mobile, 15-char GSTIN, 6-digit PIN, and non-future date validations."
+        ],
+        detailedChanges: [
+          { date: "2026-08-05", module: "Payroll & HR", submodule: "Family Information", changes: "Redesigned family member UI into accordion with 2-column grid, emergency contact badges, and validations." },
+          { date: "2026-08-05", module: "Master Management", submodule: "City Master", changes: "Created CityMaster model, controller, routes, frontend page, and menu link under Master." },
+          { date: "2026-08-05", module: "Payroll & HR", submodule: "Org Chart", changes: "Granted Org Chart access permission to all authenticated employee user accounts." },
+          { date: "2026-08-05", module: "Customer Service", submodule: "Complaint Reassignment", changes: "Added reassign endpoint, reassignmentHistory schema array, reasons modal, timeline log, and engineer notification." },
+          { date: "2026-08-05", module: "Finance & Vouchers", submodule: "Invoice Voucher", changes: "Renamed Purchase Voucher to Invoice Voucher in Voucher model, UI forms, filters, and reports." },
+          { date: "2026-08-05", module: "Vendor Portal", submodule: "Role Scoping", changes: "Added vendor credentials schema and scoped sidebar/permissions strictly to Product Catalog and Read-Only Invoice Vouchers." },
+          { date: "2026-08-05", module: "Master Management", submodule: "GST Formatting", changes: "Added formatGstPrefix helper formatting single-digit state codes with leading zeroes (01, 04, 09)." },
+          { date: "2026-08-05", module: "CRM Contacts", submodule: "Contacts Redesign", changes: "Expanded Contact schema and redesigned Contacts.jsx form matching contacts.html with Anniversary Date next to DOB and field validations." }
+        ],
+        deployedBy: "Super Admin",
+        deployedAt: new Date("2026-08-05T21:30:00Z"),
         isActive: true
       },
       { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }

@@ -8,6 +8,18 @@ const TicketTimelineSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now }
 }, { _id: false });
 
+const ReassignmentHistorySchema = new mongoose.Schema({
+    fromEngineerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Engineer' },
+    fromEngineerName: { type: String, default: '' },
+    toEngineerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Engineer', required: true },
+    toEngineerName: { type: String, default: '' },
+    reason: { type: String, enum: ['Leave', 'Sick', 'Emergency', 'Workload', 'Other'], required: true },
+    notes: { type: String, default: '' },
+    reassignedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    reassignedByName: { type: String, default: '' },
+    reassignedAt: { type: Date, default: Date.now }
+}, { _id: true });
+
 const TicketCommentSchema = new mongoose.Schema({
     text: { type: String, required: true },
     authorId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
@@ -64,6 +76,7 @@ const TicketSchema = new mongoose.Schema({
     },
     isFirstCallResolved: { type: Boolean, default: false },
     timeline: { type: [TicketTimelineSchema], default: [] },
+    reassignmentHistory: { type: [ReassignmentHistorySchema], default: [] },
     comments: { type: [TicketCommentSchema], default: [] },
     feedback: {
         rating: { type: Number, min: 1, max: 5 },

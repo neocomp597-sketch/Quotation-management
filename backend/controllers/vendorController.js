@@ -197,7 +197,7 @@ const getVendor360Data = async (req, res) => {
             timeline.push({
                 id: `purchase-${p._id}`,
                 type: 'purchase',
-                title: `Purchase Voucher (${p.voucherNumber})`,
+                title: `Invoice Voucher (${p.voucherNumber})`,
                 description: `Billed total ₹${(p.grandTotal || 0).toLocaleString()} with ${p.totalQty || 0} items.`,
                 date: p.date,
                 icon: 'MdShoppingCart'

@@ -20,7 +20,7 @@ import { vendorService } from '../services/api';
 const TABS = [
     { id: 'overview', label: 'Overview', icon: <MdStorefront size={18} /> },
     { id: 'products', label: 'Supplied Products', icon: <MdInventory size={18} /> },
-    { id: 'purchases', label: 'Purchase Vouchers', icon: <MdShoppingCart size={18} /> },
+    { id: 'purchases', label: 'Invoice Vouchers', icon: <MdShoppingCart size={18} /> },
     { id: 'quotations', label: 'Quotations Linked', icon: <MdRequestQuote size={18} /> },
     { id: 'contacts', label: 'Vendor Contacts', icon: <MdPeople size={18} /> },
     { id: 'timeline', label: 'Interaction Timeline', icon: <MdTimeline size={18} /> }
@@ -240,7 +240,7 @@ const Vendor360Workspace = () => {
                 {/* PURCHASES TAB */}
                 {activeTab === 'purchases' && (
                     <div className="space-y-6">
-                        <h3 className="font-black text-slate-800 text-sm uppercase tracking-wider">Purchase Vouchers / Invoices</h3>
+                        <h3 className="font-black text-slate-800 text-sm uppercase tracking-wider">Invoice Vouchers</h3>
                         <div className="overflow-x-auto">
                             <table className="w-full text-left">
                                 <thead className="bg-slate-50 text-[10px] uppercase font-black tracking-widest border-b border-slate-100 text-slate-400">
@@ -264,7 +264,7 @@ const Vendor360Workspace = () => {
                                     ))}
                                     {purchases.length === 0 && (
                                         <tr>
-                                            <td colSpan="5" className="p-8 text-center text-slate-400 font-bold uppercase tracking-widest text-xs">No purchase vouchers found for this vendor.</td>
+                                            <td colSpan="5" className="p-8 text-center text-slate-400 font-bold uppercase tracking-widest text-xs">No invoice vouchers found for this vendor.</td>
                                         </tr>
                                     )}
                                 </tbody>

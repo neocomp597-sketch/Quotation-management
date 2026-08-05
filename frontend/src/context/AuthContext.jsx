@@ -201,6 +201,10 @@ export const AuthProvider = ({ children }) => {
             }
         }
 
+        if (roleStr === 'vendor') {
+            return ['master_products', 'sales_catalog', 'voucher_list', 'vouchers', 'settings', 'settings_profile'].includes(permissionKey);
+        }
+
         if (Object.prototype.hasOwnProperty.call(permissions || {}, permissionKey)) {
             return Boolean(permissions?.[permissionKey]);
         }

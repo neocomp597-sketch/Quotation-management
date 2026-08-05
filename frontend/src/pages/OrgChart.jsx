@@ -26,10 +26,14 @@ const OrgChart = () => {
     // Authorization & View Scope: 'my' | 'full'
     const canViewFullChart = useMemo(() => {
         if (!user) return false;
-        const roleLower = String(user.role || '').toLowerCase();
-        if (isAdmin || isSuperAdmin || roleLower === 'admin' || roleLower === 'super_admin') return true;
-        return hasAccess('payroll_org_chart') || hasAccess('admin') || hasAccess('payroll');
-    }, [user, isAdmin, isSuperAdmin, hasAccess]);
+        return true; // All authenticated employees can view organizational hierarchy & reporting chain
+    }, [user]);
+
+    const canEditOrgChart = useMemo(() => {
+        if (!user) return false;
+        const roleStr = String(user.role || '').toLowerCase();
+        return isAdmin || isSuperAdmin || roleStr === 'hr' || roleStr === 'hr_manager' || roleStr === 'admin';
+    }, [user, isAdmin, isSuperAdmin]);
 
     const [orgViewMode, setOrgViewMode] = useState(() => (canViewFullChart ? 'full' : 'my'));
 
@@ -533,7 +537,7 @@ const OrgChart = () => {
                 {meta.isTopTier ? (
                     /* Tier 0 / Leadership Style: Diamond Frame on Left + Teal Pill Container */
                     <div
-                        draggable
+                        draggable={canEditOrgChart}
                         onDragStart={(e) => handleDragStart(e, node._id)}
                         onDragOver={(e) => handleDragOver(e, node._id)}
                         onDragLeave={handleDragLeave}
@@ -591,7 +595,7 @@ const OrgChart = () => {
                 ) : (
                     /* Tier 1+ Style matching Reference Image: Oval Pill + Small Floating Circular Avatar Photo on Top-Right */
                     <div
-                        draggable
+                        draggable={canEditOrgChart}
                         onDragStart={(e) => handleDragStart(e, node._id)}
                         onDragOver={(e) => handleDragOver(e, node._id)}
                         onDragLeave={handleDragLeave}
@@ -807,41 +811,45 @@ const OrgChart = () => {
                         )}
                     </div>
 
-                    {treeData.roots.length > 1 && (
-                        <button
-                            onClick={handleAutoOrganizeHierarchy}
-                            className="flex items-center space-x-2 px-4 py-2.5 bg-gradient-to-r from-teal-600 to-emerald-600 text-white rounded-xl font-bold text-sm transition-all shadow-md"
-                            title="Auto-organize unassigned employees under CEO"
-                        >
-                            <MdAutoFixHigh size={20} />
-                            <span>Auto-Build Tree</span>
-                        </button>
+                    {canEditOrgChart && (
+                        <>
+                            {treeData.roots.length > 1 && (
+                                <button
+                                    onClick={handleAutoOrganizeHierarchy}
+                                    className="flex items-center space-x-2 px-4 py-2.5 bg-gradient-to-r from-teal-600 to-emerald-600 text-white rounded-xl font-bold text-sm transition-all shadow-md"
+                                    title="Auto-organize unassigned employees under CEO"
+                                >
+                                    <MdAutoFixHigh size={20} />
+                                    <span>Auto-Build Tree</span>
+                                </button>
+                            )}
+
+                            <button
+                                onClick={handleOpenHierarchyModal}
+                                className="flex items-center space-x-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-bold text-sm transition-all shadow-md"
+                                title="Set Reporting Hierarchy"
+                            >
+                                <MdOutlineSwapVert size={20} className="text-teal-400" />
+                                <span>Organize Hierarchy</span>
+                            </button>
+
+                            <button
+                                onClick={() => setIsVacantModalOpen(true)}
+                                className="flex items-center space-x-2 px-4 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl font-bold text-sm transition-all shadow-sm"
+                            >
+                                <MdAdd size={20} className="text-teal-500" />
+                                <span>Add Vacant Position</span>
+                            </button>
+
+                            <button
+                                onClick={handleOpenBatchModal}
+                                className="flex items-center space-x-2 px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl font-bold text-sm transition-all shadow-md shadow-amber-500/20"
+                            >
+                                <MdCorporateFare size={20} />
+                                <span>Batch Assign Branch & ID</span>
+                            </button>
+                        </>
                     )}
-
-                    <button
-                        onClick={handleOpenHierarchyModal}
-                        className="flex items-center space-x-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-bold text-sm transition-all shadow-md"
-                        title="Set Reporting Hierarchy"
-                    >
-                        <MdOutlineSwapVert size={20} className="text-teal-400" />
-                        <span>Organize Hierarchy</span>
-                    </button>
-
-                    <button
-                        onClick={() => setIsVacantModalOpen(true)}
-                        className="flex items-center space-x-2 px-4 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl font-bold text-sm transition-all shadow-sm"
-                    >
-                        <MdAdd size={20} className="text-teal-500" />
-                        <span>Add Vacant Position</span>
-                    </button>
-
-                    <button
-                        onClick={handleOpenBatchModal}
-                        className="flex items-center space-x-2 px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl font-bold text-sm transition-all shadow-md shadow-amber-500/20"
-                    >
-                        <MdCorporateFare size={20} />
-                        <span>Batch Assign Branch & ID</span>
-                    </button>
 
                     <button
                         onClick={handleExportChart}
@@ -993,8 +1001,12 @@ const OrgChart = () => {
                                     className="org-chart-scaled-tree flex justify-center min-w-max transition-transform duration-200"
                                 >
                                     {treeData.roots.length === 0 ? (
-                                        <div className="text-center py-20">
-                                            <p className="text-slate-400 font-medium">No employees found matching the current filters.</p>
+                                        <div className="flex flex-col items-center justify-center py-16 text-center space-y-2">
+                                            <div className="w-12 h-12 rounded-full bg-amber-50 dark:bg-amber-950/50 text-amber-500 flex items-center justify-center text-2xl mx-auto">
+                                                <MdAccountTree />
+                                            </div>
+                                            <p className="text-sm font-black text-slate-700 dark:text-slate-200">No reporting hierarchy has been assigned for this employee.</p>
+                                            <p className="text-xs text-slate-400">Please contact HR or your System Administrator to set up your reporting manager.</p>
                                         </div>
                                     ) : (
                                         <div className="flex space-x-12 px-8">

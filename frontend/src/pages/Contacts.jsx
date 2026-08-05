@@ -15,11 +15,32 @@ const CUSTOMER_TYPES = ['Customer', 'Prospect', 'Vendor', 'Partner'];
 
 const defaultForm = {
     contactName: '',
+    firstName: '',
+    lastName: '',
     company: '',
-    email: '',
-    phone: '',
+    department: '',
     designation: '',
+    industry: '',
+    gstin: '',
+    website: '',
+    phone: '',
+    alternatePhone: '',
+    whatsappNumber: '',
+    email: '',
+    alternateEmail: '',
+    officePhone: '',
     customerType: '',
+    dob: '',
+    anniversaryDate: '',
+    bloodGroup: '',
+    gender: '',
+    maritalStatus: '',
+    country: 'India',
+    state: '',
+    city: '',
+    pincode: '',
+    addressLine1: '',
+    addressLine2: '',
     lastInteractionDate: '',
     notes: ''
 };
@@ -270,6 +291,112 @@ const Contacts = ({ isCreatePage, isEditPage }) => {
 
     const filteredContacts = useMemo(() => contacts, [contacts]);
 
+    const validateContactForm = (data) => {
+        if (!data.contactName || !data.contactName.trim()) {
+            return 'Contact Name is mandatory';
+        }
+        if (data.contactName.trim().length < 2) {
+            return 'Contact Name must be at least 2 characters long';
+        }
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (data.email && data.email.trim() && !emailRegex.test(data.email.trim())) {
+            return 'Please enter a valid primary Email address';
+        }
+        if (data.alternateEmail && data.alternateEmail.trim() && !emailRegex.test(data.alternateEmail.trim())) {
+            return 'Please enter a valid alternate Email address';
+        }
+
+        if (data.phone && data.phone.trim()) {
+            const cleanPhone = data.phone.replace(/[\s\-\(\)\+]/g, '');
+            if (cleanPhone.length < 10 || cleanPhone.length > 13) {
+                return 'Primary Mobile number must be a valid 10-digit phone number';
+            }
+        }
+        if (data.alternatePhone && data.alternatePhone.trim()) {
+            const cleanAlt = data.alternatePhone.replace(/[\s\-\(\)\+]/g, '');
+            if (cleanAlt.length < 10 || cleanAlt.length > 13) {
+                return 'Alternate Mobile number must be a valid 10-digit phone number';
+            }
+        }
+        if (data.whatsappNumber && data.whatsappNumber.trim()) {
+            const cleanWA = data.whatsappNumber.replace(/[\s\-\(\)\+]/g, '');
+            if (cleanWA.length < 10 || cleanWA.length > 13) {
+                return 'WhatsApp number must be a valid 10-digit phone number';
+            }
+        }
+
+        if (data.gstin && data.gstin.trim()) {
+            const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+            if (!gstRegex.test(data.gstin.trim().toUpperCase())) {
+                return 'Invalid GSTIN format. Expected format: 27AAAAA0000A1Z5';
+            }
+        }
+
+        if (data.pincode && data.pincode.trim()) {
+            if (!/^\d{6}$/.test(data.pincode.trim())) {
+                return 'PIN Code must be exactly 6 numeric digits';
+            }
+        }
+
+        const today = new Date();
+        today.setHours(23, 59, 59, 999);
+
+        if (data.dob) {
+            const dobDate = new Date(data.dob);
+            if (dobDate > today) {
+                return 'Date of Birth (DOB) cannot be in the future';
+            }
+        }
+
+        if (data.anniversaryDate) {
+            const annivDate = new Date(data.anniversaryDate);
+            if (annivDate > today) {
+                return 'Anniversary Date cannot be in the future';
+            }
+            if (data.dob) {
+                const dobDate = new Date(data.dob);
+                if (annivDate < dobDate) {
+                    return 'Anniversary Date cannot be prior to Date of Birth';
+                }
+            }
+        }
+
+        return null;
+    };
+
+    const populateForm = (item) => ({
+        contactName: item.contactName || '',
+        firstName: item.firstName || '',
+        lastName: item.lastName || '',
+        company: item.company || '',
+        department: item.department || '',
+        designation: item.designation || '',
+        industry: item.industry || '',
+        gstin: item.gstin || '',
+        website: item.website || '',
+        phone: item.phone || '',
+        alternatePhone: item.alternatePhone || '',
+        whatsappNumber: item.whatsappNumber || '',
+        email: item.email || '',
+        alternateEmail: item.alternateEmail || '',
+        officePhone: item.officePhone || '',
+        customerType: item.customerType || '',
+        dob: item.dob ? item.dob.substring(0, 10) : '',
+        anniversaryDate: item.anniversaryDate ? item.anniversaryDate.substring(0, 10) : '',
+        bloodGroup: item.bloodGroup || '',
+        gender: item.gender || '',
+        maritalStatus: item.maritalStatus || '',
+        country: item.country || 'India',
+        state: item.state || '',
+        city: item.city || '',
+        pincode: item.pincode || '',
+        addressLine1: item.addressLine1 || '',
+        addressLine2: item.addressLine2 || '',
+        lastInteractionDate: item.lastInteractionDate ? item.lastInteractionDate.substring(0, 10) : '',
+        notes: item.notes || ''
+    });
+
     useEffect(() => {
         if (isCreatePage) {
             setEditingContact(null);
@@ -280,32 +407,14 @@ const Contacts = ({ isCreatePage, isEditPage }) => {
             const found = contacts.find(c => c._id === routeId);
             if (found) {
                 setEditingContact(found);
-                setFormData({
-                    contactName: found.contactName || '',
-                    company: found.company || '',
-                    email: found.email || '',
-                    phone: found.phone || '',
-                    designation: found.designation || '',
-                    customerType: found.customerType || '',
-                    lastInteractionDate: found.lastInteractionDate ? found.lastInteractionDate.substring(0, 10) : '',
-                    notes: found.notes || ''
-                });
+                setFormData(populateForm(found));
             } else {
                 contactService.getAll({ limit: 1000 }).then(res => {
                     const list = Array.isArray(res.data) ? res.data : res.data?.data || [];
                     const item = list.find(c => c._id === routeId);
                     if (item) {
                         setEditingContact(item);
-                        setFormData({
-                            contactName: item.contactName || '',
-                            company: item.company || '',
-                            email: item.email || '',
-                            phone: item.phone || '',
-                            designation: item.designation || '',
-                            customerType: item.customerType || '',
-                            lastInteractionDate: item.lastInteractionDate ? item.lastInteractionDate.substring(0, 10) : '',
-                            notes: item.notes || ''
-                        });
+                        setFormData(populateForm(item));
                     }
                 }).catch(err => console.error("Failed to load contact", err));
             }
@@ -327,8 +436,10 @@ const Contacts = ({ isCreatePage, isEditPage }) => {
 
     const onSubmit = async (e) => {
         e.preventDefault();
-        if (!formData.contactName?.trim()) {
-            toast.error('Contact Name is required');
+        
+        const validationError = validateContactForm(formData);
+        if (validationError) {
+            toast.error(validationError);
             return;
         }
 
@@ -583,113 +694,388 @@ const Contacts = ({ isCreatePage, isEditPage }) => {
 
                         {/* Form Card Body */}
                         <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
-                            <form onSubmit={onSubmit} className="space-y-6">
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Contact Name *</label>
-                                    <input
-                                        type="text"
-                                        name="contactName"
-                                        value={formData.contactName}
-                                        onChange={onChange}
-                                        className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all"
-                                        placeholder="Enter contact name"
-                                        required
-                                    />
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Company Name</label>
-                                        <SearchableSelect
-                                            options={customerOptions}
-                                            value={formData.company}
-                                            onChange={(val) => setFormData(prev => ({ ...prev, company: val }))}
-                                            placeholder="Search & Select Company..."
-                                            onAddOption={handleAddCompany}
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <div className="flex justify-between items-center mb-1">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Designation</label>
-                                            <button 
-                                                type="button" 
-                                                onClick={() => handleOpenMiniMaster('designation')}
-                                                className="text-[10px] font-black uppercase text-primary-600 hover:text-primary-700 tracking-wider flex items-center gap-0.5"
-                                            >
-                                                + Quick Add
-                                            </button>
+                            <form onSubmit={onSubmit} className="space-y-8">
+                                
+                                {/* SECTION 1: BASIC INFORMATION */}
+                                <div className="space-y-4">
+                                    <h3 className="font-outfit font-black text-sm text-primary-600 uppercase tracking-widest border-b border-slate-100 pb-2 flex items-center gap-2">
+                                        <span>👤</span> Basic Information
+                                    </h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                        <div className="md:col-span-3 space-y-2">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Contact Name *</label>
+                                            <input
+                                                type="text"
+                                                name="contactName"
+                                                value={formData.contactName}
+                                                onChange={onChange}
+                                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all"
+                                                placeholder="Enter full contact name"
+                                                required
+                                            />
                                         </div>
-                                        <select
-                                            name="designation"
-                                            value={formData.designation}
-                                            onChange={onChange}
-                                            className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all"
-                                        >
-                                            <option value="">Select Designation</option>
-                                            {designations.map(d => (
-                                                <option key={d._id} value={d.name}>{d.name}</option>
-                                            ))}
-                                        </select>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">First Name</label>
+                                            <input
+                                                type="text"
+                                                name="firstName"
+                                                value={formData.firstName}
+                                                onChange={onChange}
+                                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none"
+                                                placeholder="First name"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Last Name</label>
+                                            <input
+                                                type="text"
+                                                name="lastName"
+                                                value={formData.lastName}
+                                                onChange={onChange}
+                                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none"
+                                                placeholder="Last name"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Gender</label>
+                                            <select
+                                                name="gender"
+                                                value={formData.gender || ''}
+                                                onChange={onChange}
+                                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all"
+                                            >
+                                                <option value="">Select Gender</option>
+                                                <option value="Male">Male</option>
+                                                <option value="Female">Female</option>
+                                                <option value="Other">Other</option>
+                                            </select>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Date of Birth (DOB)</label>
+                                            <input
+                                                type="date"
+                                                name="dob"
+                                                value={formData.dob ? formData.dob.split('T')[0] : ''}
+                                                onChange={onChange}
+                                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Anniversary Date</label>
+                                            <input
+                                                type="date"
+                                                name="anniversaryDate"
+                                                value={formData.anniversaryDate ? formData.anniversaryDate.split('T')[0] : ''}
+                                                onChange={onChange}
+                                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Blood Group</label>
+                                            <input
+                                                type="text"
+                                                name="bloodGroup"
+                                                value={formData.bloodGroup}
+                                                onChange={onChange}
+                                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none"
+                                                placeholder="e.g. O+, A+, B+"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Marital Status</label>
+                                            <select
+                                                name="maritalStatus"
+                                                value={formData.maritalStatus || ''}
+                                                onChange={onChange}
+                                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all"
+                                            >
+                                                <option value="">Select Status</option>
+                                                <option value="Single">Single</option>
+                                                <option value="Married">Married</option>
+                                                <option value="Divorced">Divorced</option>
+                                                <option value="Widowed">Widowed</option>
+                                            </select>
+                                        </div>
                                     </div>
                                 </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Email</label>
-                                        <input
-                                            type="email"
-                                            name="email"
-                                            value={formData.email}
-                                            onChange={onChange}
-                                            className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none"
-                                            placeholder="contact@company.com"
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Phone Number</label>
-                                        <input
-                                            type="text"
-                                            name="phone"
-                                            value={formData.phone}
-                                            onChange={onChange}
-                                            className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none"
-                                            placeholder="+91"
-                                        />
+
+                                {/* SECTION 2: COMPANY INFORMATION */}
+                                <div className="space-y-4">
+                                    <h3 className="font-outfit font-black text-sm text-primary-600 uppercase tracking-widest border-b border-slate-100 pb-2 flex items-center gap-2">
+                                        <span>🏢</span> Company Information
+                                    </h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Company Name</label>
+                                            <SearchableSelect
+                                                options={customerOptions}
+                                                value={formData.company}
+                                                onChange={(val) => setFormData(prev => ({ ...prev, company: val }))}
+                                                placeholder="Search & Select Company..."
+                                                onAddOption={handleAddCompany}
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Department</label>
+                                            <input
+                                                type="text"
+                                                name="department"
+                                                value={formData.department}
+                                                onChange={onChange}
+                                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none"
+                                                placeholder="e.g. Purchase, Sales, IT"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <div className="flex justify-between items-center mb-1">
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Designation</label>
+                                                <button 
+                                                    type="button" 
+                                                    onClick={() => handleOpenMiniMaster('designation')}
+                                                    className="text-[10px] font-black uppercase text-primary-600 hover:text-primary-700 tracking-wider flex items-center gap-0.5"
+                                                >
+                                                    + Quick Add
+                                                </button>
+                                            </div>
+                                            <select
+                                                name="designation"
+                                                value={formData.designation}
+                                                onChange={onChange}
+                                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all"
+                                            >
+                                                <option value="">Select Designation</option>
+                                                {designations.map(d => (
+                                                    <option key={d._id} value={d.name}>{d.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Industry</label>
+                                            <input
+                                                type="text"
+                                                name="industry"
+                                                value={formData.industry}
+                                                onChange={onChange}
+                                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none"
+                                                placeholder="e.g. Manufacturing, Retail"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">GST Number</label>
+                                            <input
+                                                type="text"
+                                                name="gstin"
+                                                value={formData.gstin}
+                                                onChange={onChange}
+                                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none uppercase font-mono"
+                                                placeholder="27AAAAA0000A1Z5"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Website</label>
+                                            <input
+                                                type="url"
+                                                name="website"
+                                                value={formData.website}
+                                                onChange={onChange}
+                                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none"
+                                                placeholder="https://company.com"
+                                            />
+                                        </div>
                                     </div>
                                 </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Customer Type</label>
-                                        <select
-                                            name="customerType"
-                                            value={formData.customerType}
-                                            onChange={onChange}
-                                            className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all"
-                                        >
-                                            <option value="">Select Type</option>
-                                            {CUSTOMER_TYPES.map((t) => (
-                                                <option key={t} value={t}>{t}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Last Interaction Date</label>
-                                        <input
-                                            type="date"
-                                            name="lastInteractionDate"
-                                            value={formData.lastInteractionDate}
-                                            onChange={onChange}
-                                            className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none"
-                                        />
+
+                                {/* SECTION 3: COMMUNICATION */}
+                                <div className="space-y-4">
+                                    <h3 className="font-outfit font-black text-sm text-primary-600 uppercase tracking-widest border-b border-slate-100 pb-2 flex items-center gap-2">
+                                        <span>📞</span> Communication Details
+                                    </h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Primary Mobile</label>
+                                            <input
+                                                type="text"
+                                                name="phone"
+                                                value={formData.phone}
+                                                onChange={onChange}
+                                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none"
+                                                placeholder="+91 9876543210"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Alternate Mobile</label>
+                                            <input
+                                                type="text"
+                                                name="alternatePhone"
+                                                value={formData.alternatePhone}
+                                                onChange={onChange}
+                                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none"
+                                                placeholder="Alternate mobile"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">WhatsApp Number</label>
+                                            <input
+                                                type="text"
+                                                name="whatsappNumber"
+                                                value={formData.whatsappNumber}
+                                                onChange={onChange}
+                                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none"
+                                                placeholder="WhatsApp number"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Email</label>
+                                            <input
+                                                type="email"
+                                                name="email"
+                                                value={formData.email}
+                                                onChange={onChange}
+                                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none"
+                                                placeholder="contact@company.com"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Alternate Email</label>
+                                            <input
+                                                type="email"
+                                                name="alternateEmail"
+                                                value={formData.alternateEmail}
+                                                onChange={onChange}
+                                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none"
+                                                placeholder="alternate@company.com"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Office Phone</label>
+                                            <input
+                                                type="text"
+                                                name="officePhone"
+                                                value={formData.officePhone}
+                                                onChange={onChange}
+                                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none"
+                                                placeholder="020-12345678"
+                                            />
+                                        </div>
                                     </div>
                                 </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Notes</label>
-                                    <textarea
-                                        name="notes"
-                                        value={formData.notes}
-                                        onChange={onChange}
-                                        className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none min-h-24"
-                                        placeholder="Any notes or remarks"
-                                    />
+
+                                {/* SECTION 4: ADDRESS INFORMATION */}
+                                <div className="space-y-4">
+                                    <h3 className="font-outfit font-black text-sm text-primary-600 uppercase tracking-widest border-b border-slate-100 pb-2 flex items-center gap-2">
+                                        <span>📍</span> Address Information
+                                    </h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Country</label>
+                                            <input
+                                                type="text"
+                                                name="country"
+                                                value={formData.country}
+                                                onChange={onChange}
+                                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none"
+                                                placeholder="India"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">State</label>
+                                            <input
+                                                type="text"
+                                                name="state"
+                                                value={formData.state}
+                                                onChange={onChange}
+                                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none"
+                                                placeholder="Maharashtra"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">City</label>
+                                            <input
+                                                type="text"
+                                                name="city"
+                                                value={formData.city}
+                                                onChange={onChange}
+                                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none"
+                                                placeholder="Pune"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">PIN Code</label>
+                                            <input
+                                                type="text"
+                                                name="pincode"
+                                                value={formData.pincode}
+                                                onChange={onChange}
+                                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none"
+                                                placeholder="411001"
+                                            />
+                                        </div>
+                                        <div className="md:col-span-2 space-y-2">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Address Line 1</label>
+                                            <input
+                                                type="text"
+                                                name="addressLine1"
+                                                value={formData.addressLine1}
+                                                onChange={onChange}
+                                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none"
+                                                placeholder="Building, Street, Landmark"
+                                            />
+                                        </div>
+                                        <div className="md:col-span-2 space-y-2">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Address Line 2</label>
+                                            <input
+                                                type="text"
+                                                name="addressLine2"
+                                                value={formData.addressLine2}
+                                                onChange={onChange}
+                                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none"
+                                                placeholder="Area, Locality"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* SECTION 5: CLASSIFICATION & NOTES */}
+                                <div className="space-y-4">
+                                    <h3 className="font-outfit font-black text-sm text-primary-600 uppercase tracking-widest border-b border-slate-100 pb-2 flex items-center gap-2">
+                                        <span>📝</span> Classification & Notes
+                                    </h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Customer Type</label>
+                                            <select
+                                                name="customerType"
+                                                value={formData.customerType}
+                                                onChange={onChange}
+                                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all"
+                                            >
+                                                <option value="">Select Type</option>
+                                                {CUSTOMER_TYPES.map((t) => (
+                                                    <option key={t} value={t}>{t}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Last Interaction Date</label>
+                                            <input
+                                                type="date"
+                                                name="lastInteractionDate"
+                                                value={formData.lastInteractionDate ? formData.lastInteractionDate.split('T')[0] : ''}
+                                                onChange={onChange}
+                                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Remarks / Notes</label>
+                                        <textarea
+                                            name="notes"
+                                            value={formData.notes}
+                                            onChange={onChange}
+                                            className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none min-h-24"
+                                            placeholder="Enter any notes, background context, or remarks..."
+                                        />
+                                    </div>
                                 </div>
                             </form>
                         </div>

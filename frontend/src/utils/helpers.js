@@ -148,3 +148,17 @@ export const getPlaceholderImage = (seed, type = "shapes") => {
   }
   return `https://api.dicebear.com/7.x/shapes/svg?seed=${encodedSeed}&backgroundColor=f1f5f9`;
 };
+
+/**
+ * Format GST Prefix / Single digit State Code with leading zero (e.g., 4 -> 04, 1 -> 01, 27 -> 27)
+ */
+export const formatGstPrefix = (val) => {
+  if (val === null || val === undefined || val === '') return '';
+  const str = String(val).trim();
+  if (!str) return '';
+  if (/^\d{1,2}$/.test(str)) {
+    return str.padStart(2, '0');
+  }
+  return str;
+};
+

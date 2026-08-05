@@ -24,6 +24,7 @@ router.put('/tickets/:id', protect, ticketController.updateTicket);
 router.patch('/tickets/:id/assign', protect, ticketController.assignTicket);
 router.patch('/tickets/:id/status', protect, ticketController.updateStatus);
 router.post('/tickets/:id/comments', protect, ticketController.addComment);
+router.post('/tickets/:id/reassign', protect, ticketController.reassignTicket);
 router.patch('/tickets/:id/escalate', protect, ticketController.escalateTicket);
 router.post('/tickets/:id/feedback', protect, ticketController.submitFeedback);
 

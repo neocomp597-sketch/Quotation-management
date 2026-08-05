@@ -603,6 +603,87 @@ exports.assignTicket = async (req, res) => {
     }
 };
 
+exports.reassignTicket = async (req, res) => {
+    try {
+        const { toEngineerId, reason, notes } = req.body;
+        const companyId = req.user?.companyId;
+
+        if (!toEngineerId || !reason) {
+            return res.status(400).json({ message: 'Target engineer and reassignment reason are required' });
+        }
+
+        const validReasons = ['Leave', 'Sick', 'Emergency', 'Workload', 'Other'];
+        if (!validReasons.includes(reason)) {
+            return res.status(400).json({ message: `Reason must be one of: ${validReasons.join(', ')}` });
+        }
+
+        const ticket = await Ticket.findOne({ _id: req.params.id, companyId });
+        if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
+
+        const Engineer = require('../models/Engineer');
+        const Notification = require('../models/Notification');
+
+        let fromEngineerName = 'Unassigned';
+        if (ticket.assignedEngineerId) {
+            const oldEng = await Engineer.findById(ticket.assignedEngineerId).select('name').lean();
+            if (oldEng) fromEngineerName = oldEng.name;
+        }
+
+        const targetEng = await Engineer.findById(toEngineerId).select('name userId').lean();
+        if (!targetEng) {
+            return res.status(404).json({ message: 'Selected target engineer not found' });
+        }
+
+        const fromEngineerId = ticket.assignedEngineerId;
+        ticket.assignedEngineerId = targetEng._id;
+        ticket.status = 'Assigned';
+
+        const reassignmentRecord = {
+            fromEngineerId,
+            fromEngineerName,
+            toEngineerId: targetEng._id,
+            toEngineerName: targetEng.name,
+            reason,
+            notes: notes || '',
+            reassignedBy: req.user?.id,
+            reassignedByName: req.user?.name || 'User',
+            reassignedAt: new Date()
+        };
+
+        ticket.reassignmentHistory.push(reassignmentRecord);
+
+        const timelineDesc = `Ticket reassigned from ${fromEngineerName} to ${targetEng.name}. Reason: ${reason}${notes ? ` (${notes})` : ''}`;
+        ticket.timeline.push({
+            activityType: 'Reassigned',
+            description: timelineDesc,
+            performedBy: req.user?.id
+        });
+
+        await ticket.save();
+
+        // Send notification to new engineer if assigned user exists
+        if (targetEng.userId) {
+            try {
+                await Notification.create({
+                    user: targetEng.userId,
+                    companyId,
+                    type: 'SYSTEM',
+                    title: `Ticket Reassigned: ${ticket.ticketNo}`,
+                    message: `Complaint '${ticket.issueTitle}' has been reassigned to you. Reason: ${reason}`
+                });
+            } catch (nErr) {
+                console.warn('Failed to send notification for ticket reassignment:', nErr);
+            }
+        }
+
+        broadcastCrmUpdate('TICKET', 'UPDATE', ticket);
+        res.json({ success: true, message: 'Ticket reassigned successfully', ticket });
+    } catch (error) {
+        console.error('Reassign ticket error:', error);
+        res.status(500).json({ message: error.message || 'Error reassigning ticket' });
+    }
+};
+
 exports.updateStatus = async (req, res) => {
     try {
         const { status, isFirstCallResolved } = req.body;

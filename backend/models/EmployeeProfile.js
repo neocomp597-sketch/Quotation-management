@@ -28,10 +28,14 @@ const KraSchema = new mongoose.Schema({
 }, { _id: true });
 
 const FamilyMemberSchema = new mongoose.Schema({
-    relation: { type: String, enum: ['Father', 'Mother', 'Spouse', 'Child', 'Sibling', 'Other'], default: 'Other' },
+    relation: { type: String, enum: ['Father', 'Mother', 'Spouse', 'Wife', 'Husband', 'Child', 'Son', 'Daughter', 'Sibling', 'Other'], default: 'Other' },
     name: { type: String, trim: true, default: '' },
     contactNumber: { type: String, trim: true, default: '' },
     aadhaarNumber: { type: String, trim: true, default: '' },
+    panNumber: { type: String, trim: true, uppercase: true, default: '' },
+    email: { type: String, trim: true, lowercase: true, default: '' },
+    dob: { type: Date, default: null },
+    gender: { type: String, enum: ['Male', 'Female', 'Other'], default: 'Male' },
     isEmergencyContact: { type: Boolean, default: false }
 }, { _id: true });
 

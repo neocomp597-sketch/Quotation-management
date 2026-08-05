@@ -36,7 +36,7 @@ const CreateVoucher = ({ mode = 'grn', isViewOnly = false }) => {
 
     // Form state
     const [voucherData, setVoucherData] = useState({
-        voucherType: isInvoiceMode ? 'Invoice' : 'Purchase',
+        voucherType: isInvoiceMode ? 'Invoice' : 'Invoice Voucher',
         voucherNumber: `${isInvoiceMode ? 'INV' : 'GRN'}-${Date.now()}`,
         date: new Date().toISOString().split('T')[0],
         vendorId: '',

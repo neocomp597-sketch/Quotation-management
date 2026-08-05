@@ -4,6 +4,7 @@ import { stateMasterService } from '../services/api';
 import { toast } from 'react-toastify';
 import { MdAdd, MdSearch, MdEdit, MdDelete, MdArrowBack, MdPublic, MdLocationCity, MdPhoneInTalk } from 'react-icons/md';
 import { DEFAULT_COUNTRIES, DEFAULT_STATES, getCitiesForState, getDialCodeForCountry } from '../constants/locationData';
+import { formatGstPrefix } from '../utils/helpers';
 
 const StateMaster = ({ isCreatePage, isEditPage }) => {
     const navigate = useNavigate();
@@ -168,8 +169,9 @@ const StateMaster = ({ isCreatePage, isEditPage }) => {
         setFormData(prev => ({
             ...prev,
             state: val,
+            dialCode: prev.dialCode || '+91',
             shortCode: match ? match.shortCode : prev.shortCode,
-            gstCode: match ? (match.gstCode || '') : prev.gstCode,
+            gstCode: match ? formatGstPrefix(match.gstCode) : prev.gstCode,
             city: ''
         }));
     };
@@ -182,6 +184,7 @@ const StateMaster = ({ isCreatePage, isEditPage }) => {
             setFormData(prev => ({
                 ...prev,
                 state: '',
+                dialCode: '+91',
                 shortCode: '',
                 gstCode: '',
                 city: ''
@@ -194,8 +197,9 @@ const StateMaster = ({ isCreatePage, isEditPage }) => {
             setFormData(prev => ({
                 ...prev,
                 state: val,
+                dialCode: prev.dialCode || '+91',
                 shortCode: match ? match.shortCode : '',
-                gstCode: match ? (match.gstCode || '') : '',
+                gstCode: match ? formatGstPrefix(match.gstCode) : '',
                 city: ''
             }));
         }
@@ -336,18 +340,7 @@ const StateMaster = ({ isCreatePage, isEditPage }) => {
                 ) : (
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse">
-                            <thead>
-                                <tr className="border-b border-slate-100 bg-slate-50/50 text-[10px] font-black uppercase text-slate-400 tracking-widest">
-                                    <th className="py-4 px-6">Country</th>
-                                    <th className="py-4 px-6">Dial Code</th>
-                                    <th className="py-4 px-6">State / Union Territory</th>
-                                    <th className="py-4 px-6">City</th>
-                                    <th className="py-4 px-6">Short Code</th>
-                                    <th className="py-4 px-6">GST Code</th>
-                                    <th className="py-4 px-6">Status</th>
-                                    <th className="py-4 px-6 text-center">Actions</th>
-                                </tr>
-                            </thead>
+                            {/* Table headers removed as requested */}
                             <tbody className="divide-y divide-slate-100 text-sm font-semibold">
                                 {filteredStates.map((item) => (
                                     <tr key={item._id} className="hover:bg-slate-50/60 transition-all">
@@ -371,7 +364,7 @@ const StateMaster = ({ isCreatePage, isEditPage }) => {
                                         </td>
                                         <td className="py-4 px-6">
                                             <span className="font-mono bg-slate-50 text-slate-700 px-3 py-1 rounded-xl text-xs font-black border border-slate-200">
-                                                {item.gstCode || '-'}
+                                                {formatGstPrefix(item.gstCode) || '-'}
                                             </span>
                                         </td>
                                         <td className="py-4 px-6">
@@ -574,9 +567,10 @@ const StateMaster = ({ isCreatePage, isEditPage }) => {
                                         <input
                                             type="text"
                                             maxLength={2}
-                                            placeholder="e.g. 27"
+                                            placeholder="e.g. 04, 27"
                                             value={formData.gstCode}
                                             onChange={(e) => setFormData({ ...formData, gstCode: e.target.value.replace(/\D/g, '') })}
+                                            onBlur={(e) => setFormData(prev => ({ ...prev, gstCode: formatGstPrefix(e.target.value) }))}
                                             className="w-full px-4 py-3.5 rounded-2xl border border-slate-200 bg-slate-50 text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-bold"
                                         />
                                     </div>

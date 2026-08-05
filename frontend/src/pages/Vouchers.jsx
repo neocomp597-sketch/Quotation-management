@@ -7,8 +7,12 @@ import { formatDate } from '../utils/helpers';
 import { pdf } from '@react-pdf/renderer';
 import VoucherPDF from '../components/VoucherPDF';
 
+import { useAuth } from '../context/AuthContext';
+
 const Vouchers = ({ mode = 'grn' }) => {
     const navigate = useNavigate();
+    const { user } = useAuth();
+    const isVendorUser = user?.role === 'vendor' || String(user?.role || '').toLowerCase() === 'vendor';
     const isInvoiceMode = mode === 'invoice';
     const basePath = isInvoiceMode ? '/invoices' : '/grn';
     const [vouchers, setVouchers] = useState([]);
@@ -90,16 +94,18 @@ const Vouchers = ({ mode = 'grn' }) => {
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-black text-slate-900 tracking-tight">{isInvoiceMode ? 'Create Invoice' : 'GRN'}</h1>
-                    <p className="text-slate-500 font-medium">{isInvoiceMode ? 'Sales outward, customer billing and stock deduction' : 'Material inward, purchase and sale return management'}</p>
+                    <h1 className="text-3xl font-black text-slate-900 tracking-tight">{isInvoiceMode ? 'Sales Invoice' : 'Invoice Voucher'}</h1>
+                    <p className="text-slate-500 font-medium">{isInvoiceMode ? 'Sales outward, customer billing and stock deduction' : 'Material inward, vendor invoice vouchers, and return management'}</p>
                 </div>
-                <Link
-                    to={`${basePath}/new`}
-                    className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
-                >
-                    <MdAdd size={20} />
-                    <span>{isInvoiceMode ? 'New Invoice' : 'New GRN Entry'}</span>
-                </Link>
+                {!isVendorUser && (
+                    <Link
+                        to={`${basePath}/new`}
+                        className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
+                    >
+                        <MdAdd size={20} />
+                        <span>{isInvoiceMode ? 'New Invoice' : 'New GRN Entry'}</span>
+                    </Link>
+                )}
             </div>
 
             <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
@@ -171,13 +177,15 @@ const Vouchers = ({ mode = 'grn' }) => {
                                                     >
                                                         <MdVisibility size={20} />
                                                     </button>
-                                                    <button
-                                                        onClick={() => navigate(`${basePath}/${v._id}`)}
-                                                        className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
-                                                        title="Edit voucher"
-                                                    >
-                                                        <MdEdit size={20} />
-                                                    </button>
+                                                    {!isVendorUser && (
+                                                        <button
+                                                            onClick={() => navigate(`${basePath}/${v._id}`)}
+                                                            className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
+                                                            title="Edit voucher"
+                                                        >
+                                                            <MdEdit size={20} />
+                                                        </button>
+                                                    )}
                                                     <button
                                                         onClick={() => handleDownloadPdf(v)}
                                                         disabled={downloadingPdfId === v._id}
@@ -186,13 +194,15 @@ const Vouchers = ({ mode = 'grn' }) => {
                                                     >
                                                         <MdPrint size={20} />
                                                     </button>
-                                                    <button
-                                                        onClick={() => handleDelete(v._id)}
-                                                        className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
-                                                        title="Delete voucher"
-                                                    >
-                                                        <MdDelete size={20} />
-                                                    </button>
+                                                    {!isVendorUser && (
+                                                        <button
+                                                            onClick={() => handleDelete(v._id)}
+                                                            className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                                                            title="Delete voucher"
+                                                        >
+                                                            <MdDelete size={20} />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>

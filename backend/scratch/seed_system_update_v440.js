@@ -14,7 +14,7 @@ async function seedV440Update() {
             title: "Customer Service Reporting Hierarchy, Ticket Visibility & System Updates Sync",
             message: "We have integrated the Organization Chart reporting hierarchy into Customer Service, added 'My Complaints' and 'My Team Complaints' ticket visibility rules, ensured automatic redirection after raising tickets, and updated full role authorization module controls.",
             releaseNotes: [
-                "CSM Reporting Hierarchy Integration: Customer Service now uses the exact reporting hierarchy configured in the CRM / Org Chart (Rajshri -> Rohit -> Ashok -> Hamza).",
+                "CSM Reporting Hierarchy Integration: Customer Service now uses the exact reporting hierarchy configured in the CRM / Org Chart.",
                 "My Complaints View: Displays only the logged-in user's own tickets (tab=my).",
                 "My Team Complaints View: Displays tickets of all direct and indirect reportees in the reporting hierarchy (tab=team).",
                 "All Complaints View: Admin & Manager users can access organization-wide ticket visibility (tab=all).",

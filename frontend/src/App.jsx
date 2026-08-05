@@ -35,6 +35,7 @@ import StatusMaster from './pages/StatusMaster';
 import TerritoryMaster from './pages/TerritoryMaster';
 import BranchMaster from './pages/BranchMaster';
 import StateMaster from './pages/StateMaster';
+import CityMaster from './pages/CityMaster';
 import SerialNoMaster from './pages/SerialNoMaster';
 import Contacts from './pages/Contacts';
 import Contact360Workspace from './pages/Contact360Workspace';
@@ -190,6 +191,10 @@ function App() {
             <Route path="/state-master" element={<PermissionRoute permissionKey="master_branches"><Layout><StateMaster /></Layout></PermissionRoute>} />
             <Route path="/state-master/new" element={<PermissionRoute permissionKey="master_branches"><Layout><StateMaster isCreatePage={true} /></Layout></PermissionRoute>} />
             <Route path="/state-master/edit/:id" element={<PermissionRoute permissionKey="master_branches"><Layout><StateMaster isEditPage={true} /></Layout></PermissionRoute>} />
+            <Route path="/city-master" element={<PermissionRoute permissionKey="master_branches"><Layout><CityMaster /></Layout></PermissionRoute>} />
+            <Route path="/city-master/new" element={<PermissionRoute permissionKey="master_branches"><Layout><CityMaster isCreatePage={true} /></Layout></PermissionRoute>} />
+            <Route path="/city-master/edit/:id" element={<PermissionRoute permissionKey="master_branches"><Layout><CityMaster isEditPage={true} /></Layout></PermissionRoute>} />
+            <Route path="/masters/city" element={<PermissionRoute permissionKey="master_branches"><Layout><CityMaster /></Layout></PermissionRoute>} />
             <Route path="/serial-no-master" element={<PermissionRoute permissionKey="master_serials"><Layout><SerialNoMaster /></Layout></PermissionRoute>} />
             <Route path="/flowcharts" element={<PermissionRoute permissionKey="flowchart_view"><Layout><Flowcharts /></Layout></PermissionRoute>} />
             <Route path="/settings" element={<PermissionRoute permissionKey="settings_profile"><Layout><Settings /></Layout></PermissionRoute>} />

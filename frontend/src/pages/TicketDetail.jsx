@@ -43,6 +43,33 @@ const TicketDetail = () => {
     const [visitEngineer, setVisitEngineer] = useState('');
     const [activeVisit, setActiveVisit] = useState(null);
 
+    // Complaint Reassignment Form
+    const [showReassignModal, setShowReassignModal] = useState(false);
+    const [reassignEngineer, setReassignEngineer] = useState('');
+    const [reassignReason, setReassignReason] = useState('Leave');
+    const [reassignNotes, setReassignNotes] = useState('');
+
+    const handleReassignSubmit = async (e) => {
+        if (e) e.preventDefault();
+        if (!reassignEngineer) {
+            toast.error('Please select an engineer to reassign complaint');
+            return;
+        }
+        try {
+            await csmService.reassignTicket(id, {
+                toEngineerId: reassignEngineer,
+                reason: reassignReason,
+                notes: reassignNotes
+            });
+            toast.success('Complaint reassigned successfully!');
+            setShowReassignModal(false);
+            setReassignNotes('');
+            fetchTicketDetails();
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Reassignment failed');
+        }
+    };
+
     const fetchTicketDetails = async () => {
         try {
             const res = await csmService.getTicketById(id);
@@ -462,6 +489,18 @@ const TicketDetail = () => {
                                 <MdSave size={16} />
                                 {isAssigning ? 'Updating...' : 'Update Assignee'}
                             </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setReassignEngineer(ticket.assignedEngineerId?._id || '');
+                                    setReassignReason('Leave');
+                                    setShowReassignModal(true);
+                                }}
+                                className="w-full flex items-center justify-center gap-2 py-3 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all mt-2"
+                            >
+                                <MdAssignment size={16} />
+                                <span>Reassign Complaint</span>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -749,6 +788,82 @@ const TicketDetail = () => {
                                 </select>
                             );
                         })()}
+                    </div>
+                </form>
+            </Modal>
+
+            {/* Reassign Complaint Modal */}
+            <Modal
+                isOpen={showReassignModal}
+                onClose={() => setShowReassignModal(false)}
+                title="Reassign Complaint"
+                footer={
+                    <div className="flex items-center justify-end gap-3 w-full">
+                        <button
+                            type="button"
+                            onClick={() => setShowReassignModal(false)}
+                            className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold uppercase text-xs hover:bg-slate-50 transition-all"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            form="reassign-complaint-form"
+                            className="px-6 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-black uppercase text-xs tracking-widest rounded-xl transition-all shadow-md active:scale-95"
+                        >
+                            Reassign Ticket
+                        </button>
+                    </div>
+                }
+            >
+                <form id="reassign-complaint-form" onSubmit={handleReassignSubmit} className="space-y-4">
+                    <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Original Engineer</label>
+                        <input
+                            type="text"
+                            disabled
+                            value={ticket.assignedEngineerId?.name || 'Unassigned'}
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-bold bg-slate-100 text-slate-600"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Select New Service Engineer *</label>
+                        <select
+                            required
+                            value={reassignEngineer}
+                            onChange={(e) => setReassignEngineer(e.target.value)}
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
+                        >
+                            <option value="">-- Select New Engineer --</option>
+                            {engineers.map(u => (
+                                <option key={u._id} value={u._id}>{u.name} ({u.status || 'Active'})</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Reassignment Reason *</label>
+                        <select
+                            required
+                            value={reassignReason}
+                            onChange={(e) => setReassignReason(e.target.value)}
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
+                        >
+                            <option value="Leave">Leave</option>
+                            <option value="Sick">Sick</option>
+                            <option value="Emergency">Emergency</option>
+                            <option value="Workload">Workload</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Additional Notes</label>
+                        <textarea
+                            rows={3}
+                            placeholder="Enter any transfer notes or context..."
+                            value={reassignNotes}
+                            onChange={(e) => setReassignNotes(e.target.value)}
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-medium"
+                        />
                     </div>
                 </form>
             </Modal>

@@ -47,7 +47,7 @@ router.post('/employees', checkAdmin, payrollController.createEmployee);
 router.post('/employees/sync-users', checkAdmin, payrollController.syncEmployeeUsers);
 router.post('/employees/batch-assign-branch-id', checkAdmin, payrollController.batchAssignBranchAndEmployeeId);
 router.post('/employees/vacant-position', checkAdmin, payrollController.createVacantPosition);
-router.put('/employees/:id/reporting', payrollController.updateReportingManager);
+router.put('/employees/:id/reporting', checkAdmin, payrollController.updateReportingManager);
 router.put('/employees/:id/kra', payrollController.updateEmployeeKra);
 router.put('/employees/:id/structure', checkAdmin, payrollController.updateEmployeeStructure);
 router.get('/employees/:id', checkAdmin, payrollController.getEmployee);

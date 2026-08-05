@@ -9,6 +9,11 @@ const VendorSchema = new mongoose.Schema(
         email: { type: String, trim: true, lowercase: true, default: '' },
         address: { type: String, trim: true, default: '' },
         gstin: { type: String, trim: true, default: '' },
+        loginEnabled: { type: Boolean, default: false },
+        username: { type: String, trim: true, lowercase: true, default: '' },
+        passwordHash: { type: String, default: '' },
+        vendorUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        lastLogin: { type: Date, default: null },
         isActive: { type: Boolean, default: true }
     },
     { timestamps: true }

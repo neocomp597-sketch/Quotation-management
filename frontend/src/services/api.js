@@ -742,6 +742,7 @@ export const csmService = {
   updateTicketStatus: (id, status, isFirstCallResolved) => api.patch(`/csm/tickets/${id}/status`, { status, isFirstCallResolved }),
   getReportData: (params = {}) => api.get("/csm/reports", { params }),
   addComment: (id, data) => api.post(`/csm/tickets/${id}/comments`, data),
+  reassignTicket: (id, data) => api.post(`/csm/tickets/${id}/reassign`, data),
   escalateTicket: (id) => api.patch(`/csm/tickets/${id}/escalate`),
   submitFeedback: (id, data) => api.post(`/csm/tickets/${id}/feedback`, data),
 
@@ -928,6 +929,14 @@ export const stateMasterService = {
   create: (data) => api.post("/state-master", data),
   update: (id, data) => api.put(`/state-master/${id}`, data),
   delete: (id) => api.delete(`/state-master/${id}`),
+};
+
+export const cityMasterService = {
+  getAll: (params) => api.get("/city-master", { params }),
+  getById: (id) => api.get(`/city-master/${id}`),
+  create: (data) => api.post("/city-master", data),
+  update: (id, data) => api.put(`/city-master/${id}`, data),
+  delete: (id) => api.delete(`/city-master/${id}`),
 };
 
 export const flowchartService = {

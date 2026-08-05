@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
     MdDashboard,
@@ -25,6 +25,7 @@ import {
     MdCalendarMonth,
     MdLock,
     MdMap,
+    MdLocationCity,
     MdBusiness,
     MdAdminPanelSettings,
     MdNewReleases,
@@ -49,7 +50,7 @@ import { resolveImageUrl } from '../utils/helpers';
 
 const Sidebar = ({ isOpen, toggleSidebar }) => {
     const location = useLocation();
-    const { isAdmin, isSuperAdmin, hasAccess } = useAuth();
+    const { user, isAdmin, isSuperAdmin, hasAccess } = useAuth();
 
     const [expanded, setExpanded] = useState({});
     const [brandSettings, setBrandSettings] = useState(null);
@@ -101,7 +102,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
         });
     };
 
-    const menuStructure = [
+    const menuStructure = useMemo(() => [
         {
             type: 'link',
             key: 'dashboard_overview',
@@ -127,6 +128,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                 { key: 'master_territories', name: 'Territory Master', icon: <MdMap size={18} />, path: '/territory-master' },
                 { key: 'master_branches', name: 'Branch Master', icon: <MdBusiness size={18} />, path: '/branches' },
                 { key: 'master_branches', name: 'State Master', icon: <MdMap size={18} />, path: '/state-master' },
+                { key: 'master_branches', name: 'City Master', icon: <MdLocationCity size={18} />, path: '/city-master' },
                 { key: 'csm_masters', name: 'Engineers Master', icon: <MdBuildCircle size={18} />, path: '/csm/masters?tab=engineers' },
                 { key: 'master_mgrs', name: 'MGR Master', icon: <MdCategory size={18} />, path: '/mgrs' },
                 { key: 'master_attributes', name: 'Attributes', icon: <MdAssignment size={18} />, path: '/attributes' },
@@ -314,23 +316,34 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                 { key: 'super_admin_console', name: 'Super Admin', icon: <MdAdminPanelSettings size={18} />, path: '/super-admin', superAdminOnly: true },
             ],
         }] : []),
-    ].map((item) => {
-        if (item.type !== 'group') return item;
+    ], [isAdmin, isSuperAdmin]);
 
-        return {
-            ...item,
-            children: item.children.filter((child) => {
-                if (child.superAdminOnly) return isSuperAdmin;
-                return child.adminOnly ? (isAdmin || isSuperAdmin) : hasAccess(child.key);
-            }),
-        };
-    }).filter((item) => {
-        if (item.type === 'link') {
-            if (item.superAdminOnly) return isSuperAdmin;
-            return item.adminOnly ? (isAdmin || isSuperAdmin) : hasAccess(item.key);
+    const filteredMenuStructure = useMemo(() => {
+        if (user?.role === 'vendor' || String(user?.role || '').toLowerCase() === 'vendor') {
+            return [
+                { type: 'link', key: 'master_products', name: 'Product Catalog', icon: <MdInventory size={20} />, path: '/products' },
+                { type: 'link', key: 'voucher_list', name: 'Invoice Vouchers', icon: <MdReceipt size={20} />, path: '/vouchers' }
+            ];
         }
-        return item.children.length > 0 || hasAccess(item.key);
-    });
+
+        return menuStructure.map((item) => {
+            if (item.type !== 'group') return item;
+
+            return {
+                ...item,
+                children: item.children.filter((child) => {
+                    if (child.superAdminOnly) return isSuperAdmin;
+                    return child.adminOnly ? (isAdmin || isSuperAdmin) : hasAccess(child.key);
+                }),
+            };
+        }).filter((item) => {
+            if (item.type === 'link') {
+                if (item.superAdminOnly) return isSuperAdmin;
+                return item.adminOnly ? (isAdmin || isSuperAdmin) : hasAccess(item.key);
+            }
+            return item.children.length > 0 || hasAccess(item.key);
+        });
+    }, [user, menuStructure, isSuperAdmin, isAdmin, hasAccess]);
 
     const getAutoExpanded = (key, children) => {
         if (expanded[key] !== undefined) return expanded[key];
@@ -386,7 +399,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                 </div>
 
                 <nav className="flex-1 overflow-y-auto overflow-x-hidden py-4 px-3 space-y-1 custom-scrollbar">
-                    {menuStructure.map((item) => {
+                    {filteredMenuStructure.map((item) => {
                         if (item.type === 'link') {
                             return (
                                 <NavLink

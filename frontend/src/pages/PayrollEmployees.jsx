@@ -73,7 +73,7 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
         setBasicForm(prev => {
             const newDetails = [
                 ...(prev.familyDetails || []),
-                { relation: 'Father', name: '', contactNumber: '', aadhaarNumber: '', isEmergencyContact: false }
+                { relation: 'Father', name: '', contactNumber: '', aadhaarNumber: '', panNumber: '', email: '', dob: '', gender: 'Male', isEmergencyContact: false }
             ];
             const newIdx = newDetails.length - 1;
             setOpenFamilyCards(cardPrev => ({ ...cardPrev, [newIdx]: true }));
@@ -89,6 +89,8 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                 val = value.replace(/\D/g, '').slice(0, 10);
             } else if (field === 'aadhaarNumber') {
                 val = value.replace(/\D/g, '').slice(0, 12);
+            } else if (field === 'panNumber') {
+                val = value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10);
             }
             updated[index] = { ...updated[index], [field]: val };
             return { ...prev, familyDetails: updated };
@@ -354,13 +356,36 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
             }
         }
 
-        // 8. Family Member Aadhaar validation
+        // 8. Family Member validations
         if (Array.isArray(form.familyDetails)) {
             form.familyDetails.forEach((fam, idx) => {
+                const label = fam.name ? `${fam.relation} (${fam.name})` : `${fam.relation || 'Member'} ${idx + 1}`;
                 if (fam.aadhaarNumber && fam.aadhaarNumber.trim()) {
                     const cleanFamAadhaar = fam.aadhaarNumber.trim().replace(/\D/g, '');
                     if (cleanFamAadhaar.length !== 12) {
-                        errors[`family_aadhaar_${idx}`] = `Aadhaar number for ${fam.name || fam.relation || 'Family Member ' + (idx + 1)} must be exactly 12 digits.`;
+                        errors[`family_aadhaar_${idx}`] = `Aadhaar number for ${label} must be exactly 12 digits.`;
+                    }
+                }
+                if (fam.contactNumber && fam.contactNumber.trim()) {
+                    const cleanMobile = fam.contactNumber.trim().replace(/\D/g, '');
+                    if (cleanMobile.length !== 10) {
+                        errors[`family_mobile_${idx}`] = `Mobile number for ${label} must be 10 digits.`;
+                    }
+                }
+                if (fam.panNumber && fam.panNumber.trim()) {
+                    const cleanPan = fam.panNumber.trim().toUpperCase();
+                    if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(cleanPan)) {
+                        errors[`family_pan_${idx}`] = `PAN for ${label} must be valid format (e.g. ABCDE1234F).`;
+                    }
+                }
+                if (fam.email && fam.email.trim()) {
+                    if (!/^\S+@\S+\.\S+$/.test(fam.email.trim())) {
+                        errors[`family_email_${idx}`] = `Email for ${label} is invalid.`;
+                    }
+                }
+                if (fam.dob) {
+                    if (new Date(fam.dob) > new Date()) {
+                        errors[`family_dob_${idx}`] = `DOB for ${label} cannot be a future date.`;
                     }
                 }
             });
@@ -1182,7 +1207,8 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                                                     {/* Per-Entry Form Card Content */}
                                                                     {isCardOpen && (
                                                                         <div className="p-4 space-y-4 bg-white">
-                                                                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                                                {/* Row 1: Relation & Name */}
                                                                                 <div>
                                                                                     <label className={labelClass}>Relation *</label>
                                                                                     <select
@@ -1193,14 +1219,18 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                                                                         <option value="Father">Father</option>
                                                                                         <option value="Mother">Mother</option>
                                                                                         <option value="Spouse">Spouse</option>
+                                                                                        <option value="Wife">Wife</option>
+                                                                                        <option value="Husband">Husband</option>
                                                                                         <option value="Child">Child</option>
+                                                                                        <option value="Son">Son</option>
+                                                                                        <option value="Daughter">Daughter</option>
                                                                                         <option value="Sibling">Sibling</option>
                                                                                         <option value="Other">Other</option>
                                                                                     </select>
                                                                                 </div>
 
                                                                                 <div>
-                                                                                    <label className={labelClass}>Name *</label>
+                                                                                    <label className={labelClass}>Full Name *</label>
                                                                                     <input
                                                                                         type="text"
                                                                                         placeholder="Family member full name"
@@ -1210,16 +1240,20 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                                                                     />
                                                                                 </div>
 
+                                                                                {/* Row 2: Mobile Number & Aadhaar Number */}
                                                                                 <div>
-                                                                                    <label className={labelClass}>Contact Number</label>
+                                                                                    <label className={labelClass}>Mobile Number</label>
                                                                                     <input
                                                                                         type="text"
                                                                                         maxLength={10}
-                                                                                        placeholder="e.g. 9876543210"
+                                                                                        placeholder="10-digit mobile number"
                                                                                         value={fam.contactNumber || ''}
                                                                                         onChange={(e) => handleUpdateFamilyMember(idx, 'contactNumber', e.target.value)}
-                                                                                        className={inputClass}
+                                                                                        className={`${inputClass} ${formErrors[`family_mobile_${idx}`] ? 'border-rose-500 ring-2 ring-rose-500/20' : ''}`}
                                                                                     />
+                                                                                    {formErrors[`family_mobile_${idx}`] && (
+                                                                                        <p className="text-[11px] font-semibold text-rose-500 mt-1">{formErrors[`family_mobile_${idx}`]}</p>
+                                                                                    )}
                                                                                 </div>
 
                                                                                 <div>
@@ -1227,20 +1261,77 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                                                                     <input
                                                                                         type="text"
                                                                                         maxLength={12}
-                                                                                        placeholder="e.g. 123456789012"
+                                                                                        placeholder="12-digit Aadhaar number"
                                                                                         value={fam.aadhaarNumber || ''}
                                                                                         onChange={(e) => handleUpdateFamilyMember(idx, 'aadhaarNumber', e.target.value)}
                                                                                         className={`${inputClass} ${formErrors[`family_aadhaar_${idx}`] ? 'border-rose-500 ring-2 ring-rose-500/20 bg-rose-50/20' : ''}`}
                                                                                     />
                                                                                     {formErrors[`family_aadhaar_${idx}`] && (
-                                                                                        <p className="text-[11px] font-semibold text-rose-500 mt-1">
-                                                                                            {formErrors[`family_aadhaar_${idx}`]}
-                                                                                        </p>
+                                                                                        <p className="text-[11px] font-semibold text-rose-500 mt-1">{formErrors[`family_aadhaar_${idx}`]}</p>
                                                                                     )}
+                                                                                </div>
+
+                                                                                {/* Row 3: PAN Number & Email ID */}
+                                                                                <div>
+                                                                                    <label className={labelClass}>PAN Number</label>
+                                                                                    <input
+                                                                                        type="text"
+                                                                                        maxLength={10}
+                                                                                        placeholder="e.g. ABCDE1234F"
+                                                                                        value={fam.panNumber || ''}
+                                                                                        onChange={(e) => handleUpdateFamilyMember(idx, 'panNumber', e.target.value)}
+                                                                                        className={`${inputClass} uppercase ${formErrors[`family_pan_${idx}`] ? 'border-rose-500 ring-2 ring-rose-500/20 bg-rose-50/20' : ''}`}
+                                                                                    />
+                                                                                    {formErrors[`family_pan_${idx}`] && (
+                                                                                        <p className="text-[11px] font-semibold text-rose-500 mt-1">{formErrors[`family_pan_${idx}`]}</p>
+                                                                                    )}
+                                                                                </div>
+
+                                                                                <div>
+                                                                                    <label className={labelClass}>Email ID</label>
+                                                                                    <input
+                                                                                        type="email"
+                                                                                        placeholder="email@example.com"
+                                                                                        value={fam.email || ''}
+                                                                                        onChange={(e) => handleUpdateFamilyMember(idx, 'email', e.target.value)}
+                                                                                        className={`${inputClass} ${formErrors[`family_email_${idx}`] ? 'border-rose-500 ring-2 ring-rose-500/20 bg-rose-50/20' : ''}`}
+                                                                                    />
+                                                                                    {formErrors[`family_email_${idx}`] && (
+                                                                                        <p className="text-[11px] font-semibold text-rose-500 mt-1">{formErrors[`family_email_${idx}`]}</p>
+                                                                                    )}
+                                                                                </div>
+
+                                                                                {/* Row 4: Date of Birth & Gender */}
+                                                                                <div>
+                                                                                    <label className={labelClass}>Date of Birth</label>
+                                                                                    <input
+                                                                                        type="date"
+                                                                                        max={new Date().toISOString().split('T')[0]}
+                                                                                        value={fam.dob ? new Date(fam.dob).toISOString().split('T')[0] : ''}
+                                                                                        onChange={(e) => handleUpdateFamilyMember(idx, 'dob', e.target.value)}
+                                                                                        className={`${inputClass} ${formErrors[`family_dob_${idx}`] ? 'border-rose-500 ring-2 ring-rose-500/20 bg-rose-50/20' : ''}`}
+                                                                                    />
+                                                                                    {formErrors[`family_dob_${idx}`] && (
+                                                                                        <p className="text-[11px] font-semibold text-rose-500 mt-1">{formErrors[`family_dob_${idx}`]}</p>
+                                                                                    )}
+                                                                                </div>
+
+                                                                                <div>
+                                                                                    <label className={labelClass}>Gender</label>
+                                                                                    <select
+                                                                                        value={fam.gender || 'Male'}
+                                                                                        onChange={(e) => handleUpdateFamilyMember(idx, 'gender', e.target.value)}
+                                                                                        className={inputClass}
+                                                                                    >
+                                                                                        <option value="Male">Male</option>
+                                                                                        <option value="Female">Female</option>
+                                                                                        <option value="Other">Other</option>
+                                                                                    </select>
                                                                                 </div>
                                                                             </div>
 
-                                                                            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                                                                            {/* Row 5: Emergency Contact */}
+                                                                            <div className="pt-2 border-t border-slate-100 flex justify-between items-center">
                                                                                 <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700 select-none">
                                                                                     <input
                                                                                         type="checkbox"
@@ -1250,14 +1341,12 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                                                                     />
                                                                                     <span>Emergency Contact</span>
                                                                                 </label>
-
                                                                                 <button
                                                                                     type="button"
                                                                                     onClick={() => handleRemoveFamilyMember(idx)}
-                                                                                    className="text-xs font-bold text-rose-500 hover:underline flex items-center gap-1"
+                                                                                    className="text-xs font-bold text-rose-500 hover:underline"
                                                                                 >
-                                                                                    <MdDelete size={14} />
-                                                                                    <span>Remove Member</span>
+                                                                                    Remove
                                                                                 </button>
                                                                             </div>
                                                                         </div>
