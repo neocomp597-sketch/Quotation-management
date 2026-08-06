@@ -127,6 +127,7 @@ const branchRoutes = require("./routes/branchRoutes");
 const stateMasterRoutes = require("./routes/stateMasterRoutes");
 const cityMasterRoutes = require("./routes/cityMasterRoutes");
 const vendorCatalogRoutes = require("./routes/vendorCatalogRoutes");
+const flowchartRoutes = require("./routes/flowchartRoutes");
 const scheduler = require("./utils/scheduler");
 
 // API Routes (Reload triggered)
