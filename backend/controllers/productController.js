@@ -165,6 +165,7 @@ const validateAndPrepareVendors = async (vendors = [], options = {}) => {
 };
 
 const buildProductResponse = (productDoc) => {
+    if (!productDoc) return null;
     const product = productDoc.toObject ? productDoc.toObject() : { ...productDoc };
     const sortedVendors = sortVendorsByPriority(product.vendors || []);
     const bestVendor = getBestVendorForProduct({ ...product, vendors: sortedVendors });
@@ -317,7 +318,7 @@ const getAllProducts = async (req, res) => {
                 Product.countDocuments(query),
             ]);
             const response = {
-                data: products.map(buildProductResponse),
+                data: products.map(buildProductResponse).filter(Boolean),
                 pagination: {
                     page,
                     limit,
@@ -330,7 +331,7 @@ const getAllProducts = async (req, res) => {
         }
 
         const products = await productsQuery.lean();
-        const response = products.map(buildProductResponse);
+        const response = products.map(buildProductResponse).filter(Boolean);
         await setCachedJson(redis, cacheKey, response, PRODUCTS_CACHE_TTL_SECONDS);
 
         res.json(response);

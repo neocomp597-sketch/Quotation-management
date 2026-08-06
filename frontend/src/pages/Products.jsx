@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { MdAdd, MdSearch, MdEdit, MdDelete, MdInventory, MdCategory, MdQrCode, MdPayments, MdProductionQuantityLimits, MdCloudUpload, MdVisibility, MdFileUpload, MdCheckBox, MdCheckBoxOutlineBlank, MdDeleteSweep, MdSync, MdImage, MdFileDownload, MdArrowBack } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
-import { productService, uploadService, importService, mgrService, attributeService, productAttributeService, vendorService, categoryService } from '../services/api';
+import { productService, uploadService, importService, mgrService, attributeService, productAttributeService, vendorService, categoryService, vendorCatalogService } from '../services/api';
 
 import Modal from '../components/Modal';
 import ImportModal from '../components/ImportModal';
@@ -281,7 +281,7 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
             });
         } catch (err) {
             console.error("Error fetching products:", err);
-            toast.error('Failed to load products');
+            toast.error(err?.response?.data?.message || err?.message || 'Failed to load products');
         } finally {
             setLoading(false);
         }
