@@ -23,6 +23,7 @@ const UserSchema = new mongoose.Schema({
         },
         index: true,
     },
+    vendorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Vendor', default: null },
     createdAt: { type: Date, default: Date.now },
 });
 

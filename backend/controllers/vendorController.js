@@ -13,13 +13,19 @@ const getPagination = (query) => {
     return { page, limit, skip: (page - 1) * limit };
 };
 
+const bcrypt = require('bcryptjs');
+const User = require('../models/User');
+
 const createVendor = async (req, res) => {
     try {
-        const { name, contactPerson, phone, email, address, isActive } = req.body;
+        const { name, contactPerson, phone, email, address, gstin, isActive, loginEnabled, username, password } = req.body;
 
         if (!name || !name.trim()) {
             return res.status(400).json({ message: 'Vendor name is required' });
         }
+
+        let passwordHash = '';
+        let vendorUserId = null;
 
         const vendor = await Vendor.create({
             name: name.trim(),
@@ -27,8 +33,47 @@ const createVendor = async (req, res) => {
             phone,
             email,
             address,
-            isActive
+            gstin,
+            isActive: isActive !== false,
+            loginEnabled: Boolean(loginEnabled),
+            username: username ? username.trim().toLowerCase() : (email ? email.trim().toLowerCase() : '')
         });
+
+        if (loginEnabled) {
+            const loginEmail = (username || email || '').trim().toLowerCase();
+            if (!loginEmail) {
+                return res.status(400).json({ message: 'Email or username is required for enabling login' });
+            }
+
+            let user = await User.findOne({ email: loginEmail });
+            if (!user) {
+                if (!password || password.length < 6) {
+                    return res.status(400).json({ message: 'Password (min 6 chars) is required when enabling login for a new vendor user' });
+                }
+                const salt = await bcrypt.genSalt(10);
+                passwordHash = await bcrypt.hash(password, salt);
+                user = await User.create({
+                    name: vendor.name,
+                    email: loginEmail,
+                    passwordHash,
+                    role: 'vendor',
+                    companyId: req.user?.companyId || vendor.companyId,
+                    vendorId: vendor._id
+                });
+            } else {
+                user.role = 'vendor';
+                user.vendorId = vendor._id;
+                if (password && password.length >= 6) {
+                    const salt = await bcrypt.genSalt(10);
+                    user.passwordHash = await bcrypt.hash(password, salt);
+                }
+                await user.save();
+            }
+            vendorUserId = user._id;
+            vendor.vendorUserId = vendorUserId;
+            if (passwordHash) vendor.passwordHash = passwordHash;
+            await vendor.save();
+        }
 
         res.status(201).json(vendor);
     } catch (error) {
@@ -59,7 +104,7 @@ const getAllVendors = async (req, res) => {
             const { page, limit, skip } = getPagination(req.query);
             const [vendors, total] = await Promise.all([
                 Vendor.find(filter)
-                    .select('name contactPerson phone email address gstin isActive createdAt updatedAt')
+                    .select('name contactPerson phone email address gstin isActive loginEnabled username vendorUserId createdAt updatedAt')
                     .sort({ name: 1 })
                     .skip(skip)
                     .limit(limit)
@@ -79,7 +124,7 @@ const getAllVendors = async (req, res) => {
         }
 
         const vendors = await Vendor.find(filter)
-            .select('name contactPerson phone email address gstin isActive createdAt updatedAt')
+            .select('name contactPerson phone email address gstin isActive loginEnabled username vendorUserId createdAt updatedAt')
             .sort({ name: 1 })
             .lean();
         res.json(vendors);
@@ -92,7 +137,7 @@ const getAllVendors = async (req, res) => {
 const getVendorById = async (req, res) => {
     try {
         const vendor = await Vendor.findById(req.params.id)
-            .select('name contactPerson phone email address gstin isActive createdAt updatedAt')
+            .select('name contactPerson phone email address gstin isActive loginEnabled username vendorUserId createdAt updatedAt')
             .lean();
         if (!vendor) {
             return res.status(404).json({ message: 'Vendor not found' });
@@ -106,30 +151,66 @@ const getVendorById = async (req, res) => {
 
 const updateVendor = async (req, res) => {
     try {
-        const { name, contactPerson, phone, email, address, isActive } = req.body;
+        const { name, contactPerson, phone, email, address, gstin, isActive, loginEnabled, username, password } = req.body;
 
         if (typeof name !== 'undefined' && !String(name).trim()) {
             return res.status(400).json({ message: 'Vendor name cannot be empty' });
         }
 
-        const updatedVendor = await Vendor.findByIdAndUpdate(
-            req.params.id,
-            {
-                ...(typeof name !== 'undefined' ? { name: String(name).trim() } : {}),
-                ...(typeof contactPerson !== 'undefined' ? { contactPerson } : {}),
-                ...(typeof phone !== 'undefined' ? { phone } : {}),
-                ...(typeof email !== 'undefined' ? { email } : {}),
-                ...(typeof address !== 'undefined' ? { address } : {}),
-                ...(typeof isActive !== 'undefined' ? { isActive } : {}),
-            },
-            { new: true, runValidators: true }
-        );
-
-        if (!updatedVendor) {
+        const vendor = await Vendor.findById(req.params.id);
+        if (!vendor) {
             return res.status(404).json({ message: 'Vendor not found' });
         }
 
-        res.json(updatedVendor);
+        if (typeof name !== 'undefined') vendor.name = String(name).trim();
+        if (typeof contactPerson !== 'undefined') vendor.contactPerson = contactPerson;
+        if (typeof phone !== 'undefined') vendor.phone = phone;
+        if (typeof email !== 'undefined') vendor.email = email;
+        if (typeof address !== 'undefined') vendor.address = address;
+        if (typeof gstin !== 'undefined') vendor.gstin = gstin;
+        if (typeof isActive !== 'undefined') vendor.isActive = isActive;
+        if (typeof loginEnabled !== 'undefined') vendor.loginEnabled = Boolean(loginEnabled);
+        if (typeof username !== 'undefined') vendor.username = String(username).trim().toLowerCase();
+
+        if (vendor.loginEnabled) {
+            const loginEmail = (username || email || vendor.username || vendor.email || '').trim().toLowerCase();
+            if (!loginEmail) {
+                return res.status(400).json({ message: 'Email or username is required for enabling login' });
+            }
+
+            let user = vendor.vendorUserId ? await User.findById(vendor.vendorUserId) : await User.findOne({ email: loginEmail });
+            if (!user) {
+                if (!password || password.length < 6) {
+                    return res.status(400).json({ message: 'Password (min 6 chars) is required when enabling login for a new vendor user' });
+                }
+                const salt = await bcrypt.genSalt(10);
+                const passwordHash = await bcrypt.hash(password, salt);
+                user = await User.create({
+                    name: vendor.name,
+                    email: loginEmail,
+                    passwordHash,
+                    role: 'vendor',
+                    companyId: req.user?.companyId || vendor.companyId,
+                    vendorId: vendor._id
+                });
+            } else {
+                user.role = 'vendor';
+                user.vendorId = vendor._id;
+                user.email = loginEmail;
+                if (password && password.length >= 6) {
+                    const salt = await bcrypt.genSalt(10);
+                    user.passwordHash = await bcrypt.hash(password, salt);
+                }
+                await user.save();
+            }
+            vendor.vendorUserId = user._id;
+        } else if (vendor.vendorUserId) {
+            // Deactivate vendor user account if login disabled
+            await User.findByIdAndUpdate(vendor.vendorUserId, { isActive: false, status: false });
+        }
+
+        await vendor.save();
+        res.json(vendor);
     } catch (error) {
         console.error('Update vendor error:', error);
         res.status(500).json({ message: error.message || 'Error updating vendor' });

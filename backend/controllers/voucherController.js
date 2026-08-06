@@ -65,13 +65,19 @@ exports.getVouchers = async (req, res) => {
         if (customerId) {
             filter.customerId = customerId;
         }
+
+        const isVendorUser = req.user?.role === 'vendor' || String(req.user?.role || '').toLowerCase() === 'vendor';
+        if (isVendorUser && req.user?.vendorId) {
+            filter.vendorId = req.user.vendorId;
+        }
+
         const finalType = type || voucherType;
         if (finalType) {
             filter.voucherType = finalType;
         } else if (scope === 'invoice') {
             filter.voucherType = 'Invoice';
         } else if (scope === 'grn') {
-            filter.voucherType = { $in: ['Purchase', 'Sale Return'] };
+            filter.voucherType = { $in: ['Purchase', 'Sale Return', 'Purchase Voucher', 'Invoice Voucher'] };
         }
 
         const vouchers = await Voucher.find(filter)
@@ -94,6 +100,10 @@ exports.getVoucherById = async (req, res) => {
         if (!voucher) {
             return res.status(404).json({ message: 'Voucher not found' });
         }
+        const isVendorUser = req.user?.role === 'vendor' || String(req.user?.role || '').toLowerCase() === 'vendor';
+        if (isVendorUser && req.user?.vendorId && voucher.vendorId && String(voucher.vendorId) !== String(req.user.vendorId)) {
+            return res.status(403).json({ message: 'Not authorized to view this voucher' });
+        }
         res.status(200).json(voucher);
     } catch (error) {
         res.status(500).json({ message: 'Error fetching voucher details', error: error.message });
@@ -103,6 +113,11 @@ exports.getVoucherById = async (req, res) => {
 // Create a new voucher
 exports.createVoucher = async (req, res) => {
     try {
+        const isVendorUser = req.user?.role === 'vendor' || String(req.user?.role || '').toLowerCase() === 'vendor';
+        if (isVendorUser) {
+            return res.status(403).json({ message: 'Vendors only have read-only access to vouchers' });
+        }
+
         const voucherData = req.body;
         
         // Ensure standard fields formatting
@@ -282,6 +297,11 @@ exports.createVoucher = async (req, res) => {
 
 exports.updateVoucher = async (req, res) => {
     try {
+        const isVendorUser = req.user?.role === 'vendor' || String(req.user?.role || '').toLowerCase() === 'vendor';
+        if (isVendorUser) {
+            return res.status(403).json({ message: 'Vendors only have read-only access to vouchers' });
+        }
+
         const voucherData = req.body;
         cleanObjectIds(voucherData);
 
@@ -323,6 +343,11 @@ exports.updateVoucher = async (req, res) => {
 // Delete voucher
 exports.deleteVoucher = async (req, res) => {
     try {
+        const isVendorUser = req.user?.role === 'vendor' || String(req.user?.role || '').toLowerCase() === 'vendor';
+        if (isVendorUser) {
+            return res.status(403).json({ message: 'Vendors only have read-only access to vouchers' });
+        }
+
         const voucher = await Voucher.findByIdAndDelete(req.params.id);
         if (!voucher) {
             return res.status(404).json({ message: 'Voucher not found' });

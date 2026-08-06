@@ -353,13 +353,17 @@ const importProducts = async (req, res) => {
                     companyId: req.user?.companyId
                 };
 
-                const vendorName = pickFirstNonEmpty(row['Vendor Name'] ?? row.vendorName);
-                const vendorPrice = toSafeNumber(row['Vendor Price'] ?? row.vendorPrice);
-                const vendorStock = toSafeNumber(row['Vendor Stock'] ?? row.vendorStock ?? row.stock);
-                const isPrimary = toBoolean(row['Is Primary'] ?? row.isPrimary ?? true);
-
-                if (vendorName) {
-                    const vendorObj = await Vendor.findOne({ vendorName: buildExactRegex(vendorName) });
+                const isVendorUser = req.user?.role === 'vendor' || String(req.user?.role || '').toLowerCase() === 'vendor';
+                if (isVendorUser && req.user?.vendorId) {
+                    productData.vendorId = req.user.vendorId;
+                    productData.vendors = [{
+                        vendorId: req.user.vendorId,
+                        price: vendorPrice || basePrice || mrp || 1,
+                        stock: vendorStock,
+                        isPrimary: true
+                    }];
+                } else if (vendorName) {
+                    const vendorObj = await Vendor.findOne({ $or: [{ name: buildExactRegex(vendorName) }, { vendorName: buildExactRegex(vendorName) }] });
                     if (vendorObj) {
                         productData.vendors = [{
                             vendorId: vendorObj._id,
@@ -367,6 +371,7 @@ const importProducts = async (req, res) => {
                             stock: vendorStock,
                             isPrimary
                         }];
+                        productData.vendorId = vendorObj._id;
                     }
                 }
 

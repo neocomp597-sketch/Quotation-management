@@ -198,11 +198,15 @@ export const ROLE_LABELS = {
     admin: 'Admin',
     manager: 'Manager',
     sales: 'Sales',
-    employee: 'Employee'
+    employee: 'Employee',
+    vendor: 'Vendor'
 };
 
 export const getFallbackRoute = (permissions = {}, user = null) => {
     const roleStr = String(user?.role || '').toLowerCase();
+    if (roleStr === 'vendor') {
+        return '/products';
+    }
     if (roleStr === 'employee') {
         return '/dashboard';
     }

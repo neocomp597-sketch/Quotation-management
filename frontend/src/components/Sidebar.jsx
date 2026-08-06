@@ -322,7 +322,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
         if (user?.role === 'vendor' || String(user?.role || '').toLowerCase() === 'vendor') {
             return [
                 { type: 'link', key: 'master_products', name: 'Product Catalog', icon: <MdInventory size={20} />, path: '/products' },
-                { type: 'link', key: 'voucher_list', name: 'Invoice Vouchers', icon: <MdReceipt size={20} />, path: '/vouchers' }
+                { type: 'link', key: 'purchase_grn', name: 'Invoice Vouchers', icon: <MdReceipt size={20} />, path: '/grn' }
             ];
         }
 

@@ -45,7 +45,7 @@ exports.protect = async (req, res, next) => {
             let user = cachedUser;
 
             if (!user) {
-                user = await User.findById(decoded.id).select('_id name email role tokenVersion companyId status isActive').lean();
+                user = await User.findById(decoded.id).select('_id name email role tokenVersion companyId status isActive vendorId').lean();
                 if (user) {
                     await setCachedJson(redis, cacheKey, user, AUTH_USER_CACHE_TTL_SECONDS);
                 }
@@ -87,12 +87,22 @@ exports.protect = async (req, res, next) => {
                 }
             }
 
+            let resolvedVendorId = user.vendorId?.toString?.() || user.vendorId || null;
+            if (!resolvedVendorId && String(user.role || '').toLowerCase() === 'vendor') {
+                const Vendor = require('../models/Vendor');
+                const vendorDoc = await Vendor.findOne({ $or: [{ vendorUserId: user._id }, { email: user.email }] }).select('_id').lean();
+                if (vendorDoc) {
+                    resolvedVendorId = vendorDoc._id.toString();
+                }
+            }
+
             req.user = {
                 id: user._id.toString(),
                 name: user.name,
                 email: user.email,
                 role: user.role,
-                companyId: resolvedCompanyId
+                companyId: resolvedCompanyId,
+                vendorId: resolvedVendorId
             };
 
             runWithTenant(req.user.companyId, () => next(), { bypassTenant: isSuperAdmin });

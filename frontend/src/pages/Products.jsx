@@ -9,6 +9,7 @@ import Modal from '../components/Modal';
 import ImportModal from '../components/ImportModal';
 import PaginationControls from '../components/PaginationControls';
 import { resolveImageUrl, getPlaceholderImage } from '../utils/helpers';
+import { useAuth } from '../context/AuthContext';
 import { useSubmitGuard } from '../hooks/useSubmitGuard';
 
 const LIST_PAGE_SIZE = 20;
@@ -22,6 +23,8 @@ const emptyVendorRow = () => ({
 
 const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
     const navigate = useNavigate();
+    const { user } = useAuth();
+    const isVendorUser = user?.role === 'vendor' || String(user?.role || '').toLowerCase() === 'vendor';
     const { id: routeId } = useParams();
     const [activeTab, setActiveTab] = useState(initialTab);
     const [products, setProducts] = useState([]);

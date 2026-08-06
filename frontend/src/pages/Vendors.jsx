@@ -17,7 +17,10 @@ const defaultForm = {
     email: '',
     address: '',
     gstin: '',
-    isActive: true
+    isActive: true,
+    loginEnabled: false,
+    username: '',
+    password: ''
 };
 
 const Vendors = ({ isCreatePage, isEditPage }) => {
@@ -127,7 +130,10 @@ const Vendors = ({ isCreatePage, isEditPage }) => {
                     email: found.email || '',
                     address: found.address || '',
                     gstin: found.gstin || '',
-                    isActive: found.isActive !== false
+                    isActive: found.isActive !== false,
+                    loginEnabled: Boolean(found.loginEnabled),
+                    username: found.username || found.email || '',
+                    password: ''
                 });
             } else {
                 vendorService.getAll(false, { limit: 1000 }).then(res => {
@@ -142,7 +148,10 @@ const Vendors = ({ isCreatePage, isEditPage }) => {
                             email: item.email || '',
                             address: item.address || '',
                             gstin: item.gstin || '',
-                            isActive: item.isActive !== false
+                            isActive: item.isActive !== false,
+                            loginEnabled: Boolean(item.loginEnabled),
+                            username: item.username || item.email || '',
+                            password: ''
                         });
                     }
                 }).catch(err => console.error("Failed to load vendor", err));
@@ -296,9 +305,16 @@ const Vendors = ({ isCreatePage, isEditPage }) => {
                                             <div className="text-[10px] text-slate-400 font-medium truncate max-w-[200px]">{vendor.address || 'No address'}</div>
                                         </td>
                                         <td className="px-8 py-5 text-center">
-                                            <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-[0.1em] ${vendor.isActive ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-slate-100 text-slate-400 border border-slate-200'}`}>
-                                                {vendor.isActive ? 'Active' : 'Inactive'}
-                                            </span>
+                                            <div className="flex flex-col items-center gap-1">
+                                                <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-[0.1em] ${vendor.isActive ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-slate-100 text-slate-400 border border-slate-200'}`}>
+                                                    {vendor.isActive ? 'Active' : 'Inactive'}
+                                                </span>
+                                                {vendor.loginEnabled && (
+                                                    <span className="px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider bg-blue-50 text-blue-600 border border-blue-100">
+                                                        Login Enabled
+                                                    </span>
+                                                )}
+                                            </div>
                                         </td>
                                         <td className="px-8 py-5 text-right">
                                             <div className="flex items-center justify-end gap-2">
@@ -447,6 +463,51 @@ const Vendors = ({ isCreatePage, isEditPage }) => {
                                         placeholder="Address"
                                     />
                                 </div>
+                                <div className="p-6 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-4">
+                                    <label className="flex items-center gap-3 text-sm font-black text-slate-800 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            name="loginEnabled"
+                                            checked={formData.loginEnabled}
+                                            onChange={onChange}
+                                            className="w-5 h-5 text-primary-600 rounded focus:ring-primary-500"
+                                        />
+                                        <span>Provide Vendor Portal Login Access</span>
+                                    </label>
+                                    <p className="text-xs text-slate-500 font-medium ml-8">
+                                        Enabling login allows this vendor to access their product catalog and view their invoice vouchers.
+                                    </p>
+
+                                    {formData.loginEnabled && (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-slate-200/60 mt-3">
+                                            <div className="space-y-1.5">
+                                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Login Email / Username *</label>
+                                                <input
+                                                    type="email"
+                                                    name="username"
+                                                    value={formData.username}
+                                                    onChange={onChange}
+                                                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold outline-none"
+                                                    placeholder="vendor@company.com"
+                                                />
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
+                                                    {editingVendor ? 'New Password (leave empty to keep current)' : 'Password *'}
+                                                </label>
+                                                <input
+                                                    type="password"
+                                                    name="password"
+                                                    value={formData.password}
+                                                    onChange={onChange}
+                                                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold outline-none"
+                                                    placeholder="••••••••"
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
                                 <label className="flex items-center gap-2 text-xs font-bold text-slate-600 pt-2">
                                     <input
                                         type="checkbox"

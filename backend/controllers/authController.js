@@ -22,6 +22,7 @@ const normalizeUser = (user) => ({
     email: user.email,
     role: user.role,
     companyId: user.companyId,
+    vendorId: user.vendorId || null,
     mustChangePassword: !!user.mustChangePassword,
 });
 
@@ -405,7 +406,7 @@ exports.logoutAll = async (req, res) => {
 exports.getMe = async (req, res) => {
     try {
         const user = await User.findById(req.user.id)
-            .select('_id name email role status companyId mustChangePassword createdAt updatedAt')
+            .select('_id name email role status companyId vendorId mustChangePassword createdAt updatedAt')
             .lean();
         res.json(user);
     } catch (error) {

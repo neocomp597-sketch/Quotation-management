@@ -24,7 +24,7 @@ const getPagination = (query) => {
 
 const hasListParams = (query) => Boolean(query.page || query.limit || query.search || query.mgr1 || query.mgr2 || query.mgr3 || query.mgr4 || query.mgr5 || query.catalogType);
 
-const buildProductQuery = (queryParams = {}) => {
+const buildProductQuery = (queryParams = {}, user = null) => {
     const query = {};
     const search = String(queryParams.search || '').trim();
 
@@ -50,6 +50,17 @@ const buildProductQuery = (queryParams = {}) => {
         } else {
             query.catalogType = queryParams.catalogType;
         }
+    }
+
+    const isVendor = user?.role === 'vendor' || String(user?.role || '').toLowerCase() === 'vendor';
+    if (isVendor && user?.vendorId) {
+        query.$and = query.$and || [];
+        query.$and.push({
+            $or: [
+                { vendorId: user.vendorId },
+                { 'vendors.vendorId': user.vendorId }
+            ]
+        });
     }
 
     return query;
@@ -218,6 +229,20 @@ const createProduct = async (req, res) => {
             return res.status(400).json({ message: 'At least one vendor is required when vendor mapping is provided' });
         }
 
+        const isVendorUser = req.user?.role === 'vendor' || String(req.user?.role || '').toLowerCase() === 'vendor';
+        if (isVendorUser && req.user?.vendorId) {
+            const hasVendorInList = vendors && Array.isArray(vendors) && vendors.some(v => String(v.vendorId?._id || v.vendorId) === String(req.user.vendorId));
+            if (!hasVendorInList) {
+                vendors = vendors || [];
+                vendors.push({
+                    vendorId: req.user.vendorId,
+                    price: Number(basePrice || mrp || 1),
+                    stock: Number(inventory?.currentStock || 0),
+                    isPrimary: true
+                });
+            }
+        }
+
         const preparedVendors = await validateAndPrepareVendors(vendors || [], { allowEmpty: true });
 
         const newProduct = new Product({
@@ -238,6 +263,7 @@ const createProduct = async (req, res) => {
             mgr5: mgr5 || undefined,
             attributes: attributes || [],
             vendors: preparedVendors,
+            vendorId: isVendorUser && req.user?.vendorId ? req.user.vendorId : (req.body.vendorId || null),
             catalogType: catalogType || 'Product',
             subscriptionDetails,
             rentalDetails,
@@ -263,7 +289,7 @@ const createProduct = async (req, res) => {
 const getAllProducts = async (req, res) => {
     try {
         const listParams = hasListParams(req.query);
-        const query = buildProductQuery(req.query);
+        const query = buildProductQuery(req.query, req.user);
         const cacheKey = listParams
             ? makeCacheKey('products:list', req)
             : makeCacheKey('products:all', req);
@@ -369,6 +395,19 @@ const getProductVendors = async (req, res) => {
 // Update Product
 const updateProduct = async (req, res) => {
     try {
+        const isVendorUser = req.user?.role === 'vendor' || String(req.user?.role || '').toLowerCase() === 'vendor';
+        if (isVendorUser && req.user?.vendorId) {
+            const existing = await Product.findById(req.params.id).lean();
+            if (!existing) {
+                return res.status(404).json({ message: 'Product not found' });
+            }
+            const isOwner = String(existing.vendorId) === String(req.user.vendorId) ||
+                (existing.vendors && existing.vendors.some(v => String(v.vendorId) === String(req.user.vendorId)));
+            if (!isOwner) {
+                return res.status(403).json({ message: 'Not authorized to modify this product' });
+            }
+        }
+
         const {
             productCode,
             productName,
@@ -462,6 +501,11 @@ const updateProductVendor = async (req, res) => {
         const { id, vendorId } = req.params;
         const { price, stock, isPrimary } = req.body;
 
+        const isVendorUser = req.user?.role === 'vendor' || String(req.user?.role || '').toLowerCase() === 'vendor';
+        if (isVendorUser && req.user?.vendorId && String(vendorId) !== String(req.user.vendorId)) {
+            return res.status(403).json({ message: 'Not authorized to update price/stock for another vendor' });
+        }
+
         if (typeof price !== 'undefined' && !(Number(price) > 0)) {
             return res.status(400).json({ message: 'Price must be greater than zero' });
         }
@@ -517,6 +561,19 @@ const updateProductVendor = async (req, res) => {
 // Delete Product
 const deleteProduct = async (req, res) => {
     try {
+        const isVendorUser = req.user?.role === 'vendor' || String(req.user?.role || '').toLowerCase() === 'vendor';
+        if (isVendorUser && req.user?.vendorId) {
+            const existing = await Product.findById(req.params.id).lean();
+            if (!existing) {
+                return res.status(404).json({ message: 'Product not found' });
+            }
+            const isOwner = String(existing.vendorId) === String(req.user.vendorId) ||
+                (existing.vendors && existing.vendors.some(v => String(v.vendorId) === String(req.user.vendorId)));
+            if (!isOwner) {
+                return res.status(403).json({ message: 'Not authorized to delete this product' });
+            }
+        }
+
         const deletedProduct = await Product.findByIdAndDelete(req.params.id);
 
         if (!deletedProduct) {
@@ -540,7 +597,16 @@ const bulkDeleteProducts = async (req, res) => {
             return res.status(400).json({ message: 'Please provide an array of product IDs' });
         }
 
-        const result = await Product.deleteMany({ _id: { $in: ids } });
+        const deleteQuery = { _id: { $in: ids } };
+        const isVendorUser = req.user?.role === 'vendor' || String(req.user?.role || '').toLowerCase() === 'vendor';
+        if (isVendorUser && req.user?.vendorId) {
+            deleteQuery.$or = [
+                { vendorId: req.user.vendorId },
+                { 'vendors.vendorId': req.user.vendorId }
+            ];
+        }
+
+        const result = await Product.deleteMany(deleteQuery);
         await clearProductsCache();
 
         res.json({
