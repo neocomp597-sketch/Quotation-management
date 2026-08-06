@@ -126,7 +126,7 @@ const tenderRoutes = require("./routes/tenderRoutes");
 const branchRoutes = require("./routes/branchRoutes");
 const stateMasterRoutes = require("./routes/stateMasterRoutes");
 const cityMasterRoutes = require("./routes/cityMasterRoutes");
-const flowchartRoutes = require("./routes/flowchartRoutes");
+const vendorCatalogRoutes = require("./routes/vendorCatalogRoutes");
 const scheduler = require("./utils/scheduler");
 
 // API Routes (Reload triggered)
@@ -151,6 +151,7 @@ app.use("/api/mgrs", mgrRoutes);
 app.use("/api/attributes", attributeRoutes);
 app.use("/api/product-attributes", productAttributeRoutes);
 app.use("/api/vendors", vendorRoutes);
+app.use("/api/vendor-catalog", vendorCatalogRoutes);
 app.use("/api/vouchers", voucherRoutes);
 app.use("/api/enquiries", enquiryRoutes);
 app.use("/api/notifications", notificationRoutes);

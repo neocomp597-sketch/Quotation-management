@@ -26,8 +26,9 @@ const OrgChart = () => {
     // Authorization & View Scope: 'my' | 'full'
     const canViewFullChart = useMemo(() => {
         if (!user) return false;
-        return true; // All authenticated employees can view organizational hierarchy & reporting chain
-    }, [user]);
+        const roleStr = String(user.role || '').toLowerCase();
+        return isAdmin || isSuperAdmin || ['admin', 'super_admin', 'superadmin', 'manager', 'hr', 'hr_manager'].includes(roleStr);
+    }, [user, isAdmin, isSuperAdmin]);
 
     const canEditOrgChart = useMemo(() => {
         if (!user) return false;
@@ -130,7 +131,7 @@ const OrgChart = () => {
         }) || employees[0] || null;
     }, [user, employees]);
 
-    // Compute "My View" Employee IDs: Upward Chain + Current User + Downward Chain
+    // Compute "My View" Employee IDs: Direct Reporting Manager + Self + Direct Reportees
     const myViewEmpIds = useMemo(() => {
         if (!currentEmployee || !employees.length) return new Set();
 
@@ -141,35 +142,54 @@ const OrgChart = () => {
         const currentIdStr = String(currentEmployee._id);
         allowed.add(currentIdStr);
 
-        // 1. Upward chain: Ancestor managers up to top leadership
-        let curr = currentEmployee;
-        const visitedUp = new Set([currentIdStr]);
-        while (curr && curr.reportingTo) {
-            const managerId = String(curr.reportingTo._id || curr.reportingTo);
-            if (!managerId || visitedUp.has(managerId) || !empMap.has(managerId)) break;
-            allowed.add(managerId);
-            visitedUp.add(managerId);
-            curr = empMap.get(managerId);
+        // 1. Upward chain: Direct reporting manager (1 level up for restricted, or full chain for managers)
+        if (currentEmployee.reportingTo) {
+            const managerId = String(currentEmployee.reportingTo._id || currentEmployee.reportingTo);
+            if (managerId && empMap.has(managerId)) {
+                allowed.add(managerId);
+                if (canViewFullChart) {
+                    let curr = empMap.get(managerId);
+                    const visitedUp = new Set([currentIdStr, managerId]);
+                    while (curr && curr.reportingTo) {
+                        const mId = String(curr.reportingTo._id || curr.reportingTo);
+                        if (!mId || visitedUp.has(mId) || !empMap.has(mId)) break;
+                        allowed.add(mId);
+                        visitedUp.add(mId);
+                        curr = empMap.get(mId);
+                    }
+                }
+            }
         }
 
-        // 2. Downward chain: Direct & indirect reportees under current user
-        const queue = [currentIdStr];
-        const visitedDown = new Set([currentIdStr]);
-        while (queue.length > 0) {
-            const parentId = queue.shift();
-            employees.forEach(emp => {
-                const empIdStr = String(emp._id);
-                const empParentId = emp.reportingTo ? String(emp.reportingTo._id || emp.reportingTo) : null;
-                if (empParentId === parentId && !visitedDown.has(empIdStr)) {
-                    allowed.add(empIdStr);
-                    visitedDown.add(empIdStr);
-                    queue.push(empIdStr);
-                }
-            });
+        // 2. Downward chain: Direct reportees (or full tree for managers)
+        employees.forEach(emp => {
+            const empIdStr = String(emp._id);
+            const empParentId = emp.reportingTo ? String(emp.reportingTo._id || emp.reportingTo) : null;
+            if (empParentId === currentIdStr) {
+                allowed.add(empIdStr);
+            }
+        });
+
+        if (canViewFullChart) {
+            const queue = Array.from(allowed).filter(id => id !== currentIdStr);
+            const visitedDown = new Set(queue);
+            visitedDown.add(currentIdStr);
+            while (queue.length > 0) {
+                const parentId = queue.shift();
+                employees.forEach(emp => {
+                    const empIdStr = String(emp._id);
+                    const empParentId = emp.reportingTo ? String(emp.reportingTo._id || emp.reportingTo) : null;
+                    if (empParentId === parentId && !visitedDown.has(empIdStr)) {
+                        allowed.add(empIdStr);
+                        visitedDown.add(empIdStr);
+                        queue.push(empIdStr);
+                    }
+                });
+            }
         }
 
         return allowed;
-    }, [currentEmployee, employees]);
+    }, [currentEmployee, employees, canViewFullChart]);
 
     // Effective Employees list according to active Org View Scope ('my' vs 'full')
     const activeEmployees = useMemo(() => {

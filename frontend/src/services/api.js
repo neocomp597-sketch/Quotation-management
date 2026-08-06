@@ -951,4 +951,20 @@ export const flowchartService = {
   restoreVersion: (id, versionId) => api.post(`/flowcharts/${id}/restore/${versionId}`),
 };
 
+export const vendorCatalogService = {
+  getAll: (params) => api.get("/vendor-catalog", { params }),
+  getById: (id) => api.get(`/vendor-catalog/${id}`),
+  create: (data) => api.post("/vendor-catalog", data),
+  update: (id, data) => api.patch(`/vendor-catalog/${id}`, data),
+  delete: (id) => api.delete(`/vendor-catalog/${id}`),
+  importCatalog: (vendorId, file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    if (vendorId) formData.append("vendorId", vendorId);
+    return api.post("/vendor-catalog/import", formData, {
+      headers: { "Content-Type": "multipart/form-data" }
+    });
+  }
+};
+
 export default api;

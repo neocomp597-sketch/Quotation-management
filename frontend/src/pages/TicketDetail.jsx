@@ -131,7 +131,7 @@ const TicketDetail = () => {
             toast.success('Assignment updated');
             fetchTicketDetails();
         } catch (error) {
-            toast.error('Assignment failed');
+            toast.error(error.response?.data?.message || 'Assignment failed');
         }
     });
 

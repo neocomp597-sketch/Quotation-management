@@ -562,36 +562,58 @@ exports.updateTicket = async (req, res) => {
 
 exports.assignTicket = async (req, res) => {
     try {
-        if (!isAdminOrManagerUser(req.user)) {
-            return res.status(403).json({ message: 'Access denied: Only Admin and Manager roles can reassign complaints.' });
-        }
-
         const { assignedTeamId, assignedEngineerId } = req.body;
         const companyId = req.user?.companyId;
 
         const ticket = await Ticket.findOne({ _id: req.params.id, companyId });
         if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
 
+        const Engineer = require('../models/Engineer');
+        let oldEngineerName = 'Unassigned';
+        if (ticket.assignedEngineerId) {
+            const oldEng = await Engineer.findById(ticket.assignedEngineerId).select('name').lean();
+            if (oldEng) oldEngineerName = oldEng.name;
+        }
+
+        const oldEngineerId = ticket.assignedEngineerId;
         ticket.assignedTeamId = assignedTeamId || null;
         ticket.assignedEngineerId = assignedEngineerId || null;
         
-        if (ticket.status === 'Open') {
+        if (ticket.status === 'Open' && (assignedTeamId || assignedEngineerId)) {
             ticket.status = 'Assigned';
         }
 
-        let desc = 'Ticket reassigned';
+        let desc = 'Ticket assignment updated';
+        let newEngineerName = 'Unassigned';
         if (assignedEngineerId) {
-            const Engineer = require('../models/Engineer');
-            const eng = await Engineer.findById(assignedEngineerId).select('name').lean();
-            desc = `Ticket assigned to engineer: ${eng?.name || 'Unknown'}`;
+            const eng = await Engineer.findById(assignedEngineerId).select('name userId').lean();
+            if (eng) newEngineerName = eng.name;
+            desc = `Ticket assigned to engineer: ${newEngineerName}`;
         } else if (assignedTeamId) {
             desc = `Ticket assigned to team`;
         }
 
+        // Record history if engineer changed
+        if (assignedEngineerId && String(oldEngineerId || '') !== String(assignedEngineerId)) {
+            const validUserId = mongoose.Types.ObjectId.isValid(req.user?.id) ? req.user.id : null;
+            ticket.reassignmentHistory.push({
+                fromEngineerId: oldEngineerId || null,
+                fromEngineerName: oldEngineerName,
+                toEngineerId: assignedEngineerId,
+                toEngineerName: newEngineerName,
+                reason: 'Workload',
+                notes: 'Reassigned via ticket details',
+                reassignedBy: validUserId,
+                reassignedByName: req.user?.name || 'System User',
+                reassignedAt: new Date()
+            });
+        }
+
+        const validUserId = mongoose.Types.ObjectId.isValid(req.user?.id) ? req.user.id : null;
         ticket.timeline.push({
             activityType: 'Assigned',
             description: desc,
-            performedBy: req.user?.id
+            performedBy: validUserId
         });
 
         await ticket.save();
@@ -605,16 +627,17 @@ exports.assignTicket = async (req, res) => {
 
 exports.reassignTicket = async (req, res) => {
     try {
-        const { toEngineerId, reason, notes } = req.body;
+        const { toEngineerId, notes } = req.body;
+        let reason = req.body.reason;
         const companyId = req.user?.companyId;
 
-        if (!toEngineerId || !reason) {
-            return res.status(400).json({ message: 'Target engineer and reassignment reason are required' });
+        if (!toEngineerId) {
+            return res.status(400).json({ message: 'Target engineer is required' });
         }
 
         const validReasons = ['Leave', 'Sick', 'Emergency', 'Workload', 'Other'];
-        if (!validReasons.includes(reason)) {
-            return res.status(400).json({ message: `Reason must be one of: ${validReasons.join(', ')}` });
+        if (!reason || !validReasons.includes(reason)) {
+            reason = 'Workload';
         }
 
         const ticket = await Ticket.findOne({ _id: req.params.id, companyId });
@@ -629,7 +652,17 @@ exports.reassignTicket = async (req, res) => {
             if (oldEng) fromEngineerName = oldEng.name;
         }
 
-        const targetEng = await Engineer.findById(toEngineerId).select('name userId').lean();
+        let targetEng = await Engineer.findOne({ _id: toEngineerId, companyId }).select('name userId email employeeId').lean();
+        if (!targetEng) {
+            targetEng = await Engineer.findOne({
+                companyId,
+                $or: [{ userId: toEngineerId }, { employeeId: toEngineerId }]
+            }).select('name userId email employeeId').lean();
+        }
+        if (!targetEng && mongoose.Types.ObjectId.isValid(toEngineerId)) {
+            targetEng = await Engineer.findById(toEngineerId).select('name userId email employeeId').lean();
+        }
+
         if (!targetEng) {
             return res.status(404).json({ message: 'Selected target engineer not found' });
         }
@@ -638,6 +671,7 @@ exports.reassignTicket = async (req, res) => {
         ticket.assignedEngineerId = targetEng._id;
         ticket.status = 'Assigned';
 
+        const validUserId = mongoose.Types.ObjectId.isValid(req.user?.id) ? req.user.id : null;
         const reassignmentRecord = {
             fromEngineerId,
             fromEngineerName,
@@ -645,7 +679,7 @@ exports.reassignTicket = async (req, res) => {
             toEngineerName: targetEng.name,
             reason,
             notes: notes || '',
-            reassignedBy: req.user?.id,
+            reassignedBy: validUserId,
             reassignedByName: req.user?.name || 'User',
             reassignedAt: new Date()
         };
@@ -656,7 +690,7 @@ exports.reassignTicket = async (req, res) => {
         ticket.timeline.push({
             activityType: 'Reassigned',
             description: timelineDesc,
-            performedBy: req.user?.id
+            performedBy: validUserId
         });
 
         await ticket.save();

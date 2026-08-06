@@ -118,6 +118,7 @@ const CreateMeeting = () => {
     const [enquiries, setEnquiries] = useState([]);
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [clientHistory, setClientHistory] = useState([]);
 
     // Form fields state
     const [title, setTitle] = useState('');
@@ -127,6 +128,7 @@ const CreateMeeting = () => {
     const [startTime, setStartTime] = useState('10:00');
     const [endTime, setEndTime] = useState('11:00');
     const [organizerId, setOrganizerId] = useState('');
+    const [reportToId, setReportToId] = useState('');
     const [participants, setParticipants] = useState([]);
     const [location, setLocation] = useState('');
     const [agenda, setAgenda] = useState('');
@@ -145,6 +147,34 @@ const CreateMeeting = () => {
         }
     }, [id]);
 
+    useEffect(() => {
+        if (organizerId && users.length > 0) {
+            const org = users.find(u => u._id === organizerId);
+            if (org && org.reportsTo) {
+                const repId = typeof org.reportsTo === 'object' ? org.reportsTo._id : org.reportsTo;
+                setReportToId(repId || '');
+            }
+        }
+    }, [organizerId, users]);
+
+    useEffect(() => {
+        if (relatedRecordId) {
+            fetchClientHistory(relatedRecordId);
+        } else {
+            setClientHistory([]);
+        }
+    }, [relatedRecordId]);
+
+    const fetchClientHistory = async (recId) => {
+        try {
+            const res = await meetingService.getAll({ relatedRecordId: recId, limit: 10 });
+            const list = Array.isArray(res.data) ? res.data : res.data?.data || [];
+            setClientHistory(list.filter(item => item._id !== id));
+        } catch (err) {
+            console.error('Error fetching client history:', err);
+        }
+    };
+
     const fetchAuxiliaryData = async () => {
         try {
             const [custRes, enqRes, userRes] = await Promise.all([
@@ -157,7 +187,6 @@ const CreateMeeting = () => {
             setEnquiries(enqRes.data || []);
             setUsers(userRes.data || []);
 
-            // Set current logged in user as default organizer if not editing
             if (!isEditMode) {
                 const storedUser = localStorage.getItem('user');
                 if (storedUser) {
@@ -183,7 +212,6 @@ const CreateMeeting = () => {
             const start = new Date(m.startDateTime);
             const end = new Date(m.endDateTime);
             
-            // Format dates locally
             setMeetingDate(start.toISOString().split('T')[0]);
             
             const pad = (num) => String(num).padStart(2, '0');
@@ -191,6 +219,9 @@ const CreateMeeting = () => {
             setEndTime(`${pad(end.getHours())}:${pad(end.getMinutes())}`);
             
             setOrganizerId(m.organizerId?._id || m.organizerId || '');
+            if (m.reportToId) {
+                setReportToId(m.reportToId?._id || m.reportToId || '');
+            }
             setParticipants(m.participants?.map(p => p._id || p) || []);
             setLocation(m.location || '');
             setAgenda(m.agenda || '');
@@ -206,7 +237,6 @@ const CreateMeeting = () => {
         }
     };
 
-    // Related Records lookup mappings based on module selection
     const recordList = useMemo(() => {
         if (relatedModule === 'Customer') {
             return customers.map(c => ({
@@ -240,7 +270,6 @@ const CreateMeeting = () => {
     };
 
     const buildISODateTime = (dateStr, timeStr) => {
-        // Constructs date in local timezone time bounds
         const [hours, minutes] = timeStr.split(':').map(Number);
         const date = new Date(dateStr);
         date.setHours(hours, minutes, 0, 0);
@@ -275,6 +304,7 @@ const CreateMeeting = () => {
             relatedModule,
             relatedRecordId,
             organizerId,
+            reportToId: reportToId || undefined,
             participants,
             location,
             agenda,
@@ -298,7 +328,6 @@ const CreateMeeting = () => {
             navigate('/meetings');
         } catch (err) {
             if (err.response?.status === 409) {
-                // Time Conflict detected
                 setConflictingMeetings(err.response.data.conflicts || []);
                 setShowConflictModal(true);
             } else {
@@ -310,262 +339,297 @@ const CreateMeeting = () => {
     };
 
     return (
-        <div className="max-w-4xl mx-auto space-y-8 animate-fade-in-up pb-10">
+        <div className="max-w-6xl mx-auto space-y-8 font-outfit pb-16">
             {/* Header Banner */}
-            <div className="flex items-center gap-4">
-                <button
-                    onClick={() => navigate('/meetings')}
-                    className="p-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl transition-all"
-                >
-                    <MdArrowBack size={20} />
-                </button>
-                <div>
-                    <h1 className="text-2xl font-black text-slate-900 tracking-tight font-outfit uppercase">
-                        {isEditMode ? 'Edit Scheduled Meeting' : 'Schedule New Appointment'}
-                    </h1>
-                    <p className="text-slate-500 font-semibold mt-1">Configure meeting parameters, lookups, and participants</p>
+            <div className="flex items-center justify-between gap-4 border-b border-slate-200 pb-5">
+                <div className="flex items-center gap-4">
+                    <button
+                        onClick={() => navigate('/meetings')}
+                        className="p-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl transition-all"
+                    >
+                        <MdArrowBack size={20} />
+                    </button>
+                    <div>
+                        <h1 className="text-2xl font-black text-slate-900 tracking-tight uppercase">
+                            {isEditMode ? 'Edit Scheduled Appointment' : 'Schedule Appointment'}
+                        </h1>
+                        <p className="text-slate-500 font-semibold mt-0.5 text-xs">Configure appointment details, participants, and notes</p>
+                    </div>
                 </div>
             </div>
 
             {loading ? (
                 <div className="p-20 text-center bg-white rounded-3xl border border-slate-100 shadow-sm">
                     <div className="inline-block w-8 h-8 border-4 border-slate-200 border-t-primary-600 rounded-full animate-spin"></div>
-                    <p className="mt-4 text-slate-400 font-bold uppercase text-xs tracking-widest">Loading Details...</p>
+                    <p className="mt-4 text-slate-400 font-bold uppercase text-xs tracking-widest">Loading Appointment Details...</p>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    {/* Main Parameters Form */}
-                    <div className="lg:col-span-2 bg-white rounded-3xl border border-slate-100 shadow-sm p-6 space-y-6">
-                        <h2 className="text-lg font-black text-slate-900 border-b border-slate-50 pb-3">General Information</h2>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    {/* Left Column: APPOINTMENT & CUSTOMER DETAILS */}
+                    <div className="bg-slate-50/70 p-6 rounded-3xl border border-slate-200/80 space-y-6">
+                        <h2 className="text-xs font-black text-slate-600 uppercase tracking-widest border-b border-slate-200/60 pb-3 flex items-center gap-2">
+                            <span className="bg-slate-200 text-slate-700 w-5 h-5 rounded-full flex items-center justify-center text-[10px]">1</span>
+                            APPOINTMENT & CUSTOMER DETAILS
+                        </h2>
 
                         {/* Title */}
-                        <div className="space-y-2">
-                            <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Meeting Title *</label>
+                        <div className="space-y-1.5">
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">TITLE *</label>
                             <input
                                 type="text"
                                 value={title}
                                 onChange={(e) => setTitle(e.target.value)}
-                                placeholder="Client discussion, pipeline walkthrough, etc."
-                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-600/10 focus:border-primary-600 focus:bg-white transition-all outline-none text-sm font-semibold text-slate-900 placeholder:text-slate-400"
+                                placeholder="Client call, demo meeting..."
+                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all outline-none text-xs font-bold text-slate-900"
                             />
                         </div>
 
                         {/* Related To Polymorphic Dropdown */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div className="space-y-2">
-                                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Related To *</label>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div className="space-y-1.5">
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">RELATED MODULE</label>
                                 <select
                                     value={relatedModule}
                                     onChange={(e) => handleRelatedModuleChange(e.target.value)}
-                                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-600/10 focus:border-primary-600 focus:bg-white transition-all outline-none text-sm font-semibold text-slate-900"
+                                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all outline-none text-xs font-bold text-slate-900"
                                 >
-                                    <option value="Customer">Customer (Account/Contact)</option>
-                                    <option value="Enquiry">Enquiry (Lead/Deal)</option>
+                                    <option value="Customer">Customer</option>
+                                    <option value="Enquiry">Enquiry</option>
                                 </select>
                             </div>
 
-                            <div className="md:col-span-2 space-y-2">
-                                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Search Reference *</label>
+                            <div className="sm:col-span-2 space-y-1.5">
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">SELECT RECORD</label>
                                 <RecordSearchDropdown
                                     items={recordList}
                                     selectedId={relatedRecordId}
                                     onSelect={setRelatedRecordId}
-                                    placeholder={`Select matching ${relatedModule}...`}
+                                    placeholder={`Select ${relatedModule}...`}
                                     labelField="label"
                                     subLabelField="subLabel"
                                 />
                             </div>
                         </div>
 
-                        {/* Date & Time bounds */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div className="space-y-2">
-                                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Meeting Date *</label>
-                                <div className="relative">
-                                    <input
-                                        type="date"
-                                        value={meetingDate}
-                                        onChange={(e) => setMeetingDate(e.target.value)}
-                                        className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-600/10 focus:border-primary-600 focus:bg-white transition-all outline-none text-sm font-semibold text-slate-900"
-                                    />
+                        {/* Previous Appointments Card */}
+                        {clientHistory.length > 0 && (
+                            <div className="bg-amber-50/60 border border-amber-200/80 rounded-2xl p-4 space-y-2">
+                                <span className="text-[10px] font-black text-amber-700 uppercase tracking-wider block">
+                                    Previous Appointments ({clientHistory.length})
+                                </span>
+                                <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1 scrollbar-thin">
+                                    {clientHistory.map(hist => (
+                                        <div key={hist._id} className="text-xs bg-white p-2.5 rounded-xl border border-amber-100 flex items-center justify-between">
+                                            <div>
+                                                <p className="font-bold text-slate-800">{hist.title}</p>
+                                                <p className="text-[10px] text-slate-500 font-medium">
+                                                    {new Date(hist.startDateTime).toLocaleDateString()} • {hist.organizerId?.name || 'Unknown'}
+                                                </p>
+                                            </div>
+                                            <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-amber-100 text-amber-800">
+                                                {hist.status}
+                                            </span>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
+                        )}
 
-                            <div className="space-y-2">
-                                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Start Time *</label>
+                        {/* Date & Time bounds */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div className="space-y-1.5">
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">DATE</label>
+                                <input
+                                    type="date"
+                                    value={meetingDate}
+                                    onChange={(e) => setMeetingDate(e.target.value)}
+                                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all outline-none text-xs font-bold text-slate-900"
+                                />
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">START TIME</label>
                                 <input
                                     type="time"
                                     value={startTime}
                                     onChange={(e) => setStartTime(e.target.value)}
-                                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-600/10 focus:border-primary-600 focus:bg-white transition-all outline-none text-sm font-semibold text-slate-900"
+                                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all outline-none text-xs font-bold text-slate-900"
                                 />
                             </div>
 
-                            <div className="space-y-2">
-                                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">End Time *</label>
+                            <div className="space-y-1.5">
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">END TIME</label>
                                 <input
                                     type="time"
                                     value={endTime}
                                     onChange={(e) => setEndTime(e.target.value)}
-                                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-600/10 focus:border-primary-600 focus:bg-white transition-all outline-none text-sm font-semibold text-slate-900"
+                                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all outline-none text-xs font-bold text-slate-900"
                                 />
                             </div>
                         </div>
 
                         {/* Location */}
-                        <div className="space-y-2">
-                            <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Location</label>
+                        <div className="space-y-1.5">
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">LOCATION / MEETING LINK</label>
                             <input
                                 type="text"
                                 value={location}
                                 onChange={(e) => setLocation(e.target.value)}
-                                placeholder="Office board room, conference call links, or address"
-                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-600/10 focus:border-primary-600 focus:bg-white transition-all outline-none text-sm font-semibold text-slate-900 placeholder:text-slate-400"
-                            />
-                        </div>
-
-                        {/* Agenda */}
-                        <div className="space-y-2">
-                            <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Agenda</label>
-                            <textarea
-                                value={agenda}
-                                onChange={(e) => setAgenda(e.target.value)}
-                                rows={3}
-                                placeholder="What topics will be covered?"
-                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-600/10 focus:border-primary-600 focus:bg-white transition-all outline-none text-sm font-semibold text-slate-900 placeholder:text-slate-400"
-                            />
-                        </div>
-
-                        {/* Notes */}
-                        <div className="space-y-2">
-                            <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Additional Notes</label>
-                            <textarea
-                                value={notes}
-                                onChange={(e) => setNotes(e.target.value)}
-                                rows={3}
-                                placeholder="Summary, action items, or post-meeting logs"
-                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-600/10 focus:border-primary-600 focus:bg-white transition-all outline-none text-sm font-semibold text-slate-900 placeholder:text-slate-400"
+                                placeholder="Conference room, Google Meet / Zoom link..."
+                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all outline-none text-xs font-bold text-slate-900"
                             />
                         </div>
                     </div>
 
-                    {/* Sidebar: Organizers, Status & Outcomes */}
-                    <div className="space-y-6">
-                        {/* Status Panel */}
-                        <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 space-y-6">
-                            <h2 className="text-lg font-black text-slate-900 border-b border-slate-50 pb-3">Status</h2>
+                    {/* Right Column: EMPLOYEE ASSIGNMENT & DISCUSSION */}
+                    <div className="bg-slate-50/70 p-6 rounded-3xl border border-slate-200/80 space-y-6">
+                        <h2 className="text-xs font-black text-slate-600 uppercase tracking-widest border-b border-slate-200/60 pb-3 flex items-center gap-2">
+                            <span className="bg-slate-200 text-slate-700 w-5 h-5 rounded-full flex items-center justify-center text-[10px]">2</span>
+                            EMPLOYEE ASSIGNMENT & DISCUSSION
+                        </h2>
 
-                            {/* Status Picklist */}
-                            <div className="space-y-2">
-                                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Meeting Status</label>
-                                <select
-                                    value={status}
-                                    onChange={(e) => setStatus(e.target.value)}
-                                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-600/10 focus:border-primary-600 focus:bg-white transition-all outline-none text-sm font-semibold text-slate-900"
-                                >
-                                    <option value="Scheduled">Scheduled</option>
-                                    <option value="Confirmed">Confirmed</option>
-                                    <option value="In Progress">In Progress</option>
-                                    <option value="Completed">Completed</option>
-                                    <option value="Cancelled">Cancelled</option>
-                                    <option value="Rescheduled">Rescheduled</option>
-                                    <option value="No Show">No Show</option>
-                                </select>
-                            </div>
-
-                            {/* Outcome Picklist (Only if completed) */}
-                            {status === 'Completed' && (
-                                <div className="space-y-2 animate-fade-in-up">
-                                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest text-primary-600">Meeting Outcome *</label>
-                                    <select
-                                        value={outcome}
-                                        onChange={(e) => setOutcome(e.target.value)}
-                                        className="w-full px-4 py-3.5 bg-slate-50 border border-primary-400 rounded-2xl focus:ring-4 focus:ring-primary-600/10 focus:border-primary-600 focus:bg-white transition-all outline-none text-sm font-semibold text-slate-900"
-                                    >
-                                        <option value="">-- Choose Outcome --</option>
-                                        <option value="Successful">Successful</option>
-                                        <option value="Follow Up Required">Follow Up Required</option>
-                                        <option value="No Show">No Show</option>
-                                        <option value="Cancelled">Cancelled</option>
-                                        <option value="Not Interested">Not Interested</option>
-                                    </select>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* People Panel */}
-                        <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 space-y-6">
-                            <h2 className="text-lg font-black text-slate-900 border-b border-slate-50 pb-3">People</h2>
-
-                            {/* Organizer (Single select) */}
-                            <div className="space-y-2">
-                                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Organizer *</label>
+                        {/* Organizer & Report To */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">ORGANIZER / ASSIGNED TO *</label>
                                 <select
                                     value={organizerId}
                                     onChange={(e) => setOrganizerId(e.target.value)}
-                                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-600/10 focus:border-primary-600 focus:bg-white transition-all outline-none text-sm font-semibold text-slate-900"
+                                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all outline-none text-xs font-bold text-slate-900"
                                 >
                                     <option value="">Select Organizer</option>
                                     {users.map(u => (
-                                        <option key={u._id} value={u._id}>{u.name} ({u.role})</option>
+                                        <option key={u._id} value={u._id}>{u.name}</option>
                                     ))}
                                 </select>
                             </div>
 
-                            {/* Participants (Multi-select) */}
-                            <div className="space-y-3">
-                                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Participants</label>
-                                <div className="max-h-60 overflow-y-auto border border-slate-100 rounded-2xl p-3 space-y-2 bg-slate-50/50">
-                                    {users.filter(u => u._id !== organizerId).map(u => {
-                                        const isSelected = participants.includes(u._id);
-                                        return (
-                                            <div
-                                                key={u._id}
-                                                onClick={() => handleParticipantToggle(u._id)}
-                                                className={`flex items-center gap-3 p-2 rounded-xl cursor-pointer transition-colors ${
-                                                    isSelected ? 'bg-teal-50 text-teal-800' : 'hover:bg-slate-100 text-slate-600'
-                                                }`}
-                                            >
-                                                <input
-                                                    type="checkbox"
-                                                    checked={isSelected}
-                                                    onChange={() => {}} // toggled by parent div click
-                                                    className="rounded border-slate-300 text-teal-600 focus:ring-teal-500/20"
-                                                />
-                                                <div className="min-w-0">
-                                                    <p className="text-xs font-bold truncate">{u.name}</p>
-                                                    <p className="text-[10px] opacity-75 truncate">{u.email}</p>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                    {users.filter(u => u._id !== organizerId).length === 0 && (
-                                        <p className="text-[10px] text-center font-bold text-slate-400">No other employees registered</p>
-                                    )}
-                                </div>
+                            <div className="space-y-1.5">
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">REPORT TO (SENIOR)</label>
+                                <select
+                                    value={reportToId}
+                                    onChange={(e) => setReportToId(e.target.value)}
+                                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all outline-none text-xs font-bold text-slate-900"
+                                >
+                                    <option value="">No senior selected</option>
+                                    {users.map(u => (
+                                        <option key={u._id} value={u._id}>{u.name}</option>
+                                    ))}
+                                </select>
                             </div>
                         </div>
 
-                        {/* Save Actions */}
-                        <div className="flex flex-col gap-3">
-                            <button
-                                onClick={() => handleSave(false)}
-                                className="w-full py-3.5 bg-primary-600 hover:bg-primary-700 text-white rounded-2xl text-sm font-black flex items-center justify-center gap-2 shadow-lg shadow-primary-600/20 transition-all hover:scale-[1.01]"
+                        {/* Status */}
+                        <div className="space-y-1.5">
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">STATUS</label>
+                            <select
+                                value={status}
+                                onChange={(e) => setStatus(e.target.value)}
+                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all outline-none text-xs font-bold text-slate-900"
                             >
-                                <MdSave size={20} /> {isEditMode ? 'Update Meeting' : 'Schedule Meeting'}
-                            </button>
-                            <button
-                                onClick={() => navigate('/meetings')}
-                                className="w-full py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl text-sm font-bold transition-all"
-                            >
-                                Cancel
-                            </button>
+                                <option value="Scheduled">Scheduled</option>
+                                <option value="Confirmed">Confirmed</option>
+                                <option value="In Progress">In Progress</option>
+                                <option value="Completed">Completed</option>
+                                <option value="Cancelled">Cancelled</option>
+                                <option value="Rescheduled">Rescheduled</option>
+                                <option value="No Show">No Show</option>
+                            </select>
+                        </div>
+
+                        {/* Outcome (Only if Completed) */}
+                        {status === 'Completed' && (
+                            <div className="space-y-1.5 animate-fade-in-up">
+                                <label className="block text-[10px] font-black text-teal-600 uppercase tracking-widest">OUTCOME *</label>
+                                <select
+                                    value={outcome}
+                                    onChange={(e) => setOutcome(e.target.value)}
+                                    className="w-full px-4 py-3 bg-white border border-teal-400 rounded-2xl focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all outline-none text-xs font-bold text-slate-900"
+                                >
+                                    <option value="">-- Choose Outcome --</option>
+                                    <option value="Successful">Successful</option>
+                                    <option value="Follow Up Required">Follow Up Required</option>
+                                    <option value="No Show">No Show</option>
+                                    <option value="Cancelled">Cancelled</option>
+                                    <option value="Not Interested">Not Interested</option>
+                                </select>
+                            </div>
+                        )}
+
+                        {/* Agenda */}
+                        <div className="space-y-1.5">
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">AGENDA</label>
+                            <textarea
+                                value={agenda}
+                                onChange={(e) => setAgenda(e.target.value)}
+                                rows={2}
+                                placeholder="Topics to discuss..."
+                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all outline-none text-xs font-bold text-slate-900"
+                            />
+                        </div>
+
+                        {/* Discussion Notes */}
+                        <div className="space-y-1.5">
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">DISCUSSION NOTES</label>
+                            <textarea
+                                value={notes}
+                                onChange={(e) => setNotes(e.target.value)}
+                                rows={3}
+                                placeholder="What was discussed, decisions, commitments, next steps..."
+                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all outline-none text-xs font-bold text-slate-900"
+                            />
+                        </div>
+
+                        {/* Participants checklist */}
+                        <div className="space-y-1.5">
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">PARTICIPANTS</label>
+                            <div className="max-h-44 overflow-y-auto border border-slate-200 rounded-2xl p-3 space-y-1.5 bg-white">
+                                {users.filter(u => u._id !== organizerId).map(u => {
+                                    const isSelected = participants.includes(u._id);
+                                    return (
+                                        <div
+                                            key={u._id}
+                                            onClick={() => handleParticipantToggle(u._id)}
+                                            className={`flex items-center gap-3 p-2 rounded-xl cursor-pointer transition-colors ${
+                                                isSelected ? 'bg-teal-50 text-teal-900 font-bold' : 'hover:bg-slate-50 text-slate-600'
+                                            }`}
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={isSelected}
+                                                onChange={() => {}}
+                                                className="rounded border-slate-300 text-teal-600 focus:ring-teal-500/20"
+                                            />
+                                            <span className="text-xs uppercase font-bold">{u.name}</span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* Overlap Conflict Modal warning */}
+            {/* Bottom Action Footer */}
+            <div className="flex items-center justify-end gap-4 pt-4 border-t border-slate-200">
+                <button
+                    type="button"
+                    onClick={() => navigate('/meetings')}
+                    className="px-8 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl text-xs font-bold transition-all"
+                >
+                    Cancel
+                </button>
+                <button
+                    type="button"
+                    onClick={() => handleSave(false)}
+                    className="px-10 py-3.5 bg-teal-600 hover:bg-teal-700 text-white rounded-2xl text-xs font-black shadow-lg shadow-teal-600/20 transition-all flex items-center gap-2"
+                >
+                    <MdSave size={18} />
+                    {isEditMode ? 'Update Changes' : 'Save Changes'}
+                </button>
+            </div>
+
+            {/* Overlap Conflict Warning Modal */}
             {showConflictModal && (
                 <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
                     <div className="bg-white w-full max-w-lg rounded-3xl border border-slate-100 overflow-hidden shadow-2xl p-6 space-y-6 animate-scale-in">

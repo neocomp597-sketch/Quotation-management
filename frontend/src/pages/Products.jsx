@@ -220,6 +220,42 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
     const fetchProducts = async () => {
         setLoading(true);
         try {
+            if (isVendorUser) {
+                const res = await vendorCatalogService.getAll({
+                    page,
+                    limit: LIST_PAGE_SIZE,
+                    search: debouncedSearch || undefined,
+                    vendorId: user?.vendorId
+                });
+                const payload = res.data;
+                const items = Array.isArray(payload) ? payload : payload.data || [];
+                // Map vendor catalog schema to table fields
+                setProducts(items.map(item => ({
+                    _id: item._id,
+                    productName: item.productName,
+                    productCode: item.productCode || item.brand || '-',
+                    brand: item.brand,
+                    category: item.category,
+                    categoryId: { name: item.category || 'Vendor Catalog' },
+                    basePrice: item.price || 0,
+                    mrp: item.price || 0,
+                    uom: item.UOM || 'Nos',
+                    status: item.status || 'Active',
+                    description: item.description,
+                    specification: item.specification,
+                    MOQ: item.MOQ || 1,
+                    inventory: { currentStock: item.MOQ || 1 },
+                    vendors: [{ vendorId: { name: user?.name || 'Vendor' }, price: item.price, stock: item.MOQ || 1, isPrimary: true }]
+                })));
+                setPagination(payload.pagination || {
+                    page: 1,
+                    limit: LIST_PAGE_SIZE,
+                    total: items.length,
+                    pages: 1,
+                });
+                return;
+            }
+
             const catalogTypeMap = {
                 products: 'Product',
                 services: 'Service',
@@ -414,6 +450,38 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
             toast.error('Product Name is required');
             return;
         }
+
+        if (isVendorUser) {
+            try {
+                const catalogPayload = {
+                    productName: formData.productName,
+                    brand: formData.brand || '',
+                    category: typeof formData.categoryId === 'object' ? formData.categoryId?.name : formData.categoryId || '',
+                    price: Number(formData.basePrice || formData.mrp || 0),
+                    MOQ: Number(formData.inventory?.currentStock || 1),
+                    UOM: formData.uom || 'Nos',
+                    description: formData.description || '',
+                    status: formData.status || 'Active',
+                    vendorId: user?.vendorId
+                };
+                if (editingProduct) {
+                    await vendorCatalogService.update(editingProduct._id, catalogPayload);
+                    toast.success('Product updated in Vendor Catalog!');
+                } else {
+                    await vendorCatalogService.create(catalogPayload);
+                    toast.success('Product added to Vendor Catalog!');
+                }
+                fetchProducts();
+                setIsModalOpen(false);
+                navigate('/products');
+                return;
+            } catch (err) {
+                console.error("Error saving vendor catalog product:", err);
+                toast.error(err.response?.data?.message || 'Error saving product data');
+                return;
+            }
+        }
+
         if (!formData.productCode?.trim()) {
             toast.error('Product Code is required');
             return;
@@ -518,7 +586,11 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
     const handleDelete = async (id) => {
         if (window.confirm("Are you sure you want to delete this product?")) {
             try {
-                await productService.delete(id);
+                if (isVendorUser) {
+                    await vendorCatalogService.delete(id);
+                } else {
+                    await productService.delete(id);
+                }
                 toast.success('Product deleted successfully!');
                 fetchProducts();
             } catch (err) {
@@ -1537,94 +1609,96 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                             </div>
                         </div>
 
-                        <div>
-                            <h4 className="text-[10px] font-black text-primary-600 uppercase tracking-[0.2em] mb-6 flex items-center gap-3">
-                                <span className="h-px flex-1 bg-primary-100"></span>
-                                Vendor Mapping
-                                <span className="h-px flex-1 bg-primary-100"></span>
-                            </h4>
-                            <div className="space-y-3">
-                                {(formData.vendors || []).map((vendorRow, index) => (
-                                    <div key={`vendor-row-${index}`} className="grid grid-cols-12 gap-3 items-end p-3 rounded-2xl border border-slate-200 bg-slate-50/60">
-                                        <div className="col-span-12 md:col-span-5 space-y-1">
-                                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Vendor</label>
-                                            <select
-                                                value={vendorRow.vendorId || ''}
-                                                onChange={(e) => updateVendorRow(index, 'vendorId', e.target.value)}
-                                                className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl outline-none text-xs font-bold"
-                                            >
-                                                <option value="">Select Vendor</option>
-                                                {vendors
-                                                    .filter(v => v.isActive || String(v._id) === String(vendorRow.vendorId))
-                                                    .map(v => (
-                                                        <option key={v._id} value={v._id}>{v.name}{!v.isActive ? ' (Inactive)' : ''}</option>
-                                                    ))}
-                                            </select>
+                        {!isVendorUser && (
+                            <div>
+                                <h4 className="text-[10px] font-black text-primary-600 uppercase tracking-[0.2em] mb-6 flex items-center gap-3">
+                                    <span className="h-px flex-1 bg-primary-100"></span>
+                                    Vendor Mapping
+                                    <span className="h-px flex-1 bg-primary-100"></span>
+                                </h4>
+                                <div className="space-y-3">
+                                    {(formData.vendors || []).map((vendorRow, index) => (
+                                        <div key={`vendor-row-${index}`} className="grid grid-cols-12 gap-3 items-end p-3 rounded-2xl border border-slate-200 bg-slate-50/60">
+                                            <div className="col-span-12 md:col-span-5 space-y-1">
+                                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Vendor</label>
+                                                <select
+                                                    value={vendorRow.vendorId || ''}
+                                                    onChange={(e) => updateVendorRow(index, 'vendorId', e.target.value)}
+                                                    className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl outline-none text-xs font-bold"
+                                                >
+                                                    <option value="">Select Vendor</option>
+                                                    {vendors
+                                                        .filter(v => v.isActive || String(v._id) === String(vendorRow.vendorId))
+                                                        .map(v => (
+                                                            <option key={v._id} value={v._id}>{v.name}{!v.isActive ? ' (Inactive)' : ''}</option>
+                                                        ))}
+                                                </select>
+                                            </div>
+                                            <div className="col-span-6 md:col-span-2 space-y-1">
+                                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Price</label>
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    step="0.01"
+                                                    value={vendorRow.price}
+                                                    onChange={(e) => updateVendorRow(index, 'price', e.target.value)}
+                                                    className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold"
+                                                    placeholder="0"
+                                                />
+                                            </div>
+                                            <div className="col-span-6 md:col-span-2 space-y-1">
+                                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Stock</label>
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    value={vendorRow.stock}
+                                                    onChange={(e) => updateVendorRow(index, 'stock', e.target.value)}
+                                                    className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold"
+                                                    placeholder="0"
+                                                />
+                                            </div>
+                                            <div className="col-span-6 md:col-span-2 flex flex-col gap-2">
+                                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Primary</label>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => updateVendorRow(index, 'isPrimary', !vendorRow.isPrimary)}
+                                                    className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${vendorRow.isPrimary ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-100'}`}
+                                                >
+                                                    {vendorRow.isPrimary ? 'Primary' : 'Set Primary'}
+                                                </button>
+                                            </div>
+                                            <div className="col-span-6 md:col-span-1 flex justify-end">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeVendorRow(index)}
+                                                    className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl border border-rose-100"
+                                                    title="Remove Vendor Row"
+                                                >
+                                                    <MdDelete size={16} />
+                                                </button>
+                                            </div>
                                         </div>
-                                        <div className="col-span-6 md:col-span-2 space-y-1">
-                                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Price</label>
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                step="0.01"
-                                                value={vendorRow.price}
-                                                onChange={(e) => updateVendorRow(index, 'price', e.target.value)}
-                                                className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold"
-                                                placeholder="0"
-                                            />
-                                        </div>
-                                        <div className="col-span-6 md:col-span-2 space-y-1">
-                                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Stock</label>
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                value={vendorRow.stock}
-                                                onChange={(e) => updateVendorRow(index, 'stock', e.target.value)}
-                                                className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold"
-                                                placeholder="0"
-                                            />
-                                        </div>
-                                        <div className="col-span-6 md:col-span-2 flex flex-col gap-2">
-                                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Primary</label>
-                                            <button
-                                                type="button"
-                                                onClick={() => updateVendorRow(index, 'isPrimary', !vendorRow.isPrimary)}
-                                                className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${vendorRow.isPrimary ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-100'}`}
-                                            >
-                                                {vendorRow.isPrimary ? 'Primary' : 'Set Primary'}
-                                            </button>
-                                        </div>
-                                        <div className="col-span-6 md:col-span-1 flex justify-end">
-                                            <button
-                                                type="button"
-                                                onClick={() => removeVendorRow(index)}
-                                                className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl border border-rose-100"
-                                                title="Remove Vendor Row"
-                                            >
-                                                <MdDelete size={16} />
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
+                                    ))}
 
-                                <div className="flex items-center justify-between">
-                                    <button
-                                        type="button"
-                                        onClick={addVendorRow}
-                                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary-50 text-primary-700 border border-primary-100 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-primary-100"
-                                    >
-                                        <MdAdd size={16} />
-                                        Add Vendor
-                                    </button>
-                                    {(formData.vendors || []).filter(v => v.vendorId).length > 0 &&
-                                        (formData.vendors || []).filter(v => v.vendorId).every(v => Number(v.stock) <= 0) && (
-                                            <span className="text-[10px] font-black uppercase tracking-widest text-amber-600">
-                                                All mapped vendors are out of stock
-                                            </span>
-                                        )}
+                                    <div className="flex items-center justify-between">
+                                        <button
+                                            type="button"
+                                            onClick={addVendorRow}
+                                            className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary-50 text-primary-700 border border-primary-100 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-primary-100"
+                                        >
+                                            <MdAdd size={16} />
+                                            Add Vendor
+                                        </button>
+                                        {(formData.vendors || []).filter(v => v.vendorId).length > 0 &&
+                                            (formData.vendors || []).filter(v => v.vendorId).every(v => Number(v.stock) <= 0) && (
+                                                <span className="text-[10px] font-black uppercase tracking-widest text-amber-600">
+                                                    All mapped vendors are out of stock
+                                                </span>
+                                            )}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
+                        )}
 
                         <div>
                             <h4 className="text-[10px] font-black text-primary-600 uppercase tracking-[0.2em] mb-6 flex items-center gap-3">
@@ -1670,12 +1744,18 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
             <ImportModal
                 isOpen={isImportModalOpen}
                 onClose={() => setIsImportModalOpen(false)}
-                title="Import Products"
+                title={isVendorUser ? "Import Vendor Product Catalog" : "Import Products"}
                 type="products"
                 onImport={async (file) => {
-                    const result = await importService.importProducts(file);
-                    fetchProducts(); // Refresh products after import
-                    return result;
+                    if (isVendorUser) {
+                        const result = await vendorCatalogService.importCatalog(user?.vendorId, file);
+                        fetchProducts();
+                        return result;
+                    } else {
+                        const result = await importService.importProducts(file);
+                        fetchProducts();
+                        return result;
+                    }
                 }}
                 onDownloadTemplate={importService.getProductTemplate}
             />
