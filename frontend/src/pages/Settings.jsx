@@ -274,7 +274,8 @@ const [logoUploading, setLogoUploading] = useState(false);
             tabs.push(
                 { id: 'branding', label: 'Branding', icon: MdColorLens },
                 { id: 'footer-pages', label: 'Footer Pages', icon: MdDescription },
-                { id: 'landing-plans', label: 'Landing Page Plans ⚡', icon: MdDescription }
+                { id: 'landing-plans', label: 'Landing Page Plans ⚡', icon: MdDescription },
+                { id: 'developer-portal', label: 'Developer Portal 🚀', icon: MdDescription }
             );
         }
     }
@@ -299,6 +300,8 @@ const [logoUploading, setLogoUploading] = useState(false);
                             onClick={() => {
                                 if (tab.id === 'landing-plans') {
                                     navigate('/admin/landing-plans');
+                                } else if (tab.id === 'developer-portal') {
+                                    navigate('/developer');
                                 } else {
                                     setActiveTab(tab.id);
                                 }

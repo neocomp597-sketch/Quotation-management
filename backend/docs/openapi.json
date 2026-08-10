@@ -1,0 +1,114 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "ARCRM Public REST API",
+    "description": "Full-featured public API providing complete CRUD capabilities across all 10 ARCRM system modules.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "ARCRM Developer Support",
+      "email": "developers@arcrm.co.in"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://arcrm.co.in/api/v1",
+      "description": "Production Server"
+    },
+    {
+      "url": "http://localhost:5000/api/v1",
+      "description": "Local Development Server"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "API Key",
+        "description": "Enter your API key starting with arcrm_live_"
+      }
+    }
+  },
+  "security": [
+    { "bearerAuth": [] }
+  ],
+  "paths": {
+    "/customers": {
+      "get": { "summary": "List customers", "tags": ["Customers"], "responses": { "200": { "description": "Paginated list of customers" } } },
+      "post": { "summary": "Create customer", "tags": ["Customers"], "responses": { "201": { "description": "Customer created" } } }
+    },
+    "/customers/{id}": {
+      "get": { "summary": "Get customer by ID", "tags": ["Customers"], "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }], "responses": { "200": { "description": "Customer details" } } },
+      "patch": { "summary": "Update customer", "tags": ["Customers"], "responses": { "200": { "description": "Customer updated" } } },
+      "delete": { "summary": "Delete customer", "tags": ["Customers"], "responses": { "200": { "description": "Customer deleted" } } }
+    },
+    "/contacts": {
+      "get": { "summary": "List contacts", "tags": ["Contacts"], "responses": { "200": { "description": "Paginated contacts" } } },
+      "post": { "summary": "Create contact", "tags": ["Contacts"], "responses": { "201": { "description": "Contact created" } } }
+    },
+    "/contacts/{id}": {
+      "get": { "summary": "Get contact by ID", "tags": ["Contacts"], "responses": { "200": { "description": "Contact details" } } },
+      "patch": { "summary": "Update contact", "tags": ["Contacts"], "responses": { "200": { "description": "Contact updated" } } },
+      "delete": { "summary": "Delete contact", "tags": ["Contacts"], "responses": { "200": { "description": "Contact deleted" } } }
+    },
+    "/leads": {
+      "get": { "summary": "List leads", "tags": ["Leads"], "responses": { "200": { "description": "Paginated leads" } } },
+      "post": { "summary": "Create lead", "tags": ["Leads"], "responses": { "201": { "description": "Lead created" } } }
+    },
+    "/leads/{id}": {
+      "get": { "summary": "Get lead by ID", "tags": ["Leads"], "responses": { "200": { "description": "Lead details" } } },
+      "patch": { "summary": "Update lead", "tags": ["Leads"], "responses": { "200": { "description": "Lead updated" } } },
+      "delete": { "summary": "Delete lead", "tags": ["Leads"], "responses": { "200": { "description": "Lead deleted" } } }
+    },
+    "/deals": {
+      "get": { "summary": "List deals", "tags": ["Deals"], "responses": { "200": { "description": "Paginated deals" } } },
+      "post": { "summary": "Create deal", "tags": ["Deals"], "responses": { "201": { "description": "Deal created" } } }
+    },
+    "/deals/{id}": {
+      "get": { "summary": "Get deal by ID", "tags": ["Deals"], "responses": { "200": { "description": "Deal details" } } },
+      "patch": { "summary": "Update deal", "tags": ["Deals"], "responses": { "200": { "description": "Deal updated" } } },
+      "delete": { "summary": "Delete deal", "tags": ["Deals"], "responses": { "200": { "description": "Deal deleted" } } }
+    },
+    "/products": {
+      "get": { "summary": "List product catalog", "tags": ["Products"], "responses": { "200": { "description": "Paginated products" } } }
+    },
+    "/products/{id}": {
+      "get": { "summary": "Get product by ID", "tags": ["Products"], "responses": { "200": { "description": "Product details" } } }
+    },
+    "/quotations": {
+      "get": { "summary": "List quotations", "tags": ["Quotations"], "responses": { "200": { "description": "Paginated quotations" } } }
+    },
+    "/quotations/{id}": {
+      "get": { "summary": "Get quotation by ID", "tags": ["Quotations"], "responses": { "200": { "description": "Quotation details" } } }
+    },
+    "/vendors": {
+      "get": { "summary": "List vendors", "tags": ["Vendors"], "responses": { "200": { "description": "Paginated vendors" } } },
+      "post": { "summary": "Create vendor", "tags": ["Vendors"], "responses": { "201": { "description": "Vendor created" } } }
+    },
+    "/vendors/{id}": {
+      "get": { "summary": "Get vendor by ID", "tags": ["Vendors"], "responses": { "200": { "description": "Vendor details" } } },
+      "patch": { "summary": "Update vendor", "tags": ["Vendors"], "responses": { "200": { "description": "Vendor updated" } } },
+      "delete": { "summary": "Delete vendor", "tags": ["Vendors"], "responses": { "200": { "description": "Vendor deleted" } } }
+    },
+    "/orders": {
+      "get": { "summary": "List sales orders", "tags": ["Orders"], "responses": { "200": { "description": "Paginated sales orders" } } }
+    },
+    "/orders/{id}": {
+      "get": { "summary": "Get sales order by ID", "tags": ["Orders"], "responses": { "200": { "description": "Sales order details" } } }
+    },
+    "/meetings": {
+      "get": { "summary": "List scheduled meetings", "tags": ["Meetings"], "responses": { "200": { "description": "Paginated meetings" } } },
+      "post": { "summary": "Schedule meeting", "tags": ["Meetings"], "responses": { "201": { "description": "Meeting scheduled" } } }
+    },
+    "/meetings/{id}": {
+      "get": { "summary": "Get meeting by ID", "tags": ["Meetings"], "responses": { "200": { "description": "Meeting details" } } },
+      "delete": { "summary": "Delete meeting", "tags": ["Meetings"], "responses": { "200": { "description": "Meeting deleted" } } }
+    },
+    "/branches": {
+      "get": { "summary": "List office branches", "tags": ["Branches"], "responses": { "200": { "description": "Paginated branches" } } }
+    },
+    "/branches/{id}": {
+      "get": { "summary": "Get branch by ID", "tags": ["Branches"], "responses": { "200": { "description": "Branch details" } } }
+    }
+  }
+}

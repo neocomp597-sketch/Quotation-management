@@ -48,6 +48,17 @@ import FooterPageView from './pages/FooterPageView';
 import SystemUpdates from './pages/SystemUpdates';
 import LandingPlanManager from './pages/LandingPlanManager';
 
+import DeveloperLayout from './pages/Developer/DeveloperLayout';
+import DeveloperOverview from './pages/Developer/pages/Overview';
+import DeveloperQuickStart from './pages/Developer/pages/QuickStart';
+import DeveloperAuthentication from './pages/Developer/pages/Authentication';
+import DeveloperApiKeys from './pages/Developer/pages/ApiKeys';
+import DeveloperApiReference from './pages/Developer/pages/ApiReference';
+import DeveloperWebhooks from './pages/Developer/pages/Webhooks';
+import DeveloperErrors from './pages/Developer/pages/Errors';
+import DeveloperRateLimits from './pages/Developer/pages/RateLimits';
+import DeveloperLogs from './pages/Developer/pages/Logs';
+
 import PayrollDashboard from './pages/PayrollDashboard';
 import PayrollEmployees from './pages/PayrollEmployees';
 import PayrollRuns from './pages/PayrollRuns';
@@ -206,6 +217,20 @@ function App() {
             <Route path="/admin/landing-plans" element={<PermissionRoute adminOnly={true}><Layout><LandingPlanManager /></Layout></PermissionRoute>} />
             <Route path="/super-admin" element={<PermissionRoute superAdminOnly={true}><Layout><SuperAdmin /></Layout></PermissionRoute>} />
             <Route path="/system-updates" element={<PermissionRoute><Layout><SystemUpdates /></Layout></PermissionRoute>} />
+
+            {/* Developer Portal Routes */}
+            <Route path="/developer" element={<ProtectedRoute><DeveloperLayout /></ProtectedRoute>}>
+              <Route index element={<Navigate to="/developer/overview" replace />} />
+              <Route path="overview" element={<DeveloperOverview />} />
+              <Route path="quick-start" element={<DeveloperQuickStart />} />
+              <Route path="authentication" element={<DeveloperAuthentication />} />
+              <Route path="api-keys" element={<DeveloperApiKeys />} />
+              <Route path="api-reference" element={<DeveloperApiReference />} />
+              <Route path="webhooks" element={<DeveloperWebhooks />} />
+              <Route path="errors" element={<DeveloperErrors />} />
+              <Route path="rate-limits" element={<DeveloperRateLimits />} />
+              <Route path="logs" element={<DeveloperLogs />} />
+            </Route>
 
             {/* Sales Pipeline Routes */}
             <Route path="/sales/dashboard" element={<PermissionRoute permissionKey="sales_dashboard"><Layout><SalesDashboard /></Layout></PermissionRoute>} />

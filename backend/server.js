@@ -129,9 +129,13 @@ const cityMasterRoutes = require("./routes/cityMasterRoutes");
 const vendorCatalogRoutes = require("./routes/vendorCatalogRoutes");
 const flowchartRoutes = require("./routes/flowchartRoutes");
 const landingPlanRoutes = require("./routes/landingPlanRoutes");
+const developerRoutes = require("./routes/developerRoutes");
+const publicApiV1 = require("./routes/public-api/v1");
 const scheduler = require("./utils/scheduler");
 
 // API Routes (Reload triggered)
+app.use("/api/v1", publicApiV1);
+app.use("/api/developer", developerRoutes);
 app.use("/api/landing-plans", landingPlanRoutes);
 app.use("/api/city-master", cityMasterRoutes);
 app.use("/api/flowcharts", flowchartRoutes);

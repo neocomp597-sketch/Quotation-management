@@ -974,4 +974,12 @@ export const landingPlanService = {
   seed: () => api.post("/landing-plans/seed"),
 };
 
+export const developerService = {
+  getKeys: () => api.get("/developer/keys"),
+  createKey: (data) => api.post("/developer/keys", data),
+  revokeKey: (id) => api.post(`/developer/keys/${id}/revoke`),
+  getLogs: (params) => api.get("/developer/logs", { params }),
+  getOpenApiSpec: () => api.get("/developer/openapi.json"),
+};
+
 export default api;
