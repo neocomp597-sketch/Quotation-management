@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
+import { landingPlanService } from '../services/api';
 import './LandingPage.css';
 
 const CounterItem = ({ 
@@ -65,6 +66,410 @@ const CounterItem = ({
         <span ref={containerRef} className={className}>
             {prefix}{formattedValue}{suffix}
         </span>
+    );
+};
+
+const DEFAULT_FALLBACK_PLANS = [
+    {
+        tabKey: 'hrms_payroll',
+        tabName: 'HRMS & Payroll',
+        order: 1,
+        tiers: [
+            {
+                tierName: 'FOUNDATION',
+                subtitle: 'For companies that are just getting started with automation',
+                buttonText: 'Free Trial',
+                buttonLink: '/register',
+                featuresHeader: 'Essential Automation Features',
+                badge: '',
+                categories: [
+                    {
+                        categoryName: 'CORE HR',
+                        items: [
+                            {
+                                title: 'Org Structure Management',
+                                description: 'Effortlessly define and manage complex hierarchical organizational structures that clearly define roles and responsibilities.',
+                                isExpandable: true,
+                                isIncluded: true
+                            },
+                            { title: 'Documents & Letters', description: 'Generate standard HR letters and manage documents centrally.', isExpandable: false, isIncluded: true },
+                            { title: 'Employee Onboarding - Basic', description: 'Streamlined basic digital onboarding workflows for new hires.', isExpandable: false, isIncluded: true },
+                            { title: 'Dynamic Employee Profiles', description: 'Comprehensive 360-degree employee profiles with custom fields.', isExpandable: false, isIncluded: true },
+                            { title: 'Standard Access Roles', description: 'Pre-defined role permissions for admins, managers, and employees.', isExpandable: false, isIncluded: true },
+                            { title: 'Employee Exit', description: 'Standard exit workflows and offboarding checklists.', isExpandable: false, isIncluded: true },
+                            { title: 'Notification Engine - Basic', description: 'Automated email alerts for key HR milestones and reminders.', isExpandable: false, isIncluded: true },
+                            { title: 'Reports - Basic', description: 'Standard employee directory and statutory compliance reports.', isExpandable: false, isIncluded: true }
+                        ]
+                    },
+                    {
+                        categoryName: 'TIME & ATTENDANCE',
+                        items: [
+                            { title: 'Attendance Tracking - Basic', description: 'Daily clock-in/clock-out tracking and monthly attendance sheets.', isExpandable: false, isIncluded: true },
+                            { title: 'Shift & Leave Management', description: 'Configure custom leave policies, holidays, and shift schedules.', isExpandable: false, isIncluded: true }
+                        ]
+                    }
+                ]
+            },
+            {
+                tierName: 'STRENGTH',
+                subtitle: 'Scaling with advanced automation & employee engagement',
+                buttonText: 'Free Trial',
+                buttonLink: '/register',
+                featuresHeader: 'All Foundation Features+',
+                badge: 'Popular',
+                categories: [
+                    {
+                        categoryName: 'CORE HR',
+                        items: [
+                            { title: 'Employee Onboarding - Advanced', description: 'Multi-stage automated onboarding workflows with task assignments.', isExpandable: false, isIncluded: true },
+                            { title: 'Keka Sign (e-signature)', description: 'Legally binding e-signatures for contracts and policy acknowledgments.', isExpandable: false, isIncluded: true },
+                            { title: 'Travel Desk', description: 'End-to-end business travel requests, ticketing, and expense approvals.', isExpandable: false, isIncluded: true },
+                            { title: 'Asset Tracking', description: 'Track company hardware, software licenses, and asset allocation.', isExpandable: false, isIncluded: true },
+                            { title: 'People Analytics', description: 'Deep visual workforce trends, turnover rates, and demographic insights.', isExpandable: false, isIncluded: true },
+                            { title: 'Employee Timeline', description: 'Complete history of promotions, transfers, performance reviews, and salary changes.', isExpandable: false, isIncluded: true },
+                            { title: 'Custom Roles & Privileges', description: 'Granular access permission matrix customized to organizational needs.', isExpandable: false, isIncluded: true },
+                            { title: 'Employee Exit Survey', description: 'Automated exit interview surveys and attrition cause analytics.', isExpandable: false, isIncluded: true },
+                            { title: 'Notification Engine - Advanced', description: 'Multi-channel notifications via WhatsApp, Email, and Push notifications.', isExpandable: false, isIncluded: true },
+                            { title: 'Reports - Advanced', description: 'Customizable report builder with scheduled automated export.', isExpandable: false, isIncluded: true }
+                        ]
+                    },
+                    {
+                        categoryName: 'TIME & ATTENDANCE',
+                        items: [
+                            { title: 'Selfie clock-in', description: 'Facial recognition & photo validation for mobile attendance.', isExpandable: false, isIncluded: true },
+                            { title: 'Geo-fencing & GPS Attendance', description: 'Restrict punch-ins to designated office geofences or field sites.', isExpandable: false, isIncluded: true }
+                        ]
+                    }
+                ]
+            },
+            {
+                tierName: 'GROWTH',
+                subtitle: 'With in-built performance management capabilities and business reviews',
+                buttonText: 'Free Trial',
+                buttonLink: '/register',
+                featuresHeader: 'All Strength Features+',
+                badge: 'Enterprise',
+                categories: [
+                    {
+                        categoryName: 'CORE HR',
+                        items: [
+                            { title: 'Workflow Automation', description: 'Custom multi-step approval workflows across all HR operations.', isExpandable: false, isIncluded: true },
+                            { title: 'Custom Reports Builder', description: 'Drag-and-drop report creator with SQL export and API hooks.', isExpandable: false, isIncluded: true },
+                            { title: 'Headcount Planning', description: 'Budget forecasting and recruitment pipeline headcount projections.', isExpandable: false, isIncluded: true },
+                            { title: 'Pre-boarding', description: 'Engage candidates post-offer before day one with digital portals.', isExpandable: false, isIncluded: true }
+                        ]
+                    },
+                    {
+                        categoryName: 'BUSINESS PERFORMANCE',
+                        items: [
+                            { title: 'Company Goals/OKRs', description: 'Cascading company objectives and key results tracking.', isExpandable: false, isIncluded: true },
+                            { title: 'Department and Individual Goals', description: 'Align team goals directly with corporate strategy.', isExpandable: false, isIncluded: true },
+                            { title: 'Goals Alignment', description: 'Visual goal dependency map and progress tracking.', isExpandable: false, isIncluded: true },
+                            { title: 'Goal Insights', description: 'Real-time AI-powered quarterly goal completion forecasts.', isExpandable: false, isIncluded: true },
+                            { title: 'Core Values', description: 'Peer recognition aligned with company core values.', isExpandable: false, isIncluded: true }
+                        ]
+                    },
+                    {
+                        categoryName: 'EMPLOYEE PERFORMANCE',
+                        items: [
+                            { title: 'Performance Appraisals & 360 Feedback', description: 'Annual/quarterly appraisal cycles with 360-degree reviews.', isExpandable: false, isIncluded: true },
+                            { title: 'Continuous Feedback & One-on-Ones', description: 'Structured 1:1 meeting templates and continuous feedback logs.', isExpandable: false, isIncluded: true }
+                        ]
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        tabKey: 'hiring',
+        tabName: 'Hiring',
+        order: 2,
+        tiers: [
+            {
+                tierName: 'FOUNDATION',
+                subtitle: 'Essential Applicant Tracking System for growing teams',
+                buttonText: 'Free Trial',
+                buttonLink: '/register',
+                featuresHeader: 'Essential Hiring Features',
+                badge: '',
+                categories: [
+                    {
+                        categoryName: 'RECRUITMENT & ATS',
+                        items: [
+                            { title: 'Job Requisition Posting', description: 'Create and publish job openings on career pages.', isExpandable: false, isIncluded: true },
+                            { title: 'Candidate Resume Database', description: 'Centralized database with automated candidate profile parsing.', isExpandable: false, isIncluded: true },
+                            { title: 'Basic Interview Scheduling', description: 'Calendar integration for interview scheduling.', isExpandable: false, isIncluded: true }
+                        ]
+                    }
+                ]
+            },
+            {
+                tierName: 'STRENGTH',
+                subtitle: 'Full-suite recruitment automation & candidate experience',
+                buttonText: 'Free Trial',
+                buttonLink: '/register',
+                featuresHeader: 'All Foundation Features+',
+                badge: 'Popular',
+                categories: [
+                    {
+                        categoryName: 'RECRUITMENT & ATS',
+                        items: [
+                            { title: 'Multi-Job Board Distribution', description: '1-click job distribution to LinkedIn, Indeed, and Naukri.', isExpandable: false, isIncluded: true },
+                            { title: 'Automated Candidate Screening', description: 'AI resume scoring and keyword match ranking.', isExpandable: false, isIncluded: true },
+                            { title: 'Offer Letter Generator', description: 'E-sign offer letter dispatch with candidate portal.', isExpandable: false, isIncluded: true }
+                        ]
+                    }
+                ]
+            },
+            {
+                tierName: 'GROWTH',
+                subtitle: 'High-volume hiring & AI talent acquisition suite',
+                buttonText: 'Free Trial',
+                buttonLink: '/register',
+                featuresHeader: 'All Strength Features+',
+                badge: 'Enterprise',
+                categories: [
+                    {
+                        categoryName: 'ADVANCED ATS & TALENT',
+                        items: [
+                            { title: 'Recruitment Agency Portal', description: 'Manage third-party staffing agency submissions & commissions.', isExpandable: false, isIncluded: true },
+                            { title: 'Talent Pool CRM', description: 'Nurture passive talent pipelines for future requisitions.', isExpandable: false, isIncluded: true },
+                            { title: 'AI Video Interviewing', description: 'Asynchronous video assessment interviews.', isExpandable: false, isIncluded: true }
+                        ]
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        tabKey: 'psa',
+        tabName: 'Projects & TimeSheets (PSA)',
+        order: 3,
+        tiers: [
+            {
+                tierName: 'FOUNDATION',
+                subtitle: 'Track project hours and employee time allocation',
+                buttonText: 'Free Trial',
+                buttonLink: '/register',
+                featuresHeader: 'Essential PSA Features',
+                badge: '',
+                categories: [
+                    {
+                        categoryName: 'TIMESHEETS & PROJECTS',
+                        items: [
+                            { title: 'Weekly Timesheet Entry', description: 'Log project and task hours with manager sign-off.', isExpandable: false, isIncluded: true },
+                            { title: 'Project Task Breakdown', description: 'Define milestones, deliverables, and task estimates.', isExpandable: false, isIncluded: true }
+                        ]
+                    }
+                ]
+            },
+            {
+                tierName: 'STRENGTH',
+                subtitle: 'Resource utilization and project profitability management',
+                buttonText: 'Free Trial',
+                buttonLink: '/register',
+                featuresHeader: 'All Foundation Features+',
+                badge: 'Popular',
+                categories: [
+                    {
+                        categoryName: 'TIMESHEETS & PROJECTS',
+                        items: [
+                            { title: 'Resource Capacity Planning', description: 'Visual heatmaps of team billable availability.', isExpandable: false, isIncluded: true },
+                            { title: 'Client Billing & Invoicing', description: 'Convert billable hours directly into tax invoices.', isExpandable: false, isIncluded: true }
+                        ]
+                    }
+                ]
+            },
+            {
+                tierName: 'GROWTH',
+                subtitle: 'Enterprise PSA with real-time financial margin tracking',
+                buttonText: 'Free Trial',
+                buttonLink: '/register',
+                featuresHeader: 'All Strength Features+',
+                badge: 'Enterprise',
+                categories: [
+                    {
+                        categoryName: 'ENTERPRISE PSA',
+                        items: [
+                            { title: 'Project Profitability Analytics', description: 'Real-time revenue, cost, and gross margin per project.', isExpandable: false, isIncluded: true },
+                            { title: 'Custom Billing Rates & Currencies', description: 'Multi-rate cards by seniority, role, and jurisdiction.', isExpandable: false, isIncluded: true }
+                        ]
+                    }
+                ]
+            }
+        ]
+    }
+];
+
+const PlanTierMatrix = () => {
+    const [plans, setPlans] = useState(DEFAULT_FALLBACK_PLANS);
+    const [activeTabKey, setActiveTabKey] = useState('hrms_payroll');
+    const [expandedItems, setExpandedItems] = useState({});
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchPlans = async () => {
+            try {
+                const savedLocal = localStorage.getItem('custom_landing_plans');
+                if (savedLocal) {
+                    const parsed = JSON.parse(savedLocal);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        setPlans(parsed);
+                    }
+                }
+                const res = await landingPlanService.getAll();
+                const data = res.data?.data || [];
+                if (data.length > 0) {
+                    setPlans(data);
+                }
+            } catch (err) {
+                console.warn("Using fallback default landing plans:", err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchPlans();
+    }, []);
+
+    const activePlan = plans.find(p => p.tabKey === activeTabKey) || plans[0];
+
+    const toggleExpand = (itemKey) => {
+        setExpandedItems(prev => ({ ...prev, [itemKey]: !prev[itemKey] }));
+    };
+
+    if (loading) {
+        return (
+            <div className="py-20 text-center text-slate-400 font-semibold">
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-[#006c49] border-t-transparent mb-4"></div>
+                <p className="text-xs uppercase tracking-widest font-black">Loading Plan Matrix...</p>
+            </div>
+        );
+    }
+
+    if (!activePlan) return null;
+
+    return (
+        <section className="py-24 px-6 bg-[#f7f9fb] border-y border-[#bbcabf]/30" id="pricing">
+            <div className="max-w-[1280px] mx-auto space-y-12">
+                {/* Header & Tabs */}
+                <div className="text-center space-y-6 max-w-3xl mx-auto">
+                    <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#006c49]/10 text-[#006c49] font-extrabold text-[11px] tracking-widest uppercase border border-[#006c49]/20 shadow-sm">
+                        <span>Plans & Features Matrix</span>
+                    </div>
+                    <h2 className="text-3xl md:text-5xl font-black text-[#191c1e] tracking-tight leading-tight">
+                        Built for companies at <span className="emerald-gradient-text">every scale</span>
+                    </h2>
+                    <p className="text-[#3c4a42] text-sm md:text-base font-semibold">
+                        Explore module features across Foundation, Strength, and Growth tier plans.
+                    </p>
+
+                    {/* Navigation Tabs */}
+                    <div className="flex justify-center border-b border-[#bbcabf]/40 gap-6 md:gap-12 max-w-3xl mx-auto pt-6 overflow-x-auto">
+                        {plans.map(plan => {
+                            const isActive = activeTabKey === plan.tabKey;
+                            return (
+                                <button
+                                    key={plan.tabKey}
+                                    onClick={() => setActiveTabKey(plan.tabKey)}
+                                    className={`pb-4 px-3 font-black text-sm md:text-base transition-all whitespace-nowrap relative ${
+                                        isActive 
+                                            ? 'text-[#006c49] border-b-2 border-[#006c49]' 
+                                            : 'text-[#3c4a42] hover:text-[#006c49]'
+                                    }`}
+                                >
+                                    {plan.tabName}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {/* 3 Tier Grid (FOUNDATION, STRENGTH, GROWTH) */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch text-left">
+                    {activePlan.tiers.map((tier, tierIdx) => (
+                        <div 
+                            key={tierIdx} 
+                            className={`rounded-[2rem] p-8 border transition-all duration-300 relative flex flex-col justify-between h-full bg-white ${
+                                tier.badge ? 'border-[#006c49]/40 shadow-2xl ring-4 ring-[#006c49]/10' : 'border-[#bbcabf]/30 shadow-sm hover:shadow-xl'
+                            }`}
+                        >
+                            {tier.badge && (
+                                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-[#006c49] text-white font-black text-[10px] tracking-widest uppercase shadow-lg">
+                                    {tier.badge}
+                                </div>
+                            )}
+
+                            <div className="space-y-6 flex-1 flex flex-col">
+                                {/* Top Box */}
+                                <div className="text-center space-y-3 pb-6 border-b border-slate-100">
+                                    <h3 className="text-2xl font-black text-[#191c1e] tracking-wider uppercase">
+                                        {tier.tierName}
+                                    </h3>
+                                    <p className="text-xs font-semibold text-[#3c4a42] min-h-[40px] flex items-center justify-center max-w-xs mx-auto leading-relaxed">
+                                        {tier.subtitle}
+                                    </p>
+                                    <div className="pt-2">
+                                        <Link 
+                                            to={tier.buttonLink || '/register'}
+                                            className="w-full inline-block py-3.5 px-6 rounded-2xl font-black text-white text-xs uppercase tracking-widest primary-gradient-btn transition-all shadow-xl hover:scale-105 active:scale-95 text-center"
+                                        >
+                                            {tier.buttonText || 'Free Trial'}
+                                        </Link>
+                                    </div>
+                                </div>
+
+                                {/* Features List Header */}
+                                <div className="font-black text-xs text-[#191c1e] tracking-wider uppercase pt-2">
+                                    {tier.featuresHeader}
+                                </div>
+
+                                {/* Categories */}
+                                <div className="space-y-6 pt-2 flex-1">
+                                    {tier.categories.map((cat, catIdx) => (
+                                        <div key={catIdx} className="space-y-3">
+                                            <div className="text-[10px] font-black uppercase tracking-widest text-[#3c4a42]/70">
+                                                {cat.categoryName}
+                                            </div>
+
+                                            <ul className="space-y-3">
+                                                {cat.items.map((item, itemIdx) => {
+                                                    const itemKey = `${tierIdx}-${catIdx}-${itemIdx}`;
+                                                    const isExpanded = !!expandedItems[itemKey];
+                                                    const hasDesc = Boolean(item.description && item.description.trim());
+
+                                                    return (
+                                                        <li key={itemIdx} className="text-xs text-[#191c1e] font-semibold">
+                                                            <div 
+                                                                onClick={() => hasDesc && toggleExpand(itemKey)}
+                                                                className={`flex items-start gap-2.5 ${hasDesc ? 'cursor-pointer group select-none' : ''}`}
+                                                            >
+                                                                <span className={`text-[10px] text-[#006c49] shrink-0 mt-0.5 transition-transform duration-200 ${isExpanded ? 'rotate-90 text-[#006c49] font-black' : 'group-hover:text-[#006c49]'}`}>
+                                                                    ▶
+                                                                </span>
+                                                                <span className={`flex-1 ${isExpanded ? 'text-[#006c49] font-bold' : 'group-hover:text-[#006c49]'}`}>
+                                                                    {item.title}
+                                                                </span>
+                                                            </div>
+
+                                                            {/* Expandable description accordion */}
+                                                            {hasDesc && isExpanded && (
+                                                                <div className="mt-2.5 ml-4 p-3 bg-[#006c49]/5 border border-[#006c49]/20 rounded-2xl text-[11px] text-[#004d34] font-medium leading-relaxed animate-in fade-in duration-200">
+                                                                    {item.description}
+                                                                </div>
+                                                            )}
+                                                        </li>
+                                                    );
+                                                })}
+                                            </ul>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </section>
     );
 };
 
@@ -242,65 +647,8 @@ const LandingPage = () => {
                     </div>
                 </section>
 
-                {/* Feature Grid (Bento Style Card Design) */}
-                <section className="py-24 px-6 bg-[#f7f9fb]" id="features">
-                    <div className="max-w-[1280px] mx-auto">
-                        <div className="text-center mb-16">
-                            <h2 className="text-3xl font-semibold text-[#191c1e] mb-4">Everything you need to create <span className="emerald-gradient-text">winning quotes</span></h2>
-                            <p className="text-[#3c4a42] text-base max-w-2xl mx-auto">Unified CRM tools designed for speed, accuracy, and conversion across your entire sales organization.</p>
-                        </div>
-                        <div className="grid md:grid-cols-3 gap-6">
-                            {/* Card 1 */}
-                            <div className="bg-[#ffffff] p-8 rounded-2xl border border-[#bbcabf]/30 hover:border-[#006c49]/40 hover:shadow-xl transition-all duration-300 text-left">
-                                <div className="w-12 h-12 bg-[#006c49]/10 text-[#006c49] rounded-xl flex items-center justify-center mb-6">
-                                    <span className="material-symbols-outlined">description</span>
-                                </div>
-                                <h3 className="text-lg font-semibold text-[#191c1e] mb-2">Professional Quotes</h3>
-                                <p className="text-[#3c4a42] text-sm leading-relaxed">Create beautiful, branded proposals in minutes with dynamic pricing and custom templates.</p>
-                            </div>
-                            {/* Card 2 */}
-                            <div className="bg-[#ffffff] p-8 rounded-2xl border border-[#bbcabf]/30 hover:border-[#006c49]/40 hover:shadow-xl transition-all duration-300 text-left">
-                                <div className="w-12 h-12 bg-[#006c49]/10 text-[#006c49] rounded-xl flex items-center justify-center mb-6">
-                                    <span className="material-symbols-outlined">visibility</span>
-                                </div>
-                                <h3 className="text-lg font-semibold text-[#191c1e] mb-2">Track & Monitor</h3>
-                                <p className="text-[#3c4a42] text-sm leading-relaxed">Get real-time alerts when prospects open, view, or comment on your sales proposals.</p>
-                            </div>
-                            {/* Card 3 */}
-                            <div className="bg-[#ffffff] p-8 rounded-2xl border border-[#bbcabf]/30 hover:border-[#006c49]/40 hover:shadow-xl transition-all duration-300 text-left">
-                                <div className="w-12 h-12 bg-[#006c49]/10 text-[#006c49] rounded-xl flex items-center justify-center mb-6">
-                                    <span className="material-symbols-outlined">auto_awesome</span>
-                                </div>
-                                <h3 className="text-lg font-semibold text-[#191c1e] mb-2">AI-Powered Insights</h3>
-                                <p className="text-[#3c4a42] text-sm leading-relaxed">Smart product suggestions and predictive pricing to maximize deal value and success rate.</p>
-                            </div>
-                            {/* Card 4 */}
-                            <div className="bg-[#ffffff] p-8 rounded-2xl border border-[#bbcabf]/30 hover:border-[#006c49]/40 hover:shadow-xl transition-all duration-300 text-left">
-                                <div className="w-12 h-12 bg-[#006c49]/10 text-[#006c49] rounded-xl flex items-center justify-center mb-6">
-                                    <span className="material-symbols-outlined">draw</span>
-                                </div>
-                                <h3 className="text-lg font-semibold text-[#191c1e] mb-2">E-Sign & Approvals</h3>
-                                <p className="text-[#3c4a42] text-sm leading-relaxed">Close deals faster with integrated legally binding digital signatures and multi-level approval workflows.</p>
-                            </div>
-                            {/* Card 5 */}
-                            <div className="bg-[#ffffff] p-8 rounded-2xl border border-[#bbcabf]/30 hover:border-[#006c49]/40 hover:shadow-xl transition-all duration-300 text-left">
-                                <div className="w-12 h-12 bg-[#006c49]/10 text-[#006c49] rounded-xl flex items-center justify-center mb-6">
-                                    <span className="material-symbols-outlined">leaderboard</span>
-                                </div>
-                                <h3 className="text-lg font-semibold text-[#191c1e] mb-2">Analytics Dashboard</h3>
-                                <p className="text-[#3c4a42] text-sm leading-relaxed">Advanced data visualization for pipeline health, sales velocity, and team performance tracking.</p>
-                            </div>
-                            {/* Card 6 */}
-                            <div className="bg-[#ffffff] p-8 rounded-2xl border border-[#bbcabf]/30 hover:border-[#006c49]/40 hover:shadow-xl transition-all duration-300 text-left">
-                                <div className="w-12 h-12 bg-[#006c49]/10 text-[#006c49] rounded-xl flex items-center justify-center mb-6">
-                                    <span className="material-symbols-outlined">inventory_2</span>
-                                </div>
-                                <h3 className="text-lg font-semibold text-[#191c1e] mb-2">Inventory Integration</h3>
-                                <p className="text-[#3c4a42] text-sm leading-relaxed">Seamlessly sync with your ERP to ensure accurate stock levels and pricing in every quotation.</p>
-                            </div>
-                        </div>
-                    </div>
-                </section>
+                {/* Foundation, Strength, Growth Plan Tier Matrix */}
+                <PlanTierMatrix />
 
                 {/* Why ARCRM Table */}
                 <section className="py-24 px-6 bg-[#f2f4f6]" id="solutions">

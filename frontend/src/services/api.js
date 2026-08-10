@@ -967,4 +967,11 @@ export const vendorCatalogService = {
   }
 };
 
+export const landingPlanService = {
+  getAll: () => api.get("/landing-plans"),
+  save: (data) => api.post("/landing-plans", data),
+  delete: (tabKey) => api.delete(`/landing-plans/${tabKey}`),
+  seed: () => api.post("/landing-plans/seed"),
+};
+
 export default api;

@@ -7,6 +7,7 @@ import Modal from '../components/Modal';
 import ImportModal from '../components/ImportModal';
 import PaginationControls from '../components/PaginationControls';
 import { vendorService, importService } from '../services/api';
+import { isValidGSTIN, isValidMobile } from '../utils/validation';
 
 const LIST_PAGE_SIZE = 20;
 
@@ -169,9 +170,15 @@ const Vendors = ({ isCreatePage, isEditPage }) => {
 
     const onChange = (e) => {
         const { name, value, type, checked } = e.target;
+        let val = value;
+        if (name === 'gstin') {
+            val = value.toUpperCase().slice(0, 15);
+        } else if (name === 'phone') {
+            val = value.replace(/[^\d]/g, '').slice(0, 10);
+        }
         setFormData((prev) => ({
             ...prev,
-            [name]: type === 'checkbox' ? checked : value
+            [name]: type === 'checkbox' ? checked : val
         }));
     };
 
@@ -179,6 +186,14 @@ const Vendors = ({ isCreatePage, isEditPage }) => {
         e.preventDefault();
         if (!formData.name?.trim()) {
             toast.error('Vendor name is required');
+            return;
+        }
+        if (formData.phone && !isValidMobile(formData.phone)) {
+            toast.error('Invalid Phone Number (must be 10 digits)');
+            return;
+        }
+        if (formData.gstin && !isValidGSTIN(formData.gstin)) {
+            toast.error('Invalid GSTIN format (must be 15 characters, e.g. 27AAAAA0000A1Z5)');
             return;
         }
 
@@ -422,10 +437,11 @@ const Vendors = ({ isCreatePage, isEditPage }) => {
                                         <input
                                             type="text"
                                             name="phone"
+                                            maxLength={10}
                                             value={formData.phone}
                                             onChange={onChange}
                                             className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none"
-                                            placeholder="+91"
+                                            placeholder="10-digit phone number"
                                         />
                                     </div>
                                 </div>
@@ -446,10 +462,11 @@ const Vendors = ({ isCreatePage, isEditPage }) => {
                                         <input
                                             type="text"
                                             name="gstin"
+                                            maxLength={15}
                                             value={formData.gstin}
                                             onChange={onChange}
-                                            className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none"
-                                            placeholder="GST Number"
+                                            className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none uppercase font-mono"
+                                            placeholder="15-Digit GSTIN Code"
                                         />
                                     </div>
                                 </div>

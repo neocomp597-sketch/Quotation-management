@@ -8,6 +8,7 @@ import ImportModal from '../components/ImportModal';
 import PaginationControls from '../components/PaginationControls';
 import { contactService, customerService, csmService, importService } from '../services/api';
 import SearchableSelect from '../components/SearchableSelect';
+import { BLOOD_GROUP_OPTIONS, isValidGSTIN, isValidMobile, isValidPincode } from '../utils/validation';
 
 const LIST_PAGE_SIZE = 20;
 
@@ -307,36 +308,25 @@ const Contacts = ({ isCreatePage, isEditPage }) => {
             return 'Please enter a valid alternate Email address';
         }
 
-        if (data.phone && data.phone.trim()) {
-            const cleanPhone = data.phone.replace(/[\s\-\(\)\+]/g, '');
-            if (cleanPhone.length < 10 || cleanPhone.length > 13) {
-                return 'Primary Mobile number must be a valid 10-digit phone number';
-            }
+        if (data.phone && data.phone.trim() && !isValidMobile(data.phone)) {
+            return 'Primary Mobile number must be a valid 10-digit number';
         }
-        if (data.alternatePhone && data.alternatePhone.trim()) {
-            const cleanAlt = data.alternatePhone.replace(/[\s\-\(\)\+]/g, '');
-            if (cleanAlt.length < 10 || cleanAlt.length > 13) {
-                return 'Alternate Mobile number must be a valid 10-digit phone number';
-            }
+        if (data.alternatePhone && data.alternatePhone.trim() && !isValidMobile(data.alternatePhone)) {
+            return 'Alternate Mobile number must be a valid 10-digit number';
         }
-        if (data.whatsappNumber && data.whatsappNumber.trim()) {
-            const cleanWA = data.whatsappNumber.replace(/[\s\-\(\)\+]/g, '');
-            if (cleanWA.length < 10 || cleanWA.length > 13) {
-                return 'WhatsApp number must be a valid 10-digit phone number';
-            }
+        if (data.whatsappNumber && data.whatsappNumber.trim() && !isValidMobile(data.whatsappNumber)) {
+            return 'WhatsApp number must be a valid 10-digit number';
+        }
+        if (data.officePhone && data.officePhone.trim() && !isValidMobile(data.officePhone)) {
+            return 'Office Phone number must be a valid 10-digit number';
         }
 
-        if (data.gstin && data.gstin.trim()) {
-            const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
-            if (!gstRegex.test(data.gstin.trim().toUpperCase())) {
-                return 'Invalid GSTIN format. Expected format: 27AAAAA0000A1Z5';
-            }
+        if (data.gstin && data.gstin.trim() && !isValidGSTIN(data.gstin)) {
+            return 'Invalid GSTIN format. Expected format: 27AAAAA0000A1Z5';
         }
 
-        if (data.pincode && data.pincode.trim()) {
-            if (!/^\d{6}$/.test(data.pincode.trim())) {
-                return 'PIN Code must be exactly 6 numeric digits';
-            }
+        if (data.pincode && data.pincode.trim() && !isValidPincode(data.pincode)) {
+            return 'PIN Code must be exactly 6 numeric digits (e.g. 411001)';
         }
 
         const today = new Date();
@@ -431,7 +421,15 @@ const Contacts = ({ isCreatePage, isEditPage }) => {
 
     const onChange = (e) => {
         const { name, value } = e.target;
-        setFormData((prev) => ({ ...prev, [name]: value }));
+        let val = value;
+        if (name === 'gstin') {
+            val = value.toUpperCase().slice(0, 15);
+        } else if (name === 'pincode') {
+            val = value.replace(/[^\d]/g, '').slice(0, 6);
+        } else if (['phone', 'alternatePhone', 'whatsappNumber', 'officePhone'].includes(name)) {
+            val = value.replace(/[^\d]/g, '').slice(0, 10);
+        }
+        setFormData((prev) => ({ ...prev, [name]: val }));
     };
 
     const onSubmit = async (e) => {
@@ -750,14 +748,17 @@ const Contacts = ({ isCreatePage, isEditPage }) => {
                                         </div>
                                         <div className="space-y-2">
                                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Blood Group</label>
-                                            <input
-                                                type="text"
+                                            <select
                                                 name="bloodGroup"
-                                                value={formData.bloodGroup}
+                                                value={formData.bloodGroup || ''}
                                                 onChange={onChange}
-                                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none"
-                                                placeholder="e.g. O+, A+, B+"
-                                            />
+                                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all"
+                                            >
+                                                <option value="">Select Blood Group</option>
+                                                {BLOOD_GROUP_OPTIONS.map((bg) => (
+                                                    <option key={bg} value={bg}>{bg}</option>
+                                                ))}
+                                            </select>
                                         </div>
                                         <div className="space-y-2">
                                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Marital Status</label>
@@ -843,6 +844,7 @@ const Contacts = ({ isCreatePage, isEditPage }) => {
                                             <input
                                                 type="text"
                                                 name="gstin"
+                                                maxLength={15}
                                                 value={formData.gstin}
                                                 onChange={onChange}
                                                 className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none uppercase font-mono"
@@ -874,10 +876,11 @@ const Contacts = ({ isCreatePage, isEditPage }) => {
                                             <input
                                                 type="text"
                                                 name="phone"
+                                                maxLength={10}
                                                 value={formData.phone}
                                                 onChange={onChange}
                                                 className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none"
-                                                placeholder="+91 9876543210"
+                                                placeholder="10-digit primary mobile"
                                             />
                                         </div>
                                         <div className="space-y-2">
@@ -885,10 +888,11 @@ const Contacts = ({ isCreatePage, isEditPage }) => {
                                             <input
                                                 type="text"
                                                 name="alternatePhone"
+                                                maxLength={10}
                                                 value={formData.alternatePhone}
                                                 onChange={onChange}
                                                 className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none"
-                                                placeholder="Alternate mobile"
+                                                placeholder="10-digit alternate mobile"
                                             />
                                         </div>
                                         <div className="space-y-2">
@@ -896,10 +900,11 @@ const Contacts = ({ isCreatePage, isEditPage }) => {
                                             <input
                                                 type="text"
                                                 name="whatsappNumber"
+                                                maxLength={10}
                                                 value={formData.whatsappNumber}
                                                 onChange={onChange}
                                                 className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none"
-                                                placeholder="WhatsApp number"
+                                                placeholder="10-digit WhatsApp number"
                                             />
                                         </div>
                                         <div className="space-y-2">
@@ -929,10 +934,11 @@ const Contacts = ({ isCreatePage, isEditPage }) => {
                                             <input
                                                 type="text"
                                                 name="officePhone"
+                                                maxLength={10}
                                                 value={formData.officePhone}
                                                 onChange={onChange}
                                                 className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none"
-                                                placeholder="020-12345678"
+                                                placeholder="10-digit office phone"
                                             />
                                         </div>
                                     </div>
@@ -982,6 +988,7 @@ const Contacts = ({ isCreatePage, isEditPage }) => {
                                             <input
                                                 type="text"
                                                 name="pincode"
+                                                maxLength={6}
                                                 value={formData.pincode}
                                                 onChange={onChange}
                                                 className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none"

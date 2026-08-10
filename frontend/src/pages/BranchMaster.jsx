@@ -8,6 +8,7 @@ import { toast } from 'react-toastify';
 import { branchService, stateMasterService } from '../services/api';
 import Modal from '../components/Modal';
 import CascadingLocationSelector from '../components/CascadingLocationSelector';
+import { isValidGSTIN, isValidMobile, isValidPincode } from '../utils/validation';
 
 const BranchMaster = ({ isCreatePage, isEditPage }) => {
     const navigate = useNavigate();
@@ -143,6 +144,19 @@ const BranchMaster = ({ isCreatePage, isEditPage }) => {
         
         if (!formData.name || !formData.code || !formData.branchPrefix) {
             toast.error('Branch Name, Code, and Prefix are required!');
+            return;
+        }
+
+        if (formData.pincode && !isValidPincode(formData.pincode)) {
+            toast.error('Invalid Pincode (must be exactly 6 numeric digits)');
+            return;
+        }
+        if (formData.contactNo && !isValidMobile(formData.contactNo)) {
+            toast.error('Invalid Contact Phone (must be 10 digits)');
+            return;
+        }
+        if (formData.gstNo && !isValidGSTIN(formData.gstNo)) {
+            toast.error('Invalid GSTIN format (must be 15 characters, e.g. 27AAAAA0000A1Z5)');
             return;
         }
 
@@ -517,9 +531,10 @@ const BranchMaster = ({ isCreatePage, isEditPage }) => {
                                         </label>
                                         <input
                                             type="text"
+                                            maxLength={6}
                                             placeholder="400001"
                                             value={formData.pincode}
-                                            onChange={(e) => setFormData({ ...formData, pincode: e.target.value })}
+                                            onChange={(e) => setFormData({ ...formData, pincode: e.target.value.replace(/[^\d]/g, '').slice(0, 6) })}
                                             className="w-full px-3.5 py-3 bg-slate-50 rounded-xl border border-slate-200 text-sm font-semibold text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20 outline-none"
                                         />
                                     </div>
@@ -529,9 +544,10 @@ const BranchMaster = ({ isCreatePage, isEditPage }) => {
                                         </label>
                                         <input
                                             type="text"
-                                            placeholder="+91 9876543210"
+                                            maxLength={10}
+                                            placeholder="10-digit contact phone"
                                             value={formData.contactNo}
-                                            onChange={(e) => setFormData({ ...formData, contactNo: e.target.value })}
+                                            onChange={(e) => setFormData({ ...formData, contactNo: e.target.value.replace(/[^\d]/g, '').slice(0, 10) })}
                                             className="w-full px-3.5 py-3 bg-slate-50 rounded-xl border border-slate-200 text-sm font-semibold text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20 outline-none"
                                         />
                                     </div>
@@ -553,10 +569,11 @@ const BranchMaster = ({ isCreatePage, isEditPage }) => {
                                         </label>
                                         <input
                                             type="text"
+                                            maxLength={15}
                                             placeholder="27AAAAA0000A1Z5"
                                             value={formData.gstNo}
-                                            onChange={(e) => setFormData({ ...formData, gstNo: e.target.value.toUpperCase() })}
-                                            className="w-full px-3.5 py-3 bg-slate-50 rounded-xl border border-slate-200 text-sm font-semibold uppercase text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20 outline-none"
+                                            onChange={(e) => setFormData({ ...formData, gstNo: e.target.value.toUpperCase().slice(0, 15) })}
+                                            className="w-full px-3.5 py-3 bg-slate-50 rounded-xl border border-slate-200 text-sm font-semibold uppercase text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20 outline-none font-mono"
                                         />
                                     </div>
                                 </div>

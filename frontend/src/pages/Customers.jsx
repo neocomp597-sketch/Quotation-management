@@ -8,6 +8,7 @@ import Modal from '../components/Modal';
 import ImportModal from '../components/ImportModal';
 import PaginationControls from '../components/PaginationControls';
 import { resolveImageUrl } from '../utils/helpers';
+import { isValidGSTIN, isValidPAN, isValidMobile } from '../utils/validation';
 import CustomerPricingDashboard from './CustomerPricingDashboard';
 import { useSubmitGuard } from '../hooks/useSubmitGuard';
 
@@ -193,17 +194,25 @@ const Customers = ({ isCreatePage, isEditPage }) => {
 
     const handleFormChange = (e) => {
         const { name, value } = e.target;
+        let val = value;
+        if (name === 'gstin') {
+            val = value.toUpperCase().slice(0, 15);
+        } else if (name === 'pan') {
+            val = value.toUpperCase().slice(0, 10);
+        } else if (name === 'mobile') {
+            val = value.replace(/[^\d]/g, '').slice(0, 10);
+        }
         if (name.includes('.')) {
             const [parent, child] = name.split('.');
             setFormData(prev => ({
                 ...prev,
                 [parent]: {
                     ...prev[parent],
-                    [child]: value
+                    [child]: val
                 }
             }));
         } else {
-            setFormData(prev => ({ ...prev, [name]: value }));
+            setFormData(prev => ({ ...prev, [name]: val }));
         }
     };
 
@@ -234,6 +243,18 @@ const Customers = ({ isCreatePage, isEditPage }) => {
         }
         if (!formData.customerName?.trim()) {
             toast.error('Customer Code is required');
+            return;
+        }
+        if (formData.gstin && !isValidGSTIN(formData.gstin)) {
+            toast.error('Invalid GSTIN format (must be 15 characters, e.g. 27AAAAA0000A1Z5)');
+            return;
+        }
+        if (formData.mobile && !isValidMobile(formData.mobile)) {
+            toast.error('Invalid Mobile Number (must be 10 digits)');
+            return;
+        }
+        if (formData.pan && !isValidPAN(formData.pan)) {
+            toast.error('Invalid PAN format (must be 10 characters, e.g. ABCDE1234F)');
             return;
         }
 
@@ -795,10 +816,11 @@ const Customers = ({ isCreatePage, isEditPage }) => {
                                                     <input
                                                         type="text"
                                                         name="mobile"
+                                                        maxLength={10}
                                                         value={formData.mobile}
                                                         onChange={handleFormChange}
                                                         className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-bold"
-                                                        placeholder="+91"
+                                                        placeholder="10-digit mobile number"
                                                     />
                                                 </div>
                                             </div>
@@ -833,6 +855,7 @@ const Customers = ({ isCreatePage, isEditPage }) => {
                                                 <input
                                                     type="text"
                                                     name="gstin"
+                                                    maxLength={15}
                                                     value={formData.gstin || ''}
                                                     onChange={handleFormChange}
                                                     className="w-full px-4 py-3.5 bg-primary-50/50 border border-primary-100 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-mono font-black text-primary-700 uppercase"
@@ -950,6 +973,7 @@ const Customers = ({ isCreatePage, isEditPage }) => {
                                                 <input
                                                     type="text"
                                                     name="pan"
+                                                    maxLength={10}
                                                     value={formData.pan || ''}
                                                     onChange={handleFormChange}
                                                     className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-mono font-bold uppercase"

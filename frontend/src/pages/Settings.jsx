@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { MdBusiness, MdPerson, MdLocationOn, MdAccountBalance, MdDescription, MdCloudUpload, MdSave, MdEdit, MdVisibility, MdVisibilityOff, MdColorLens } from 'react-icons/md';
 import { userService, companySettingsService, uploadService, footerPageService } from '../services/api';
@@ -8,6 +9,7 @@ import { ROLE_LABELS } from '../constants/menuPermissions';
 import RichTextEditor from '../components/RichTextEditor';
 
 const Settings = () => {
+    const navigate = useNavigate();
     const { user: authUser, refreshSession } = useAuth();
     const [activeTab, setActiveTab] = useState('profile');
     const [loading, setLoading] = useState(false);
@@ -271,7 +273,8 @@ const [logoUploading, setLogoUploading] = useState(false);
         if (userRole === 'admin' || userRole === 'super_admin') {
             tabs.push(
                 { id: 'branding', label: 'Branding', icon: MdColorLens },
-                { id: 'footer-pages', label: 'Footer Pages', icon: MdDescription }
+                { id: 'footer-pages', label: 'Footer Pages', icon: MdDescription },
+                { id: 'landing-plans', label: 'Landing Page Plans ⚡', icon: MdDescription }
             );
         }
     }
@@ -293,7 +296,13 @@ const [logoUploading, setLogoUploading] = useState(false);
                     return (
                         <button
                             key={tab.id}
-                            onClick={() => setActiveTab(tab.id)}
+                            onClick={() => {
+                                if (tab.id === 'landing-plans') {
+                                    navigate('/admin/landing-plans');
+                                } else {
+                                    setActiveTab(tab.id);
+                                }
+                            }}
                             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm transition-all ${activeTab === tab.id
                                 ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/20'
                                 : 'text-slate-500 hover:bg-slate-50'

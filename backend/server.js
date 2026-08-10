@@ -128,9 +128,11 @@ const stateMasterRoutes = require("./routes/stateMasterRoutes");
 const cityMasterRoutes = require("./routes/cityMasterRoutes");
 const vendorCatalogRoutes = require("./routes/vendorCatalogRoutes");
 const flowchartRoutes = require("./routes/flowchartRoutes");
+const landingPlanRoutes = require("./routes/landingPlanRoutes");
 const scheduler = require("./utils/scheduler");
 
 // API Routes (Reload triggered)
+app.use("/api/landing-plans", landingPlanRoutes);
 app.use("/api/city-master", cityMasterRoutes);
 app.use("/api/flowcharts", flowchartRoutes);
 app.use("/api/state-master", stateMasterRoutes);
@@ -176,6 +178,15 @@ app.use("/api/csm", csmRoutes);
 app.use("/api/cpq", cpqRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/clm", clmRoutes);
+
+app.get('/api/trigger-seed-landing', async (req, res) => {
+    try {
+        const landingPlanController = require('./controllers/landingPlanController');
+        await landingPlanController.seedLandingPlans(req, res);
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
 
 app.get('/api/trigger-seed', async (req, res) => {
     try {
@@ -922,6 +933,15 @@ if (require.main === module) {
     try {
         require('fs').writeFileSync(require('path').join(__dirname, 'test_run.txt'), 'Hello at ' + new Date().toISOString());
         await dbStartupPromise;
+        
+        // Auto-seed LandingPlan model if empty
+        const LandingPlan = require('./models/LandingPlan');
+        const landingPlanCount = await LandingPlan.countDocuments();
+        if (landingPlanCount === 0) {
+            const landingPlanController = require('./controllers/landingPlanController');
+            await landingPlanController.seedLandingPlans();
+            console.log('[SEED] Auto-seeded LandingPlan collection!');
+        }
         const Quotation = require('./models/Quotation');
         const quotations = await Quotation.find({}).lean();
         const output = quotations.map(q => `ID: ${q._id}, quotationNo: ${q.quotationNo}, companyId: ${q.companyId}, status: ${q.status}`).join('\n');

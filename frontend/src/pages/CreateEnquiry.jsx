@@ -5,6 +5,7 @@ import { toast } from 'react-toastify';
 import { customerService, enquiryService, vendorService, productService } from '../services/api';
 import Modal from '../components/Modal';
 import PortalDropdown from '../components/PortalDropdown';
+import { isValidMobile, isValidGSTIN } from '../utils/validation';
 
 // Reuse CustomerSearchDropdown with Teal accents
 const CustomerSearchDropdown = ({ customers, selectedCustomerId, onSelect }) => {
@@ -413,7 +414,11 @@ const CreateEnquiry = () => {
 
     const handleHeaderChange = (e) => {
         const { name, value } = e.target;
-        setHeader(prev => ({ ...prev, [name]: value }));
+        let val = value;
+        if (name === 'contactMobile') {
+            val = value.replace(/[^\d]/g, '').slice(0, 10);
+        }
+        setHeader(prev => ({ ...prev, [name]: val }));
     };
 
     const formatCustomerAddress = (customer) => {
@@ -437,6 +442,14 @@ const CreateEnquiry = () => {
 
     const handleCreateCustomer = async (e) => {
         e.preventDefault();
+        if (newCustomerForm.mobile && !isValidMobile(newCustomerForm.mobile)) {
+            toast.error('Invalid Customer Mobile Number (must be 10 digits)');
+            return;
+        }
+        if (newCustomerForm.gstin && !isValidGSTIN(newCustomerForm.gstin)) {
+            toast.error('Invalid GSTIN format (must be 15 characters, e.g. 27AAAAA0000A1Z5)');
+            return;
+        }
         try {
             const res = await customerService.create(newCustomerForm);
             const newCust = res.data?.data || res.data;
@@ -614,6 +627,11 @@ const CreateEnquiry = () => {
             return;
         }
 
+        if (header.contactMobile && !isValidMobile(header.contactMobile)) {
+            toast.error('Invalid Contact Mobile Number (must be 10 digits)');
+            return;
+        }
+
         const filledItems = items.filter(item => !isBlankRow(item));
 
         if (filledItems.length === 0) {
@@ -718,6 +736,11 @@ const CreateEnquiry = () => {
 
         if (!header.customerId) {
             toast.error('Customer is required');
+            return;
+        }
+
+        if (header.contactMobile && !isValidMobile(header.contactMobile)) {
+            toast.error('Invalid Contact Mobile Number (must be 10 digits)');
             return;
         }
 
@@ -1016,9 +1039,10 @@ const CreateEnquiry = () => {
                             <input
                                 type="tel"
                                 name="contactMobile"
+                                maxLength={10}
                                 value={header.contactMobile}
                                 onChange={handleHeaderChange}
-                                placeholder="Mobile number"
+                                placeholder="10-digit mobile number"
                                 className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold focus:bg-white focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 transition-all text-slate-800"
                             />
                         </div>
@@ -1576,8 +1600,9 @@ const CreateEnquiry = () => {
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 text-teal-600">Mobile No.</label>
                         <input
                             type="tel"
+                            maxLength={10}
                             value={newCustomerForm.mobile}
-                            onChange={(e) => setNewCustomerForm(prev => ({ ...prev, mobile: e.target.value }))}
+                            onChange={(e) => setNewCustomerForm(prev => ({ ...prev, mobile: e.target.value.replace(/[^\d]/g, '').slice(0, 10) }))}
                             placeholder="e.g. 9876543210"
                             className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold focus:bg-white focus:border-teal-500 transition-all text-slate-800"
                         />
@@ -1586,10 +1611,11 @@ const CreateEnquiry = () => {
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 text-teal-600">GSTIN</label>
                         <input
                             type="text"
+                            maxLength={15}
                             value={newCustomerForm.gstin}
-                            onChange={(e) => setNewCustomerForm(prev => ({ ...prev, gstin: e.target.value }))}
+                            onChange={(e) => setNewCustomerForm(prev => ({ ...prev, gstin: e.target.value.toUpperCase().slice(0, 15) }))}
                             placeholder="e.g. 27AABCU9603R1ZM"
-                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold focus:bg-white focus:border-teal-500 transition-all text-slate-800"
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold focus:bg-white focus:border-teal-500 transition-all text-slate-800 uppercase font-mono"
                         />
                     </div>
                     <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 mt-6">

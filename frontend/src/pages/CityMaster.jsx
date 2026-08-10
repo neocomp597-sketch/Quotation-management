@@ -27,6 +27,8 @@ const CityMaster = ({ isCreatePage, isEditPage }) => {
         status: 'Active'
     });
 
+    const [isCustomDistrict, setIsCustomDistrict] = useState(false);
+
     useEffect(() => {
         fetchInitialData();
     }, []);
@@ -101,8 +103,14 @@ const CityMaster = ({ isCreatePage, isEditPage }) => {
         return getStatesForCountry(formData.country, states);
     }, [formData.country, states]);
 
+    const availableDistricts = useMemo(() => {
+        if (!formData.state) return [];
+        return getCitiesForState(formData.state);
+    }, [formData.state]);
+
     const handleCountryChange = (e) => {
         const val = e.target.value;
+        setIsCustomDistrict(false);
         setFormData(prev => ({
             ...prev,
             country: val,
@@ -114,12 +122,28 @@ const CityMaster = ({ isCreatePage, isEditPage }) => {
 
     const handleStateChange = (e) => {
         const val = e.target.value;
+        setIsCustomDistrict(false);
         setFormData(prev => ({
             ...prev,
             state: val,
-            district: val ? `${val} District` : '',
+            district: '',
             city: ''
         }));
+    };
+
+    const handleDistrictChange = (e) => {
+        const val = e.target.value;
+        if (val === '__custom__') {
+            setIsCustomDistrict(true);
+            setFormData(prev => ({ ...prev, district: '' }));
+        } else {
+            setIsCustomDistrict(false);
+            setFormData(prev => ({
+                ...prev,
+                district: val,
+                city: prev.city ? prev.city : val
+            }));
+        }
     };
 
     const handleSubmit = async (e) => {
@@ -388,14 +412,52 @@ const CityMaster = ({ isCreatePage, isEditPage }) => {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
                                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">District *</label>
-                                    <input
-                                        type="text"
-                                        required
-                                        placeholder="e.g. Pune, Thane, Ahmedabad"
-                                        value={formData.district}
-                                        onChange={(e) => setFormData({ ...formData, district: e.target.value })}
-                                        className="w-full px-4 py-3.5 rounded-2xl border border-slate-200 bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-semibold"
-                                    />
+                                    {!formData.state ? (
+                                        <select
+                                            disabled
+                                            className="w-full px-4 py-3.5 rounded-2xl border border-slate-200 bg-slate-100 text-slate-400 text-sm font-semibold cursor-not-allowed"
+                                        >
+                                            <option>-- Select State First --</option>
+                                        </select>
+                                    ) : !isCustomDistrict && (availableDistricts.length > 0 || (formData.district && availableDistricts.includes(formData.district))) ? (
+                                        <div className="space-y-1.5">
+                                            <select
+                                                value={formData.district}
+                                                onChange={handleDistrictChange}
+                                                required
+                                                className="w-full px-4 py-3.5 rounded-2xl border border-slate-200 bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-semibold cursor-pointer"
+                                            >
+                                                <option value="">-- Select District ({availableDistricts.length} available) --</option>
+                                                {formData.district && !availableDistricts.includes(formData.district) && (
+                                                    <option value={formData.district}>{formData.district}</option>
+                                                )}
+                                                {availableDistricts.map(dist => (
+                                                    <option key={dist} value={dist}>{dist}</option>
+                                                ))}
+                                                <option value="__custom__">+ Enter Custom District...</option>
+                                            </select>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-1.5">
+                                            <input
+                                                type="text"
+                                                required
+                                                placeholder="Enter District Name"
+                                                value={formData.district}
+                                                onChange={(e) => setFormData({ ...formData, district: e.target.value })}
+                                                className="w-full px-4 py-3.5 rounded-2xl border border-slate-200 bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-semibold"
+                                            />
+                                            {availableDistricts.length > 0 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setIsCustomDistrict(false)}
+                                                    className="text-xs text-primary-600 font-bold hover:underline"
+                                                >
+                                                    ← Select from list of districts
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div>

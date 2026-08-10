@@ -9,6 +9,7 @@ import { toast } from 'react-toastify';
 import { territoryService, userService, mgrService, csmService } from '../services/api';
 import Modal from '../components/Modal';
 import { useSubmitGuard } from '../hooks/useSubmitGuard';
+import { isValidPincode } from '../utils/validation';
 
 const TERRITORY_TYPE_OPTIONS = ['Country', 'Zone', 'State', 'City', 'Area', 'Custom'];
 const TERRITORY_LOAD_TOAST_ID = 'territory-master-territories-load-error';
@@ -187,6 +188,13 @@ const TerritoryMaster = ({ isCreatePage, isEditPage }) => {
             return;
         }
 
+        const pincodeList = formData.rules.pincodes.split(',').map(s => s.trim()).filter(Boolean);
+        const invalidPin = pincodeList.find(pin => !isValidPincode(pin));
+        if (invalidPin) {
+            toast.error(`Invalid pincode "${invalidPin}". Each pincode must be exactly 6 numeric digits.`);
+            return;
+        }
+
         const formattedData = {
             ...formData,
             parent: formData.parent || null,
@@ -199,7 +207,7 @@ const TerritoryMaster = ({ isCreatePage, isEditPage }) => {
             mgr5: formData.mgr5 || null,
             rules: {
                 cities: formData.rules.cities.split(',').map(s => s.trim()).filter(Boolean),
-                pincodes: formData.rules.pincodes.split(',').map(s => s.trim()).filter(Boolean)
+                pincodes: pincodeList
             }
         };
 

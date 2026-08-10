@@ -46,6 +46,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 
 import FooterPageView from './pages/FooterPageView';
 import SystemUpdates from './pages/SystemUpdates';
+import LandingPlanManager from './pages/LandingPlanManager';
 
 import PayrollDashboard from './pages/PayrollDashboard';
 import PayrollEmployees from './pages/PayrollEmployees';
@@ -202,6 +203,7 @@ function App() {
             <Route path="/status-master/new" element={<PermissionRoute adminOnly={true}><Layout><StatusMaster isCreatePage={true} /></Layout></PermissionRoute>} />
             <Route path="/status-master/edit/:id" element={<PermissionRoute adminOnly={true}><Layout><StatusMaster isEditPage={true} /></Layout></PermissionRoute>} />
             <Route path="/admin/authorization" element={<PermissionRoute permissionKey="admin_authorization"><Layout><Authorization /></Layout></PermissionRoute>} />
+            <Route path="/admin/landing-plans" element={<PermissionRoute adminOnly={true}><Layout><LandingPlanManager /></Layout></PermissionRoute>} />
             <Route path="/super-admin" element={<PermissionRoute superAdminOnly={true}><Layout><SuperAdmin /></Layout></PermissionRoute>} />
             <Route path="/system-updates" element={<PermissionRoute><Layout><SystemUpdates /></Layout></PermissionRoute>} />
 
