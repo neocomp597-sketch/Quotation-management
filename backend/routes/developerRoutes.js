@@ -3,7 +3,6 @@ const router = express.Router();
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
-const yaml = require('js-yaml');
 
 const ApiKey = require('../models/ApiKey');
 const ApiRequestLog = require('../models/ApiRequestLog');
