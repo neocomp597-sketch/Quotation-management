@@ -4,6 +4,7 @@ import { toast } from 'react-toastify';
 import { MdAdd, MdVpnKey, MdBlock, MdContentCopy, MdCheck, MdShield, MdRefresh } from 'react-icons/md';
 
 const ALL_SCOPES = [
+    { id: 'dashboard.read', label: 'Dashboard Read', desc: 'View high-level CRM metrics & statistics' },
     { id: 'customers.read', label: 'Customers Read', desc: 'List and view customer profiles' },
     { id: 'customers.write', label: 'Customers Write', desc: 'Create, update, and delete customers' },
     { id: 'contacts.read', label: 'Contacts Read', desc: 'List and view contact directory' },
@@ -14,16 +15,32 @@ const ALL_SCOPES = [
     { id: 'deals.write', label: 'Deals Write', desc: 'Create, update, and delete deals' },
     { id: 'products.read', label: 'Products Read', desc: 'List and view product catalog' },
     { id: 'products.write', label: 'Products Write', desc: 'Create, update, and delete products' },
+    { id: 'payroll.read', label: 'Payroll Read', desc: 'View payroll runs, slips, and HR letters' },
+    { id: 'payroll.write', label: 'Payroll Write', desc: 'Execute payroll runs and settings' },
     { id: 'quotations.read', label: 'Quotations Read', desc: 'List and view quotations' },
     { id: 'quotations.write', label: 'Quotations Write', desc: 'Create, update, and delete quotations' },
+    { id: 'cpq.read', label: 'CPQ Read', desc: 'View price books, rules, and discount policies' },
+    { id: 'cpq.write', label: 'CPQ Write', desc: 'Configure product bundles and pricing' },
     { id: 'vendors.read', label: 'Vendors Read', desc: 'List and view vendor master' },
     { id: 'vendors.write', label: 'Vendors Write', desc: 'Create, update, and delete vendors' },
-    { id: 'orders.read', label: 'Orders Read', desc: 'List and view sales orders' },
+    { id: 'orders.read', label: 'Orders Read', desc: 'List and view sales orders and invoices' },
     { id: 'orders.write', label: 'Orders Write', desc: 'Create, update, and delete sales orders' },
+    { id: 'clm.read', label: 'CLM Read', desc: 'View contracts, templates, and renewal pipeline' },
+    { id: 'clm.write', label: 'CLM Write', desc: 'Create and update contract agreements' },
+    { id: 'csm.read', label: 'CSM Read', desc: 'View service tickets, visits, and warranties' },
+    { id: 'csm.write', label: 'CSM Write', desc: 'Log service tickets and field engineer visits' },
+    { id: 'tenders.read', label: 'Tenders Read', desc: 'View tender register and bid analytics' },
+    { id: 'tenders.write', label: 'Tenders Write', desc: 'Create and update tender opportunities' },
+    { id: 'inventory.read', label: 'Inventory Read', desc: 'View GRN stock inward receipts' },
+    { id: 'inventory.write', label: 'Inventory Write', desc: 'Log new stock inward GRN receipts' },
+    { id: 'planning.read', label: 'Planning Read', desc: 'View production capacity board & simulations' },
     { id: 'meetings.read', label: 'Meetings Read', desc: 'List and view meetings' },
     { id: 'meetings.write', label: 'Meetings Write', desc: 'Schedule and update meetings' },
     { id: 'branches.read', label: 'Branches Read', desc: 'List and view office branches' },
-    { id: 'branches.write', label: 'Branches Write', desc: 'Manage branch records' }
+    { id: 'branches.write', label: 'Branches Write', desc: 'Manage branch records' },
+    { id: 'analytics.read', label: 'Analytics Read', desc: 'View BI reports and revenue analytics' },
+    { id: 'admin.read', label: 'Admin Read', desc: 'View authorization matrix and sales reps' },
+    { id: 'system.read', label: 'System Read', desc: 'View system health and API audit logs' }
 ];
 
 const ApiKeys = () => {

@@ -56,10 +56,27 @@ router.post('/keys', protect, async (req, res) => {
         }
 
         const validScopes = [
+            'dashboard.read',
             'customers.read', 'customers.write',
             'contacts.read', 'contacts.write',
             'leads.read', 'leads.write',
-            'deals.read', 'deals.write'
+            'deals.read', 'deals.write',
+            'products.read', 'products.write',
+            'payroll.read', 'payroll.write',
+            'quotations.read', 'quotations.write',
+            'cpq.read', 'cpq.write',
+            'vendors.read', 'vendors.write',
+            'orders.read', 'orders.write',
+            'clm.read', 'clm.write',
+            'csm.read', 'csm.write',
+            'tenders.read', 'tenders.write',
+            'inventory.read', 'inventory.write',
+            'planning.read',
+            'meetings.read', 'meetings.write',
+            'branches.read', 'branches.write',
+            'analytics.read',
+            'admin.read',
+            'system.read'
         ];
 
         const selectedPermissions = Array.isArray(permissions) 

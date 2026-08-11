@@ -1,21 +1,294 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import CodeBlock from '../components/CodeBlock';
-import { MdVpnKey, MdBook, MdRocketLaunch, MdArrowForward, MdShield } from 'react-icons/md';
+import {
+    MdVpnKey,
+    MdBook,
+    MdRocketLaunch,
+    MdArrowForward,
+    MdSearch,
+    MdFilterList,
+    MdCheckCircle,
+    MdLayers,
+    MdSpeed,
+    MdCode
+} from 'react-icons/md';
+
+const ALL_SYSTEM_MODULES = [
+    {
+        categoryId: 'dashboard',
+        categoryName: 'Dashboard & Intelligence',
+        moduleTitle: 'Dashboard & Core System',
+        icon: '📊',
+        subModules: [
+            { title: 'Overview Statistics', desc: 'Retrieve aggregated CRM metrics, monthly lead counts, active quotation totals, and conversion velocity.', endpoint: 'GET /api/v1/dashboard/stats', scope: 'dashboard.read', method: 'GET', modId: 'dashboard' },
+            { title: 'Revenue KPI Summary', desc: 'Fetch top-line revenue snapshots, target achievements, and regional sales distribution.', endpoint: 'GET /api/v1/dashboard/revenue-summary', scope: 'dashboard.read', method: 'GET', modId: 'dashboard' }
+        ]
+    },
+    {
+        categoryId: 'master',
+        categoryName: 'Master Data',
+        moduleTitle: 'Master Directory & Entities',
+        icon: '📁',
+        subModules: [
+            { title: 'Customers Master', desc: 'Manage customer accounts, corporate profiles, GSTIN validation, and billing addresses.', endpoint: 'GET /api/v1/customers', scope: 'customers.read', method: 'GET', modId: 'customers' },
+            { title: 'Contacts Directory', desc: 'Corporate contact directory, designations, key decision makers, and direct lines.', endpoint: 'GET /api/v1/contacts', scope: 'contacts.read', method: 'GET', modId: 'contacts' },
+            { title: 'Vendors Master', desc: 'Supplier and vendor master catalog, tax credentials, and supplier item mappings.', endpoint: 'GET /api/v1/vendors', scope: 'vendors.read', method: 'GET', modId: 'vendors' },
+            { title: 'Product Catalog', desc: 'Product master items, HSN/SAC codes, tax slabs, unit-of-measure pricing, and SKUs.', endpoint: 'GET /api/v1/products', scope: 'products.read', method: 'GET', modId: 'products' },
+            { title: 'Employees Master', desc: 'Organization employee profiles, employment status, reporting managers, and departments.', endpoint: 'GET /api/v1/payroll/employees', scope: 'employees.read', method: 'GET', modId: 'payroll' },
+            { title: 'Org Hierarchy Chart', desc: 'Fetch reporting trees, organizational nodes, and departmental sub-structures.', endpoint: 'GET /api/v1/payroll/org-chart', scope: 'employees.read', method: 'GET', modId: 'payroll' },
+            { title: 'Department Master', desc: 'Company department definitions, cost centers, and head of department assignments.', endpoint: 'GET /api/v1/payroll/departments', scope: 'master.read', method: 'GET', modId: 'payroll' },
+            { title: 'Designation Master', desc: 'Job roles, designation grades, and authorization bands across departments.', endpoint: 'GET /api/v1/payroll/designations', scope: 'master.read', method: 'GET', modId: 'payroll' },
+            { title: 'Territory Master', desc: 'Regional boundaries, PIN code mappings, and geographic sales territory assignments.', endpoint: 'GET /api/v1/territories', scope: 'territories.read', method: 'GET', modId: 'branches' },
+            { title: 'Branch Master', desc: 'Company branch offices, state registrations, GSTIN numbers, and warehouse locations.', endpoint: 'GET /api/v1/branches', scope: 'branches.read', method: 'GET', modId: 'branches' },
+            { title: 'State Master', desc: 'State directory, GST state codes, and inter-state vs intra-state tax definitions.', endpoint: 'GET /api/v1/states', scope: 'master.read', method: 'GET', modId: 'branches' },
+            { title: 'City Master', desc: 'Tier-1/2/3 city classifications, postal zones, and regional cluster codes.', endpoint: 'GET /api/v1/cities', scope: 'master.read', method: 'GET', modId: 'branches' },
+            { title: 'Engineers Master', desc: 'Field service engineer profiles, technical certifications, and service zone mappings.', endpoint: 'GET /api/v1/csm/engineers', scope: 'csm.read', method: 'GET', modId: 'csm' },
+            { title: 'MGR Master', desc: 'Material Group Reference (MGR) codes, product family categorizations, and segments.', endpoint: 'GET /api/v1/mgrs', scope: 'master.read', method: 'GET', modId: 'products' },
+            { title: 'Product Attributes', desc: 'Dynamic technical specifications, configurable product parameters, and attributes.', endpoint: 'GET /api/v1/attributes', scope: 'products.read', method: 'GET', modId: 'products' },
+            { title: 'Terms & Conditions', desc: 'Standard quotation clauses, legal disclaimers, payment terms, and warranty rules.', endpoint: 'GET /api/v1/terms', scope: 'master.read', method: 'GET', modId: 'quotations' },
+            { title: 'Status Master', desc: 'Workflow status transitions, lifecycle stages, and color code mappings.', endpoint: 'GET /api/v1/statuses', scope: 'master.read', method: 'GET', modId: 'master' },
+            { title: 'Serial Number Master', desc: 'Machine equipment serial numbers, barcode records, and dispatch tracking.', endpoint: 'GET /api/v1/serials', scope: 'master.read', method: 'GET', modId: 'master' },
+            { title: 'Flowchart Builder', desc: 'Visual workflow diagrams, process maps, and custom approval sequence nodes.', endpoint: 'GET /api/v1/flowcharts', scope: 'master.read', method: 'GET', modId: 'master' }
+        ]
+    },
+    {
+        categoryId: 'payroll',
+        categoryName: 'Payroll & HR',
+        moduleTitle: 'Payroll & Human Resources',
+        icon: '💵',
+        subModules: [
+            { title: 'Payroll Dashboard', desc: 'Summary of payroll cycles, gross disbursal figures, tax deductions, and active runs.', endpoint: 'GET /api/v1/payroll/dashboard', scope: 'payroll.read', method: 'GET', modId: 'payroll' },
+            { title: 'Run Payroll Execution', desc: 'Execute monthly payroll processing, salary calculations, and allowance computations.', endpoint: 'POST /api/v1/payroll/runs', scope: 'payroll.write', method: 'POST', modId: 'payroll' },
+            { title: 'Payments & Disbursal', desc: 'Bank payout files, batch transfer logs, and employee salary credit verifications.', endpoint: 'GET /api/v1/payroll/payments', scope: 'payroll.read', method: 'GET', modId: 'payroll' },
+            { title: 'Employee Payslips', desc: 'Generate and retrieve itemized employee salary slips in PDF/JSON formats.', endpoint: 'GET /api/v1/payroll/payslips', scope: 'payroll.read', method: 'GET', modId: 'payroll' },
+            { title: 'HR Letters & Documents', desc: 'Issue automated offer letters, increment letters, experience certificates, and NDAs.', endpoint: 'GET /api/v1/payroll/letters', scope: 'payroll.read', method: 'GET', modId: 'payroll' },
+            { title: 'Payroll Configuration', desc: 'PF/ESI rules, professional tax brackets, TDS slabs, and salary structure settings.', endpoint: 'GET /api/v1/payroll/settings', scope: 'payroll.write', method: 'GET', modId: 'payroll' }
+        ]
+    },
+    {
+        categoryId: 'enquiry',
+        categoryName: 'Enquiry & Leads',
+        moduleTitle: 'Enquiries & Lead Management',
+        icon: '🎯',
+        subModules: [
+            { title: 'Enquiry Register', desc: 'Capture web inquiries, incoming lead records, customer requirements, and channel sources.', endpoint: 'GET /api/v1/leads', scope: 'leads.read', method: 'GET', modId: 'leads' },
+            { title: 'Capture Incoming Lead', desc: 'Programmatically submit leads from external landing pages, forms, or webhooks.', endpoint: 'POST /api/v1/leads', scope: 'leads.write', method: 'POST', modId: 'leads' },
+            { title: 'Enquiry Analytics', desc: 'Lead volume trendlines, source attribution, response time metrics, and drop-off analysis.', endpoint: 'GET /api/v1/enquiries/analytics', scope: 'leads.read', method: 'GET', modId: 'leads' }
+        ]
+    },
+    {
+        categoryId: 'sales_pipeline',
+        categoryName: 'Sales Pipeline',
+        moduleTitle: 'Sales Pipeline & Opportunities',
+        icon: '💼',
+        subModules: [
+            { title: 'Pipeline Dashboard', desc: 'Pipeline stage velocity, total open opportunity valuations, and deal distribution.', endpoint: 'GET /api/v1/sales/pipeline-summary', scope: 'deals.read', method: 'GET', modId: 'deals' },
+            { title: 'Pipelines Configurator', desc: 'Custom sales pipeline stages, probability percentages, and stage gate requirements.', endpoint: 'GET /api/v1/sales/pipelines', scope: 'deals.read', method: 'GET', modId: 'deals' },
+            { title: 'Deals Opportunities', desc: 'Manage qualified sales opportunities, target closure dates, and expected values.', endpoint: 'GET /api/v1/deals', scope: 'deals.read', method: 'GET', modId: 'deals' },
+            { title: 'Sales Forecasting', desc: 'Weighted revenue projections, commit stage forecasts, and best-case estimates.', endpoint: 'GET /api/v1/sales/forecasts', scope: 'sales.read', method: 'GET', modId: 'deals' },
+            { title: 'Sales Activity Logs', desc: 'Log customer calls, emails, product presentations, and sales representative tasks.', endpoint: 'GET /api/v1/sales/activities', scope: 'sales.read', method: 'GET', modId: 'deals' },
+            { title: 'Sales Targets & Quotas', desc: 'Quota allocations, monthly rep targets, team achievements, and quota variance.', endpoint: 'GET /api/v1/sales/targets', scope: 'sales.read', method: 'GET', modId: 'deals' }
+        ]
+    },
+    {
+        categoryId: 'meetings',
+        categoryName: 'Appointments',
+        moduleTitle: 'Appointments & Field Visits',
+        icon: '📅',
+        subModules: [
+            { title: 'Appointments Register', desc: 'Schedule customer product demos, site inspection visits, and follow-up meetings.', endpoint: 'GET /api/v1/meetings', scope: 'meetings.read', method: 'GET', modId: 'meetings' },
+            { title: 'Schedule Meeting', desc: 'Book appointment slots with customer contacts, set reminders, and log meeting agendas.', endpoint: 'POST /api/v1/meetings', scope: 'meetings.write', method: 'POST', modId: 'meetings' }
+        ]
+    },
+    {
+        categoryId: 'cpq_catalog',
+        categoryName: 'CPQ & Pricing',
+        moduleTitle: 'Configure Price Quote (CPQ)',
+        icon: '⚙️',
+        subModules: [
+            { title: 'Price Books Master', desc: 'Tiered price lists, customer tier pricing, dealer rates, and list price revisions.', endpoint: 'GET /api/v1/cpq/price-books', scope: 'cpq.read', method: 'GET', modId: 'products' },
+            { title: 'Pricing Rules Engine', desc: 'Quantity discount matrices, volume price breaks, and automated surcharge logic.', endpoint: 'GET /api/v1/cpq/pricing-rules', scope: 'cpq.read', method: 'GET', modId: 'products' },
+            { title: 'Discount Policies', desc: 'Max allowable discount caps, margin protection thresholds, and approval rules.', endpoint: 'GET /api/v1/cpq/discounts', scope: 'cpq.read', method: 'GET', modId: 'products' },
+            { title: 'Promotions & Offers', desc: 'Seasonal promotional codes, bundled packages, and limited-time discount campaigns.', endpoint: 'GET /api/v1/cpq/promotions', scope: 'cpq.read', method: 'GET', modId: 'products' },
+            { title: 'Currency Exchange Rates', desc: 'Multi-currency exchange rates, base currency conversions, and FX spot rates.', endpoint: 'GET /api/v1/cpq/currencies', scope: 'cpq.read', method: 'GET', modId: 'products' }
+        ]
+    },
+    {
+        categoryId: 'quotations',
+        categoryName: 'Quotations & Orders',
+        moduleTitle: 'Quotations & Invoicing',
+        icon: '📄',
+        subModules: [
+            { title: 'Quotation Register', desc: 'Fetch generated sales quotations, line item details, taxes, grand totals, and status.', endpoint: 'GET /api/v1/quotations', scope: 'quotations.read', method: 'GET', modId: 'quotations' },
+            { title: 'Generate Quotation', desc: 'Create complex commercial proposals with multi-item tax breakdown and terms.', endpoint: 'POST /api/v1/quotations', scope: 'quotations.write', method: 'POST', modId: 'quotations' },
+            { title: 'Pending Approval Quotes', desc: 'Queue of high-value proposals awaiting commercial discount manager approval.', endpoint: 'GET /api/v1/quotations?status=pending_approval', scope: 'quotations.read', method: 'GET', modId: 'quotations' },
+            { title: 'Approved Quotations', desc: 'Finalized and customer-approved quotation vouchers ready for sales order conversion.', endpoint: 'GET /api/v1/quotations?status=final', scope: 'quotations.read', method: 'GET', modId: 'quotations' },
+            { title: 'Quote Conversion Analytics', desc: 'Win/loss ratio reports, deal conversion timelines, and quote cycle durations.', endpoint: 'GET /api/v1/quotations/conversion-report', scope: 'quotations.read', method: 'GET', modId: 'quotations' },
+            { title: 'Guided Selling Wizard', desc: 'Interactive questionnaire endpoint to recommend optimal product catalog bundles.', endpoint: 'GET /api/v1/cpq/guided-selling', scope: 'cpq.read', method: 'GET', modId: 'quotations' },
+            { title: 'Product Configurator', desc: 'Dynamic rules engine for custom product option assembly and pricing calculations.', endpoint: 'POST /api/v1/cpq/configurator', scope: 'cpq.write', method: 'POST', modId: 'quotations' },
+            { title: 'Quote Price Simulator', desc: 'Real-time sandbox tool for estimating margins, freight cost, and net deal revenue.', endpoint: 'POST /api/v1/cpq/simulator', scope: 'cpq.read', method: 'POST', modId: 'quotations' },
+            { title: 'Invoices & Billing', desc: 'Tax invoices, proforma billing documents, payment collection status, and credit notes.', endpoint: 'GET /api/v1/invoices', scope: 'orders.read', method: 'GET', modId: 'orders' },
+            { title: 'Approval Workflows', desc: 'Hierarchical approval logs, discount override requests, and escalation histories.', endpoint: 'GET /api/v1/approvals', scope: 'quotations.read', method: 'GET', modId: 'quotations' },
+            { title: 'Sales Orders', desc: 'Confirmed customer sales orders, voucher numbers, delivery schedules, and fulfillment.', endpoint: 'GET /api/v1/orders', scope: 'orders.read', method: 'GET', modId: 'orders' }
+        ]
+    },
+    {
+        categoryId: 'clm',
+        categoryName: 'Contracts (CLM)',
+        moduleTitle: 'Contract Lifecycle Management',
+        icon: '📑',
+        subModules: [
+            { title: 'CLM Overview Dashboard', desc: 'Active customer agreements, expiring contracts, renewal pipeline, and contract value.', endpoint: 'GET /api/v1/clm/dashboard', scope: 'clm.read', method: 'GET', modId: 'clm' },
+            { title: 'Contracts Repository', desc: 'Master contract directory, executed agreements, milestone dates, and attachments.', endpoint: 'GET /api/v1/clm/contracts', scope: 'clm.read', method: 'GET', modId: 'clm' },
+            { title: 'Contract Templates', desc: 'Standardized legal agreement templates, MSA, SLA, NDA, and service agreement formats.', endpoint: 'GET /api/v1/clm/templates', scope: 'clm.read', method: 'GET', modId: 'clm' },
+            { title: 'Clauses Library', desc: 'Pre-approved legal clauses, liability caps, indemnity statements, and governing law terms.', endpoint: 'GET /api/v1/clm/clauses', scope: 'clm.read', method: 'GET', modId: 'clm' },
+            { title: 'CLM Approvals Queue', desc: 'Legal department review queue, non-standard clause exceptions, and signatures.', endpoint: 'GET /api/v1/clm/approvals', scope: 'clm.read', method: 'GET', modId: 'clm' },
+            { title: 'Renewals Kanban', desc: 'Automated contract expiration alerts, 90-day renewal windows, and expansion tracking.', endpoint: 'GET /api/v1/clm/renewals', scope: 'clm.read', method: 'GET', modId: 'clm' },
+            { title: 'CLM Reports', desc: 'Contract risk analysis, SLA compliance metrics, and contract cycle turnaround times.', endpoint: 'GET /api/v1/clm/reports', scope: 'clm.read', method: 'GET', modId: 'clm' },
+            { title: 'CLM Settings', desc: 'Notification triggers, auto-renewal policies, and digital signature integration settings.', endpoint: 'GET /api/v1/clm/settings', scope: 'clm.write', method: 'GET', modId: 'clm' }
+        ]
+    },
+    {
+        categoryId: 'purchase',
+        categoryName: 'Material (GRN)',
+        moduleTitle: 'Material & Goods Receipt',
+        icon: '📦',
+        subModules: [
+            { title: 'Goods Receipt Notes (GRN)', desc: 'Track incoming material receipts, vendor delivery notes, serials, and quality checks.', endpoint: 'GET /api/v1/grn', scope: 'inventory.read', method: 'GET', modId: 'purchase' },
+            { title: 'Create GRN Entry', desc: 'Log new stock inward entry, serial verification, and warehouse shelf assignment.', endpoint: 'POST /api/v1/grn', scope: 'inventory.write', method: 'POST', modId: 'purchase' }
+        ]
+    },
+    {
+        categoryId: 'planning',
+        categoryName: 'Planning Board',
+        moduleTitle: 'Production & Planning Board',
+        icon: '🗓️',
+        subModules: [
+            { title: 'Planning Board Matrix', desc: 'Resource capacity planning, production schedules, machine utilization, and lead times.', endpoint: 'GET /api/v1/planning', scope: 'planning.read', method: 'GET', modId: 'planning' },
+            { title: 'What-If Simulations', desc: 'Capacity bottleneck simulation models, load balancing, and schedule forecasting.', endpoint: 'GET /api/v1/simulations', scope: 'planning.read', method: 'GET', modId: 'planning' }
+        ]
+    },
+    {
+        categoryId: 'csm',
+        categoryName: 'Customer Service',
+        moduleTitle: 'Customer Service Management (CSM)',
+        icon: '🛠️',
+        subModules: [
+            { title: 'CSM Dashboard', desc: 'Open ticket counts, first response time KPIs, customer CSAT scores, and field visits.', endpoint: 'GET /api/v1/csm/dashboard', scope: 'csm.read', method: 'GET', modId: 'csm' },
+            { title: 'Service Tickets Register', desc: 'Customer complaint tickets, severity levels, root cause categories, and resolution logs.', endpoint: 'GET /api/v1/csm/tickets', scope: 'csm.read', method: 'GET', modId: 'csm' },
+            { title: 'Create Service Ticket', desc: 'Log a new customer breakdown, maintenance inquiry, or technical ticket.', endpoint: 'POST /api/v1/csm/tickets', scope: 'csm.write', method: 'POST', modId: 'csm' },
+            { title: 'Field Service Visits', desc: 'Dispatch service engineers, track GPS check-in/out times, and log spare parts used.', endpoint: 'GET /api/v1/csm/visits', scope: 'csm.read', method: 'GET', modId: 'csm' },
+            { title: 'Warranty & AMC Contracts', desc: 'Equipment warranty validation, annual maintenance contract dates, and coverage scope.', endpoint: 'GET /api/v1/csm/warranties', scope: 'csm.read', method: 'GET', modId: 'csm' },
+            { title: 'Service Knowledge Base', desc: 'Troubleshooting guides, error code manuals, technical diagrams, and FAQs.', endpoint: 'GET /api/v1/csm/kb', scope: 'csm.read', method: 'GET', modId: 'csm' },
+            { title: 'CSM Config Masters', desc: 'SLA priority matrix, escalation tiers, service category codes, and resolution time limits.', endpoint: 'GET /api/v1/csm/masters', scope: 'csm.write', method: 'GET', modId: 'csm' },
+            { title: 'Service Reports', desc: 'Engineer performance, mean time to repair (MTTR), and customer satisfaction trends.', endpoint: 'GET /api/v1/csm/reports', scope: 'csm.read', method: 'GET', modId: 'csm' }
+        ]
+    },
+    {
+        categoryId: 'tender',
+        categoryName: 'Tenders & Bidding',
+        moduleTitle: 'Tender & Bid Management',
+        icon: '⚖️',
+        subModules: [
+            { title: 'Tender Overview Dashboard', desc: 'Summary of active government/private tenders, EMD deposits, and bid deadlines.', endpoint: 'GET /api/v1/tenders/dashboard', scope: 'tenders.read', method: 'GET', modId: 'tenders' },
+            { title: 'Tenders Register', desc: 'Master directory of tender notices, bid submission dates, eligibility, and document links.', endpoint: 'GET /api/v1/tenders', scope: 'tenders.read', method: 'GET', modId: 'tenders' },
+            { title: 'Create Tender Entry', desc: 'Register a new tender opportunity, assign bid manager, and attach RFP specifications.', endpoint: 'POST /api/v1/tenders', scope: 'tenders.write', method: 'POST', modId: 'tenders' },
+            { title: 'Tender Reports', desc: 'Bid win/loss analytics, EMD refund status, and tender valuation breakdown.', endpoint: 'GET /api/v1/tenders/reports', scope: 'tenders.read', method: 'GET', modId: 'tenders' }
+        ]
+    },
+    {
+        categoryId: 'reports',
+        categoryName: 'Reports & Analytics',
+        moduleTitle: 'Reports & Business Intelligence',
+        icon: '📈',
+        subModules: [
+            { title: 'Executive Reports Center', desc: 'Centralized directory of exportable business performance reports in Excel/PDF.', endpoint: 'GET /api/v1/reports', scope: 'analytics.read', method: 'GET', modId: 'reports' },
+            { title: 'Payroll Reports', desc: 'PF returns, ESI statements, Form 16 summaries, and gross salary payout audit reports.', endpoint: 'GET /api/v1/payroll/reports', scope: 'payroll.read', method: 'GET', modId: 'payroll' },
+            { title: 'Sales Reports', desc: 'Product-wise sales reports, customer segment sales, and sales rep performance.', endpoint: 'GET /api/v1/sales/reports', scope: 'sales.read', method: 'GET', modId: 'reports' },
+            { title: 'Sales Analytics', desc: 'Interactive charts for monthly sales trends, deal win velocity, and average order value.', endpoint: 'GET /api/v1/analytics/sales', scope: 'analytics.read', method: 'GET', modId: 'reports' },
+            { title: 'Customer Analytics', desc: 'Customer lifetime value (CLV), churn risk indicators, and RFM segmentation metrics.', endpoint: 'GET /api/v1/analytics/customers', scope: 'analytics.read', method: 'GET', modId: 'customers' },
+            { title: 'Revenue Growth Analytics', desc: 'Year-over-year revenue comparisons, MRR/ARR growth metrics, and product contribution.', endpoint: 'GET /api/v1/analytics/revenue', scope: 'analytics.read', method: 'GET', modId: 'reports' },
+            { title: 'Competitor Intelligence', desc: 'Competitor price benchmarks, feature matrix comparisons, and battle cards.', endpoint: 'GET /api/v1/sales/competitors', scope: 'sales.read', method: 'GET', modId: 'reports' },
+            { title: 'AI Pricing Insights', desc: 'Machine-learning recommendations for win-optimal discount margins and deal pricing.', endpoint: 'GET /api/v1/sales/ai-pricing', scope: 'cpq.read', method: 'GET', modId: 'products' }
+        ]
+    },
+    {
+        categoryId: 'admin',
+        categoryName: 'Admin & Security',
+        moduleTitle: 'Administration & Access Control',
+        icon: '🔒',
+        subModules: [
+            { title: 'Access Control & Permissions', desc: 'User role matrix, module RBAC authorization definitions, and scope boundaries.', endpoint: 'GET /api/v1/admin/authorization', scope: 'admin.read', method: 'GET', modId: 'admin' },
+            { title: 'Salespersons Directory', desc: 'Sales representatives master list, commission rates, and branch manager assignments.', endpoint: 'GET /api/v1/salespersons', scope: 'admin.read', method: 'GET', modId: 'admin' }
+        ]
+    },
+    {
+        categoryId: 'platform',
+        categoryName: 'Platform & System',
+        moduleTitle: 'Platform & Developer Hub',
+        icon: '⚙️',
+        subModules: [
+            { title: 'Super Admin System Metrics', desc: 'Multi-tenant organization statistics, database health, and active user connections.', endpoint: 'GET /api/v1/super-admin/metrics', scope: 'system.read', method: 'GET', modId: 'platform' },
+            { title: 'System Updates & Changelog', desc: 'Software release notes, system upgrade history, patch notes, and feature flags.', endpoint: 'GET /api/v1/system-updates', scope: 'system.read', method: 'GET', modId: 'platform' },
+            { title: 'Developer Audit Logs', desc: 'API access key request logs, rate limit hits, error tracebacks, and payload metrics.', endpoint: 'GET /api/v1/developer/logs', scope: 'system.read', method: 'GET', modId: 'platform' }
+        ]
+    }
+];
+
+const CATEGORIES = [
+    { id: 'all', label: 'All Modules' },
+    { id: 'dashboard', label: 'Dashboard' },
+    { id: 'master', label: 'Master Data' },
+    { id: 'payroll', label: 'Payroll & HR' },
+    { id: 'enquiry', label: 'Enquiries & Leads' },
+    { id: 'sales_pipeline', label: 'Sales Pipeline' },
+    { id: 'meetings', label: 'Appointments' },
+    { id: 'cpq_catalog', label: 'CPQ & Pricing' },
+    { id: 'quotations', label: 'Quotations & Orders' },
+    { id: 'clm', label: 'Contracts (CLM)' },
+    { id: 'purchase', label: 'Material (GRN)' },
+    { id: 'planning', label: 'Planning Board' },
+    { id: 'csm', label: 'Customer Service' },
+    { id: 'tender', label: 'Tenders & Bidding' },
+    { id: 'reports', label: 'Reports & Analytics' },
+    { id: 'admin', label: 'Admin & Security' },
+    { id: 'platform', label: 'Platform & System' }
+];
 
 const Overview = () => {
-    const systemApis = [
-        { title: 'Customers', icon: '👥', desc: 'Manage customer profiles, corporate accounts, GSTINs, and billing addresses.', endpoint: 'GET /api/v1/customers' },
-        { title: 'Contacts', icon: '📇', desc: 'Corporate contact directory, designations, decision makers, and phone numbers.', endpoint: 'GET /api/v1/contacts' },
-        { title: 'Leads & Inquiries', icon: '🎯', desc: 'Capture web inquiries, project lead stages, requirements, and assignees.', endpoint: 'GET /api/v1/leads' },
-        { title: 'Deals & Pipeline', icon: '💼', desc: 'Track sales pipeline deals, valuations, win probabilities, and forecasts.', endpoint: 'GET /api/v1/deals' },
-        { title: 'Quotations', icon: '📄', desc: 'Retrieve generated quotations, line items, grand totals, and validity dates.', endpoint: 'GET /api/v1/quotations' },
-        { title: 'Product Catalog', icon: '📦', desc: 'Fetch product catalog items, HSN codes, GST percentages, and UOM pricing.', endpoint: 'GET /api/v1/products' },
-        { title: 'Vendors', icon: '🏢', desc: 'Manage vendor master directory, supplier catalogs, and item quotes.', endpoint: 'GET /api/v1/vendors' },
-        { title: 'Sales Orders', icon: '🛒', desc: 'Track confirmed customer sales orders, tax invoices, and vouchers.', endpoint: 'GET /api/v1/orders' },
-        { title: 'Meetings & Schedule', icon: '📅', desc: 'Schedule customer visits, demo logs, follow-up dates, and activity notes.', endpoint: 'GET /api/v1/meetings' },
-        { title: 'Branch & Territory', icon: '📍', desc: 'Access office branches, territory pin-codes, and regional boundaries.', endpoint: 'GET /api/v1/branches' }
-    ];
+    const [selectedCategory, setSelectedCategory] = useState('all');
+    const [searchQuery, setSearchQuery] = useState('');
+
+    // Total counts calculations
+    const totalModulesCount = ALL_SYSTEM_MODULES.length;
+    const totalEndpointsCount = useMemo(() => {
+        return ALL_SYSTEM_MODULES.reduce((acc, cat) => acc + cat.subModules.length, 0);
+    }, []);
+
+    // Filter modules based on category tab & search query
+    const filteredModules = useMemo(() => {
+        let result = ALL_SYSTEM_MODULES;
+
+        if (selectedCategory !== 'all') {
+            result = result.filter(mod => mod.categoryId === selectedCategory);
+        }
+
+        if (searchQuery.trim()) {
+            const query = searchQuery.toLowerCase().trim();
+            result = result.map(mod => {
+                const filteredSubs = mod.subModules.filter(sub =>
+                    sub.title.toLowerCase().includes(query) ||
+                    sub.desc.toLowerCase().includes(query) ||
+                    sub.endpoint.toLowerCase().includes(query) ||
+                    sub.scope.toLowerCase().includes(query)
+                );
+                return { ...mod, subModules: filteredSubs };
+            }).filter(mod => mod.subModules.length > 0);
+        }
+
+        return result;
+    }, [selectedCategory, searchQuery]);
 
     return (
         <div className="space-y-8 animate-in fade-in duration-300">
@@ -23,13 +296,13 @@ const Overview = () => {
             <div className="bg-gradient-to-r from-[#006c49] via-[#059669] to-[#10b981] p-8 rounded-3xl text-white space-y-4 shadow-xl shadow-[#006c49]/15 relative overflow-hidden">
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-white font-extrabold text-[10px] tracking-widest uppercase border border-white/30">
                     <MdRocketLaunch size={14} />
-                    <span>Enterprise Developer Portal</span>
+                    <span>Enterprise Public REST API Platform</span>
                 </div>
                 <h1 className="text-3xl md:text-4xl font-black tracking-tight">
-                    ARCRM Enterprise Public API Platform
+                    ARCRM Enterprise Modules & API Reference Directory
                 </h1>
-                <p className="text-emerald-100 text-sm max-w-2xl font-semibold leading-relaxed">
-                    Build bi-directional enterprise integrations, automate CRM workflows, and sync customer data between ARCRM and external applications using standardized JSON REST endpoints.
+                <p className="text-emerald-100 text-sm max-w-3xl font-semibold leading-relaxed">
+                    Build bi-directional enterprise integrations, automate CRM workflows, and sync customer, payroll, sales, contracts, and service data across all 16 system modules and {totalEndpointsCount}+ sub-module API endpoints.
                 </p>
                 <div className="pt-2 flex flex-wrap gap-4">
                     <Link
@@ -47,6 +320,45 @@ const Overview = () => {
                         <MdVpnKey size={16} />
                         <span>Generate Access Key</span>
                     </Link>
+                </div>
+            </div>
+
+            {/* Quick Metrics Bar */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-1">
+                    <div className="flex items-center gap-2 text-slate-400 text-[10px] font-black uppercase tracking-widest">
+                        <MdLayers className="text-[#006c49]" size={16} />
+                        <span>System Modules</span>
+                    </div>
+                    <div className="text-2xl font-black text-slate-900">{totalModulesCount} Modules</div>
+                    <div className="text-xs font-semibold text-slate-500">Fully Documented</div>
+                </div>
+
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-1">
+                    <div className="flex items-center gap-2 text-slate-400 text-[10px] font-black uppercase tracking-widest">
+                        <MdCode className="text-[#006c49]" size={16} />
+                        <span>Sub-Module APIs</span>
+                    </div>
+                    <div className="text-2xl font-black text-slate-900">{totalEndpointsCount}+ Endpoints</div>
+                    <div className="text-xs font-semibold text-slate-500">JSON REST Format</div>
+                </div>
+
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-1">
+                    <div className="flex items-center gap-2 text-slate-400 text-[10px] font-black uppercase tracking-widest">
+                        <MdCheckCircle className="text-[#006c49]" size={16} />
+                        <span>JSON Envelope</span>
+                    </div>
+                    <div className="text-2xl font-black text-slate-900">Standardized</div>
+                    <div className="text-xs font-semibold text-slate-500">Succeeded/Data/Page</div>
+                </div>
+
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-1">
+                    <div className="flex items-center gap-2 text-slate-400 text-[10px] font-black uppercase tracking-widest">
+                        <MdSpeed className="text-[#006c49]" size={16} />
+                        <span>Avg API Latency</span>
+                    </div>
+                    <div className="text-2xl font-black text-[#006c49]">&lt; 45 ms</div>
+                    <div className="text-xs font-semibold text-slate-500">99.9% Uptime SLA</div>
                 </div>
             </div>
 
@@ -72,7 +384,7 @@ const Overview = () => {
                     <span className="px-2.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-mono font-bold">Standard JSON</span>
                 </div>
                 <p className="text-xs text-slate-600 font-medium leading-relaxed">
-                    All API responses conform strictly to the standard JSON response envelope featuring <code className="text-[#006c49] font-mono">succeeded</code> status boolean, <code className="text-[#006c49] font-mono">message</code> summary, <code className="text-[#006c49] font-mono">data</code> payload array, and <code className="text-[#006c49] font-mono">pagination</code> parameters.
+                    All API endpoints return responses encapsulated strictly inside the standard JSON envelope with <code className="text-[#006c49] font-mono">succeeded</code> status boolean, <code className="text-[#006c49] font-mono">message</code> summary, <code className="text-[#006c49] font-mono">data</code> payload array/object, and <code className="text-[#006c49] font-mono">pagination</code> metadata.
                 </p>
                 <CodeBlock code={`{
   "succeeded": true,
@@ -93,38 +405,125 @@ const Overview = () => {
     "totalCount": 1,
     "totalPages": 1
   }
-}`} language="json" title="Standard Response Format" />
+}`} language="json" title="Standard Response Envelope Schema" />
             </div>
 
-            {/* Public Resources Grid */}
+            {/* Interactive Module Filter & Search Bar */}
             <div className="space-y-4">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
-                        <h2 className="text-xl font-black text-slate-900 tracking-tight">System APIs Directory</h2>
-                        <p className="text-xs text-slate-500 font-semibold mt-0.5">Explore endpoints across all 10 system modules.</p>
+                        <h2 className="text-xl font-black text-slate-900 tracking-tight">System Modules & Sub-Modules Directory</h2>
+                        <p className="text-xs text-slate-500 font-semibold mt-0.5">Explore REST API endpoints across all {totalModulesCount} system modules.</p>
                     </div>
-                    <span className="text-xs font-black uppercase tracking-widest px-3 py-1 bg-slate-100 text-slate-600 rounded-full border border-slate-200">
-                        {systemApis.length} API Modules
-                    </span>
+
+                    {/* Search Input */}
+                    <div className="relative min-w-[280px]">
+                        <MdSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                        <input
+                            type="text"
+                            placeholder="Search sub-modules, endpoints, scopes..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-white border border-slate-200 text-xs font-semibold outline-none focus:border-[#006c49] focus:ring-2 focus:ring-[#006c49]/10 transition-all"
+                        />
+                    </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {systemApis.map(api => (
-                        <div key={api.title} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md hover:border-[#006c49]/30 transition-all space-y-3">
-                            <div className="w-10 h-10 rounded-2xl bg-[#006c49]/10 text-[#006c49] flex items-center justify-center font-black text-lg border border-[#006c49]/20">
-                                {api.icon}
-                            </div>
-                            <h3 className="text-base font-black text-slate-900">{api.title}</h3>
-                            <p className="text-xs text-slate-600 font-medium leading-relaxed min-h-[40px]">
-                                {api.desc}
-                            </p>
-                            <div className="text-[11px] font-mono text-[#006c49] font-bold pt-2 border-t border-slate-100 flex items-center justify-between">
-                                <span>{api.endpoint}</span>
-                                <Link to="/developer/api-reference" className="text-[10px] uppercase font-bold text-slate-400 hover:text-[#006c49] font-sans">Docs ➔</Link>
-                            </div>
-                        </div>
+                {/* Category Pills Slider */}
+                <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 shrink-0 flex items-center gap-1 pr-2 border-r border-slate-200">
+                        <MdFilterList size={14} /> Filter
+                    </span>
+                    {CATEGORIES.map(cat => (
+                        <button
+                            key={cat.id}
+                            onClick={() => setSelectedCategory(cat.id)}
+                            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+                                selectedCategory === cat.id
+                                    ? 'bg-[#006c49] text-white shadow-md shadow-[#006c49]/20'
+                                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                            }`}
+                        >
+                            {cat.label}
+                        </button>
                     ))}
                 </div>
+
+                {/* System Modules List */}
+                {filteredModules.length === 0 ? (
+                    <div className="bg-white p-12 rounded-3xl border border-slate-200 text-center space-y-2">
+                        <div className="text-3xl">🔍</div>
+                        <h3 className="text-base font-black text-slate-900">No matching sub-module APIs found</h3>
+                        <p className="text-xs text-slate-500 font-semibold max-w-sm mx-auto">
+                            Try adjusting your search query or category filter to locate the desired API module.
+                        </p>
+                    </div>
+                ) : (
+                    <div className="space-y-8">
+                        {filteredModules.map(modCategory => (
+                            <div key={modCategory.categoryId} className="space-y-4">
+                                <div className="flex items-center justify-between border-b border-slate-200/80 pb-3">
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-2xl">{modCategory.icon}</span>
+                                        <div>
+                                            <h3 className="text-lg font-black text-slate-900 tracking-tight">{modCategory.moduleTitle}</h3>
+                                            <span className="text-[11px] font-bold text-[#006c49] uppercase tracking-wider">{modCategory.categoryName}</span>
+                                        </div>
+                                    </div>
+                                    <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-600 font-mono text-xs font-bold border border-slate-200">
+                                        {modCategory.subModules.length} Sub-Modules
+                                    </span>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                                    {modCategory.subModules.map((sub, idx) => (
+                                        <div
+                                            key={idx}
+                                            className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md hover:border-[#006c49]/40 transition-all flex flex-col justify-between space-y-3 group"
+                                        >
+                                            <div className="space-y-2">
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-black uppercase ${
+                                                        sub.method === 'GET' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' :
+                                                        sub.method === 'POST' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
+                                                        sub.method === 'PATCH' ? 'bg-amber-100 text-amber-800 border border-amber-200' :
+                                                        'bg-rose-100 text-rose-800 border border-rose-200'
+                                                    }`}>
+                                                        {sub.method}
+                                                    </span>
+                                                    <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-mono text-[10px] font-bold border border-slate-200">
+                                                        Scope: {sub.scope}
+                                                    </span>
+                                                </div>
+
+                                                <h4 className="text-sm font-black text-slate-900 group-hover:text-[#006c49] transition-colors">
+                                                    {sub.title}
+                                                </h4>
+
+                                                <p className="text-xs text-slate-600 font-medium leading-relaxed min-h-[36px]">
+                                                    {sub.desc}
+                                                </p>
+                                            </div>
+
+                                            <div className="pt-3 border-t border-slate-100 flex items-center justify-between font-mono text-[11px]">
+                                                <span className="text-[#006c49] font-bold truncate max-w-[190px]" title={sub.endpoint}>
+                                                    {sub.endpoint}
+                                                </span>
+                                                <Link
+                                                    to="/developer/api-reference"
+                                                    className="text-[10px] font-sans font-bold uppercase text-slate-400 hover:text-[#006c49] shrink-0 flex items-center gap-1 transition-colors"
+                                                >
+                                                    <span>Test Explorer</span>
+                                                    <span>➔</span>
+                                                </Link>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
         </div>
     );

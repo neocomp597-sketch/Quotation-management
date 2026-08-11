@@ -3,19 +3,33 @@ import CodeBlock from '../components/CodeBlock';
 import { MdBook, MdSend, MdVpnKey, MdCheck, MdCode } from 'react-icons/md';
 
 const MODULES = [
+    { id: 'dashboard', label: 'Dashboard', icon: '📊', scope: 'dashboard', basePath: '/dashboard' },
     { id: 'customers', label: 'Customers', icon: '👥', scope: 'customers', basePath: '/customers' },
     { id: 'contacts', label: 'Contacts', icon: '📇', scope: 'contacts', basePath: '/contacts' },
-    { id: 'leads', label: 'Leads', icon: '🎯', scope: 'leads', basePath: '/leads' },
-    { id: 'deals', label: 'Deals', icon: '💼', scope: 'deals', basePath: '/deals' },
-    { id: 'products', label: 'Products', icon: '📦', scope: 'products', basePath: '/products' },
+    { id: 'leads', label: 'Leads & Enquiry', icon: '🎯', scope: 'leads', basePath: '/leads' },
+    { id: 'deals', label: 'Sales Deals', icon: '💼', scope: 'deals', basePath: '/deals' },
+    { id: 'products', label: 'Product Catalog', icon: '📦', scope: 'products', basePath: '/products' },
+    { id: 'payroll', label: 'Payroll & HR', icon: '💵', scope: 'payroll', basePath: '/payroll' },
     { id: 'quotations', label: 'Quotations', icon: '📄', scope: 'quotations', basePath: '/quotations' },
-    { id: 'vendors', label: 'Vendors', icon: '🏢', scope: 'vendors', basePath: '/vendors' },
+    { id: 'cpq', label: 'CPQ Engine', icon: '⚙️', scope: 'cpq', basePath: '/cpq' },
     { id: 'orders', label: 'Sales Orders', icon: '🛒', scope: 'orders', basePath: '/orders' },
+    { id: 'clm', label: 'Contracts (CLM)', icon: '📑', scope: 'clm', basePath: '/clm' },
+    { id: 'csm', label: 'Customer Service', icon: '🛠️', scope: 'csm', basePath: '/csm' },
+    { id: 'tenders', label: 'Tenders & Bids', icon: '⚖️', scope: 'tenders', basePath: '/tenders' },
+    { id: 'purchase', label: 'Material (GRN)', icon: '📦', scope: 'inventory', basePath: '/grn' },
+    { id: 'planning', label: 'Planning Board', icon: '🗓️', scope: 'planning', basePath: '/planning' },
+    { id: 'vendors', label: 'Vendors', icon: '🏢', scope: 'vendors', basePath: '/vendors' },
     { id: 'meetings', label: 'Meetings', icon: '📅', scope: 'meetings', basePath: '/meetings' },
-    { id: 'branches', label: 'Branches', icon: '📍', scope: 'branches', basePath: '/branches' }
+    { id: 'reports', label: 'Reports & Analytics', icon: '📈', scope: 'analytics', basePath: '/reports' },
+    { id: 'branches', label: 'Branches & Master', icon: '📍', scope: 'branches', basePath: '/branches' },
+    { id: 'admin', label: 'Admin & System', icon: '🔒', scope: 'admin', basePath: '/admin' }
 ];
 
 const ENDPOINT_MAP = {
+    dashboard: [
+        { method: 'GET', path: '/dashboard/stats', summary: 'Get System Overview KPIs', scope: 'dashboard.read', desc: 'Retrieve aggregated CRM metrics, monthly lead counts, quotation totals, and conversion rates.' },
+        { method: 'GET', path: '/dashboard/revenue-summary', summary: 'Get Revenue Summary', scope: 'dashboard.read', desc: 'Fetch top-line revenue snapshots, target achievements, and regional distribution.' }
+    ],
     customers: [
         { method: 'GET', path: '/customers', summary: 'List All Customers', scope: 'customers.read', desc: 'Retrieve a paginated list of company customer records with search filter support.' },
         { method: 'GET', path: '/customers/{id}', summary: 'Get Customer Details', scope: 'customers.read', desc: 'Fetch single customer profile by MongoDB object identifier.' },
@@ -31,31 +45,91 @@ const ENDPOINT_MAP = {
     leads: [
         { method: 'GET', path: '/leads', summary: 'List Sales Inquiries', scope: 'leads.read', desc: 'Fetch incoming leads and inquiry records.' },
         { method: 'GET', path: '/leads/{id}', summary: 'Get Lead Details', scope: 'leads.read', desc: 'Fetch lead valuation and product requirement details.' },
-        { method: 'POST', path: '/leads', summary: 'Capture New Lead', scope: 'leads.write', desc: 'Submit a new incoming sales lead.' }
+        { method: 'POST', path: '/leads', summary: 'Capture New Lead', scope: 'leads.write', desc: 'Submit a new incoming sales lead.' },
+        { method: 'GET', path: '/enquiries/analytics', summary: 'Lead Conversion Analytics', scope: 'leads.read', desc: 'Lead volume trendlines, source attribution, and conversion drop-off.' }
     ],
     deals: [
         { method: 'GET', path: '/deals', summary: 'List Sales Pipeline Deals', scope: 'deals.read', desc: 'Retrieve all active deals across pipeline stages.' },
-        { method: 'POST', path: '/deals', summary: 'Create Deal', scope: 'deals.write', desc: 'Create a new deal opportunity.' }
+        { method: 'POST', path: '/deals', summary: 'Create Deal', scope: 'deals.write', desc: 'Create a new deal opportunity.' },
+        { method: 'GET', path: '/sales/pipelines', summary: 'List Sales Pipelines', scope: 'deals.read', desc: 'Fetch sales pipeline stage definitions and win probability ratios.' },
+        { method: 'GET', path: '/sales/forecasts', summary: 'Sales Revenue Forecast', scope: 'sales.read', desc: 'Weighted revenue projections and commit stage estimates.' }
     ],
     products: [
-        { method: 'GET', path: '/products', summary: 'List Product Catalog', scope: 'products.read', desc: 'Retrieve product master list with HSN codes and prices.' }
+        { method: 'GET', path: '/products', summary: 'List Product Catalog', scope: 'products.read', desc: 'Retrieve product master list with HSN codes, tax slabs, and unit prices.' },
+        { method: 'POST', path: '/products', summary: 'Create Catalog Product', scope: 'products.write', desc: 'Add a new product SKU to master catalog.' },
+        { method: 'GET', path: '/attributes', summary: 'List Product Attributes', scope: 'products.read', desc: 'Fetch configurable product attributes and specifications.' },
+        { method: 'GET', path: '/mgrs', summary: 'List Material Group References (MGR)', scope: 'products.read', desc: 'Retrieve product family segment reference codes.' }
+    ],
+    payroll: [
+        { method: 'GET', path: '/payroll/dashboard', summary: 'Payroll Overview Metrics', scope: 'payroll.read', desc: 'Get current payroll run summary, total gross disbursal, and employee counts.' },
+        { method: 'GET', path: '/payroll/employees', summary: 'List Employee Roster', scope: 'payroll.read', desc: 'Retrieve organization employee profiles and active designations.' },
+        { method: 'POST', path: '/payroll/runs', summary: 'Execute Payroll Run', scope: 'payroll.write', desc: 'Trigger monthly salary processing and tax calculations.' },
+        { method: 'GET', path: '/payroll/payslips', summary: 'Retrieve Employee Payslips', scope: 'payroll.read', desc: 'Fetch itemized employee salary slips.' },
+        { method: 'GET', path: '/payroll/letters', summary: 'HR Generated Letters', scope: 'payroll.read', desc: 'Offer letters, increment notices, and experience certificates.' }
     ],
     quotations: [
-        { method: 'GET', path: '/quotations', summary: 'List Quotations', scope: 'quotations.read', desc: 'Retrieve generated sales quotations.' }
+        { method: 'GET', path: '/quotations', summary: 'List Quotations', scope: 'quotations.read', desc: 'Retrieve generated commercial quotations with status filters.' },
+        { method: 'POST', path: '/quotations', summary: 'Create Quotation Proposal', scope: 'quotations.write', desc: 'Generate multi-item quote with taxes and payment terms.' },
+        { method: 'GET', path: '/quotations/conversion-report', summary: 'Quote Conversion Report', scope: 'quotations.read', desc: 'Win/loss ratio reports and quote cycle durations.' },
+        { method: 'GET', path: '/terms', summary: 'List Standard Terms & Conditions', scope: 'quotations.read', desc: 'Retrieve commercial terms clauses and legal disclaimers.' }
     ],
-    vendors: [
-        { method: 'GET', path: '/vendors', summary: 'List Vendors', scope: 'vendors.read', desc: 'Retrieve vendor master directory.' },
-        { method: 'POST', path: '/vendors', summary: 'Create Vendor', scope: 'vendors.write', desc: 'Create new supplier vendor profile.' }
+    cpq: [
+        { method: 'GET', path: '/cpq/price-books', summary: 'List Price Books', scope: 'cpq.read', desc: 'Tiered price lists, customer tier rates, and list revisions.' },
+        { method: 'GET', path: '/cpq/pricing-rules', summary: 'List Pricing Rules', scope: 'cpq.read', desc: 'Quantity price breaks, volume rules, and surcharge logic.' },
+        { method: 'GET', path: '/cpq/discounts', summary: 'Discount Policies', scope: 'cpq.read', desc: 'Max discount limits and margin protection caps.' },
+        { method: 'POST', path: '/cpq/configurator', summary: 'Run Product Configurator', scope: 'cpq.write', desc: 'Dynamic assembly rules engine for complex product packages.' },
+        { method: 'POST', path: '/cpq/simulator', summary: 'Simulate Deal Pricing', scope: 'cpq.read', desc: 'Estimate margins, freight fees, and net proposal revenue.' }
     ],
     orders: [
-        { method: 'GET', path: '/orders', summary: 'List Sales Orders', scope: 'orders.read', desc: 'Retrieve customer vouchers and invoices.' }
+        { method: 'GET', path: '/orders', summary: 'List Sales Orders', scope: 'orders.read', desc: 'Retrieve confirmed customer vouchers, sales orders, and invoices.' },
+        { method: 'POST', path: '/orders', summary: 'Create Sales Order', scope: 'orders.write', desc: 'Convert an approved quotation into a binding sales order.' },
+        { method: 'GET', path: '/invoices', summary: 'List Invoices & Billing', scope: 'orders.read', desc: 'Tax invoices, proforma billing documents, and collection status.' }
+    ],
+    clm: [
+        { method: 'GET', path: '/clm/contracts', summary: 'List Legal Contracts', scope: 'clm.read', desc: 'Master contract directory, executed agreements, and milestone dates.' },
+        { method: 'POST', path: '/clm/contracts', summary: 'Draft New Contract', scope: 'clm.write', desc: 'Create contract record from template and clause parameters.' },
+        { method: 'GET', path: '/clm/templates', summary: 'Contract Templates Library', scope: 'clm.read', desc: 'Standardized MSA, SLA, NDA, and agreement formats.' },
+        { method: 'GET', path: '/clm/renewals', summary: 'Contract Renewals Pipeline', scope: 'clm.read', desc: 'Upcoming 90-day contract expiration notices and expansion leads.' }
+    ],
+    csm: [
+        { method: 'GET', path: '/csm/tickets', summary: 'List Service Tickets', scope: 'csm.read', desc: 'Customer complaint tickets, severity levels, and resolution logs.' },
+        { method: 'POST', path: '/csm/tickets', summary: 'Create Service Ticket', scope: 'csm.write', desc: 'Log a new equipment breakdown or service inquiry ticket.' },
+        { method: 'GET', path: '/csm/visits', summary: 'Field Service Visits', scope: 'csm.read', desc: 'Dispatched service engineer visits and on-site inspection logs.' },
+        { method: 'GET', path: '/csm/warranties', summary: 'Warranty & AMC Contracts', scope: 'csm.read', desc: 'Equipment warranty validity and annual service contracts.' }
+    ],
+    tenders: [
+        { method: 'GET', path: '/tenders', summary: 'List Tenders Directory', scope: 'tenders.read', desc: 'Master directory of tender notices, bid submission dates, and EMDs.' },
+        { method: 'POST', path: '/tenders', summary: 'Register New Tender', scope: 'tenders.write', desc: 'Add new tender opportunity with RFP requirements.' },
+        { method: 'GET', path: '/tenders/reports', summary: 'Tender Win/Loss Analytics', scope: 'tenders.read', desc: 'Tender bid outcomes, win percentages, and EMD refund logs.' }
+    ],
+    purchase: [
+        { method: 'GET', path: '/grn', summary: 'List Goods Receipt Notes', scope: 'inventory.read', desc: 'Track incoming material receipts, vendor delivery notes, and serials.' },
+        { method: 'POST', path: '/grn', summary: 'Create GRN Entry', scope: 'inventory.write', desc: 'Log new stock inward entry and warehouse allocation.' }
+    ],
+    planning: [
+        { method: 'GET', path: '/planning', summary: 'Planning Matrix Data', scope: 'planning.read', desc: 'Resource capacity planning, production schedules, and utilization.' },
+        { method: 'GET', path: '/simulations', summary: 'What-If Capacity Models', scope: 'planning.read', desc: 'Capacity bottleneck simulation models and load balancing.' }
+    ],
+    vendors: [
+        { method: 'GET', path: '/vendors', summary: 'List Vendors', scope: 'vendors.read', desc: 'Retrieve vendor master directory and GSTIN numbers.' },
+        { method: 'POST', path: '/vendors', summary: 'Create Vendor', scope: 'vendors.write', desc: 'Create new supplier vendor profile.' }
     ],
     meetings: [
         { method: 'GET', path: '/meetings', summary: 'List Scheduled Meetings', scope: 'meetings.read', desc: 'Fetch customer meeting schedule.' },
         { method: 'POST', path: '/meetings', summary: 'Schedule Meeting', scope: 'meetings.write', desc: 'Schedule a new customer visit or demo.' }
     ],
+    reports: [
+        { method: 'GET', path: '/reports', summary: 'List Standard Reports', scope: 'analytics.read', desc: 'Centralized directory of exportable business performance reports.' },
+        { method: 'GET', path: '/analytics/sales', summary: 'Sales Analytics Charts', scope: 'analytics.read', desc: 'Monthly sales trendlines and average order size.' },
+        { method: 'GET', path: '/analytics/revenue', summary: 'Revenue Growth Metrics', scope: 'analytics.read', desc: 'Year-over-year revenue comparisons and growth metrics.' }
+    ],
     branches: [
-        { method: 'GET', path: '/branches', summary: 'List Office Branches', scope: 'branches.read', desc: 'Retrieve company branch master directory.' }
+        { method: 'GET', path: '/branches', summary: 'List Office Branches', scope: 'branches.read', desc: 'Retrieve company branch master directory.' },
+        { method: 'GET', path: '/territories', summary: 'List Territory Zones', scope: 'branches.read', desc: 'Regional PIN code mappings and sales territory bounds.' }
+    ],
+    admin: [
+        { method: 'GET', path: '/admin/authorization', summary: 'RBAC Access Matrix', scope: 'admin.read', desc: 'User role matrix and scope authorization limits.' },
+        { method: 'GET', path: '/salespersons', summary: 'Salespersons Roster', scope: 'admin.read', desc: 'Sales representative directory and manager assignments.' }
     ]
 };
 
@@ -139,12 +213,12 @@ const ApiReference = () => {
                     API Explorer & Interactive Console
                 </h1>
                 <p className="text-slate-500 text-xs font-medium mt-1">
-                    Explore API documentation, inspect schemas, and execute live HTTP requests directly against your environment.
+                    Explore API documentation across all system modules, inspect schemas, and execute live HTTP requests directly against your environment.
                 </p>
             </div>
 
             {/* Module Selector Pills */}
-            <div className="flex flex-wrap gap-2 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm">
+            <div className="flex flex-wrap gap-2 bg-white p-2.5 rounded-2xl border border-slate-200 shadow-sm max-h-[160px] overflow-y-auto custom-scrollbar">
                 {MODULES.map(mod => (
                     <button
                         key={mod.id}
@@ -236,8 +310,8 @@ const ApiReference = () => {
   "data": [
     {
       "id": "65cb7f92a10e82c1",
-      "customerName": "Acme Global Solutions",
-      "status": "Active"
+      "status": "Active",
+      "createdAt": "2026-08-11T12:00:00Z"
     }
   ],
   "pagination": {
@@ -246,7 +320,7 @@ const ApiReference = () => {
     "totalCount": 1,
     "totalPages": 1
   }
-}`} language="json" title="Standard 200 OK Response" />
+}`} language="json" title="Standard 200 OK Response Envelope" />
                             </div>
                         </div>
                     )}
