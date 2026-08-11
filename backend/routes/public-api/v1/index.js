@@ -35,6 +35,7 @@ router.use(apiRateLimiter(60000, 100)); // 100 requests per minute per key
 router.use('/customers', customerRoutes);
 router.use('/contacts', contactRoutes);
 router.use('/leads', leadRoutes);
+router.use('/enquiries', leadRoutes);
 router.use('/deals', dealRoutes);
 router.use('/products', productRoutes);
 router.use('/quotations', quotationRoutes);
@@ -49,6 +50,7 @@ router.use('/payroll', payrollPublicRoutes);
 router.use('/cpq', cpqPublicRoutes);
 router.use('/clm', clmPublicRoutes);
 router.use('/csm', csmPublicRoutes);
+router.use('/tender', tenderPublicRoutes);
 router.use('/tenders', tenderPublicRoutes);
 router.use('/grn', grnPublicRoutes);
 router.use('/planning', planningPublicRoutes);

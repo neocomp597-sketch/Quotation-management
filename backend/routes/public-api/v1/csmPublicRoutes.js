@@ -14,13 +14,28 @@ router.get('/dashboard', requireApiScope('csm.read'), async (req, res) => {
     }, 200, 'CSM dashboard overview');
 });
 
-// GET /api/v1/csm/tickets
+// GET /api/v1/csm/tickets & /api/v1/csm/tickets/:id
 router.get('/tickets', requireApiScope('csm.read'), async (req, res) => {
     const tickets = [
         { ticketNo: 'TCK-10492', customerName: 'Reliance Industries', issueSummary: 'PLC Controller Communication Error', priority: 'High', status: 'In Progress', assignedEngineer: 'Vikram Singh', createdAt: '2026-08-11T09:30:00Z' },
         { ticketNo: 'TCK-10493', customerName: 'Tata Motors', issueSummary: 'Annual Maintenance Inspection Request', priority: 'Medium', status: 'Assigned', assignedEngineer: 'Rahul Varma', createdAt: '2026-08-11T10:15:00Z' }
     ];
     return sendPaginated(res, tickets, 1, 25, tickets.length);
+});
+
+router.get('/tickets/:id', requireApiScope('csm.read'), async (req, res) => {
+    return sendSuccess(res, {
+        ticketNo: req.params.id,
+        customerName: 'Reliance Industries',
+        issueSummary: 'PLC Controller Communication Error',
+        priority: 'High',
+        status: 'In Progress',
+        assignedEngineer: 'Vikram Singh',
+        timeline: [
+            { time: '2026-08-11T09:30:00Z', note: 'Ticket created via Web Portal' },
+            { time: '2026-08-11T09:44:00Z', note: 'Assigned to Engineer Vikram Singh' }
+        ]
+    }, 200, 'Service ticket details fetched');
 });
 
 // POST /api/v1/csm/tickets
@@ -41,8 +56,8 @@ router.get('/visits', requireApiScope('csm.read'), async (req, res) => {
     return sendPaginated(res, visits, 1, 25, visits.length);
 });
 
-// GET /api/v1/csm/warranties
-router.get('/warranties', requireApiScope('csm.read'), async (req, res) => {
+// GET /api/v1/csm/warranties & /api/v1/csm/warranties-amc
+router.get(['/warranties', '/warranties-amc'], requireApiScope('csm.read'), async (req, res) => {
     const warranties = [
         { serialNo: 'SN-9048201', equipmentName: 'AR-500 CNC Mill', customerName: 'Precision Engineering', warrantyStatus: 'Valid', validUntil: '2027-03-31' }
     ];

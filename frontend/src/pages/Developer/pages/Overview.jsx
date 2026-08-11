@@ -32,8 +32,11 @@ const ALL_SYSTEM_MODULES = [
         icon: '📁',
         subModules: [
             { title: 'Customers Master', desc: 'Manage customer accounts, corporate profiles, GSTIN validation, and billing addresses.', endpoint: 'GET /api/v1/customers', scope: 'customers.read', method: 'GET', modId: 'customers' },
+            { title: 'Customer 360 Workspace', desc: 'Comprehensive customer 360 degree view including quotation history, orders, and interactions.', endpoint: 'GET /api/v1/customers/{id}/360', scope: 'customers.read', method: 'GET', modId: 'customers' },
             { title: 'Contacts Directory', desc: 'Corporate contact directory, designations, key decision makers, and direct lines.', endpoint: 'GET /api/v1/contacts', scope: 'contacts.read', method: 'GET', modId: 'contacts' },
+            { title: 'Contact 360 Workspace', desc: 'Individual contact 360 view with activity logs, linked leads, and meeting notes.', endpoint: 'GET /api/v1/contacts/{id}/360', scope: 'contacts.read', method: 'GET', modId: 'contacts' },
             { title: 'Vendors Master', desc: 'Supplier and vendor master catalog, tax credentials, and supplier item mappings.', endpoint: 'GET /api/v1/vendors', scope: 'vendors.read', method: 'GET', modId: 'vendors' },
+            { title: 'Vendor 360 Workspace', desc: 'Vendor performance 360 view with GRN history, item quotes, and supplier metrics.', endpoint: 'GET /api/v1/vendors/{id}/360', scope: 'vendors.read', method: 'GET', modId: 'vendors' },
             { title: 'Product Catalog', desc: 'Product master items, HSN/SAC codes, tax slabs, unit-of-measure pricing, and SKUs.', endpoint: 'GET /api/v1/products', scope: 'products.read', method: 'GET', modId: 'products' },
             { title: 'Employees Master', desc: 'Organization employee profiles, employment status, reporting managers, and departments.', endpoint: 'GET /api/v1/payroll/employees', scope: 'employees.read', method: 'GET', modId: 'payroll' },
             { title: 'Org Hierarchy Chart', desc: 'Fetch reporting trees, organizational nodes, and departmental sub-structures.', endpoint: 'GET /api/v1/payroll/org-chart', scope: 'employees.read', method: 'GET', modId: 'payroll' },
@@ -63,7 +66,9 @@ const ALL_SYSTEM_MODULES = [
             { title: 'Payments & Disbursal', desc: 'Bank payout files, batch transfer logs, and employee salary credit verifications.', endpoint: 'GET /api/v1/payroll/payments', scope: 'payroll.read', method: 'GET', modId: 'payroll' },
             { title: 'Employee Payslips', desc: 'Generate and retrieve itemized employee salary slips in PDF/JSON formats.', endpoint: 'GET /api/v1/payroll/payslips', scope: 'payroll.read', method: 'GET', modId: 'payroll' },
             { title: 'HR Letters & Documents', desc: 'Issue automated offer letters, increment letters, experience certificates, and NDAs.', endpoint: 'GET /api/v1/payroll/letters', scope: 'payroll.read', method: 'GET', modId: 'payroll' },
-            { title: 'Payroll Configuration', desc: 'PF/ESI rules, professional tax brackets, TDS slabs, and salary structure settings.', endpoint: 'GET /api/v1/payroll/settings', scope: 'payroll.write', method: 'GET', modId: 'payroll' }
+            { title: 'Payroll Reports', desc: 'PF returns, ESI compliance statements, Form 16 tax summaries, and payout audit logs.', endpoint: 'GET /api/v1/payroll/reports', scope: 'payroll.read', method: 'GET', modId: 'payroll' },
+            { title: 'Payroll Configuration', desc: 'PF/ESI rules, professional tax brackets, TDS slabs, and salary structure settings.', endpoint: 'GET /api/v1/payroll/settings', scope: 'payroll.write', method: 'GET', modId: 'payroll' },
+            { title: 'Payroll Masters', desc: 'Department and designation master definitions for HR payroll management.', endpoint: 'GET /api/v1/payroll/masters', scope: 'payroll.read', method: 'GET', modId: 'payroll' }
         ]
     },
     {
@@ -86,9 +91,11 @@ const ALL_SYSTEM_MODULES = [
             { title: 'Pipeline Dashboard', desc: 'Pipeline stage velocity, total open opportunity valuations, and deal distribution.', endpoint: 'GET /api/v1/sales/pipeline-summary', scope: 'deals.read', method: 'GET', modId: 'deals' },
             { title: 'Pipelines Configurator', desc: 'Custom sales pipeline stages, probability percentages, and stage gate requirements.', endpoint: 'GET /api/v1/sales/pipelines', scope: 'deals.read', method: 'GET', modId: 'deals' },
             { title: 'Deals Opportunities', desc: 'Manage qualified sales opportunities, target closure dates, and expected values.', endpoint: 'GET /api/v1/deals', scope: 'deals.read', method: 'GET', modId: 'deals' },
+            { title: 'Deal Detail & Timeline', desc: 'Individual deal view with stage history, line item valuations, and notes.', endpoint: 'GET /api/v1/deals/{id}', scope: 'deals.read', method: 'GET', modId: 'deals' },
             { title: 'Sales Forecasting', desc: 'Weighted revenue projections, commit stage forecasts, and best-case estimates.', endpoint: 'GET /api/v1/sales/forecasts', scope: 'sales.read', method: 'GET', modId: 'deals' },
             { title: 'Sales Activity Logs', desc: 'Log customer calls, emails, product presentations, and sales representative tasks.', endpoint: 'GET /api/v1/sales/activities', scope: 'sales.read', method: 'GET', modId: 'deals' },
-            { title: 'Sales Targets & Quotas', desc: 'Quota allocations, monthly rep targets, team achievements, and quota variance.', endpoint: 'GET /api/v1/sales/targets', scope: 'sales.read', method: 'GET', modId: 'deals' }
+            { title: 'Sales Targets & Quotas', desc: 'Quota allocations, monthly rep targets, team achievements, and quota variance.', endpoint: 'GET /api/v1/sales/targets', scope: 'sales.read', method: 'GET', modId: 'deals' },
+            { title: 'Sales Reports', desc: 'Rep performance, stage conversion time, and monthly sales pipeline activity.', endpoint: 'GET /api/v1/sales/reports', scope: 'sales.read', method: 'GET', modId: 'deals' }
         ]
     },
     {
@@ -102,6 +109,18 @@ const ALL_SYSTEM_MODULES = [
         ]
     },
     {
+        categoryId: 'sales_catalog',
+        categoryName: 'Product Submodules',
+        moduleTitle: 'Catalog & Offerings Submodules',
+        icon: '🏷️',
+        subModules: [
+            { title: 'Product Catalog Items', desc: 'Physical hardware products, machinery SKUs, and spare part catalogs.', endpoint: 'GET /api/v1/sales/catalog/products', scope: 'products.read', method: 'GET', modId: 'products' },
+            { title: 'Service Catalog Offerings', desc: 'Professional services, installation packages, AMC coverage, and consulting.', endpoint: 'GET /api/v1/sales/catalog/services', scope: 'products.read', method: 'GET', modId: 'products' },
+            { title: 'Product Bundles & Kits', desc: 'Pre-configured product bundles, starter kits, and promotional packages.', endpoint: 'GET /api/v1/sales/catalog/bundles', scope: 'products.read', method: 'GET', modId: 'products' },
+            { title: 'Subscription Offerings', desc: 'SaaS subscriptions, recurring service licenses, and billing intervals.', endpoint: 'GET /api/v1/sales/catalog/subscriptions', scope: 'products.read', method: 'GET', modId: 'products' }
+        ]
+    },
+    {
         categoryId: 'cpq_catalog',
         categoryName: 'CPQ & Pricing',
         moduleTitle: 'Configure Price Quote (CPQ)',
@@ -111,7 +130,8 @@ const ALL_SYSTEM_MODULES = [
             { title: 'Pricing Rules Engine', desc: 'Quantity discount matrices, volume price breaks, and automated surcharge logic.', endpoint: 'GET /api/v1/cpq/pricing-rules', scope: 'cpq.read', method: 'GET', modId: 'products' },
             { title: 'Discount Policies', desc: 'Max allowable discount caps, margin protection thresholds, and approval rules.', endpoint: 'GET /api/v1/cpq/discounts', scope: 'cpq.read', method: 'GET', modId: 'products' },
             { title: 'Promotions & Offers', desc: 'Seasonal promotional codes, bundled packages, and limited-time discount campaigns.', endpoint: 'GET /api/v1/cpq/promotions', scope: 'cpq.read', method: 'GET', modId: 'products' },
-            { title: 'Currency Exchange Rates', desc: 'Multi-currency exchange rates, base currency conversions, and FX spot rates.', endpoint: 'GET /api/v1/cpq/currencies', scope: 'cpq.read', method: 'GET', modId: 'products' }
+            { title: 'Currency Exchange Rates', desc: 'Multi-currency exchange rates, base currency conversions, and FX spot rates.', endpoint: 'GET /api/v1/cpq/currencies', scope: 'cpq.read', method: 'GET', modId: 'products' },
+            { title: 'Customer Pricing Dashboard', desc: 'Special customer contract pricing rates, negotiated discount tiers, and histories.', endpoint: 'GET /api/v1/sales/customer-pricing', scope: 'cpq.read', method: 'GET', modId: 'products' }
         ]
     },
     {
@@ -124,12 +144,13 @@ const ALL_SYSTEM_MODULES = [
             { title: 'Generate Quotation', desc: 'Create complex commercial proposals with multi-item tax breakdown and terms.', endpoint: 'POST /api/v1/quotations', scope: 'quotations.write', method: 'POST', modId: 'quotations' },
             { title: 'Pending Approval Quotes', desc: 'Queue of high-value proposals awaiting commercial discount manager approval.', endpoint: 'GET /api/v1/quotations?status=pending_approval', scope: 'quotations.read', method: 'GET', modId: 'quotations' },
             { title: 'Approved Quotations', desc: 'Finalized and customer-approved quotation vouchers ready for sales order conversion.', endpoint: 'GET /api/v1/quotations?status=final', scope: 'quotations.read', method: 'GET', modId: 'quotations' },
+            { title: 'Rejected Quotations', desc: 'Log of rejected commercial quotes with rejection rationale and revision notes.', endpoint: 'GET /api/v1/quotations?status=rejected', scope: 'quotations.read', method: 'GET', modId: 'quotations' },
             { title: 'Quote Conversion Analytics', desc: 'Win/loss ratio reports, deal conversion timelines, and quote cycle durations.', endpoint: 'GET /api/v1/quotations/conversion-report', scope: 'quotations.read', method: 'GET', modId: 'quotations' },
             { title: 'Guided Selling Wizard', desc: 'Interactive questionnaire endpoint to recommend optimal product catalog bundles.', endpoint: 'GET /api/v1/cpq/guided-selling', scope: 'cpq.read', method: 'GET', modId: 'quotations' },
             { title: 'Product Configurator', desc: 'Dynamic rules engine for custom product option assembly and pricing calculations.', endpoint: 'POST /api/v1/cpq/configurator', scope: 'cpq.write', method: 'POST', modId: 'quotations' },
             { title: 'Quote Price Simulator', desc: 'Real-time sandbox tool for estimating margins, freight cost, and net deal revenue.', endpoint: 'POST /api/v1/cpq/simulator', scope: 'cpq.read', method: 'POST', modId: 'quotations' },
+            { title: 'Approval Workflows', desc: 'Hierarchical approval logs, discount override requests, and escalation histories.', endpoint: 'GET /api/v1/sales/approvals', scope: 'quotations.read', method: 'GET', modId: 'quotations' },
             { title: 'Invoices & Billing', desc: 'Tax invoices, proforma billing documents, payment collection status, and credit notes.', endpoint: 'GET /api/v1/invoices', scope: 'orders.read', method: 'GET', modId: 'orders' },
-            { title: 'Approval Workflows', desc: 'Hierarchical approval logs, discount override requests, and escalation histories.', endpoint: 'GET /api/v1/approvals', scope: 'quotations.read', method: 'GET', modId: 'quotations' },
             { title: 'Sales Orders', desc: 'Confirmed customer sales orders, voucher numbers, delivery schedules, and fulfillment.', endpoint: 'GET /api/v1/orders', scope: 'orders.read', method: 'GET', modId: 'orders' }
         ]
     },
@@ -141,6 +162,7 @@ const ALL_SYSTEM_MODULES = [
         subModules: [
             { title: 'CLM Overview Dashboard', desc: 'Active customer agreements, expiring contracts, renewal pipeline, and contract value.', endpoint: 'GET /api/v1/clm/dashboard', scope: 'clm.read', method: 'GET', modId: 'clm' },
             { title: 'Contracts Repository', desc: 'Master contract directory, executed agreements, milestone dates, and attachments.', endpoint: 'GET /api/v1/clm/contracts', scope: 'clm.read', method: 'GET', modId: 'clm' },
+            { title: 'Draft New Contract', desc: 'Create contract record from template and clause parameters.', endpoint: 'POST /api/v1/clm/contracts', scope: 'clm.write', method: 'POST', modId: 'clm' },
             { title: 'Contract Templates', desc: 'Standardized legal agreement templates, MSA, SLA, NDA, and service agreement formats.', endpoint: 'GET /api/v1/clm/templates', scope: 'clm.read', method: 'GET', modId: 'clm' },
             { title: 'Clauses Library', desc: 'Pre-approved legal clauses, liability caps, indemnity statements, and governing law terms.', endpoint: 'GET /api/v1/clm/clauses', scope: 'clm.read', method: 'GET', modId: 'clm' },
             { title: 'CLM Approvals Queue', desc: 'Legal department review queue, non-standard clause exceptions, and signatures.', endpoint: 'GET /api/v1/clm/approvals', scope: 'clm.read', method: 'GET', modId: 'clm' },
@@ -177,9 +199,10 @@ const ALL_SYSTEM_MODULES = [
         subModules: [
             { title: 'CSM Dashboard', desc: 'Open ticket counts, first response time KPIs, customer CSAT scores, and field visits.', endpoint: 'GET /api/v1/csm/dashboard', scope: 'csm.read', method: 'GET', modId: 'csm' },
             { title: 'Service Tickets Register', desc: 'Customer complaint tickets, severity levels, root cause categories, and resolution logs.', endpoint: 'GET /api/v1/csm/tickets', scope: 'csm.read', method: 'GET', modId: 'csm' },
+            { title: 'Ticket Detail Workspace', desc: 'Individual ticket workspace with communication history, diagnostic notes, and status.', endpoint: 'GET /api/v1/csm/tickets/{id}', scope: 'csm.read', method: 'GET', modId: 'csm' },
             { title: 'Create Service Ticket', desc: 'Log a new customer breakdown, maintenance inquiry, or technical ticket.', endpoint: 'POST /api/v1/csm/tickets', scope: 'csm.write', method: 'POST', modId: 'csm' },
             { title: 'Field Service Visits', desc: 'Dispatch service engineers, track GPS check-in/out times, and log spare parts used.', endpoint: 'GET /api/v1/csm/visits', scope: 'csm.read', method: 'GET', modId: 'csm' },
-            { title: 'Warranty & AMC Contracts', desc: 'Equipment warranty validation, annual maintenance contract dates, and coverage scope.', endpoint: 'GET /api/v1/csm/warranties', scope: 'csm.read', method: 'GET', modId: 'csm' },
+            { title: 'Warranty & AMC Contracts', desc: 'Equipment warranty validation, annual maintenance contract dates, and coverage scope.', endpoint: 'GET /api/v1/csm/warranties-amc', scope: 'csm.read', method: 'GET', modId: 'csm' },
             { title: 'Service Knowledge Base', desc: 'Troubleshooting guides, error code manuals, technical diagrams, and FAQs.', endpoint: 'GET /api/v1/csm/kb', scope: 'csm.read', method: 'GET', modId: 'csm' },
             { title: 'CSM Config Masters', desc: 'SLA priority matrix, escalation tiers, service category codes, and resolution time limits.', endpoint: 'GET /api/v1/csm/masters', scope: 'csm.write', method: 'GET', modId: 'csm' },
             { title: 'Service Reports', desc: 'Engineer performance, mean time to repair (MTTR), and customer satisfaction trends.', endpoint: 'GET /api/v1/csm/reports', scope: 'csm.read', method: 'GET', modId: 'csm' }
@@ -191,10 +214,10 @@ const ALL_SYSTEM_MODULES = [
         moduleTitle: 'Tender & Bid Management',
         icon: '⚖️',
         subModules: [
-            { title: 'Tender Overview Dashboard', desc: 'Summary of active government/private tenders, EMD deposits, and bid deadlines.', endpoint: 'GET /api/v1/tenders/dashboard', scope: 'tenders.read', method: 'GET', modId: 'tenders' },
-            { title: 'Tenders Register', desc: 'Master directory of tender notices, bid submission dates, eligibility, and document links.', endpoint: 'GET /api/v1/tenders', scope: 'tenders.read', method: 'GET', modId: 'tenders' },
-            { title: 'Create Tender Entry', desc: 'Register a new tender opportunity, assign bid manager, and attach RFP specifications.', endpoint: 'POST /api/v1/tenders', scope: 'tenders.write', method: 'POST', modId: 'tenders' },
-            { title: 'Tender Reports', desc: 'Bid win/loss analytics, EMD refund status, and tender valuation breakdown.', endpoint: 'GET /api/v1/tenders/reports', scope: 'tenders.read', method: 'GET', modId: 'tenders' }
+            { title: 'Tender Overview Dashboard', desc: 'Summary of active government/private tenders, EMD deposits, and bid deadlines.', endpoint: 'GET /api/v1/tender/dashboard', scope: 'tenders.read', method: 'GET', modId: 'tenders' },
+            { title: 'Tenders Register', desc: 'Master directory of tender notices, bid submission dates, eligibility, and document links.', endpoint: 'GET /api/v1/tender/register', scope: 'tenders.read', method: 'GET', modId: 'tenders' },
+            { title: 'Create Tender Entry', desc: 'Register a new tender opportunity, assign bid manager, and attach RFP specifications.', endpoint: 'POST /api/v1/tender/register', scope: 'tenders.write', method: 'POST', modId: 'tenders' },
+            { title: 'Tender Reports', desc: 'Bid win/loss analytics, EMD refund status, and tender valuation breakdown.', endpoint: 'GET /api/v1/tender/reports', scope: 'tenders.read', method: 'GET', modId: 'tenders' }
         ]
     },
     {
@@ -205,10 +228,9 @@ const ALL_SYSTEM_MODULES = [
         subModules: [
             { title: 'Executive Reports Center', desc: 'Centralized directory of exportable business performance reports in Excel/PDF.', endpoint: 'GET /api/v1/reports', scope: 'analytics.read', method: 'GET', modId: 'reports' },
             { title: 'Payroll Reports', desc: 'PF returns, ESI statements, Form 16 summaries, and gross salary payout audit reports.', endpoint: 'GET /api/v1/payroll/reports', scope: 'payroll.read', method: 'GET', modId: 'payroll' },
-            { title: 'Sales Reports', desc: 'Product-wise sales reports, customer segment sales, and sales rep performance.', endpoint: 'GET /api/v1/sales/reports', scope: 'sales.read', method: 'GET', modId: 'reports' },
-            { title: 'Sales Analytics', desc: 'Interactive charts for monthly sales trends, deal win velocity, and average order value.', endpoint: 'GET /api/v1/analytics/sales', scope: 'analytics.read', method: 'GET', modId: 'reports' },
-            { title: 'Customer Analytics', desc: 'Customer lifetime value (CLV), churn risk indicators, and RFM segmentation metrics.', endpoint: 'GET /api/v1/analytics/customers', scope: 'analytics.read', method: 'GET', modId: 'customers' },
-            { title: 'Revenue Growth Analytics', desc: 'Year-over-year revenue comparisons, MRR/ARR growth metrics, and product contribution.', endpoint: 'GET /api/v1/analytics/revenue', scope: 'analytics.read', method: 'GET', modId: 'reports' },
+            { title: 'Sales Analytics Charts', desc: 'Interactive charts for monthly sales trends, deal win velocity, and average order value.', endpoint: 'GET /api/v1/sales/analytics', scope: 'analytics.read', method: 'GET', modId: 'reports' },
+            { title: 'Revenue Growth Analytics', desc: 'Year-over-year revenue comparisons, MRR/ARR growth metrics, and product contribution.', endpoint: 'GET /api/v1/sales/revenue-analytics', scope: 'analytics.read', method: 'GET', modId: 'reports' },
+            { title: 'Customer Analytics', desc: 'Customer lifetime value (CLV), churn risk indicators, and RFM segmentation metrics.', endpoint: 'GET /api/v1/customers/analytics', scope: 'analytics.read', method: 'GET', modId: 'customers' },
             { title: 'Competitor Intelligence', desc: 'Competitor price benchmarks, feature matrix comparisons, and battle cards.', endpoint: 'GET /api/v1/sales/competitors', scope: 'sales.read', method: 'GET', modId: 'reports' },
             { title: 'AI Pricing Insights', desc: 'Machine-learning recommendations for win-optimal discount margins and deal pricing.', endpoint: 'GET /api/v1/sales/ai-pricing', scope: 'cpq.read', method: 'GET', modId: 'products' }
         ]
@@ -220,7 +242,8 @@ const ALL_SYSTEM_MODULES = [
         icon: '🔒',
         subModules: [
             { title: 'Access Control & Permissions', desc: 'User role matrix, module RBAC authorization definitions, and scope boundaries.', endpoint: 'GET /api/v1/admin/authorization', scope: 'admin.read', method: 'GET', modId: 'admin' },
-            { title: 'Salespersons Directory', desc: 'Sales representatives master list, commission rates, and branch manager assignments.', endpoint: 'GET /api/v1/salespersons', scope: 'admin.read', method: 'GET', modId: 'admin' }
+            { title: 'Salespersons Directory', desc: 'Sales representatives master list, commission rates, and branch manager assignments.', endpoint: 'GET /api/v1/salespersons', scope: 'admin.read', method: 'GET', modId: 'admin' },
+            { title: 'Landing Plan Manager', desc: 'Whitelabel marketing landing plans, pricing packages, and feature configurations.', endpoint: 'GET /api/v1/admin/landing-plans', scope: 'admin.read', method: 'GET', modId: 'admin' }
         ]
     },
     {
@@ -229,9 +252,10 @@ const ALL_SYSTEM_MODULES = [
         moduleTitle: 'Platform & Developer Hub',
         icon: '⚙️',
         subModules: [
-            { title: 'Super Admin System Metrics', desc: 'Multi-tenant organization statistics, database health, and active user connections.', endpoint: 'GET /api/v1/super-admin/metrics', scope: 'system.read', method: 'GET', modId: 'platform' },
-            { title: 'System Updates & Changelog', desc: 'Software release notes, system upgrade history, patch notes, and feature flags.', endpoint: 'GET /api/v1/system-updates', scope: 'system.read', method: 'GET', modId: 'platform' },
-            { title: 'Developer Audit Logs', desc: 'API access key request logs, rate limit hits, error tracebacks, and payload metrics.', endpoint: 'GET /api/v1/developer/logs', scope: 'system.read', method: 'GET', modId: 'platform' }
+            { title: 'Super Admin Console Metrics', desc: 'Multi-tenant organization statistics, database health, and active user connections.', endpoint: 'GET /api/v1/super-admin', scope: 'system.read', method: 'GET', modId: 'platform' },
+            { title: 'System Software Updates', desc: 'Software release notes, system upgrade history, patch notes, and feature flags.', endpoint: 'GET /api/v1/system-updates', scope: 'system.read', method: 'GET', modId: 'platform' },
+            { title: 'Developer Audit Logs', desc: 'API access key request logs, rate limit hits, error tracebacks, and payload metrics.', endpoint: 'GET /api/v1/developer/logs', scope: 'system.read', method: 'GET', modId: 'platform' },
+            { title: 'Footer Information Pages', desc: 'Public CMS pages, terms of service, privacy policy, and help center articles.', endpoint: 'GET /api/v1/info/{slug}', scope: 'system.read', method: 'GET', modId: 'platform' }
         ]
     }
 ];
@@ -244,6 +268,7 @@ const CATEGORIES = [
     { id: 'enquiry', label: 'Enquiries & Leads' },
     { id: 'sales_pipeline', label: 'Sales Pipeline' },
     { id: 'meetings', label: 'Appointments' },
+    { id: 'sales_catalog', label: 'Product Submodules' },
     { id: 'cpq_catalog', label: 'CPQ & Pricing' },
     { id: 'quotations', label: 'Quotations & Orders' },
     { id: 'clm', label: 'Contracts (CLM)' },
@@ -302,7 +327,7 @@ const Overview = () => {
                     ARCRM Enterprise Modules & API Reference Directory
                 </h1>
                 <p className="text-emerald-100 text-sm max-w-3xl font-semibold leading-relaxed">
-                    Build bi-directional enterprise integrations, automate CRM workflows, and sync customer, payroll, sales, contracts, and service data across all 16 system modules and {totalEndpointsCount}+ sub-module API endpoints.
+                    Build bi-directional enterprise integrations, automate CRM workflows, and sync customer, payroll, sales, contracts, and service data across all {totalModulesCount} system modules and {totalEndpointsCount}+ sub-module API endpoints.
                 </p>
                 <div className="pt-2 flex flex-wrap gap-4">
                     <Link

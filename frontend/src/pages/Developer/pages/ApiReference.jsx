@@ -12,6 +12,7 @@ const MODULES = [
     { id: 'payroll', label: 'Payroll & HR', icon: '💵', scope: 'payroll', basePath: '/payroll' },
     { id: 'quotations', label: 'Quotations', icon: '📄', scope: 'quotations', basePath: '/quotations' },
     { id: 'cpq', label: 'CPQ Engine', icon: '⚙️', scope: 'cpq', basePath: '/cpq' },
+    { id: 'sales_catalog', label: 'Catalog Submodules', icon: '🏷️', scope: 'products', basePath: '/sales/catalog' },
     { id: 'orders', label: 'Sales Orders', icon: '🛒', scope: 'orders', basePath: '/orders' },
     { id: 'clm', label: 'Contracts (CLM)', icon: '📑', scope: 'clm', basePath: '/clm' },
     { id: 'csm', label: 'Customer Service', icon: '🛠️', scope: 'csm', basePath: '/csm' },
@@ -33,6 +34,7 @@ const ENDPOINT_MAP = {
     customers: [
         { method: 'GET', path: '/customers', summary: 'List All Customers', scope: 'customers.read', desc: 'Retrieve a paginated list of company customer records with search filter support.' },
         { method: 'GET', path: '/customers/{id}', summary: 'Get Customer Details', scope: 'customers.read', desc: 'Fetch single customer profile by MongoDB object identifier.' },
+        { method: 'GET', path: '/customers/{id}/360', summary: 'Customer 360 Workspace', scope: 'customers.read', desc: 'Complete 360 degree view of customer quotations, orders, and interactions.' },
         { method: 'POST', path: '/customers', summary: 'Create New Customer', scope: 'customers.write', desc: 'Create a new customer with contact details, GSTIN, and billing address.' },
         { method: 'PATCH', path: '/customers/{id}', summary: 'Update Customer Profile', scope: 'customers.write', desc: 'Update specific fields of an existing customer record.' },
         { method: 'DELETE', path: '/customers/{id}', summary: 'Delete Customer', scope: 'customers.write', desc: 'Remove a customer record permanently from your organization.' }
@@ -40,6 +42,7 @@ const ENDPOINT_MAP = {
     contacts: [
         { method: 'GET', path: '/contacts', summary: 'List Contacts Directory', scope: 'contacts.read', desc: 'Retrieve corporate contact directory entries.' },
         { method: 'GET', path: '/contacts/{id}', summary: 'Get Contact Details', scope: 'contacts.read', desc: 'Fetch individual decision maker contact details.' },
+        { method: 'GET', path: '/contacts/{id}/360', summary: 'Contact 360 Workspace', scope: 'contacts.read', desc: 'Contact 360 view with activity history and meeting notes.' },
         { method: 'POST', path: '/contacts', summary: 'Create Contact', scope: 'contacts.write', desc: 'Add a new contact to a customer or lead record.' }
     ],
     leads: [
@@ -50,9 +53,12 @@ const ENDPOINT_MAP = {
     ],
     deals: [
         { method: 'GET', path: '/deals', summary: 'List Sales Pipeline Deals', scope: 'deals.read', desc: 'Retrieve all active deals across pipeline stages.' },
+        { method: 'GET', path: '/deals/{id}', summary: 'Get Deal Timeline & Details', scope: 'deals.read', desc: 'Fetch deal stage history and opportunity line items.' },
         { method: 'POST', path: '/deals', summary: 'Create Deal', scope: 'deals.write', desc: 'Create a new deal opportunity.' },
         { method: 'GET', path: '/sales/pipelines', summary: 'List Sales Pipelines', scope: 'deals.read', desc: 'Fetch sales pipeline stage definitions and win probability ratios.' },
-        { method: 'GET', path: '/sales/forecasts', summary: 'Sales Revenue Forecast', scope: 'sales.read', desc: 'Weighted revenue projections and commit stage estimates.' }
+        { method: 'GET', path: '/sales/forecasts', summary: 'Sales Revenue Forecast', scope: 'sales.read', desc: 'Weighted revenue projections and commit stage estimates.' },
+        { method: 'GET', path: '/sales/activities', summary: 'Sales Rep Activity Logs', scope: 'sales.read', desc: 'Log customer calls, presentations, and sales tasks.' },
+        { method: 'GET', path: '/sales/targets', summary: 'Sales Targets & Quotas', scope: 'sales.read', desc: 'Quota allocations and team monthly achievements.' }
     ],
     products: [
         { method: 'GET', path: '/products', summary: 'List Product Catalog', scope: 'products.read', desc: 'Retrieve product master list with HSN codes, tax slabs, and unit prices.' },
@@ -60,12 +66,20 @@ const ENDPOINT_MAP = {
         { method: 'GET', path: '/attributes', summary: 'List Product Attributes', scope: 'products.read', desc: 'Fetch configurable product attributes and specifications.' },
         { method: 'GET', path: '/mgrs', summary: 'List Material Group References (MGR)', scope: 'products.read', desc: 'Retrieve product family segment reference codes.' }
     ],
+    sales_catalog: [
+        { method: 'GET', path: '/sales/catalog/products', summary: 'Hardware Products Catalog', scope: 'products.read', desc: 'Physical machinery, hardware items, and equipment SKUs.' },
+        { method: 'GET', path: '/sales/catalog/services', summary: 'Professional Services Catalog', scope: 'products.read', desc: 'Service packages, installation fees, and consulting.' },
+        { method: 'GET', path: '/sales/catalog/bundles', summary: 'Product Bundles & Kits', scope: 'products.read', desc: 'Pre-packaged product bundles and starter kits.' },
+        { method: 'GET', path: '/sales/catalog/subscriptions', summary: 'SaaS Subscriptions', scope: 'products.read', desc: 'Recurring license offerings and billing terms.' }
+    ],
     payroll: [
         { method: 'GET', path: '/payroll/dashboard', summary: 'Payroll Overview Metrics', scope: 'payroll.read', desc: 'Get current payroll run summary, total gross disbursal, and employee counts.' },
         { method: 'GET', path: '/payroll/employees', summary: 'List Employee Roster', scope: 'payroll.read', desc: 'Retrieve organization employee profiles and active designations.' },
         { method: 'POST', path: '/payroll/runs', summary: 'Execute Payroll Run', scope: 'payroll.write', desc: 'Trigger monthly salary processing and tax calculations.' },
+        { method: 'GET', path: '/payroll/payments', summary: 'Bank Disbursal Logs', scope: 'payroll.read', desc: 'Bank payout files and salary credit verifications.' },
         { method: 'GET', path: '/payroll/payslips', summary: 'Retrieve Employee Payslips', scope: 'payroll.read', desc: 'Fetch itemized employee salary slips.' },
-        { method: 'GET', path: '/payroll/letters', summary: 'HR Generated Letters', scope: 'payroll.read', desc: 'Offer letters, increment notices, and experience certificates.' }
+        { method: 'GET', path: '/payroll/letters', summary: 'HR Generated Letters', scope: 'payroll.read', desc: 'Offer letters, increment notices, and experience certificates.' },
+        { method: 'GET', path: '/payroll/reports', summary: 'Payroll Compliance Reports', scope: 'payroll.read', desc: 'PF returns, ESI statements, and Form 16 summaries.' }
     ],
     quotations: [
         { method: 'GET', path: '/quotations', summary: 'List Quotations', scope: 'quotations.read', desc: 'Retrieve generated commercial quotations with status filters.' },
@@ -77,6 +91,7 @@ const ENDPOINT_MAP = {
         { method: 'GET', path: '/cpq/price-books', summary: 'List Price Books', scope: 'cpq.read', desc: 'Tiered price lists, customer tier rates, and list revisions.' },
         { method: 'GET', path: '/cpq/pricing-rules', summary: 'List Pricing Rules', scope: 'cpq.read', desc: 'Quantity price breaks, volume rules, and surcharge logic.' },
         { method: 'GET', path: '/cpq/discounts', summary: 'Discount Policies', scope: 'cpq.read', desc: 'Max discount limits and margin protection caps.' },
+        { method: 'GET', path: '/sales/customer-pricing', summary: 'Customer Special Rates', scope: 'cpq.read', desc: 'Contracted customer pricing agreements and discount tiers.' },
         { method: 'POST', path: '/cpq/configurator', summary: 'Run Product Configurator', scope: 'cpq.write', desc: 'Dynamic assembly rules engine for complex product packages.' },
         { method: 'POST', path: '/cpq/simulator', summary: 'Simulate Deal Pricing', scope: 'cpq.read', desc: 'Estimate margins, freight fees, and net proposal revenue.' }
     ],
@@ -93,14 +108,16 @@ const ENDPOINT_MAP = {
     ],
     csm: [
         { method: 'GET', path: '/csm/tickets', summary: 'List Service Tickets', scope: 'csm.read', desc: 'Customer complaint tickets, severity levels, and resolution logs.' },
+        { method: 'GET', path: '/csm/tickets/{id}', summary: 'Ticket Workspace Detail', scope: 'csm.read', desc: 'Ticket workspace with communication history and notes.' },
         { method: 'POST', path: '/csm/tickets', summary: 'Create Service Ticket', scope: 'csm.write', desc: 'Log a new equipment breakdown or service inquiry ticket.' },
         { method: 'GET', path: '/csm/visits', summary: 'Field Service Visits', scope: 'csm.read', desc: 'Dispatched service engineer visits and on-site inspection logs.' },
-        { method: 'GET', path: '/csm/warranties', summary: 'Warranty & AMC Contracts', scope: 'csm.read', desc: 'Equipment warranty validity and annual service contracts.' }
+        { method: 'GET', path: '/csm/warranties-amc', summary: 'Warranty & AMC Contracts', scope: 'csm.read', desc: 'Equipment warranty validity and annual service contracts.' }
     ],
     tenders: [
-        { method: 'GET', path: '/tenders', summary: 'List Tenders Directory', scope: 'tenders.read', desc: 'Master directory of tender notices, bid submission dates, and EMDs.' },
-        { method: 'POST', path: '/tenders', summary: 'Register New Tender', scope: 'tenders.write', desc: 'Add new tender opportunity with RFP requirements.' },
-        { method: 'GET', path: '/tenders/reports', summary: 'Tender Win/Loss Analytics', scope: 'tenders.read', desc: 'Tender bid outcomes, win percentages, and EMD refund logs.' }
+        { method: 'GET', path: '/tender/dashboard', summary: 'Tender Overview Dashboard', scope: 'tenders.read', desc: 'Active tenders summary, bid valuations, and deadlines.' },
+        { method: 'GET', path: '/tender/register', summary: 'List Tenders Register', scope: 'tenders.read', desc: 'Master directory of tender notices, bid submission dates, and EMDs.' },
+        { method: 'POST', path: '/tender/register', summary: 'Register New Tender', scope: 'tenders.write', desc: 'Add new tender opportunity with RFP requirements.' },
+        { method: 'GET', path: '/tender/reports', summary: 'Tender Win/Loss Analytics', scope: 'tenders.read', desc: 'Tender bid outcomes, win percentages, and EMD refund logs.' }
     ],
     purchase: [
         { method: 'GET', path: '/grn', summary: 'List Goods Receipt Notes', scope: 'inventory.read', desc: 'Track incoming material receipts, vendor delivery notes, and serials.' },
@@ -112,6 +129,7 @@ const ENDPOINT_MAP = {
     ],
     vendors: [
         { method: 'GET', path: '/vendors', summary: 'List Vendors', scope: 'vendors.read', desc: 'Retrieve vendor master directory and GSTIN numbers.' },
+        { method: 'GET', path: '/vendors/{id}/360', summary: 'Vendor 360 Workspace', scope: 'vendors.read', desc: 'Vendor performance 360 view with GRN history and item quotes.' },
         { method: 'POST', path: '/vendors', summary: 'Create Vendor', scope: 'vendors.write', desc: 'Create new supplier vendor profile.' }
     ],
     meetings: [
@@ -120,16 +138,24 @@ const ENDPOINT_MAP = {
     ],
     reports: [
         { method: 'GET', path: '/reports', summary: 'List Standard Reports', scope: 'analytics.read', desc: 'Centralized directory of exportable business performance reports.' },
-        { method: 'GET', path: '/analytics/sales', summary: 'Sales Analytics Charts', scope: 'analytics.read', desc: 'Monthly sales trendlines and average order size.' },
-        { method: 'GET', path: '/analytics/revenue', summary: 'Revenue Growth Metrics', scope: 'analytics.read', desc: 'Year-over-year revenue comparisons and growth metrics.' }
+        { method: 'GET', path: '/sales/analytics', summary: 'Sales Analytics Charts', scope: 'analytics.read', desc: 'Monthly sales trendlines and average order size.' },
+        { method: 'GET', path: '/sales/revenue-analytics', summary: 'Revenue Growth Metrics', scope: 'analytics.read', desc: 'Year-over-year revenue comparisons and growth metrics.' },
+        { method: 'GET', path: '/customers/analytics', summary: 'Customer Lifetime Analytics', scope: 'analytics.read', desc: 'CLV scores, churn risk, and RFM customer segments.' },
+        { method: 'GET', path: '/sales/competitors', summary: 'Competitor Intelligence', scope: 'sales.read', desc: 'Competitor price benchmarks and battle cards.' },
+        { method: 'GET', path: '/sales/ai-pricing', summary: 'AI Pricing Insights', scope: 'cpq.read', desc: 'ML recommendations for optimal deal pricing.' }
     ],
     branches: [
         { method: 'GET', path: '/branches', summary: 'List Office Branches', scope: 'branches.read', desc: 'Retrieve company branch master directory.' },
-        { method: 'GET', path: '/territories', summary: 'List Territory Zones', scope: 'branches.read', desc: 'Regional PIN code mappings and sales territory bounds.' }
+        { method: 'GET', path: '/territories', summary: 'List Territory Zones', scope: 'branches.read', desc: 'Regional PIN code mappings and sales territory bounds.' },
+        { method: 'GET', path: '/states', summary: 'List State Directory', scope: 'branches.read', desc: 'State directory and GST state codes.' },
+        { method: 'GET', path: '/cities', summary: 'List City Master', scope: 'branches.read', desc: 'Tier-1/2/3 city classifications.' }
     ],
     admin: [
         { method: 'GET', path: '/admin/authorization', summary: 'RBAC Access Matrix', scope: 'admin.read', desc: 'User role matrix and scope authorization limits.' },
-        { method: 'GET', path: '/salespersons', summary: 'Salespersons Roster', scope: 'admin.read', desc: 'Sales representative directory and manager assignments.' }
+        { method: 'GET', path: '/salespersons', summary: 'Salespersons Roster', scope: 'admin.read', desc: 'Sales representative directory and manager assignments.' },
+        { method: 'GET', path: '/admin/landing-plans', summary: 'Landing Plan Manager', scope: 'admin.read', desc: 'Whitelabel plans and marketing configurations.' },
+        { method: 'GET', path: '/super-admin', summary: 'Super Admin Metrics', scope: 'system.read', desc: 'Tenant statistics and database health.' },
+        { method: 'GET', path: '/system-updates', summary: 'System Release Updates', scope: 'system.read', desc: 'Changelog history and feature flags.' }
     ]
 };
 
