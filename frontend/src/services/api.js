@@ -531,7 +531,18 @@ export const voucherService = {
 };
 
 export const enquiryService = {
-  getAll: () => api.get("/enquiries"),
+  getAll: (params) => {
+    const cleanedParams = {};
+    if (params) {
+      Object.keys(params).forEach(key => {
+        const val = params[key];
+        if (val !== '' && val !== null && val !== undefined && val !== 'null' && val !== 'undefined') {
+          cleanedParams[key] = val;
+        }
+      });
+    }
+    return api.get("/enquiries", { params: cleanedParams });
+  },
   getById: (id) => api.get(`/enquiries/${id}`),
   create: (data) => api.post("/enquiries", data),
   update: (id, data) => api.put(`/enquiries/${id}`, data),

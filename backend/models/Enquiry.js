@@ -118,4 +118,5 @@ EnquirySchema.pre(['updateOne', 'updateMany'], function() {
 const tenantPlugin = require('./plugins/tenantPlugin');
 EnquirySchema.plugin(tenantPlugin);
 EnquirySchema.index({ companyId: 1, enquiryNo: 1 }, { unique: true });
+EnquirySchema.index({ assignedTo: 1 });
 module.exports = mongoose.model('Enquiry', EnquirySchema);

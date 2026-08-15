@@ -25,29 +25,46 @@ const getAllSalespersons = async (req, res) => {
             .sort({ name: 1 })
             .lean();
 
-        // Fetch all sales Users
+        // Fetch all active Users
         const userFilter = {
-            role: { $in: ['sales', 'SALESPERSON', 'SalesPerson', 'salesperson'] },
             status: { $ne: false },
             isActive: { $ne: false },
         };
+        if (req.user?.companyId) {
+            userFilter.companyId = req.user.companyId;
+        }
         const users = await User.find(userFilter)
             .select('_id name email mobile role status isActive createdAt updatedAt')
             .sort({ name: 1 })
             .lean();
 
-        // Merge users into salespersons list if not already present
+        const userByEmail = new Map();
+        const userByName = new Map();
+        for (const user of users) {
+            if (user.email) userByEmail.set(user.email.toLowerCase().trim(), user._id.toString());
+            if (user.name) userByName.set(user.name.toLowerCase().trim(), user._id.toString());
+        }
+
         const salespersonEmails = new Set(salespersons.map(s => s.email?.toLowerCase()).filter(Boolean));
         const salespersonNames = new Set(salespersons.map(s => s.name?.toLowerCase()).filter(Boolean));
 
-        const merged = [...salespersons];
+        const merged = salespersons.map(s => {
+            const sEmail = (s.email || '').toLowerCase().trim();
+            const sName = (s.name || '').toLowerCase().trim();
+            const matchedUserId = userByEmail.get(sEmail) || userByName.get(sName);
+            return {
+                ...s,
+                _id: matchedUserId || s._id.toString(),
+                salespersonId: s._id.toString()
+            };
+        });
 
         for (const user of users) {
             const hasEmail = user.email && salespersonEmails.has(user.email.toLowerCase());
             const hasName = user.name && salespersonNames.has(user.name.toLowerCase());
             if (!hasEmail && !hasName) {
                 merged.push({
-                    _id: user._id,
+                    _id: user._id.toString(),
                     name: user.name,
                     email: user.email,
                     mobile: user.mobile || '',

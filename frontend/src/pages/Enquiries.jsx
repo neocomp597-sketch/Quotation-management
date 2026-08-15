@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { MdAdd, MdEdit, MdDelete, MdSearch, MdMoreVert, MdTimer, MdCheckCircle, MdCancel, MdPerson, MdNumbers, MdEventAvailable, MdReceiptLong, MdFilterList, MdPercent, MdAnalytics, MdVisibility, MdStar, MdClose } from 'react-icons/md';
+import { MdAdd, MdEdit, MdDelete, MdSearch, MdMoreVert, MdTimer, MdCheckCircle, MdCancel, MdPerson, MdNumbers, MdEventAvailable, MdReceiptLong, MdFilterList, MdPercent, MdAnalytics, MdVisibility, MdStar, MdClose, MdPeople } from 'react-icons/md';
 import { toast } from 'react-toastify';
-import { useNavigate } from 'react-router-dom';
-import { enquiryService } from '../services/api';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { enquiryService, salespersonService, userService } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import Modal from '../components/Modal';
 import CreateEnquiry from './CreateEnquiry';
 import { formatDate } from '../utils/helpers';
@@ -44,31 +45,81 @@ const ActionStatusPill = ({ status }) => {
 
 const Enquiries = () => {
     const navigate = useNavigate();
+    const [searchParams, setSearchParams] = useSearchParams();
+    const { user, isAdmin, isSuperAdmin } = useAuth();
+
+    const isManagerOrAdmin = useMemo(() => {
+        if (!user) return false;
+        const role = String(user.role || '').toLowerCase();
+        return isAdmin || isSuperAdmin || role === 'admin' || role === 'manager' || role === 'super_admin' || role === 'superadmin';
+    }, [user, isAdmin, isSuperAdmin]);
+
+    const activeTab = searchParams.get('tab') || 'my';
+
+    const handleTabChange = (newTab) => {
+        setFilters(prev => ({ ...prev, assignedTo: '' }));
+        setSearchParams({ tab: newTab });
+    };
+
     const [enquiries, setEnquiries] = useState([]);
+    const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [deleteModal, setDeleteModal] = useState({ open: false, id: null });
     const [enquiryModal, setEnquiryModal] = useState({ open: false, id: null });
     const [viewModal, setViewModal] = useState({ open: false, id: null, data: null });
+    const [reassignModal, setReassignModal] = useState({ open: false, enquiry: null, targetUser: '' });
     const [newNote, setNewNote] = useState('');
     const [newActionType, setNewActionType] = useState('Call');
     const [addingFollowUp, setAddingFollowUp] = useState(false);
     const [showFilters, setShowFilters] = useState(false);
 
-    // Advanced Filters State
     const [filters, setFilters] = useState({
         searchTerm: '',
         status: '',
         followUpDate: '',
         minProbability: '',
         productName: '',
-        vendorName: ''
+        vendorName: '',
+        assignedTo: ''
     });
+
+    useEffect(() => {
+        const loadUsers = async () => {
+            try {
+                const [salesRes, userRes] = await Promise.allSettled([
+                    salespersonService.getAll(),
+                    userService.getAll({ limit: 1000 })
+                ]);
+                const sData = salesRes.status === 'fulfilled' ? (salesRes.value.data?.data || salesRes.value.data || []) : [];
+                const uData = userRes.status === 'fulfilled' ? (userRes.value.data?.data || userRes.value.data || []) : [];
+                
+                const mergedMap = new Map();
+                [...sData, ...uData].forEach(item => {
+                    if (item && item._id && !mergedMap.has(item._id.toString())) {
+                        mergedMap.set(item._id.toString(), {
+                            _id: item._id.toString(),
+                            name: item.name,
+                            email: item.email,
+                            role: item.role || 'Sales Executive'
+                        });
+                    }
+                });
+                setUsers(Array.from(mergedMap.values()).sort((a, b) => a.name.localeCompare(b.name)));
+            } catch (err) {
+                console.error('Failed to load salespersons for assignment:', err);
+            }
+        };
+        loadUsers();
+    }, []);
 
     const fetchEnquiries = async () => {
         setLoading(true);
         try {
-            const res = await enquiryService.getAll();
-            setEnquiries(res.data);
+            const params = { tab: activeTab };
+            if (filters.assignedTo && String(filters.assignedTo).trim() !== '') params.assignedTo = filters.assignedTo;
+            if (filters.status && String(filters.status).trim() !== '') params.status = filters.status;
+            const res = await enquiryService.getAll(params);
+            setEnquiries(res.data || []);
         } catch (err) {
             toast.error('Failed to fetch enquiries');
         } finally {
@@ -85,45 +136,26 @@ const Enquiries = () => {
         }
     };
 
-    const handleAddFollowUp = async (e) => {
-        e.preventDefault();
-        if (!newNote.trim()) {
-            toast.error('Follow-up note cannot be empty');
-            return;
-        }
-
-        setAddingFollowUp(true);
+    const handleReassign = async () => {
+        if (!reassignModal.enquiry) return;
         try {
-            const currentHistory = viewModal.data.followUpHistory || [];
-            const updatedHistory = [
-                ...currentHistory,
-                {
-                    note: newNote,
-                    actionType: newActionType,
-                    date: new Date()
-                }
-            ];
-
             const payload = {
-                ...viewModal.data,
-                followUpHistory: updatedHistory
+                ...reassignModal.enquiry,
+                assignedTo: reassignModal.targetUser || null
             };
-
-            // Normalize payload fields for save
-            if (payload.customerId && typeof payload.customerId === 'object') {
-                payload.customerId = payload.customerId._id;
-            }
-            if (payload.assignedTo && typeof payload.assignedTo === 'object') {
-                payload.assignedTo = payload.assignedTo._id;
-            } else if (payload.assignedTo === '') {
-                delete payload.assignedTo;
-            }
-
+            if (payload.customerId && typeof payload.customerId === 'object') payload.customerId = payload.customerId._id;
+            if (payload.createdBy && typeof payload.createdBy === 'object') payload.createdBy = payload.createdBy._id;
+            
             payload.items = (payload.items || []).map(item => {
                 const cleaned = { ...item };
+                if (cleaned.productId && typeof cleaned.productId === 'object') {
+                    cleaned.productId = cleaned.productId._id;
+                } else if (!cleaned.productId || cleaned.productId === '') {
+                    delete cleaned.productId;
+                }
                 if (cleaned.finalVendor && typeof cleaned.finalVendor === 'object') {
                     cleaned.finalVendor = cleaned.finalVendor._id;
-                } else if (cleaned.finalVendor === '') {
+                } else if (!cleaned.finalVendor || cleaned.finalVendor === '') {
                     delete cleaned.finalVendor;
                 }
                 cleaned.vendors = (cleaned.vendors || []).map(v => (v && typeof v === 'object') ? v._id : v).filter(Boolean);
@@ -134,9 +166,50 @@ const Enquiries = () => {
                 return cleaned;
             });
 
+            await enquiryService.update(reassignModal.enquiry._id, payload);
+            toast.success('Sales Executive assigned successfully');
+            setReassignModal({ open: false, enquiry: null, targetUser: '' });
+            fetchEnquiries();
+            if (viewModal.open && viewModal.id === reassignModal.enquiry._id) {
+                handleOpenViewModal(reassignModal.enquiry._id);
+            }
+        } catch (err) {
+            toast.error('Failed to assign Sales Executive');
+        }
+    };
+
+    const handleAddFollowUp = async (e) => {
+        e.preventDefault();
+        if (!newNote.trim()) {
+            toast.error('Follow-up note cannot be empty');
+            return;
+        }
+        setAddingFollowUp(true);
+        try {
+            const currentHistory = viewModal.data.followUpHistory || [];
+            const updatedHistory = [...currentHistory, { note: newNote, actionType: newActionType, date: new Date() }];
+            const payload = { ...viewModal.data, followUpHistory: updatedHistory };
+            if (payload.customerId && typeof payload.customerId === 'object') payload.customerId = payload.customerId._id;
+            if (payload.assignedTo && typeof payload.assignedTo === 'object') payload.assignedTo = payload.assignedTo._id;
+            if (payload.createdBy && typeof payload.createdBy === 'object') payload.createdBy = payload.createdBy._id;
+            payload.items = (payload.items || []).map(item => {
+                const cleaned = { ...item };
+                if (cleaned.productId && typeof cleaned.productId === 'object') {
+                    cleaned.productId = cleaned.productId._id;
+                } else if (!cleaned.productId || cleaned.productId === '') {
+                    delete cleaned.productId;
+                }
+                if (cleaned.finalVendor && typeof cleaned.finalVendor === 'object') {
+                    cleaned.finalVendor = cleaned.finalVendor._id;
+                } else if (!cleaned.finalVendor || cleaned.finalVendor === '') {
+                    delete cleaned.finalVendor;
+                }
+                cleaned.vendors = (cleaned.vendors || []).map(v => (v && typeof v === 'object') ? v._id : v).filter(Boolean);
+                return cleaned;
+            });
+
             await enquiryService.update(viewModal.id, payload);
             toast.success('Follow-up entry added successfully');
-
             const refreshed = await enquiryService.getById(viewModal.id);
             setViewModal(prev => ({ ...prev, data: refreshed.data }));
             setNewNote('');
@@ -150,16 +223,12 @@ const Enquiries = () => {
 
     useEffect(() => {
         fetchEnquiries();
-
         const handleRealtimeUpdate = (e) => {
-            if (e.detail?.entity === 'ENQUIRY') {
-                fetchEnquiries();
-            }
+            if (e.detail?.entity === 'ENQUIRY') fetchEnquiries();
         };
-
         window.addEventListener('onCrmSocketUpdate', handleRealtimeUpdate);
         return () => window.removeEventListener('onCrmSocketUpdate', handleRealtimeUpdate);
-    }, []);
+    }, [activeTab, filters.assignedTo]);
 
     const handleDelete = async () => {
         try {
@@ -184,42 +253,27 @@ const Enquiries = () => {
             followUpDate: '',
             minProbability: '',
             productName: '',
-            vendorName: ''
+            vendorName: '',
+            assignedTo: ''
         });
     };
 
     const filteredEnquiries = useMemo(() => {
         const filtered = enquiries.filter(e => {
-            // General text match
             const matchesSearch = 
                 e.enquiryNo.toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
                 e.customerId?.companyName?.toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
                 e.customerId?.customerName?.toLowerCase().includes(filters.searchTerm.toLowerCase());
 
             const matchesStatus = filters.status ? e.status === filters.status : true;
-            
-            const matchesFollowUp = filters.followUpDate ? 
-                (e.followUpDate && e.followUpDate.startsWith(filters.followUpDate)) : true;
-
-            const matchesProb = filters.minProbability ? 
-                (Number(e.probability) >= Number(filters.minProbability)) : true;
-
-            const matchesProduct = filters.productName ? 
-                e.items.some(item => item.productName.toLowerCase().includes(filters.productName.toLowerCase())) : true;
-
-            const matchesVendor = filters.vendorName ?
-                e.items.some(item => 
-                    item.vendors.some(v => v.name && v.name.toLowerCase().includes(filters.vendorName.toLowerCase())) ||
-                    (item.finalVendor && item.finalVendor.name && item.finalVendor.name.toLowerCase().includes(filters.vendorName.toLowerCase()))
-                ) : true;
+            const matchesFollowUp = filters.followUpDate ? (e.followUpDate && e.followUpDate.startsWith(filters.followUpDate)) : true;
+            const matchesProb = filters.minProbability ? (Number(e.probability) >= Number(filters.minProbability)) : true;
+            const matchesProduct = filters.productName ? e.items.some(item => (item.productName || item.productId?.productName || '').toLowerCase().includes(filters.productName.toLowerCase())) : true;
+            const matchesVendor = filters.vendorName ? e.items.some(item => item.vendors.some(v => v.name && v.name.toLowerCase().includes(filters.vendorName.toLowerCase())) || (item.finalVendor && item.finalVendor.name && item.finalVendor.name.toLowerCase().includes(filters.vendorName.toLowerCase()))) : true;
 
             return matchesSearch && matchesStatus && matchesFollowUp && matchesProb && matchesProduct && matchesVendor;
         });
-
-        // Sort by enquiryNo descending (e.g., 8 at top, 1 at bottom)
-        return filtered.sort((a, b) => {
-            return String(b.enquiryNo || '').localeCompare(String(a.enquiryNo || ''), undefined, { numeric: true, sensitivity: 'base' });
-        });
+        return filtered.sort((a, b) => String(b.enquiryNo || '').localeCompare(String(a.enquiryNo || ''), undefined, { numeric: true, sensitivity: 'base' }));
     }, [enquiries, filters]);
 
     const wonCount = enquiries.filter(e => e.status === 'PO Received' || e.status === 'Finalized').length;
@@ -227,7 +281,6 @@ const Enquiries = () => {
 
     return (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-24">
-            {/* Header Section */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div>
                     <h1 className="text-4xl font-black text-slate-900 tracking-tight flex items-center gap-3">
@@ -241,25 +294,44 @@ const Enquiries = () => {
                         onClick={() => navigate('/enquiries/analytics')}
                         className="group px-6 py-4 bg-slate-100 text-slate-700 rounded-[2rem] font-black uppercase text-[10px] tracking-widest hover:bg-slate-200 transition-all shadow-lg flex items-center gap-3"
                     >
-                        <MdAnalytics size={18} />
-                        Analytics
+                        <MdAnalytics size={18} /> Analytics
                     </button>
                     <button
                         onClick={() => navigate('/enquiries/create')}
                         className="group px-8 py-4 bg-primary-600 text-white rounded-[2rem] font-black uppercase text-[10px] tracking-widest hover:bg-primary-700 transition-all shadow-xl shadow-primary-600/20 active:scale-95 flex items-center gap-3"
                     >
-                        <div className="h-6 w-6 rounded-full bg-white/20 flex items-center justify-center group-hover:rotate-90 transition-transform">
-                            <MdAdd size={20} />
-                        </div>
+                        <div className="h-6 w-6 rounded-full bg-white/20 flex items-center justify-center group-hover:rotate-90 transition-transform"><MdAdd size={20} /></div>
                         New Enquiry
                     </button>
                 </div>
             </div>
 
-            {/* Quick Stats Grid */}
+            <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
+                <button
+                    onClick={() => handleTabChange('my')}
+                    className={`px-6 py-3 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 ${activeTab === 'my' ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/20' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}
+                >
+                    <MdPerson size={18} /> My Enquiries {activeTab === 'my' && <span className="ml-1 px-2 py-0.5 rounded-full text-[10px] bg-white/20 text-white font-black">{enquiries.length}</span>}
+                </button>
+                <button
+                    onClick={() => handleTabChange('team')}
+                    className={`px-6 py-3 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 ${activeTab === 'team' ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/20' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}
+                >
+                    <MdPeople size={18} /> Team Enquiries {activeTab === 'team' && <span className="ml-1 px-2 py-0.5 rounded-full text-[10px] bg-white/20 text-white font-black">{enquiries.length}</span>}
+                </button>
+                {isManagerOrAdmin && (
+                    <button
+                        onClick={() => handleTabChange('all')}
+                        className={`px-6 py-3 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 ${activeTab === 'all' ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/20' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}
+                    >
+                        <MdReceiptLong size={18} /> All Enquiries {activeTab === 'all' && <span className="ml-1 px-2 py-0.5 rounded-full text-[10px] bg-white/20 text-white font-black">{enquiries.length}</span>}
+                    </button>
+                )}
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 {[
-                    { label: 'Total Enquiries', value: enquiries.length, icon: MdReceiptLong, color: 'text-primary-600', bg: 'bg-primary-50' },
+                    { label: activeTab === 'my' ? 'My Total Enquiries' : activeTab === 'team' ? 'Team Total Enquiries' : 'Total System Enquiries', value: enquiries.length, icon: MdReceiptLong, color: 'text-primary-600', bg: 'bg-primary-50' },
                     { label: 'Final/PO Received', value: wonCount, icon: MdCheckCircle, color: 'text-emerald-600', bg: 'bg-emerald-50' },
                     { label: 'In Progress', value: progressCount, icon: MdTimer, color: 'text-amber-600', bg: 'bg-amber-50' },
                     { label: 'Lost', value: enquiries.filter(e => e.status === 'Lost').length, icon: MdCancel, color: 'text-rose-600', bg: 'bg-rose-50' },
@@ -276,9 +348,7 @@ const Enquiries = () => {
                 ))}
             </div>
 
-            {/* Main Content Area */}
             <div className="bg-white rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden min-h-[500px]">
-                {/* Tool Bar */}
                 <div className="p-8 border-b border-slate-50 bg-slate-50/30 flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div className="relative flex-1 max-w-md">
                         <MdSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={24} />
@@ -294,14 +364,12 @@ const Enquiries = () => {
                         onClick={() => setShowFilters(!showFilters)}
                         className={`flex items-center gap-2 px-6 py-3.5 rounded-2xl text-xs font-bold transition-all border ${showFilters ? 'bg-primary-50 text-primary-700 border-primary-200' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
                     >
-                        <MdFilterList size={18} />
-                        Advanced Filters
+                        <MdFilterList size={18} /> Advanced Filters
                     </button>
                 </div>
 
-                {/* Advanced Filters Panel */}
                 {showFilters && (
-                    <div className="p-6 bg-slate-50/50 border-b border-slate-100 grid grid-cols-1 md:grid-cols-5 gap-4">
+                    <div className="p-6 bg-slate-50/50 border-b border-slate-100 grid grid-cols-1 md:grid-cols-6 gap-4">
                         <div>
                             <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 ml-1">Status (Outcome)</label>
                             <select 
@@ -315,6 +383,21 @@ const Enquiries = () => {
                                 ))}
                             </select>
                         </div>
+                        {isManagerOrAdmin && (
+                            <div>
+                                <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 ml-1">Assigned Executive</label>
+                                <select 
+                                    value={filters.assignedTo}
+                                    onChange={(e) => handleFilterChange('assignedTo', e.target.value)}
+                                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-primary-500 text-slate-700"
+                                >
+                                    <option value="">All Executives</option>
+                                    {users.map(u => (
+                                        <option key={u._id} value={u._id}>{u.name} {u.role ? `(${u.role})` : ''}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
                         <div>
                             <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 ml-1">Follow-up Date</label>
                             <input 
@@ -358,7 +441,7 @@ const Enquiries = () => {
                                 className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-primary-500 text-slate-700"
                             />
                         </div>
-                        <div className="md:col-span-5 flex justify-end">
+                        <div className="md:col-span-6 flex justify-end">
                             <button 
                                 onClick={clearFilters}
                                 className="text-xs font-bold text-slate-500 hover:text-slate-900 underline"
@@ -369,13 +452,13 @@ const Enquiries = () => {
                     </div>
                 )}
 
-                {/* Data Table */}
                 <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="bg-slate-50/50">
                                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Enquiry No</th>
                                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 min-w-[180px]">Customer & Date</th>
+                                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Assigned Executive</th>
                                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Items / Partners</th>
                                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 min-w-[150px]">Stats</th>
                                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Status</th>
@@ -386,7 +469,7 @@ const Enquiries = () => {
                             {loading ? (
                                 Array(5).fill(0).map((_, i) => (
                                     <tr key={i} className="animate-pulse">
-                                        <td colSpan="6" className="px-8 py-10"><div className="h-4 bg-slate-100 rounded-full w-full"></div></td>
+                                        <td colSpan="7" className="px-8 py-10"><div className="h-4 bg-slate-100 rounded-full w-full"></div></td>
                                     </tr>
                                 ))
                             ) : filteredEnquiries.length > 0 ? (
@@ -404,11 +487,31 @@ const Enquiries = () => {
                                             <div className="space-y-1">
                                                 <div className="flex items-center gap-2 font-bold text-slate-900 text-sm">
                                                     <MdPerson className="text-slate-300" size={16} />
-                                                    {e.customerId?.companyName}
+                                                    {e.customerId?.companyName || e.customerId?.customerName || 'N/A'}
                                                 </div>
                                                 <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-tighter">
                                                     <MdEventAvailable size={14} />
                                                     {formatDate(e.enquiryDate)}
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center gap-2">
+                                                <div className="h-8 w-8 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-xs font-bold text-slate-600 shrink-0">
+                                                    {e.assignedTo?.name ? e.assignedTo.name.charAt(0).toUpperCase() : '?'}
+                                                </div>
+                                                <div>
+                                                    <div className="text-xs font-bold text-slate-900 leading-none">
+                                                        {e.assignedTo?.name || <span className="text-slate-400 font-normal italic">Unassigned</span>}
+                                                    </div>
+                                                    {isManagerOrAdmin && (
+                                                        <button
+                                                            onClick={() => setReassignModal({ open: true, enquiry: e, targetUser: e.assignedTo?._id || '' })}
+                                                            className="text-[10px] font-bold text-primary-600 hover:underline mt-0.5 block"
+                                                        >
+                                                            Reassign
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </div>
                                         </td>
@@ -447,26 +550,26 @@ const Enquiries = () => {
                                         <td className="px-6 py-4">
                                             <StatusPill status={e.status} />
                                         </td>
-                                        <td className="px-6 py-4">
+                                        <td className="px-6 py-4 text-center">
                                             <div className="flex items-center justify-center gap-2">
                                                 <button
                                                     onClick={() => handleOpenViewModal(e._id)}
-                                                    className="p-2 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all"
-                                                    title="View Enquiry"
+                                                    title="View Details"
+                                                    className="p-2 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-colors"
                                                 >
                                                     <MdVisibility size={18} />
                                                 </button>
                                                 <button
                                                     onClick={() => navigate(`/enquiries/edit/${e._id}`)}
-                                                    className="p-2 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all"
                                                     title="Edit Enquiry"
+                                                    className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-xl transition-colors"
                                                 >
                                                     <MdEdit size={18} />
                                                 </button>
                                                 <button
                                                     onClick={() => setDeleteModal({ open: true, id: e._id })}
-                                                    className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
                                                     title="Delete Enquiry"
+                                                    className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors"
                                                 >
                                                     <MdDelete size={18} />
                                                 </button>
@@ -476,8 +579,14 @@ const Enquiries = () => {
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan="6" className="px-8 py-20 text-center text-slate-400 font-bold">
-                                        No enquiries found matching your search.
+                                    <td colSpan="7" className="px-8 py-16 text-center">
+                                        <div className="max-w-xs mx-auto space-y-3">
+                                            <div className="h-16 w-16 bg-slate-50 text-slate-300 rounded-full flex items-center justify-center mx-auto">
+                                                <MdReceiptLong size={32} />
+                                            </div>
+                                            <p className="text-sm font-bold text-slate-700">No enquiries found</p>
+                                            <p className="text-xs text-slate-400">Try adjusting your filters or search term to locate the records you need.</p>
+                                        </div>
                                     </td>
                                 </tr>
                             )}
@@ -486,15 +595,16 @@ const Enquiries = () => {
                 </div>
             </div>
 
-            {/* Delete Modal */}
             <Modal
                 isOpen={deleteModal.open}
                 onClose={() => setDeleteModal({ open: false, id: null })}
-                title="Delete Enquiry"
+                title="Confirm Deletion"
             >
                 <div className="space-y-6">
-                    <p className="text-slate-600 font-medium">Are you sure you want to delete this enquiry from the register? This action cannot be undone.</p>
-                    <div className="flex gap-3">
+                    <p className="text-sm font-bold text-slate-600 leading-relaxed">
+                        Are you sure you want to delete this enquiry? This action is permanent and cannot be undone.
+                    </p>
+                    <div className="flex gap-4">
                         <button
                             onClick={() => setDeleteModal({ open: false, id: null })}
                             className="flex-1 px-6 py-4 bg-slate-100 text-slate-600 rounded-[1.5rem] font-black uppercase text-[10px] tracking-widest hover:bg-slate-200 transition-all"
@@ -511,7 +621,45 @@ const Enquiries = () => {
                 </div>
             </Modal>
 
-            {/* View Enquiry Modal */}
+            <Modal
+                isOpen={reassignModal.open}
+                onClose={() => setReassignModal({ open: false, enquiry: null, targetUser: '' })}
+                title="Assign Sales Executive"
+            >
+                <div className="space-y-4">
+                    <p className="text-xs font-semibold text-slate-600">
+                        Assign or reassign Enquiry <span className="font-bold text-slate-900">{reassignModal.enquiry?.enquiryNo}</span> to a Sales Executive.
+                    </p>
+                    <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Sales Executive</label>
+                        <select
+                            value={reassignModal.targetUser}
+                            onChange={(e) => setReassignModal(prev => ({ ...prev, targetUser: e.target.value }))}
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 outline-none focus:bg-white focus:border-primary-500"
+                        >
+                            <option value="">Unassigned</option>
+                            {users.map(u => (
+                                <option key={u._id} value={u._id}>{u.name} {u.role ? `(${u.role})` : ''}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="flex justify-end gap-3 pt-4">
+                        <button
+                            onClick={() => setReassignModal({ open: false, enquiry: null, targetUser: '' })}
+                            className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-200"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={handleReassign}
+                            className="px-5 py-2 bg-primary-600 text-white rounded-xl text-xs font-bold hover:bg-primary-700 shadow-md"
+                        >
+                            Save Assignment
+                        </button>
+                    </div>
+                </div>
+            </Modal>
+
             {viewModal.open && viewModal.data && (
                 <Modal
                     isOpen={viewModal.open}
@@ -520,11 +668,24 @@ const Enquiries = () => {
                     maxWidth="max-w-[95vw] md:max-w-7xl"
                 >
                     <div className="space-y-8 animate-in fade-in duration-300">
-                        {/* Summary Header */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 p-6 bg-slate-50 border border-slate-100 rounded-3xl">
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-6 p-6 bg-slate-50 border border-slate-100 rounded-3xl">
                             <div>
                                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Customer Name</span>
                                 <span className="text-sm font-black text-slate-900 mt-1 block">{viewModal.data.customerId?.companyName || viewModal.data.customerId?.customerName || 'N/A'}</span>
+                            </div>
+                            <div>
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Assigned Executive</span>
+                                <div className="flex items-center gap-2 mt-1">
+                                    <span className="text-sm font-black text-slate-900 block">{viewModal.data.assignedTo?.name || 'Unassigned'}</span>
+                                    {isManagerOrAdmin && (
+                                        <button
+                                            onClick={() => setReassignModal({ open: true, enquiry: viewModal.data, targetUser: viewModal.data.assignedTo?._id || '' })}
+                                            className="text-[10px] font-bold text-primary-600 hover:underline"
+                                        >
+                                            Change
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                             <div>
                                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Enquiry Date</span>
@@ -540,11 +701,8 @@ const Enquiries = () => {
                             </div>
                         </div>
 
-                        {/* Details Grid */}
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                            {/* Left Side: General Info & Items */}
                             <div className="space-y-6">
-                                {/* Customer Card */}
                                 <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
                                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 pb-3 mb-4 flex items-center gap-2">
                                         <MdPerson className="text-primary-600" size={16} /> Customer Details
@@ -566,54 +724,9 @@ const Enquiries = () => {
                                             <span className="text-slate-400 block">Email Address</span>
                                             <span className="text-slate-900 font-bold">{viewModal.data.customerId?.email || 'N/A'}</span>
                                         </div>
-                                        {viewModal.data.customerId?.billingAddress && (
-                                            <div className="col-span-2 border-t border-slate-50 pt-2">
-                                                <span className="text-slate-400 block">Billing Address</span>
-                                                <span className="text-slate-800 font-semibold">
-                                                    {viewModal.data.customerId.billingAddress.line1}, {viewModal.data.customerId.billingAddress.line2 || ''} {viewModal.data.customerId.billingAddress.city}, {viewModal.data.customerId.billingAddress.state} - {viewModal.data.customerId.billingAddress.pincode}
-                                                </span>
-                                            </div>
-                                        )}
                                     </div>
                                 </div>
 
-                                {Array.isArray(viewModal.data.partners) && viewModal.data.partners.length > 0 && (
-                                    <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
-                                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 pb-3 mb-4 flex items-center gap-2">
-                                            <MdPerson className="text-teal-600" size={16} /> Partner Details
-                                        </h3>
-                                        <div className="space-y-3">
-                                            {viewModal.data.partners.map((partner, idx) => (
-                                                <div key={idx} className="grid grid-cols-1 md:grid-cols-2 gap-3 p-4 bg-slate-50 border border-slate-100 rounded-2xl text-xs">
-                                                    <div>
-                                                        <span className="text-slate-400 block">Partner</span>
-                                                        <span className="text-slate-900 font-bold">{partner.name || 'N/A'}</span>
-                                                    </div>
-                                                    <div>
-                                                        <span className="text-slate-400 block">Contact Person</span>
-                                                        <span className="text-slate-900 font-bold">{partner.contactPerson || 'N/A'}</span>
-                                                    </div>
-                                                    <div>
-                                                        <span className="text-slate-400 block">Mobile</span>
-                                                        <span className="text-slate-900 font-bold">{partner.mobile || 'N/A'}</span>
-                                                    </div>
-                                                    <div>
-                                                        <span className="text-slate-400 block">Email</span>
-                                                        <span className="text-slate-900 font-bold">{partner.email || 'N/A'}</span>
-                                                    </div>
-                                                    {partner.notes && (
-                                                        <div className="md:col-span-2">
-                                                            <span className="text-slate-400 block">Notes</span>
-                                                            <span className="text-slate-900 font-bold">{partner.notes}</span>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Items Card */}
                                 <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
                                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 pb-3 mb-4 flex items-center gap-2">
                                         <MdReceiptLong className="text-orange-600" size={16} /> Enquiry Items
@@ -644,14 +757,12 @@ const Enquiries = () => {
                                 </div>
                             </div>
 
-                            {/* Right Side: Follow-up Section */}
                             <div className="space-y-6">
                                 <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm flex flex-col max-h-[85vh]">
                                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 pb-3 mb-4 flex items-center gap-2">
                                         <MdStar className="text-purple-600" size={16} /> Follow-Up Logs & Add Entry
                                     </h3>
 
-                                    {/* Action Form */}
                                     <form onSubmit={handleAddFollowUp} className="bg-slate-50 border border-slate-100 p-4 rounded-2xl space-y-3 mb-4">
                                         <div className="flex gap-2">
                                             <select
@@ -665,7 +776,6 @@ const Enquiries = () => {
                                                 <option value="Meeting">Meeting</option>
                                                 <option value="Other">Other</option>
                                             </select>
-                                            <span className="text-[10px] font-bold text-slate-400 self-center">Record client interaction details</span>
                                         </div>
                                         <div className="flex gap-2">
                                             <input
@@ -686,7 +796,6 @@ const Enquiries = () => {
                                         </div>
                                     </form>
 
-                                    {/* History list */}
                                     <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-3 max-h-[35vh]">
                                         {(!viewModal.data.followUpHistory || viewModal.data.followUpHistory.length === 0) ? (
                                             <p className="text-xs font-bold text-slate-400 bg-slate-50/50 p-4 rounded-2xl border border-dashed border-slate-200 text-center">No follow-up entries recorded yet.</p>
@@ -708,7 +817,6 @@ const Enquiries = () => {
                     </div>
                 </Modal>
             )}
-
         </div>
     );
 };

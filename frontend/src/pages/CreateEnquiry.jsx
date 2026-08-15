@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { MdArrowBack, MdAdd, MdDelete, MdCheckCircle, MdPerson, MdSearch, MdBadge, MdExpandMore, MdOutlineDriveFileRenameOutline, MdNumbers, MdClose } from 'react-icons/md';
 import { toast } from 'react-toastify';
-import { customerService, enquiryService, vendorService, productService } from '../services/api';
+import { customerService, enquiryService, salespersonService, productService, userService } from '../services/api';
 import Modal from '../components/Modal';
 import PortalDropdown from '../components/PortalDropdown';
 import { isValidMobile, isValidGSTIN } from '../utils/validation';
@@ -268,6 +268,7 @@ const CreateEnquiry = () => {
     const [customers, setCustomers] = useState([]);
     const [allVendors, setAllVendors] = useState([]);
     const [products, setProducts] = useState([]);
+    const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(false);
 
     // New Customer inline registration state
@@ -296,6 +297,7 @@ const CreateEnquiry = () => {
         projectName: '',
         requiredDeliveryDate: '',
         priority: 'Medium',
+        assignedTo: '',
         budget: '',
         technicalSpecifications: '',
         attachmentName: '',
@@ -322,15 +324,37 @@ const CreateEnquiry = () => {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const [custRes, vendRes, prodRes] = await Promise.all([
+                const [custRes, prodRes, salesRes, userRes] = await Promise.allSettled([
                     customerService.getAll(),
-                    vendorService.getAll(true),
-                    productService.getAll()
+                    productService.getAll(),
+                    salespersonService.getAll(),
+                    userService.getAll({ limit: 1000 })
                 ]);
-                const fetchedProducts = Array.isArray(prodRes.data) ? prodRes.data : prodRes.data?.data || [];
-                setCustomers(custRes.data);
-                setAllVendors(vendRes.data);
+                const valueOf = (r) => r.status === 'fulfilled' ? r.value : null;
+                const custData = valueOf(custRes)?.data || [];
+                const prodData = valueOf(prodRes)?.data;
+                const salesData = valueOf(salesRes)?.data;
+                const userData = valueOf(userRes)?.data;
+
+                const fetchedProducts = Array.isArray(prodData) ? prodData : prodData?.data || [];
+                const fetchedSalespersons = Array.isArray(salesData) ? salesData : salesData?.data || [];
+                const fetchedUsers = Array.isArray(userData) ? userData : userData?.data || [];
+
+                const mergedMap = new Map();
+                [...fetchedSalespersons, ...fetchedUsers].forEach(item => {
+                    if (item && item._id && !mergedMap.has(item._id.toString())) {
+                        mergedMap.set(item._id.toString(), {
+                            _id: item._id.toString(),
+                            name: item.name,
+                            email: item.email,
+                            role: item.role || 'Sales Executive'
+                        });
+                    }
+                });
+
+                setCustomers(custData);
                 setProducts(fetchedProducts);
+                setUsers(Array.from(mergedMap.values()).sort((a, b) => a.name.localeCompare(b.name)));
 
                 if (id) {
                     setLoading(true);
@@ -353,6 +377,7 @@ const CreateEnquiry = () => {
                             projectName: e.projectName || '',
                             requiredDeliveryDate: e.requiredDeliveryDate ? new Date(e.requiredDeliveryDate).toISOString().split('T')[0] : '',
                             priority: e.priority || 'Medium',
+                            assignedTo: e.assignedTo?._id || e.assignedTo || '',
                             budget: e.budget || '',
                             technicalSpecifications: e.technicalSpecifications || '',
                             attachmentName: e.attachmentName || '',
@@ -675,14 +700,24 @@ const CreateEnquiry = () => {
             cleaned.quantity = Number(cleaned.quantity) || 1;
             cleaned.discountPercent = Number(cleaned.discountPercent) || 0;
             cleaned.value = Number((cleaned.quantity * cleaned.price * (1 - cleaned.discountPercent / 100)).toFixed(2));
-            if (cleaned.finalVendor === '') {
+            if (!cleaned.productId || cleaned.productId === '') {
+                delete cleaned.productId;
+            } else if (cleaned.productId && typeof cleaned.productId === 'object') {
+                cleaned.productId = cleaned.productId._id;
+            }
+            if (!cleaned.finalVendor || cleaned.finalVendor === '') {
                 delete cleaned.finalVendor;
+            } else if (cleaned.finalVendor && typeof cleaned.finalVendor === 'object') {
+                cleaned.finalVendor = cleaned.finalVendor._id;
             }
             return cleaned;
         });
 
         const cleanedHeader = { ...header };
-        if (cleanedHeader.assignedTo === '') {
+        if (cleanedHeader.assignedTo && typeof cleanedHeader.assignedTo === 'object') {
+            cleanedHeader.assignedTo = cleanedHeader.assignedTo._id;
+        }
+        if (!cleanedHeader.assignedTo || cleanedHeader.assignedTo === '') {
             delete cleanedHeader.assignedTo;
         }
         if (cleanedHeader.followUpDate === '') {
@@ -914,7 +949,7 @@ const CreateEnquiry = () => {
                         </div>
                     </div>
                     <div className="p-5 md:p-6 space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                             <div className="space-y-2">
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Enquiry No.</label>
                                 <div className="relative">
@@ -962,6 +997,21 @@ const CreateEnquiry = () => {
                                 >
                                     {['Low', 'Medium', 'High', 'Urgent'].map(s => (
                                         <option key={s} value={s}>{s}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Assign to Sales Executive</label>
+                                <select
+                                    name="assignedTo"
+                                    value={header.assignedTo}
+                                    onChange={handleHeaderChange}
+                                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold text-slate-700 focus:bg-white focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 transition-all"
+                                >
+                                    <option value="">Unassigned</option>
+                                    {users.map(u => (
+                                        <option key={u._id} value={u._id}>{u.name} {u.role ? `(${u.role})` : ''}</option>
                                     ))}
                                 </select>
                             </div>
