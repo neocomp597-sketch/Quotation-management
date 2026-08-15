@@ -787,6 +787,31 @@ const startBackgroundServices = async () => {
       },
       { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
     );
+    await SystemUpdate.findOneAndUpdate(
+      { version: "v4.6.0-enquiry-sales-executive-assignment" },
+      {
+        version: "v4.6.0-enquiry-sales-executive-assignment",
+        title: "Enquiry Module Sales Executive Assignment, Hierarchy Scope Tabs & Executive Resolution",
+        message: "We have released a major feature update to the Enquiry module introducing Sales Executive assignment, role-based scope tabs (My Enquiries, Team Enquiries, All Enquiries), automatic reassignment ownership transfer, and dual-collection executive resolution.",
+        releaseNotes: [
+          "Sales Executive Assignment: Added Sales Executive selection dropdown during enquiry creation/edit and quick one-click Reassign modal directly from Enquiry Register table and View details modal.",
+          "Role & Hierarchy Scope Tabs: Implemented tabbed scope views ('My Enquiries', 'Team Enquiries', 'All Enquiries') filtering records according to employee reporting hierarchy trees and user permissions.",
+          "Reassignment Ownership Transfer: Reassigning an enquiry to another executive automatically transfers ownership so it displays in the new assignee's My Enquiries tab.",
+          "Dual-Collection Executive Resolver: Built fallback resolver querying both User and Salesperson collections to display executive names, emails, roles, and avatar badges seamlessly across all views.",
+          "Data Sanitization & Bug Fixes: Fixed query parameter casting and payload unwrapping for empty string ObjectIds to prevent CastError exceptions on update and filter operations."
+        ],
+        detailedChanges: [
+          { date: "2026-08-16", module: "Enquiry Register", submodule: "Sales Executive Assignment", changes: "Added assignedTo field, Sales Executive dropdown in Create/Edit, and quick Reassign modal." },
+          { date: "2026-08-16", module: "Enquiry Register", submodule: "Hierarchy Scope Tabs", changes: "Added My Enquiries, Team Enquiries, and All Enquiries tabbed navigation with hierarchy resolution." },
+          { date: "2026-08-16", module: "Enquiry Register", submodule: "Executive Resolver", changes: "Implemented populateAssignedToFallback querying User and Salesperson collections." },
+          { date: "2026-08-16", module: "Enquiry Register", submodule: "Data Sanitization", changes: "Cleaned empty string ObjectIds in backend cleanEnquiryBody and frontend api service." }
+        ],
+        deployedBy: "Super Admin",
+        deployedAt: new Date("2026-08-16T00:15:00Z"),
+        isActive: true
+      },
+      { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
+    );
   } catch (err) {
     console.error("[Release Seed Error] Failed to seed system update:", err.message);
   }
