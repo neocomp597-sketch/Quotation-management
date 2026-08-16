@@ -99,15 +99,15 @@ exports.getDashboardSummary = async (req, res) => {
                     totalEnquiries: { $sum: 1 },
                     wonCount: {
                         $sum: {
-                            $cond: [{ $in: ['$status', ['PO Received', 'Finalized']] }, 1, 0]
+                            $cond: [{ $in: ['$status', ['Resolved', 'Closed', 'PO Received', 'Finalized']] }, 1, 0]
                         }
                     },
                     lostCount: {
-                        $sum: { $cond: [{ $eq: ['$status', 'Lost'] }, 1, 0] }
+                        $sum: { $cond: [{ $in: ['$status', ['Cancelled', 'Lost']] }, 1, 0] }
                     },
                     activeCount: {
                         $sum: {
-                            $cond: [{ $not: { $in: ['$status', ['Lost', 'PO Received', 'Finalized']] } }, 1, 0]
+                            $cond: [{ $not: { $in: ['$status', ['Resolved', 'Closed', 'Cancelled', 'Lost', 'PO Received', 'Finalized']] } }, 1, 0]
                         }
                     },
                     overdueFU: {
@@ -116,7 +116,7 @@ exports.getDashboardSummary = async (req, res) => {
                                 $and: [
                                     { $ne: ['$followUpDate', null] },
                                     { $lt: ['$followUpDate', now] },
-                                    { $not: { $in: ['$status', ['Lost', 'PO Received', 'Finalized']] } }
+                                    { $not: { $in: ['$status', ['Resolved', 'Closed', 'Cancelled', 'Lost', 'PO Received', 'Finalized']] } }
                                 ]
                             }, 1, 0]
                         }
@@ -177,7 +177,7 @@ exports.getStageDistribution = async (req, res) => {
             { $sort: { _id: 1 } }
         ]);
 
-        const stageOrder = ['New', 'Contacted', 'Quotation Pending', 'Quotation Received', 'Negotiation', 'Finalized', 'PO Received', 'Lost'];
+        const stageOrder = ['Open', 'Assigned', 'In Progress', 'Pending Customer', 'Resolved', 'Closed', 'Cancelled'];
         const result = stageOrder.map(stage => {
             const found = stages.find(s => s._id === stage);
             return { stage, count: found ? found.count : 0 };

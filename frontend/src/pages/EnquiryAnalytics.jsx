@@ -738,7 +738,7 @@ const EnquiryAnalytics = () => {
                                 className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-bold outline-none focus:border-primary-500"
                             >
                                 <option value="">All Statuses</option>
-                                {['New', 'Contacted', 'Quotation Pending', 'Quotation Received', 'Negotiation', 'Finalized', 'PO Received', 'Lost'].map(s => (
+                                {['Open', 'Assigned', 'In Progress', 'Pending Customer', 'Resolved', 'Closed', 'Cancelled'].map(s => (
                                     <option key={s} value={s}>{s}</option>
                                 ))}
                             </select>

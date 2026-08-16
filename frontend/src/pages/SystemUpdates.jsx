@@ -177,6 +177,10 @@ const SystemUpdates = () => {
         // Sample fallback updates if none in DB yet
         if (list.length === 0) {
             return [
+                { id: 'enq1', date: '16.08.2026', module: 'CRM Core', submodule: 'Manual Product Entry', changes: 'Added custom product option and free-text code/description entry for non-mastered items.', version: 'v4.7.0', deployedBy: 'Super Admin' },
+                { id: 'enq2', date: '16.08.2026', module: 'CRM Core', submodule: 'Role Filtering', changes: 'Filtered assigned executive selection exclusively to users with Sales Executive role.', version: 'v4.7.0', deployedBy: 'Super Admin' },
+                { id: 'enq3', date: '16.08.2026', module: 'CRM Core', submodule: 'Enquiry Status Workflow', changes: 'Standardized status dropdown with Open, Assigned, In Progress, Pending Customer, Resolved, Closed, Cancelled enums.', version: 'v4.7.0', deployedBy: 'Super Admin' },
+                { id: 'enq4', date: '16.08.2026', module: 'CRM Core', submodule: 'Product Value Calculation', changes: 'Automated line item values and header summary totals (Subtotal, Freight, Other Charges, Grand Total).', version: 'v4.7.0', deployedBy: 'Super Admin' },
                 { id: 'u1', date: '01.08.2026', module: 'State Master', submodule: 'Field Sequence & Layout', changes: 'Rearranged field order to Country -> Country Dial Code -> State / UT -> Short Code -> GST Code -> City Name with balanced 2-column grid layout.', version: 'v2.5.0', deployedBy: 'GitHub main (569278f)' },
                 { id: 'u2', date: '01.08.2026', module: 'State Master', submodule: 'Dependent City Dropdown', changes: 'Implemented state-wise dependent City dropdown with auto-reset on State change and disabled state validation.', version: 'v2.5.0', deployedBy: 'GitHub main (569278f)' },
                 { id: 'u3', date: '01.08.2026', module: 'State Master', submodule: 'Auto-Fill Logic', changes: 'Added auto-fill for Country Dial Code (+91, +1, etc.), State Short Code (MH, GJ, etc.) and GST Code (27, 24, etc.).', version: 'v2.5.0', deployedBy: 'GitHub main (569278f)' },

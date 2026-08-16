@@ -812,6 +812,30 @@ const startBackgroundServices = async () => {
       },
       { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
     );
+    await SystemUpdate.findOneAndUpdate(
+      { version: "v4.7.0-enquiry-enhancements" },
+      {
+        version: "v4.7.0-enquiry-enhancements",
+        title: "Enquiry Module Manual Product Entry, Role Filtering & Automated Calculations",
+        message: "We have enhanced the Enquiry module with manual product entry, restricted sales executive role assignment, standardized 7-stage enquiry status workflow, and automated line-item and grand total calculations.",
+        releaseNotes: [
+          "Manual Product Entry: Option to enter non-mastered products manually with free-text item code and description",
+          "Sales Executive Role Filtering: Restricted Assign to Sales Executive dropdown to display only users with the Sales Executive role",
+          "Standardized Status Workflow: Expanded status workflow to Open, Assigned, In Progress, Pending Customer, Resolved, Closed, and Cancelled",
+          "Automated Calculations: Real-time calculation of product line item values (Quantity × Price − Discount) and header total summaries"
+        ],
+        detailedChanges: [
+          { date: "2026-08-16", module: "CRM Core", submodule: "Manual Product Entry", changes: "Added custom product option and free-text code/description entry for non-mastered items." },
+          { date: "2026-08-16", module: "CRM Core", submodule: "Role Filtering", changes: "Filtered assigned executive selection exclusively to users with Sales Executive role." },
+          { date: "2026-08-16", module: "CRM Core", submodule: "Enquiry Status Workflow", changes: "Standardized status dropdown with Open, Assigned, In Progress, Pending Customer, Resolved, Closed, Cancelled enums." },
+          { date: "2026-08-16", module: "CRM Core", submodule: "Product Value Calculation", changes: "Automated line item values and header summary totals (Subtotal, Freight, Other Charges, Grand Total)." }
+        ],
+        deployedBy: "Super Admin",
+        deployedAt: new Date("2026-08-16T17:20:00Z"),
+        isActive: true
+      },
+      { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
+    );
   } catch (err) {
     console.error("[Release Seed Error] Failed to seed system update:", err.message);
   }

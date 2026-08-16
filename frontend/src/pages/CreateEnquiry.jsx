@@ -938,7 +938,7 @@ const CreateEnquiry = () => {
                 budget: '',
                 technicalSpecifications: '',
                 attachmentName: '',
-                status: 'New',
+                status: 'Open',
                 probability: 0,
                 remarks: '',
                 closureReason: '',
@@ -1053,7 +1053,7 @@ const CreateEnquiry = () => {
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Status</label>
                                 <select
                                     name="status"
-                                    value={header.status || 'Open'}
+                                    value={header.status === 'New' ? 'Open' : (header.status || 'Open')}
                                     onChange={handleHeaderChange}
                                     className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold text-teal-700 focus:bg-white focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 transition-all"
                                 >
