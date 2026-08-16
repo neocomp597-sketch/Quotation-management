@@ -74,8 +74,8 @@ const EnquirySchema = new mongoose.Schema({
 
     status: { 
         type: String, 
-        enum: ['New', 'Contacted', 'Quotation Pending', 'Quotation Received', 'Negotiation', 'Finalized', 'PO Received', 'Lost'], 
-        default: 'New' 
+        enum: ['Open', 'Assigned', 'In Progress', 'Pending Customer', 'Resolved', 'Closed', 'Cancelled', 'New', 'Contacted', 'Quotation Pending', 'Quotation Received', 'Negotiation', 'Finalized', 'PO Received', 'Lost'], 
+        default: 'Open' 
     },
     closureReason: { type: String }, // captured when status changes to Lost or Finalized
     probability: { type: Number, min: 0, max: 100, default: 0 },

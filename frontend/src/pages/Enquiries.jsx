@@ -10,6 +10,13 @@ import { formatDate } from '../utils/helpers';
 
 const StatusPill = ({ status }) => {
     const styles = {
+        'Open': 'bg-teal-50 text-teal-700 border-teal-200',
+        'Assigned': 'bg-indigo-50 text-indigo-700 border-indigo-200',
+        'In Progress': 'bg-amber-50 text-amber-700 border-amber-200',
+        'Pending Customer': 'bg-purple-50 text-purple-700 border-purple-200',
+        'Resolved': 'bg-emerald-50 text-emerald-700 border-emerald-200',
+        'Closed': 'bg-slate-100 text-slate-700 border-slate-200',
+        'Cancelled': 'bg-rose-50 text-rose-700 border-rose-200',
         'New': 'bg-blue-50 text-blue-600 border-blue-100',
         'Contacted': 'bg-indigo-50 text-indigo-600 border-indigo-100',
         'Quotation Pending': 'bg-amber-50 text-amber-600 border-amber-100',
@@ -94,14 +101,28 @@ const Enquiries = () => {
                 const uData = userRes.status === 'fulfilled' ? (userRes.value.data?.data || userRes.value.data || []) : [];
                 
                 const mergedMap = new Map();
-                [...sData, ...uData].forEach(item => {
+                sData.forEach(item => {
                     if (item && item._id && !mergedMap.has(item._id.toString())) {
                         mergedMap.set(item._id.toString(), {
                             _id: item._id.toString(),
                             name: item.name,
                             email: item.email,
-                            role: item.role || 'Sales Executive'
+                            role: 'Sales Executive'
                         });
+                    }
+                });
+                uData.forEach(item => {
+                    if (item && item._id && !mergedMap.has(item._id.toString())) {
+                        const roleStr = String(item.role || '').toLowerCase().trim().replace(/_/g, ' ');
+                        const isSalesExec = roleStr === 'sales executive' || roleStr === 'sales executive role' || roleStr === 'sales' || roleStr === 'salesperson' || roleStr === 'sales_executive';
+                        if (isSalesExec) {
+                            mergedMap.set(item._id.toString(), {
+                                _id: item._id.toString(),
+                                name: item.name,
+                                email: item.email,
+                                role: item.role || 'Sales Executive'
+                            });
+                        }
                     }
                 });
                 setUsers(Array.from(mergedMap.values()).sort((a, b) => a.name.localeCompare(b.name)));
@@ -378,7 +399,7 @@ const Enquiries = () => {
                                 className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-primary-500 text-slate-700"
                             >
                                 <option value="">All Statuses</option>
-                                {['New', 'Contacted', 'Quotation Pending', 'Quotation Received', 'Negotiation', 'Finalized', 'PO Received', 'Lost'].map(s => (
+                                {['Open', 'Assigned', 'In Progress', 'Pending Customer', 'Resolved', 'Closed', 'Cancelled'].map(s => (
                                     <option key={s} value={s}>{s}</option>
                                 ))}
                             </select>
@@ -460,7 +481,6 @@ const Enquiries = () => {
                                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 min-w-[180px]">Customer & Date</th>
                                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Assigned Executive</th>
                                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Items / Partners</th>
-                                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 min-w-[150px]">Stats</th>
                                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Status</th>
                                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 text-center">Actions</th>
                             </tr>
@@ -469,7 +489,7 @@ const Enquiries = () => {
                             {loading ? (
                                 Array(5).fill(0).map((_, i) => (
                                     <tr key={i} className="animate-pulse">
-                                        <td colSpan="7" className="px-8 py-10"><div className="h-4 bg-slate-100 rounded-full w-full"></div></td>
+                                        <td colSpan="6" className="px-8 py-10"><div className="h-4 bg-slate-100 rounded-full w-full"></div></td>
                                     </tr>
                                 ))
                             ) : filteredEnquiries.length > 0 ? (
@@ -489,9 +509,16 @@ const Enquiries = () => {
                                                     <MdPerson className="text-slate-300" size={16} />
                                                     {e.customerId?.companyName || e.customerId?.customerName || 'N/A'}
                                                 </div>
-                                                <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-tighter">
-                                                    <MdEventAvailable size={14} />
-                                                    {formatDate(e.enquiryDate)}
+                                                <div className="flex flex-col gap-0.5 text-[10px] font-black text-slate-400 uppercase tracking-tighter">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <MdEventAvailable size={14} />
+                                                        {formatDate(e.enquiryDate)}
+                                                    </div>
+                                                    {e.followUpDate && (
+                                                        <div className="flex items-center gap-1.5 text-amber-600">
+                                                            <span>Follow-up: {formatDate(e.followUpDate)}</span>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         </td>
@@ -534,20 +561,6 @@ const Enquiries = () => {
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <div className="space-y-1.5">
-                                                <div className="flex items-center gap-2 text-[10px] font-bold text-slate-600">
-                                                    <span className="w-16">Probability:</span> 
-                                                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-black ${e.probability >= 70 ? 'bg-emerald-100 text-emerald-700' : e.probability >= 40 ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'}`}>{e.probability || 0}%</span>
-                                                </div>
-                                                {e.followUpDate && (
-                                                    <div className="flex items-center gap-2 text-[10px] font-bold text-slate-600">
-                                                        <span className="w-16">Follow-up:</span> 
-                                                        <span className="text-slate-900">{formatDate(e.followUpDate)}</span>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
                                             <StatusPill status={e.status} />
                                         </td>
                                         <td className="px-6 py-4 text-center">
@@ -579,7 +592,7 @@ const Enquiries = () => {
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan="7" className="px-8 py-16 text-center">
+                                    <td colSpan="6" className="px-8 py-16 text-center">
                                         <div className="max-w-xs mx-auto space-y-3">
                                             <div className="h-16 w-16 bg-slate-50 text-slate-300 rounded-full flex items-center justify-center mx-auto">
                                                 <MdReceiptLong size={32} />

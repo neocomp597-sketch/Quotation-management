@@ -95,7 +95,7 @@ const CustomerSearchDropdown = ({ customers, selectedCustomerId, onSelect }) => 
 };
 
 // Product dropdown searching by productCode or productName with Teal accents
-const ProductCodeSearchAutocomplete = ({ value, selectedLabel, onChange, products, onSelectProduct }) => {
+const ProductCodeSearchAutocomplete = ({ value, selectedLabel, onChange, products, onSelectProduct, onSelectManualProduct }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const anchorRef = useRef(null);
@@ -176,6 +176,21 @@ const ProductCodeSearchAutocomplete = ({ value, selectedLabel, onChange, product
                             )}
                         </div>
                     </div>
+                    {onSelectManualProduct && (
+                        <button
+                            type="button"
+                            onMouseDown={(e) => {
+                                e.preventDefault();
+                                setIsOpen(false);
+                                setSearchTerm('');
+                                onSelectManualProduct();
+                            }}
+                            className="w-full px-4 py-2.5 bg-amber-50/80 hover:bg-amber-100 text-amber-900 border-b border-amber-200/80 transition-colors text-left flex items-center gap-2 font-bold text-xs"
+                        >
+                            <MdAdd size={16} className="text-amber-600" />
+                            <span>Enter Details Manually</span>
+                        </button>
+                    )}
                     <div className="overflow-y-auto max-h-60 divide-y divide-slate-50">
                         {filteredProducts.length > 0 ? (
                             filteredProducts.map(product => (
@@ -217,6 +232,7 @@ const createItemRow = (overrides = {}) => ({
     discountPercent: 0,
     value: 0,
     uom: 'Pcs',
+    isManual: false,
     actionStatus: 'VISIT CUSTOMER',
     salespersonName: '',
     agentName: '',
@@ -301,7 +317,7 @@ const CreateEnquiry = () => {
         budget: '',
         technicalSpecifications: '',
         attachmentName: '',
-        status: 'New',
+        status: 'Open',
         probability: 0,
         remarks: '',
         closureReason: '',
@@ -341,14 +357,30 @@ const CreateEnquiry = () => {
                 const fetchedUsers = Array.isArray(userData) ? userData : userData?.data || [];
 
                 const mergedMap = new Map();
-                [...fetchedSalespersons, ...fetchedUsers].forEach(item => {
+                // Add salespersons (from Salesperson master)
+                fetchedSalespersons.forEach(item => {
                     if (item && item._id && !mergedMap.has(item._id.toString())) {
                         mergedMap.set(item._id.toString(), {
                             _id: item._id.toString(),
                             name: item.name,
                             email: item.email,
-                            role: item.role || 'Sales Executive'
+                            role: 'Sales Executive'
                         });
+                    }
+                });
+                // Add users with Sales Executive role only
+                fetchedUsers.forEach(item => {
+                    if (item && item._id && !mergedMap.has(item._id.toString())) {
+                        const roleStr = String(item.role || '').toLowerCase().trim().replace(/_/g, ' ');
+                        const isSalesExec = roleStr === 'sales executive' || roleStr === 'sales executive role' || roleStr === 'sales' || roleStr === 'salesperson' || roleStr === 'sales_executive';
+                        if (isSalesExec) {
+                            mergedMap.set(item._id.toString(), {
+                                _id: item._id.toString(),
+                                name: item.name,
+                                email: item.email,
+                                role: item.role || 'Sales Executive'
+                            });
+                        }
                     }
                 });
 
@@ -381,7 +413,7 @@ const CreateEnquiry = () => {
                             budget: e.budget || '',
                             technicalSpecifications: e.technicalSpecifications || '',
                             attachmentName: e.attachmentName || '',
-                            status: e.status || 'New',
+                            status: e.status || 'Open',
                             probability: e.probability || 0,
                             remarks: e.remarks || '',
                             closureReason: e.closureReason || '',
@@ -399,6 +431,7 @@ const CreateEnquiry = () => {
                             return createItemRow({
                                 ...item,
                                 productId: pId,
+                                isManual: !pId || Boolean(item.isManual),
                                 productCode: item.productCode || item.productId?.productCode || matchedProduct?.productCode || '',
                                 productName: item.productName || item.productId?.productName || matchedProduct?.productName || '',
                                 quantity: item.quantity || 1,
@@ -558,6 +591,21 @@ const CreateEnquiry = () => {
 
     const addItem = () => {
         setItems([...items, createItemRow()]);
+    };
+
+    const handleSelectManualProduct = (rowId) => {
+        setItems(prevItems => prevItems.map(item => {
+            if (item.rowId === rowId) {
+                return {
+                    ...item,
+                    productId: '',
+                    isManual: true,
+                    productCode: item.productCode || '',
+                    productName: item.productName || ''
+                };
+            }
+            return item;
+        }));
     };
 
     const removeItem = (index) => {
@@ -949,7 +997,7 @@ const CreateEnquiry = () => {
                         </div>
                     </div>
                     <div className="p-5 md:p-6 space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
                             <div className="space-y-2">
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Enquiry No.</label>
                                 <div className="relative">
@@ -996,6 +1044,20 @@ const CreateEnquiry = () => {
                                     className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold text-slate-700 focus:bg-white focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 transition-all"
                                 >
                                     {['Low', 'Medium', 'High', 'Urgent'].map(s => (
+                                        <option key={s} value={s}>{s}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Status</label>
+                                <select
+                                    name="status"
+                                    value={header.status || 'Open'}
+                                    onChange={handleHeaderChange}
+                                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold text-teal-700 focus:bg-white focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 transition-all"
+                                >
+                                    {['Open', 'Assigned', 'In Progress', 'Pending Customer', 'Resolved', 'Closed', 'Cancelled'].map(s => (
                                         <option key={s} value={s}>{s}</option>
                                     ))}
                                 </select>
@@ -1211,12 +1273,22 @@ const CreateEnquiry = () => {
                                 <p className="text-xs font-semibold text-slate-500 mt-0.5">Specify products, codes, quantities, price rates, and item discounts</p>
                             </div>
                         </div>
-                        <button
-                            onClick={addItem}
-                            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 shadow-md"
-                        >
-                            <MdAdd size={16} /> Add Product
-                        </button>
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => addItem()}
+                                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 shadow-md"
+                            >
+                                <MdAdd size={16} /> Add Product
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => addItem({ isManual: true })}
+                                className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 shadow-md"
+                            >
+                                <MdAdd size={16} /> Add Manual Product
+                            </button>
+                        </div>
                     </div>
 
                     <div className="overflow-x-auto">
@@ -1239,13 +1311,34 @@ const CreateEnquiry = () => {
                                     <tr key={item.rowId || index} className="group hover:bg-slate-50/50 transition-colors border-b border-slate-100 last:border-0">
                                         <td className="px-6 py-4 text-xs font-bold text-slate-400 text-center align-middle">{index + 1}</td>
                                         <td className="px-4 py-3 align-middle">
-                                            <ProductCodeSearchAutocomplete
-                                                value={item.productId || item.productCode}
-                                                selectedLabel={item.productCode}
-                                                onChange={(val) => updateItem(item.rowId, 'productCode', val)}
-                                                products={products}
-                                                onSelectProduct={(product) => handleProductSelect(item.rowId, product)}
-                                            />
+                                            {item.isManual ? (
+                                                <div className="flex items-center gap-1.5">
+                                                    <input
+                                                        type="text"
+                                                        value={item.productCode || ''}
+                                                        onChange={(e) => updateItem(item.rowId, 'productCode', e.target.value)}
+                                                        placeholder="Custom Code"
+                                                        className="w-full px-3 py-2 bg-amber-50/60 border border-amber-300 rounded-xl focus:border-teal-500 focus:bg-white outline-none text-xs font-bold text-slate-800"
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => updateItem(item.rowId, 'isManual', false)}
+                                                        className="px-2 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-[10px] font-bold transition-all whitespace-nowrap"
+                                                        title="Switch to Master Search"
+                                                    >
+                                                        Search
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <ProductCodeSearchAutocomplete
+                                                    value={item.productId || item.productCode}
+                                                    selectedLabel={item.productCode}
+                                                    onChange={(val) => updateItem(item.rowId, 'productCode', val)}
+                                                    products={products}
+                                                    onSelectProduct={(product) => handleProductSelect(item.rowId, product)}
+                                                    onSelectManualProduct={() => handleSelectManualProduct(item.rowId)}
+                                                />
+                                            )}
                                         </td>
                                         <td className="px-4 py-3 align-middle">
                                             <input
