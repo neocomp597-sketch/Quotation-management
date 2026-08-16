@@ -31,6 +31,8 @@ const EnquirySchema = new mongoose.Schema({
         productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
         productCode: { type: String },
         productName: { type: String, required: true },
+        itemCategory: { type: String, enum: ['Added', 'Manual'], default: 'Added' },
+        isManual: { type: Boolean, default: false },
         quantity: { type: Number, required: true },
         uom: { type: String, enum: ['Pcs', 'Nos', 'Kg', 'Meter', 'Set', 'Ltr', 'Pack', 'Doz', 'Mtr'], default: 'Pcs' },
         rate: { type: Number, default: 0 },

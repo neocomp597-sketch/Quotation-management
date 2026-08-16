@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { MdArrowBack, MdAdd, MdDelete, MdCheckCircle, MdPerson, MdSearch, MdBadge, MdExpandMore, MdOutlineDriveFileRenameOutline, MdNumbers, MdClose } from 'react-icons/md';
 import { toast } from 'react-toastify';
-import { customerService, enquiryService, salespersonService, productService, userService } from '../services/api';
+import { customerService, enquiryService, salespersonService, productService, userService, payrollService } from '../services/api';
 import Modal from '../components/Modal';
 import PortalDropdown from '../components/PortalDropdown';
 import { isValidMobile, isValidGSTIN } from '../utils/validation';
@@ -223,25 +223,32 @@ const ProductCodeSearchAutocomplete = ({ value, selectedLabel, onChange, product
     );
 };
 
-const createItemRow = (overrides = {}) => ({
-    productId: '',
-    productCode: '',
-    productName: '',
-    quantity: 1,
-    price: 0,
-    discountPercent: 0,
-    value: 0,
-    uom: 'Pcs',
-    isManual: false,
-    actionStatus: 'VISIT CUSTOMER',
-    salespersonName: '',
-    agentName: '',
-    vendors: [],
-    vendorQuotes: [],
-    finalVendor: '',
-    ...overrides,
-    rowId: overrides.rowId || `item-${Date.now()}-${Math.random().toString(36).slice(2)}`
-});
+
+const createItemRow = (overrides = {}) => {
+    const isManualBool = overrides.isManual !== undefined 
+        ? Boolean(overrides.isManual) 
+        : (overrides.itemCategory ? overrides.itemCategory === 'Manual' : false);
+    return {
+        productId: '',
+        productCode: '',
+        productName: '',
+        quantity: 1,
+        price: 0,
+        discountPercent: 0,
+        value: 0,
+        uom: 'Pcs',
+        isManual: isManualBool,
+        itemCategory: isManualBool ? 'Manual' : 'Added',
+        actionStatus: 'VISIT CUSTOMER',
+        salespersonName: '',
+        agentName: '',
+        vendors: [],
+        vendorQuotes: [],
+        finalVendor: '',
+        ...overrides,
+        rowId: overrides.rowId || `item-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    };
+};
 
 const isBlankRow = (item) => {
     return (!item.productName || item.productName.trim() === '') && (!item.productCode || item.productCode.trim() === '');
@@ -340,45 +347,94 @@ const CreateEnquiry = () => {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const [custRes, prodRes, salesRes, userRes] = await Promise.allSettled([
+                const [custRes, prodRes, salesRes, userRes, empRes] = await Promise.allSettled([
                     customerService.getAll(),
                     productService.getAll(),
                     salespersonService.getAll(),
-                    userService.getAll({ limit: 1000 })
+                    userService.getAll({ limit: 1000 }),
+                    payrollService.getEmployees({ limit: 1000 })
                 ]);
                 const valueOf = (r) => r.status === 'fulfilled' ? r.value : null;
                 const custData = valueOf(custRes)?.data || [];
                 const prodData = valueOf(prodRes)?.data;
                 const salesData = valueOf(salesRes)?.data;
                 const userData = valueOf(userRes)?.data;
+                const empData = valueOf(empRes)?.data;
 
                 const fetchedProducts = Array.isArray(prodData) ? prodData : prodData?.data || [];
                 const fetchedSalespersons = Array.isArray(salesData) ? salesData : salesData?.data || [];
                 const fetchedUsers = Array.isArray(userData) ? userData : userData?.data || [];
+                const fetchedEmployees = Array.isArray(empData) ? empData : empData?.data || [];
 
-                const mergedMap = new Map();
-                // Add salespersons (from Salesperson master)
-                fetchedSalespersons.forEach(item => {
-                    if (item && item._id && !mergedMap.has(item._id.toString())) {
-                        mergedMap.set(item._id.toString(), {
-                            _id: item._id.toString(),
-                            name: item.name,
-                            email: item.email,
-                            role: 'Sales Executive'
-                        });
+                // Map employee designations by email and userId
+                const empDesignationMap = new Map();
+                fetchedEmployees.forEach(emp => {
+                    if (!emp) return;
+                    const desig = String(emp.designation || '').trim();
+                    if (emp.email) {
+                        empDesignationMap.set(String(emp.email).toLowerCase().trim(), desig);
+                    }
+                    if (emp.userId) {
+                        const uId = typeof emp.userId === 'object' ? emp.userId._id : emp.userId;
+                        if (uId) empDesignationMap.set(String(uId), desig);
                     }
                 });
-                // Add users with Sales Executive role only
-                fetchedUsers.forEach(item => {
+
+                const isSalesExecutiveDesignation = (desigStr, roleStr) => {
+                    const desigLower = (desigStr || '').toLowerCase().trim();
+                    const roleLower = (roleStr || '').toLowerCase().trim().replace(/_/g, ' ');
+                    if (desigLower) {
+                        return desigLower === 'sales executive' || desigLower === 'sales executive role' || desigLower === 'salesperson';
+                    }
+                    return roleLower === 'sales executive' || roleLower === 'sales executive role' || roleLower === 'sales' || roleLower === 'salesperson' || roleLower === 'sales_executive';
+                };
+
+                const mergedMap = new Map();
+
+                // 1. Add salespersons from Salesperson master
+                fetchedSalespersons.forEach(item => {
                     if (item && item._id && !mergedMap.has(item._id.toString())) {
-                        const roleStr = String(item.role || '').toLowerCase().trim().replace(/_/g, ' ');
-                        const isSalesExec = roleStr === 'sales executive' || roleStr === 'sales executive role' || roleStr === 'sales' || roleStr === 'salesperson' || roleStr === 'sales_executive';
-                        if (isSalesExec) {
+                        const empDesig = item.email ? empDesignationMap.get(String(item.email).toLowerCase().trim()) : null;
+                        if (!empDesig || isSalesExecutiveDesignation(empDesig, 'Sales Executive')) {
                             mergedMap.set(item._id.toString(), {
                                 _id: item._id.toString(),
                                 name: item.name,
                                 email: item.email,
-                                role: item.role || 'Sales Executive'
+                                role: 'Sales Executive'
+                            });
+                        }
+                    }
+                });
+
+                // 2. Add users only if Designation or Role = Sales Executive
+                fetchedUsers.forEach(item => {
+                    if (item && item._id && !mergedMap.has(item._id.toString())) {
+                        const emailStr = String(item.email || '').toLowerCase().trim();
+                        const empDesig = empDesignationMap.get(item._id.toString()) || empDesignationMap.get(emailStr);
+                        if (isSalesExecutiveDesignation(empDesig, item.role)) {
+                            mergedMap.set(item._id.toString(), {
+                                _id: item._id.toString(),
+                                name: item.name,
+                                email: item.email,
+                                role: 'Sales Executive'
+                            });
+                        }
+                    }
+                });
+
+                // 3. Add employees directly if designation is Sales Executive
+                fetchedEmployees.forEach(emp => {
+                    if (!emp || !emp.name) return;
+                    const desig = String(emp.designation || '').trim();
+                    if (isSalesExecutiveDesignation(desig, '')) {
+                        const targetId = emp.userId ? (typeof emp.userId === 'object' ? emp.userId._id : emp.userId) : emp._id;
+                        const idStr = String(targetId);
+                        if (!mergedMap.has(idStr)) {
+                            mergedMap.set(idStr, {
+                                _id: idStr,
+                                name: emp.name,
+                                email: emp.email || '',
+                                role: 'Sales Executive'
                             });
                         }
                     }
@@ -534,9 +590,16 @@ const CreateEnquiry = () => {
 
     const updateItem = (rowId, field, value) => {
         setItems(prevItems => {
-            const newItems = prevItems.map(item => (
-                item.rowId === rowId ? { ...item, [field]: value } : item
-            ));
+            const newItems = prevItems.map(item => {
+                if (item.rowId !== rowId) return item;
+                const updated = { ...item, [field]: value };
+                if (field === 'itemCategory') {
+                    updated.isManual = (value === 'Manual');
+                } else if (field === 'isManual') {
+                    updated.itemCategory = value ? 'Manual' : 'Added';
+                }
+                return updated;
+            });
             const targetIndex = newItems.findIndex(item => item.rowId === rowId);
             if (targetIndex !== -1 && (field === 'quantity' || field === 'price' || field === 'discountPercent')) {
                 const qty = Number(newItems[targetIndex].quantity) || 0;
@@ -563,6 +626,8 @@ const CreateEnquiry = () => {
             newItems[targetIndex].price = product.basePrice || 0;
             newItems[targetIndex].discountPercent = 0;
             newItems[targetIndex].value = Number(((newItems[targetIndex].quantity || 1) * (product.basePrice || 0)).toFixed(2));
+            newItems[targetIndex].isManual = false;
+            newItems[targetIndex].itemCategory = 'Added';
 
             const validUoms = ['Pcs', 'Nos', 'Kg', 'Meter', 'Mtr', 'Set', 'Ltr', 'Pack', 'Doz'];
             const productUom = product.uom || 'Pcs';
@@ -589,8 +654,8 @@ const CreateEnquiry = () => {
         });
     };
 
-    const addItem = () => {
-        setItems([...items, createItemRow()]);
+    const addItem = (overrides = {}) => {
+        setItems([...items, createItemRow(overrides)]);
     };
 
     const handleSelectManualProduct = (rowId) => {
@@ -600,6 +665,7 @@ const CreateEnquiry = () => {
                     ...item,
                     productId: '',
                     isManual: true,
+                    itemCategory: 'Manual',
                     productCode: item.productCode || '',
                     productName: item.productName || ''
                 };
@@ -1276,17 +1342,17 @@ const CreateEnquiry = () => {
                         <div className="flex items-center gap-2">
                             <button
                                 type="button"
-                                onClick={() => addItem()}
+                                onClick={() => addItem({ itemCategory: 'Added', isManual: false })}
                                 className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 shadow-md"
                             >
-                                <MdAdd size={16} /> Add Product
+                                <MdAdd size={16} /> Add Product (Added)
                             </button>
                             <button
                                 type="button"
-                                onClick={() => addItem({ isManual: true })}
+                                onClick={() => addItem({ itemCategory: 'Manual', isManual: true })}
                                 className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 shadow-md"
                             >
-                                <MdAdd size={16} /> Add Manual Product
+                                <MdAdd size={16} /> Add Product (Manual)
                             </button>
                         </div>
                     </div>
@@ -1296,6 +1362,7 @@ const CreateEnquiry = () => {
                             <thead>
                                 <tr className="bg-slate-50/50 border-b border-slate-100">
                                     <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest w-12 text-center">#</th>
+                                    <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest min-w-[130px]">Category</th>
                                     <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest min-w-[200px]">Item Code</th>
                                     <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest min-w-[280px]">Description</th>
                                     <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest w-24">Unit</th>
@@ -1310,6 +1377,22 @@ const CreateEnquiry = () => {
                                 {items.map((item, index) => (
                                     <tr key={item.rowId || index} className="group hover:bg-slate-50/50 transition-colors border-b border-slate-100 last:border-0">
                                         <td className="px-6 py-4 text-xs font-bold text-slate-400 text-center align-middle">{index + 1}</td>
+                                        <td className="px-3 py-3 align-middle">
+                                            <select
+                                                value={item.itemCategory || (item.isManual ? 'Manual' : 'Added')}
+                                                onChange={(e) => {
+                                                    updateItem(item.rowId, 'itemCategory', e.target.value);
+                                                }}
+                                                className={`w-full px-2.5 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider outline-none border transition-all cursor-pointer ${
+                                                    (item.itemCategory === 'Manual' || item.isManual)
+                                                        ? 'bg-amber-50 text-amber-800 border-amber-300 focus:ring-2 focus:ring-amber-400'
+                                                        : 'bg-emerald-50 text-emerald-800 border-emerald-300 focus:ring-2 focus:ring-emerald-400'
+                                                }`}
+                                            >
+                                                <option value="Added">Added</option>
+                                                <option value="Manual">Manual</option>
+                                            </select>
+                                        </td>
                                         <td className="px-4 py-3 align-middle">
                                             {item.isManual ? (
                                                 <div className="flex items-center gap-1.5">

@@ -82,6 +82,10 @@ const cleanEnquiryBody = (body) => {
     if (Array.isArray(body.items)) {
         body.items = body.items.map(item => {
             const cleanedItem = { ...item };
+            const isManualBool = Boolean(cleanedItem.isManual || cleanedItem.itemCategory === 'Manual');
+            cleanedItem.isManual = isManualBool;
+            cleanedItem.itemCategory = isManualBool ? 'Manual' : 'Added';
+
             if (cleanedItem.productId && typeof cleanedItem.productId === 'object') {
                 cleanedItem.productId = cleanedItem.productId._id;
             }

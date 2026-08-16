@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { MdAdd, MdEdit, MdDelete, MdSearch, MdMoreVert, MdTimer, MdCheckCircle, MdCancel, MdPerson, MdNumbers, MdEventAvailable, MdReceiptLong, MdFilterList, MdPercent, MdAnalytics, MdVisibility, MdStar, MdClose, MdPeople } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { enquiryService, salespersonService, userService } from '../services/api';
+import { enquiryService, salespersonService, userService, payrollService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import Modal from '../components/Modal';
 import CreateEnquiry from './CreateEnquiry';
@@ -87,44 +87,92 @@ const Enquiries = () => {
         minProbability: '',
         productName: '',
         vendorName: '',
-        assignedTo: ''
+        assignedTo: '',
+        itemCategory: ''
     });
 
     useEffect(() => {
         const loadUsers = async () => {
             try {
-                const [salesRes, userRes] = await Promise.allSettled([
+                const [salesRes, userRes, empRes] = await Promise.allSettled([
                     salespersonService.getAll(),
-                    userService.getAll({ limit: 1000 })
+                    userService.getAll({ limit: 1000 }),
+                    payrollService.getEmployees({ limit: 1000 })
                 ]);
                 const sData = salesRes.status === 'fulfilled' ? (salesRes.value.data?.data || salesRes.value.data || []) : [];
                 const uData = userRes.status === 'fulfilled' ? (userRes.value.data?.data || userRes.value.data || []) : [];
-                
-                const mergedMap = new Map();
-                sData.forEach(item => {
-                    if (item && item._id && !mergedMap.has(item._id.toString())) {
-                        mergedMap.set(item._id.toString(), {
-                            _id: item._id.toString(),
-                            name: item.name,
-                            email: item.email,
-                            role: 'Sales Executive'
-                        });
+                const eData = empRes.status === 'fulfilled' ? (empRes.value.data?.data || empRes.value.data || []) : [];
+
+                const empDesignationMap = new Map();
+                eData.forEach(emp => {
+                    if (!emp) return;
+                    const desig = String(emp.designation || '').trim();
+                    if (emp.email) {
+                        empDesignationMap.set(String(emp.email).toLowerCase().trim(), desig);
+                    }
+                    if (emp.userId) {
+                        const uId = typeof emp.userId === 'object' ? emp.userId._id : emp.userId;
+                        if (uId) empDesignationMap.set(String(uId), desig);
                     }
                 });
-                uData.forEach(item => {
+
+                const isSalesExecutiveDesignation = (desigStr, roleStr) => {
+                    const desigLower = (desigStr || '').toLowerCase().trim();
+                    const roleLower = (roleStr || '').toLowerCase().trim().replace(/_/g, ' ');
+                    if (desigLower) {
+                        return desigLower === 'sales executive' || desigLower === 'sales executive role' || desigLower === 'salesperson';
+                    }
+                    return roleLower === 'sales executive' || roleLower === 'sales executive role' || roleLower === 'sales' || roleLower === 'salesperson' || roleLower === 'sales_executive';
+                };
+
+                const mergedMap = new Map();
+
+                sData.forEach(item => {
                     if (item && item._id && !mergedMap.has(item._id.toString())) {
-                        const roleStr = String(item.role || '').toLowerCase().trim().replace(/_/g, ' ');
-                        const isSalesExec = roleStr === 'sales executive' || roleStr === 'sales executive role' || roleStr === 'sales' || roleStr === 'salesperson' || roleStr === 'sales_executive';
-                        if (isSalesExec) {
+                        const empDesig = item.email ? empDesignationMap.get(String(item.email).toLowerCase().trim()) : null;
+                        if (!empDesig || isSalesExecutiveDesignation(empDesig, 'Sales Executive')) {
                             mergedMap.set(item._id.toString(), {
                                 _id: item._id.toString(),
                                 name: item.name,
                                 email: item.email,
-                                role: item.role || 'Sales Executive'
+                                role: 'Sales Executive'
                             });
                         }
                     }
                 });
+
+                uData.forEach(item => {
+                    if (item && item._id && !mergedMap.has(item._id.toString())) {
+                        const emailStr = String(item.email || '').toLowerCase().trim();
+                        const empDesig = empDesignationMap.get(item._id.toString()) || empDesignationMap.get(emailStr);
+                        if (isSalesExecutiveDesignation(empDesig, item.role)) {
+                            mergedMap.set(item._id.toString(), {
+                                _id: item._id.toString(),
+                                name: item.name,
+                                email: item.email,
+                                role: 'Sales Executive'
+                            });
+                        }
+                    }
+                });
+
+                eData.forEach(emp => {
+                    if (!emp || !emp.name) return;
+                    const desig = String(emp.designation || '').trim();
+                    if (isSalesExecutiveDesignation(desig, '')) {
+                        const targetId = emp.userId ? (typeof emp.userId === 'object' ? emp.userId._id : emp.userId) : emp._id;
+                        const idStr = String(targetId);
+                        if (!mergedMap.has(idStr)) {
+                            mergedMap.set(idStr, {
+                                _id: idStr,
+                                name: emp.name,
+                                email: emp.email || '',
+                                role: 'Sales Executive'
+                            });
+                        }
+                    }
+                });
+
                 setUsers(Array.from(mergedMap.values()).sort((a, b) => a.name.localeCompare(b.name)));
             } catch (err) {
                 console.error('Failed to load salespersons for assignment:', err);
@@ -275,7 +323,8 @@ const Enquiries = () => {
             minProbability: '',
             productName: '',
             vendorName: '',
-            assignedTo: ''
+            assignedTo: '',
+            itemCategory: ''
         });
     };
 
@@ -291,8 +340,12 @@ const Enquiries = () => {
             const matchesProb = filters.minProbability ? (Number(e.probability) >= Number(filters.minProbability)) : true;
             const matchesProduct = filters.productName ? e.items.some(item => (item.productName || item.productId?.productName || '').toLowerCase().includes(filters.productName.toLowerCase())) : true;
             const matchesVendor = filters.vendorName ? e.items.some(item => item.vendors.some(v => v.name && v.name.toLowerCase().includes(filters.vendorName.toLowerCase())) || (item.finalVendor && item.finalVendor.name && item.finalVendor.name.toLowerCase().includes(filters.vendorName.toLowerCase()))) : true;
+            const matchesItemCategory = filters.itemCategory ? e.items.some(item => {
+                const cat = item.itemCategory || (item.isManual ? 'Manual' : 'Added');
+                return cat === filters.itemCategory;
+            }) : true;
 
-            return matchesSearch && matchesStatus && matchesFollowUp && matchesProb && matchesProduct && matchesVendor;
+            return matchesSearch && matchesStatus && matchesFollowUp && matchesProb && matchesProduct && matchesVendor && matchesItemCategory;
         });
         return filtered.sort((a, b) => String(b.enquiryNo || '').localeCompare(String(a.enquiryNo || ''), undefined, { numeric: true, sensitivity: 'base' }));
     }, [enquiries, filters]);
@@ -461,6 +514,18 @@ const Enquiries = () => {
                                 onChange={(e) => handleFilterChange('vendorName', e.target.value)}
                                 className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-primary-500 text-slate-700"
                             />
+                        </div>
+                        <div>
+                            <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 ml-1">Product Category</label>
+                            <select 
+                                value={filters.itemCategory}
+                                onChange={(e) => handleFilterChange('itemCategory', e.target.value)}
+                                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-primary-500 text-slate-700 cursor-pointer"
+                            >
+                                <option value="">All Categories</option>
+                                <option value="Added">Added (Catalog)</option>
+                                <option value="Manual">Manual (Custom)</option>
+                            </select>
                         </div>
                         <div className="md:col-span-6 flex justify-end">
                             <button 
@@ -749,7 +814,16 @@ const Enquiries = () => {
                                             <div key={idx} className="p-4 bg-slate-50 border border-slate-100 rounded-2xl space-y-3">
                                                 <div className="flex justify-between items-start gap-4">
                                                     <div>
-                                                        <h4 className="text-xs font-black text-slate-900">{item.productName || item.productId?.productName || 'Unnamed Product'}</h4>
+                                                        <div className="flex items-center gap-2">
+                                                            <h4 className="text-xs font-black text-slate-900">{item.productName || item.productId?.productName || 'Unnamed Product'}</h4>
+                                                            <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider border ${
+                                                                (item.itemCategory === 'Manual' || item.isManual)
+                                                                    ? 'bg-amber-50 text-amber-700 border-amber-300'
+                                                                    : 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                                                            }`}>
+                                                                {item.itemCategory || (item.isManual ? 'Manual' : 'Added')}
+                                                            </span>
+                                                        </div>
                                                         <p className="text-[10px] font-bold text-slate-500 mt-1">Qty: {item.quantity} {item.uom}</p>
                                                     </div>
                                                     <ActionStatusPill status={item.actionStatus} />
