@@ -1063,7 +1063,7 @@ const CreateEnquiry = () => {
                         </div>
                     </div>
                     <div className="p-5 md:p-6 space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                             <div className="space-y-2">
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Enquiry No.</label>
                                 <div className="relative">
@@ -1111,35 +1111,6 @@ const CreateEnquiry = () => {
                                 >
                                     {['Low', 'Medium', 'High', 'Urgent'].map(s => (
                                         <option key={s} value={s}>{s}</option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Status</label>
-                                <select
-                                    name="status"
-                                    value={header.status === 'New' ? 'Open' : (header.status || 'Open')}
-                                    onChange={handleHeaderChange}
-                                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold text-teal-700 focus:bg-white focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 transition-all"
-                                >
-                                    {['Open', 'Assigned', 'In Progress', 'Pending Customer', 'Resolved', 'Closed', 'Cancelled'].map(s => (
-                                        <option key={s} value={s}>{s}</option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Assign to Sales Executive</label>
-                                <select
-                                    name="assignedTo"
-                                    value={header.assignedTo}
-                                    onChange={handleHeaderChange}
-                                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold text-slate-700 focus:bg-white focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 transition-all"
-                                >
-                                    <option value="">Unassigned</option>
-                                    {users.map(u => (
-                                        <option key={u._id} value={u._id}>{u.name} {u.role ? `(${u.role})` : ''}</option>
                                     ))}
                                 </select>
                             </div>
