@@ -30,22 +30,6 @@ const ensureIndexDropped = async () => {
     }
 };
 
-const generateEnquiryNumber = async (companyId) => {
-    const year = new Date().getFullYear();
-    const prefix = 'ENQ';
-    
-    // Find counter for enquiry type, companyId, prefix, and year
-    // Scoped per tenant (companyId)
-    const counter = await Counter.findOneAndUpdate(
-        { type: 'enquiry', companyId: companyId || null, prefix, year },
-        { $inc: { seq: 1 } },
-        { new: true, upsert: true, setDefaultsOnInsert: true }
-    );
-
-    const seqStr = counter.seq.toString().padStart(4, '0');
-    return `${prefix}/${year}/${seqStr}`;
-};
-
 const cleanEnquiryBody = (body) => {
     if (!body) return body;
     
