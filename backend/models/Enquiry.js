@@ -90,6 +90,22 @@ const EnquirySchema = new mongoose.Schema({
         performedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
     }],
 
+    visits: [{
+        visitDate: { type: Date, required: true },
+        assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        purpose: { type: String, default: 'Site Visit' },
+        status: { 
+            type: String, 
+            enum: ['Scheduled', 'Visited', 'Follow-up Required', 'Completed', 'Cancelled'], 
+            default: 'Scheduled' 
+        },
+        remarks: { type: String, default: '' },
+        outcome: { type: String, default: '' },
+        createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        createdAt: { type: Date, default: Date.now },
+        updatedAt: { type: Date, default: Date.now }
+    }],
+
     assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null, index: true },
     lastActivityDate: { type: Date, default: Date.now },

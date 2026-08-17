@@ -196,11 +196,13 @@ const Customers = ({ isCreatePage, isEditPage }) => {
         const { name, value } = e.target;
         let val = value;
         if (name === 'gstin') {
-            val = value.toUpperCase().slice(0, 15);
+            val = value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 15);
         } else if (name === 'pan') {
-            val = value.toUpperCase().slice(0, 10);
+            val = value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10);
         } else if (name === 'mobile') {
             val = value.replace(/[^\d]/g, '').slice(0, 10);
+        } else if (name === 'email') {
+            val = value.toLowerCase().trim();
         }
         if (name.includes('.')) {
             const [parent, child] = name.split('.');

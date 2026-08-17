@@ -18253,5 +18253,29 @@
     "customerName": "SDFS",
     "companyName": "SDFS",
     "gstin": ""
+  },
+  {
+    "_id": "6a81e436a04464e4b8cb5df9",
+    "customerName": "Tahir",
+    "companyName": "TDK",
+    "gstin": ""
+  },
+  {
+    "_id": "6a82ac795d3a37bbd6c75679",
+    "customerName": "DARSHAN R JADHAV",
+    "companyName": "POLYCAB WIRE",
+    "gstin": "27ABPYF4581A1Z1"
+  },
+  {
+    "_id": "6a82acc55d3a37bbd6c756a7",
+    "customerName": "Tahir-2",
+    "companyName": "TDK.",
+    "gstin": ""
+  },
+  {
+    "_id": "6a82b07f5d3a37bbd6c7592e",
+    "customerName": "shruti bhamare",
+    "companyName": "JD buzz",
+    "gstin": ""
   }
 ]

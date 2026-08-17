@@ -50,6 +50,29 @@ const ActionStatusPill = ({ status }) => {
     );
 };
 
+const VisitStatusPill = ({ status }) => {
+    const styles = {
+        'Scheduled': 'bg-amber-50 text-amber-700 border-amber-300',
+        'Visited': 'bg-sky-50 text-sky-700 border-sky-300',
+        'Follow-up Required': 'bg-purple-50 text-purple-700 border-purple-300',
+        'Completed': 'bg-emerald-50 text-emerald-700 border-emerald-300',
+        'Cancelled': 'bg-rose-50 text-rose-700 border-rose-300'
+    };
+    return (
+        <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${styles[status] || 'bg-slate-50 text-slate-600 border-slate-200'}`}>
+            {status || 'Scheduled'}
+        </span>
+    );
+};
+
+const toDatetimeLocal = (dateInput) => {
+    if (!dateInput) return '';
+    const d = new Date(dateInput);
+    if (isNaN(d.getTime())) return '';
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
 const Enquiries = () => {
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
@@ -88,12 +111,15 @@ const Enquiries = () => {
     const [updatingDetailsAssignee, setUpdatingDetailsAssignee] = useState(false);
     const [activeDetailsTab, setActiveDetailsTab] = useState('items');
 
-    // Field Visit Schedule Form state
+    // Field Visit Schedule & Edit Form state
     const [showVisitModal, setShowVisitModal] = useState(false);
+    const [editingVisitId, setEditingVisitId] = useState(null);
+    const [visitStatus, setVisitStatus] = useState('Scheduled');
     const [visitDate, setVisitDate] = useState('');
     const [visitExecutive, setVisitExecutive] = useState('');
     const [visitPurpose, setVisitPurpose] = useState('Site Visit');
     const [visitNotes, setVisitNotes] = useState('');
+    const [visitOutcome, setVisitOutcome] = useState('');
     const [schedulingVisit, setSchedulingVisit] = useState(false);
 
     const [filters, setFilters] = useState({
@@ -309,6 +335,28 @@ const Enquiries = () => {
         }
     };
 
+    const handleOpenNewVisitModal = () => {
+        setEditingVisitId(null);
+        setVisitStatus('Scheduled');
+        setVisitDate(toDatetimeLocal(new Date()));
+        setVisitExecutive(selectedDetailsAssignee || viewModal.data?.assignedTo?._id || viewModal.data?.assignedTo || '');
+        setVisitPurpose('Site Visit');
+        setVisitNotes('');
+        setVisitOutcome('');
+        setShowVisitModal(true);
+    };
+
+    const handleOpenEditVisitModal = (visit, index) => {
+        setEditingVisitId(visit._id || index);
+        setVisitStatus(visit.status || 'Scheduled');
+        setVisitDate(toDatetimeLocal(visit.visitDate || visit.date));
+        setVisitExecutive(visit.assignedTo?._id || visit.assignedTo || '');
+        setVisitPurpose(visit.purpose || 'Site Visit');
+        setVisitNotes(visit.remarks || visit.note || '');
+        setVisitOutcome(visit.outcome || '');
+        setShowVisitModal(true);
+    };
+
     const handleScheduleVisitSubmit = async (e) => {
         if (e) e.preventDefault();
         if (!visitDate) {
@@ -318,20 +366,79 @@ const Enquiries = () => {
         setSchedulingVisit(true);
         try {
             const currentData = viewModal.data;
+            const currentVisits = Array.isArray(currentData.visits) ? [...currentData.visits] : [];
             const currentHistory = currentData.followUpHistory || [];
+
             const execObj = users.find(u => u._id === visitExecutive);
             const execName = execObj ? execObj.name : 'Sales Executive';
-            const visitNoteText = `[VISIT SCHEDULED] Purpose: ${visitPurpose}. Agenda/Notes: ${visitNotes || 'N/A'} (Assigned: ${execName})`;
-            
-            const updatedHistory = [...currentHistory, { 
-                note: visitNoteText, 
-                actionType: 'Visit', 
-                date: new Date(visitDate) 
+
+            let updatedVisits = [];
+            let logMessage = '';
+
+            if (editingVisitId !== null && editingVisitId !== undefined) {
+                // Edit existing visit
+                let matchFound = false;
+                updatedVisits = currentVisits.map((v, idx) => {
+                    const isMatch = (v._id && v._id === editingVisitId) || idx === editingVisitId;
+                    if (isMatch) {
+                        matchFound = true;
+                        return {
+                            ...v,
+                            visitDate: new Date(visitDate),
+                            assignedTo: visitExecutive || null,
+                            purpose: visitPurpose,
+                            status: visitStatus,
+                            remarks: visitNotes,
+                            outcome: visitOutcome,
+                            updatedAt: new Date()
+                        };
+                    }
+                    return v;
+                });
+                if (!matchFound) {
+                    // Fallback if editing legacy history entry as a new structured visit
+                    updatedVisits.push({
+                        visitDate: new Date(visitDate),
+                        assignedTo: visitExecutive || null,
+                        purpose: visitPurpose,
+                        status: visitStatus,
+                        remarks: visitNotes,
+                        outcome: visitOutcome,
+                        createdAt: new Date(),
+                        updatedAt: new Date()
+                    });
+                }
+                logMessage = `[VISIT UPDATED] Status: ${visitStatus}. Purpose: ${visitPurpose}. Remarks: ${visitNotes || 'N/A'}${visitOutcome ? ` - Outcome: ${visitOutcome}` : ''} (Executive: ${execName})`;
+            } else {
+                // Create new visit
+                const newVisitObj = {
+                    visitDate: new Date(visitDate),
+                    assignedTo: visitExecutive || null,
+                    purpose: visitPurpose,
+                    status: visitStatus,
+                    remarks: visitNotes,
+                    outcome: visitOutcome,
+                    createdAt: new Date(),
+                    updatedAt: new Date()
+                };
+                updatedVisits = [...currentVisits, newVisitObj];
+                logMessage = `[VISIT SCHEDULED] Status: ${visitStatus}. Purpose: ${visitPurpose}. Remarks: ${visitNotes || 'N/A'}${visitOutcome ? ` - Outcome: ${visitOutcome}` : ''} (Assigned: ${execName})`;
+            }
+
+            const updatedHistory = [...currentHistory, {
+                note: logMessage,
+                actionType: 'Visit',
+                date: new Date()
             }];
+
+            const nextFollowUp = (visitStatus === 'Scheduled' || visitStatus === 'Follow-up Required')
+                ? new Date(visitDate)
+                : currentData.followUpDate;
 
             const payload = {
                 ...currentData,
-                followUpDate: new Date(visitDate),
+                visits: updatedVisits,
+                followUpDate: nextFollowUp,
                 followUpHistory: updatedHistory,
                 assignedTo: visitExecutive || currentData.assignedTo?._id || currentData.assignedTo || null
             };
@@ -353,15 +460,18 @@ const Enquiries = () => {
             });
 
             await enquiryService.update(viewModal.id, payload);
-            toast.success('Field Visit scheduled successfully!');
+            toast.success(editingVisitId !== null ? 'Visit details & status updated successfully!' : 'Field Visit scheduled successfully!');
             setShowVisitModal(false);
+            setEditingVisitId(null);
             setVisitNotes('');
+            setVisitOutcome('');
             setVisitDate('');
             const refreshed = await enquiryService.getById(viewModal.id);
             setViewModal(prev => ({ ...prev, data: refreshed.data }));
             fetchEnquiries();
         } catch (err) {
-            toast.error('Failed to schedule visit');
+            console.error('[Visit Save Error]', err);
+            toast.error('Failed to save visit details');
         } finally {
             setSchedulingVisit(false);
         }
@@ -1030,10 +1140,7 @@ const Enquiries = () => {
                                         </div>
                                     )}
                                     <button
-                                        onClick={() => {
-                                            setVisitExecutive(selectedDetailsAssignee || viewModal.data.assignedTo?._id || viewModal.data.assignedTo || '');
-                                            setShowVisitModal(true);
-                                        }}
+                                        onClick={handleOpenNewVisitModal}
                                         className="w-full py-2.5 bg-amber-500 text-white rounded-xl text-xs font-bold hover:bg-amber-600 transition-all shadow-md shadow-amber-500/10 flex items-center justify-center gap-2"
                                     >
                                         <MdCalendarMonth size={16} /> + Schedule / Log Visit
@@ -1103,7 +1210,7 @@ const Enquiries = () => {
                                         }`}
                                     >
                                         <MdCalendarMonth size={16} className="text-amber-500" />
-                                        Field Visits ({(viewModal.data.followUpHistory || []).filter(h => h.actionType === 'Visit').length})
+                                        Field Visits ({(viewModal.data.visits || []).length || (viewModal.data.followUpHistory || []).filter(h => h.actionType === 'Visit').length})
                                     </button>
                                 </div>
 
@@ -1205,46 +1312,100 @@ const Enquiries = () => {
                                         <div className="flex justify-between items-center border-b border-slate-100 pb-3">
                                             <div>
                                                 <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider">Scheduled & Recorded Visits</h4>
-                                                <p className="text-[11px] text-slate-500 font-medium">Track customer field visits, site measurements, and meetings</p>
+                                                <p className="text-[11px] text-slate-500 font-medium">Manage and update customer visit details, statuses, and outcomes</p>
                                             </div>
                                             <button
-                                                onClick={() => {
-                                                    setVisitExecutive(selectedDetailsAssignee || viewModal.data.assignedTo?._id || viewModal.data.assignedTo || '');
-                                                    setShowVisitModal(true);
-                                                }}
-                                                className="px-3.5 py-2 bg-amber-500 text-white rounded-xl text-xs font-bold hover:bg-amber-600 transition-all flex items-center gap-1.5"
+                                                onClick={handleOpenNewVisitModal}
+                                                className="px-3.5 py-2 bg-amber-500 text-white rounded-xl text-xs font-bold hover:bg-amber-600 transition-all flex items-center gap-1.5 shadow-sm"
                                             >
-                                                <MdCalendarMonth size={16} /> Schedule Visit
+                                                <MdCalendarMonth size={16} /> + Schedule Visit
                                             </button>
                                         </div>
 
-                                        <div className="overflow-y-auto pr-2 custom-scrollbar space-y-3 max-h-[45vh]">
-                                            {(!viewModal.data.followUpHistory || viewModal.data.followUpHistory.filter(h => h.actionType === 'Visit').length === 0) ? (
-                                                <div className="text-center py-8 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                                                    <MdCalendarMonth size={32} className="mx-auto text-slate-300 mb-2" />
-                                                    <p className="text-xs font-bold text-slate-500">No field visits scheduled or recorded yet.</p>
+                                        <div className="overflow-y-auto pr-2 custom-scrollbar space-y-3 max-h-[48vh]">
+                                            {(!viewModal.data.visits || viewModal.data.visits.length === 0) && (!viewModal.data.followUpHistory || viewModal.data.followUpHistory.filter(h => h.actionType === 'Visit').length === 0) ? (
+                                                <div className="text-center py-10 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                                                    <MdCalendarMonth size={36} className="mx-auto text-slate-300 mb-2" />
+                                                    <p className="text-xs font-bold text-slate-600">No field visits scheduled or recorded yet.</p>
+                                                    <p className="text-[11px] text-slate-400 mt-1">Schedule visits to track site visits, product demos, and client meetings.</p>
                                                     <button
-                                                        onClick={() => {
-                                                            setVisitExecutive(selectedDetailsAssignee || viewModal.data.assignedTo?._id || viewModal.data.assignedTo || '');
-                                                            setShowVisitModal(true);
-                                                        }}
-                                                        className="mt-3 px-4 py-2 bg-amber-50 text-amber-700 border border-amber-200 rounded-xl text-xs font-bold hover:bg-amber-100"
+                                                        onClick={handleOpenNewVisitModal}
+                                                        className="mt-4 px-4 py-2 bg-amber-50 text-amber-700 border border-amber-200 rounded-xl text-xs font-bold hover:bg-amber-100 transition-all"
                                                     >
                                                         + Schedule First Visit
                                                     </button>
                                                 </div>
                                             ) : (
-                                                viewModal.data.followUpHistory.filter(h => h.actionType === 'Visit').slice().reverse().map((visit, idx) => (
-                                                    <div key={idx} className="p-4 bg-amber-50/40 border border-amber-100 rounded-2xl space-y-2">
-                                                        <div className="flex justify-between items-center">
-                                                            <span className="px-2.5 py-1 bg-amber-100 text-amber-800 text-[9px] font-black rounded-lg uppercase tracking-wider flex items-center gap-1">
-                                                                <MdCalendarMonth size={12} /> Visit Entry
-                                                            </span>
-                                                            <span className="text-[10px] font-bold text-slate-500">Scheduled/Recorded: {new Date(visit.date).toLocaleString()}</span>
+                                                <>
+                                                    {/* Render structured visits array */}
+                                                    {Array.isArray(viewModal.data.visits) && viewModal.data.visits.slice().reverse().map((visit, idx) => {
+                                                        const originalIdx = viewModal.data.visits.length - 1 - idx;
+                                                        return (
+                                                            <div key={visit._id || originalIdx} className="p-4 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-3 hover:border-amber-300 transition-all shadow-sm">
+                                                                <div className="flex justify-between items-start gap-2">
+                                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                                        <VisitStatusPill status={visit.status} />
+                                                                        <span className="px-2.5 py-0.5 bg-amber-100/80 text-amber-800 text-[10px] font-bold rounded-md">
+                                                                            {visit.purpose || 'Site Visit'}
+                                                                        </span>
+                                                                    </div>
+                                                                    <button
+                                                                        onClick={() => handleOpenEditVisitModal(visit, originalIdx)}
+                                                                        className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-amber-50 hover:border-amber-300 text-slate-700 hover:text-amber-800 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs"
+                                                                    >
+                                                                        <MdEdit size={14} className="text-amber-600" /> Edit Visit
+                                                                    </button>
+                                                                </div>
+
+                                                                <div className="grid grid-cols-2 gap-3 text-xs font-medium bg-white p-3 rounded-xl border border-slate-100">
+                                                                    <div>
+                                                                        <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider block">Visit Date & Time</span>
+                                                                        <span className="text-slate-800 font-black">{visit.visitDate ? new Date(visit.visitDate).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : 'N/A'}</span>
+                                                                    </div>
+                                                                    <div>
+                                                                        <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider block">Assigned Executive</span>
+                                                                        <span className="text-slate-800 font-bold">{visit.assignedTo?.name || 'Unassigned'}</span>
+                                                                    </div>
+                                                                </div>
+
+                                                                {visit.remarks && (
+                                                                    <div className="text-xs">
+                                                                        <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider block mb-0.5">Remarks / Discussion</span>
+                                                                        <p className="text-slate-700 font-medium bg-white p-2.5 rounded-xl border border-slate-100 leading-relaxed">{visit.remarks}</p>
+                                                                    </div>
+                                                                )}
+
+                                                                {visit.outcome && (
+                                                                    <div className="text-xs">
+                                                                        <span className="text-emerald-600 text-[10px] font-black uppercase tracking-wider block mb-0.5">Visit Outcome & Feedback</span>
+                                                                        <p className="text-emerald-900 font-bold bg-emerald-50/70 p-2.5 rounded-xl border border-emerald-200/60 leading-relaxed">{visit.outcome}</p>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
+
+                                                    {/* Fallback rendering of legacy history visits if visits array is empty */}
+                                                    {(!viewModal.data.visits || viewModal.data.visits.length === 0) && (viewModal.data.followUpHistory || []).filter(h => h.actionType === 'Visit').slice().reverse().map((visit, idx) => (
+                                                        <div key={idx} className="p-4 bg-amber-50/40 border border-amber-100 rounded-2xl space-y-2 flex justify-between items-start">
+                                                            <div className="space-y-1">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="px-2.5 py-1 bg-amber-100 text-amber-800 text-[9px] font-black rounded-lg uppercase tracking-wider flex items-center gap-1">
+                                                                        <MdCalendarMonth size={12} /> Visit Entry
+                                                                    </span>
+                                                                    <span className="text-[10px] font-bold text-slate-500">Date: {new Date(visit.date).toLocaleString()}</span>
+                                                                </div>
+                                                                <p className="text-xs font-bold text-slate-800 leading-relaxed">{visit.note}</p>
+                                                            </div>
+                                                            <button
+                                                                onClick={() => handleOpenEditVisitModal(visit, idx)}
+                                                                className="px-2.5 py-1 bg-white border border-amber-200 text-amber-700 hover:bg-amber-100 rounded-lg text-xs font-bold flex items-center gap-1 flex-shrink-0"
+                                                            >
+                                                                <MdEdit size={13} /> Update
+                                                            </button>
                                                         </div>
-                                                        <p className="text-xs font-bold text-slate-800 leading-relaxed">{visit.note}</p>
-                                                    </div>
-                                                ))
+                                                    ))}
+                                                </>
                                             )}
                                         </div>
                                     </div>
@@ -1255,18 +1416,58 @@ const Enquiries = () => {
                 </Modal>
             )}
 
-            {/* SCHEDULE FIELD VISIT MODAL */}
+            {/* SCHEDULE / EDIT FIELD VISIT MODAL */}
             {showVisitModal && (
                 <Modal
                     isOpen={showVisitModal}
-                    onClose={() => setShowVisitModal(false)}
-                    title="Schedule / Log Customer Visit"
+                    onClose={() => {
+                        setShowVisitModal(false);
+                        setEditingVisitId(null);
+                    }}
+                    title={editingVisitId !== null ? "Edit Visit Details & Status" : "Schedule / Log Customer Visit"}
                     maxWidth="max-w-lg"
                 >
                     <form onSubmit={handleScheduleVisitSubmit} className="space-y-4">
                         <p className="text-xs font-medium text-slate-500">
-                            Schedule a field visit or site meeting for Enquiry <span className="font-bold text-slate-800">{viewModal.data?.enquiryNo}</span>.
+                            {editingVisitId !== null
+                                ? `Update visit status and details for Enquiry `
+                                : `Schedule a field visit or site meeting for Enquiry `}
+                            <span className="font-bold text-slate-800">{viewModal.data?.enquiryNo}</span>.
                         </p>
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Visit Status *</label>
+                                <select
+                                    value={visitStatus}
+                                    onChange={(e) => setVisitStatus(e.target.value)}
+                                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-amber-500"
+                                    required
+                                >
+                                    <option value="Scheduled">Scheduled</option>
+                                    <option value="Visited">Visited</option>
+                                    <option value="Follow-up Required">Follow-up Required</option>
+                                    <option value="Completed">Completed</option>
+                                    <option value="Cancelled">Cancelled</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Visit Purpose</label>
+                                <select
+                                    value={visitPurpose}
+                                    onChange={(e) => setVisitPurpose(e.target.value)}
+                                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-amber-500"
+                                >
+                                    <option value="Site Visit">Site Visit / Measurement</option>
+                                    <option value="Product Demonstration">Product Demonstration</option>
+                                    <option value="Commercial Negotiation">Commercial Negotiation</option>
+                                    <option value="Requirement Gathering">Requirement Gathering</option>
+                                    <option value="Customer Meeting">Customer Meeting</option>
+                                    <option value="Followup">General Followup</option>
+                                </select>
+                            </div>
+                        </div>
 
                         <div>
                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Appointment Date & Time *</label>
@@ -1274,7 +1475,7 @@ const Enquiries = () => {
                                 type="datetime-local"
                                 value={visitDate}
                                 onChange={(e) => setVisitDate(e.target.value)}
-                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-amber-500"
+                                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-amber-500"
                                 required
                             />
                         </div>
@@ -1284,7 +1485,7 @@ const Enquiries = () => {
                             <select
                                 value={visitExecutive}
                                 onChange={(e) => setVisitExecutive(e.target.value)}
-                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-amber-500"
+                                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-amber-500"
                             >
                                 <option value="">-- Select Executive --</option>
                                 {users.map(u => (
@@ -1294,36 +1495,34 @@ const Enquiries = () => {
                         </div>
 
                         <div>
-                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Visit Purpose</label>
-                            <select
-                                value={visitPurpose}
-                                onChange={(e) => setVisitPurpose(e.target.value)}
-                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-amber-500"
-                            >
-                                <option value="Site Visit">Site Visit / Measurement</option>
-                                <option value="Product Demonstration">Product Demonstration</option>
-                                <option value="Commercial Negotiation">Commercial Negotiation</option>
-                                <option value="Requirement Gathering">Requirement Gathering</option>
-                                <option value="Customer Meeting">Customer Meeting</option>
-                                <option value="Followup">General Followup</option>
-                            </select>
-                        </div>
-
-                        <div>
                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Discussion Agenda / Remarks</label>
                             <textarea
-                                rows={3}
+                                rows={2}
                                 value={visitNotes}
                                 onChange={(e) => setVisitNotes(e.target.value)}
                                 placeholder="Enter visit details or discussion topics..."
-                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-amber-500"
+                                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-amber-500"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Visit Outcome & Feedback</label>
+                            <textarea
+                                rows={2}
+                                value={visitOutcome}
+                                onChange={(e) => setVisitOutcome(e.target.value)}
+                                placeholder="Enter visit outcome, client response, or next required action..."
+                                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-amber-500"
                             />
                         </div>
 
                         <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
                             <button
                                 type="button"
-                                onClick={() => setShowVisitModal(false)}
+                                onClick={() => {
+                                    setShowVisitModal(false);
+                                    setEditingVisitId(null);
+                                }}
                                 className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-200"
                             >
                                 Cancel
@@ -1331,9 +1530,12 @@ const Enquiries = () => {
                             <button
                                 type="submit"
                                 disabled={schedulingVisit}
-                                className="px-5 py-2 bg-amber-500 text-white rounded-xl text-xs font-bold hover:bg-amber-600 shadow-md shadow-amber-500/20"
+                                className="px-5 py-2 bg-amber-500 text-white rounded-xl text-xs font-bold hover:bg-amber-600 shadow-md shadow-amber-500/20 flex items-center gap-1.5"
                             >
-                                {schedulingVisit ? 'Scheduling...' : 'Schedule Visit'}
+                                <MdSave size={16} />
+                                {schedulingVisit
+                                    ? (editingVisitId !== null ? 'Saving...' : 'Scheduling...')
+                                    : (editingVisitId !== null ? 'Update Visit Details' : 'Schedule Visit')}
                             </button>
                         </div>
                     </form>

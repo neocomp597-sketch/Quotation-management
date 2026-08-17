@@ -56,8 +56,7 @@ export const isValidMobile = (phone) => {
     if (!phone) return true; // Optional if empty
     const cleaned = sanitizePhoneNumber(phone);
     if (!cleaned) return true;
-    const phoneRegex = /^[6-9]\d{9}$/;
-    return phoneRegex.test(cleaned);
+    return /^\d{10}$/.test(cleaned);
 };
 
 /**

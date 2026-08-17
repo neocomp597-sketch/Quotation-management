@@ -255,32 +255,26 @@ const isBlankRow = (item) => {
 };
 
 const generateNextEnquiryNumber = (existingEnquiries = []) => {
-    let maxNum = 0;
-    let prefix = '';
+    const currentYear = new Date().getFullYear();
+    const prefix = `${currentYear}-`;
     
+    let maxSeq = 0;
     existingEnquiries.forEach(e => {
         const str = String(e.enquiryNo || '').trim();
-        const match = str.match(/^(.*?)(\d+)$/);
-        if (match) {
-            const currentPrefix = match[1];
-            const num = parseInt(match[2], 10);
-            if (num > maxNum) {
-                maxNum = num;
-                prefix = currentPrefix;
+        if (str.startsWith(prefix)) {
+            const parts = str.split('-');
+            if (parts.length >= 2) {
+                const seq = parseInt(parts[parts.length - 1], 10);
+                if (!isNaN(seq) && seq > maxSeq) {
+                    maxSeq = seq;
+                }
             }
         }
     });
 
-    if (maxNum > 0) {
-        const nextNum = maxNum + 1;
-        const origNumStr = existingEnquiries.find(e => String(e.enquiryNo).endsWith(String(maxNum)))?.enquiryNo || '';
-        const numMatch = origNumStr.match(/(\d+)$/);
-        const paddingLen = numMatch ? numMatch[1].length : 0;
-        const nextNumStr = String(nextNum).padStart(paddingLen, '0');
-        return `${prefix}${nextNumStr}`;
-    }
-    
-    return '5001';
+    const nextSeq = maxSeq + 1;
+    const seqStr = String(nextSeq).padStart(2, '0');
+    return `${prefix}${seqStr}`;
 };
 
 const CreateEnquiry = () => {
@@ -296,6 +290,7 @@ const CreateEnquiry = () => {
 
     // New Customer inline registration state
     const [isNewCustomerModalOpen, setIsNewCustomerModalOpen] = useState(false);
+    const [isInlineCustomerFormOpen, setIsInlineCustomerFormOpen] = useState(false);
     const [newCustomerForm, setNewCustomerForm] = useState({
         companyName: '',
         customerName: '',
@@ -531,6 +526,8 @@ const CreateEnquiry = () => {
         let val = value;
         if (name === 'contactMobile') {
             val = value.replace(/[^\d]/g, '').slice(0, 10);
+        } else if (name === 'contactEmail') {
+            val = value.toLowerCase().trim();
         }
         setHeader(prev => ({ ...prev, [name]: val }));
     };
@@ -541,37 +538,66 @@ const CreateEnquiry = () => {
         return [address.line1, address.line2, address.city, address.state, address.pincode].filter(Boolean).join(', ');
     };
 
-    const handleCustomerSelect = (customerId) => {
-        const customer = customers.find(c => c._id === customerId);
+    const selectCustomerObject = (customer) => {
+        if (!customer) return;
         setHeader(prev => ({
             ...prev,
-            customerId,
-            companyName: customer?.companyName || prev.companyName,
-            contactPerson: customer?.customerName || prev.contactPerson,
-            contactMobile: customer?.mobile || prev.contactMobile,
-            contactEmail: customer?.email || prev.contactEmail,
+            customerId: customer._id,
+            companyName: customer.companyName || prev.companyName,
+            contactPerson: customer.customerName || prev.contactPerson,
+            contactMobile: customer.mobile || prev.contactMobile,
+            contactEmail: customer.email ? customer.email.toLowerCase().trim() : prev.contactEmail,
             siteAddress: formatCustomerAddress(customer) || prev.siteAddress
         }));
     };
 
+    const handleCustomerSelect = (customerId) => {
+        const customer = customers.find(c => c._id === customerId);
+        if (customer) {
+            selectCustomerObject(customer);
+        } else {
+            setHeader(prev => ({ ...prev, customerId }));
+        }
+    };
+
     const handleCreateCustomer = async (e) => {
-        e.preventDefault();
-        if (newCustomerForm.mobile && !isValidMobile(newCustomerForm.mobile)) {
-            toast.error('Invalid Customer Mobile Number (must be 10 digits)');
+        if (e) e.preventDefault();
+        const cleanEmail = (newCustomerForm.email || '').toLowerCase().trim();
+        const cleanMobile = (newCustomerForm.mobile || '').replace(/[^\d]/g, '').slice(0, 10);
+        const cleanGSTIN = (newCustomerForm.gstin || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 15);
+
+        if (!newCustomerForm.companyName?.trim()) {
+            toast.error('Company Name is required');
             return;
         }
-        if (newCustomerForm.gstin && !isValidGSTIN(newCustomerForm.gstin)) {
-            toast.error('Invalid GSTIN format (must be 15 characters, e.g. 27AAAAA0000A1Z5)');
+        if (!newCustomerForm.customerName?.trim()) {
+            toast.error('Contact Name is required');
             return;
         }
+        if (cleanMobile && cleanMobile.length !== 10) {
+            toast.error('Mobile number must be exactly 10 numeric digits');
+            return;
+        }
+        if (cleanGSTIN && !isValidGSTIN(cleanGSTIN)) {
+            toast.error('Invalid GSTIN format (15 characters: 2 digits + 5 letters + 4 digits + 1 letter + 1 char + Z + 1 check digit, e.g. 27AAAAA0000A1Z5)');
+            return;
+        }
+
         try {
-            const res = await customerService.create(newCustomerForm);
+            const payload = {
+                ...newCustomerForm,
+                email: cleanEmail,
+                mobile: cleanMobile,
+                gstin: cleanGSTIN
+            };
+            const res = await customerService.create(payload);
             const newCust = res.data?.data || res.data;
             if (newCust && newCust._id) {
                 setCustomers(prev => [...prev, newCust]);
-                handleCustomerSelect(newCust._id);
-                toast.success('Customer created successfully');
+                selectCustomerObject(newCust);
+                toast.success('Customer created & details auto-filled!');
                 setIsNewCustomerModalOpen(false);
+                setIsInlineCustomerFormOpen(false);
                 setNewCustomerForm({
                     companyName: '',
                     customerName: '',
@@ -1135,7 +1161,9 @@ const CreateEnquiry = () => {
 
                 {/* 2. Customer Details Card (Matching user layout image) */}
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 space-y-4">
-                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest text-teal-600">Customer Details</h3>
+                    <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest text-teal-600">Customer Details</h3>
+                    </div>
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-end">
                         {/* Customer Dropdown search */}
                         <div className="lg:col-span-4 space-y-2">
@@ -1150,10 +1178,10 @@ const CreateEnquiry = () => {
                         <div className="lg:col-span-2">
                             <button
                                 type="button"
-                                onClick={() => setIsNewCustomerModalOpen(true)}
+                                onClick={() => setIsInlineCustomerFormOpen(!isInlineCustomerFormOpen)}
                                 className="w-full py-3.5 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center justify-center whitespace-nowrap gap-1 shadow-md active:scale-95 shrink-0"
                             >
-                                + New Customer
+                                {isInlineCustomerFormOpen ? '✕ Close Form' : '+ New Customer'}
                             </button>
                         </div>
                         {/* Contact Person */}
@@ -1177,10 +1205,92 @@ const CreateEnquiry = () => {
                                 value={header.contactEmail}
                                 onChange={handleHeaderChange}
                                 placeholder="Email address"
-                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold focus:bg-white focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 transition-all text-slate-800"
+                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold focus:bg-white focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 transition-all text-slate-800 lowercase"
                             />
                         </div>
                     </div>
+
+                    {/* Inline Customer Registration Section */}
+                    {isInlineCustomerFormOpen && (
+                        <div className="bg-slate-50/80 border border-teal-200 p-5 rounded-2xl space-y-4 my-3 animate-in fade-in duration-300">
+                            <div className="flex items-center justify-between border-b border-slate-200/80 pb-2">
+                                <h4 className="text-xs font-black uppercase text-teal-700 tracking-wider">Quick Create Customer</h4>
+                                <button type="button" onClick={() => setIsInlineCustomerFormOpen(false)} className="text-xs font-bold text-slate-400 hover:text-rose-500">✕ Close</button>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                                <div>
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">Company Name *</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={newCustomerForm.companyName}
+                                        onChange={(e) => setNewCustomerForm(prev => ({ ...prev, companyName: e.target.value }))}
+                                        placeholder="e.g. ACME Corp"
+                                        className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold focus:border-teal-500 outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">Contact Name *</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={newCustomerForm.customerName}
+                                        onChange={(e) => setNewCustomerForm(prev => ({ ...prev, customerName: e.target.value }))}
+                                        placeholder="e.g. John Doe"
+                                        className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold focus:border-teal-500 outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">Email (Lowercase)</label>
+                                    <input
+                                        type="email"
+                                        value={newCustomerForm.email}
+                                        onChange={(e) => setNewCustomerForm(prev => ({ ...prev, email: e.target.value.toLowerCase().trim() }))}
+                                        placeholder="e.g. john@acme.com"
+                                        className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold focus:border-teal-500 outline-none lowercase"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">Mobile No. (10 digits)</label>
+                                    <input
+                                        type="tel"
+                                        maxLength={10}
+                                        value={newCustomerForm.mobile}
+                                        onChange={(e) => setNewCustomerForm(prev => ({ ...prev, mobile: e.target.value.replace(/[^\d]/g, '').slice(0, 10) }))}
+                                        placeholder="e.g. 9876543210"
+                                        className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold focus:border-teal-500 outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">GSTIN (15 chars)</label>
+                                    <input
+                                        type="text"
+                                        maxLength={15}
+                                        value={newCustomerForm.gstin}
+                                        onChange={(e) => setNewCustomerForm(prev => ({ ...prev, gstin: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 15) }))}
+                                        placeholder="e.g. 27AABCU9603R1ZM"
+                                        className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold focus:border-teal-500 outline-none uppercase font-mono"
+                                    />
+                                </div>
+                            </div>
+                            <div className="flex justify-end gap-2 pt-1">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsInlineCustomerFormOpen(false)}
+                                    className="px-4 py-2 border border-slate-200 text-slate-500 rounded-xl font-bold text-xs uppercase"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleCreateCustomer}
+                                    className="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-black text-xs uppercase tracking-wider shadow-sm transition-all"
+                                >
+                                    Save & Auto-Fill Customer
+                                </button>
+                            </div>
+                        </div>
+                    )}
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
                         <div className="space-y-2">
@@ -1751,86 +1861,6 @@ const CreateEnquiry = () => {
                         </div>
                     </div>
                 )}
-            </Modal>
-
-            {/* Inline New Customer Creation Modal */}
-            <Modal
-                isOpen={isNewCustomerModalOpen}
-                onClose={() => setIsNewCustomerModalOpen(false)}
-                title="Create New Customer"
-                maxWidth="max-w-md"
-            >
-                <form onSubmit={handleCreateCustomer} className="space-y-4">
-                    <div className="space-y-1">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 text-teal-600">Company Name <span className="text-rose-500">*</span></label>
-                        <input
-                            type="text"
-                            required
-                            value={newCustomerForm.companyName}
-                            onChange={(e) => setNewCustomerForm(prev => ({ ...prev, companyName: e.target.value }))}
-                            placeholder="e.g. ACME Corp"
-                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold focus:bg-white focus:border-teal-500 transition-all text-slate-800"
-                        />
-                    </div>
-                    <div className="space-y-1">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 text-teal-600">Contact Name <span className="text-rose-500">*</span></label>
-                        <input
-                            type="text"
-                            required
-                            value={newCustomerForm.customerName}
-                            onChange={(e) => setNewCustomerForm(prev => ({ ...prev, customerName: e.target.value }))}
-                            placeholder="e.g. John Doe"
-                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold focus:bg-white focus:border-teal-500 transition-all text-slate-800"
-                        />
-                    </div>
-                    <div className="space-y-1">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 text-teal-600">Email</label>
-                        <input
-                            type="email"
-                            value={newCustomerForm.email}
-                            onChange={(e) => setNewCustomerForm(prev => ({ ...prev, email: e.target.value }))}
-                            placeholder="e.g. john@acme.com"
-                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold focus:bg-white focus:border-teal-500 transition-all text-slate-800"
-                        />
-                    </div>
-                    <div className="space-y-1">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 text-teal-600">Mobile No.</label>
-                        <input
-                            type="tel"
-                            maxLength={10}
-                            value={newCustomerForm.mobile}
-                            onChange={(e) => setNewCustomerForm(prev => ({ ...prev, mobile: e.target.value.replace(/[^\d]/g, '').slice(0, 10) }))}
-                            placeholder="e.g. 9876543210"
-                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold focus:bg-white focus:border-teal-500 transition-all text-slate-800"
-                        />
-                    </div>
-                    <div className="space-y-1">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 text-teal-600">GSTIN</label>
-                        <input
-                            type="text"
-                            maxLength={15}
-                            value={newCustomerForm.gstin}
-                            onChange={(e) => setNewCustomerForm(prev => ({ ...prev, gstin: e.target.value.toUpperCase().slice(0, 15) }))}
-                            placeholder="e.g. 27AABCU9603R1ZM"
-                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold focus:bg-white focus:border-teal-500 transition-all text-slate-800 uppercase font-mono"
-                        />
-                    </div>
-                    <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 mt-6">
-                        <button
-                            type="button"
-                            onClick={() => setIsNewCustomerModalOpen(false)}
-                            className="px-6 py-3 border border-slate-200 text-slate-500 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            className="px-6 py-3 bg-teal-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-teal-700 transition-all shadow-md active:scale-95"
-                        >
-                            Create Customer
-                        </button>
-                    </div>
-                </form>
             </Modal>
         </div>
     );

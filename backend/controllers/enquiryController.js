@@ -124,7 +124,54 @@ const cleanEnquiryBody = (body) => {
             return cleanedItem;
         });
     }
+
+    // Clean visits
+    if (Array.isArray(body.visits)) {
+        body.visits = body.visits.map(v => {
+            const cleanedV = { ...v };
+            if (cleanedV.assignedTo && typeof cleanedV.assignedTo === 'object') {
+                cleanedV.assignedTo = cleanedV.assignedTo._id ? cleanedV.assignedTo._id.toString() : null;
+            }
+            if (cleanedV.assignedTo === '' || cleanedV.assignedTo === 'null' || cleanedV.assignedTo === 'undefined') {
+                cleanedV.assignedTo = null;
+            }
+            if (cleanedV.createdBy && typeof cleanedV.createdBy === 'object') {
+                cleanedV.createdBy = cleanedV.createdBy._id ? cleanedV.createdBy._id.toString() : null;
+            }
+            if (!cleanedV.createdBy || cleanedV.createdBy === '' || cleanedV.createdBy === 'null' || cleanedV.createdBy === 'undefined') {
+                delete cleanedV.createdBy;
+            }
+            return cleanedV;
+        });
+    }
+
     return body;
+};
+
+const generateEnquiryNumber = async (companyId) => {
+    const currentYear = new Date().getFullYear();
+    const prefix = `${currentYear}-`;
+    const filter = { enquiryNo: new RegExp(`^${prefix}`) };
+    if (companyId) filter.companyId = companyId;
+
+    const existingEnquiries = await Enquiry.find(filter).select('enquiryNo').lean();
+    let maxSeq = 0;
+    existingEnquiries.forEach(e => {
+        if (e.enquiryNo) {
+            const str = String(e.enquiryNo).trim();
+            const parts = str.split('-');
+            if (parts.length >= 2) {
+                const seq = parseInt(parts[parts.length - 1], 10);
+                if (!isNaN(seq) && seq > maxSeq) {
+                    maxSeq = seq;
+                }
+            }
+        }
+    });
+
+    const nextSeq = maxSeq + 1;
+    const seqStr = String(nextSeq).padStart(2, '0');
+    return `${prefix}${seqStr}`;
 };
 
 exports.createEnquiry = async (req, res) => {
@@ -294,6 +341,17 @@ const populateAssignedToFallback = async (itemsList) => {
                 unpopulatedIds.push(e.assignedTo.toString());
             }
         }
+        if (Array.isArray(e.visits)) {
+            e.visits.forEach(v => {
+                if (v && v.assignedTo) {
+                    if (typeof v.assignedTo === 'object' && !v.assignedTo.name && v.assignedTo._id) {
+                        unpopulatedIds.push(v.assignedTo._id.toString());
+                    } else if (typeof v.assignedTo === 'string' || v.assignedTo instanceof mongoose.Types.ObjectId) {
+                        unpopulatedIds.push(v.assignedTo.toString());
+                    }
+                }
+            });
+        }
     });
 
     if (unpopulatedIds.length === 0) return isArray ? list : list[0];
@@ -317,6 +375,16 @@ const populateAssignedToFallback = async (itemsList) => {
             if (rawId && userMap.has(rawId)) {
                 e.assignedTo = userMap.get(rawId);
             }
+        }
+        if (Array.isArray(e.visits)) {
+            e.visits.forEach(v => {
+                if (v && v.assignedTo) {
+                    const rawVId = (typeof v.assignedTo === 'object' ? v.assignedTo._id : v.assignedTo || '').toString();
+                    if (rawVId && userMap.has(rawVId)) {
+                        v.assignedTo = userMap.get(rawVId);
+                    }
+                }
+            });
         }
     });
 
@@ -424,9 +492,11 @@ exports.getAllEnquiries = async (req, res) => {
         }
 
         let enquiries = await Enquiry.find(filter)
-            .select('enquiryNo enquiryDate followUpDate customerId partners status probability priority projectName requiredDeliveryDate items assignedTo createdBy lastActivityDate createdAt updatedAt remarks closureReason lossReason grandTotal')
+            .select('enquiryNo enquiryDate followUpDate customerId partners status probability priority projectName requiredDeliveryDate items assignedTo visits createdBy lastActivityDate createdAt updatedAt remarks closureReason lossReason grandTotal')
             .populate('customerId', 'customerName companyName gstin')
             .populate('createdBy', 'name email')
+            .populate('visits.assignedTo', 'name email role')
+            .populate('visits.createdBy', 'name email')
             .populate('items.productId')
             .populate('items.vendors', 'name')
             .populate('items.vendorQuotes.vendorId', 'name')
@@ -450,6 +520,8 @@ exports.getEnquiryById = async (req, res) => {
         let enquiry = await Enquiry.findById(id)
             .populate('customerId', 'customerName companyName gstin billingAddress mobile email')
             .populate('createdBy', 'name email')
+            .populate('visits.assignedTo', 'name email role')
+            .populate('visits.createdBy', 'name email')
             .populate('items.productId')
             .populate('items.vendors', 'name')
             .populate('items.vendorQuotes.vendorId', 'name')
@@ -499,6 +571,8 @@ exports.updateEnquiry = async (req, res) => {
         )
         .populate('customerId', 'customerName companyName gstin')
         .populate('createdBy', 'name email')
+        .populate('visits.assignedTo', 'name email role')
+        .populate('visits.createdBy', 'name email')
         .populate('items.productId')
         .populate('items.vendors', 'name')
         .populate('items.vendorQuotes.vendorId', 'name')
