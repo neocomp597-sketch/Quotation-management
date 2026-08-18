@@ -322,7 +322,7 @@ const Contacts = ({ isCreatePage, isEditPage }) => {
         }
 
         if (data.gstin && data.gstin.trim() && !isValidGSTIN(data.gstin)) {
-            return 'Invalid GSTIN format. Expected format: 27AAAAA0000A1Z5';
+            return 'Invalid GSTIN format (15 characters with state code 01-37, e.g. 27AAAAA0000A1Z5 or 09AAAAA0000A1Z5)';
         }
 
         if (data.pincode && data.pincode.trim() && !isValidPincode(data.pincode)) {

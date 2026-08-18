@@ -300,6 +300,83 @@ exports.getFollowUpIntelligence = async (req, res) => {
     }
 };
 
+exports.getCustomerIntelligence = async (req, res) => {
+    try {
+        const { from, to } = req.query;
+
+        let matchStage = {};
+        if (from || to) {
+            matchStage.enquiryDate = {};
+            if (from) matchStage.enquiryDate.$gte = new Date(from);
+            if (to) matchStage.enquiryDate.$lte = new Date(to);
+        }
+
+        const customers = await Enquiry.aggregate([
+            { $match: matchStage },
+            {
+                $group: {
+                    _id: '$customerId',
+                    enquiryCount: { $sum: 1 },
+                    wonCount: {
+                        $sum: {
+                            $cond: [{ $in: ['$status', ['Resolved', 'Closed', 'PO Received', 'Finalized']] }, 1, 0]
+                        }
+                    },
+                    lostCount: {
+                        $sum: { $cond: [{ $in: ['$status', ['Cancelled', 'Lost']] }, 1, 0] }
+                    },
+                    inProgressCount: {
+                        $sum: {
+                            $cond: [{ $not: { $in: ['$status', ['Resolved', 'Closed', 'Cancelled', 'Lost', 'PO Received', 'Finalized']] } }, 1, 0]
+                        }
+                    },
+                    avgProbability: { $avg: '$probability' }
+                }
+            },
+            {
+                $lookup: {
+                    from: 'customers',
+                    localField: '_id',
+                    foreignField: '_id',
+                    as: 'customerDetails'
+                }
+            },
+            { $unwind: { path: '$customerDetails', preserveNullAndEmptyArrays: true } },
+            {
+                $project: {
+                    _id: 1,
+                    customerName: {
+                        $ifNull: [
+                            '$customerDetails.companyName',
+                            { $ifNull: ['$customerDetails.customerName', 'Unknown Customer'] }
+                        ]
+                    },
+                    email: '$customerDetails.email',
+                    phone: '$customerDetails.mobile',
+                    enquiryCount: 1,
+                    wonCount: 1,
+                    lostCount: 1,
+                    inProgressCount: 1,
+                    avgProbability: { $round: [{ $ifNull: ['$avgProbability', 0] }, 0] },
+                    conversionRate: {
+                        $cond: [
+                            { $gt: ['$enquiryCount', 0] },
+                            { $round: [{ $multiply: [{ $divide: ['$wonCount', '$enquiryCount'] }, 100] }, 2] },
+                            0
+                        ]
+                    }
+                }
+            },
+            { $sort: { enquiryCount: -1 } }
+        ]);
+
+        res.json(customers);
+    } catch (err) {
+        console.error('[Analytics Error] getCustomerIntelligence:', err);
+        res.status(500).json({ message: err.message });
+    }
+};
+
 exports.getVendorIntelligence = async (req, res) => {
     try {
         const { from, to } = req.query;
@@ -313,10 +390,10 @@ exports.getVendorIntelligence = async (req, res) => {
 
         const vendors = await Quotation.aggregate([
             { $match: matchStage },
-            { $unwind: '$items' },
+            { $unwind: { path: '$items', preserveNullAndEmptyArrays: false } },
             {
                 $group: {
-                    _id: '$items.vendorId',
+                    _id: { $ifNull: ['$items.vendorId', 'Unassigned'] },
                     vendorName: { $first: '$items.vendorName' },
                     quoteCount: { $sum: 1 },
                     avgPrice: { $avg: '$items.vendorPrice' },
@@ -332,7 +409,7 @@ exports.getVendorIntelligence = async (req, res) => {
                     _id: 1,
                     vendorName: { $ifNull: ['$vendorName', 'Unknown Vendor'] },
                     quoteCount: 1,
-                    avgPrice: 1,
+                    avgPrice: { $ifNull: ['$avgPrice', 0] },
                     winCount: 1,
                     lossCount: { $subtract: ['$quoteCount', '$winCount'] },
                     winRatio: {
@@ -367,10 +444,10 @@ exports.getProductIntelligence = async (req, res) => {
 
         const products = await Quotation.aggregate([
             { $match: matchStage },
-            { $unwind: '$items' },
+            { $unwind: { path: '$items', preserveNullAndEmptyArrays: false } },
             {
                 $group: {
-                    _id: '$items.productSnapshot.productName',
+                    _id: { $ifNull: ['$items.productSnapshot.productName', { $ifNull: ['$items.productName', 'Unspecified Product'] }] },
                     enquiryCount: { $sum: 1 },
                     wonCount: {
                         $sum: {
@@ -387,7 +464,7 @@ exports.getProductIntelligence = async (req, res) => {
                     enquiryCount: 1,
                     wonCount: 1,
                     lostCount: { $subtract: ['$enquiryCount', '$wonCount'] },
-                    vendorCount: { $size: '$vendors' },
+                    vendorCount: { $size: { $ifNull: ['$vendors', []] } },
                     conversionRate: {
                         $cond: [
                             { $gt: ['$enquiryCount', 0] },
@@ -420,7 +497,7 @@ exports.getUserPerformance = async (req, res) => {
 
         const users = await Enquiry.aggregate([
             { $match: matchStage },
-            { $unwind: '$items' },
+            { $unwind: { path: '$items', preserveNullAndEmptyArrays: true } },
             {
                 $group: {
                     _id: { $ifNull: ['$items.salespersonName', 'Unassigned'] },

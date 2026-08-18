@@ -19,7 +19,7 @@ const defaultForm = {
     address: '',
     gstin: '',
     isActive: true,
-    loginEnabled: false,
+    loginEnabled: true,
     username: '',
     password: ''
 };
@@ -193,7 +193,7 @@ const Vendors = ({ isCreatePage, isEditPage }) => {
             return;
         }
         if (formData.gstin && !isValidGSTIN(formData.gstin)) {
-            toast.error('Invalid GSTIN format (must be 15 characters, e.g. 27AAAAA0000A1Z5)');
+            toast.error('Invalid GSTIN format (must be 15 characters with state code 01-37, e.g. 27AAAAA0000A1Z5 or 09AAAAA0000A1Z5)');
             return;
         }
 

@@ -94,6 +94,7 @@ const EnquirySchema = new mongoose.Schema({
         visitDate: { type: Date, required: true },
         assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
         purpose: { type: String, default: 'Site Visit' },
+        location: { type: String, default: '' },
         status: { 
             type: String, 
             enum: ['Scheduled', 'Visited', 'Follow-up Required', 'Completed', 'Cancelled'], 

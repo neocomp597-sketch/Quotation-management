@@ -24,8 +24,9 @@ const createVendor = async (req, res) => {
             return res.status(400).json({ message: 'Vendor name is required' });
         }
 
-        let passwordHash = '';
-        let vendorUserId = null;
+        const isLoginEnabled = loginEnabled !== false; // Auto-login enabled by default
+        const effectiveEmail = (username || email || '').trim().toLowerCase();
+        const rawPassword = (password && String(password).trim().length > 0) ? String(password).trim() : '1-6';
 
         const vendor = await Vendor.create({
             name: name.trim(),
@@ -35,26 +36,19 @@ const createVendor = async (req, res) => {
             address,
             gstin,
             isActive: isActive !== false,
-            loginEnabled: Boolean(loginEnabled),
-            username: username ? username.trim().toLowerCase() : (email ? email.trim().toLowerCase() : '')
+            loginEnabled: isLoginEnabled,
+            username: effectiveEmail
         });
 
-        if (loginEnabled) {
-            const loginEmail = (username || email || '').trim().toLowerCase();
-            if (!loginEmail) {
-                return res.status(400).json({ message: 'Email or username is required for enabling login' });
-            }
+        if (isLoginEnabled && effectiveEmail) {
+            let user = await User.findOne({ email: effectiveEmail });
+            const salt = await bcrypt.genSalt(10);
+            const passwordHash = await bcrypt.hash(rawPassword, salt);
 
-            let user = await User.findOne({ email: loginEmail });
             if (!user) {
-                if (!password || password.length < 6) {
-                    return res.status(400).json({ message: 'Password (min 6 chars) is required when enabling login for a new vendor user' });
-                }
-                const salt = await bcrypt.genSalt(10);
-                passwordHash = await bcrypt.hash(password, salt);
                 user = await User.create({
                     name: vendor.name,
-                    email: loginEmail,
+                    email: effectiveEmail,
                     passwordHash,
                     role: 'vendor',
                     companyId: req.user?.companyId || vendor.companyId,
@@ -63,15 +57,11 @@ const createVendor = async (req, res) => {
             } else {
                 user.role = 'vendor';
                 user.vendorId = vendor._id;
-                if (password && password.length >= 6) {
-                    const salt = await bcrypt.genSalt(10);
-                    user.passwordHash = await bcrypt.hash(password, salt);
-                }
+                user.passwordHash = passwordHash;
                 await user.save();
             }
-            vendorUserId = user._id;
-            vendor.vendorUserId = vendorUserId;
-            if (passwordHash) vendor.passwordHash = passwordHash;
+            vendor.vendorUserId = user._id;
+            vendor.passwordHash = passwordHash;
             await vendor.save();
         }
 

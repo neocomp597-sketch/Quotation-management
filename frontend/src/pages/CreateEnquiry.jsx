@@ -579,7 +579,7 @@ const CreateEnquiry = () => {
             return;
         }
         if (cleanGSTIN && !isValidGSTIN(cleanGSTIN)) {
-            toast.error('Invalid GSTIN format (15 characters: 2 digits + 5 letters + 4 digits + 1 letter + 1 char + Z + 1 check digit, e.g. 27AAAAA0000A1Z5)');
+            toast.error('Invalid GSTIN format (15 characters: 2-digit state code 01-37 + 5 letters + 4 digits + 1 letter + 1 char + Z + 1 check digit, e.g. 27AAAAA0000A1Z5 or 09AAAAA0000A1Z5)');
             return;
         }
 

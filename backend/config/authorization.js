@@ -219,9 +219,9 @@ const FULL_ACCESS_KEYS = getAllPermissionKeys();
 // Employee: employee access - payslips, payroll, csm tickets, csm kb, dashboard
 const DEFAULT_ROLE_PERMISSIONS = {
     admin: buildPermissions(FULL_ACCESS_KEYS),
-    manager: buildPermissions(['dashboard', 'master', 'enquiry', 'sales_pipeline', 'quotation', 'meetings', 'sale', 'purchase', 'planning', 'reports', 'settings', 'csm', 'tender']),
-    sales: buildPermissions(['dashboard', 'enquiry', 'sales_pipeline', 'quotation', 'meetings', 'csm_tickets', 'csm_kb', 'tender_dashboard', 'tender_register']),
-    employee: buildPermissions(['dashboard', 'payroll_payslips', 'csm_tickets', 'csm_kb', 'settings_profile'])
+    manager: buildPermissions(['dashboard', 'master', 'enquiry', 'sales_pipeline', 'quotation', 'meetings', 'sale', 'purchase', 'planning', 'reports', 'settings', 'csm', 'tender', 'payroll_org_chart']),
+    sales: buildPermissions(['dashboard', 'enquiry', 'sales_pipeline', 'quotation', 'meetings', 'csm_tickets', 'csm_kb', 'tender_dashboard', 'tender_register', 'payroll_org_chart']),
+    employee: buildPermissions(['dashboard', 'payroll_payslips', 'payroll_org_chart', 'csm_tickets', 'csm_kb', 'settings_profile'])
 };
 
 /**

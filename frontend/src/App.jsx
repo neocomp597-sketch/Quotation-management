@@ -16,6 +16,8 @@ import LandingPage from './pages/LandingPage';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Enquiries from './pages/Enquiries';
+import EnquiryDetail from './pages/EnquiryDetail';
+import ScheduleEnquiryVisit from './pages/ScheduleEnquiryVisit';
 import CreateEnquiry from './pages/CreateEnquiry';
 import EnquiryAnalytics from './pages/EnquiryAnalytics';
 import Meetings from './pages/Meetings';
@@ -161,6 +163,13 @@ function App() {
             <Route path="/enquiries/analytics" element={<PermissionRoute permissionKey="enquiry_analytics"><Layout><EnquiryAnalytics /></Layout></PermissionRoute>} />
             <Route path="/enquiries/create" element={<PermissionRoute permissionKey="enquiry_leads"><Layout><CreateEnquiry /></Layout></PermissionRoute>} />
             <Route path="/enquiries/edit/:id" element={<PermissionRoute permissionKey="enquiry_leads"><Layout><CreateEnquiry /></Layout></PermissionRoute>} />
+            <Route path="/enquiries/view/:id" element={<PermissionRoute permissionKey="enquiry_leads"><Layout><EnquiryDetail /></Layout></PermissionRoute>} />
+            <Route path="/enquiries/view/:id/visit/new" element={<PermissionRoute permissionKey="enquiry_leads"><Layout><ScheduleEnquiryVisit /></Layout></PermissionRoute>} />
+            <Route path="/enquiries/view/:id/visit/edit/:visitIndex" element={<PermissionRoute permissionKey="enquiry_leads"><Layout><ScheduleEnquiryVisit /></Layout></PermissionRoute>} />
+            <Route path="/enquiries/details/:id" element={<PermissionRoute permissionKey="enquiry_leads"><Layout><EnquiryDetail /></Layout></PermissionRoute>} />
+            <Route path="/enquiries/:id/visit/new" element={<PermissionRoute permissionKey="enquiry_leads"><Layout><ScheduleEnquiryVisit /></Layout></PermissionRoute>} />
+            <Route path="/enquiries/:id/visit/edit/:visitIndex" element={<PermissionRoute permissionKey="enquiry_leads"><Layout><ScheduleEnquiryVisit /></Layout></PermissionRoute>} />
+            <Route path="/enquiries/:id" element={<PermissionRoute permissionKey="enquiry_leads"><Layout><EnquiryDetail /></Layout></PermissionRoute>} />
             <Route path="/meetings" element={<PermissionRoute permissionKey="meetings_list"><Layout><Meetings /></Layout></PermissionRoute>} />
             <Route path="/meetings/new" element={<PermissionRoute permissionKey="meetings_list"><Layout><CreateMeeting /></Layout></PermissionRoute>} />
             <Route path="/meetings/:id" element={<PermissionRoute permissionKey="meetings_list"><Layout><CreateMeeting /></Layout></PermissionRoute>} />

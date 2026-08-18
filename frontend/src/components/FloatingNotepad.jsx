@@ -1,9 +1,42 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MdStickyNote2, MdClose, MdDragIndicator, MdOpenInFull, MdMinimize } from 'react-icons/md';
+import { MdStickyNote2, MdClose, MdDragIndicator, MdMinimize, MdPushPin } from 'react-icons/md';
 import NotepadWidget from './NotepadWidget';
 
 const FloatingNotepad = () => {
-    const [isOpen, setIsOpen] = useState(false);
+    // Default open & pinned so it remains accessible permanently across all pages
+    const [isOpen, setIsOpen] = useState(() => {
+        try {
+            const saved = localStorage.getItem('floating_notepad_open');
+            return saved === null ? true : saved !== 'false';
+        } catch {
+            return true;
+        }
+    });
+
+    const [isPinned, setIsPinned] = useState(() => {
+        try {
+            const saved = localStorage.getItem('floating_notepad_pinned');
+            return saved === null ? true : saved !== 'false';
+        } catch {
+            return true;
+        }
+    });
+
+    const toggleOpen = (state) => {
+        const nextState = typeof state === 'boolean' ? state : !isOpen;
+        setIsOpen(nextState);
+        try {
+            localStorage.setItem('floating_notepad_open', String(nextState));
+        } catch {}
+    };
+
+    const togglePinned = () => {
+        const nextState = !isPinned;
+        setIsPinned(nextState);
+        try {
+            localStorage.setItem('floating_notepad_pinned', String(nextState));
+        } catch {}
+    };
     
     // Position state for floating button
     const [buttonPos, setButtonPos] = useState(() => {
@@ -11,7 +44,7 @@ const FloatingNotepad = () => {
             const saved = localStorage.getItem('floating_notepad_button_pos');
             if (saved) return JSON.parse(saved);
         } catch {}
-        return { x: window.innerWidth - 80, y: window.innerHeight - 100 };
+        return { x: Math.max(10, window.innerWidth - 340), y: 16 };
     });
 
     const isDraggingRef = useRef(false);
@@ -36,7 +69,6 @@ const FloatingNotepad = () => {
 
     // Drag handlers for Floating Button
     const handleMouseDown = (e) => {
-        // Only primary mouse button
         if (e.button !== 0) return;
         isDraggingRef.current = true;
         hasMovedRef.current = false;
@@ -115,12 +147,12 @@ const FloatingNotepad = () => {
         }
     };
 
-    const handleClick = (e) => {
+    const handleClick = () => {
         if (hasMovedRef.current) {
             hasMovedRef.current = false;
             return;
         }
-        setIsOpen((prev) => !prev);
+        toggleOpen();
     };
 
     return (
@@ -141,25 +173,25 @@ const FloatingNotepad = () => {
             >
                 <button
                     onClick={handleClick}
-                    className={`relative w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-2xl transition-transform duration-200 active:scale-95 border-2 border-white/20 ${
+                    className={`relative w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-xl transition-all duration-200 active:scale-95 border-2 border-white/30 ${
                         isOpen 
-                            ? 'bg-gradient-to-br from-slate-800 to-slate-900 shadow-slate-900/40' 
-                            : 'bg-gradient-to-br from-amber-500 via-amber-600 to-orange-600 shadow-amber-500/40 hover:scale-105'
+                            ? 'bg-gradient-to-br from-amber-600 via-orange-600 to-amber-700 shadow-amber-600/50 ring-2 ring-amber-300' 
+                            : 'bg-gradient-to-br from-amber-500 via-amber-600 to-orange-600 shadow-amber-500/40 hover:scale-105 hover:shadow-amber-500/60'
                     }`}
                     title="Drag to move • Click to toggle Notepad"
                 >
-                    {isOpen ? <MdClose size={26} /> : <MdStickyNote2 size={26} />}
+                    {isOpen ? <MdClose size={24} /> : <MdStickyNote2 size={24} />}
 
                     {/* Drag hint handle icon overlay */}
-                    <div className="absolute -top-1 -right-1 w-5 h-5 bg-white/20 dark:bg-slate-700/60 backdrop-blur-md rounded-full flex items-center justify-center text-white text-[10px] opacity-70 group-hover:opacity-100">
-                        <MdDragIndicator size={12} />
+                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-white/30 dark:bg-slate-700/70 backdrop-blur-md rounded-full flex items-center justify-center text-white text-[9px] opacity-80 group-hover:opacity-100">
+                        <MdDragIndicator size={10} />
                     </div>
                 </button>
 
                 {/* Floating Tooltip / Label */}
                 {!isOpen && (
                     <div className="absolute right-16 top-2 hidden group-hover:flex items-center gap-1 px-3 py-1.5 bg-slate-900 text-white rounded-xl text-xs font-bold whitespace-nowrap shadow-xl border border-slate-800 pointer-events-none">
-                        <span>Notepad</span>
+                        <span>Pinned Notepad</span>
                         <span className="text-[10px] opacity-60 font-mono">(Drag me)</span>
                     </div>
                 )}
@@ -170,23 +202,32 @@ const FloatingNotepad = () => {
                 <div 
                     className="fixed bottom-24 right-6 sm:right-10 w-[92vw] sm:w-[420px] h-[520px] max-h-[80vh] z-[9998] shadow-2xl rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col overflow-hidden animate-fade-in-up backdrop-blur-xl"
                 >
-                    {/* Window Header with Drag & Close controls */}
+                    {/* Window Header with Drag, Pin & Close controls */}
                     <div className="bg-slate-900 text-white px-4 py-2.5 flex items-center justify-between border-b border-slate-800 select-none">
                         <div className="flex items-center gap-2">
-                            <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
-                            <span className="text-xs font-black uppercase tracking-wider text-slate-300">Quick Notes Overlay</span>
+                            <span className={`w-2.5 h-2.5 rounded-full ${isPinned ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`}></span>
+                            <span className="text-xs font-black uppercase tracking-wider text-slate-300">
+                                {isPinned ? 'Pinned Notepad (Global Access)' : 'Quick Notes Overlay'}
+                            </span>
                         </div>
                         <div className="flex items-center gap-1">
                             <button
-                                onClick={() => setIsOpen(false)}
-                                className="p-1 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+                                onClick={togglePinned}
+                                className={`p-1.5 rounded-lg transition-colors ${isPinned ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
+                                title={isPinned ? "Pinned to Screen (Always Visible)" : "Click to Pin to Screen"}
+                            >
+                                <MdPushPin size={16} />
+                            </button>
+                            <button
+                                onClick={() => toggleOpen(false)}
+                                className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
                                 title="Minimize Notepad"
                             >
                                 <MdMinimize size={18} />
                             </button>
                             <button
-                                onClick={() => setIsOpen(false)}
-                                className="p-1 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+                                onClick={() => toggleOpen(false)}
+                                className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
                                 title="Close Notepad"
                             >
                                 <MdClose size={18} />
@@ -196,7 +237,7 @@ const FloatingNotepad = () => {
 
                     {/* Notepad Body */}
                     <div className="flex-1 overflow-hidden">
-                        <NotepadWidget isFloating={true} onClose={() => setIsOpen(false)} />
+                        <NotepadWidget isFloating={true} onClose={() => toggleOpen(false)} />
                     </div>
                 </div>
             )}

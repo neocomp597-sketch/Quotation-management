@@ -77,7 +77,7 @@ const EnquiryAnalytics = () => {
     const [stages, setStages] = useState([]);
     const [trends, setTrends] = useState([]);
     const [followUps, setFollowUps] = useState(null);
-    const [vendors, setVendors] = useState([]);
+    const [customers, setCustomers] = useState([]);
     const [products, setProducts] = useState([]);
     const [users, setUsers] = useState([]);
     const [probability, setProbability] = useState(null);
@@ -100,27 +100,36 @@ const EnquiryAnalytics = () => {
         try {
             const params = Object.fromEntries(Object.entries(filters).filter(([, v]) => v));
 
-            const [summaryRes, stagesRes, trendsRes, followUpsRes, vendorsRes, productsRes, usersRes, probRes, healthRes] = await Promise.all([
+            const results = await Promise.allSettled([
                 analyticsService.getSummary(params),
                 analyticsService.getStages(params),
                 analyticsService.getTrends(trendPeriod, params),
                 analyticsService.getFollowUps(params),
-                analyticsService.getVendors(params),
+                analyticsService.getCustomers(params),
                 analyticsService.getProducts(params),
                 analyticsService.getUsers(params),
                 analyticsService.getProbability(params),
                 analyticsService.getHealth(params)
             ]);
 
-            setSummary(summaryRes.data);
-            setStages(stagesRes.data);
-            setTrends(trendsRes.data);
-            setFollowUps(followUpsRes.data);
-            setVendors(vendorsRes.data);
-            setProducts(productsRes.data);
-            setUsers(usersRes.data);
-            setProbability(probRes.data);
-            setHealth(healthRes.data);
+            const [summaryRes, stagesRes, trendsRes, followUpsRes, customersRes, productsRes, usersRes, probRes, healthRes] = results;
+
+            if (summaryRes.status === 'fulfilled') setSummary(summaryRes.value.data);
+            if (stagesRes.status === 'fulfilled') setStages(stagesRes.value.data);
+            if (trendsRes.status === 'fulfilled') setTrends(trendsRes.value.data);
+            if (followUpsRes.status === 'fulfilled') setFollowUps(followUpsRes.value.data);
+            if (customersRes.status === 'fulfilled') setCustomers(customersRes.value.data);
+            if (productsRes.status === 'fulfilled') setProducts(productsRes.value.data);
+            if (usersRes.status === 'fulfilled') setUsers(usersRes.value.data);
+            if (probRes.status === 'fulfilled') setProbability(probRes.value.data);
+            if (healthRes.status === 'fulfilled') setHealth(healthRes.value.data);
+
+            const rejected = results.filter(r => r.status === 'rejected');
+            if (rejected.length === results.length) {
+                toast.error('Failed to load analytics');
+            } else if (rejected.length > 0) {
+                console.warn('Some analytics endpoints failed:', rejected.map(r => r.reason));
+            }
         } catch (err) {
             toast.error('Failed to load analytics');
             console.error(err);
@@ -170,10 +179,10 @@ const EnquiryAnalytics = () => {
         // Stages sheet
         sheets['Stages'] = [['Status', 'Count'], ...stages.map(s => [s.stage, s.count])];
 
-        // Vendors sheet
-        sheets['Vendors'] = [
-            ['Vendor', 'Quotes', 'Wins', 'Win Ratio (%)'],
-            ...vendors.map(v => [v._id || 'Unknown', v.quoteCount, v.winCount, v.winRatio || 0])
+        // Customers sheet
+        sheets['Customers'] = [
+            ['Customer Name', 'Enquiries', 'Won', 'Lost', 'In Progress', 'Conversion (%)', 'Avg Prob (%)'],
+            ...customers.map(c => [c.customerName || 'Unknown', c.enquiryCount, c.wonCount, c.lostCount, c.inProgressCount, c.conversionRate || 0, c.avgProbability || 0])
         ];
 
         // Products sheet
@@ -436,38 +445,49 @@ const EnquiryAnalytics = () => {
         </div>
     );
 
-    // Tab: Vendors
-    const renderVendors = () => (
+    // Tab: Customers
+    const renderCustomers = () => (
         <div className="space-y-6">
-            {vendors.length > 0 && (
+            {customers.length > 0 ? (
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 overflow-x-auto">
-                    <h3 className="text-sm font-black text-slate-900 mb-4">Vendor Performance</h3>
+                    <h3 className="text-sm font-black text-slate-900 mb-4">Customer Intelligence & Performance</h3>
                     <table className="w-full text-left text-sm">
                         <thead>
                             <tr className="border-b border-slate-100 bg-slate-50">
-                                <th className="py-3 px-4 font-black text-slate-600">Vendor</th>
-                                <th className="py-3 px-4 font-black text-slate-600 text-right">Quotes</th>
-                                <th className="py-3 px-4 font-black text-slate-600 text-right">Wins</th>
-                                <th className="py-3 px-4 font-black text-slate-600 text-right">Win Ratio</th>
-                                <th className="py-3 px-4 font-black text-slate-600 text-right">Avg Price</th>
+                                <th className="py-3 px-4 font-black text-slate-600">Customer Name</th>
+                                <th className="py-3 px-4 font-black text-slate-600 text-right">Total Enquiries</th>
+                                <th className="py-3 px-4 font-black text-slate-600 text-right">Won</th>
+                                <th className="py-3 px-4 font-black text-slate-600 text-right">Lost</th>
+                                <th className="py-3 px-4 font-black text-slate-600 text-right">In Progress</th>
+                                <th className="py-3 px-4 font-black text-slate-600 text-right">Conversion Rate</th>
+                                <th className="py-3 px-4 font-black text-slate-600 text-right">Avg Probability</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
-                            {vendors.map(v => (
-                                <tr key={v._id} className="hover:bg-slate-50 transition-colors">
-                                    <td className="py-3 px-4 font-bold text-slate-900">{v._id || 'Unknown'}</td>
-                                    <td className="py-3 px-4 text-right text-slate-700">{v.quoteCount}</td>
-                                    <td className="py-3 px-4 text-right font-bold text-emerald-600">{v.winCount}</td>
+                            {customers.map(c => (
+                                <tr key={c._id || c.customerName} className="hover:bg-slate-50 transition-colors">
+                                    <td className="py-3 px-4 font-bold text-slate-900">
+                                        <div>{c.customerName || 'Unknown Customer'}</div>
+                                        {c.email && <div className="text-xs text-slate-400 font-normal">{c.email}</div>}
+                                    </td>
+                                    <td className="py-3 px-4 text-right text-slate-700 font-bold">{c.enquiryCount}</td>
+                                    <td className="py-3 px-4 text-right font-bold text-emerald-600">{c.wonCount}</td>
+                                    <td className="py-3 px-4 text-right font-bold text-rose-600">{c.lostCount}</td>
+                                    <td className="py-3 px-4 text-right font-bold text-amber-600">{c.inProgressCount}</td>
                                     <td className="py-3 px-4 text-right">
-                                        <span className="text-xs font-black px-2 py-1 rounded bg-blue-100 text-blue-700">
-                                            {v.winRatio}%
+                                        <span className="text-xs font-black px-2 py-1 rounded bg-emerald-100 text-emerald-700">
+                                            {c.conversionRate}%
                                         </span>
                                     </td>
-                                    <td className="py-3 px-4 text-right text-slate-700">₹{Math.round(v.avgPrice || 0)}</td>
+                                    <td className="py-3 px-4 text-right font-bold text-slate-700">{c.avgProbability}%</td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
+                </div>
+            ) : (
+                <div className="text-center py-12 bg-slate-50 rounded-xl text-slate-500 font-bold text-sm">
+                    No customer enquiry data found for selected period.
                 </div>
             )}
         </div>
@@ -760,7 +780,7 @@ const EnquiryAnalytics = () => {
                 {[
                     { id: 'dashboard', label: 'Dashboard', icon: MdDashboard },
                     { id: 'followups', label: 'Follow-ups', icon: MdPhone },
-                    { id: 'vendors', label: 'Vendors', icon: MdPieChart },
+                    { id: 'customers', label: 'Customers', icon: MdPeople },
                     { id: 'products', label: 'Products', icon: MdLocalOffer },
                     { id: 'users', label: 'Salespersons', icon: MdPerson },
                     { id: 'probability', label: 'Probability', icon: MdTrendingUp },
@@ -795,7 +815,7 @@ const EnquiryAnalytics = () => {
                     <>
                         {activeTab === 'dashboard' && renderDashboard()}
                         {activeTab === 'followups' && renderFollowups()}
-                        {activeTab === 'vendors' && renderVendors()}
+                        {activeTab === 'customers' && renderCustomers()}
                         {activeTab === 'products' && renderProducts()}
                         {activeTab === 'users' && renderUsers()}
                         {activeTab === 'probability' && renderProbability()}

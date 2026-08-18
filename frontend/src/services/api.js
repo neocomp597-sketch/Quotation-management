@@ -556,6 +556,7 @@ export const analyticsService = {
   getTrends: (period, params) =>
     api.get("/analytics/trends", { params: { period, ...params } }),
   getFollowUps: (params) => api.get("/analytics/followups", { params }),
+  getCustomers: (params) => api.get("/analytics/customers", { params }),
   getVendors: (params) => api.get("/analytics/vendors", { params }),
   getProducts: (params) => api.get("/analytics/products", { params }),
   getUsers: (params) => api.get("/analytics/users", { params }),

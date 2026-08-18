@@ -18277,5 +18277,23 @@
     "customerName": "shruti bhamare",
     "companyName": "JD buzz",
     "gstin": ""
+  },
+  {
+    "_id": "6a8332e008ac170f066570ce",
+    "customerName": "raj kere",
+    "companyName": "ZOMAYO",
+    "gstin": "27DFRGV1245K1Z2"
+  },
+  {
+    "_id": "6a8407c360a637b834fdc691",
+    "customerName": "SUDARSHAN",
+    "companyName": "PAARTH PVT.LTD",
+    "gstin": "23GFHTJ1200N1Z5"
+  },
+  {
+    "_id": "6a84335b60a637b834fdcf1c",
+    "customerName": "RD",
+    "companyName": "Eton",
+    "gstin": ""
   }
 ]

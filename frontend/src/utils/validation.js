@@ -27,13 +27,13 @@ export const sanitizePhoneNumber = (val) => {
 
 /**
  * Validates Indian GSTIN (15 characters)
- * Standard pattern: 2 digits state code + 5 chars PAN + 4 digits + 1 char + 1 entity code + Z + 1 check digit
+ * Standard pattern: 2-digit state code (01-37, 38, 97, 99) + 5 chars PAN + 4 digits + 1 char + 1 entity code + Z + 1 check digit
  */
 export const isValidGSTIN = (gstin) => {
     if (!gstin) return true; // Optional if empty
     const cleanGST = String(gstin).trim().toUpperCase();
     if (cleanGST.length !== 15) return false;
-    const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+    const gstRegex = /^(0[1-9]|[1-2][0-9]|3[0-8]|97|99)[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
     return gstRegex.test(cleanGST);
 };
 
