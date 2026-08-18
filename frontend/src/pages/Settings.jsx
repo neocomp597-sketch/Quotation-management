@@ -1,15 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { MdBusiness, MdPerson, MdLocationOn, MdAccountBalance, MdDescription, MdCloudUpload, MdSave, MdEdit, MdVisibility, MdVisibilityOff, MdColorLens } from 'react-icons/md';
+import { MdBusiness, MdPerson, MdLocationOn, MdAccountBalance, MdDescription, MdCloudUpload, MdSave, MdEdit, MdVisibility, MdVisibilityOff, MdColorLens, MdAccountTree } from 'react-icons/md';
 import { userService, companySettingsService, uploadService, footerPageService } from '../services/api';
 import { resolveImageUrl } from '../utils/helpers';
 import { useAuth } from '../context/AuthContext';
 import { ROLE_LABELS } from '../constants/menuPermissions';
 import RichTextEditor from '../components/RichTextEditor';
+import OrgChart from './OrgChart';
 
 const Settings = () => {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const { user: authUser, refreshSession } = useAuth();
     const [activeTab, setActiveTab] = useState('profile');
     const [loading, setLoading] = useState(false);
@@ -260,8 +262,16 @@ const [logoUploading, setLogoUploading] = useState(false);
         }
     };
 
+    useEffect(() => {
+        const tabParam = searchParams.get('tab');
+        if (tabParam) {
+            setActiveTab(tabParam);
+        }
+    }, [searchParams]);
+
     const tabs = [
-        { id: 'profile', label: 'Profile', icon: MdPerson }
+        { id: 'profile', label: 'Profile', icon: MdPerson },
+        { id: 'org-chart', label: 'Org Chart & My Team', icon: MdAccountTree }
     ];
     if (isAdminOrManager) {
         tabs.push(
@@ -392,6 +402,13 @@ const [logoUploading, setLogoUploading] = useState(false);
                             </button>
                         </div>
                     </form>
+                </div>
+            )}
+
+            {/* Org Chart & My Team Tab */}
+            {activeTab === 'org-chart' && (
+                <div className="bg-white dark:bg-slate-900 rounded-[2rem] shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden p-4 md:p-6">
+                    <OrgChart />
                 </div>
             )}
 

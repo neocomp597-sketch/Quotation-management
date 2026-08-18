@@ -27,7 +27,7 @@ const OrgChart = () => {
     const canViewFullChart = useMemo(() => {
         if (!user) return false;
         const roleStr = String(user.role || '').toLowerCase();
-        return isAdmin || isSuperAdmin || hasAccess('payroll_org_chart') || ['admin', 'super_admin', 'superadmin', 'manager', 'hr', 'hr_manager'].includes(roleStr);
+        return isAdmin || isSuperAdmin || hasAccess('payroll_org_chart_full') || ['admin', 'super_admin', 'superadmin', 'hr', 'hr_manager'].includes(roleStr);
     }, [user, isAdmin, isSuperAdmin, hasAccess]);
 
     const canEditOrgChart = useMemo(() => {

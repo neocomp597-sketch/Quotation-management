@@ -117,7 +117,7 @@ const Authorization = () => {
     if (!isAdmin && !isSuperAdmin) return <Navigate to="/dashboard" replace />;
 
     const existingAdmin = users.find((u) => u.role === 'admin');
-    const displayGroups = menuGroups.length ? menuGroups : MENU_PERMISSION_GROUPS;
+    const displayGroups = MENU_PERMISSION_GROUPS;
     
     const enabledCount = (perms = {}) => displayGroups.reduce((count, group) => {
         const childKeys = childKeysFor(group);

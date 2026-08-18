@@ -205,6 +205,12 @@ export const AuthProvider = ({ children }) => {
             return ['master_products', 'sales_catalog', 'voucher_list', 'vouchers', 'purchase_grn', 'settings', 'settings_profile'].includes(permissionKey);
         }
 
+        if (permissionKey === 'payroll_org_chart' || permissionKey === 'master_org_chart') {
+            if (permissions?.payroll_org_chart || permissions?.master_org_chart || permissions?.master) {
+                return true;
+            }
+        }
+
         if (Object.prototype.hasOwnProperty.call(permissions || {}, permissionKey)) {
             return Boolean(permissions?.[permissionKey]);
         }

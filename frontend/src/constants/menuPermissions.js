@@ -16,6 +16,7 @@ export const MENU_PERMISSION_GROUPS = [
         children: [
             { key: 'master_customers', label: 'Customers', description: 'Customer master records', defaultRoute: '/customers' },
             { key: 'payroll_org_chart', label: 'Org Chart', description: 'Employee hierarchy and org chart module', defaultRoute: '/payroll/org-chart' },
+            { key: 'payroll_org_chart_full', label: 'Full Org Chart View', description: 'Full company org chart access', defaultRoute: '/payroll/org-chart' },
             { key: 'master_vendors', label: 'Vendors', description: 'Vendor master records', defaultRoute: '/vendors' },
             { key: 'master_contacts', label: 'Contacts', description: 'Contact management records', defaultRoute: '/contacts' },
             { key: 'master_products', label: 'Products', description: 'Product master records', defaultRoute: '/products' },
@@ -157,7 +158,8 @@ export const MENU_PERMISSION_GROUPS = [
         children: [
             { key: 'payroll_payslips', label: 'My Payslips', description: 'View and download monthly payslips', defaultRoute: '/payroll/payslips' },
             { key: 'payroll_employees', label: 'Employees', description: 'Employee salary profiles and base structures', defaultRoute: '/payroll/employees' },
-            { key: 'payroll_org_chart', label: 'Org Chart', description: 'Employee hierarchy and org chart module', defaultRoute: '/payroll/org-chart' },
+            { key: 'payroll_org_chart', label: 'Org Chart (My Team View)', description: 'View employee hierarchy and direct team', defaultRoute: '/payroll/org-chart' },
+            { key: 'payroll_org_chart_full', label: 'Org Chart (Full Company View)', description: 'View full company organizational hierarchy', defaultRoute: '/payroll/org-chart' },
             { key: 'payroll_masters', label: 'Department & Designation Masters', description: 'Manage departments and designations', defaultRoute: '/payroll/masters' },
             { key: 'payroll_runs', label: 'Run Payroll', description: 'Run and calculate monthly payroll', defaultRoute: '/payroll/runs' },
             { key: 'payroll_payments', label: 'Payments', description: 'Record employee payments', defaultRoute: '/payroll/payments' },

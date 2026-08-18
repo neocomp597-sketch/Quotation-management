@@ -64,6 +64,7 @@ exports.getAuthorizationMatrix = async (req, res) => {
         const allDocs = [...syntheticBuiltIns, ...documents];
         const roles   = allDocs.map(buildRolePayload);
 
+        // Send updated MENU_GROUPS including Org Chart under Master
         res.json({ menuGroups: MENU_GROUPS, roles });
     } catch (error) {
         console.error('getAuthorizationMatrix error:', error);

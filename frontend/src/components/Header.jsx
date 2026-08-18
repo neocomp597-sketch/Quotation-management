@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { MdSearch, MdNotifications, MdLogout, MdMenu, MdSettings, MdCheck, MdInfoOutline, MdWbSunny, MdNightsStay, MdSync, MdExpandMore, MdExpandLess } from 'react-icons/md';
+import { MdSearch, MdNotifications, MdLogout, MdMenu, MdSettings, MdCheck, MdInfoOutline, MdWbSunny, MdNightsStay, MdSync, MdExpandMore, MdExpandLess, MdStickyNote2 } from 'react-icons/md';
 import { useNavigate, Link } from 'react-router-dom';
 import { notificationService, systemUpdateService, enquiryService } from '../services/api';
 import { toast } from 'react-toastify';
@@ -49,6 +49,7 @@ const searchablePages = [
     { label: 'Branch Master', path: '/branches', keywords: ['branch', 'office', 'branches', 'branch master'] },
     { label: 'Serial No. Master', path: '/serial-no-master', permissionKey: 'master_serials', keywords: ['serial number', 'assets', 'stock serials'] },
     { label: 'Settings', path: '/settings', permissionKey: 'settings_profile', keywords: ['profile'] },
+    { label: 'Org Chart & My Team', path: '/settings?tab=org-chart', permissionKey: 'payroll_org_chart', keywords: ['org chart', 'my team', 'team', 'hierarchy', 'tree'] },
     { label: 'Authorization', path: '/admin/authorization', permissionKey: 'admin_authorization', keywords: ['permissions', 'roles'] },
     { label: 'Salespersons', path: '/salespersons', permissionKey: 'admin_salespersons', adminOnly: true, keywords: ['sales person'] },
     { label: 'Sales Dashboard', path: '/sales/dashboard', permissionKey: 'sales_dashboard', keywords: ['sales overview'] },
@@ -383,6 +384,7 @@ const moduleSubmodulesMap = {
     ],
     '/settings': [
         { label: 'Profile & Preferences', path: '/settings' },
+        { label: 'Org Chart & My Team', path: '/settings?tab=org-chart' },
         { label: 'System Configuration', path: '/settings' }
     ],
     '/status-master': [
@@ -789,6 +791,16 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
                             ) : (
                                 <MdWbSunny size={20} className="text-amber-500" />
                             )}
+                        </button>
+
+                        {/* Notepad Quick Notes Button (Right beside Night Mode button) */}
+                        <button
+                            type="button"
+                            onClick={() => window.dispatchEvent(new CustomEvent('toggle-floating-notepad'))}
+                            title="Quick Notepad"
+                            className="p-2.5 rounded-2xl bg-gradient-to-br from-amber-500 via-orange-500 to-amber-600 text-white hover:scale-105 shadow-md shadow-orange-500/20 transition-all flex items-center justify-center border border-amber-400/30"
+                        >
+                            <MdStickyNote2 size={20} />
                         </button>
 
                         {/* Information (i) Button */}

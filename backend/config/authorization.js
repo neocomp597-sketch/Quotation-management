@@ -13,6 +13,8 @@ const MENU_GROUPS = [
         description: 'Customers, vendors, products, MGRs, attributes and terms',
         children: [
             { key: 'master_customers', label: 'Customers', description: 'Customer master records' },
+            { key: 'payroll_org_chart', label: 'Org Chart', description: 'Employee hierarchy and org chart module' },
+            { key: 'payroll_org_chart_full', label: 'Full Org Chart View', description: 'Full company org chart access' },
             { key: 'master_vendors', label: 'Vendors', description: 'Vendor master records' },
             { key: 'master_products', label: 'Products', description: 'Product master records' },
             { key: 'master_mgrs', label: 'MGRs', description: 'MGR master hierarchy' },
