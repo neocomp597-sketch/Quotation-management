@@ -186,11 +186,30 @@ export const AuthProvider = ({ children }) => {
             return true;
         }
 
-        if (user.role === "admin" || user.role === "Admin") {
+        if (!permissionKey) {
             return true;
         }
 
-        if (!permissionKey) {
+        const isAdminUser = user.role === "admin" || user.role === "Admin";
+        if (isAdminUser) {
+            // Always allow authorization matrix and core settings so admin is never locked out of administrative control
+            if (['admin_authorization', 'admin', 'settings', 'settings_profile'].includes(permissionKey)) {
+                return true;
+            }
+            if (permissions && Object.keys(permissions).length > 0) {
+                if (Object.prototype.hasOwnProperty.call(permissions, permissionKey)) {
+                    return Boolean(permissions[permissionKey]);
+                }
+                const group = MENU_PERMISSION_GROUPS.find((item) =>
+                    item.key === permissionKey || (item.children || []).some((child) => child.key === permissionKey)
+                );
+                if (group) {
+                    if (group.key === permissionKey) {
+                        return Boolean(permissions[group.key]) || (group.children || []).some((child) => Boolean(permissions[child.key]));
+                    }
+                    return Boolean(permissions[group.key]);
+                }
+            }
             return true;
         }
 

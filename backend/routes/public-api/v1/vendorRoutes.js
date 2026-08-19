@@ -82,6 +82,8 @@ router.get('/:id', requireApiScope('vendors.read'), async (req, res) => {
     }
 });
 
+const { syncUserForVendor } = require('../../../services/vendorUserService');
+
 // POST /api/v1/vendors - Create vendor
 router.post('/', requireApiScope('vendors.write'), async (req, res) => {
     try {
@@ -102,6 +104,10 @@ router.post('/', requireApiScope('vendors.write'), async (req, res) => {
         });
 
         await newVendor.save();
+
+        if (newVendor.email) {
+            await syncUserForVendor(newVendor);
+        }
 
         const formatted = {
             id: newVendor._id,

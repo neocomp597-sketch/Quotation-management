@@ -260,11 +260,7 @@ const sanitizePermissions = (input = {}) => {
  * For other roles, stored child permissions are respected.
  */
 const resolvePermissions = (role, storedPermissions = {}) => {
-    if (role === 'admin') {
-        return { ...DEFAULT_ROLE_PERMISSIONS.admin };
-    }
-
-    const defaults = DEFAULT_ROLE_PERMISSIONS[role] || buildPermissions([]);
+    const defaults = DEFAULT_ROLE_PERMISSIONS[role] || DEFAULT_ROLE_PERMISSIONS.admin;
 
     return MENU_GROUPS.reduce((permissions, group) => {
         const childKeys = (group.children || []).map((child) => child.key);

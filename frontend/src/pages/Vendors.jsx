@@ -176,10 +176,16 @@ const Vendors = ({ isCreatePage, isEditPage }) => {
         } else if (name === 'phone') {
             val = value.replace(/[^\d]/g, '').slice(0, 10);
         }
-        setFormData((prev) => ({
-            ...prev,
-            [name]: type === 'checkbox' ? checked : val
-        }));
+        setFormData((prev) => {
+            const next = {
+                ...prev,
+                [name]: type === 'checkbox' ? checked : val
+            };
+            if (name === 'email' && (!prev.username || prev.username === prev.email)) {
+                next.username = val;
+            }
+            return next;
+        });
     };
 
     const onSubmit = async (e) => {
@@ -510,7 +516,7 @@ const Vendors = ({ isCreatePage, isEditPage }) => {
                                             </div>
                                             <div className="space-y-1.5">
                                                 <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
-                                                    {editingVendor ? 'New Password (leave empty to keep current)' : 'Password *'}
+                                                    {editingVendor ? 'New Password (leave empty to keep current)' : 'Password (Default: 123456)'}
                                                 </label>
                                                 <input
                                                     type="password"

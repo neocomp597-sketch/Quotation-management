@@ -15,6 +15,7 @@ const getPagination = (query) => {
 
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
+const { syncUserForVendor } = require('../services/vendorUserService');
 
 const createVendor = async (req, res) => {
     try {
@@ -26,13 +27,13 @@ const createVendor = async (req, res) => {
 
         const isLoginEnabled = loginEnabled !== false; // Auto-login enabled by default
         const effectiveEmail = (username || email || '').trim().toLowerCase();
-        const rawPassword = (password && String(password).trim().length > 0) ? String(password).trim() : '1-6';
+        const rawPassword = (password && String(password).trim().length >= 6) ? String(password).trim() : '123456';
 
         const vendor = await Vendor.create({
             name: name.trim(),
             contactPerson,
             phone,
-            email,
+            email: email ? String(email).trim().toLowerCase() : effectiveEmail,
             address,
             gstin,
             isActive: isActive !== false,
@@ -40,29 +41,8 @@ const createVendor = async (req, res) => {
             username: effectiveEmail
         });
 
-        if (isLoginEnabled && effectiveEmail) {
-            let user = await User.findOne({ email: effectiveEmail });
-            const salt = await bcrypt.genSalt(10);
-            const passwordHash = await bcrypt.hash(rawPassword, salt);
-
-            if (!user) {
-                user = await User.create({
-                    name: vendor.name,
-                    email: effectiveEmail,
-                    passwordHash,
-                    role: 'vendor',
-                    companyId: req.user?.companyId || vendor.companyId,
-                    vendorId: vendor._id
-                });
-            } else {
-                user.role = 'vendor';
-                user.vendorId = vendor._id;
-                user.passwordHash = passwordHash;
-                await user.save();
-            }
-            vendor.vendorUserId = user._id;
-            vendor.passwordHash = passwordHash;
-            await vendor.save();
+        if (effectiveEmail) {
+            await syncUserForVendor(vendor, rawPassword);
         }
 
         res.status(201).json(vendor);
@@ -162,44 +142,15 @@ const updateVendor = async (req, res) => {
         if (typeof loginEnabled !== 'undefined') vendor.loginEnabled = Boolean(loginEnabled);
         if (typeof username !== 'undefined') vendor.username = String(username).trim().toLowerCase();
 
-        if (vendor.loginEnabled) {
-            const loginEmail = (username || email || vendor.username || vendor.email || '').trim().toLowerCase();
-            if (!loginEmail) {
-                return res.status(400).json({ message: 'Email or username is required for enabling login' });
-            }
+        await vendor.save();
 
-            let user = vendor.vendorUserId ? await User.findById(vendor.vendorUserId) : await User.findOne({ email: loginEmail });
-            if (!user) {
-                if (!password || password.length < 6) {
-                    return res.status(400).json({ message: 'Password (min 6 chars) is required when enabling login for a new vendor user' });
-                }
-                const salt = await bcrypt.genSalt(10);
-                const passwordHash = await bcrypt.hash(password, salt);
-                user = await User.create({
-                    name: vendor.name,
-                    email: loginEmail,
-                    passwordHash,
-                    role: 'vendor',
-                    companyId: req.user?.companyId || vendor.companyId,
-                    vendorId: vendor._id
-                });
-            } else {
-                user.role = 'vendor';
-                user.vendorId = vendor._id;
-                user.email = loginEmail;
-                if (password && password.length >= 6) {
-                    const salt = await bcrypt.genSalt(10);
-                    user.passwordHash = await bcrypt.hash(password, salt);
-                }
-                await user.save();
-            }
-            vendor.vendorUserId = user._id;
-        } else if (vendor.vendorUserId) {
-            // Deactivate vendor user account if login disabled
+        const loginEmail = (vendor.username || vendor.email || '').trim().toLowerCase();
+        if (vendor.loginEnabled && loginEmail) {
+            await syncUserForVendor(vendor, password || null);
+        } else if (!vendor.loginEnabled && vendor.vendorUserId) {
             await User.findByIdAndUpdate(vendor.vendorUserId, { isActive: false, status: false });
         }
 
-        await vendor.save();
         res.json(vendor);
     } catch (error) {
         console.error('Update vendor error:', error);

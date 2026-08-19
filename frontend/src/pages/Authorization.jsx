@@ -29,7 +29,7 @@ const buildPermissionsFromEnabledSections = (groups, enabledSections = []) => {
 };
 
 const Authorization = () => {
-    const { user: currentUser, isAdmin, isSuperAdmin } = useAuth();
+    const { user: currentUser, isAdmin, isSuperAdmin, refreshSession } = useAuth();
 
     const [roles, setRoles] = useState([]);
     const [menuGroups, setMenuGroups] = useState([]);
@@ -176,6 +176,9 @@ const Authorization = () => {
             const saved = res.data?.permissions || next;
             setRoles((prev) => prev.map((r) => r.role === roleKey ? { ...r, permissions: saved } : r));
             setStatusByRole((prev) => ({ ...prev, [roleKey]: 'saved' }));
+            if (roleKey === currentUser?.role || (roleKey === 'admin' && isAdmin)) {
+                await refreshSession();
+            }
         } catch (err) {
             setRoles((prev) => prev.map((r) => r.role === roleKey ? { ...r, permissions: roleObj.permissions } : r));
             setStatusByRole((prev) => ({ ...prev, [roleKey]: 'error' }));
@@ -199,6 +202,9 @@ const Authorization = () => {
             const res = await authorizationService.update(roleKey, defaults, params);
             setRoles((prev) => prev.map((r) => r.role === roleKey ? { ...r, permissions: res.data?.permissions || defaults } : r));
             setStatusByRole((prev) => ({ ...prev, [roleKey]: 'saved' }));
+            if (roleKey === currentUser?.role || (roleKey === 'admin' && isAdmin)) {
+                await refreshSession();
+            }
             toast.success('Permissions reset');
         } catch (err) {
             setStatusByRole((prev) => ({ ...prev, [roleKey]: 'error' }));

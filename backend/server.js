@@ -909,6 +909,13 @@ const startBackgroundServices = async () => {
       console.error('[Auto User Sync Startup Error]:', syncErr.message);
   }
 
+  try {
+      const { syncUsersForExistingVendors } = require("./services/vendorUserService");
+      await syncUsersForExistingVendors();
+  } catch (vendorSyncErr) {
+      console.error('[Vendor User Sync Startup Error]:', vendorSyncErr.message);
+  }
+
   if (redisReady) {
     await startCacheInvalidationWorker();
     await startAuthSessionWorker();
@@ -1006,6 +1013,11 @@ if (require.main === module) {
         const prodOutput = products.map(p => `ID: ${p._id}, code: ${p.productCode}, name: ${p.productName}, price: ${p.basePrice}`).join('\n');
         require('fs').writeFileSync(require('path').join(__dirname, 'debug_products.txt'), `Total products: ${products.length}\n${prodOutput}`);
         console.log("[DEBUG] Written products to debug_products.txt");
+        // Auto sync vendor users
+        const { syncUsersForExistingVendors } = require('./services/vendorUserService');
+        const syncRes = await syncUsersForExistingVendors();
+        require('fs').writeFileSync(require('path').join(__dirname, 'vendor_sync_debug.txt'), JSON.stringify(syncRes, null, 2));
+        console.log('[DEBUG] Vendor user sync completed:', syncRes);
     } catch (err) {
         require('fs').writeFileSync(require('path').join(__dirname, 'debug_error.txt'), `Error: ${err.message}\nStack: ${err.stack}`);
         console.error("[DEBUG] Error writing quotations/products:", err);

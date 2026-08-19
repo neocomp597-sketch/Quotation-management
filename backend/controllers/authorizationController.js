@@ -28,15 +28,14 @@ const toPermissionObject = (menuVisibility) => {
 
 const buildRolePayload = (doc) => {
     const roleKey = doc.role;
-    const isAdmin = roleKey === 'admin';
     const rawPerms = toPermissionObject(doc.menuVisibility);
     return {
         role:        roleKey,
         label:       doc.label || ROLE_LABELS[roleKey] || roleKey,
         description: doc.description || '',
-        locked:      isAdmin,
+        locked:      false,
         isCustom:    doc.isCustom || false,
-        permissions: isAdmin ? { ...DEFAULT_ROLE_PERMISSIONS.admin } : resolvePermissions(roleKey, rawPerms)
+        permissions: resolvePermissions(roleKey, rawPerms)
     };
 };
 
@@ -76,9 +75,7 @@ exports.getAuthorizationMatrix = async (req, res) => {
 exports.getMyPermissions = async (req, res) => {
     try {
         const role     = req.user?.role || 'sales';
-        const document = role === 'admin'
-            ? null
-            : await RolePermission.findOne({ role }).select('menuVisibility').lean();
+        const document = await RolePermission.findOne({ role }).select('menuVisibility').lean();
         res.json({
             role,
             menuGroups:  MENU_GROUPS,
@@ -94,9 +91,6 @@ exports.getMyPermissions = async (req, res) => {
 exports.updateRolePermissions = async (req, res) => {
     try {
         const { role } = req.params;
-        if (role === 'admin') {
-            return res.status(400).json({ message: 'Admin permissions are locked and cannot be edited.' });
-        }
 
         const sanitizedPermissions = sanitizePermissions(req.body?.permissions || {});
         const doc = await RolePermission.findOneAndUpdate(
@@ -189,7 +183,7 @@ exports.deleteRole = async (req, res) => {
 // ─── POST /authorization/initialize ───────────────────────────────────────
 exports.initializeDefaults = async (req, res) => {
     try {
-        const rolesToSeed = ROLE_OPTIONS.filter((r) => r !== 'admin');
+        const rolesToSeed = ROLE_OPTIONS;
         const results = [];
         for (const role of rolesToSeed) {
             const defaultPerms = sanitizePermissions(DEFAULT_ROLE_PERMISSIONS[role] || {});
