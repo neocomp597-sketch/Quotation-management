@@ -204,11 +204,15 @@ const Vendors = ({ isCreatePage, isEditPage }) => {
         }
 
         try {
+            const payload = {
+                ...formData,
+                username: formData.email ? formData.email.trim() : formData.username
+            };
             if (editingVendor) {
-                await vendorService.update(editingVendor._id, formData);
+                await vendorService.update(editingVendor._id, payload);
                 toast.success('Vendor updated successfully');
             } else {
-                await vendorService.create(formData);
+                await vendorService.create(payload);
                 toast.success('Vendor created successfully');
             }
             setIsModalOpen(false);
@@ -498,37 +502,8 @@ const Vendors = ({ isCreatePage, isEditPage }) => {
                                         <span>Provide Vendor Portal Login Access</span>
                                     </label>
                                     <p className="text-xs text-slate-500 font-medium ml-8">
-                                        Enabling login allows this vendor to access their product catalog and view their invoice vouchers.
+                                        Enabling login allows this vendor to access their product catalog and view their invoice vouchers using their email address with default password (<strong>123456</strong>).
                                     </p>
-
-                                    {formData.loginEnabled && (
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-slate-200/60 mt-3">
-                                            <div className="space-y-1.5">
-                                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Login Email / Username *</label>
-                                                <input
-                                                    type="email"
-                                                    name="username"
-                                                    value={formData.username}
-                                                    onChange={onChange}
-                                                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold outline-none"
-                                                    placeholder="vendor@company.com"
-                                                />
-                                            </div>
-                                            <div className="space-y-1.5">
-                                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
-                                                    {editingVendor ? 'New Password (leave empty to keep current)' : 'Password (Default: 123456)'}
-                                                </label>
-                                                <input
-                                                    type="password"
-                                                    name="password"
-                                                    value={formData.password}
-                                                    onChange={onChange}
-                                                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold outline-none"
-                                                    placeholder="••••••••"
-                                                />
-                                            </div>
-                                        </div>
-                                    )}
                                 </div>
 
                                 <label className="flex items-center gap-2 text-xs font-bold text-slate-600 pt-2">
