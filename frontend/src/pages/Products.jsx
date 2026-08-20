@@ -925,74 +925,76 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
 
             <div className="mobile-master-shell bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
                 {/* MGR Filters Section */}
-                <div className="mobile-master-toolbar px-6 py-6 border-b border-slate-50 bg-white">
-                    <div className="space-y-6">
-                        <div className="flex flex-wrap gap-4">
-                            {[1, 2, 3, 4, 5].map(num => {
-                                const mgrKey = `mgr${num}`;
-                                const usedOptions = getUsedMGRs(mgrKey);
-                                return (
-                                    <div key={mgrKey} className="flex-1 min-w-[140px]">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">Filter MGR {num}</label>
-                                        <select
-                                            name={mgrKey}
-                                            value={mgrFilters[mgrKey]}
-                                            onChange={handleMgrFilterChange}
-                                            className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none text-[11px] font-bold appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2210%22%20height%3D%226%22%20viewBox%3D%220%200%2010%206%22%20fill%3D%22none%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Cpath%20d%3D%22M1%201L5%205L9%201%22%20stroke%3D%22%2394A3B8%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22/%3E%3C/svg%3E')] bg-[length:12px_8px] bg-[right_1rem_center] bg-no-repeat focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all cursor-pointer"
-                                        >
-                                            <option value="">All MGR {num}</option>
-                                            {usedOptions.map(m => (
-                                                <option key={m._id} value={m._id}>{m.code}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                );
-                            })}
-                            <div className="flex items-end flex-shrink-0">
-                                <button
-                                    onClick={clearFilters}
-                                    className="px-4 py-2 text-[10px] font-black text-rose-600 uppercase tracking-widest hover:bg-rose-50 rounded-xl transition-all"
-                                >
-                                    Clear All
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Attribute Filters */}
-                        {mgrFilters.mgr3 && allFilterAttributes.length > 0 && (
-                            <div className="pt-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-4 block">Filter by Attributes</label>
-                                <div className="space-y-4">
-                                    {Object.entries(
-                                        allFilterAttributes.reduce((acc, attr) => {
-                                            if (!acc[attr.code]) acc[attr.code] = [];
-                                            acc[attr.code].push(attr);
-                                            return acc;
-                                        }, {})
-                                    ).map(([code, attrs]) => (
-                                        <div key={code} className="flex flex-col gap-2">
-                                            <span className="text-[9px] font-black text-primary-600/60 uppercase tracking-widest ml-1">{code}</span>
-                                            <div className="flex flex-wrap gap-2">
-                                                {attrs.map(attr => (
-                                                    <button
-                                                        key={attr._id}
-                                                        onClick={() => handleAttributeFilterChange(attr._id)}
-                                                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all border ${attributeFilters[attr._id]
-                                                                ? 'bg-primary-600 text-white border-primary-600 shadow-sm'
-                                                                : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
-                                                            }`}
-                                                    >
-                                                        {attr.description}
-                                                    </button>
+                {!isVendorUser && (
+                    <div className="mobile-master-toolbar px-6 py-6 border-b border-slate-50 bg-white">
+                        <div className="space-y-6">
+                            <div className="flex flex-wrap gap-4">
+                                {[1, 2, 3, 4, 5].map(num => {
+                                    const mgrKey = `mgr${num}`;
+                                    const usedOptions = getUsedMGRs(mgrKey);
+                                    return (
+                                        <div key={mgrKey} className="flex-1 min-w-[140px]">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">Filter MGR {num}</label>
+                                            <select
+                                                name={mgrKey}
+                                                value={mgrFilters[mgrKey]}
+                                                onChange={handleMgrFilterChange}
+                                                className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none text-[11px] font-bold appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2210%22%20height%3D%226%22%20viewBox%3D%220%200%2010%206%22%20fill%3D%22none%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Cpath%20d%3D%22M1%201L5%205L9%201%22%20stroke%3D%22%2394A3B8%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22/%3E%3C/svg%3E')] bg-[length:12px_8px] bg-[right_1rem_center] bg-no-repeat focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all cursor-pointer"
+                                            >
+                                                <option value="">All MGR {num}</option>
+                                                {usedOptions.map(m => (
+                                                    <option key={m._id} value={m._id}>{m.code}</option>
                                                 ))}
-                                            </div>
+                                            </select>
                                         </div>
-                                    ))}
+                                    );
+                                })}
+                                <div className="flex items-end flex-shrink-0">
+                                    <button
+                                        onClick={clearFilters}
+                                        className="px-4 py-2 text-[10px] font-black text-rose-600 uppercase tracking-widest hover:bg-rose-50 rounded-xl transition-all"
+                                    >
+                                        Clear All
+                                    </button>
                                 </div>
                             </div>
-                        )}
+
+                            {/* Attribute Filters */}
+                            {mgrFilters.mgr3 && allFilterAttributes.length > 0 && (
+                                <div className="pt-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-4 block">Filter by Attributes</label>
+                                    <div className="space-y-4">
+                                        {Object.entries(
+                                            allFilterAttributes.reduce((acc, attr) => {
+                                                if (!acc[attr.code]) acc[attr.code] = [];
+                                                acc[attr.code].push(attr);
+                                                return acc;
+                                            }, {})
+                                        ).map(([code, attrs]) => (
+                                            <div key={code} className="flex flex-col gap-2">
+                                                <span className="text-[9px] font-black text-primary-600/60 uppercase tracking-widest ml-1">{code}</span>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {attrs.map(attr => (
+                                                        <button
+                                                            key={attr._id}
+                                                            onClick={() => handleAttributeFilterChange(attr._id)}
+                                                            className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all border ${attributeFilters[attr._id]
+                                                                    ? 'bg-primary-600 text-white border-primary-600 shadow-sm'
+                                                                    : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+                                                                }`}
+                                                        >
+                                                            {attr.description}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
-                </div>
+                )}
 
                 <div className="p-6 border-b border-slate-50 flex flex-col md:flex-row gap-4 items-center bg-slate-50/30">
                     <div className="relative flex-1 w-full text-slate-400 focus-within:text-primary-600 transition-colors">

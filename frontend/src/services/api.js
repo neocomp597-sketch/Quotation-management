@@ -268,6 +268,7 @@ export const userService = {
   updateRole: (id, role, params) => api.patch(`/users/${id}/role`, { role }, { params }),
   update: (id, data, params) => api.put(`/users/${id}`, data, { params }),
   delete: (id, params) => api.delete(`/users/${id}`, { params }),
+  updatePermissions: (id, customPermissions, params) => api.put(`/users/${id}/permissions`, { customPermissions }, { params }),
 };
 
 export const branchService = {

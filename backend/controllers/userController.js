@@ -29,9 +29,10 @@ exports.getAllUsers = async (req, res) => {
         }
 
         const users = await User.find({ companyId: req.user.companyId })
-            .select('_id name email role reportsTo branchId status companyId createdAt')
+            .select('_id name email role reportsTo branchId status companyId customPermissions vendorId createdAt')
             .populate('reportsTo', 'name email')
             .populate('branchId', 'name code branchPrefix')
+            .populate('vendorId', 'name code companyName')
             .sort({ createdAt: -1 })
             .lean();
 
@@ -44,7 +45,7 @@ exports.getAllUsers = async (req, res) => {
 
 exports.createUser = async (req, res) => {
     try {
-        const { name, email, password, role = 'sales', status = true, reportsTo, branchId } = req.body;
+        const { name, email, password, role = 'sales', status = true, reportsTo, branchId, vendorId } = req.body;
 
         const companyId = req.user?.companyId || getTenantId?.();
         if (!companyId) {
@@ -91,6 +92,7 @@ exports.createUser = async (req, res) => {
             role,
             reportsTo: validatedReportsTo,
             branchId: branchId || null,
+            vendorId: vendorId || null,
             status,
             companyId,
         });
@@ -102,6 +104,8 @@ exports.createUser = async (req, res) => {
             role: user.role,
             reportsTo: user.reportsTo,
             branchId: user.branchId,
+            vendorId: user.vendorId,
+            customPermissions: user.customPermissions || {},
             status: user.status,
             companyId: user.companyId,
             createdAt: user.createdAt,
@@ -202,7 +206,7 @@ exports.updateUserRole = async (req, res) => {
 exports.updateUser = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, email, password, role, reportsTo, branchId } = req.body;
+        const { name, email, password, role, reportsTo, branchId, vendorId } = req.body;
 
         const user = await User.findOne({ _id: id, companyId: req.user.companyId });
         if (!user) {
@@ -223,6 +227,7 @@ exports.updateUser = async (req, res) => {
 
         if (name) user.name = name;
         if (branchId !== undefined) user.branchId = branchId || null;
+        if (vendorId !== undefined) user.vendorId = vendorId || null;
         if (password) {
             const salt = await bcrypt.genSalt(10);
             user.passwordHash = await bcrypt.hash(password, salt);
@@ -272,6 +277,8 @@ exports.updateUser = async (req, res) => {
             role: updatedUser.role,
             reportsTo: updatedUser.reportsTo,
             branchId: updatedUser.branchId,
+            vendorId: updatedUser.vendorId,
+            customPermissions: updatedUser.customPermissions || {},
             status: updatedUser.status,
             createdAt: updatedUser.createdAt
         });
@@ -281,6 +288,33 @@ exports.updateUser = async (req, res) => {
         }
         console.error('[updateUser] Error:', error.message);
         res.status(500).json({ message: 'Failed to update user', error: error.message });
+    }
+};
+
+exports.updateUserPermissions = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { customPermissions } = req.body;
+
+        const user = await User.findOne({ _id: id, companyId: req.user.companyId });
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        user.customPermissions = customPermissions || {};
+        await user.save();
+
+        res.json({
+            _id: user._id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            customPermissions: user.customPermissions,
+            message: 'User permissions updated successfully'
+        });
+    } catch (error) {
+        console.error('[updateUserPermissions] Error:', error.message);
+        res.status(500).json({ message: 'Failed to update user permissions', error: error.message });
     }
 };
 

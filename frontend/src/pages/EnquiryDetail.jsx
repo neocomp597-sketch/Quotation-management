@@ -504,11 +504,11 @@ const EnquiryDetail = () => {
     return (
         <div className="p-4 sm:p-6 md:p-8 max-w-[1600px] mx-auto space-y-6 animate-in fade-in duration-300">
             {/* Top Navigation & Action Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 sm:p-6 rounded-3xl border border-slate-200/80 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-4 sm:p-6 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs">
                 <div className="flex items-center gap-4">
                     <button
                         onClick={() => navigate('/enquiries')}
-                        className="p-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl transition-colors font-bold text-xs flex items-center gap-2"
+                        className="p-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-2xl transition-colors font-bold text-xs flex items-center gap-2"
                         title="Back to Enquiries List"
                     >
                         <MdArrowBack size={20} />
@@ -517,13 +517,13 @@ const EnquiryDetail = () => {
 
                     <div>
                         <div className="flex items-center gap-3">
-                            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                                Enquiry Details: <span className="text-teal-600 font-mono">{enquiry.enquiryNo}</span>
+                            <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+                                Enquiry Details: <span className="text-teal-600 dark:text-teal-400 font-mono">{enquiry.enquiryNo}</span>
                             </h1>
                             <StatusPill status={enquiry.status} />
                         </div>
-                        <p className="text-xs text-slate-500 font-semibold mt-0.5">
-                            Created on {formatDate(enquiry.enquiryDate)} • Priority: <span className="font-bold text-slate-800">{enquiry.priority || 'Medium'}</span>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold mt-0.5">
+                            Created on {formatDate(enquiry.enquiryDate)} • Priority: <span className="font-bold text-slate-800 dark:text-slate-200">{enquiry.priority || 'Medium'}</span>
                         </p>
                     </div>
                 </div>
@@ -531,7 +531,7 @@ const EnquiryDetail = () => {
                 <div className="flex items-center gap-2 flex-wrap">
                     <button
                         onClick={() => window.print()}
-                        className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl text-xs font-bold transition-all flex items-center gap-2"
+                        className="px-4 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-2xl text-xs font-bold transition-all flex items-center gap-2"
                     >
                         <MdPrint size={18} /> Print
                     </button>
@@ -545,7 +545,7 @@ const EnquiryDetail = () => {
 
                     <button
                         onClick={() => setDeleteModalOpen(true)}
-                        className="p-2.5 text-rose-600 hover:bg-rose-50 rounded-2xl transition-colors"
+                        className="p-2.5 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-2xl transition-colors"
                         title="Delete Enquiry"
                     >
                         <MdDelete size={20} />
@@ -554,28 +554,28 @@ const EnquiryDetail = () => {
             </div>
 
             {/* Top Summary Banner */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 p-6 bg-white rounded-3xl shadow-sm border border-slate-200/80">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 p-6 bg-white dark:bg-slate-900 rounded-3xl shadow-sm border border-slate-200/80 dark:border-slate-800">
                 <div>
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Customer Name</span>
-                    <span className="text-base font-black mt-1 block truncate text-slate-900">{customerDisplayName}</span>
+                    <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block">Customer Name</span>
+                    <span className="text-base font-black mt-1 block truncate text-slate-900 dark:text-white">{customerDisplayName}</span>
                 </div>
                 <div>
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Assigned Executive</span>
-                    <span className="text-base font-black mt-1 block truncate text-indigo-600">
+                    <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block">Assigned Executive</span>
+                    <span className="text-base font-black mt-1 block truncate text-indigo-600 dark:text-indigo-400">
                         {executiveName}
                     </span>
                 </div>
                 <div>
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Enquiry Date</span>
-                    <span className="text-base font-black text-slate-800 mt-1 block">{formatDate(enquiry.enquiryDate)}</span>
+                    <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block">Enquiry Date</span>
+                    <span className="text-base font-black text-slate-800 dark:text-slate-200 mt-1 block">{formatDate(enquiry.enquiryDate)}</span>
                 </div>
                 <div>
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Status</span>
+                    <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block">Status</span>
                     <div className="mt-1 flex"><StatusPill status={enquiry.status} /></div>
                 </div>
                 <div>
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Closure Probability</span>
-                    <span className="text-base font-black text-teal-600 mt-1 block">{enquiry.probability || 0}%</span>
+                    <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block">Closure Probability</span>
+                    <span className="text-base font-black text-teal-600 dark:text-teal-400 mt-1 block">{enquiry.probability || 0}%</span>
                 </div>
             </div>
 
@@ -584,17 +584,17 @@ const EnquiryDetail = () => {
                 {/* Left Panel: Workflow Management & Information Cards */}
                 <div className="lg:col-span-4 space-y-6">
                     {/* Card 1: Outcome Status Management */}
-                    <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-xs space-y-4">
-                        <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-3">
-                            <MdAssignment className="text-teal-600" size={20} /> Managing Status
+                    <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-6 shadow-xs space-y-4">
+                        <h3 className="text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
+                            <MdAssignment className="text-teal-600 dark:text-teal-400" size={20} /> Managing Status
                         </h3>
                         <div className="space-y-4">
                             <div>
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Update Outcome Status</label>
+                                <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1.5">Update Outcome Status</label>
                                 <select
                                     value={selectedStatus}
                                     onChange={(e) => setSelectedStatus(e.target.value)}
-                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-xs font-bold text-slate-800 focus:bg-white focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10"
+                                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl outline-none text-xs font-bold text-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-900 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10"
                                 >
                                     {['Open', 'Assigned', 'In Progress', 'Pending Customer', 'Resolved', 'Closed', 'Cancelled', 'Contacted', 'Quotation Pending', 'Quotation Received', 'Negotiation', 'Finalized', 'PO Received', 'Lost'].map(s => (
                                         <option key={s} value={s}>{s}</option>
@@ -608,7 +608,7 @@ const EnquiryDetail = () => {
                                     <select
                                         value={selectedLossReason}
                                         onChange={(e) => setSelectedLossReason(e.target.value)}
-                                        className="w-full px-4 py-3 bg-rose-50/60 border border-rose-200 rounded-2xl outline-none text-xs font-bold text-rose-800"
+                                        className="w-full px-4 py-3 bg-rose-50/60 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 rounded-2xl outline-none text-xs font-bold text-rose-800 dark:text-rose-300"
                                     >
                                         <option value="">-- Select Loss Reason --</option>
                                         {['High Price', 'Slow Delivery', 'No Stock', 'Delayed Follow-up', 'Customer Dropped', 'Other'].map(r => (
@@ -629,17 +629,17 @@ const EnquiryDetail = () => {
                     </div>
 
                     {/* Card 2: Sales Executive Assignment */}
-                    <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-xs space-y-4">
-                        <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-3">
-                            <MdPerson className="text-teal-600" size={20} /> Sales Executive Assignment
+                    <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-6 shadow-xs space-y-4">
+                        <h3 className="text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
+                            <MdPerson className="text-teal-600 dark:text-teal-400" size={20} /> Sales Executive Assignment
                         </h3>
                         <div className="space-y-4">
                             <div>
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Assigned Sales Executive</label>
+                                <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1.5">Assigned Sales Executive</label>
                                 <select
                                     value={selectedAssignee}
                                     onChange={(e) => setSelectedAssignee(e.target.value)}
-                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-xs font-bold text-slate-800 focus:bg-white focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10"
+                                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl outline-none text-xs font-bold text-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-900 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10"
                                 >
                                     <option value="">Unassigned</option>
                                     {users.map(u => (
@@ -659,18 +659,18 @@ const EnquiryDetail = () => {
                     </div>
 
                     {/* Card 3: Field Visit & Appointment Schedule */}
-                    <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-xs space-y-4">
-                        <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest flex items-center justify-between border-b border-slate-100 pb-3">
+                    <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-6 shadow-xs space-y-4">
+                        <h3 className="text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-widest flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
                             <span className="flex items-center gap-2">
-                                <MdCalendarMonth className="text-teal-600" size={20} /> Visit Management
+                                <MdCalendarMonth className="text-teal-600 dark:text-teal-400" size={20} /> Visit Management
                             </span>
                         </h3>
                         {enquiry.followUpDate && (
-                            <div className="p-4 bg-teal-50/80 border border-teal-200/70 rounded-2xl flex items-center gap-3">
-                                <MdEventAvailable className="text-teal-600 flex-shrink-0" size={22} />
+                            <div className="p-4 bg-teal-50/80 dark:bg-teal-950/40 border border-teal-200/70 dark:border-teal-800/60 rounded-2xl flex items-center gap-3">
+                                <MdEventAvailable className="text-teal-600 dark:text-teal-400 flex-shrink-0" size={22} />
                                 <div>
-                                    <span className="text-[9px] font-black text-teal-700 uppercase tracking-wider block">Next Follow-up / Appointment</span>
-                                    <span className="text-xs font-bold text-teal-950">{formatDate(enquiry.followUpDate)}</span>
+                                    <span className="text-[9px] font-black text-teal-700 dark:text-teal-300 uppercase tracking-wider block">Next Follow-up / Appointment</span>
+                                    <span className="text-xs font-bold text-teal-950 dark:text-teal-100">{formatDate(enquiry.followUpDate)}</span>
                                 </div>
                             </div>
                         )}
@@ -683,44 +683,44 @@ const EnquiryDetail = () => {
                     </div>
 
                     {/* Card 4: Customer Details Summary */}
-                    <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-xs space-y-4">
-                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">
+                    <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-6 shadow-xs space-y-4">
+                        <h3 className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest border-b border-slate-100 dark:border-slate-800 pb-2">
                             Customer Contact Information
                         </h3>
                         <div className="space-y-3 text-xs font-medium">
                             <div className="flex items-start gap-3">
                                 <MdBusiness className="text-slate-400 mt-0.5 flex-shrink-0" size={18} />
                                 <div>
-                                    <span className="text-[10px] text-slate-400 block font-bold uppercase">Company Name</span>
-                                    <span className="text-slate-900 font-bold text-sm">{customerDisplayName}</span>
+                                    <span className="text-[10px] text-slate-400 dark:text-slate-500 block font-bold uppercase">Company Name</span>
+                                    <span className="text-slate-900 dark:text-white font-bold text-sm">{customerDisplayName}</span>
                                 </div>
                             </div>
                             <div className="flex items-start gap-3">
                                 <MdPerson className="text-slate-400 mt-0.5 flex-shrink-0" size={18} />
                                 <div>
-                                    <span className="text-[10px] text-slate-400 block font-bold uppercase">Contact Person</span>
-                                    <span className="text-slate-800 font-bold">{customerObj.customerName || enquiry.contactPerson || 'N/A'}</span>
-                                    {enquiry.contactDesignation && <span className="text-slate-500 text-[11px] block">{enquiry.contactDesignation}</span>}
+                                    <span className="text-[10px] text-slate-400 dark:text-slate-500 block font-bold uppercase">Contact Person</span>
+                                    <span className="text-slate-800 dark:text-slate-200 font-bold">{customerObj.customerName || enquiry.contactPerson || 'N/A'}</span>
+                                    {enquiry.contactDesignation && <span className="text-slate-500 dark:text-slate-400 text-[11px] block">{enquiry.contactDesignation}</span>}
                                 </div>
                             </div>
-                            <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100">
+                            <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
                                 <div>
-                                    <span className="text-[10px] text-slate-400 block font-bold uppercase">GSTIN</span>
-                                    <span className="text-slate-900 font-bold font-mono">{customerObj.gstin || 'N/A'}</span>
+                                    <span className="text-[10px] text-slate-400 dark:text-slate-500 block font-bold uppercase">GSTIN</span>
+                                    <span className="text-slate-900 dark:text-white font-bold font-mono">{customerObj.gstin || 'N/A'}</span>
                                 </div>
                                 <div>
-                                    <span className="text-[10px] text-slate-400 block font-bold uppercase">Mobile Phone</span>
-                                    <span className="text-slate-900 font-bold">{customerObj.mobile || enquiry.contactMobile || 'N/A'}</span>
+                                    <span className="text-[10px] text-slate-400 dark:text-slate-500 block font-bold uppercase">Mobile Phone</span>
+                                    <span className="text-slate-900 dark:text-white font-bold">{customerObj.mobile || enquiry.contactMobile || 'N/A'}</span>
                                 </div>
                             </div>
                             <div>
-                                <span className="text-[10px] text-slate-400 block font-bold uppercase">Email Address</span>
-                                <span className="text-slate-900 font-bold truncate block">{customerObj.email || enquiry.contactEmail || 'N/A'}</span>
+                                <span className="text-[10px] text-slate-400 dark:text-slate-500 block font-bold uppercase">Email Address</span>
+                                <span className="text-slate-900 dark:text-white font-bold truncate block">{customerObj.email || enquiry.contactEmail || 'N/A'}</span>
                             </div>
                             {enquiry.siteAddress && (
-                                <div className="pt-2 border-t border-slate-100">
-                                    <span className="text-[10px] text-slate-400 block font-bold uppercase">Site / Delivery Address</span>
-                                    <p className="text-slate-700 font-semibold leading-relaxed mt-0.5">{enquiry.siteAddress}</p>
+                                <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+                                    <span className="text-[10px] text-slate-400 dark:text-slate-500 block font-bold uppercase">Site / Delivery Address</span>
+                                    <p className="text-slate-700 dark:text-slate-300 font-semibold leading-relaxed mt-0.5">{enquiry.siteAddress}</p>
                                 </div>
                             )}
                         </div>
@@ -728,35 +728,35 @@ const EnquiryDetail = () => {
 
                     {/* Card 5: Project & Specification Details */}
                     {(enquiry.projectName || enquiry.technicalSpecifications || enquiry.remarks || enquiry.budget) && (
-                        <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-xs space-y-4">
-                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">
+                        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-6 shadow-xs space-y-4">
+                            <h3 className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest border-b border-slate-100 dark:border-slate-800 pb-2">
                                 Project Overview & Specifications
                             </h3>
                             <div className="space-y-3 text-xs">
                                 {enquiry.projectName && (
                                     <div>
-                                        <span className="text-[10px] text-slate-400 font-bold uppercase block">Project Name</span>
-                                        <span className="text-slate-900 font-bold">{enquiry.projectName}</span>
+                                        <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase block">Project Name</span>
+                                        <span className="text-slate-900 dark:text-white font-bold">{enquiry.projectName}</span>
                                     </div>
                                 )}
                                 {enquiry.budget && (
                                     <div>
-                                        <span className="text-[10px] text-slate-400 font-bold uppercase block">Estimated Budget</span>
-                                        <span className="text-teal-700 font-bold font-mono">₹{Number(enquiry.budget).toLocaleString('en-IN')}</span>
+                                        <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase block">Estimated Budget</span>
+                                        <span className="text-teal-700 dark:text-teal-400 font-bold font-mono">₹{Number(enquiry.budget).toLocaleString('en-IN')}</span>
                                     </div>
                                 )}
                                 {enquiry.technicalSpecifications && (
                                     <div>
-                                        <span className="text-[10px] text-slate-400 font-bold uppercase block">Technical Specifications</span>
-                                        <p className="text-slate-700 font-medium bg-slate-50 p-3 rounded-2xl border border-slate-100 leading-relaxed mt-1">
+                                        <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase block">Technical Specifications</span>
+                                        <p className="text-slate-700 dark:text-slate-300 font-medium bg-slate-50 dark:bg-slate-800/80 p-3 rounded-2xl border border-slate-100 dark:border-slate-700 leading-relaxed mt-1">
                                             {enquiry.technicalSpecifications}
                                         </p>
                                     </div>
                                 )}
                                 {enquiry.remarks && (
                                     <div>
-                                        <span className="text-[10px] text-slate-400 font-bold uppercase block">Remarks</span>
-                                        <p className="text-slate-600 italic mt-0.5">{enquiry.remarks}</p>
+                                        <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase block">Remarks</span>
+                                        <p className="text-slate-600 dark:text-slate-400 italic mt-0.5">{enquiry.remarks}</p>
                                     </div>
                                 )}
                             </div>
@@ -767,16 +767,16 @@ const EnquiryDetail = () => {
                 {/* Right Panel: Workspace Tabs (Items, Timeline, Visits) */}
                 <div className="lg:col-span-8 space-y-6">
                     {/* Tab Navigation */}
-                    <div className="flex border border-slate-200/80 bg-slate-100/70 p-1.5 rounded-3xl gap-2">
+                    <div className="flex border border-slate-200/80 dark:border-slate-800 bg-slate-100/70 dark:bg-slate-900 p-1.5 rounded-3xl gap-2">
                         <button
                             onClick={() => setActiveTab('items')}
                             className={`flex-1 py-3 px-4 rounded-2xl text-xs font-extrabold transition-all flex items-center justify-center gap-2 ${
                                 activeTab === 'items'
-                                    ? 'bg-white text-slate-900 shadow-md'
-                                    : 'text-slate-500 hover:text-slate-900'
+                                    ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-md'
+                                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                             }`}
                         >
-                            <MdReceiptLong size={18} className="text-teal-600" />
+                            <MdReceiptLong size={18} className="text-teal-600 dark:text-teal-400" />
                             Enquiry Items ({(enquiry.items || []).length})
                         </button>
 
@@ -784,11 +784,11 @@ const EnquiryDetail = () => {
                             onClick={() => setActiveTab('timeline')}
                             className={`flex-1 py-3 px-4 rounded-2xl text-xs font-extrabold transition-all flex items-center justify-center gap-2 ${
                                 activeTab === 'timeline'
-                                    ? 'bg-white text-slate-900 shadow-md'
-                                    : 'text-slate-500 hover:text-slate-900'
+                                    ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-md'
+                                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                             }`}
                         >
-                            <MdChat size={18} className="text-purple-600" />
+                            <MdChat size={18} className="text-purple-600 dark:text-purple-400" />
                             Follow-ups & Notes ({(enquiry.followUpHistory || []).length})
                         </button>
 
@@ -796,80 +796,80 @@ const EnquiryDetail = () => {
                             onClick={() => setActiveTab('visits')}
                             className={`flex-1 py-3 px-4 rounded-2xl text-xs font-extrabold transition-all flex items-center justify-center gap-2 ${
                                 activeTab === 'visits'
-                                    ? 'bg-white text-slate-900 shadow-md'
-                                    : 'text-slate-500 hover:text-slate-900'
+                                    ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-md'
+                                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                             }`}
                         >
-                            <MdCalendarMonth size={18} className="text-teal-600" />
+                            <MdCalendarMonth size={18} className="text-teal-600 dark:text-teal-400" />
                             Field Visits ({(enquiry.visits || []).length})
                         </button>
                     </div>
 
                     {/* TAB 1: ENQUIRY ITEMS */}
                     {activeTab === 'items' && (
-                        <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-xs space-y-6 animate-in fade-in duration-200">
-                            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-6 shadow-xs space-y-6 animate-in fade-in duration-200">
+                            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
                                 <div>
-                                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">Requested Line Items</h3>
-                                    <p className="text-xs text-slate-500 font-medium">Products and services included in this enquiry</p>
+                                    <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider">Requested Line Items</h3>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Products and services included in this enquiry</p>
                                 </div>
-                                <span className="px-3 py-1 bg-teal-50 text-teal-800 rounded-full text-xs font-black">
+                                <span className="px-3 py-1 bg-teal-50 dark:bg-teal-950/40 text-teal-800 dark:text-teal-300 rounded-full text-xs font-black">
                                     {(enquiry.items || []).length} Items
                                 </span>
                             </div>
 
                             <div className="space-y-4">
                                 {(enquiry.items || []).map((item, idx) => (
-                                    <div key={idx} className="p-5 bg-slate-50/80 border border-slate-200/70 rounded-2xl space-y-3 hover:border-teal-300 transition-all shadow-2xs">
+                                    <div key={idx} className="p-5 bg-slate-50/80 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/80 rounded-2xl space-y-3 hover:border-teal-300 dark:hover:border-teal-500 transition-all shadow-2xs">
                                         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                                             <div>
                                                 <div className="flex items-center gap-2 flex-wrap">
-                                                    <h4 className="text-sm font-black text-slate-900">
+                                                    <h4 className="text-sm font-black text-slate-900 dark:text-white">
                                                         {item.productName || item.productId?.productName || 'Unnamed Product'}
                                                     </h4>
                                                     <span className={`px-2.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider border ${
                                                         (item.itemCategory === 'Manual' || item.isManual)
-                                                            ? 'bg-amber-50 text-amber-800 border-amber-300'
-                                                            : 'bg-teal-50 text-teal-800 border-teal-300'
+                                                            ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-700'
+                                                            : 'bg-teal-50 dark:bg-teal-950/40 text-teal-800 dark:text-teal-300 border-teal-300 dark:border-teal-700'
                                                     }`}>
                                                         {item.itemCategory || (item.isManual ? 'Manual' : 'Added')}
                                                     </span>
                                                 </div>
                                                 {item.productCode && (
-                                                    <p className="text-xs font-mono font-bold text-slate-500 mt-0.5">Code: {item.productCode}</p>
+                                                    <p className="text-xs font-mono font-bold text-slate-500 dark:text-slate-400 mt-0.5">Code: {item.productCode}</p>
                                                 )}
                                             </div>
                                             <ActionStatusPill status={item.actionStatus} />
                                         </div>
 
-                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-white p-3.5 rounded-xl border border-slate-100 text-xs font-medium">
+                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-white dark:bg-slate-900 p-3.5 rounded-xl border border-slate-100 dark:border-slate-800 text-xs font-medium">
                                             <div>
-                                                <span className="text-slate-400 text-[10px] font-bold block uppercase">Quantity</span>
-                                                <span className="text-slate-900 font-black">{item.quantity} {item.uom || 'Pcs'}</span>
+                                                <span className="text-slate-400 dark:text-slate-500 text-[10px] font-bold block uppercase">Quantity</span>
+                                                <span className="text-slate-900 dark:text-white font-black">{item.quantity} {item.uom || 'Pcs'}</span>
                                             </div>
                                             <div>
-                                                <span className="text-slate-400 text-[10px] font-bold block uppercase">Unit Price</span>
-                                                <span className="text-slate-900 font-bold font-mono">₹{Number(item.price || 0).toLocaleString('en-IN')}</span>
+                                                <span className="text-slate-400 dark:text-slate-500 text-[10px] font-bold block uppercase">Unit Price</span>
+                                                <span className="text-slate-900 dark:text-slate-200 font-bold font-mono">₹{Number(item.price || 0).toLocaleString('en-IN')}</span>
                                             </div>
                                             <div>
-                                                <span className="text-slate-400 text-[10px] font-bold block uppercase">Discount</span>
-                                                <span className="text-slate-900 font-bold">{item.discountPercent || 0}%</span>
+                                                <span className="text-slate-400 dark:text-slate-500 text-[10px] font-bold block uppercase">Discount</span>
+                                                <span className="text-slate-900 dark:text-slate-200 font-bold">{item.discountPercent || 0}%</span>
                                             </div>
                                             <div>
-                                                <span className="text-slate-400 text-[10px] font-bold block uppercase">Total Value</span>
-                                                <span className="text-teal-700 font-black font-mono">₹{Number(item.value || 0).toLocaleString('en-IN')}</span>
+                                                <span className="text-slate-400 dark:text-slate-500 text-[10px] font-bold block uppercase">Total Value</span>
+                                                <span className="text-teal-700 dark:text-teal-400 font-black font-mono">₹{Number(item.value || 0).toLocaleString('en-IN')}</span>
                                             </div>
                                         </div>
 
-                                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 text-xs pt-1 border-t border-slate-200/50">
+                                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 text-xs pt-1 border-t border-slate-200/50 dark:border-slate-700/50">
                                             <div>
-                                                <span className="text-slate-400 text-[10px] font-bold uppercase mr-2">Final Selected Vendor:</span>
-                                                <span className="text-teal-700 font-bold">{item.finalVendor?.name || item.finalVendor || 'Pending Selection'}</span>
+                                                <span className="text-slate-400 dark:text-slate-500 text-[10px] font-bold uppercase mr-2">Final Selected Vendor:</span>
+                                                <span className="text-teal-700 dark:text-teal-400 font-bold">{item.finalVendor?.name || item.finalVendor || 'Pending Selection'}</span>
                                             </div>
                                             {item.salespersonName && (
                                                 <div>
-                                                    <span className="text-slate-400 text-[10px] font-bold uppercase mr-2">Assigned Salesman:</span>
-                                                    <span className="text-slate-800 font-bold">{item.salespersonName}</span>
+                                                    <span className="text-slate-400 dark:text-slate-500 text-[10px] font-bold uppercase mr-2">Assigned Salesman:</span>
+                                                    <span className="text-slate-800 dark:text-slate-200 font-bold">{item.salespersonName}</span>
                                                 </div>
                                             )}
                                         </div>
@@ -878,18 +878,18 @@ const EnquiryDetail = () => {
                             </div>
 
                             {/* Financial Totals Banner */}
-                            <div className="p-5 bg-teal-50/60 border border-teal-200/80 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                            <div className="p-5 bg-teal-50/60 dark:bg-teal-950/30 border border-teal-200/80 dark:border-teal-800/60 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
                                 <div className="space-y-1 text-center sm:text-left">
-                                    <span className="text-[10px] font-black text-teal-800 uppercase tracking-widest block">Summary Breakdown</span>
-                                    <div className="flex items-center gap-4 text-xs font-bold text-slate-600 flex-wrap">
+                                    <span className="text-[10px] font-black text-teal-800 dark:text-teal-300 uppercase tracking-widest block">Summary Breakdown</span>
+                                    <div className="flex items-center gap-4 text-xs font-bold text-slate-600 dark:text-slate-300 flex-wrap">
                                         <span>Subtotal: ₹{Number(enquiry.subtotal || 0).toLocaleString('en-IN')}</span>
                                         <span>Disc: ₹{Number(enquiry.discount || 0).toLocaleString('en-IN')}</span>
                                         <span>Freight: ₹{Number(enquiry.freight || 0).toLocaleString('en-IN')}</span>
                                     </div>
                                 </div>
                                 <div className="text-right">
-                                    <span className="text-[10px] font-black text-teal-700 uppercase tracking-widest block">Grand Total</span>
-                                    <span className="text-2xl font-black text-teal-900 font-mono">
+                                    <span className="text-[10px] font-black text-teal-700 dark:text-teal-400 uppercase tracking-widest block">Grand Total</span>
+                                    <span className="text-2xl font-black text-teal-900 dark:text-teal-200 font-mono">
                                         ₹{Number(enquiry.grandTotal || enquiry.subtotal || 0).toLocaleString('en-IN')}
                                     </span>
                                 </div>
@@ -899,15 +899,15 @@ const EnquiryDetail = () => {
 
                     {/* TAB 2: FOLLOW-UPS & TIMELINE */}
                     {activeTab === 'timeline' && (
-                        <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-xs space-y-6 animate-in fade-in duration-200">
+                        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-6 shadow-xs space-y-6 animate-in fade-in duration-200">
                             {/* Follow up log form */}
-                            <form onSubmit={handleAddFollowUp} className="bg-slate-50 border border-slate-200/80 p-5 rounded-2xl space-y-3">
-                                <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">Log New Communication / Follow-up</h4>
+                            <form onSubmit={handleAddFollowUp} className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 p-5 rounded-2xl space-y-3">
+                                <h4 className="text-xs font-black text-slate-800 dark:text-slate-100 uppercase tracking-wider">Log New Communication / Follow-up</h4>
                                 <div className="flex flex-col sm:flex-row gap-3">
                                     <select
                                         value={newFollowUpAction}
                                         onChange={(e) => setNewFollowUpAction(e.target.value)}
-                                        className="px-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none text-xs font-bold text-slate-700"
+                                        className="px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl outline-none text-xs font-bold text-slate-700 dark:text-slate-200"
                                     >
                                         <option value="Call">Call</option>
                                         <option value="Email">Email</option>
@@ -920,7 +920,7 @@ const EnquiryDetail = () => {
                                         placeholder="What was discussed with the client?"
                                         value={newFollowUpNote}
                                         onChange={(e) => setNewFollowUpNote(e.target.value)}
-                                        className="flex-1 px-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none text-xs font-bold text-slate-700"
+                                        className="flex-1 px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl outline-none text-xs font-bold text-slate-700 dark:text-slate-200"
                                         required
                                     />
                                     <button
@@ -936,21 +936,21 @@ const EnquiryDetail = () => {
                             {/* Timeline display */}
                             <div className="space-y-3">
                                 {(!enquiry.followUpHistory || enquiry.followUpHistory.length === 0) ? (
-                                    <p className="text-xs font-bold text-slate-400 bg-slate-50 p-6 rounded-2xl border border-dashed border-slate-200 text-center">
+                                    <p className="text-xs font-bold text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-800/40 p-6 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 text-center">
                                         No follow-up entries recorded yet. Use the form above to add meeting or call notes.
                                     </p>
                                 ) : (
                                     enquiry.followUpHistory.slice().reverse().map((log, idx) => (
-                                        <div key={idx} className="bg-slate-50/80 border border-slate-200/70 p-4 rounded-2xl flex flex-col gap-2 hover:bg-white transition-colors">
+                                        <div key={idx} className="bg-slate-50/80 dark:bg-slate-800/80 border border-slate-200/70 dark:border-slate-700 p-4 rounded-2xl flex flex-col gap-2 hover:bg-white dark:hover:bg-slate-800 transition-colors">
                                             <div className="flex justify-between items-center">
-                                                <span className="px-3 py-1 bg-white text-[10px] font-black text-purple-700 rounded-lg border border-purple-200 uppercase tracking-wider">
+                                                <span className="px-3 py-1 bg-white dark:bg-slate-900 text-[10px] font-black text-purple-700 dark:text-purple-300 rounded-lg border border-purple-200 dark:border-purple-800 uppercase tracking-wider">
                                                     {log.actionType}
                                                 </span>
-                                                <span className="text-[10px] font-bold text-slate-400">
+                                                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500">
                                                     {new Date(log.date).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
                                                 </span>
                                             </div>
-                                            <p className="text-xs text-slate-800 font-bold leading-relaxed">{log.note}</p>
+                                            <p className="text-xs text-slate-800 dark:text-slate-100 font-bold leading-relaxed">{log.note}</p>
                                         </div>
                                     ))
                                 )}
@@ -960,11 +960,11 @@ const EnquiryDetail = () => {
 
                     {/* TAB 3: FIELD VISITS */}
                     {activeTab === 'visits' && (
-                        <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-xs space-y-6 animate-in fade-in duration-200">
-                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-100 pb-4">
+                        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-6 shadow-xs space-y-6 animate-in fade-in duration-200">
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-100 dark:border-slate-800 pb-4">
                                 <div>
-                                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">Field Visits & Site Appointments</h3>
-                                    <p className="text-xs text-slate-500 font-medium">Track customer visits, GPS locations, statuses, and field feedback</p>
+                                    <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider">Field Visits & Site Appointments</h3>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Track customer visits, GPS locations, statuses, and field feedback</p>
                                 </div>
                                 <button
                                     onClick={handleOpenNewVisitModal}
@@ -976,13 +976,13 @@ const EnquiryDetail = () => {
 
                             <div className="space-y-4">
                                 {(!enquiry.visits || enquiry.visits.length === 0) ? (
-                                    <div className="text-center py-12 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                                        <MdCalendarMonth size={40} className="mx-auto text-slate-300 mb-2" />
-                                        <p className="text-xs font-bold text-slate-700">No field visits recorded yet.</p>
-                                        <p className="text-[11px] text-slate-400 mt-1">Schedule visits to track site visits, product demos, and client meetings.</p>
+                                    <div className="text-center py-12 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700">
+                                        <MdCalendarMonth size={40} className="mx-auto text-slate-300 dark:text-slate-600 mb-2" />
+                                        <p className="text-xs font-bold text-slate-700 dark:text-slate-300">No field visits recorded yet.</p>
+                                        <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">Schedule visits to track site visits, product demos, and client meetings.</p>
                                         <button
                                             onClick={handleOpenNewVisitModal}
-                                            className="mt-4 px-5 py-2.5 bg-teal-50 text-teal-800 border border-teal-300 rounded-xl text-xs font-bold hover:bg-teal-100 transition-all"
+                                            className="mt-4 px-5 py-2.5 bg-teal-50 dark:bg-teal-950/40 text-teal-800 dark:text-teal-300 border border-teal-300 dark:border-teal-700 rounded-xl text-xs font-bold hover:bg-teal-100 dark:hover:bg-teal-900/60 transition-all"
                                         >
                                             + Schedule First Visit
                                         </button>
@@ -991,51 +991,51 @@ const EnquiryDetail = () => {
                                     enquiry.visits.slice().reverse().map((visit, idx) => {
                                         const originalIdx = enquiry.visits.length - 1 - idx;
                                         return (
-                                            <div key={visit._id || originalIdx} className="p-5 bg-slate-50/80 border border-slate-200/80 rounded-2xl space-y-4 hover:border-teal-300 transition-all shadow-2xs">
+                                            <div key={visit._id || originalIdx} className="p-5 bg-slate-50/80 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 rounded-2xl space-y-4 hover:border-teal-300 dark:hover:border-teal-500 transition-all shadow-2xs">
                                                 <div className="flex justify-between items-start gap-2">
                                                     <div className="flex items-center gap-2 flex-wrap">
                                                         <VisitStatusPill status={visit.status} />
-                                                        <span className="px-3 py-1 bg-teal-100/90 text-teal-900 text-[10px] font-bold rounded-lg uppercase tracking-wider">
+                                                        <span className="px-3 py-1 bg-teal-100/90 dark:bg-teal-950/60 text-teal-900 dark:text-teal-200 text-[10px] font-bold rounded-lg uppercase tracking-wider">
                                                             {visit.purpose || 'Site Visit'}
                                                         </span>
                                                     </div>
                                                     <button
                                                         onClick={() => handleOpenEditVisitModal(visit, originalIdx)}
-                                                        className="px-3.5 py-1.5 bg-white border border-slate-200 hover:bg-teal-50 hover:border-teal-300 text-slate-700 hover:text-teal-900 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs"
+                                                        className="px-3.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:bg-teal-50 dark:hover:bg-teal-950/40 hover:border-teal-300 dark:hover:border-teal-700 text-slate-700 dark:text-slate-200 hover:text-teal-900 dark:hover:text-teal-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs"
                                                     >
-                                                        <MdEdit size={14} className="text-teal-600" /> Edit Visit
+                                                        <MdEdit size={14} className="text-teal-600 dark:text-teal-400" /> Edit Visit
                                                     </button>
                                                 </div>
 
-                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-white p-3.5 rounded-xl border border-slate-100 text-xs">
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-white dark:bg-slate-900 p-3.5 rounded-xl border border-slate-100 dark:border-slate-800 text-xs">
                                                     <div>
-                                                        <span className="text-slate-400 text-[10px] font-bold uppercase block">Appointment Date & Time</span>
-                                                        <span className="text-slate-900 font-black">{visit.visitDate ? new Date(visit.visitDate).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : 'N/A'}</span>
+                                                        <span className="text-slate-400 dark:text-slate-500 text-[10px] font-bold uppercase block">Appointment Date & Time</span>
+                                                        <span className="text-slate-900 dark:text-white font-black">{visit.visitDate ? new Date(visit.visitDate).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : 'N/A'}</span>
                                                     </div>
                                                     <div>
-                                                        <span className="text-slate-400 text-[10px] font-bold uppercase block">Assigned Representative</span>
-                                                        <span className="text-slate-900 font-bold">{visit.assignedTo?.name || 'Unassigned'}</span>
+                                                        <span className="text-slate-400 dark:text-slate-500 text-[10px] font-bold uppercase block">Assigned Representative</span>
+                                                        <span className="text-slate-900 dark:text-slate-200 font-bold">{visit.assignedTo?.name || 'Unassigned'}</span>
                                                     </div>
                                                 </div>
 
                                                 {visit.location && (
-                                                    <div className="text-xs flex items-center gap-2 bg-teal-50/70 p-3 rounded-xl border border-teal-200/70 font-bold text-teal-950">
-                                                        <MdLocationOn size={18} className="text-teal-600 flex-shrink-0" />
+                                                    <div className="text-xs flex items-center gap-2 bg-teal-50/70 dark:bg-teal-950/40 p-3 rounded-xl border border-teal-200/70 dark:border-teal-800/60 font-bold text-teal-950 dark:text-teal-200">
+                                                        <MdLocationOn size={18} className="text-teal-600 dark:text-teal-400 flex-shrink-0" />
                                                         <span>{visit.location}</span>
                                                     </div>
                                                 )}
 
                                                 {visit.remarks && (
                                                     <div className="text-xs">
-                                                        <span className="text-slate-400 text-[10px] font-bold uppercase block mb-1">Remarks / Agenda</span>
-                                                        <p className="text-slate-800 font-medium bg-white p-3 rounded-xl border border-slate-100 leading-relaxed">{visit.remarks}</p>
+                                                        <span className="text-slate-400 dark:text-slate-500 text-[10px] font-bold uppercase block mb-1">Remarks / Agenda</span>
+                                                        <p className="text-slate-800 dark:text-slate-200 font-medium bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-100 dark:border-slate-800 leading-relaxed">{visit.remarks}</p>
                                                     </div>
                                                 )}
 
                                                 {visit.outcome && (
                                                     <div className="text-xs">
-                                                        <span className="text-teal-700 text-[10px] font-black uppercase block mb-1">Visit Outcome & Feedback</span>
-                                                        <p className="text-teal-950 font-bold bg-teal-50/70 p-3 rounded-xl border border-teal-200/70 leading-relaxed">{visit.outcome}</p>
+                                                        <span className="text-teal-700 dark:text-teal-400 text-[10px] font-black uppercase block mb-1">Visit Outcome & Feedback</span>
+                                                        <p className="text-teal-950 dark:text-teal-100 font-bold bg-teal-50/70 dark:bg-teal-950/40 p-3 rounded-xl border border-teal-200/70 dark:border-teal-800/60 leading-relaxed">{visit.outcome}</p>
                                                     </div>
                                                 )}
                                             </div>
@@ -1060,20 +1060,20 @@ const EnquiryDetail = () => {
                     maxWidth="max-w-lg"
                 >
                     <form onSubmit={handleScheduleVisitSubmit} className="space-y-4">
-                        <p className="text-xs font-medium text-slate-500">
+                        <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
                             {editingVisitId !== null
                                 ? `Update visit status and details for Enquiry `
                                 : `Schedule a field visit or site meeting for Enquiry `}
-                            <span className="font-bold text-slate-800">{enquiry.enquiryNo}</span>.
+                            <span className="font-bold text-slate-800 dark:text-slate-200">{enquiry.enquiryNo}</span>.
                         </p>
 
                         <div className="grid grid-cols-2 gap-3">
                             <div>
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Visit Status *</label>
+                                <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Visit Status *</label>
                                 <select
                                     value={visitStatus}
                                     onChange={(e) => setVisitStatus(e.target.value)}
-                                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-amber-500"
+                                    className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-bold text-slate-800 dark:text-slate-100 outline-none focus:bg-white dark:focus:bg-slate-900 focus:border-amber-500"
                                     required
                                 >
                                     <option value="Scheduled">Scheduled</option>
@@ -1085,11 +1085,11 @@ const EnquiryDetail = () => {
                             </div>
 
                             <div>
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Visit Purpose</label>
+                                <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Visit Purpose</label>
                                 <select
                                     value={visitPurpose}
                                     onChange={(e) => setVisitPurpose(e.target.value)}
-                                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-teal-500"
+                                    className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-bold text-slate-800 dark:text-slate-100 outline-none focus:bg-white dark:focus:bg-slate-900 focus:border-teal-500"
                                 >
                                     <option value="Site Visit">Site Visit / Measurement</option>
                                     <option value="Product Demonstration">Product Demonstration</option>
@@ -1102,14 +1102,14 @@ const EnquiryDetail = () => {
                         </div>
 
                         <div>
-                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Visit Location / GPS Coordinates</label>
+                            <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Visit Location / GPS Coordinates</label>
                             <div className="relative">
                                 <input
                                     type="text"
                                     value={visitLocation}
                                     onChange={(e) => setVisitLocation(e.target.value)}
                                     placeholder="Enter address or fetch live GPS..."
-                                    className="w-full pl-9 pr-24 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-teal-500"
+                                    className="w-full pl-9 pr-24 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-bold text-slate-800 dark:text-slate-100 outline-none focus:bg-white dark:focus:bg-slate-900 focus:border-teal-500"
                                 />
                                 <MdLocationOn className="absolute left-3 top-1/2 -translate-y-1/2 text-rose-500" size={18} />
                                 <button
@@ -1125,22 +1125,22 @@ const EnquiryDetail = () => {
                         </div>
 
                         <div>
-                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Appointment Date & Time *</label>
+                            <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Appointment Date & Time *</label>
                             <input
                                 type="datetime-local"
                                 value={visitDate}
                                 onChange={(e) => setVisitDate(e.target.value)}
-                                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-teal-500"
+                                className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-bold text-slate-800 dark:text-slate-100 outline-none focus:bg-white dark:focus:bg-slate-900 focus:border-teal-500"
                                 required
                             />
                         </div>
 
                         <div>
-                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Sales Representative for Visit</label>
+                            <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Sales Representative for Visit</label>
                             <select
                                 value={visitExecutive}
                                 onChange={(e) => setVisitExecutive(e.target.value)}
-                                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-teal-500"
+                                className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-bold text-slate-800 dark:text-slate-100 outline-none focus:bg-white dark:focus:bg-slate-900 focus:border-teal-500"
                             >
                                 <option value="">-- Select Executive --</option>
                                 {users.map(u => (
@@ -1150,28 +1150,28 @@ const EnquiryDetail = () => {
                         </div>
 
                         <div>
-                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Discussion Agenda / Remarks</label>
+                            <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Discussion Agenda / Remarks</label>
                             <textarea
                                 rows={2}
                                 value={visitNotes}
                                 onChange={(e) => setVisitNotes(e.target.value)}
                                 placeholder="Enter visit details or discussion topics..."
-                                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-teal-500"
+                                className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-bold text-slate-800 dark:text-slate-100 outline-none focus:bg-white dark:focus:bg-slate-900 focus:border-teal-500"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Visit Outcome & Feedback</label>
+                            <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Visit Outcome & Feedback</label>
                             <textarea
                                 rows={2}
                                 value={visitOutcome}
                                 onChange={(e) => setVisitOutcome(e.target.value)}
                                 placeholder="Enter visit outcome, client response, or next required action..."
-                                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-teal-500"
+                                className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-bold text-slate-800 dark:text-slate-100 outline-none focus:bg-white dark:focus:bg-slate-900 focus:border-teal-500"
                             />
                         </div>
 
-                        <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+                        <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
                             <button
                                 type="button"
                                 onClick={() => {

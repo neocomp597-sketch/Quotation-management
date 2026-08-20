@@ -270,25 +270,25 @@ const ScheduleEnquiryVisit = () => {
     return (
         <div className="max-w-4xl mx-auto space-y-6 pb-12">
             {/* Top Bar Header */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white border border-slate-200/80 p-6 rounded-3xl shadow-xs">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 p-6 rounded-3xl shadow-xs">
                 <div className="flex items-center gap-4">
                     <button
                         onClick={() => navigate(`/enquiries/view/${id}`)}
-                        className="p-2.5 hover:bg-slate-100 rounded-2xl text-slate-500 transition-all"
+                        className="p-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-2xl text-slate-500 dark:text-slate-400 transition-all"
                         title="Back to Enquiry Details"
                     >
                         <MdArrowBack size={20} />
                     </button>
                     <div>
                         <div className="flex items-center gap-2 flex-wrap">
-                            <h1 className="text-lg font-black text-slate-900 font-outfit">
+                            <h1 className="text-lg font-black text-slate-900 dark:text-white font-outfit">
                                 {isEditMode ? 'Edit Customer Visit' : 'Schedule / Log Customer Visit'}
                             </h1>
-                            <span className="px-3 py-0.5 bg-teal-50 text-teal-700 border border-teal-200 rounded-full text-[10px] font-black uppercase tracking-wider">
+                            <span className="px-3 py-0.5 bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 rounded-full text-[10px] font-black uppercase tracking-wider">
                                 Enquiry #{enquiry.enquiryNo}
                             </span>
                         </div>
-                        <p className="text-xs text-slate-500 font-medium mt-0.5">
+                        <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">
                             {customerDisplayName} • {customerObj.mobile || enquiry.contactMobile || 'No contact number'}
                         </p>
                     </div>
@@ -298,7 +298,7 @@ const ScheduleEnquiryVisit = () => {
                     <button
                         type="button"
                         onClick={() => navigate(`/enquiries/view/${id}`)}
-                        className="flex-1 sm:flex-none px-5 py-2.5 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-2xl text-xs font-bold transition-all"
+                        className="flex-1 sm:flex-none px-5 py-2.5 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-2xl text-xs font-bold transition-all"
                     >
                         Cancel
                     </button>
@@ -316,22 +316,22 @@ const ScheduleEnquiryVisit = () => {
             {/* Form Section */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Left Form: Main Visit Details */}
-                <div className="lg:col-span-2 bg-white border border-slate-200/80 p-6 rounded-3xl shadow-xs space-y-5">
-                    <h2 className="text-xs font-black text-slate-800 uppercase tracking-widest border-b border-slate-100 pb-3 flex items-center gap-2">
-                        <MdCalendarMonth className="text-teal-600" size={18} />
+                <div className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 p-6 rounded-3xl shadow-xs space-y-5">
+                    <h2 className="text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-widest border-b border-slate-100 dark:border-slate-800 pb-3 flex items-center gap-2">
+                        <MdCalendarMonth className="text-teal-600 dark:text-teal-400" size={18} />
                         Visit Parameters & Timeline
                     </h2>
 
                     <form onSubmit={handleSubmit} className="space-y-5">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                                <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">
                                     Visit Status *
                                 </label>
                                 <select
                                     value={visitStatus}
                                     onChange={(e) => setVisitStatus(e.target.value)}
-                                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-teal-500 transition-all"
+                                    className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-bold text-slate-800 dark:text-slate-100 outline-none focus:bg-white dark:focus:bg-slate-900 focus:border-teal-500 transition-all"
                                 >
                                     <option value="Scheduled">Scheduled</option>
                                     <option value="Visited">Visited</option>
@@ -342,13 +342,13 @@ const ScheduleEnquiryVisit = () => {
                             </div>
 
                             <div>
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                                <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">
                                     Visit Purpose
                                 </label>
                                 <select
                                     value={visitPurpose}
                                     onChange={(e) => setVisitPurpose(e.target.value)}
-                                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-teal-500 transition-all"
+                                    className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-bold text-slate-800 dark:text-slate-100 outline-none focus:bg-white dark:focus:bg-slate-900 focus:border-teal-500 transition-all"
                                 >
                                     <option value="Site Visit">Site Visit / Measurement</option>
                                     <option value="Product Demonstration">Product Demonstration</option>
@@ -361,7 +361,7 @@ const ScheduleEnquiryVisit = () => {
                         </div>
 
                         <div>
-                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                            <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">
                                 Visit Location / GPS Coordinates
                             </label>
                             <div className="relative">
@@ -370,7 +370,7 @@ const ScheduleEnquiryVisit = () => {
                                     value={visitLocation}
                                     onChange={(e) => setVisitLocation(e.target.value)}
                                     placeholder="Enter address or fetch live GPS..."
-                                    className="w-full pl-9 pr-24 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-teal-500 transition-all"
+                                    className="w-full pl-9 pr-24 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-bold text-slate-800 dark:text-slate-100 outline-none focus:bg-white dark:focus:bg-slate-900 focus:border-teal-500 transition-all"
                                 />
                                 <MdLocationOn className="absolute left-3 top-1/2 -translate-y-1/2 text-rose-500" size={18} />
                                 <button
@@ -387,7 +387,7 @@ const ScheduleEnquiryVisit = () => {
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                                <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">
                                     Appointment Date & Time *
                                 </label>
                                 <input
@@ -395,18 +395,18 @@ const ScheduleEnquiryVisit = () => {
                                     value={visitDate}
                                     onChange={(e) => setVisitDate(e.target.value)}
                                     required
-                                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-teal-500 transition-all"
+                                    className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-bold text-slate-800 dark:text-slate-100 outline-none focus:bg-white dark:focus:bg-slate-900 focus:border-teal-500 transition-all"
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                                <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">
                                     Sales Representative for Visit
                                 </label>
                                 <select
                                     value={visitExecutive}
                                     onChange={(e) => setVisitExecutive(e.target.value)}
-                                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-teal-500 transition-all"
+                                    className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-bold text-slate-800 dark:text-slate-100 outline-none focus:bg-white dark:focus:bg-slate-900 focus:border-teal-500 transition-all"
                                 >
                                     <option value="">-- Unassigned --</option>
                                     {users.map(u => (
@@ -419,7 +419,7 @@ const ScheduleEnquiryVisit = () => {
                         </div>
 
                         <div>
-                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                            <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">
                                 Discussion Agenda / Remarks
                             </label>
                             <textarea
@@ -427,12 +427,12 @@ const ScheduleEnquiryVisit = () => {
                                 value={visitNotes}
                                 onChange={(e) => setVisitNotes(e.target.value)}
                                 placeholder="Enter visit details or discussion topics..."
-                                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-teal-500 transition-all"
+                                className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-bold text-slate-800 dark:text-slate-100 outline-none focus:bg-white dark:focus:bg-slate-900 focus:border-teal-500 transition-all"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                            <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">
                                 Visit Outcome & Feedback
                             </label>
                             <textarea
@@ -440,7 +440,7 @@ const ScheduleEnquiryVisit = () => {
                                 value={visitOutcome}
                                 onChange={(e) => setVisitOutcome(e.target.value)}
                                 placeholder="Enter visit outcome, client response, or next required action..."
-                                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-teal-500 transition-all"
+                                className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-bold text-slate-800 dark:text-slate-100 outline-none focus:bg-white dark:focus:bg-slate-900 focus:border-teal-500 transition-all"
                             />
                         </div>
                     </form>
@@ -448,47 +448,47 @@ const ScheduleEnquiryVisit = () => {
 
                 {/* Right Sidebar: Customer & Enquiry Summary Card */}
                 <div className="space-y-6">
-                    <div className="bg-white border border-slate-200/80 p-6 rounded-3xl shadow-xs space-y-4">
-                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">
+                    <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 p-6 rounded-3xl shadow-xs space-y-4">
+                        <h3 className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest border-b border-slate-100 dark:border-slate-800 pb-2">
                             Client & Site Reference
                         </h3>
                         <div className="space-y-3 text-xs font-medium">
                             <div className="flex items-start gap-3">
                                 <MdBusiness className="text-slate-400 mt-0.5 shrink-0" size={18} />
                                 <div>
-                                    <span className="text-[10px] text-slate-400 block font-bold uppercase">Company</span>
-                                    <span className="text-slate-900 font-bold">{customerDisplayName}</span>
+                                    <span className="text-[10px] text-slate-400 dark:text-slate-500 block font-bold uppercase">Company</span>
+                                    <span className="text-slate-900 dark:text-white font-bold">{customerDisplayName}</span>
                                 </div>
                             </div>
 
                             <div className="flex items-start gap-3">
                                 <MdPerson className="text-slate-400 mt-0.5 shrink-0" size={18} />
                                 <div>
-                                    <span className="text-[10px] text-slate-400 block font-bold uppercase">Contact Person</span>
-                                    <span className="text-slate-800 font-bold">{customerObj.customerName || enquiry.contactPerson || 'N/A'}</span>
+                                    <span className="text-[10px] text-slate-400 dark:text-slate-500 block font-bold uppercase">Contact Person</span>
+                                    <span className="text-slate-800 dark:text-slate-200 font-bold">{customerObj.customerName || enquiry.contactPerson || 'N/A'}</span>
                                 </div>
                             </div>
 
                             <div className="flex items-start gap-3">
                                 <MdPhone className="text-slate-400 mt-0.5 shrink-0" size={18} />
                                 <div>
-                                    <span className="text-[10px] text-slate-400 block font-bold uppercase">Phone Number</span>
-                                    <span className="text-slate-900 font-bold">{customerObj.mobile || enquiry.contactMobile || 'N/A'}</span>
+                                    <span className="text-[10px] text-slate-400 dark:text-slate-500 block font-bold uppercase">Phone Number</span>
+                                    <span className="text-slate-900 dark:text-white font-bold">{customerObj.mobile || enquiry.contactMobile || 'N/A'}</span>
                                 </div>
                             </div>
 
                             {enquiry.siteAddress && (
-                                <div className="pt-2 border-t border-slate-100">
-                                    <span className="text-[10px] text-slate-400 block font-bold uppercase">Registered Site Address</span>
-                                    <p className="text-slate-700 font-semibold leading-relaxed mt-0.5">{enquiry.siteAddress}</p>
+                                <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+                                    <span className="text-[10px] text-slate-400 dark:text-slate-500 block font-bold uppercase">Registered Site Address</span>
+                                    <p className="text-slate-700 dark:text-slate-300 font-semibold leading-relaxed mt-0.5">{enquiry.siteAddress}</p>
                                 </div>
                             )}
                         </div>
                     </div>
 
-                    <div className="bg-teal-50/70 border border-teal-200/80 p-5 rounded-3xl space-y-2">
-                        <span className="text-[10px] font-black text-teal-800 uppercase tracking-wider block">Pro-Tip for Field Visits</span>
-                        <p className="text-xs text-teal-950 font-medium leading-relaxed">
+                    <div className="bg-teal-50/70 dark:bg-teal-950/40 border border-teal-200/80 dark:border-teal-800/60 p-5 rounded-3xl space-y-2">
+                        <span className="text-[10px] font-black text-teal-800 dark:text-teal-300 uppercase tracking-wider block">Pro-Tip for Field Visits</span>
+                        <p className="text-xs text-teal-950 dark:text-teal-100 font-medium leading-relaxed">
                             Click <strong>Get GPS</strong> when arriving at the client site to automatically capture live GPS coordinates and street address verification.
                         </p>
                     </div>

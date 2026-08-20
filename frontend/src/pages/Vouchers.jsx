@@ -94,8 +94,8 @@ const Vouchers = ({ mode = 'grn' }) => {
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-black text-slate-900 tracking-tight">{isInvoiceMode ? 'Sales Invoice' : 'Invoice Voucher'}</h1>
-                    <p className="text-slate-500 font-medium">{isInvoiceMode ? 'Sales outward, customer billing and stock deduction' : 'Material inward, vendor invoice vouchers, and return management'}</p>
+                    <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">{isInvoiceMode ? 'Sales Invoice' : 'Invoice Voucher'}</h1>
+                    <p className="text-slate-500 dark:text-slate-400 font-medium">{isInvoiceMode ? 'Sales outward, customer billing and stock deduction' : 'Material inward, vendor invoice vouchers, and return management'}</p>
                 </div>
                 {!isVendorUser && (
                     <Link
@@ -108,14 +108,14 @@ const Vouchers = ({ mode = 'grn' }) => {
                 )}
             </div>
 
-            <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
-                <div className="p-6 border-b border-slate-50 flex flex-col md:flex-row gap-4 items-center bg-slate-50/30">
-                    <div className="relative flex-1 w-full text-slate-400 focus-within:text-primary-600 transition-colors">
+            <div className="bg-white dark:bg-slate-900 rounded-[2rem] shadow-xs border border-slate-100 dark:border-slate-800 overflow-hidden">
+                <div className="p-6 border-b border-slate-50 dark:border-slate-800 flex flex-col md:flex-row gap-4 items-center bg-slate-50/30 dark:bg-slate-800/50">
+                    <div className="relative flex-1 w-full text-slate-400 dark:text-slate-500 focus-within:text-primary-600 dark:focus-within:text-primary-400 transition-colors">
                         <MdSearch className="absolute left-4 top-1/2 -translate-y-1/2" size={20} />
                         <input
                             type="text"
                             placeholder={`Search by ${isInvoiceMode ? 'Invoice No or Customer' : 'GRN No, Vendor or Customer'}...`}
-                            className="w-full pl-12 pr-4 py-3.5 bg-white border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm text-slate-900 transition-all font-medium"
+                            className="w-full pl-12 pr-4 py-3.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all font-medium"
                             value={searchTerm}
                             onChange={(e) => {
                                 setSearchTerm(e.target.value);
@@ -133,7 +133,7 @@ const Vouchers = ({ mode = 'grn' }) => {
                     ) : (
                         <div className="overflow-x-auto">
                             <table className="w-full text-left">
-                                <thead className="bg-slate-50 text-slate-400 text-[10px] uppercase font-black tracking-widest border-b border-slate-100">
+                                <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-400 dark:text-slate-400 text-[10px] uppercase font-black tracking-widest border-b border-slate-100 dark:border-slate-800">
                                     <tr>
                                         <th className="px-8 py-5">{isInvoiceMode ? 'Invoice Detail' : 'GRN Detail'}</th>
                                         <th className="px-8 py-5">{isInvoiceMode ? 'Customer' : 'Vendor / Link'}</th>
@@ -143,36 +143,36 @@ const Vouchers = ({ mode = 'grn' }) => {
                                         <th className="px-8 py-5 text-right">Actions</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-slate-50">
+                                <tbody className="divide-y divide-slate-50 dark:divide-slate-800/60">
                                     {paginatedVouchers.map((v) => (
-                                        <tr key={v._id} className="hover:bg-slate-50/50 transition-colors">
-                                            <td className="px-8 py-5 border-r border-slate-50">
-                                                <div className="font-black text-slate-900 tracking-tight">{v.voucherNumber}</div>
-                                                <div className="text-[10px] text-slate-400 font-bold uppercase mt-1 flex gap-2">
+                                        <tr key={v._id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
+                                            <td className="px-8 py-5 border-r border-slate-50 dark:border-slate-800/50">
+                                                <div className="font-black text-slate-900 dark:text-white tracking-tight">{v.voucherNumber}</div>
+                                                <div className="text-[10px] text-slate-400 dark:text-slate-400 font-bold uppercase mt-1 flex gap-2">
                                                     <span>{formatDate(v.date)}</span>
-                                                    <span className={`px-1 rounded ${v.voucherType === 'Invoice' ? 'bg-rose-100 text-rose-600' : v.voucherType === 'Purchase' ? 'bg-blue-100 text-blue-600' : 'bg-emerald-100 text-emerald-600'}`}>
+                                                    <span className={`px-1 rounded ${v.voucherType === 'Invoice' ? 'bg-rose-100 dark:bg-rose-950/80 text-rose-600 dark:text-rose-300' : v.voucherType === 'Purchase' ? 'bg-blue-100 dark:bg-blue-950/80 text-blue-600 dark:text-blue-300' : 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-300'}`}>
                                                         {v.voucherType}
                                                     </span>
                                                 </div>
                                             </td>
-                                            <td className="px-8 py-5 border-r border-slate-50">
-                                                <div className="font-bold text-slate-700">{['Invoice', 'Sale Return'].includes(v.voucherType) ? v.customerName : v.vendorName}</div>
-                                                <div className="text-[10px] text-slate-400 font-black uppercase tracking-tighter mt-1">{v.contactNumber || '-'}</div>
+                                            <td className="px-8 py-5 border-r border-slate-50 dark:border-slate-800/50">
+                                                <div className="font-bold text-slate-700 dark:text-slate-200">{['Invoice', 'Sale Return'].includes(v.voucherType) ? v.customerName : v.vendorName}</div>
+                                                <div className="text-[10px] text-slate-400 dark:text-slate-400 font-black uppercase tracking-tighter mt-1">{v.contactNumber || '-'}</div>
                                             </td>
-                                            <td className="px-8 py-5 text-center border-r border-slate-50 font-black text-slate-500 text-sm">
+                                            <td className="px-8 py-5 text-center border-r border-slate-50 dark:border-slate-800/50 font-black text-slate-500 dark:text-slate-400 text-sm">
                                                 {v.totalQty}
                                             </td>
-                                            <td className="px-8 py-5 text-center border-r border-slate-50 font-black text-slate-500 text-sm">
+                                            <td className="px-8 py-5 text-center border-r border-slate-50 dark:border-slate-800/50 font-black text-slate-500 dark:text-slate-400 text-sm">
                                                 ₹{v.totalTax}
                                             </td>
-                                            <td className="px-8 py-5 text-right font-black text-slate-900 text-lg">
+                                            <td className="px-8 py-5 text-right font-black text-slate-900 dark:text-white text-lg">
                                                 ₹{v.grandTotal?.toLocaleString()}
                                             </td>
                                             <td className="px-8 py-5 text-right">
                                                 <div className="flex items-center justify-end gap-2">
                                                     <button
                                                         onClick={() => navigate(`${basePath}/view/${v._id}`)}
-                                                        className="p-2 text-primary-600 hover:bg-primary-50 rounded-lg transition-all"
+                                                        className="p-2 text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-slate-800 rounded-lg transition-all"
                                                         title="View voucher"
                                                     >
                                                         <MdVisibility size={20} />
@@ -180,7 +180,7 @@ const Vouchers = ({ mode = 'grn' }) => {
                                                     {!isVendorUser && (
                                                         <button
                                                             onClick={() => navigate(`${basePath}/${v._id}`)}
-                                                            className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
+                                                            className="p-2 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-slate-800 rounded-lg transition-all"
                                                             title="Edit voucher"
                                                         >
                                                             <MdEdit size={20} />
@@ -189,7 +189,7 @@ const Vouchers = ({ mode = 'grn' }) => {
                                                     <button
                                                         onClick={() => handleDownloadPdf(v)}
                                                         disabled={downloadingPdfId === v._id}
-                                                        className="p-2 text-primary-600 hover:bg-primary-50 rounded-lg transition-all disabled:opacity-50"
+                                                        className="p-2 text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-slate-800 rounded-lg transition-all disabled:opacity-50"
                                                         title="Print voucher"
                                                     >
                                                         <MdPrint size={20} />
@@ -197,7 +197,7 @@ const Vouchers = ({ mode = 'grn' }) => {
                                                     {!isVendorUser && (
                                                         <button
                                                             onClick={() => handleDelete(v._id)}
-                                                            className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                                                            className="p-2 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-slate-800 rounded-lg transition-all"
                                                             title="Delete voucher"
                                                         >
                                                             <MdDelete size={20} />
@@ -216,22 +216,22 @@ const Vouchers = ({ mode = 'grn' }) => {
                             </table>
                             
                             {totalPages > 1 && (
-                                <div className="p-4 flex items-center justify-between bg-slate-50/50">
-                                    <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+                                <div className="p-4 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-800">
+                                    <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">
                                         Page {currentPage} of {totalPages}
                                     </span>
                                     <div className="flex gap-2">
                                         <button
                                             disabled={currentPage === 1}
                                             onClick={() => setCurrentPage(p => p - 1)}
-                                            className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition-all uppercase tracking-widest"
+                                            className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 transition-all uppercase tracking-widest"
                                         >
                                             Prev
                                         </button>
                                         <button
                                             disabled={currentPage === totalPages}
                                             onClick={() => setCurrentPage(p => p + 1)}
-                                            className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition-all uppercase tracking-widest"
+                                            className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 transition-all uppercase tracking-widest"
                                         >
                                             Next
                                         </button>

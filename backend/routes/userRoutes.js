@@ -10,6 +10,7 @@ router.get('/note', protect, userController.getUserNote);
 router.put('/note', protect, userController.updateUserNote);
 router.put('/profile', protect, userController.updateUserProfile);
 router.put('/:id', protect, admin, userController.updateUser);
+router.put('/:id/permissions', protect, admin, userController.updateUserPermissions);
 router.patch('/:id/role', protect, admin, userController.updateUserRole);
 router.delete('/:id', protect, admin, userController.deleteUser);
 

@@ -1,4 +1,5 @@
 const RolePermission = require('../models/RolePermission');
+const User = require('../models/User');
 const {
     MENU_GROUPS,
     ROLE_OPTIONS,
@@ -76,10 +77,20 @@ exports.getMyPermissions = async (req, res) => {
     try {
         const role     = req.user?.role || 'sales';
         const document = await RolePermission.findOne({ role }).select('menuVisibility').lean();
+        const rolePerms = resolvePermissions(role, toPermissionObject(document?.menuVisibility));
+
+        let userCustom = {};
+        if (req.user?.id) {
+            const userDoc = await User.findById(req.user.id).select('customPermissions').lean();
+            userCustom = toPermissionObject(userDoc?.customPermissions);
+        }
+
+        const mergedPermissions = { ...rolePerms, ...userCustom };
+
         res.json({
             role,
             menuGroups:  MENU_GROUPS,
-            permissions: resolvePermissions(role, toPermissionObject(document?.menuVisibility))
+            permissions: mergedPermissions
         });
     } catch (error) {
         console.error('getMyPermissions error:', error);
