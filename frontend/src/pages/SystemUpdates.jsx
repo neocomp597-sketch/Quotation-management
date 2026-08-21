@@ -33,7 +33,13 @@ const modulePathMap = {
     'CSM': '/csm/dashboard',
     'CSM Support': '/csm/tickets',
     'Authentication': '/settings',
-    'Tenders': '/tenders'
+    'Tenders': '/tenders',
+    'Inventory Management': '/inventory/dashboard',
+    'Warehouse Master': '/inventory/warehouses',
+    'Stock Matrix': '/inventory/stock',
+    'Stock Transfers': '/inventory/transfers',
+    'Stock Adjustments': '/inventory/adjustments',
+    'Physical Audits': '/inventory/counts'
 };
 
 const SearchableSelect = ({ label, options, value, onChange, placeholder = "Type module name..." }) => {
@@ -177,6 +183,9 @@ const SystemUpdates = () => {
         // Sample fallback updates if none in DB yet
         if (list.length === 0) {
             return [
+                { id: 'inv1', date: '21.08.2026', module: 'Inventory Management', submodule: 'Full-Page Migration', changes: 'Migrated Warehouse, Stock Matrix, Transfer, Adjustment, and Audit flows from popups to dedicated full-page routes.', version: 'v5.2.0', deployedBy: 'Super Admin' },
+                { id: 'inv2', date: '21.08.2026', module: 'Warehouse Master', submodule: 'Full-Page Form & API Fix', changes: 'Added standalone WarehouseForm component with bin/rack layout editor and resolved API endpoint base URL integration.', version: 'v5.2.0', deployedBy: 'Super Admin' },
+                { id: 'inv3', date: '21.08.2026', module: 'Stock Matrix', submodule: 'Product Stock Detail Page', changes: 'Replaced modal popup with full-page ProductStockDetail view showing location-wise and bin-wise breakdowns.', version: 'v5.2.0', deployedBy: 'Super Admin' },
                 { id: 'enq1', date: '16.08.2026', module: 'CRM Core', submodule: 'Manual Product Entry', changes: 'Added custom product option and free-text code/description entry for non-mastered items.', version: 'v4.7.0', deployedBy: 'Super Admin' },
                 { id: 'enq2', date: '16.08.2026', module: 'CRM Core', submodule: 'Role Filtering', changes: 'Filtered assigned executive selection exclusively to users with Sales Executive role.', version: 'v4.7.0', deployedBy: 'Super Admin' },
                 { id: 'enq3', date: '16.08.2026', module: 'CRM Core', submodule: 'Enquiry Status Workflow', changes: 'Standardized status dropdown with Open, Assigned, In Progress, Pending Customer, Resolved, Closed, Cancelled enums.', version: 'v4.7.0', deployedBy: 'Super Admin' },

@@ -97,6 +97,22 @@ import TenderDashboard from './pages/TenderDashboard';
 import TenderRegister from './pages/TenderRegister';
 import TenderReports from './pages/TenderReports';
 
+// Inventory Pages
+import InventoryDashboard from './pages/inventory/InventoryDashboard';
+import StockMatrix from './pages/inventory/StockMatrix';
+import ProductStockDetail from './pages/inventory/ProductStockDetail';
+import WarehouseMaster from './pages/inventory/WarehouseMaster';
+import WarehouseForm from './pages/inventory/WarehouseForm';
+import StockTransfers from './pages/inventory/StockTransfers';
+import CreateTransfer from './pages/inventory/CreateTransfer';
+import StockAdjustments from './pages/inventory/StockAdjustments';
+import CreateAdjustment from './pages/inventory/CreateAdjustment';
+import StockAudits from './pages/inventory/StockAudits';
+import CreateAudit from './pages/inventory/CreateAudit';
+import RecordAuditCount from './pages/inventory/RecordAuditCount';
+import StockAlertsPage from './pages/inventory/StockAlertsPage';
+import InventoryReports from './pages/inventory/InventoryReports';
+
 // CPQ Pages
 import CatalogSubmodule from './pages/CatalogSubmodule';
 import PriceManagement from './pages/PriceManagement';
@@ -316,6 +332,23 @@ function App() {
             <Route path="/tender/dashboard" element={<PermissionRoute permissionKey="tender_dashboard"><Layout><TenderDashboard /></Layout></PermissionRoute>} />
             <Route path="/tender/register" element={<PermissionRoute permissionKey="tender_register"><Layout><TenderRegister /></Layout></PermissionRoute>} />
             <Route path="/tender/reports" element={<PermissionRoute permissionKey="tender_reports"><Layout><TenderReports /></Layout></PermissionRoute>} />
+
+            {/* Inventory Routes */}
+            <Route path="/inventory/dashboard" element={<PermissionRoute permissionKey="inventory_dashboard"><Layout><InventoryDashboard /></Layout></PermissionRoute>} />
+            <Route path="/inventory/stock" element={<PermissionRoute permissionKey="inventory_items"><Layout><StockMatrix /></Layout></PermissionRoute>} />
+            <Route path="/inventory/stock/:id" element={<PermissionRoute permissionKey="inventory_items"><Layout><ProductStockDetail /></Layout></PermissionRoute>} />
+            <Route path="/inventory/warehouses" element={<PermissionRoute permissionKey="inventory_warehouses"><Layout><WarehouseMaster /></Layout></PermissionRoute>} />
+            <Route path="/inventory/warehouses/new" element={<PermissionRoute permissionKey="inventory_warehouses"><Layout><WarehouseForm /></Layout></PermissionRoute>} />
+            <Route path="/inventory/warehouses/edit/:id" element={<PermissionRoute permissionKey="inventory_warehouses"><Layout><WarehouseForm /></Layout></PermissionRoute>} />
+            <Route path="/inventory/transfers" element={<PermissionRoute permissionKey="inventory_transfers"><Layout><StockTransfers /></Layout></PermissionRoute>} />
+            <Route path="/inventory/transfers/new" element={<PermissionRoute permissionKey="inventory_transfers"><Layout><CreateTransfer /></Layout></PermissionRoute>} />
+            <Route path="/inventory/adjustments" element={<PermissionRoute permissionKey="inventory_adjustments"><Layout><StockAdjustments /></Layout></PermissionRoute>} />
+            <Route path="/inventory/adjustments/new" element={<PermissionRoute permissionKey="inventory_adjustments"><Layout><CreateAdjustment /></Layout></PermissionRoute>} />
+            <Route path="/inventory/counts" element={<PermissionRoute permissionKey="inventory_stock_counts"><Layout><StockAudits /></Layout></PermissionRoute>} />
+            <Route path="/inventory/counts/new" element={<PermissionRoute permissionKey="inventory_stock_counts"><Layout><CreateAudit /></Layout></PermissionRoute>} />
+            <Route path="/inventory/counts/record/:id" element={<PermissionRoute permissionKey="inventory_stock_counts"><Layout><RecordAuditCount /></Layout></PermissionRoute>} />
+            <Route path="/inventory/alerts" element={<PermissionRoute permissionKey="inventory_alerts"><Layout><StockAlertsPage /></Layout></PermissionRoute>} />
+            <Route path="/inventory/reports" element={<PermissionRoute permissionKey="inventory_reports"><Layout><InventoryReports /></Layout></PermissionRoute>} />
 
             <Route path="/info/:slug" element={<Layout><FooterPageView /></Layout>} />
           </Route>

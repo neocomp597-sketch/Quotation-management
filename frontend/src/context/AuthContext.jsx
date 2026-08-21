@@ -203,10 +203,7 @@ export const AuthProvider = ({ children }) => {
                 const group = MENU_PERMISSION_GROUPS.find((item) =>
                     item.key === permissionKey || (item.children || []).some((child) => child.key === permissionKey)
                 );
-                if (group) {
-                    if (group.key === permissionKey) {
-                        return Boolean(permissions[group.key]) || (group.children || []).some((child) => Boolean(permissions[child.key]));
-                    }
+                if (group && Object.prototype.hasOwnProperty.call(permissions, group.key)) {
                     return Boolean(permissions[group.key]);
                 }
             }
@@ -239,6 +236,7 @@ export const AuthProvider = ({ children }) => {
         );
 
         if (!group) {
+            if (['manager', 'sales'].includes(roleStr)) return true;
             return false;
         }
 
@@ -246,7 +244,15 @@ export const AuthProvider = ({ children }) => {
             return Boolean(permissions?.[group.key]) || (group.children || []).some((child) => Boolean(permissions?.[child.key]));
         }
 
-        return Boolean(permissions?.[group.key]);
+        if (Object.prototype.hasOwnProperty.call(permissions || {}, group.key)) {
+            return Boolean(permissions?.[group.key]);
+        }
+
+        if (permissionKey.startsWith('inventory')) {
+            if (['manager', 'sales', 'admin'].includes(roleStr)) return true;
+        }
+
+        return false;
     }, [permissions, user]);
 
     const updateUser = useCallback((updatedUserData) => {

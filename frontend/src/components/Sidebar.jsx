@@ -38,6 +38,10 @@ import {
     MdSpeed,
     MdPayments,
     MdTag,
+    MdCompareArrows,
+    MdTune,
+    MdFactCheck,
+    MdNotificationsActive,
     MdList,
     MdSecurity,
     MdCheckCircle,
@@ -239,6 +243,22 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             icon: <MdShoppingCart size={22} />,
             children: [
                 { key: 'purchase_grn', name: 'GRN', icon: <MdLocalShipping size={18} />, path: '/grn' },
+            ]
+        },
+        {
+            type: 'group',
+            name: 'Inventory',
+            key: 'inventory',
+            icon: <MdInventory size={22} />,
+            children: [
+                { key: 'inventory_dashboard', name: 'Dashboard', icon: <MdDashboard size={18} />, path: '/inventory/dashboard' },
+                { key: 'inventory_items', name: 'Items & Matrix', icon: <MdInventory size={18} />, path: '/inventory/stock' },
+                { key: 'inventory_warehouses', name: 'Warehouses', icon: <MdStorefront size={18} />, path: '/inventory/warehouses' },
+                { key: 'inventory_transfers', name: 'Stock Transfers', icon: <MdCompareArrows size={18} />, path: '/inventory/transfers' },
+                { key: 'inventory_adjustments', name: 'Adjustments', icon: <MdTune size={18} />, path: '/inventory/adjustments' },
+                { key: 'inventory_stock_counts', name: 'Physical Audit', icon: <MdFactCheck size={18} />, path: '/inventory/counts' },
+                { key: 'inventory_alerts', name: 'Stock Alerts', icon: <MdNotificationsActive size={18} />, path: '/inventory/alerts' },
+                { key: 'inventory_reports', name: 'Valuation & Reports', icon: <MdAssessment size={18} />, path: '/inventory/reports' },
             ]
         },
         {

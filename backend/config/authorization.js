@@ -104,6 +104,23 @@ const MENU_GROUPS = [
         ]
     },
     {
+        key: 'inventory',
+        label: 'Inventory Management',
+        description: 'Stock ledger, multi-warehouse stock, transfers, adjustments, physical audit, and alerts',
+        children: [
+            { key: 'inventory_dashboard', label: 'Inventory Dashboard', description: 'KPI cards, stock valuation, movement feed' },
+            { key: 'inventory_items', label: 'Items & Stock Matrix', description: 'Warehouse-wise stock and batch details' },
+            { key: 'inventory_warehouses', label: 'Warehouse Master', description: 'Manage warehouses and bins' },
+            { key: 'inventory_stock_in', label: 'Stock In / GRN', description: 'Record inward goods receipts' },
+            { key: 'inventory_stock_out', label: 'Stock Out / Dispatch', description: 'Record outward material issues' },
+            { key: 'inventory_transfers', label: 'Stock Transfers', description: 'Inter-warehouse transfers and approvals' },
+            { key: 'inventory_adjustments', label: 'Stock Adjustments', description: 'Damage, loss, and physical audit adjustments' },
+            { key: 'inventory_stock_counts', label: 'Stock Count Audits', description: 'Physical count sessions and reconciliation' },
+            { key: 'inventory_alerts', label: 'Stock Alerts', description: 'Low-stock and expiry notification setup' },
+            { key: 'inventory_reports', label: 'Inventory Reports', description: 'Stock ledger, valuation, and dead-stock reports' }
+        ]
+    },
+    {
         key: 'planning',
         label: 'Planning',
         description: 'Revenue planning and simulation screens',
@@ -217,12 +234,12 @@ const buildPermissions = (enabledKeys = []) => {
 const FULL_ACCESS_KEYS = getAllPermissionKeys();
 
 // Manager: everything except the admin panel
-// Sales: lightweight access - dashboard, enquiry, quotation only
+// Sales: lightweight access - dashboard, enquiry, quotation, inventory items/transfers
 // Employee: employee access - payslips, payroll, csm tickets, csm kb, dashboard
 const DEFAULT_ROLE_PERMISSIONS = {
     admin: buildPermissions(FULL_ACCESS_KEYS),
-    manager: buildPermissions(['dashboard', 'master', 'enquiry', 'sales_pipeline', 'quotation', 'meetings', 'sale', 'purchase', 'planning', 'reports', 'settings', 'csm', 'tender', 'payroll_org_chart']),
-    sales: buildPermissions(['dashboard', 'enquiry', 'sales_pipeline', 'quotation', 'meetings', 'csm_tickets', 'csm_kb', 'tender_dashboard', 'tender_register', 'payroll_org_chart']),
+    manager: buildPermissions(['dashboard', 'master', 'enquiry', 'sales_pipeline', 'quotation', 'meetings', 'sale', 'purchase', 'inventory', 'planning', 'reports', 'settings', 'csm', 'tender', 'payroll_org_chart']),
+    sales: buildPermissions(['dashboard', 'enquiry', 'sales_pipeline', 'quotation', 'meetings', 'inventory_items', 'inventory_stock_in', 'inventory_stock_out', 'inventory_transfers', 'csm_tickets', 'csm_kb', 'tender_dashboard', 'tender_register', 'payroll_org_chart']),
     employee: buildPermissions(['dashboard', 'payroll_payslips', 'payroll_org_chart', 'csm_tickets', 'csm_kb', 'settings_profile'])
 };
 

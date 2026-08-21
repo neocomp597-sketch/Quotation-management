@@ -1,6 +1,7 @@
 const Voucher = require('../models/Voucher');
 const Product = require('../models/Product');
 const Vendor = require('../models/Vendor');
+const stockLedgerService = require('../services/stockLedgerService');
 
 const normalizeVoucherType = (type = '') => String(type || '').trim();
 const isInvoiceType = (type = '') => normalizeVoucherType(type) === 'Invoice';
@@ -17,43 +18,45 @@ const cleanObjectIds = (voucherData = {}) => {
     }
 };
 
-const adjustProductStock = async (voucherData, direction) => {
+const adjustProductStock = async (voucherData, savedVoucher, userId) => {
     for (const item of voucherData.items || []) {
         if (!item.productId) continue;
 
-        const product = await Product.findById(item.productId);
-        if (!product) continue;
-
         const qty = Number(item.qty || 0);
-        const stockDelta = direction === 'out' ? -qty : qty;
-        let vendorUpdated = false;
+        if (qty <= 0) continue;
 
-        if (voucherData.vendorId) {
-            const vendorIndex = product.vendors.findIndex(
-                v => v.vendorId.toString() === voucherData.vendorId.toString()
-            );
+        let transactionType = 'STOCK_OUT';
+        let quantityDelta = -qty;
 
-            if (vendorIndex > -1) {
-                product.vendors[vendorIndex].stock = Math.max(0, Number(product.vendors[vendorIndex].stock || 0) + stockDelta);
-                vendorUpdated = true;
-            } else if (direction === 'in') {
-                product.vendors.push({
-                    vendorId: voucherData.vendorId,
-                    price: item.price,
-                    stock: qty,
-                    isPrimary: product.vendors.length === 0
-                });
-                vendorUpdated = true;
-            }
+        const type = normalizeVoucherType(voucherData.voucherType);
+        if (type === 'Purchase' || type === 'Purchase Voucher' || type === 'Invoice Voucher') {
+            transactionType = 'STOCK_IN';
+            quantityDelta = qty;
+        } else if (type === 'Sale Return') {
+            transactionType = 'RETURN_CUSTOMER';
+            quantityDelta = qty;
+        } else if (type === 'Purchase Return') {
+            transactionType = 'RETURN_SUPPLIER';
+            quantityDelta = -qty;
         }
 
-        if (!vendorUpdated && product.vendors.length > 0) {
-            let primaryIndex = product.vendors.findIndex(v => v.isPrimary);
-            if (primaryIndex === -1) primaryIndex = 0;
-            product.vendors[primaryIndex].stock = Math.max(0, Number(product.vendors[primaryIndex].stock || 0) + stockDelta);
-        }
+        const serials = (item.serialNumbers || []).map(s => s.serialNumber || s);
 
-        await product.save();
+        await stockLedgerService.recordTransaction({
+            companyId: savedVoucher.companyId || voucherData.companyId,
+            productId: item.productId,
+            warehouseId: voucherData.warehouseId || null,
+            transactionType,
+            quantityDelta,
+            unitCost: item.price || 0,
+            serialNumbers: serials,
+            referenceType: 'Voucher',
+            referenceId: savedVoucher._id,
+            referenceNumber: voucherData.voucherNumber,
+            vendorId: voucherData.vendorId || null,
+            performedBy: userId,
+            notes: `${voucherData.voucherType} #${voucherData.voucherNumber}`
+        });
     }
 };
 
@@ -284,7 +287,7 @@ exports.createVoucher = async (req, res) => {
             }
         }
 
-        await adjustProductStock(voucherData, isInvoiceType(voucherData.voucherType) ? 'out' : 'in');
+        await adjustProductStock(voucherData, newVoucher, req.user?.id);
 
         res.status(201).json({ message: 'Voucher saved successfully', voucher: newVoucher });
     } catch (error) {
