@@ -305,7 +305,6 @@ const PlanTierMatrix = () => {
     const [plans, setPlans] = useState(DEFAULT_FALLBACK_PLANS);
     const [activeTabKey, setActiveTabKey] = useState('hrms_payroll');
     const [expandedItems, setExpandedItems] = useState({});
-    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const fetchPlans = async () => {
@@ -324,8 +323,6 @@ const PlanTierMatrix = () => {
                 }
             } catch (err) {
                 console.warn("Using fallback default landing plans:", err);
-            } finally {
-                setLoading(false);
             }
         };
         fetchPlans();
@@ -336,15 +333,6 @@ const PlanTierMatrix = () => {
     const toggleExpand = (itemKey) => {
         setExpandedItems(prev => ({ ...prev, [itemKey]: !prev[itemKey] }));
     };
-
-    if (loading) {
-        return (
-            <div className="py-20 text-center text-slate-400 font-semibold">
-                <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-[#006c49] border-t-transparent mb-4"></div>
-                <p className="text-xs uppercase tracking-widest font-black">Loading Plan Matrix...</p>
-            </div>
-        );
-    }
 
     if (!activePlan) return null;
 

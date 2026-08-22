@@ -39,7 +39,7 @@ const CustomerSearchDropdown = ({ customers, selectedCustomerId, onSelect }) => 
 
     useEffect(() => {
         if (isOpen && inputRef.current) {
-            inputRef.current.focus();
+            inputRef.current.focus({ preventScroll: true });
         }
     }, [isOpen]);
 
@@ -129,7 +129,7 @@ const ProductCodeSearchAutocomplete = ({ value, selectedLabel, onChange, product
 
     useEffect(() => {
         if (isOpen && inputRef.current) {
-            inputRef.current.focus();
+            inputRef.current.focus({ preventScroll: true });
         }
     }, [isOpen]);
 
@@ -385,34 +385,46 @@ const CreateEnquiry = () => {
                 };
 
                 const mergedMap = new Map();
+                const getKey = (item) => {
+                    if (item.email && String(item.email).trim()) {
+                        return String(item.email).toLowerCase().trim();
+                    }
+                    return String(item.name || '').toLowerCase().trim();
+                };
 
                 // 1. Add salespersons from Salesperson master
                 fetchedSalespersons.forEach(item => {
-                    if (item && item._id && !mergedMap.has(item._id.toString())) {
-                        const empDesig = item.email ? empDesignationMap.get(String(item.email).toLowerCase().trim()) : null;
-                        if (!empDesig || isSalesExecutiveDesignation(empDesig, 'Sales Executive')) {
-                            mergedMap.set(item._id.toString(), {
-                                _id: item._id.toString(),
-                                name: item.name,
-                                email: item.email,
-                                role: 'Sales Executive'
-                            });
+                    if (item && item._id) {
+                        const key = getKey(item);
+                        if (key && !mergedMap.has(key)) {
+                            const empDesig = item.email ? empDesignationMap.get(String(item.email).toLowerCase().trim()) : null;
+                            if (!empDesig || isSalesExecutiveDesignation(empDesig, 'Sales Executive')) {
+                                mergedMap.set(key, {
+                                    _id: item._id.toString(),
+                                    name: item.name,
+                                    email: item.email,
+                                    role: 'Sales Executive'
+                                });
+                            }
                         }
                     }
                 });
 
                 // 2. Add users only if Designation or Role = Sales Executive
                 fetchedUsers.forEach(item => {
-                    if (item && item._id && !mergedMap.has(item._id.toString())) {
-                        const emailStr = String(item.email || '').toLowerCase().trim();
-                        const empDesig = empDesignationMap.get(item._id.toString()) || empDesignationMap.get(emailStr);
-                        if (isSalesExecutiveDesignation(empDesig, item.role)) {
-                            mergedMap.set(item._id.toString(), {
-                                _id: item._id.toString(),
-                                name: item.name,
-                                email: item.email,
-                                role: 'Sales Executive'
-                            });
+                    if (item && item._id) {
+                        const key = getKey(item);
+                        if (key && !mergedMap.has(key)) {
+                            const emailStr = String(item.email || '').toLowerCase().trim();
+                            const empDesig = empDesignationMap.get(item._id.toString()) || empDesignationMap.get(emailStr);
+                            if (isSalesExecutiveDesignation(empDesig, item.role)) {
+                                mergedMap.set(key, {
+                                    _id: item._id.toString(),
+                                    name: item.name,
+                                    email: item.email,
+                                    role: 'Sales Executive'
+                                });
+                            }
                         }
                     }
                 });
@@ -422,10 +434,11 @@ const CreateEnquiry = () => {
                     if (!emp || !emp.name) return;
                     const desig = String(emp.designation || '').trim();
                     if (isSalesExecutiveDesignation(desig, '')) {
-                        const targetId = emp.userId ? (typeof emp.userId === 'object' ? emp.userId._id : emp.userId) : emp._id;
-                        const idStr = String(targetId);
-                        if (!mergedMap.has(idStr)) {
-                            mergedMap.set(idStr, {
+                        const key = getKey(emp);
+                        if (key && !mergedMap.has(key)) {
+                            const targetId = emp.userId ? (typeof emp.userId === 'object' ? emp.userId._id : emp.userId) : emp._id;
+                            const idStr = String(targetId);
+                            mergedMap.set(key, {
                                 _id: idStr,
                                 name: emp.name,
                                 email: emp.email || '',
@@ -1099,8 +1112,10 @@ const CreateEnquiry = () => {
                                         name="enquiryNo"
                                         value={header.enquiryNo}
                                         onChange={handleHeaderChange}
-                                        placeholder="Leave blank to auto-generate"
-                                        className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-teal-500/10 focus:border-teal-500 outline-none text-sm font-bold text-slate-800"
+                                        disabled={isEditMode}
+                                        readOnly={isEditMode}
+                                        placeholder="Auto-generated"
+                                        className={`w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold text-slate-800 ${isEditMode ? 'opacity-70 cursor-not-allowed bg-slate-100' : 'focus:ring-4 focus:ring-teal-500/10 focus:border-teal-500'}`}
                                     />
                                 </div>
                             </div>

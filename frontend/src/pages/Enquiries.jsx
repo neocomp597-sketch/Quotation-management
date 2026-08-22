@@ -145,32 +145,44 @@ const Enquiries = () => {
                 };
 
                 const mergedMap = new Map();
+                const getKey = (item) => {
+                    if (item.email && String(item.email).trim()) {
+                        return String(item.email).toLowerCase().trim();
+                    }
+                    return String(item.name || '').toLowerCase().trim();
+                };
 
                 sData.forEach(item => {
-                    if (item && item._id && !mergedMap.has(item._id.toString())) {
-                        const empDesig = item.email ? empDesignationMap.get(String(item.email).toLowerCase().trim()) : null;
-                        if (!empDesig || isSalesExecutiveDesignation(empDesig, 'Sales Executive')) {
-                            mergedMap.set(item._id.toString(), {
-                                _id: item._id.toString(),
-                                name: item.name,
-                                email: item.email,
-                                role: 'Sales Executive'
-                            });
+                    if (item && item._id) {
+                        const key = getKey(item);
+                        if (key && !mergedMap.has(key)) {
+                            const empDesig = item.email ? empDesignationMap.get(String(item.email).toLowerCase().trim()) : null;
+                            if (!empDesig || isSalesExecutiveDesignation(empDesig, 'Sales Executive')) {
+                                mergedMap.set(key, {
+                                    _id: item._id.toString(),
+                                    name: item.name,
+                                    email: item.email,
+                                    role: 'Sales Executive'
+                                });
+                            }
                         }
                     }
                 });
 
                 uData.forEach(item => {
-                    if (item && item._id && !mergedMap.has(item._id.toString())) {
-                        const emailStr = String(item.email || '').toLowerCase().trim();
-                        const empDesig = empDesignationMap.get(item._id.toString()) || empDesignationMap.get(emailStr);
-                        if (isSalesExecutiveDesignation(empDesig, item.role)) {
-                            mergedMap.set(item._id.toString(), {
-                                _id: item._id.toString(),
-                                name: item.name,
-                                email: item.email,
-                                role: 'Sales Executive'
-                            });
+                    if (item && item._id) {
+                        const key = getKey(item);
+                        if (key && !mergedMap.has(key)) {
+                            const emailStr = String(item.email || '').toLowerCase().trim();
+                            const empDesig = empDesignationMap.get(item._id.toString()) || empDesignationMap.get(emailStr);
+                            if (isSalesExecutiveDesignation(empDesig, item.role)) {
+                                mergedMap.set(key, {
+                                    _id: item._id.toString(),
+                                    name: item.name,
+                                    email: item.email,
+                                    role: 'Sales Executive'
+                                });
+                            }
                         }
                     }
                 });
@@ -179,10 +191,11 @@ const Enquiries = () => {
                     if (!emp || !emp.name) return;
                     const desig = String(emp.designation || '').trim();
                     if (isSalesExecutiveDesignation(desig, '')) {
-                        const targetId = emp.userId ? (typeof emp.userId === 'object' ? emp.userId._id : emp.userId) : emp._id;
-                        const idStr = String(targetId);
-                        if (!mergedMap.has(idStr)) {
-                            mergedMap.set(idStr, {
+                        const key = getKey(emp);
+                        if (key && !mergedMap.has(key)) {
+                            const targetId = emp.userId ? (typeof emp.userId === 'object' ? emp.userId._id : emp.userId) : emp._id;
+                            const idStr = String(targetId);
+                            mergedMap.set(key, {
                                 _id: idStr,
                                 name: emp.name,
                                 email: emp.email || '',

@@ -9,6 +9,7 @@ import {
 import { authorizationService, userService, superAdminService, vendorService } from '../services/api';
 import { ROLE_LABELS as BUILTIN_ROLE_LABELS, MENU_PERMISSION_GROUPS } from '../constants/menuPermissions';
 import { useAuth } from '../context/AuthContext';
+import Modal from '../components/Modal';
 
 const childKeysFor = (group) => (group.children || []).map((child) => child.key);
 
@@ -68,6 +69,12 @@ const Authorization = () => {
     // Edit User Modal/Row
     const [editingUserId, setEditingUserId] = useState(null);
     const [editingUserData, setEditingUserData] = useState({ name: '', email: '', password: '', role: '', reportsTo: '', vendorId: '' });
+
+    // Password Update Modal
+    const [passwordModalUser, setPasswordModalUser] = useState(null);
+    const [newPasswordValue, setNewPasswordValue] = useState('');
+    const [confirmPasswordValue, setConfirmPasswordValue] = useState('');
+    const [updatingPassword, setUpdatingPassword] = useState(false);
 
     // Super Admin Company Selector
     const [companies, setCompanies] = useState([]);
@@ -472,6 +479,32 @@ const Authorization = () => {
     const handleCancelEditUser = () => {
         setEditingUserId(null);
         setEditingUserData({ name: '', email: '', password: '', role: '', reportsTo: '', vendorId: '' });
+    };
+
+    const handleUpdateUserPassword = async (e) => {
+        if (e) e.preventDefault();
+        if (!passwordModalUser) return;
+        if (!newPasswordValue || newPasswordValue.length < 6) {
+            toast.error('Password must be at least 6 characters');
+            return;
+        }
+        if (newPasswordValue !== confirmPasswordValue) {
+            toast.error('Passwords do not match');
+            return;
+        }
+        try {
+            setUpdatingPassword(true);
+            const params = isSuperAdmin && selectedCompanyId ? { companyId: selectedCompanyId } : {};
+            await userService.update(passwordModalUser._id, { password: newPasswordValue }, params);
+            toast.success(`Password for ${passwordModalUser.name} updated successfully!`);
+            setPasswordModalUser(null);
+            setNewPasswordValue('');
+            setConfirmPasswordValue('');
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Failed to update password');
+        } finally {
+            setUpdatingPassword(false);
+        }
     };
 
     const handleSaveUser = async () => {
@@ -909,7 +942,7 @@ const Authorization = () => {
 
                                         if (isEditing) {
                                             return (
-                                                <div key={user._id} className="p-6 bg-primary-50/40 dark:bg-slate-800/80 grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+                                                <div key={user._id} className="p-6 bg-primary-50/40 dark:bg-slate-800/80 grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
                                                     <div>
                                                         <label className="block text-[10px] font-bold uppercase text-primary-600 dark:text-primary-400 mb-1">Name</label>
                                                         <input
@@ -925,6 +958,16 @@ const Authorization = () => {
                                                             type="email"
                                                             value={editingUserData.email}
                                                             onChange={(e) => setEditingUserData(prev => ({...prev, email: e.target.value}))}
+                                                            className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 border border-primary-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-slate-100 outline-none focus:border-primary-500"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-[10px] font-bold uppercase text-primary-600 dark:text-primary-400 mb-1">New Password (optional)</label>
+                                                        <input
+                                                            type="password"
+                                                            placeholder="New password..."
+                                                            value={editingUserData.password || ''}
+                                                            onChange={(e) => setEditingUserData(prev => ({...prev, password: e.target.value}))}
                                                             className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 border border-primary-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-slate-100 outline-none focus:border-primary-500"
                                                         />
                                                     </div>
@@ -1010,6 +1053,18 @@ const Authorization = () => {
 
                                                         {/* Actions */}
                                                         <div className="flex items-center gap-1">
+                                                            <button 
+                                                                onClick={() => {
+                                                                    setPasswordModalUser(user);
+                                                                    setNewPasswordValue('');
+                                                                    setConfirmPasswordValue('');
+                                                                }}
+                                                                disabled={isUpdating}
+                                                                className="p-2 text-slate-500 dark:text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-slate-800 rounded-xl transition-colors"
+                                                                title="Update Password"
+                                                            >
+                                                                <MdKey size={18} />
+                                                            </button>
                                                             <button 
                                                                 onClick={() => handleStartEditUser(user)}
                                                                 disabled={isUpdating}
@@ -1316,6 +1371,18 @@ const Authorization = () => {
                                                             <td className="px-6 py-4 text-right">
                                                                 <div className="flex items-center justify-end gap-1">
                                                                     <button 
+                                                                        onClick={() => {
+                                                                            setPasswordModalUser(user);
+                                                                            setNewPasswordValue('');
+                                                                            setConfirmPasswordValue('');
+                                                                        }}
+                                                                        disabled={isUpdating}
+                                                                        className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                                                                        title="Update Password"
+                                                                    >
+                                                                        <MdKey size={16} />
+                                                                    </button>
+                                                                    <button 
                                                                         onClick={() => handleStartEditUser(user)}
                                                                         disabled={isUpdating}
                                                                         className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-slate-800 rounded-lg transition-colors"
@@ -1345,6 +1412,60 @@ const Authorization = () => {
                     )}
                 </>
             )}
+            {/* Password Update Modal */}
+            <Modal
+                isOpen={!!passwordModalUser}
+                onClose={() => setPasswordModalUser(null)}
+                title={`Update Password - ${passwordModalUser?.name || ''}`}
+            >
+                <form onSubmit={handleUpdateUserPassword} className="space-y-4">
+                    <div className="p-3 bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 rounded-xl border border-amber-200 dark:border-amber-800 text-xs font-bold flex items-center gap-2">
+                        <MdKey size={18} className="text-amber-600 shrink-0" />
+                        <span>Update login password for <strong className="font-extrabold">{passwordModalUser?.name}</strong> ({passwordModalUser?.email})</span>
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">New Password *</label>
+                        <input
+                            type="password"
+                            required
+                            minLength={6}
+                            value={newPasswordValue}
+                            onChange={(e) => setNewPasswordValue(e.target.value)}
+                            placeholder="Enter new password (min 6 chars)"
+                            className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold text-slate-900 dark:text-white outline-none focus:border-primary-500"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">Confirm Password *</label>
+                        <input
+                            type="password"
+                            required
+                            minLength={6}
+                            value={confirmPasswordValue}
+                            onChange={(e) => setConfirmPasswordValue(e.target.value)}
+                            placeholder="Confirm new password"
+                            className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold text-slate-900 dark:text-white outline-none focus:border-primary-500"
+                        />
+                    </div>
+                    <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+                        <button
+                            type="button"
+                            onClick={() => setPasswordModalUser(null)}
+                            className="px-4 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-bold hover:bg-slate-200 dark:hover:bg-slate-700"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={updatingPassword}
+                            className="px-6 py-2.5 bg-primary-600 text-white rounded-xl text-xs font-black uppercase tracking-wider hover:bg-primary-700 disabled:opacity-50 shadow-md flex items-center gap-1.5"
+                        >
+                            <MdKey size={16} />
+                            {updatingPassword ? 'Updating...' : 'Update Password'}
+                        </button>
+                    </div>
+                </form>
+            </Modal>
         </div>
     );
 };

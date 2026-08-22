@@ -7,6 +7,7 @@ const PortalDropdown = ({ isOpen, anchorRef, children }) => {
     useEffect(() => {
         if (isOpen && anchorRef.current) {
             const updatePosition = () => {
+                if (!anchorRef.current) return;
                 const rect = anchorRef.current.getBoundingClientRect();
                 const dropdownHeight = 320;
                 const spaceBelow = window.innerHeight - rect.bottom;
@@ -24,13 +25,11 @@ const PortalDropdown = ({ isOpen, anchorRef, children }) => {
             
             updatePosition();
             window.addEventListener('resize', updatePosition);
-            
-            const handleScroll = () => updatePosition();
-            window.addEventListener('scroll', handleScroll, true);
+            window.addEventListener('scroll', updatePosition, { capture: true, passive: true });
             
             return () => {
                 window.removeEventListener('resize', updatePosition);
-                window.removeEventListener('scroll', handleScroll, true);
+                window.removeEventListener('scroll', updatePosition, { capture: true, passive: true });
             };
         }
     }, [isOpen, anchorRef]);
@@ -50,6 +49,7 @@ const PortalDropdown = ({ isOpen, anchorRef, children }) => {
                 transform: transform,
                 zIndex: 9999 
             }}
+            onClick={(e) => e.stopPropagation()}
         >
             {children}
         </div>,
@@ -58,3 +58,4 @@ const PortalDropdown = ({ isOpen, anchorRef, children }) => {
 };
 
 export default PortalDropdown;
+
