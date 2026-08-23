@@ -190,6 +190,9 @@ const ScheduleEnquiryVisit = () => {
             let updatedVisits = [];
             let logMessage = '';
 
+            const isValidMongoId = (str) => typeof str === 'string' && /^[0-9a-fA-F]{24}$/.test(str);
+            const safeAssignedTo = isValidMongoId(visitExecutive) ? visitExecutive : null;
+
             if (isEditMode) {
                 const idx = parseInt(visitIndex, 10);
                 updatedVisits = currentVisits.map((v, i) => {
@@ -197,7 +200,7 @@ const ScheduleEnquiryVisit = () => {
                         return {
                             ...v,
                             visitDate: new Date(visitDate),
-                            assignedTo: visitExecutive || null,
+                            assignedTo: safeAssignedTo,
                             purpose: visitPurpose,
                             location: visitLocation,
                             status: visitStatus,
@@ -212,7 +215,7 @@ const ScheduleEnquiryVisit = () => {
             } else {
                 const newVisitObj = {
                     visitDate: new Date(visitDate),
-                    assignedTo: visitExecutive || null,
+                    assignedTo: safeAssignedTo,
                     purpose: visitPurpose,
                     location: visitLocation,
                     status: visitStatus,
@@ -238,8 +241,7 @@ const ScheduleEnquiryVisit = () => {
             const updatedEnquiryPayload = {
                 visits: updatedVisits,
                 followUpHistory: updatedHistory,
-                followUpDate: nextFollowUp,
-                lastActivityDate: new Date()
+                followUpDate: nextFollowUp
             };
 
             await enquiryService.update(id, updatedEnquiryPayload);
@@ -247,7 +249,8 @@ const ScheduleEnquiryVisit = () => {
             navigate(`/enquiries/view/${id}`);
         } catch (err) {
             console.error('Failed to save visit:', err);
-            toast.error('Failed to save visit schedule');
+            const serverMsg = err?.response?.data?.message;
+            toast.error(serverMsg || 'Failed to save visit schedule');
         } finally {
             setSaving(false);
         }

@@ -45,14 +45,15 @@ exports.validateEnquiryUpdate = (req, res, next) => {
     next();
 };
 
-// Middleware to ensure lastActivityDate is not manually overridden to past
+// Middleware to ensure lastActivityDate is not manually overridden to future
 exports.validateActivityDate = (req, res, next) => {
     if (req.body.lastActivityDate) {
         const providedDate = new Date(req.body.lastActivityDate);
         const now = new Date();
 
-        // Don't allow manually setting to future date
-        if (providedDate > now) {
+        // Don't allow manually setting to far future date (allow 10 min clock skew)
+        const maxAllowedFuture = new Date(now.getTime() + 10 * 60 * 1000);
+        if (providedDate > maxAllowedFuture) {
             console.error(`[Enquiry Validation Error] lastActivityDate cannot be set to a future date: ${req.body.lastActivityDate}`);
             return res.status(400).json({
                 message: 'lastActivityDate cannot be set to a future date',

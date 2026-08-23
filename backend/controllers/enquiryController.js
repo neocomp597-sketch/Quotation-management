@@ -37,21 +37,21 @@ const cleanEnquiryBody = (body) => {
     if (body.assignedTo && typeof body.assignedTo === 'object') {
         body.assignedTo = body.assignedTo._id ? body.assignedTo._id.toString() : null;
     }
-    if (body.assignedTo === '' || body.assignedTo === 'null' || body.assignedTo === 'undefined') {
+    if (body.assignedTo === '' || body.assignedTo === 'null' || body.assignedTo === 'undefined' || (body.assignedTo && !mongoose.Types.ObjectId.isValid(body.assignedTo))) {
         body.assignedTo = null;
     }
 
     if (body.createdBy && typeof body.createdBy === 'object') {
         body.createdBy = body.createdBy._id ? body.createdBy._id.toString() : null;
     }
-    if (!body.createdBy || body.createdBy === '' || body.createdBy === 'null' || body.createdBy === 'undefined') {
+    if (!body.createdBy || body.createdBy === '' || body.createdBy === 'null' || body.createdBy === 'undefined' || (body.createdBy && !mongoose.Types.ObjectId.isValid(body.createdBy))) {
         delete body.createdBy;
     }
 
     if (body.customerId && typeof body.customerId === 'object') {
         body.customerId = body.customerId._id ? body.customerId._id.toString() : null;
     }
-    if (!body.customerId || body.customerId === '' || body.customerId === 'null') {
+    if (!body.customerId || body.customerId === '' || body.customerId === 'null' || (body.customerId && !mongoose.Types.ObjectId.isValid(body.customerId))) {
         delete body.customerId;
     }
 
@@ -71,32 +71,32 @@ const cleanEnquiryBody = (body) => {
             cleanedItem.itemCategory = isManualBool ? 'Manual' : 'Added';
 
             if (cleanedItem.productId && typeof cleanedItem.productId === 'object') {
-                cleanedItem.productId = cleanedItem.productId._id;
+                cleanedItem.productId = cleanedItem.productId._id ? cleanedItem.productId._id.toString() : null;
             }
-            if (!cleanedItem.productId || cleanedItem.productId === '') {
+            if (!cleanedItem.productId || cleanedItem.productId === '' || !mongoose.Types.ObjectId.isValid(cleanedItem.productId)) {
                 delete cleanedItem.productId;
             }
 
             if (cleanedItem.finalVendor && typeof cleanedItem.finalVendor === 'object') {
-                cleanedItem.finalVendor = cleanedItem.finalVendor._id;
+                cleanedItem.finalVendor = cleanedItem.finalVendor._id ? cleanedItem.finalVendor._id.toString() : null;
             }
-            if (!cleanedItem.finalVendor || cleanedItem.finalVendor === '') {
+            if (!cleanedItem.finalVendor || cleanedItem.finalVendor === '' || !mongoose.Types.ObjectId.isValid(cleanedItem.finalVendor)) {
                 delete cleanedItem.finalVendor;
             }
 
             if (Array.isArray(cleanedItem.vendors)) {
                 cleanedItem.vendors = cleanedItem.vendors
                     .map(v => (v && typeof v === 'object') ? v._id : v)
-                    .filter(v => v && v !== '');
+                    .filter(v => v && v !== '' && mongoose.Types.ObjectId.isValid(v));
             }
 
             if (Array.isArray(cleanedItem.vendorQuotes)) {
                 cleanedItem.vendorQuotes = cleanedItem.vendorQuotes.map(vq => {
                     const cleanedVq = { ...vq };
                     if (cleanedVq.vendorId && typeof cleanedVq.vendorId === 'object') {
-                        cleanedVq.vendorId = cleanedVq.vendorId._id;
+                        cleanedVq.vendorId = cleanedVq.vendorId._id ? cleanedVq.vendorId._id.toString() : null;
                     }
-                    if (!cleanedVq.vendorId || cleanedVq.vendorId === '') {
+                    if (!cleanedVq.vendorId || cleanedVq.vendorId === '' || !mongoose.Types.ObjectId.isValid(cleanedVq.vendorId)) {
                         delete cleanedVq.vendorId;
                     }
                     if (cleanedVq.price === '') {
@@ -116,16 +116,30 @@ const cleanEnquiryBody = (body) => {
             if (cleanedV.assignedTo && typeof cleanedV.assignedTo === 'object') {
                 cleanedV.assignedTo = cleanedV.assignedTo._id ? cleanedV.assignedTo._id.toString() : null;
             }
-            if (cleanedV.assignedTo === '' || cleanedV.assignedTo === 'null' || cleanedV.assignedTo === 'undefined') {
+            if (cleanedV.assignedTo === '' || cleanedV.assignedTo === 'null' || cleanedV.assignedTo === 'undefined' || (cleanedV.assignedTo && !mongoose.Types.ObjectId.isValid(cleanedV.assignedTo))) {
                 cleanedV.assignedTo = null;
             }
             if (cleanedV.createdBy && typeof cleanedV.createdBy === 'object') {
                 cleanedV.createdBy = cleanedV.createdBy._id ? cleanedV.createdBy._id.toString() : null;
             }
-            if (!cleanedV.createdBy || cleanedV.createdBy === '' || cleanedV.createdBy === 'null' || cleanedV.createdBy === 'undefined') {
+            if (!cleanedV.createdBy || cleanedV.createdBy === '' || cleanedV.createdBy === 'null' || cleanedV.createdBy === 'undefined' || (cleanedV.createdBy && !mongoose.Types.ObjectId.isValid(cleanedV.createdBy))) {
                 delete cleanedV.createdBy;
             }
             return cleanedV;
+        });
+    }
+
+    // Clean followUpHistory
+    if (Array.isArray(body.followUpHistory)) {
+        body.followUpHistory = body.followUpHistory.map(h => {
+            const cleanedH = { ...h };
+            if (cleanedH.performedBy && typeof cleanedH.performedBy === 'object') {
+                cleanedH.performedBy = cleanedH.performedBy._id ? cleanedH.performedBy._id.toString() : null;
+            }
+            if (cleanedH.performedBy === '' || cleanedH.performedBy === 'null' || cleanedH.performedBy === 'undefined' || (cleanedH.performedBy && !mongoose.Types.ObjectId.isValid(cleanedH.performedBy))) {
+                cleanedH.performedBy = null;
+            }
+            return cleanedH;
         });
     }
 

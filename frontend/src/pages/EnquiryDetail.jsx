@@ -343,13 +343,16 @@ const EnquiryDetail = () => {
             let updatedVisits = [];
             let logMessage = '';
 
+            const isValidMongoId = (str) => typeof str === 'string' && /^[0-9a-fA-F]{24}$/.test(str);
+            const safeAssignedTo = isValidMongoId(visitExecutive) ? visitExecutive : null;
+
             if (editingVisitId !== null && currentVisits[editingVisitId]) {
                 updatedVisits = currentVisits.map((v, i) => {
                     if (i === editingVisitId) {
                         return {
                             ...v,
                             visitDate: new Date(visitDate),
-                            assignedTo: visitExecutive || null,
+                            assignedTo: safeAssignedTo,
                             purpose: visitPurpose,
                             location: visitLocation,
                             status: visitStatus,
@@ -364,7 +367,7 @@ const EnquiryDetail = () => {
             } else {
                 const newVisitObj = {
                     visitDate: new Date(visitDate),
-                    assignedTo: visitExecutive || null,
+                    assignedTo: safeAssignedTo,
                     purpose: visitPurpose,
                     location: visitLocation,
                     status: visitStatus,
@@ -387,11 +390,13 @@ const EnquiryDetail = () => {
                 ? new Date(visitDate)
                 : enquiry.followUpDate;
 
+            const headerAssignedTo = safeAssignedTo || (isValidMongoId(enquiry.assignedTo?._id) ? enquiry.assignedTo._id : (isValidMongoId(enquiry.assignedTo) ? enquiry.assignedTo : null));
+
             const payload = {
                 visits: updatedVisits,
                 followUpDate: nextFollowUp,
                 followUpHistory: updatedHistory,
-                assignedTo: visitExecutive || enquiry.assignedTo?._id || enquiry.assignedTo || null
+                assignedTo: headerAssignedTo
             };
 
             await enquiryService.update(id, payload);
@@ -401,7 +406,8 @@ const EnquiryDetail = () => {
             await loadEnquiryDetails();
         } catch (err) {
             console.error('Visit Save Error:', err);
-            toast.error('Failed to save visit details');
+            const serverMsg = err?.response?.data?.message;
+            toast.error(serverMsg || 'Failed to save visit details');
         } finally {
             setSchedulingVisit(false);
         }
