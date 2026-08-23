@@ -1150,7 +1150,7 @@ const CreateEnquiry = () => {
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3">
                                 <div>
-                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">Company Name *</label>
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">Company Name <span className="text-rose-500">*</span></label>
                                     <input
                                         type="text"
                                         required
@@ -1161,7 +1161,7 @@ const CreateEnquiry = () => {
                                     />
                                 </div>
                                 <div>
-                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">Contact Name *</label>
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">Contact Name <span className="text-rose-500">*</span></label>
                                     <input
                                         type="text"
                                         required

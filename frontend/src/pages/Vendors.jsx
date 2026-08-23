@@ -419,7 +419,9 @@ const Vendors = ({ isCreatePage, isEditPage }) => {
                         <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
                             <form onSubmit={onSubmit} className="space-y-6">
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Vendor Name *</label>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                                        Vendor Name <span className="text-red-500 font-bold ml-0.5">*</span>
+                                    </label>
                                     <input
                                         type="text"
                                         name="name"

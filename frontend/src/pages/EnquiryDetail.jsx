@@ -1003,7 +1003,9 @@ const EnquiryDetail = () => {
 
                         <div className="grid grid-cols-2 gap-3">
                             <div>
-                                <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Visit Status *</label>
+                                <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">
+                                    Visit Status <span className="text-red-500 font-bold ml-0.5">*</span>
+                                </label>
                                 <select
                                     value={visitStatus}
                                     onChange={(e) => setVisitStatus(e.target.value)}
@@ -1059,7 +1061,9 @@ const EnquiryDetail = () => {
                         </div>
 
                         <div>
-                            <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Appointment Date & Time *</label>
+                            <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">
+                                Appointment Date & Time <span className="text-red-500 font-bold ml-0.5">*</span>
+                            </label>
                             <input
                                 type="datetime-local"
                                 value={visitDate}

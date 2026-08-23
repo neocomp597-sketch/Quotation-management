@@ -1572,15 +1572,15 @@ const PlanningScreen = () => {
     const isRightAligned = className.includes("text-right");
 
     return (
-      <th className={`py-3 px-3 border border-slate-200 ${className}`}>
+      <th className={`py-3 px-3 border border-slate-200 dark:border-slate-800 ${className}`}>
         <button
           type="button"
           onClick={() => requestSort(key)}
-          className={`group inline-flex items-center gap-1.5 font-black text-slate-700 text-xs ${isRightAligned ? "w-full justify-end" : ""}`}
+          className={`group inline-flex items-center gap-1.5 font-black text-slate-700 dark:text-slate-200 text-xs ${isRightAligned ? "w-full justify-end" : ""}`}
         >
           <span>{label}</span>
           <MdKeyboardArrowDown
-            className={`transition-all duration-200 ${isActive ? "text-primary-600 opacity-100" : "text-slate-300 opacity-70 group-hover:text-slate-500"} ${isActive && sortConfig.direction === "asc" ? "rotate-180" : ""}`}
+            className={`transition-all duration-200 ${isActive ? "text-primary-600 dark:text-primary-400 opacity-100" : "text-slate-300 dark:text-slate-600 opacity-70 group-hover:text-slate-500 dark:group-hover:text-slate-300"} ${isActive && sortConfig.direction === "asc" ? "rotate-180" : ""}`}
             size={16}
           />
         </button>
@@ -1606,15 +1606,15 @@ const PlanningScreen = () => {
   const calculatedTotal =
     newRow.qty && newRow.value ? Number(newRow.qty) * Number(newRow.value) : 0;
   const compactFieldClass =
-    "w-full px-2.5 py-2.5 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-primary-500 bg-white";
+    "w-full px-2.5 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold outline-none focus:border-primary-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100";
   const compactNumericFieldClass = `${compactFieldClass} text-right`;
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-24">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-            <MdCalendarMonth className="text-primary-600" />
+          <h1 className="text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight flex items-center gap-2">
+            <MdCalendarMonth className="text-primary-600 dark:text-primary-400" />
             Planning Screen
           </h1>
         </div>
@@ -1622,7 +1622,7 @@ const PlanningScreen = () => {
           <select
             value={financialYear}
             onChange={(e) => setFinancialYear(e.target.value)}
-            className="px-4 py-3 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-primary-500 bg-white"
+            className="px-4 py-3 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold outline-none focus:border-primary-500 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200"
           >
             {getFinancialYears().map((fy) => (
               <option key={fy} value={fy}>
@@ -1632,20 +1632,20 @@ const PlanningScreen = () => {
           </select>
           <button
             onClick={fetchData}
-            className="p-3 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition-all"
+            className="p-3 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
             title="Refresh now"
           >
             <MdRefresh size={20} />
           </button>
           {isSelectedYearPrevious && !canEdit && (
-            <span className="text-xs font-bold text-amber-600 bg-amber-50 px-3 py-2 rounded-lg border border-amber-200 flex items-center gap-1.5 shadow-sm">
+            <span className="text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 rounded-lg border border-amber-200 dark:border-amber-800 flex items-center gap-1.5 shadow-sm">
               ⚠️ Read-only (Previous Year)
             </span>
           )}
           {canEdit && (
             <button
               onClick={() => setIsImportModalOpen(true)}
-              className="px-5 py-3 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center gap-2"
+              className="px-5 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-50 dark:hover:bg-slate-700 transition-all flex items-center gap-2"
             >
               <MdFileUpload size={18} />
               Import
@@ -1663,13 +1663,13 @@ const PlanningScreen = () => {
 
 
 
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden">
         <>
           {editingId && (
-            <div className="p-4 md:p-5 border-b border-slate-100 bg-slate-50/60 flex justify-end">
+            <div className="p-4 md:p-5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/60 flex justify-end">
               <button
                 onClick={handleCancelEdit}
-                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 transition-colors"
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
               >
                 <MdClose size={18} />
                 Cancel Edit
@@ -1677,11 +1677,11 @@ const PlanningScreen = () => {
             </div>
           )}
 
-          <div className="px-4 md:px-5 py-4 border-b border-slate-100 bg-white">
+          <div className="px-4 md:px-5 py-4 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900">
             <div className="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-4">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 xl:flex-1">
                 <div>
-                  <label className="block text-[11px] font-black uppercase tracking-widest text-slate-500 mb-2">
+                  <label className="block text-[11px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-2">
                     📅 Filter Month (Primary)
                   </label>
                   <select
@@ -1689,7 +1689,7 @@ const PlanningScreen = () => {
                     onChange={(e) =>
                       handleFilterChange("month", e.target.value)
                     }
-                    className="w-full px-3 py-3 border border-primary-300 rounded-xl text-sm font-bold outline-none focus:border-primary-500 bg-primary-50"
+                    className="w-full px-3 py-3 border border-primary-300 dark:border-primary-700 rounded-xl text-sm font-bold outline-none focus:border-primary-500 bg-primary-50 dark:bg-primary-950/50 text-slate-800 dark:text-slate-100"
                   >
                     <option value="">Select</option>
                     {monthLabels.map((month) => (
@@ -1701,7 +1701,7 @@ const PlanningScreen = () => {
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-black uppercase tracking-widest text-slate-500 mb-2">
+                  <label className="block text-[11px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-2">
                     Filter MGR 1
                   </label>
                   <select
@@ -1709,7 +1709,7 @@ const PlanningScreen = () => {
                     onChange={(e) =>
                       handleFilterChange("mgrCode", e.target.value)
                     }
-                    className="w-full px-3 py-3 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-primary-500 bg-white"
+                    className="w-full px-3 py-3 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold outline-none focus:border-primary-500 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100"
                   >
                     <option value="">All MGR 1</option>
                     {mgrList.map((mgr) => (
@@ -1721,7 +1721,7 @@ const PlanningScreen = () => {
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-black uppercase tracking-widest text-slate-500 mb-2">
+                  <label className="block text-[11px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-2">
                     Filter MGR 2
                   </label>
                   <select
@@ -1729,7 +1729,7 @@ const PlanningScreen = () => {
                     onChange={(e) =>
                       handleFilterChange("mgrCode2", e.target.value)
                     }
-                    className="w-full px-3 py-3 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-primary-500 bg-white"
+                    className="w-full px-3 py-3 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold outline-none focus:border-primary-500 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100"
                   >
                     <option value="">All MGR 2</option>
                     {mgrList2.map((mgr) => (
@@ -1741,7 +1741,7 @@ const PlanningScreen = () => {
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-black uppercase tracking-widest text-slate-500 mb-2">
+                  <label className="block text-[11px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-2">
                     Filter Status
                   </label>
                   <select
@@ -1749,7 +1749,7 @@ const PlanningScreen = () => {
                     onChange={(e) =>
                       handleFilterChange("status", e.target.value)
                     }
-                    className="w-full px-3 py-3 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-primary-500 bg-white"
+                    className="w-full px-3 py-3 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold outline-none focus:border-primary-500 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100"
                   >
                     <option value="">All Statuses</option>
                     {(statusOptions.length > 0 ? statusOptions : ["Budget", "Firm", "MFC", "B & B", "Others", "Order Received", "Invoice", "Lost", "Parked"])
@@ -1767,14 +1767,14 @@ const PlanningScreen = () => {
               </div>
 
               <div className="flex items-center gap-3">
-                <span className="px-3 py-2 rounded-xl bg-slate-100 text-slate-600 text-sm font-bold">
+                <span className="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-sm font-bold">
                   {filteredEntries.length}{" "}
                   {filteredEntries.length === 1 ? "entry" : "entries"}
                 </span>
                 <button
                   onClick={clearFilters}
                   disabled={!hasActiveFilters}
-                  className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-600 font-bold hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <MdRefresh size={18} />
                   Clear Filters
@@ -1784,7 +1784,7 @@ const PlanningScreen = () => {
           </div>
 
           <div className="overflow-hidden">
-            <table className="w-full table-fixed text-left text-sm border-collapse border border-slate-200">
+            <table className="w-full table-fixed text-left text-sm border-collapse border border-slate-200 dark:border-slate-800">
               <colgroup>
                 <col className="w-[8%]" />
                 <col className="w-[17%]" />
@@ -1797,7 +1797,7 @@ const PlanningScreen = () => {
                 <col className="w-[13%]" />
               </colgroup>
               <thead>
-                <tr className="bg-amber-50 border-b border-amber-100">
+                <tr className="bg-amber-50/80 dark:bg-amber-950/40 border-b border-amber-100 dark:border-amber-900/60">
                   {renderSortableHeader("Month", "monthYear", "px-2 py-3")}
                   {renderSortableHeader(
                     "Customer",
@@ -1818,19 +1818,19 @@ const PlanningScreen = () => {
                   {renderSortableHeader(
                     "Total",
                     "totalValue",
-                    "px-2 py-3 text-right bg-amber-100",
+                    "px-2 py-3 text-right bg-amber-100 dark:bg-amber-900/40",
                   )}
                   {renderSortableHeader("MGR 1", "mgrCode", "px-2 py-3")}
                   {renderSortableHeader("MGR 2", "mgrCode2", "px-2 py-3")}
                   {renderSortableHeader("Status", "status", "px-2 py-3")}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-50">
+              <tbody className="divide-y divide-slate-50 dark:divide-slate-800/60">
                 {canEdit && (
-                  <tr className="bg-primary-50/40 border-b border-primary-100 align-top">
-                    <td className="py-2 px-2 border border-slate-200">
+                  <tr className="bg-primary-50/40 dark:bg-primary-950/40 border-b border-primary-100 dark:border-primary-900/50 align-top">
+                    <td className="py-2 px-2 border border-slate-200 dark:border-slate-800">
                       {editingId ? (
-                        <div className="w-full px-3 py-2.5 bg-slate-100 border border-slate-200 rounded-lg text-xs font-black text-slate-500 text-center select-none shadow-sm">
+                        <div className="w-full px-3 py-2.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-black text-slate-500 dark:text-slate-400 text-center select-none shadow-sm">
                           {newRow.monthYear}
                         </div>
                       ) : (
@@ -1843,7 +1843,7 @@ const PlanningScreen = () => {
                             setShowCustomerDropdown(false);
                             setShowProductDropdown(false);
                           }}
-                          className="w-full px-2.5 py-2.5 border border-primary-400 rounded-lg text-xs font-black outline-none focus:border-primary-500 bg-primary-50"
+                          className="w-full px-2.5 py-2.5 border border-primary-400 dark:border-primary-700 rounded-lg text-xs font-black outline-none focus:border-primary-500 bg-primary-50 dark:bg-primary-950/50 text-slate-800 dark:text-slate-100"
                         >
                           <option value="">Select</option>
                           {monthLabels.map((month) => (
@@ -1880,8 +1880,8 @@ const PlanningScreen = () => {
                         isOpen={showCustomerDropdown}
                         anchorRef={customerAnchorRef}
                       >
-                        <div className="portal-dropdown-content bg-white border border-slate-200 rounded-xl shadow-2xl min-w-[300px] max-h-64 flex flex-col overflow-hidden">
-                          <div className="p-2 border-b border-slate-100 bg-slate-50">
+                        <div className="portal-dropdown-content bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl min-w-[300px] max-h-64 flex flex-col overflow-hidden">
+                          <div className="p-2 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800">
                             <input
                               type="text"
                               value={customerSearch}
@@ -1892,12 +1892,12 @@ const PlanningScreen = () => {
                               }}
                               onClick={(e) => e.stopPropagation()}
                               placeholder="Search by name, GSTIN, code..."
-                              className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-primary-500 bg-white"
+                              className="w-full px-2.5 py-1.5 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold outline-none focus:border-primary-500 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
                             />
                           </div>
                           <div
                             onScroll={handleCustomerScroll}
-                            className="overflow-y-auto custom-scrollbar flex-1 max-h-52 divide-y divide-slate-50"
+                            className="overflow-y-auto custom-scrollbar flex-1 max-h-52 divide-y divide-slate-50 dark:divide-slate-800"
                           >
                             {filteredCustomers.length > 0 ? (
                               filteredCustomers.map((customer) => (
@@ -1905,12 +1905,12 @@ const PlanningScreen = () => {
                                   key={customer._id}
                                   type="button"
                                   onClick={() => selectCustomer(customer)}
-                                  className="w-full text-left px-3 py-2.5 hover:bg-primary-50 transition-colors border-b border-slate-50 group"
+                                  className="w-full text-left px-3 py-2.5 hover:bg-primary-50 dark:hover:bg-slate-800 transition-colors border-b border-slate-50 dark:border-slate-800 group"
                                 >
-                                  <div className="font-bold text-slate-900 text-xs truncate">
+                                  <div className="font-bold text-slate-900 dark:text-slate-100 text-xs truncate">
                                     {customer.companyName || customer.customerName}
                                   </div>
-                                  <div className="text-[10px] text-slate-500 font-medium truncate mt-0.5">
+                                  <div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium truncate mt-0.5">
                                     {customer.customerName && customer.companyName ? `${customer.customerName} • ` : ""}
                                     {customer.externalCode || getFallbackCode("CUST", customer._id)}
                                     {customer.gstin ? ` • GST: ${customer.gstin}` : ""}
@@ -1923,7 +1923,7 @@ const PlanningScreen = () => {
                               </div>
                             )}
                             {isCustomerLoadingMore && (
-                              <div className="p-2 text-center text-[10px] font-bold text-primary-600 uppercase tracking-widest animate-pulse">
+                              <div className="p-2 text-center text-[10px] font-bold text-primary-600 dark:text-primary-400 uppercase tracking-widest animate-pulse">
                                 Loading more customers...
                               </div>
                             )}
@@ -1931,7 +1931,7 @@ const PlanningScreen = () => {
                         </div>
                       </PortalDropdown>
                     </td>
-                    <td ref={productAnchorRef} className="py-2 px-2 border border-slate-200">
+                    <td ref={productAnchorRef} className="py-2 px-2 border border-slate-200 dark:border-slate-800">
                       <div className="relative">
                         <input
                           type="text"
@@ -1957,8 +1957,8 @@ const PlanningScreen = () => {
                         isOpen={showProductDropdown}
                         anchorRef={productAnchorRef}
                       >
-                        <div className="portal-dropdown-content bg-white border border-slate-200 rounded-xl shadow-2xl min-w-[300px] max-h-64 flex flex-col overflow-hidden">
-                          <div className="p-2 border-b border-slate-100 bg-slate-50">
+                        <div className="portal-dropdown-content bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl min-w-[300px] max-h-64 flex flex-col overflow-hidden">
+                          <div className="p-2 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800">
                             <input
                               type="text"
                               value={productSearch}
@@ -1969,12 +1969,12 @@ const PlanningScreen = () => {
                               }}
                               onClick={(e) => e.stopPropagation()}
                               placeholder="Search by product name, code, HSN..."
-                              className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-primary-500 bg-white"
+                              className="w-full px-2.5 py-1.5 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold outline-none focus:border-primary-500 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
                             />
                           </div>
                           <div
                             onScroll={handleProductScroll}
-                            className="overflow-y-auto custom-scrollbar flex-1 max-h-52 divide-y divide-slate-50"
+                            className="overflow-y-auto custom-scrollbar flex-1 max-h-52 divide-y divide-slate-50 dark:divide-slate-800"
                           >
                             {filteredProducts.length > 0 ? (
                               filteredProducts.map((product) => (
@@ -1982,12 +1982,12 @@ const PlanningScreen = () => {
                                   key={product._id}
                                   type="button"
                                   onClick={() => selectProduct(product)}
-                                  className="w-full text-left px-3 py-2.5 hover:bg-primary-50 transition-colors border-b border-slate-50 group"
+                                  className="w-full text-left px-3 py-2.5 hover:bg-primary-50 dark:hover:bg-slate-800 transition-colors border-b border-slate-50 dark:border-slate-800 group"
                                 >
-                                  <div className="font-bold text-slate-900 text-xs truncate">
+                                  <div className="font-bold text-slate-900 dark:text-slate-100 text-xs truncate">
                                     {product.productName}
                                   </div>
-                                  <div className="text-[10px] text-slate-500 font-medium truncate mt-0.5">
+                                  <div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium truncate mt-0.5">
                                     {product.productCode ? `Code: ${product.productCode}` : ""}
                                     {product.hsnCode ? ` • HSN: ${product.hsnCode}` : ""}
                                     {product.basePrice ? ` • ₹${product.basePrice.toLocaleString('en-IN')}` : ""}
@@ -2000,7 +2000,7 @@ const PlanningScreen = () => {
                               </div>
                             )}
                             {isProductLoadingMore && (
-                              <div className="p-2 text-center text-[10px] font-bold text-primary-600 uppercase tracking-widest animate-pulse">
+                              <div className="p-2 text-center text-[10px] font-bold text-primary-600 dark:text-primary-400 uppercase tracking-widest animate-pulse">
                                 Loading more products...
                               </div>
                             )}
@@ -2008,7 +2008,7 @@ const PlanningScreen = () => {
                         </div>
                       </PortalDropdown>
                     </td>
-                    <td className="py-2 px-2 border border-slate-200">
+                    <td className="py-2 px-2 border border-slate-200 dark:border-slate-800">
                       <input
                         type="number"
                         value={newRow.qty}
@@ -2023,7 +2023,7 @@ const PlanningScreen = () => {
                         className={compactNumericFieldClass}
                       />
                     </td>
-                    <td className="py-2 px-2 border border-slate-200">
+                    <td className="py-2 px-2 border border-slate-200 dark:border-slate-800">
                       <input
                         type="number"
                         min="0"
@@ -2039,12 +2039,12 @@ const PlanningScreen = () => {
                         className={compactNumericFieldClass}
                       />
                     </td>
-                    <td className="py-2 px-2 bg-amber-50/80 border border-slate-200">
-                      <div className="px-2.5 py-2.5 rounded-lg bg-amber-50 border border-amber-100 text-sm font-black text-slate-900 text-right">
+                    <td className="py-2 px-2 bg-amber-50/80 dark:bg-amber-950/40 border border-slate-200 dark:border-slate-800">
+                      <div className="px-2.5 py-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/60 border border-amber-100 dark:border-amber-900 text-sm font-black text-slate-900 dark:text-amber-200 text-right">
                         {formatToIndian(calculatedTotal, 2)}
                       </div>
                     </td>
-                    <td ref={mgr1AnchorRef} className="py-2 px-2 border border-slate-200">
+                    <td ref={mgr1AnchorRef} className="py-2 px-2 border border-slate-200 dark:border-slate-800">
                       <button
                         type="button"
                         onClick={() => {
@@ -2054,7 +2054,7 @@ const PlanningScreen = () => {
                           setShowMgr2Dropdown(false);
                           setShowStatusDropdown(false);
                         }}
-                        className={`${compactFieldClass} flex justify-between items-center bg-white text-left font-bold w-full`}
+                        className={`${compactFieldClass} flex justify-between items-center bg-white dark:bg-slate-800 text-left font-bold w-full`}
                       >
                         <span className="truncate">
                           {newRow.mgrCode ? getCanonicalMgrCode(newRow.mgrCode, mgrList) : "Select"}
@@ -2062,22 +2062,22 @@ const PlanningScreen = () => {
                         <MdKeyboardArrowDown className="text-slate-400 shrink-0 ml-1" size={16} />
                       </button>
                       <PortalDropdown isOpen={showMgr1Dropdown} anchorRef={mgr1AnchorRef}>
-                        <div className="portal-dropdown-content bg-white border border-slate-200 rounded-xl shadow-xl max-h-56 flex flex-col overflow-hidden">
-                          <div className="p-2 border-b border-slate-100 bg-slate-50">
+                        <div className="portal-dropdown-content bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl max-h-56 flex flex-col overflow-hidden">
+                          <div className="p-2 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800">
                             <input
                               type="text"
                               value={mgr1Search}
                               onChange={(e) => setMgr1Search(e.target.value)}
                               onClick={(e) => e.stopPropagation()}
                               placeholder="Search MGR 1..."
-                              className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-primary-500 bg-white"
+                              className="w-full px-2.5 py-1.5 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold outline-none focus:border-primary-500 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
                             />
                           </div>
                           <div className="overflow-y-auto custom-scrollbar flex-1 max-h-40">
                             <button
                               type="button"
                               onClick={() => selectMgr1({ code: "" })}
-                              className="w-full text-left px-3 py-2 text-xs font-bold text-slate-400 hover:bg-slate-50 border-b border-slate-50"
+                              className="w-full text-left px-3 py-2 text-xs font-bold text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 border-b border-slate-50 dark:border-slate-800"
                             >
                               Select
                             </button>
@@ -2086,7 +2086,7 @@ const PlanningScreen = () => {
                                 key={mgr._id}
                                 type="button"
                                 onClick={() => selectMgr1(mgr)}
-                                className="w-full text-left px-3 py-2 text-xs font-bold hover:bg-primary-50 transition-colors border-b border-slate-50 text-slate-700"
+                                className="w-full text-left px-3 py-2 text-xs font-bold hover:bg-primary-50 dark:hover:bg-slate-800 transition-colors border-b border-slate-50 dark:border-slate-800 text-slate-700 dark:text-slate-200"
                               >
                                 {mgr.code} - {mgr.description}
                               </button>
@@ -2098,7 +2098,7 @@ const PlanningScreen = () => {
                         </div>
                       </PortalDropdown>
                     </td>
-                    <td ref={mgr2AnchorRef} className="py-2 px-2 border border-slate-200">
+                    <td ref={mgr2AnchorRef} className="py-2 px-2 border border-slate-200 dark:border-slate-800">
                       <button
                         type="button"
                         onClick={() => {
@@ -2108,7 +2108,7 @@ const PlanningScreen = () => {
                           setShowMgr1Dropdown(false);
                           setShowStatusDropdown(false);
                         }}
-                        className={`${compactFieldClass} flex justify-between items-center bg-white text-left font-bold w-full`}
+                        className={`${compactFieldClass} flex justify-between items-center bg-white dark:bg-slate-800 text-left font-bold w-full`}
                       >
                         <span className="truncate">
                           {newRow.mgrCode2 ? getCanonicalMgrCode(newRow.mgrCode2, mgrList2) : "Select"}
@@ -2116,22 +2116,22 @@ const PlanningScreen = () => {
                         <MdKeyboardArrowDown className="text-slate-400 shrink-0 ml-1" size={16} />
                       </button>
                       <PortalDropdown isOpen={showMgr2Dropdown} anchorRef={mgr2AnchorRef}>
-                        <div className="portal-dropdown-content bg-white border border-slate-200 rounded-xl shadow-xl max-h-56 flex flex-col overflow-hidden">
-                          <div className="p-2 border-b border-slate-100 bg-slate-50">
+                        <div className="portal-dropdown-content bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl max-h-56 flex flex-col overflow-hidden">
+                          <div className="p-2 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800">
                             <input
                               type="text"
                               value={mgr2Search}
                               onChange={(e) => setMgr2Search(e.target.value)}
                               onClick={(e) => e.stopPropagation()}
                               placeholder="Search MGR 2..."
-                              className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-primary-500 bg-white"
+                              className="w-full px-2.5 py-1.5 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold outline-none focus:border-primary-500 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
                             />
                           </div>
                           <div className="overflow-y-auto custom-scrollbar flex-1 max-h-40">
                             <button
                               type="button"
                               onClick={() => selectMgr2({ code: "" })}
-                              className="w-full text-left px-3 py-2 text-xs font-bold text-slate-400 hover:bg-slate-50 border-b border-slate-50"
+                              className="w-full text-left px-3 py-2 text-xs font-bold text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 border-b border-slate-50 dark:border-slate-800"
                             >
                               Select
                             </button>
@@ -2140,7 +2140,7 @@ const PlanningScreen = () => {
                                 key={mgr._id}
                                 type="button"
                                 onClick={() => selectMgr2(mgr)}
-                                className="w-full text-left px-3 py-2 text-xs font-bold hover:bg-primary-50 transition-colors border-b border-slate-50 text-slate-700"
+                                className="w-full text-left px-3 py-2 text-xs font-bold hover:bg-primary-50 dark:hover:bg-slate-800 transition-colors border-b border-slate-50 dark:border-slate-800 text-slate-700 dark:text-slate-200"
                               >
                                 {mgr.code} - {mgr.description}
                               </button>
@@ -2152,7 +2152,7 @@ const PlanningScreen = () => {
                         </div>
                       </PortalDropdown>
                     </td>
-                    <td ref={statusAnchorRef} className="py-2 px-2 border border-slate-200">
+                    <td ref={statusAnchorRef} className="py-2 px-2 border border-slate-200 dark:border-slate-800">
                       <div className="space-y-2">
                         <button
                           type="button"
@@ -2163,7 +2163,7 @@ const PlanningScreen = () => {
                             setShowMgr1Dropdown(false);
                             setShowMgr2Dropdown(false);
                           }}
-                          className={`${compactFieldClass} flex justify-between items-center bg-white text-left font-bold w-full`}
+                          className={`${compactFieldClass} flex justify-between items-center bg-white dark:bg-slate-800 text-left font-bold w-full`}
                         >
                           <span className="truncate">
                             {newRow.status ? newRow.status : "Select"}
@@ -2171,22 +2171,22 @@ const PlanningScreen = () => {
                           <MdKeyboardArrowDown className="text-slate-400 shrink-0 ml-1" size={16} />
                         </button>
                         <PortalDropdown isOpen={showStatusDropdown} anchorRef={statusAnchorRef}>
-                          <div className="portal-dropdown-content bg-white border border-slate-200 rounded-xl shadow-xl max-h-56 flex flex-col overflow-hidden">
-                            <div className="p-2 border-b border-slate-100 bg-slate-50">
+                          <div className="portal-dropdown-content bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl max-h-56 flex flex-col overflow-hidden">
+                            <div className="p-2 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800">
                               <input
                                 type="text"
                                 value={statusSearch}
                                 onChange={(e) => setStatusSearch(e.target.value)}
                                 onClick={(e) => e.stopPropagation()}
                                 placeholder="Search status..."
-                                className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-primary-500 bg-white"
+                                className="w-full px-2.5 py-1.5 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold outline-none focus:border-primary-500 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
                               />
                             </div>
                             <div className="overflow-y-auto custom-scrollbar flex-1 max-h-40">
                               <button
                                 type="button"
                                 onClick={() => selectStatus("")}
-                                className="w-full text-left px-3 py-2 text-xs font-bold text-slate-400 hover:bg-slate-50 border-b border-slate-50"
+                                className="w-full text-left px-3 py-2 text-xs font-bold text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 border-b border-slate-50 dark:border-slate-800"
                               >
                                 Select
                               </button>
@@ -2195,7 +2195,7 @@ const PlanningScreen = () => {
                                   key={status}
                                   type="button"
                                   onClick={() => selectStatus(status)}
-                                  className="w-full text-left px-3 py-2 text-xs font-bold hover:bg-primary-50 transition-colors border-b border-slate-50 text-slate-700"
+                                  className="w-full text-left px-3 py-2 text-xs font-bold hover:bg-primary-50 dark:hover:bg-slate-800 transition-colors border-b border-slate-50 dark:border-slate-800 text-slate-700 dark:text-slate-200"
                                 >
                                   {status}
                                 </button>
@@ -2227,7 +2227,7 @@ const PlanningScreen = () => {
                           {editingId && (
                             <button
                               onClick={handleCancelEdit}
-                              className="inline-flex items-center justify-center gap-1 px-3 py-2.5 rounded-lg bg-white border border-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-50 transition-colors"
+                              className="inline-flex items-center justify-center gap-1 px-3 py-2.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
                             >
                               <MdClose size={16} />
                               Cancel
@@ -2242,48 +2242,48 @@ const PlanningScreen = () => {
                 {loading ? (
                   <tr>
                     <td colSpan="9" className="py-10 text-center">
-                      <div className="animate-spin border-4 border-slate-200 border-t-primary-600 rounded-full h-8 w-8 mx-auto"></div>
+                      <div className="animate-spin border-4 border-slate-200 dark:border-slate-700 border-t-primary-600 rounded-full h-8 w-8 mx-auto"></div>
                     </td>
                   </tr>
                 ) : sortedEntries.length > 0 ? (
                   sortedEntries.map((entry) => (
                     <tr
                       key={entry._id}
-                      className={`hover:bg-slate-50 transition-colors ${editingId === entry._id ? "bg-primary-50/60" : ""}`}
+                      className={`hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors ${editingId === entry._id ? "bg-primary-50/60 dark:bg-primary-950/60" : ""}`}
                     >
-                      <td className="py-3 px-2 font-bold text-slate-700 text-xs whitespace-nowrap border border-slate-200">
+                      <td className="py-3 px-2 font-bold text-slate-700 dark:text-slate-300 text-xs whitespace-nowrap border border-slate-200 dark:border-slate-800">
                         {entry.monthYear}
                       </td>
-                      <td className="py-3 px-2 font-bold text-slate-900 text-xs border border-slate-200">
+                      <td className="py-3 px-2 font-bold text-slate-900 dark:text-slate-100 text-xs border border-slate-200 dark:border-slate-800">
                         <p className="truncate" title={entry.customerId?.companyName || entry.customerId?.customerName || getCustomerById(entry.customerId)?.companyName || "-"}>
                           {entry.customerId?.companyName || entry.customerId?.customerName || getCustomerById(entry.customerId)?.companyName || "-"}
                         </p>
                       </td>
-                      <td className="py-3 px-2 text-slate-700 text-xs border border-slate-200">
+                      <td className="py-3 px-2 text-slate-700 dark:text-slate-300 text-xs border border-slate-200 dark:border-slate-800">
                         <p className="truncate" title={entry.productId?.productName || getProductById(entry.productId)?.productName || "-"}>
                           {entry.productId?.productName || getProductById(entry.productId)?.productName || "-"}
                         </p>
                       </td>
-                      <td className="py-3 px-2 text-right font-bold text-slate-700 text-xs whitespace-nowrap border border-slate-200">
+                      <td className="py-3 px-2 text-right font-bold text-slate-700 dark:text-slate-300 text-xs whitespace-nowrap border border-slate-200 dark:border-slate-800">
                         {entry.qty}
                       </td>
-                      <td className="py-3 px-2 text-right font-bold text-slate-700 text-xs whitespace-nowrap border border-slate-200">
+                      <td className="py-3 px-2 text-right font-bold text-slate-700 dark:text-slate-300 text-xs whitespace-nowrap border border-slate-200 dark:border-slate-800">
                         {entry.value?.toLocaleString()}
                       </td>
-                      <td className="py-3 px-2 text-right font-black text-slate-900 text-xs bg-amber-50/50 whitespace-nowrap border border-slate-200">
+                      <td className="py-3 px-2 text-right font-black text-slate-900 dark:text-amber-200 text-xs bg-amber-50/50 dark:bg-amber-950/30 whitespace-nowrap border border-slate-200 dark:border-slate-800">
                         {entry.totalValue?.toLocaleString()}
                       </td>
-                      <td className="py-3 px-2 text-xs whitespace-nowrap border border-slate-200">
+                      <td className="py-3 px-2 text-xs whitespace-nowrap border border-slate-200 dark:border-slate-800">
                         <span
-                          className="block truncate px-2 py-1 bg-blue-50 text-blue-700 rounded font-bold"
+                          className="block truncate px-2 py-1 bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 rounded font-bold"
                           title={getCanonicalMgrCode(entry.mgrCode, mgrList)}
                         >
                           {getCanonicalMgrCode(entry.mgrCode, mgrList)}
                         </span>
                       </td>
-                      <td className="py-3 px-2 text-xs whitespace-nowrap border border-slate-200">
+                      <td className="py-3 px-2 text-xs whitespace-nowrap border border-slate-200 dark:border-slate-800">
                         <span
-                          className="block truncate px-2 py-1 bg-indigo-50 text-indigo-700 rounded font-bold"
+                          className="block truncate px-2 py-1 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 rounded font-bold"
                           title={
                             getCanonicalMgrCode(
                               entry.mgrCode2 || "",
@@ -2297,7 +2297,7 @@ const PlanningScreen = () => {
                           ) || "-"}
                         </span>
                       </td>
-                      <td className="py-3 px-2 text-xs border border-slate-200">
+                      <td className="py-3 px-2 text-xs border border-slate-200 dark:border-slate-800">
                         <div className="flex items-center justify-between gap-1">
                           <span
                             className="truncate px-2 py-1 rounded font-bold whitespace-nowrap"
@@ -2315,14 +2315,14 @@ const PlanningScreen = () => {
                               <>
                                 <button
                                   onClick={() => handleEditEntry(entry)}
-                                  className={`p-1.5 rounded-lg transition-all ${editingId === entry._id ? "text-primary-600 bg-primary-50" : "text-slate-400 hover:text-primary-600 hover:bg-primary-50"}`}
+                                  className={`p-1.5 rounded-lg transition-all ${editingId === entry._id ? "text-primary-600 bg-primary-50 dark:bg-primary-950/50" : "text-slate-400 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-slate-800"}`}
                                   title="Edit Entry"
                                 >
                                   <MdEdit size={16} />
                                 </button>
                                 <button
                                   onClick={() => handleDeleteEntry(entry._id)}
-                                  className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                                  className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-lg transition-all"
                                   title="Delete Entry"
                                 >
                                   <MdDelete size={16} />
@@ -2351,19 +2351,19 @@ const PlanningScreen = () => {
           </div>
 
           {/* Pagination Footer */}
-          <div className="px-4 py-4 border-t border-slate-100 bg-slate-50/30 flex flex-col items-center gap-3">
-            <div className="text-xs font-bold text-slate-500 uppercase tracking-widest">
-              Showing <span className="text-primary-600">{entries.length}</span> of <span className="text-slate-900">{totalEntries}</span> entries
+          <div className="px-4 py-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-900/30 flex flex-col items-center gap-3">
+            <div className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">
+              Showing <span className="text-primary-600 dark:text-primary-400">{entries.length}</span> of <span className="text-slate-900 dark:text-slate-100">{totalEntries}</span> entries
             </div>
 
             {entries.length < totalEntries && (
               <button
                 onClick={() => setOffset(prev => prev + limit)}
                 disabled={isLoadingMore}
-                className="px-6 py-2.5 bg-white border border-primary-200 text-primary-600 rounded-xl font-black text-[11px] uppercase tracking-widest hover:bg-primary-50 transition-all flex items-center gap-2 shadow-sm disabled:opacity-50"
+                className="px-6 py-2.5 bg-white dark:bg-slate-800 border border-primary-200 dark:border-primary-800 text-primary-600 dark:text-primary-400 rounded-xl font-black text-[11px] uppercase tracking-widest hover:bg-primary-50 dark:hover:bg-slate-700 transition-all flex items-center gap-2 shadow-sm disabled:opacity-50"
               >
                 {isLoadingMore ? (
-                  <div className="h-4 w-4 border-2 border-primary-600 border-t-transparent rounded-full animate-spin"></div>
+                  <div className="h-4 w-4 border-2 border-primary-600 dark:border-primary-400 border-t-transparent rounded-full animate-spin"></div>
                 ) : (
                   "Load More Entries"
                 )}
@@ -2374,18 +2374,18 @@ const PlanningScreen = () => {
       </div>
 
       {hasAccess('planning_view_sbu_wise') && (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100/80 overflow-hidden transition-all duration-300 hover:shadow-md hover:border-slate-200/60">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100/80 dark:border-slate-800 overflow-hidden transition-all duration-300 hover:shadow-md hover:border-slate-200/60 dark:hover:border-slate-700">
           <div
-            className="p-5 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 to-indigo-50/10 flex justify-between items-center cursor-pointer select-none group"
+            className="p-5 border-b border-slate-100 dark:border-slate-800 bg-gradient-to-r from-slate-50/80 to-indigo-50/10 dark:from-slate-800/80 dark:to-indigo-950/20 flex justify-between items-center cursor-pointer select-none group"
             onClick={() => setIsReportExpanded(!isReportExpanded)}
           >
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-black text-xs shadow-sm transition-all group-hover:scale-110">
+              <div className="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-950/80 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-black text-xs shadow-sm transition-all group-hover:scale-110">
                 SBU
               </div>
-              <h2 className="text-xs font-extrabold text-slate-700 uppercase tracking-widest flex items-center gap-2">
+              <h2 className="text-xs font-extrabold text-slate-700 dark:text-slate-200 uppercase tracking-widest flex items-center gap-2">
                 <MdKeyboardArrowDown
-                  className={`text-slate-400 transition-transform duration-300 ${!isReportExpanded ? "-rotate-90 text-slate-400" : "text-indigo-600"}`}
+                  className={`text-slate-400 transition-transform duration-300 ${!isReportExpanded ? "-rotate-90 text-slate-400" : "text-indigo-600 dark:text-indigo-400"}`}
                   size={20}
                 />
                 SBU Wise - FY {financialYear}
@@ -2400,7 +2400,7 @@ const PlanningScreen = () => {
               disabled={
                 !combinedReportData || !combinedReportData.mgrCodes?.length
               }
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 font-extrabold text-xs uppercase tracking-widest hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-extrabold text-xs uppercase tracking-widest hover:bg-slate-50 dark:hover:bg-slate-700 hover:border-slate-300 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <MdDownload size={16} />
               Export
@@ -2434,21 +2434,21 @@ const PlanningScreen = () => {
 
             return (
               <div className="overflow-x-auto custom-scrollbar">
-                <table className="w-full text-left text-sm border-collapse border border-slate-200">
+                <table className="w-full text-left text-sm border-collapse border border-slate-200 dark:border-slate-800">
                   <thead>
-                    <tr className="bg-slate-50/70 border-b border-slate-100">
-                      <th className="py-3.5 px-5 font-black text-slate-500 text-left min-w-[200px] uppercase tracking-wider text-[10px] border border-slate-200">
+                    <tr className="bg-slate-50/70 dark:bg-slate-800/70 border-b border-slate-100 dark:border-slate-800">
+                      <th className="py-3.5 px-5 font-black text-slate-500 dark:text-slate-400 text-left min-w-[200px] uppercase tracking-wider text-[10px] border border-slate-200 dark:border-slate-800">
                         Month / Segment
                       </th>
                       {visibleMgrCodes.map((sbu) => (
                         <th
                           key={sbu}
-                          className="py-3.5 px-4 font-black text-slate-500 text-right min-w-[110px] border border-slate-200 uppercase tracking-wider text-[10px]"
+                          className="py-3.5 px-4 font-black text-slate-500 dark:text-slate-400 text-right min-w-[110px] border border-slate-200 dark:border-slate-800 uppercase tracking-wider text-[10px]"
                         >
                           {sbu}
                         </th>
                       ))}
-                      <th className="py-3.5 px-4 font-black text-slate-600 text-right bg-slate-100/40 min-w-[110px] border border-slate-200 uppercase tracking-wider text-[10px]">
+                      <th className="py-3.5 px-4 font-black text-slate-600 dark:text-slate-300 text-right bg-slate-100/40 dark:bg-slate-800/60 min-w-[110px] border border-slate-200 dark:border-slate-800 uppercase tracking-wider text-[10px]">
                         Total
                       </th>
                     </tr>
@@ -2456,7 +2456,7 @@ const PlanningScreen = () => {
                   <tbody>
                     {visibleMonthLabels.length === 0 ? (
                       <tr>
-                        <td colSpan={visibleMgrCodes.length + 2} className="py-10 px-5 text-center text-slate-400 font-bold border border-slate-200">
+                        <td colSpan={visibleMgrCodes.length + 2} className="py-10 px-5 text-center text-slate-400 dark:text-slate-500 font-bold border border-slate-200 dark:border-slate-800">
                           No SBU-wise planning data available.
                         </td>
                       </tr>
@@ -2479,13 +2479,13 @@ const PlanningScreen = () => {
                           <React.Fragment key={monthLabel}>
                             {/* MONTH ROW */}
                             <tr
-                              className="bg-indigo-50/20 hover:bg-indigo-50/40 border-l-4 border-l-indigo-500 transition-all border-b border-slate-100 font-bold cursor-pointer"
+                              className="bg-indigo-50/20 dark:bg-indigo-950/30 hover:bg-indigo-50/40 dark:hover:bg-indigo-950/50 border-l-4 border-l-indigo-500 transition-all border-b border-slate-100 dark:border-slate-800 font-bold cursor-pointer"
                               onClick={() => toggleSbuWiseMonth(monthLabel)}
                             >
-                              <td className="py-3.5 px-4 text-slate-800 border border-slate-200">
+                              <td className="py-3.5 px-4 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-800">
                                 <div className="flex items-center gap-2">
                                   <MdKeyboardArrowDown
-                                    className={`text-indigo-500 transition-transform duration-300 ${!expandedSbuWiseMonths[monthLabel] ? "-rotate-90" : ""}`}
+                                    className={`text-indigo-500 dark:text-indigo-400 transition-transform duration-300 ${!expandedSbuWiseMonths[monthLabel] ? "-rotate-90" : ""}`}
                                     size={18}
                                   />
                                   <span className="font-extrabold text-xs tracking-wide">
@@ -2498,25 +2498,25 @@ const PlanningScreen = () => {
                                 return (
                                   <td
                                     key={sbu}
-                                    className="py-3.5 px-4 text-right border border-slate-200"
+                                    className="py-3.5 px-4 text-right border border-slate-200 dark:border-slate-800"
                                   >
                                     {cellValue > 0 ? (
-                                      <span className="inline-flex items-center justify-end px-2.5 py-1 rounded-full bg-indigo-50/70 text-indigo-700 text-[11px] font-black min-w-[70px] border border-indigo-100/40 shadow-sm hover:scale-105 transition-all">
+                                      <span className="inline-flex items-center justify-end px-2.5 py-1 rounded-full bg-indigo-50/70 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 text-[11px] font-black min-w-[70px] border border-indigo-100/40 dark:border-indigo-900/50 shadow-sm hover:scale-105 transition-all">
                                         {formatReportValue(cellValue, 2)}
                                       </span>
                                     ) : (
-                                      <span className="text-slate-300 font-normal">-</span>
+                                      <span className="text-slate-300 dark:text-slate-600 font-normal">-</span>
                                     )}
                                   </td>
                                 );
                               })}
-                              <td className="py-3.5 px-4 text-right border border-slate-200 bg-indigo-50/10">
+                              <td className="py-3.5 px-4 text-right border border-slate-200 dark:border-slate-800 bg-indigo-50/10 dark:bg-indigo-950/20">
                                 {monthTotal > 0 ? (
-                                  <span className="inline-flex items-center justify-end px-2.5 py-1 rounded-full bg-indigo-100/50 text-indigo-800 text-[11px] font-black min-w-[70px] border border-indigo-200/30 shadow-sm">
+                                  <span className="inline-flex items-center justify-end px-2.5 py-1 rounded-full bg-indigo-100/50 dark:bg-indigo-900/50 text-indigo-800 dark:text-indigo-200 text-[11px] font-black min-w-[70px] border border-indigo-200/30 dark:border-indigo-800/40 shadow-sm">
                                     {formatReportValue(monthTotal, 2)}
                                   </span>
                                 ) : (
-                                  <span className="text-slate-300 font-normal">-</span>
+                                  <span className="text-slate-300 dark:text-slate-600 font-normal">-</span>
                                 )}
                               </td>
                             </tr>
@@ -2530,9 +2530,9 @@ const PlanningScreen = () => {
                               return (
                                 <tr
                                   key={`${monthLabel}-${segRow.month}`}
-                                  className="border-b border-slate-100/60 bg-slate-50/20 hover:bg-slate-50/60 transition-colors border-l-4 border-l-slate-200"
+                                  className="border-b border-slate-100/60 dark:border-slate-800/60 bg-slate-50/20 dark:bg-slate-800/20 hover:bg-slate-50/60 dark:hover:bg-slate-800/60 transition-colors border-l-4 border-l-slate-200 dark:border-l-slate-700"
                                 >
-                                  <td className="py-3 px-4 text-slate-600 font-bold pl-8 text-xs border border-slate-200">
+                                  <td className="py-3 px-4 text-slate-600 dark:text-slate-400 font-bold pl-8 text-xs border border-slate-200 dark:border-slate-800">
                                     {segRow.month}
                                   </td>
                                   {visibleMgrCodes.map((sbu) => {
@@ -2540,19 +2540,19 @@ const PlanningScreen = () => {
                                     return (
                                       <td
                                         key={`${monthLabel}-${segRow.month}-${sbu}`}
-                                        className="py-3 px-4 text-right border-slate-200 text-xs"
+                                        className="py-3 px-4 text-right border border-slate-200 dark:border-slate-800 text-xs"
                                       >
                                         {val > 0 ? (
-                                          <span className="inline-flex items-center justify-end px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-extrabold min-w-[64px] border border-slate-200/40">
+                                          <span className="inline-flex items-center justify-end px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[10px] font-extrabold min-w-[64px] border border-slate-200/40 dark:border-slate-700/50">
                                             {formatReportValue(val, 2)}
                                           </span>
                                         ) : (
-                                          <span className="text-slate-300 font-normal">-</span>
+                                          <span className="text-slate-300 dark:text-slate-600 font-normal">-</span>
                                         )}
                                       </td>
                                     );
                                   })}
-                                  <td className="py-3 px-4 text-right border-slate-200 bg-slate-50/30 font-bold text-slate-700 text-xs">
+                                  <td className="py-3 px-4 text-right border border-slate-200 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-800/30 font-bold text-slate-700 dark:text-slate-300 text-xs">
                                     {segmentTotal > 0 ? formatReportValue(segmentTotal, 2) : "-"}
                                   </td>
                                 </tr>
@@ -2573,17 +2573,17 @@ const PlanningScreen = () => {
                       return (
                         <tr
                           key={`sbu-summary-${row.month}`}
-                          className={`border-b border-slate-200/60 transition-colors ${isTotal
-                            ? "bg-emerald-50/60 border-t border-emerald-100 font-black text-emerald-900"
+                          className={`border-b border-slate-200/60 dark:border-slate-800/60 transition-colors ${isTotal
+                            ? "bg-emerald-50/60 dark:bg-emerald-950/40 border-t border-emerald-100 dark:border-emerald-900/60 font-black text-emerald-900 dark:text-emerald-200"
                             : isPreviousYearValue
-                              ? "bg-amber-50/50 border-t border-amber-100 font-bold text-amber-900"
+                              ? "bg-amber-50/50 dark:bg-amber-950/40 border-t border-amber-100 dark:border-amber-900/60 font-bold text-amber-900 dark:text-amber-200"
                               : isPercentage || isTotalPercentage
-                                ? "bg-violet-50/50 border-t border-violet-100 text-violet-900"
-                                : "border-slate-100 hover:bg-slate-50 text-slate-700"
+                                ? "bg-violet-50/50 dark:bg-violet-950/40 border-t border-violet-100 dark:border-violet-900/60 text-violet-900 dark:text-violet-200"
+                                : "border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
                             }`}
                         >
                           <td
-                            className="py-3.5 px-5 font-extrabold text-xs uppercase tracking-wide border border-slate-200"
+                            className="py-3.5 px-5 font-extrabold text-xs uppercase tracking-wide border border-slate-200 dark:border-slate-800"
                           >
                             {isPercentage ? "Percentage CY" : row.month}
                           </td>
@@ -2592,27 +2592,27 @@ const PlanningScreen = () => {
                             return (
                               <td
                                 key={`sbu-summary-${row.month}-${sbu}`}
-                                className="py-3.5 px-4 text-right border-slate-200"
+                                className="py-3.5 px-4 text-right border border-slate-200 dark:border-slate-800"
                               >
                                 {cellValue > 0 ? (
                                   <span className={`inline-flex items-center justify-end px-2.5 py-1 rounded-full text-[11px] font-black min-w-[70px] border ${isTotal
-                                    ? "bg-emerald-100/50 text-emerald-800 border-emerald-200/40"
+                                    ? "bg-emerald-100/50 dark:bg-emerald-900/50 text-emerald-800 dark:text-emerald-200 border-emerald-200/40 dark:border-emerald-800/40"
                                     : isPreviousYearValue
-                                      ? "bg-amber-100/50 text-amber-800 border-amber-200/40"
-                                      : "bg-violet-100/50 text-violet-800 border-violet-200/40"
+                                      ? "bg-amber-100/50 dark:bg-amber-900/50 text-amber-800 dark:text-amber-200 border-amber-200/40 dark:border-amber-800/40"
+                                      : "bg-violet-100/50 dark:bg-violet-900/50 text-violet-800 dark:text-violet-200 border-violet-200/40 dark:border-violet-800/40"
                                     }`}>
                                     {isPercentage || isTotalPercentage
                                       ? formatReportPercentage(cellValue)
                                       : formatReportValue(cellValue, 3)}
                                   </span>
                                 ) : (
-                                  <span className="text-slate-300 font-normal">-</span>
+                                  <span className="text-slate-300 dark:text-slate-600 font-normal">-</span>
                                 )}
                               </td>
                             );
                           })}
                           <td
-                            className="py-3.5 px-4 text-right border border-slate-200 bg-slate-100/20 font-black text-xs"
+                            className="py-3.5 px-4 text-right border border-slate-200 dark:border-slate-800 bg-slate-100/20 dark:bg-slate-800/40 font-black text-xs"
                           >
                             {isPercentage || isTotalPercentage
                               ? formatReportPercentageTotal(row.total)
@@ -2630,18 +2630,18 @@ const PlanningScreen = () => {
       )}
 
       {hasAccess('planning_view_segment_wise') && (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100/80 overflow-hidden transition-all duration-300 hover:shadow-md hover:border-slate-200/60">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100/80 dark:border-slate-800 overflow-hidden transition-all duration-300 hover:shadow-md hover:border-slate-200/60 dark:hover:border-slate-700">
           <div
-            className="p-5 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 to-sky-50/10 flex justify-between items-center cursor-pointer select-none group"
+            className="p-5 border-b border-slate-100 dark:border-slate-800 bg-gradient-to-r from-slate-50/80 to-sky-50/10 dark:from-slate-800/80 dark:to-sky-950/20 flex justify-between items-center cursor-pointer select-none group"
             onClick={() => setIsReportExpanded2(!isReportExpanded2)}
           >
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center font-black text-xs shadow-sm transition-all group-hover:scale-110">
+              <div className="w-8 h-8 rounded-xl bg-sky-50 dark:bg-sky-950/80 text-sky-600 dark:text-sky-400 flex items-center justify-center font-black text-xs shadow-sm transition-all group-hover:scale-110">
                 SEG
               </div>
-              <h2 className="text-xs font-extrabold text-slate-700 uppercase tracking-widest flex items-center gap-2">
+              <h2 className="text-xs font-extrabold text-slate-700 dark:text-slate-200 uppercase tracking-widest flex items-center gap-2">
                 <MdKeyboardArrowDown
-                  className={`text-slate-400 transition-transform duration-300 ${!isReportExpanded2 ? "-rotate-90 text-slate-400" : "text-sky-600"}`}
+                  className={`text-slate-400 transition-transform duration-300 ${!isReportExpanded2 ? "-rotate-90 text-slate-400" : "text-sky-600 dark:text-sky-400"}`}
                   size={20}
                 />
                 Segment Wise - FY {financialYear}
@@ -2654,7 +2654,7 @@ const PlanningScreen = () => {
                 exportReportToExcel(reportData2, "Segment Wise Report");
               }}
               disabled={!reportData2 || !reportData2.mgrCodes?.length}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 font-extrabold text-xs uppercase tracking-widest hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-extrabold text-xs uppercase tracking-widest hover:bg-slate-50 dark:hover:bg-slate-700 hover:border-slate-300 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <MdDownload size={16} />
               Export
@@ -2663,21 +2663,21 @@ const PlanningScreen = () => {
 
           {isReportExpanded2 && (
             <div className="overflow-x-auto custom-scrollbar">
-              <table className="w-full text-left text-sm border-collapse border border-slate-200">
+              <table className="w-full text-left text-sm border-collapse border border-slate-200 dark:border-slate-800">
                 <thead>
-                  <tr className="bg-slate-50/70 border-b border-slate-100">
-                    <th className="py-3.5 px-5 font-black text-slate-500 text-left min-w-[200px] uppercase tracking-wider text-[10px] border border-slate-200">
+                  <tr className="bg-slate-50/70 dark:bg-slate-800/70 border-b border-slate-100 dark:border-slate-800">
+                    <th className="py-3.5 px-5 font-black text-slate-500 dark:text-slate-400 text-left min-w-[200px] uppercase tracking-wider text-[10px] border border-slate-200 dark:border-slate-800">
                       Month
                     </th>
                     {(reportData2?.mgrCodes?.length > 0 ? reportData2.mgrCodes : ['Export', 'Industry', 'UC', 'Utility']).map((mgr) => (
                       <th
                         key={mgr}
-                        className="py-3.5 px-4 font-black text-slate-500 text-right min-w-[110px] uppercase tracking-wider text-[10px] border border-slate-200"
+                        className="py-3.5 px-4 font-black text-slate-500 dark:text-slate-400 text-right min-w-[110px] uppercase tracking-wider text-[10px] border border-slate-200 dark:border-slate-800"
                       >
                         {mgr}
                       </th>
                     ))}
-                    <th className="py-3.5 px-4 font-black text-slate-600 text-right bg-slate-100/40 min-w-[110px] uppercase tracking-wider text-[10px] border border-slate-200">
+                    <th className="py-3.5 px-4 font-black text-slate-600 dark:text-slate-300 text-right bg-slate-100/40 dark:bg-slate-800/60 min-w-[110px] uppercase tracking-wider text-[10px] border border-slate-200 dark:border-slate-800">
                       Total
                     </th>
                   </tr>
@@ -2704,13 +2704,13 @@ const PlanningScreen = () => {
                       return (
                         <React.Fragment key={monthLabel}>
                           <tr
-                            className="bg-sky-50/20 hover:bg-sky-50/40 border-l-4 border-l-sky-500 transition-all border-b border-slate-100 font-bold cursor-pointer"
+                            className="bg-sky-50/20 dark:bg-sky-950/30 hover:bg-sky-50/40 dark:hover:bg-sky-950/50 border-l-4 border-l-sky-500 transition-all border-b border-slate-100 dark:border-slate-800 font-bold cursor-pointer"
                             onClick={() => toggleSegmentMonth(monthLabel)}
                           >
-                            <td className="py-3.5 px-4 text-slate-800 border border-slate-200">
+                            <td className="py-3.5 px-4 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-800">
                               <div className="flex items-center gap-2">
                                 <MdKeyboardArrowDown
-                                  className={`text-sky-500 transition-transform duration-300 ${!expandedSegmentMonths[monthLabel] ? "-rotate-90" : ""}`}
+                                  className={`text-sky-500 dark:text-sky-400 transition-transform duration-300 ${!expandedSegmentMonths[monthLabel] ? "-rotate-90" : ""}`}
                                   size={18}
                                 />
                                 <span className="font-extrabold text-xs tracking-wide">{monthRow.month}</span>
@@ -2721,27 +2721,27 @@ const PlanningScreen = () => {
                               return (
                                 <td
                                   key={mgr}
-                                  className="py-3.5 px-4 text-right border border-slate-200"
+                                  className="py-3.5 px-4 text-right border border-slate-200 dark:border-slate-800"
                                 >
                                   {cellValue > 0 ? (
-                                    <span className="inline-flex items-center justify-end px-2.5 py-1 rounded-full bg-sky-50/70 text-sky-700 text-[11px] font-black min-w-[70px] border border-sky-100/40 shadow-sm hover:scale-105 transition-all">
+                                    <span className="inline-flex items-center justify-end px-2.5 py-1 rounded-full bg-sky-50/70 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 text-[11px] font-black min-w-[70px] border border-sky-100/40 dark:border-sky-900/50 shadow-sm hover:scale-105 transition-all">
                                       {formatReportValue(cellValue, 3)}
                                     </span>
                                   ) : (
-                                    <span className="text-slate-300 font-normal">-</span>
+                                    <span className="text-slate-300 dark:text-slate-600 font-normal">-</span>
                                   )}
                                 </td>
                               );
                             })}
                             <td
-                              className="py-3.5 px-4 text-right bg-sky-50/10 border border-slate-200"
+                              className="py-3.5 px-4 text-right bg-sky-50/10 dark:bg-sky-950/20 border border-slate-200 dark:border-slate-800"
                             >
                               {Number(monthRow.total || 0) > 0 ? (
-                                <span className="inline-flex items-center justify-end px-2.5 py-1 rounded-full bg-sky-100/50 text-sky-800 text-[11px] font-black min-w-[70px] border border-sky-200/30 shadow-sm">
+                                <span className="inline-flex items-center justify-end px-2.5 py-1 rounded-full bg-sky-100/50 dark:bg-sky-900/50 text-sky-800 dark:text-sky-200 text-[11px] font-black min-w-[70px] border border-sky-200/30 dark:border-sky-800/40 shadow-sm">
                                   {formatReportValue(monthRow.total || 0, 3)}
                                 </span>
                               ) : (
-                                <span className="text-slate-300 font-normal">-</span>
+                                <span className="text-slate-300 dark:text-slate-600 font-normal">-</span>
                               )}
                             </td>
                           </tr>
@@ -2787,20 +2787,20 @@ const PlanningScreen = () => {
                                 return ['EPC', 'SBU1', 'SBU2', 'SBU3'].map(sbu => (
                                   <tr
                                     key={`${monthLabel}-${sbu}`}
-                                    className="border-b border-slate-100/60 bg-slate-50/20 hover:bg-slate-50/60 transition-colors border-l-4 border-l-slate-200"
+                                    className="border-b border-slate-100/60 dark:border-slate-800/60 bg-slate-50/20 dark:bg-slate-800/20 hover:bg-slate-50/60 dark:hover:bg-slate-800/60 transition-colors border-l-4 border-l-slate-200 dark:border-l-slate-700"
                                   >
-                                    <td className="py-3 px-4 text-slate-600 font-bold pl-8 text-xs border border-slate-200">
+                                    <td className="py-3 px-4 text-slate-600 dark:text-slate-400 font-bold pl-8 text-xs border border-slate-200 dark:border-slate-800">
                                       <span>{sbu}</span>
                                     </td>
                                     {mgrCodes.map((mgr) => (
                                       <td
                                         key={mgr}
-                                        className="py-3 px-4 text-right text-xs text-slate-300 border border-slate-200"
+                                        className="py-3 px-4 text-right text-xs text-slate-300 dark:text-slate-600 border border-slate-200 dark:border-slate-800"
                                       >
                                         -
                                       </td>
                                     ))}
-                                    <td className="py-3 px-4 text-right bg-slate-50/30 font-bold text-xs text-slate-300 border border-slate-200">
+                                    <td className="py-3 px-4 text-right bg-slate-50/30 dark:bg-slate-800/30 font-bold text-xs text-slate-300 dark:text-slate-600 border border-slate-200 dark:border-slate-800">
                                       -
                                     </td>
                                   </tr>
@@ -2810,9 +2810,9 @@ const PlanningScreen = () => {
                               return sbuRows.map((row) => (
                                 <tr
                                   key={`${monthLabel}-${row.normalizedSbu}`}
-                                  className="border-b border-slate-100/60 bg-slate-50/20 hover:bg-slate-50/60 transition-colors border-l-4 border-l-slate-200"
+                                  className="border-b border-slate-100/60 dark:border-slate-800/60 bg-slate-50/20 dark:bg-slate-800/20 hover:bg-slate-50/60 dark:hover:bg-slate-800/60 transition-colors border-l-4 border-l-slate-200 dark:border-l-slate-700"
                                 >
-                                  <td className="py-3 px-4 text-slate-600 font-bold pl-8 text-xs border border-slate-200">
+                                  <td className="py-3 px-4 text-slate-600 dark:text-slate-400 font-bold pl-8 text-xs border border-slate-200 dark:border-slate-800">
                                     <span>{row.sbu}</span>
                                   </td>
                                   {mgrCodes.map((mgr) => {
@@ -2820,20 +2820,20 @@ const PlanningScreen = () => {
                                     return (
                                       <td
                                         key={mgr}
-                                        className="py-3 px-4 text-right text-xs border border-slate-200"
+                                        className="py-3 px-4 text-right text-xs border border-slate-200 dark:border-slate-800"
                                       >
                                         {val > 0 ? (
-                                          <span className="inline-flex items-center justify-end px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-extrabold min-w-[64px] border border-slate-200/40">
+                                          <span className="inline-flex items-center justify-end px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[10px] font-extrabold min-w-[64px] border border-slate-200/40 dark:border-slate-700/50">
                                             {formatReportValue(val, 3)}
                                           </span>
                                         ) : (
-                                          <span className="text-slate-300 font-normal">-</span>
+                                          <span className="text-slate-300 dark:text-slate-600 font-normal">-</span>
                                         )}
                                       </td>
                                     );
                                   })}
                                   <td
-                                    className="py-3 px-4 text-right bg-slate-50/30 font-bold text-slate-700 text-xs border border-slate-200"
+                                    className="py-3 px-4 text-right bg-slate-50/30 dark:bg-slate-800/30 font-bold text-slate-700 dark:text-slate-300 text-xs border border-slate-200 dark:border-slate-800"
                                   >
                                     {row.total > 0 ? formatReportValue(row.total, 3) : "-"}
                                   </td>
@@ -2871,17 +2871,17 @@ const PlanningScreen = () => {
                       return (
                         <tr
                           key={row.month}
-                          className={`border-b border-slate-200/60 transition-colors ${isTotal
-                            ? "bg-emerald-50/60 border-t border-emerald-100 font-black text-emerald-900"
+                          className={`border-b border-slate-200/60 dark:border-slate-800/60 transition-colors ${isTotal
+                            ? "bg-emerald-50/60 dark:bg-emerald-950/40 border-t border-emerald-100 dark:border-emerald-900/60 font-black text-emerald-900 dark:text-emerald-200"
                             : isPreviousYearValue
-                              ? "bg-amber-50/50 border-t border-amber-100 font-bold text-amber-900"
+                              ? "bg-amber-50/50 dark:bg-amber-950/40 border-t border-amber-100 dark:border-amber-900/60 font-bold text-amber-900 dark:text-amber-200"
                               : isPercentage || isTotalPercentage
-                                ? "bg-violet-50/50 border-t border-violet-100 text-violet-900"
-                                : "border-slate-100 hover:bg-slate-50 text-slate-700"
+                                ? "bg-violet-50/50 dark:bg-violet-950/40 border-t border-violet-100 dark:border-violet-900/60 text-violet-900 dark:text-violet-200"
+                                : "border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
                             }`}
                         >
                           <td
-                            className="py-3.5 px-5 font-extrabold text-xs uppercase tracking-wide border border-slate-200"
+                            className="py-3.5 px-5 font-extrabold text-xs uppercase tracking-wide border border-slate-200 dark:border-slate-800"
                           >
                             {isPercentage ? "Percentage CY" : row.month}
                           </td>
@@ -2890,27 +2890,27 @@ const PlanningScreen = () => {
                             return (
                               <td
                                 key={mgr}
-                                className="py-3.5 px-4 text-right border-slate-200 border"
+                                className="py-3.5 px-4 text-right border-slate-200 dark:border-slate-800 border"
                               >
                                 {cellValue > 0 ? (
                                   <span className={`inline-flex items-center justify-end px-2.5 py-1 rounded-full text-[11px] font-black min-w-[70px] border ${isTotal
-                                    ? "bg-emerald-100/50 text-emerald-800 border-emerald-200/40"
+                                    ? "bg-emerald-100/50 dark:bg-emerald-900/50 text-emerald-800 dark:text-emerald-200 border-emerald-200/40 dark:border-emerald-800/40"
                                     : isPreviousYearValue
-                                      ? "bg-amber-100/50 text-amber-800 border-amber-200/40"
-                                      : "bg-violet-100/50 text-violet-800 border-violet-200/40"
+                                      ? "bg-amber-100/50 dark:bg-amber-900/50 text-amber-800 dark:text-amber-200 border-amber-200/40 dark:border-amber-800/40"
+                                      : "bg-violet-100/50 dark:bg-violet-900/50 text-violet-800 dark:text-violet-200 border-violet-200/40 dark:border-violet-800/40"
                                     }`}>
                                     {isPercentage || isTotalPercentage
                                       ? formatReportPercentage(cellValue)
                                       : formatReportValue(cellValue, 3)}
                                   </span>
                                 ) : (
-                                  <span className="text-slate-300 font-normal">-</span>
+                                  <span className="text-slate-300 dark:text-slate-600 font-normal">-</span>
                                 )}
                               </td>
                             );
                           })}
                           <td
-                            className="py-3.5 px-4 text-right bg-slate-100/20 font-black text-xs border border-slate-200"
+                            className="py-3.5 px-4 text-right bg-slate-100/20 dark:bg-slate-800/40 font-black text-xs border border-slate-200 dark:border-slate-800"
                           >
                             {isPercentage || isTotalPercentage
                               ? formatReportPercentageTotal(row.total)
@@ -2928,20 +2928,20 @@ const PlanningScreen = () => {
       )}
 
       {hasAccess('planning_view_status_breakdown') && (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100/80 overflow-hidden transition-all duration-300 hover:shadow-md hover:border-slate-200/60">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100/80 dark:border-slate-800 overflow-hidden transition-all duration-300 hover:shadow-md hover:border-slate-200/60 dark:hover:border-slate-700">
           <div
-            className="p-5 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 to-emerald-50/10 flex justify-between items-center cursor-pointer select-none group"
+            className="p-5 border-b border-slate-100 dark:border-slate-800 bg-gradient-to-r from-slate-50/80 to-emerald-50/10 dark:from-slate-800/80 dark:to-emerald-950/20 flex justify-between items-center cursor-pointer select-none group"
             onClick={() =>
               setIsStatusBreakdownExpanded(!isStatusBreakdownExpanded)
             }
           >
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-black text-xs shadow-sm transition-all group-hover:scale-110">
+              <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-black text-xs shadow-sm transition-all group-hover:scale-110">
                 STT
               </div>
-              <h2 className="text-xs font-extrabold text-slate-700 uppercase tracking-widest flex items-center gap-2">
+              <h2 className="text-xs font-extrabold text-slate-700 dark:text-slate-200 uppercase tracking-widest flex items-center gap-2">
                 <MdKeyboardArrowDown
-                  className={`text-slate-400 transition-transform duration-300 ${!isStatusBreakdownExpanded ? "-rotate-90 text-slate-400" : "text-emerald-600"}`}
+                  className={`text-slate-400 transition-transform duration-300 ${!isStatusBreakdownExpanded ? "-rotate-90 text-slate-400" : "text-emerald-600 dark:text-emerald-400"}`}
                   size={20}
                 />
                 Status Breakdown Summary - FY {financialYear}
@@ -2957,7 +2957,7 @@ const PlanningScreen = () => {
                 !computedStatusBreakdownData ||
                 !computedStatusBreakdownData.length
               }
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 font-extrabold text-xs uppercase tracking-widest hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-extrabold text-xs uppercase tracking-widest hover:bg-slate-50 dark:hover:bg-slate-700 hover:border-slate-300 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <MdDownload size={16} />
               Export
@@ -2966,21 +2966,21 @@ const PlanningScreen = () => {
 
           {isStatusBreakdownExpanded && (
             <div className="overflow-x-auto custom-scrollbar">
-              <table className="w-full text-sm border-collapse border border-slate-200">
+              <table className="w-full text-sm border-collapse border border-slate-200 dark:border-slate-800">
                 <thead>
-                  <tr className="bg-slate-50/70 border-b border-slate-100">
-                    <th className="py-3.5 px-4 text-left font-black text-slate-500 text-[10px] min-w-[90px] border border-slate-200 uppercase tracking-wider">Month</th>
-                    <th className="py-3.5 px-3 text-left font-black text-slate-500 text-[10px] min-w-[110px] border border-slate-200 uppercase tracking-wider">SBU/EPC</th>
-                    <th className="py-3.5 px-3 text-left font-black text-slate-500 text-[10px] min-w-[110px] border border-slate-200 uppercase tracking-wider">Segment</th>
+                  <tr className="bg-slate-50/70 dark:bg-slate-800/70 border-b border-slate-100 dark:border-slate-800">
+                    <th className="py-3.5 px-4 text-left font-black text-slate-500 dark:text-slate-400 text-[10px] min-w-[90px] border border-slate-200 dark:border-slate-800 uppercase tracking-wider">Month</th>
+                    <th className="py-3.5 px-3 text-left font-black text-slate-500 dark:text-slate-400 text-[10px] min-w-[110px] border border-slate-200 dark:border-slate-800 uppercase tracking-wider">SBU/EPC</th>
+                    <th className="py-3.5 px-3 text-left font-black text-slate-500 dark:text-slate-400 text-[10px] min-w-[110px] border border-slate-200 dark:border-slate-800 uppercase tracking-wider">Segment</th>
                     {(visibleStatusColumns.length > 0 ? visibleStatusColumns : STATUS_REPORT_COLUMNS).map((column) => (
                       <th
                         key={`status-breakdown-header-${column}`}
-                        className="py-3.5 px-3 text-right font-black text-slate-500 text-[10px] min-w-[80px] border border-slate-200 uppercase tracking-wider"
+                        className="py-3.5 px-3 text-right font-black text-slate-500 dark:text-slate-400 text-[10px] min-w-[80px] border border-slate-200 dark:border-slate-800 uppercase tracking-wider"
                       >
                         {column}
                       </th>
                     ))}
-                    <th className="py-3.5 px-3 text-right font-black text-slate-600 text-[10px] min-w-[90px] bg-slate-100/40 border border-slate-200 uppercase tracking-wider">
+                    <th className="py-3.5 px-3 text-right font-black text-slate-600 dark:text-slate-300 text-[10px] min-w-[90px] bg-slate-100/40 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800 uppercase tracking-wider">
                       Total
                     </th>
                   </tr>
@@ -2994,39 +2994,39 @@ const PlanningScreen = () => {
                       <React.Fragment key={monthData.month}>
                         {/* Month Header Row */}
                         <tr
-                          className="bg-emerald-50/20 border-l-4 border-l-emerald-500 border-b border-slate-100 cursor-pointer hover:bg-emerald-50/40 transition-colors font-bold"
+                          className="bg-emerald-50/20 dark:bg-emerald-950/30 border-l-4 border-l-emerald-500 border-b border-slate-100 dark:border-slate-800 cursor-pointer hover:bg-emerald-50/40 dark:hover:bg-emerald-950/50 transition-colors font-bold"
                           onClick={() => toggleStatusBreakdownMonth(monthData.month)}
                         >
-                          <td className="py-3 px-4 text-emerald-900 font-extrabold uppercase tracking-wider text-[11px] flex items-center gap-2 border border-slate-200">
+                          <td className="py-3 px-4 text-emerald-900 dark:text-emerald-200 font-extrabold uppercase tracking-wider text-[11px] flex items-center gap-2 border border-slate-200 dark:border-slate-800">
                             <MdKeyboardArrowDown
-                              className={`text-emerald-500 transition-transform duration-200 ${!isMonthExpanded ? "-rotate-90" : ""}`}
+                              className={`text-emerald-500 dark:text-emerald-400 transition-transform duration-200 ${!isMonthExpanded ? "-rotate-90" : ""}`}
                               size={18}
                             />
                             {monthData.month}
                           </td>
-                          <td className="py-3 px-3 border border-slate-200"></td>
-                          <td className="py-3 px-3 border border-slate-200"></td>
+                          <td className="py-3 px-3 border border-slate-200 dark:border-slate-800"></td>
+                          <td className="py-3 px-3 border border-slate-200 dark:border-slate-800"></td>
                           {statusCols.map(col => {
                             const cellVal = monthData.monthTotalStatuses?.[col] || 0;
                             return (
-                              <td key={col} className="py-3 px-3 text-right border border-slate-200">
+                              <td key={col} className="py-3 px-3 text-right border border-slate-200 dark:border-slate-800">
                                 {cellVal > 0 ? (
-                                  <span className="inline-flex items-center justify-end px-2.5 py-1 rounded-full bg-emerald-50/70 text-emerald-700 text-[11px] font-black min-w-[70px] border border-emerald-100/40 shadow-sm">
+                                  <span className="inline-flex items-center justify-end px-2.5 py-1 rounded-full bg-emerald-50/70 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 text-[11px] font-black min-w-[70px] border border-emerald-100/40 dark:border-emerald-900/50 shadow-sm">
                                     {formatReportValue(cellVal, 3)}
                                   </span>
                                 ) : (
-                                  <span className="text-slate-300 font-normal">-</span>
+                                  <span className="text-slate-300 dark:text-slate-600 font-normal">-</span>
                                 )}
                               </td>
                             );
                           })}
-                          <td className="py-3 px-3 text-right font-black text-emerald-950 bg-emerald-50/30 border border-slate-200">
+                          <td className="py-3 px-3 text-right font-black text-emerald-950 dark:text-emerald-100 bg-emerald-50/30 dark:bg-emerald-950/40 border border-slate-200 dark:border-slate-800">
                             {monthData.monthGrandTotal > 0 ? (
-                              <span className="inline-flex items-center justify-end px-2.5 py-1 rounded-full bg-emerald-100/50 text-emerald-800 text-[11px] font-black min-w-[70px] border border-emerald-200/30 shadow-sm">
+                              <span className="inline-flex items-center justify-end px-2.5 py-1 rounded-full bg-emerald-100/50 dark:bg-emerald-900/50 text-emerald-800 dark:text-emerald-200 text-[11px] font-black min-w-[70px] border border-emerald-200/30 dark:border-emerald-800/40 shadow-sm">
                                 {formatReportValue(monthData.monthGrandTotal || 0, 3)}
                               </span>
                             ) : (
-                              <span className="text-slate-300 font-normal">-</span>
+                              <span className="text-slate-300 dark:text-slate-600 font-normal">-</span>
                             )}
                           </td>
                         </tr>
@@ -3044,18 +3044,18 @@ const PlanningScreen = () => {
                             <React.Fragment key={sbuGroup.sbu}>
                               {/* SBU Header Row */}
                               <tr
-                                className="bg-slate-50/40 border-b border-slate-100 cursor-pointer hover:bg-slate-100/60 transition-colors border-l-4 border-l-slate-300"
+                                className="bg-slate-50/40 dark:bg-slate-800/40 border-b border-slate-100 dark:border-slate-800 cursor-pointer hover:bg-slate-100/60 dark:hover:bg-slate-800/60 transition-colors border-l-4 border-l-slate-300 dark:border-l-slate-600"
                                 onClick={() => toggleStatusBreakdownSbu(monthData.month, sbuGroup.sbu)}
                               >
-                                <td className="py-2.5 px-4 border border-slate-200"></td>
-                                <td className="py-2.5 px-3 text-slate-700 font-extrabold flex items-center gap-2 border border-slate-200 text-xs">
+                                <td className="py-2.5 px-4 border border-slate-200 dark:border-slate-800"></td>
+                                <td className="py-2.5 px-3 text-slate-700 dark:text-slate-300 font-extrabold flex items-center gap-2 border border-slate-200 dark:border-slate-800 text-xs">
                                   <MdKeyboardArrowDown
                                     className={`text-slate-400 transition-transform duration-200 ${!isSbuExpanded ? "-rotate-90" : ""}`}
                                     size={16}
                                   />
                                   {sbuGroup.sbu}
                                 </td>
-                                <td colSpan={statusCols.length + 2} className="bg-slate-50/10 border border-slate-200"></td>
+                                <td colSpan={statusCols.length + 2} className="bg-slate-50/10 dark:bg-slate-800/10 border border-slate-200 dark:border-slate-800"></td>
                               </tr>
 
                               {isSbuExpanded && (
@@ -3067,52 +3067,52 @@ const PlanningScreen = () => {
                                     { segment: 'Utility', statuses: {}, total: 0 }
                                   ]).map((seg) => {
                                     return (
-                                      <tr key={`${monthData.month}-${sbuGroup.sbu}-${seg.segment}`} className="bg-white border-b border-slate-100/40 hover:bg-slate-50/40 transition-colors border-l-4 border-l-slate-200">
-                                        <td className="py-2 px-4 border border-slate-200"></td>
-                                        <td className="py-2 px-3 border border-slate-200"></td>
-                                        <td className="py-2 px-6 text-slate-600 font-bold border border-slate-200 text-xs pl-8">
+                                      <tr key={`${monthData.month}-${sbuGroup.sbu}-${seg.segment}`} className="bg-white dark:bg-slate-900 border-b border-slate-100/40 dark:border-slate-800/40 hover:bg-slate-50/40 dark:hover:bg-slate-800/40 transition-colors border-l-4 border-l-slate-200 dark:border-l-slate-700">
+                                        <td className="py-2 px-4 border border-slate-200 dark:border-slate-800"></td>
+                                        <td className="py-2 px-3 border border-slate-200 dark:border-slate-800"></td>
+                                        <td className="py-2 px-6 text-slate-600 dark:text-slate-400 font-bold border border-slate-200 dark:border-slate-800 text-xs pl-8">
                                           {seg.segment}
                                         </td>
                                         {statusCols.map(col => {
                                           const cellVal = seg.statuses?.[col] || 0;
                                           return (
-                                            <td key={col} className="py-2 px-3 text-right border border-slate-200 text-xs">
+                                            <td key={col} className="py-2 px-3 text-right border border-slate-200 dark:border-slate-800 text-xs">
                                               {cellVal > 0 ? (
-                                                <span className="inline-flex items-center justify-end px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-extrabold min-w-[64px] border border-slate-200/40">
+                                                <span className="inline-flex items-center justify-end px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[10px] font-extrabold min-w-[64px] border border-slate-200/40 dark:border-slate-700/50">
                                                   {formatReportValue(cellVal, 3)}
                                                 </span>
                                               ) : (
-                                                <span className="text-slate-300 font-normal">-</span>
+                                                <span className="text-slate-300 dark:text-slate-600 font-normal">-</span>
                                               )}
                                             </td>
                                           );
                                         })}
-                                        <td className="py-2 px-3 text-right font-bold text-slate-700 bg-slate-50/30 text-xs border border-slate-200">
+                                        <td className="py-2 px-3 text-right font-bold text-slate-700 dark:text-slate-300 bg-slate-50/30 dark:bg-slate-800/30 text-xs border border-slate-200 dark:border-slate-800">
                                           {seg.total > 0 ? formatReportValue(seg.total || 0, 3) : "-"}
                                         </td>
                                       </tr>
                                     );
                                   })}
                                   {/* SBU TOTAL Row */}
-                                  <tr className="bg-teal-50/30 font-bold border-b border-teal-100 border-l-4 border-l-teal-400">
-                                    <td className="py-2 px-4 border border-slate-200"></td>
-                                    <td className="py-2 px-3 border border-slate-200"></td>
-                                    <td className="py-2 px-6 text-teal-900 border border-slate-200 uppercase tracking-tight text-[11px] font-black pl-8">SBU TOTAL</td>
+                                  <tr className="bg-teal-50/30 dark:bg-teal-950/30 font-bold border-b border-teal-100 dark:border-teal-900/50 border-l-4 border-l-teal-400">
+                                    <td className="py-2 px-4 border border-slate-200 dark:border-slate-800"></td>
+                                    <td className="py-2 px-3 border border-slate-200 dark:border-slate-800"></td>
+                                    <td className="py-2 px-6 text-teal-900 dark:text-teal-200 border border-slate-200 dark:border-slate-800 uppercase tracking-tight text-[11px] font-black pl-8">SBU TOTAL</td>
                                     {statusCols.map(col => {
                                       const cellVal = sbuGroup.sbuTotalStatuses?.[col] || 0;
                                       return (
-                                        <td key={col} className="py-2 px-3 text-right border border-slate-200">
+                                        <td key={col} className="py-2 px-3 text-right border border-slate-200 dark:border-slate-800">
                                           {cellVal > 0 ? (
-                                            <span className="inline-flex items-center justify-end px-2.5 py-0.5 rounded-full bg-teal-100/50 text-teal-800 text-[10px] font-black min-w-[64px] border border-teal-200/30">
+                                            <span className="inline-flex items-center justify-end px-2.5 py-0.5 rounded-full bg-teal-100/50 dark:bg-teal-900/50 text-teal-800 dark:text-teal-200 text-[10px] font-black min-w-[64px] border border-teal-200/30 dark:border-teal-800/40">
                                               {formatReportValue(cellVal, 3)}
                                             </span>
                                           ) : (
-                                            <span className="text-slate-300 font-normal">-</span>
+                                            <span className="text-slate-300 dark:text-slate-600 font-normal">-</span>
                                           )}
                                         </td>
                                       );
                                     })}
-                                    <td className="py-2 px-3 text-right font-black text-teal-950 bg-teal-50/40 text-xs border border-slate-200">
+                                    <td className="py-2 px-3 text-right font-black text-teal-950 dark:text-teal-100 bg-teal-50/40 dark:bg-teal-950/50 text-xs border border-slate-200 dark:border-slate-800">
                                       {sbuGroup.sbuGrandTotal > 0 ? formatReportValue(sbuGroup.sbuGrandTotal || 0, 3) : "-"}
                                     </td>
                                   </tr>
@@ -3136,11 +3136,11 @@ const PlanningScreen = () => {
                     return (
                       <tr
                         key={`status-breakdown-${summaryRow.key}`}
-                        className={`border-b border-slate-200/60 transition-colors ${isYellowLabel ? "border-t border-emerald-100 bg-emerald-50/60 font-black text-emerald-900" : "border-t border-indigo-100 bg-indigo-50/50 text-indigo-900"}`}
+                        className={`border-b border-slate-200/60 dark:border-slate-800/60 transition-colors ${isYellowLabel ? "border-t border-emerald-100 dark:border-emerald-900/60 bg-emerald-50/60 dark:bg-emerald-950/40 font-black text-emerald-900 dark:text-emerald-200" : "border-t border-indigo-100 dark:border-indigo-900/60 bg-indigo-50/50 dark:bg-indigo-950/40 text-indigo-900 dark:text-indigo-200"}`}
                       >
                         <td
                           colSpan={3}
-                          className="py-3.5 px-4 font-extrabold text-xs uppercase tracking-wide border border-slate-200"
+                          className="py-3.5 px-4 font-extrabold text-xs uppercase tracking-wide border border-slate-200 dark:border-slate-800"
                         >
                           {summaryRow.label}
                         </td>
@@ -3149,25 +3149,25 @@ const PlanningScreen = () => {
                           return (
                             <td
                               key={`${summaryRow.key}-${column}`}
-                              className="py-3.5 px-3 text-right border border-slate-200"
+                              className="py-3.5 px-3 text-right border border-slate-200 dark:border-slate-800"
                             >
                               {cellValue > 0 ? (
                                 <span className={`inline-flex items-center justify-end px-2.5 py-1 rounded-full text-[11px] font-black min-w-[70px] border ${isYellowLabel
-                                  ? "bg-emerald-100/50 text-emerald-800 border-emerald-200/40"
-                                  : "bg-indigo-100/50 text-indigo-800 border-indigo-200/40"
+                                  ? "bg-emerald-100/50 dark:bg-emerald-900/50 text-emerald-800 dark:text-emerald-200 border-emerald-200/40 dark:border-emerald-800/40"
+                                  : "bg-indigo-100/50 dark:bg-indigo-900/50 text-indigo-800 dark:text-indigo-200 border-indigo-200/40 dark:border-indigo-800/40"
                                   }`}>
                                   {summaryRow.isPercentage || summaryRow.isTotalPercentage
                                     ? formatReportPercentage(cellValue)
                                     : formatReportValue(cellValue, 3)}
                                 </span>
                               ) : (
-                                <span className="text-slate-300 font-normal">-</span>
+                                <span className="text-slate-300 dark:text-slate-600 font-normal">-</span>
                               )}
                             </td>
                           );
                         })}
                         <td
-                          className="py-3.5 px-3 text-right font-black border border-slate-200 bg-slate-100/20 text-xs"
+                          className="py-3.5 px-3 text-right font-black border border-slate-200 dark:border-slate-800 bg-slate-100/20 dark:bg-slate-800/40 text-xs"
                         >
                           {summaryRow.isPercentage || summaryRow.isTotalPercentage
                             ? formatReportPercentageTotal(summaryRow.rowTotal)

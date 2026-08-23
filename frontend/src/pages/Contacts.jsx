@@ -701,7 +701,9 @@ const Contacts = ({ isCreatePage, isEditPage }) => {
                                     </h3>
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                         <div className="md:col-span-3 space-y-2">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Contact Name *</label>
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                                                Contact Name <span className="text-red-500 font-bold ml-0.5">*</span>
+                                            </label>
                                             <input
                                                 type="text"
                                                 name="contactName"

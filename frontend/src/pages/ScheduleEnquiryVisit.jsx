@@ -340,7 +340,7 @@ const ScheduleEnquiryVisit = () => {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                                 <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">
-                                    Visit Status *
+                                    Visit Status <span className="text-red-500 font-bold ml-0.5">*</span>
                                 </label>
                                 <select
                                     value={visitStatus}
@@ -402,7 +402,7 @@ const ScheduleEnquiryVisit = () => {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                                 <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">
-                                    Appointment Date & Time *
+                                    Appointment Date & Time <span className="text-red-500 font-bold ml-0.5">*</span>
                                 </label>
                                 <input
                                     type="datetime-local"
