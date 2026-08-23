@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { MdAdd, MdEdit, MdDelete, MdSearch, MdMoreVert, MdTimer, MdCheckCircle, MdCancel, MdPerson, MdNumbers, MdEventAvailable, MdReceiptLong, MdFilterList, MdPercent, MdAnalytics, MdVisibility, MdStar, MdClose, MdPeople, MdCalendarMonth, MdAssignment, MdSave, MdWarning, MdChat, MdLocationOn, MdMyLocation } from 'react-icons/md';
+import { MdAdd, MdEdit, MdSearch, MdMoreVert, MdTimer, MdCheckCircle, MdCancel, MdPerson, MdNumbers, MdEventAvailable, MdReceiptLong, MdFilterList, MdPercent, MdAnalytics, MdVisibility, MdStar, MdClose, MdPeople, MdCalendarMonth, MdAssignment, MdSave, MdWarning, MdChat, MdLocationOn, MdMyLocation } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { enquiryService, salespersonService, userService, payrollService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import Modal from '../components/Modal';
 import CreateEnquiry from './CreateEnquiry';
-import { formatDate } from '../utils/helpers';
+import { formatDate, buildSalesExecutiveList } from '../utils/helpers';
 
 const StatusPill = ({ status }) => {
     const styles = {
@@ -94,7 +94,6 @@ const Enquiries = () => {
     const [enquiries, setEnquiries] = useState([]);
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [deleteModal, setDeleteModal] = useState({ open: false, id: null });
     const [enquiryModal, setEnquiryModal] = useState({ open: false, id: null });
     const [reassignModal, setReassignModal] = useState({ open: false, enquiry: null, targetUser: '' });
     const [showFilters, setShowFilters] = useState(false);
@@ -118,94 +117,12 @@ const Enquiries = () => {
                     userService.getAll({ limit: 1000 }),
                     payrollService.getEmployees({ limit: 1000 })
                 ]);
-                const sData = salesRes.status === 'fulfilled' ? (salesRes.value.data?.data || salesRes.value.data || []) : [];
-                const uData = userRes.status === 'fulfilled' ? (userRes.value.data?.data || userRes.value.data || []) : [];
-                const eData = empRes.status === 'fulfilled' ? (empRes.value.data?.data || empRes.value.data || []) : [];
+                const fetchedSalespersons = sData;
+                const fetchedUsers = uData;
+                const fetchedEmployees = eData;
 
-                const empDesignationMap = new Map();
-                eData.forEach(emp => {
-                    if (!emp) return;
-                    const desig = String(emp.designation || '').trim();
-                    if (emp.email) {
-                        empDesignationMap.set(String(emp.email).toLowerCase().trim(), desig);
-                    }
-                    if (emp.userId) {
-                        const uId = typeof emp.userId === 'object' ? emp.userId._id : emp.userId;
-                        if (uId) empDesignationMap.set(String(uId), desig);
-                    }
-                });
-
-                const isSalesExecutiveDesignation = (desigStr, roleStr) => {
-                    const desigLower = (desigStr || '').toLowerCase().trim();
-                    const roleLower = (roleStr || '').toLowerCase().trim().replace(/_/g, ' ');
-                    if (desigLower) {
-                        return desigLower === 'sales executive' || desigLower === 'sales executive role' || desigLower === 'salesperson';
-                    }
-                    return roleLower === 'sales executive' || roleLower === 'sales executive role' || roleLower === 'sales' || roleLower === 'salesperson' || roleLower === 'sales_executive';
-                };
-
-                const mergedMap = new Map();
-                const getKey = (item) => {
-                    if (item.email && String(item.email).trim()) {
-                        return String(item.email).toLowerCase().trim();
-                    }
-                    return String(item.name || '').toLowerCase().trim();
-                };
-
-                sData.forEach(item => {
-                    if (item && item._id) {
-                        const key = getKey(item);
-                        if (key && !mergedMap.has(key)) {
-                            const empDesig = item.email ? empDesignationMap.get(String(item.email).toLowerCase().trim()) : null;
-                            if (!empDesig || isSalesExecutiveDesignation(empDesig, 'Sales Executive')) {
-                                mergedMap.set(key, {
-                                    _id: item._id.toString(),
-                                    name: item.name,
-                                    email: item.email,
-                                    role: 'Sales Executive'
-                                });
-                            }
-                        }
-                    }
-                });
-
-                uData.forEach(item => {
-                    if (item && item._id) {
-                        const key = getKey(item);
-                        if (key && !mergedMap.has(key)) {
-                            const emailStr = String(item.email || '').toLowerCase().trim();
-                            const empDesig = empDesignationMap.get(item._id.toString()) || empDesignationMap.get(emailStr);
-                            if (isSalesExecutiveDesignation(empDesig, item.role)) {
-                                mergedMap.set(key, {
-                                    _id: item._id.toString(),
-                                    name: item.name,
-                                    email: item.email,
-                                    role: 'Sales Executive'
-                                });
-                            }
-                        }
-                    }
-                });
-
-                eData.forEach(emp => {
-                    if (!emp || !emp.name) return;
-                    const desig = String(emp.designation || '').trim();
-                    if (isSalesExecutiveDesignation(desig, '')) {
-                        const key = getKey(emp);
-                        if (key && !mergedMap.has(key)) {
-                            const targetId = emp.userId ? (typeof emp.userId === 'object' ? emp.userId._id : emp.userId) : emp._id;
-                            const idStr = String(targetId);
-                            mergedMap.set(key, {
-                                _id: idStr,
-                                name: emp.name,
-                                email: emp.email || '',
-                                role: 'Sales Executive'
-                            });
-                        }
-                    }
-                });
-
-                setUsers(Array.from(mergedMap.values()).sort((a, b) => a.name.localeCompare(b.name)));
+                const salesExecutives = buildSalesExecutiveList({ fetchedSalespersons, fetchedUsers, fetchedEmployees });
+                setUsers(salesExecutives);
             } catch (err) {
                 console.error('Failed to load salespersons for assignment:', err);
             }
@@ -280,17 +197,6 @@ const Enquiries = () => {
         return () => window.removeEventListener('onCrmSocketUpdate', handleRealtimeUpdate);
     }, [activeTab, filters.assignedTo]);
 
-    const handleDelete = async () => {
-        try {
-            await enquiryService.delete(deleteModal.id);
-            toast.success('Enquiry removed');
-            fetchEnquiries();
-        } catch (err) {
-            toast.error('Deletion failed');
-        } finally {
-            setDeleteModal({ open: false, id: null });
-        }
-    };
 
     const handleFilterChange = (field, value) => {
         setFilters(prev => ({ ...prev, [field]: value }));
@@ -631,13 +537,7 @@ const Enquiries = () => {
                                                 >
                                                     <MdEdit size={18} />
                                                 </button>
-                                                <button
-                                                    onClick={() => setDeleteModal({ open: true, id: e._id })}
-                                                    title="Delete Enquiry"
-                                                    className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors"
-                                                >
-                                                    <MdDelete size={18} />
-                                                </button>
+
                                             </div>
                                         </td>
                                     </tr>
@@ -660,31 +560,6 @@ const Enquiries = () => {
                 </div>
             </div>
 
-            <Modal
-                isOpen={deleteModal.open}
-                onClose={() => setDeleteModal({ open: false, id: null })}
-                title="Confirm Deletion"
-            >
-                <div className="space-y-6">
-                    <p className="text-sm font-bold text-slate-600 leading-relaxed">
-                        Are you sure you want to delete this enquiry? This action is permanent and cannot be undone.
-                    </p>
-                    <div className="flex gap-4">
-                        <button
-                            onClick={() => setDeleteModal({ open: false, id: null })}
-                            className="flex-1 px-6 py-4 bg-slate-100 text-slate-600 rounded-[1.5rem] font-black uppercase text-[10px] tracking-widest hover:bg-slate-200 transition-all"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            onClick={handleDelete}
-                            className="flex-1 px-6 py-4 bg-rose-600 text-white rounded-[1.5rem] font-black uppercase text-[10px] tracking-widest hover:bg-rose-700 transition-all shadow-xl shadow-rose-600/20"
-                        >
-                            Delete
-                        </button>
-                    </div>
-                </div>
-            </Modal>
 
             <Modal
                 isOpen={reassignModal.open}

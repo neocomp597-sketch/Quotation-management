@@ -6,6 +6,7 @@ import { customerService, enquiryService, salespersonService, productService, us
 import Modal from '../components/Modal';
 import PortalDropdown from '../components/PortalDropdown';
 import { isValidMobile, isValidGSTIN } from '../utils/validation';
+import { buildSalesExecutiveList } from '../utils/helpers';
 
 // Reuse CustomerSearchDropdown with Teal accents
 const CustomerSearchDropdown = ({ customers, selectedCustomerId, onSelect }) => {
@@ -361,96 +362,11 @@ const CreateEnquiry = () => {
                 const fetchedUsers = Array.isArray(userData) ? userData : userData?.data || [];
                 const fetchedEmployees = Array.isArray(empData) ? empData : empData?.data || [];
 
-                // Map employee designations by email and userId
-                const empDesignationMap = new Map();
-                fetchedEmployees.forEach(emp => {
-                    if (!emp) return;
-                    const desig = String(emp.designation || '').trim();
-                    if (emp.email) {
-                        empDesignationMap.set(String(emp.email).toLowerCase().trim(), desig);
-                    }
-                    if (emp.userId) {
-                        const uId = typeof emp.userId === 'object' ? emp.userId._id : emp.userId;
-                        if (uId) empDesignationMap.set(String(uId), desig);
-                    }
-                });
-
-                const isSalesExecutiveDesignation = (desigStr, roleStr) => {
-                    const desigLower = (desigStr || '').toLowerCase().trim();
-                    const roleLower = (roleStr || '').toLowerCase().trim().replace(/_/g, ' ');
-                    if (desigLower) {
-                        return desigLower === 'sales executive' || desigLower === 'sales executive role' || desigLower === 'salesperson';
-                    }
-                    return roleLower === 'sales executive' || roleLower === 'sales executive role' || roleLower === 'sales' || roleLower === 'salesperson' || roleLower === 'sales_executive';
-                };
-
-                const mergedMap = new Map();
-                const getKey = (item) => {
-                    if (item.email && String(item.email).trim()) {
-                        return String(item.email).toLowerCase().trim();
-                    }
-                    return String(item.name || '').toLowerCase().trim();
-                };
-
-                // 1. Add salespersons from Salesperson master
-                fetchedSalespersons.forEach(item => {
-                    if (item && item._id) {
-                        const key = getKey(item);
-                        if (key && !mergedMap.has(key)) {
-                            const empDesig = item.email ? empDesignationMap.get(String(item.email).toLowerCase().trim()) : null;
-                            if (!empDesig || isSalesExecutiveDesignation(empDesig, 'Sales Executive')) {
-                                mergedMap.set(key, {
-                                    _id: item._id.toString(),
-                                    name: item.name,
-                                    email: item.email,
-                                    role: 'Sales Executive'
-                                });
-                            }
-                        }
-                    }
-                });
-
-                // 2. Add users only if Designation or Role = Sales Executive
-                fetchedUsers.forEach(item => {
-                    if (item && item._id) {
-                        const key = getKey(item);
-                        if (key && !mergedMap.has(key)) {
-                            const emailStr = String(item.email || '').toLowerCase().trim();
-                            const empDesig = empDesignationMap.get(item._id.toString()) || empDesignationMap.get(emailStr);
-                            if (isSalesExecutiveDesignation(empDesig, item.role)) {
-                                mergedMap.set(key, {
-                                    _id: item._id.toString(),
-                                    name: item.name,
-                                    email: item.email,
-                                    role: 'Sales Executive'
-                                });
-                            }
-                        }
-                    }
-                });
-
-                // 3. Add employees directly if designation is Sales Executive
-                fetchedEmployees.forEach(emp => {
-                    if (!emp || !emp.name) return;
-                    const desig = String(emp.designation || '').trim();
-                    if (isSalesExecutiveDesignation(desig, '')) {
-                        const key = getKey(emp);
-                        if (key && !mergedMap.has(key)) {
-                            const targetId = emp.userId ? (typeof emp.userId === 'object' ? emp.userId._id : emp.userId) : emp._id;
-                            const idStr = String(targetId);
-                            mergedMap.set(key, {
-                                _id: idStr,
-                                name: emp.name,
-                                email: emp.email || '',
-                                role: 'Sales Executive'
-                            });
-                        }
-                    }
-                });
+                const salesExecutives = buildSalesExecutiveList({ fetchedSalespersons, fetchedUsers, fetchedEmployees });
 
                 setCustomers(custData);
                 setProducts(fetchedProducts);
-                setUsers(Array.from(mergedMap.values()).sort((a, b) => a.name.localeCompare(b.name)));
+                setUsers(salesExecutives);
 
                 if (id) {
                     setLoading(true);
@@ -1112,10 +1028,10 @@ const CreateEnquiry = () => {
                                         name="enquiryNo"
                                         value={header.enquiryNo}
                                         onChange={handleHeaderChange}
-                                        disabled={isEditMode}
-                                        readOnly={isEditMode}
+                                        disabled={true}
+                                        readOnly={true}
                                         placeholder="Auto-generated"
-                                        className={`w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold text-slate-800 ${isEditMode ? 'opacity-70 cursor-not-allowed bg-slate-100' : 'focus:ring-4 focus:ring-teal-500/10 focus:border-teal-500'}`}
+                                        className="w-full pl-12 pr-4 py-3.5 bg-slate-100 border border-slate-200 rounded-2xl outline-none text-sm font-bold text-slate-500 opacity-70 cursor-not-allowed select-none"
                                     />
                                 </div>
                             </div>

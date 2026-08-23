@@ -162,3 +162,139 @@ export const formatGstPrefix = (val) => {
   return str;
 };
 
+/**
+ * Filter users/salespersons/employees strictly to active Sales Executives only.
+ * Excludes vendors, admins, super admins, managers, and non-sales roles/designations.
+ */
+export const buildSalesExecutiveList = ({ fetchedSalespersons = [], fetchedUsers = [], fetchedEmployees = [] }) => {
+  const empDesignationMap = new Map();
+  (fetchedEmployees || []).forEach(emp => {
+    if (!emp) return;
+    const desig = String(emp.designation || '').trim();
+    if (emp.email) {
+      empDesignationMap.set(String(emp.email).toLowerCase().trim(), desig);
+    }
+    if (emp.userId) {
+      const uId = typeof emp.userId === 'object' ? emp.userId._id : emp.userId;
+      if (uId) empDesignationMap.set(String(uId), desig);
+    }
+  });
+
+  const isVendor = (item) => {
+    if (!item) return false;
+    if (item.vendorId) return true;
+    const nameLower = String(item.name || '').toLowerCase().trim();
+    const emailLower = String(item.email || '').toLowerCase().trim();
+    const roleLower = String(item.role || '').toLowerCase().trim();
+    const typeLower = String(item.type || '').toLowerCase().trim();
+
+    if (nameLower.includes('vendor') || nameLower.startsWith('venda') || nameLower.includes('venda ') || nameLower.includes('guest')) return true;
+    if (emailLower.includes('vendor') || emailLower.includes('guest')) return true;
+    if (roleLower.includes('vendor') || typeLower.includes('vendor')) return true;
+    return false;
+  };
+
+  const isStrictSalesExecutive = (desigStr, roleStr, nameStr, emailStr, vendorId) => {
+    if (vendorId) return false;
+
+    const nameLower = String(nameStr || '').toLowerCase().trim();
+    const emailLower = String(emailStr || '').toLowerCase().trim();
+    if (nameLower.includes('vendor') || nameLower.startsWith('venda') || nameLower.includes('venda ') || emailLower.includes('vendor')) {
+      return false;
+    }
+
+    const roleLower = String(roleStr || '').toLowerCase().trim().replace(/_/g, ' ');
+    const desigLower = String(desigStr || '').toLowerCase().trim();
+
+    // 1. Exclude Admin, Super Admin, Manager, Vendor, Guest
+    const forbiddenRoles = ['admin', 'super admin', 'manager', 'mgr', 'vendor', 'customer', 'accountant', 'hr', 'director', 'head', 'lead', 'superadmin', 'guest'];
+    if (forbiddenRoles.includes(roleLower)) {
+      return false;
+    }
+
+    // Exclude if designation contains manager or admin or director or vendor
+    if (desigLower.includes('manager') || desigLower.includes('mgr') || desigLower.includes('admin') || desigLower.includes('vendor') || desigLower.includes('director') || desigLower.includes('head')) {
+      return false;
+    }
+
+    // 2. Strict Check for Sales Executive Designation or Role
+    const validDesignations = ['sales executive', 'sales executive role', 'salesperson', 'sales representative', 'sales rep', 'executive - sales', 'sales exec'];
+    const validRoles = ['sales executive', 'sales_executive', 'sales executive role', 'salesperson', 'sales rep', 'sales representative', 'sales'];
+
+    const hasValidDesig = validDesignations.includes(desigLower);
+    const hasValidRole = validRoles.includes(roleLower);
+
+    // Must match either a valid designation or valid role (and not be excluded)
+    return hasValidDesig || hasValidRole;
+  };
+
+  const mergedMap = new Map();
+  const getKey = (item) => {
+    if (item.email && String(item.email).trim()) {
+      return String(item.email).toLowerCase().trim();
+    }
+    return String(item.name || '').toLowerCase().trim();
+  };
+
+  // 1. Process Employees first (designation is source of truth for employees)
+  (fetchedEmployees || []).forEach(emp => {
+    if (!emp || !emp.name) return;
+    if (isVendor(emp)) return;
+    const desig = String(emp.designation || '').trim();
+    const targetId = emp.userId ? (typeof emp.userId === 'object' ? emp.userId._id : emp.userId) : emp._id;
+    const idStr = String(targetId);
+
+    if (isStrictSalesExecutive(desig, '', emp.name, emp.email, emp.vendorId)) {
+      const key = getKey(emp);
+      if (key && !mergedMap.has(key)) {
+        mergedMap.set(key, {
+          _id: idStr,
+          name: emp.name,
+          email: emp.email || '',
+          role: 'Sales Executive'
+        });
+      }
+    }
+  });
+
+  // 2. Process Users (users with sales executive role or mapped sales executive employee designation)
+  (fetchedUsers || []).forEach(item => {
+    if (!item || !item._id) return;
+    if (isVendor(item)) return;
+    const key = getKey(item);
+    if (key && !mergedMap.has(key)) {
+      const emailStr = String(item.email || '').toLowerCase().trim();
+      const empDesig = empDesignationMap.get(item._id.toString()) || empDesignationMap.get(emailStr) || '';
+      if (isStrictSalesExecutive(empDesig, item.role, item.name, item.email, item.vendorId)) {
+        mergedMap.set(key, {
+          _id: item._id.toString(),
+          name: item.name,
+          email: item.email,
+          role: 'Sales Executive'
+        });
+      }
+    }
+  });
+
+  // 3. Process Salespersons from Salesperson master
+  (fetchedSalespersons || []).forEach(item => {
+    if (!item || !item._id) return;
+    if (isVendor(item)) return;
+    const key = getKey(item);
+    if (key && !mergedMap.has(key)) {
+      const emailStr = String(item.email || '').toLowerCase().trim();
+      const empDesig = empDesignationMap.get(item._id.toString()) || empDesignationMap.get(emailStr) || '';
+      if (isStrictSalesExecutive(empDesig, item.role || 'sales', item.name, item.email, item.vendorId)) {
+        mergedMap.set(key, {
+          _id: item._id.toString(),
+          name: item.name,
+          email: item.email,
+          role: 'Sales Executive'
+        });
+      }
+    }
+  });
+
+  return Array.from(mergedMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+};
+

@@ -249,7 +249,7 @@ const KnowledgeBase = () => {
                         </div>
 
                         {/* Article Index List */}
-                        <div className="glass shadow-premium rounded-[2rem] p-4 bg-white border border-slate-100 max-h-[500px] overflow-y-auto custom-scrollbar space-y-2">
+                        <div className="glass shadow-premium rounded-[2rem] p-4 bg-white dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 max-h-[500px] overflow-y-auto custom-scrollbar space-y-2">
                             {loading ? (
                                 <p className="text-center py-8 text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Loading Index...</p>
                             ) : articles.length === 0 ? (
@@ -261,13 +261,13 @@ const KnowledgeBase = () => {
                                         onClick={() => handleSelectArticle(art)}
                                         className={`w-full text-left p-4 rounded-2xl border transition-all flex flex-col gap-1.5 ${
                                             selectedArticle?._id === art._id
-                                                ? 'border-primary-600 bg-primary-50/50'
-                                                : 'border-slate-100 bg-slate-50/50 hover:bg-slate-50'
+                                                ? 'border-primary-600 bg-primary-50 dark:bg-primary-950/60'
+                                                : 'border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 hover:bg-slate-50 dark:hover:bg-slate-800'
                                         }`}
                                     >
-                                        <span className="text-[9px] font-black uppercase text-teal-600 tracking-wider">{art.category}</span>
-                                        <h4 className="text-sm font-black text-slate-900 leading-tight">{art.title}</h4>
-                                        <div className="flex items-center justify-between text-[10px] text-slate-400 mt-1 font-bold">
+                                        <span className="text-[9px] font-black uppercase text-teal-600 dark:text-teal-400 tracking-wider">{art.category}</span>
+                                        <h4 className="text-sm font-black text-slate-900 dark:text-slate-100 leading-tight">{art.title}</h4>
+                                        <div className="flex items-center justify-between text-[10px] text-slate-400 dark:text-slate-500 mt-1 font-bold">
                                             <div className="flex items-center gap-1">
                                                 <MdRemoveRedEye size={12} />
                                                 <span>{art.views} views</span>
@@ -283,13 +283,13 @@ const KnowledgeBase = () => {
                     {/* Right Panel: Article Reader */}
                     <div className="lg:col-span-2">
                         {selectedArticle ? (
-                            <div className="glass shadow-premium rounded-[2.5rem] p-6 bg-white border border-slate-100 min-h-[500px] flex flex-col justify-between">
+                            <div className="glass shadow-premium rounded-[2.5rem] p-6 bg-white dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 min-h-[500px] flex flex-col justify-between">
                                 <div className="space-y-6">
-                                    <div className="border-b border-slate-100 pb-4 flex items-start justify-between gap-4">
+                                    <div className="border-b border-slate-100 dark:border-slate-800 pb-4 flex items-start justify-between gap-4">
                                         <div>
-                                            <span className="text-[10px] font-black uppercase tracking-widest text-teal-600">{selectedArticle.category}</span>
-                                            <h2 className="text-2xl font-black text-slate-900 font-outfit uppercase -mt-0.5">{selectedArticle.title}</h2>
-                                            <div className="flex items-center gap-4 text-xs font-bold text-slate-400 mt-1">
+                                            <span className="text-[10px] font-black uppercase tracking-widest text-teal-600 dark:text-teal-400">{selectedArticle.category}</span>
+                                            <h2 className="text-2xl font-black text-slate-900 dark:text-slate-100 font-outfit uppercase -mt-0.5">{selectedArticle.title}</h2>
+                                            <div className="flex items-center gap-4 text-xs font-bold text-slate-400 dark:text-slate-500 mt-1">
                                                 <span>Created by: {selectedArticle.createdBy?.name || 'Technical Support'}</span>
                                                 <span>Views: {selectedArticle.views} hits</span>
                                             </div>

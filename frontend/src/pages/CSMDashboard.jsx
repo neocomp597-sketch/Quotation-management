@@ -201,11 +201,11 @@ const CSMDashboard = () => {
                         {metricCards.map((card, i) => (
                             <div 
                                 key={i}
-                                className="glass shadow-premium rounded-[2rem] p-6 hover-lift border border-slate-100/80 bg-white relative overflow-hidden flex items-center justify-between"
+                                className="glass shadow-premium rounded-[2rem] p-6 hover-lift border border-slate-100/80 bg-white dark:bg-slate-900/60 dark:border-slate-800 relative overflow-hidden flex items-center justify-between"
                             >
                                 <div className="space-y-1">
-                                    <span className="text-xs font-black uppercase text-slate-400 tracking-widest">{card.label}</span>
-                                    <h2 className="text-4xl font-black text-slate-900 font-outfit">{card.value}</h2>
+                                    <span className="text-xs font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest">{card.label}</span>
+                                    <h2 className="text-4xl font-black text-slate-900 dark:text-slate-100 font-outfit">{card.value}</h2>
                                 </div>
                                 <div className={`w-14 h-14 bg-gradient-to-br ${card.color} rounded-2xl flex items-center justify-center text-white shadow-lg`}>
                                     {card.icon}
@@ -235,9 +235,9 @@ const CSMDashboard = () => {
                         </div>
 
                         {/* SLA Compliance Donut */}
-                        <div className="glass shadow-premium rounded-[2rem] p-6 bg-white border border-slate-100 flex flex-col justify-between h-[300px]">
+                        <div className="glass shadow-premium rounded-[2rem] p-6 bg-white dark:bg-slate-900/60 dark:border-slate-800 border border-slate-100 flex flex-col justify-between h-[300px]">
                             <div>
-                                <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">SLA Resolution Compliance</h3>
+                                <h3 className="text-sm font-black text-slate-900 dark:text-slate-100 uppercase tracking-widest">SLA Resolution Compliance</h3>
                             </div>
                             <div className="flex items-center gap-6 flex-1 min-h-0">
                                 <div className="w-1/2 h-full relative">
@@ -267,21 +267,21 @@ const CSMDashboard = () => {
                                     </ResponsiveContainer>
                                     {/* Centered Compliance Rating */}
                                     <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                                        <span className="text-2xl font-black text-slate-800 font-outfit leading-none">{complianceRate}%</span>
-                                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">SLA Met</span>
+                                        <span className="text-2xl font-black text-slate-800 dark:text-slate-100 font-outfit leading-none">{complianceRate}%</span>
+                                        <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1">SLA Met</span>
                                     </div>
                                 </div>
-                                <div className="w-1/2 space-y-2.5 font-semibold text-xs text-slate-500">
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Milestone Review</p>
+                                <div className="w-1/2 space-y-2.5 font-semibold text-xs text-slate-500 dark:text-slate-400">
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Milestone Review</p>
                                     <p className="leading-relaxed">SLA breaches represent tickets where engineers exceeded priority-defined fix durations.</p>
-                                    <p className="font-bold text-teal-600 bg-teal-50 border border-teal-100 rounded-xl px-3 py-1.5 inline-block">Target: 95.0%</p>
+                                    <p className="font-bold text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/40 border border-teal-100 dark:border-teal-900/50 rounded-xl px-3 py-1.5 inline-block">Target: 95.0%</p>
                                 </div>
                             </div>
                         </div>
 
                         {/* Recent Service Visits Timeline */}
-                        <div className="glass shadow-premium rounded-[2rem] p-6 bg-white border border-slate-100 flex flex-col h-[300px]">
-                            <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-3">Field Service Log</h3>
+                        <div className="glass shadow-premium rounded-[2rem] p-6 bg-white dark:bg-slate-900/60 dark:border-slate-800 border border-slate-100 flex flex-col h-[300px]">
+                            <h3 className="text-sm font-black text-slate-900 dark:text-slate-100 uppercase tracking-widest mb-3">Field Service Log</h3>
                             <div className="flex-1 overflow-y-auto space-y-3 pr-1 custom-scrollbar">
                                 {visits.length === 0 ? (
                                     <div className="flex flex-col items-center justify-center h-full text-slate-400 text-xs font-bold py-8">
@@ -289,16 +289,16 @@ const CSMDashboard = () => {
                                     </div>
                                 ) : (
                                     visits.slice(0, 5).map((visit, idx) => (
-                                        <div key={visit._id || idx} className="p-3 rounded-2xl bg-slate-50/50 hover:bg-slate-50 transition-colors border border-slate-100/50 flex flex-col space-y-1.5">
+                                        <div key={visit._id || idx} className="p-3 rounded-2xl bg-slate-50/50 dark:bg-slate-800/40 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors border border-slate-100/50 dark:border-slate-700/50 flex flex-col space-y-1.5">
                                             <div className="flex items-center justify-between">
-                                                <span className="font-black text-slate-800 text-xs tracking-tight">{visit.visitNo}</span>
+                                                <span className="font-black text-slate-800 dark:text-slate-100 text-xs tracking-tight">{visit.visitNo}</span>
                                                 {getVisitStatusBadge(visit.status)}
                                             </div>
-                                            <div className="text-xs text-slate-500 font-bold flex items-center gap-1">
+                                            <div className="text-xs text-slate-500 dark:text-slate-400 font-bold flex items-center gap-1">
                                                 <MdLocationOn className="text-slate-400 shrink-0" size={13} />
                                                 <span className="truncate">{visit.ticketId?.customerId?.customerName || 'Unknown Location'}</span>
                                             </div>
-                                            <div className="flex items-center justify-between text-[11px] text-slate-400 font-semibold">
+                                            <div className="flex items-center justify-between text-[11px] text-slate-400 dark:text-slate-500 font-semibold">
                                                 <span className="flex items-center gap-0.5">
                                                     <MdPerson size={12} /> {visit.engineerId?.name || 'Unassigned'}
                                                 </span>
@@ -314,8 +314,8 @@ const CSMDashboard = () => {
                     {/* Charts Grid */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {/* Tickets by Status */}
-                        <div className="glass shadow-premium rounded-[2rem] p-6 bg-white border border-slate-100 h-[340px] flex flex-col">
-                            <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-4">Tickets by Status</h3>
+                        <div className="glass shadow-premium rounded-[2rem] p-6 bg-white dark:bg-slate-900/60 dark:border-slate-800 border border-slate-100 h-[340px] flex flex-col">
+                            <h3 className="text-sm font-black text-slate-900 dark:text-slate-100 uppercase tracking-widest mb-4">Tickets by Status</h3>
                             <div className="flex-1 min-h-0">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <PieChart>
@@ -339,13 +339,13 @@ const CSMDashboard = () => {
                         </div>
 
                         {/* Tickets by Category */}
-                        <div className="glass shadow-premium rounded-[2rem] p-6 bg-white border border-slate-100 h-[340px] flex flex-col">
-                            <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-4">Tickets by Category</h3>
+                        <div className="glass shadow-premium rounded-[2rem] p-6 bg-white dark:bg-slate-900/60 dark:border-slate-800 border border-slate-100 h-[340px] flex flex-col">
+                            <h3 className="text-sm font-black text-slate-900 dark:text-slate-100 uppercase tracking-widest mb-4">Tickets by Category</h3>
                             <div className="flex-1 min-h-0">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <BarChart data={categoryData} layout="vertical" margin={{ left: 10, right: 10, top: 10, bottom: 10 }}>
                                         <XAxis type="number" hide />
-                                        <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 10, fontWeight: 'bold', fill: '#475569' }} />
+                                        <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 10, fontWeight: 'bold', fill: '#94a3b8' }} />
                                         <Tooltip />
                                         <Bar dataKey="value" fill="#0d9488" radius={[0, 8, 8, 0]} barSize={16} />
                                     </BarChart>
@@ -355,8 +355,8 @@ const CSMDashboard = () => {
                     </div>
 
                     {/* Engineer Performance Leaderboard */}
-                    <div className="glass shadow-premium rounded-[2rem] p-6 bg-white border border-slate-100">
-                        <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-4">Top Performing Engineers</h3>
+                    <div className="glass shadow-premium rounded-[2rem] p-6 bg-white dark:bg-slate-900/60 dark:border-slate-800 border border-slate-100">
+                        <h3 className="text-sm font-black text-slate-900 dark:text-slate-100 uppercase tracking-widest mb-4">Top Performing Engineers</h3>
                         {engineers.length === 0 ? (
                             <div className="text-center py-8 text-slate-400 text-sm font-bold">
                                 No closed tickets resolved by engineers yet.
@@ -365,18 +365,18 @@ const CSMDashboard = () => {
                             <div className="overflow-x-auto">
                                 <table className="w-full text-left border-collapse">
                                     <thead>
-                                        <tr className="text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-50">
+                                        <tr className="text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-50 dark:border-slate-800">
                                             <th className="pb-3 pl-4">Engineer</th>
                                             <th className="pb-3">Tickets Resolved</th>
                                             <th className="pb-3">Average CSAT Score</th>
                                             <th className="pb-3 text-right pr-4">Performance Status</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-slate-50 text-sm font-semibold text-slate-700">
+                                    <tbody className="divide-y divide-slate-50 dark:divide-slate-800 text-sm font-semibold text-slate-700 dark:text-slate-300">
                                         {engineers.map((eng, idx) => (
-                                            <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
-                                                <td className="py-4 pl-4 font-black text-slate-900">{eng.name}</td>
-                                                <td className="py-4 font-black text-teal-600">{eng.resolvedCount} cases</td>
+                                            <tr key={idx} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors">
+                                                <td className="py-4 pl-4 font-black text-slate-900 dark:text-slate-100">{eng.name}</td>
+                                                <td className="py-4 font-black text-teal-600 dark:text-teal-400">{eng.resolvedCount} cases</td>
                                                 <td className="py-4">
                                                     <div className="flex items-center gap-1.5">
                                                         <span className="text-amber-500 text-lg leading-none">★</span>

@@ -5,7 +5,8 @@ import {
     MdPerson, MdBusiness, MdCheckCircle, MdSave, MdPhone
 } from 'react-icons/md';
 import { toast } from 'react-toastify';
-import { enquiryService, userService } from '../services/api';
+import { enquiryService, userService, salespersonService, payrollService } from '../services/api';
+import { buildSalesExecutiveList } from '../utils/helpers';
 
 const toDatetimeLocal = (dateInput) => {
     if (!dateInput) return '';
@@ -40,16 +41,29 @@ const ScheduleEnquiryVisit = () => {
         const fetchData = async () => {
             setLoading(true);
             try {
-                const [enqRes, usersRes] = await Promise.all([
+                const [enqRes, salesRes, usersRes, empRes] = await Promise.allSettled([
                     enquiryService.getById(id),
-                    userService.getAll()
+                    salespersonService.getAll(),
+                    userService.getAll({ limit: 1000 }),
+                    payrollService.getEmployees({ limit: 1000 })
                 ]);
 
-                const enq = enqRes.data;
+                if (enqRes.status !== 'fulfilled' || !enqRes.value.data) {
+                    toast.error('Enquiry not found');
+                    navigate('/enquiries');
+                    return;
+                }
+
+                const enq = enqRes.value.data;
                 setEnquiry(enq);
-                
-                const userList = Array.isArray(usersRes.data) ? usersRes.data : (usersRes.data?.users || []);
-                setUsers(userList);
+
+                const valueOf = (r) => r.status === 'fulfilled' ? r.value : null;
+                const fetchedSalespersons = valueOf(salesRes)?.data?.data || valueOf(salesRes)?.data || [];
+                const fetchedUsers = valueOf(usersRes)?.data?.data || valueOf(usersRes)?.data || [];
+                const fetchedEmployees = valueOf(empRes)?.data?.data || valueOf(empRes)?.data || [];
+
+                const salesExecutives = buildSalesExecutiveList({ fetchedSalespersons, fetchedUsers, fetchedEmployees });
+                setUsers(salesExecutives);
 
                 if (isEditMode) {
                     const idx = parseInt(visitIndex, 10);

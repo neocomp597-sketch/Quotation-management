@@ -54,8 +54,8 @@ const SalesAnalytics = () => {
                     <MdAnalytics size={22} />
                 </div>
                 <div>
-                    <h1 className="text-2xl font-black text-slate-900">Sales Analytics</h1>
-                    <p className="text-xs text-slate-500">Pipeline velocity, stuck deals & salesperson performance</p>
+                    <h1 className="text-2xl font-black text-slate-900 dark:text-slate-100">Sales Analytics</h1>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Pipeline velocity, stuck deals & salesperson performance</p>
                 </div>
             </div>
 
@@ -70,12 +70,12 @@ const SalesAnalytics = () => {
                         { label: 'Velocity', value: formatCurrency(velocity.pipelineVelocity), color: 'from-violet-500 to-purple-600' },
                         { label: 'Won Deals', value: velocity.totalWonDeals, color: 'from-teal-500 to-cyan-600' },
                     ].map((card, i) => (
-                        <div key={i} className="bg-white rounded-2xl border border-slate-100 p-4 hover:shadow-lg transition-all">
+                        <div key={i} className="bg-white dark:bg-slate-900/60 rounded-2xl border border-slate-100 dark:border-slate-800 p-4 hover:shadow-lg transition-all">
                             <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${card.color} flex items-center justify-center text-white mb-2`}>
                                 <MdSpeed size={16} />
                             </div>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase">{card.label}</p>
-                            <p className="text-xl font-black text-slate-900 mt-0.5">{card.value}</p>
+                            <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">{card.label}</p>
+                            <p className="text-xl font-black text-slate-900 dark:text-slate-100 mt-0.5">{card.value}</p>
                         </div>
                     ))}
                 </div>
@@ -83,10 +83,10 @@ const SalesAnalytics = () => {
 
             {/* Stuck Deals */}
             {stuck && stuck.totalStuck > 0 && (
-                <div className="bg-white rounded-2xl border border-slate-100 p-6">
+                <div className="bg-white dark:bg-slate-900/60 rounded-2xl border border-slate-100 dark:border-slate-800 p-6">
                     <div className="flex items-center gap-2 mb-4">
                         <MdWarning className="text-amber-500" size={22} />
-                        <h3 className="text-lg font-black text-slate-900">Stuck Deals</h3>
+                        <h3 className="text-lg font-black text-slate-900 dark:text-slate-100">Stuck Deals</h3>
                         <span className="px-2 py-0.5 rounded-lg bg-amber-50 text-amber-700 text-xs font-bold">{stuck.totalStuck} total</span>
                     </div>
 
@@ -94,19 +94,19 @@ const SalesAnalytics = () => {
                         {/* 30+ days */}
                         {stuck.thirtyDays?.length > 0 && (
                             <div>
-                                <h4 className="text-xs font-black text-red-600 uppercase mb-2 flex items-center gap-1">
+                                <h4 className="text-xs font-black text-red-600 dark:text-red-400 uppercase mb-2 flex items-center gap-1">
                                     <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
                                     30+ Days ({stuck.thirtyDays.length})
                                 </h4>
                                 <div className="space-y-2">
                                     {stuck.thirtyDays.slice(0, 5).map((d, i) => (
-                                        <div key={i} className="p-3 bg-red-50/50 rounded-xl border border-red-100">
-                                            <p className="text-sm font-bold text-slate-900 truncate">{d.title}</p>
+                                        <div key={i} className="p-3 bg-red-50/50 dark:bg-rose-950/30 rounded-xl border border-red-100 dark:border-rose-900/40">
+                                            <p className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">{d.title}</p>
                                             <div className="flex items-center justify-between mt-1">
-                                                <span className="text-xs text-slate-500">{d.ownerId?.name || '—'}</span>
-                                                <span className="text-xs font-bold text-red-600">{daysSince(d.updatedAt)} inactive</span>
+                                                <span className="text-xs text-slate-500 dark:text-slate-400">{d.ownerId?.name || '—'}</span>
+                                                <span className="text-xs font-bold text-red-600 dark:text-red-400">{daysSince(d.updatedAt)} inactive</span>
                                             </div>
-                                            <p className="text-sm font-black text-slate-900 mt-1">{formatCurrency(d.value)}</p>
+                                            <p className="text-sm font-black text-slate-900 dark:text-slate-100 mt-1">{formatCurrency(d.value)}</p>
                                         </div>
                                     ))}
                                 </div>
@@ -116,19 +116,19 @@ const SalesAnalytics = () => {
                         {/* 15+ days */}
                         {stuck.fifteenDays?.length > 0 && (
                             <div>
-                                <h4 className="text-xs font-black text-amber-600 uppercase mb-2 flex items-center gap-1">
+                                <h4 className="text-xs font-black text-amber-600 dark:text-amber-400 uppercase mb-2 flex items-center gap-1">
                                     <span className="w-2 h-2 rounded-full bg-amber-500" />
                                     15+ Days ({stuck.fifteenDays.length})
                                 </h4>
                                 <div className="space-y-2">
                                     {stuck.fifteenDays.slice(0, 5).map((d, i) => (
-                                        <div key={i} className="p-3 bg-amber-50/50 rounded-xl border border-amber-100">
-                                            <p className="text-sm font-bold text-slate-900 truncate">{d.title}</p>
+                                        <div key={i} className="p-3 bg-amber-50/50 dark:bg-amber-950/30 rounded-xl border border-amber-100 dark:border-amber-900/40">
+                                            <p className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">{d.title}</p>
                                             <div className="flex items-center justify-between mt-1">
-                                                <span className="text-xs text-slate-500">{d.ownerId?.name || '—'}</span>
-                                                <span className="text-xs font-bold text-amber-600">{daysSince(d.updatedAt)} inactive</span>
+                                                <span className="text-xs text-slate-500 dark:text-slate-400">{d.ownerId?.name || '—'}</span>
+                                                <span className="text-xs font-bold text-amber-600 dark:text-amber-400">{daysSince(d.updatedAt)} inactive</span>
                                             </div>
-                                            <p className="text-sm font-black text-slate-900 mt-1">{formatCurrency(d.value)}</p>
+                                            <p className="text-sm font-black text-slate-900 dark:text-slate-100 mt-1">{formatCurrency(d.value)}</p>
                                         </div>
                                     ))}
                                 </div>
@@ -138,19 +138,19 @@ const SalesAnalytics = () => {
                         {/* 7+ days */}
                         {stuck.sevenDays?.length > 0 && (
                             <div>
-                                <h4 className="text-xs font-black text-blue-600 uppercase mb-2 flex items-center gap-1">
+                                <h4 className="text-xs font-black text-blue-600 dark:text-blue-400 uppercase mb-2 flex items-center gap-1">
                                     <span className="w-2 h-2 rounded-full bg-blue-500" />
                                     7+ Days ({stuck.sevenDays.length})
                                 </h4>
                                 <div className="space-y-2">
                                     {stuck.sevenDays.slice(0, 5).map((d, i) => (
-                                        <div key={i} className="p-3 bg-blue-50/50 rounded-xl border border-blue-100">
-                                            <p className="text-sm font-bold text-slate-900 truncate">{d.title}</p>
+                                        <div key={i} className="p-3 bg-blue-50/50 dark:bg-blue-950/30 rounded-xl border border-blue-100 dark:border-blue-900/40">
+                                            <p className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">{d.title}</p>
                                             <div className="flex items-center justify-between mt-1">
-                                                <span className="text-xs text-slate-500">{d.ownerId?.name || '—'}</span>
-                                                <span className="text-xs font-bold text-blue-600">{daysSince(d.updatedAt)} inactive</span>
+                                                <span className="text-xs text-slate-500 dark:text-slate-400">{d.ownerId?.name || '—'}</span>
+                                                <span className="text-xs font-bold text-blue-600 dark:text-blue-400">{daysSince(d.updatedAt)} inactive</span>
                                             </div>
-                                            <p className="text-sm font-black text-slate-900 mt-1">{formatCurrency(d.value)}</p>
+                                            <p className="text-sm font-black text-slate-900 dark:text-slate-100 mt-1">{formatCurrency(d.value)}</p>
                                         </div>
                                     ))}
                                 </div>
@@ -161,42 +161,42 @@ const SalesAnalytics = () => {
             )}
 
             {stuck && stuck.totalStuck === 0 && (
-                <div className="bg-emerald-50 rounded-2xl border border-emerald-100 p-6 text-center">
-                    <p className="text-emerald-700 font-bold">✓ No stuck deals! All deals are moving through the pipeline.</p>
+                <div className="bg-emerald-50 dark:bg-emerald-950/40 rounded-2xl border border-emerald-100 dark:border-emerald-900/50 p-6 text-center">
+                    <p className="text-emerald-700 dark:text-emerald-300 font-bold">✓ No stuck deals! All deals are moving through the pipeline.</p>
                 </div>
             )}
 
             {/* Salesperson Performance */}
             {performers.length > 0 && (
-                <div className="bg-white rounded-2xl border border-slate-100 p-6">
+                <div className="bg-white dark:bg-slate-900/60 rounded-2xl border border-slate-100 dark:border-slate-800 p-6">
                     <div className="flex items-center gap-2 mb-4">
                         <MdPerson className="text-indigo-500" size={22} />
-                        <h3 className="text-lg font-black text-slate-900">Salesperson Performance</h3>
+                        <h3 className="text-lg font-black text-slate-900 dark:text-slate-100">Salesperson Performance</h3>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                             <thead>
-                                <tr className="border-b border-slate-100">
-                                    <th className="text-left py-3 px-4 text-xs font-bold text-slate-400 uppercase">Salesperson</th>
-                                    <th className="text-right py-3 px-4 text-xs font-bold text-slate-400 uppercase">Total</th>
-                                    <th className="text-right py-3 px-4 text-xs font-bold text-slate-400 uppercase">Open</th>
-                                    <th className="text-right py-3 px-4 text-xs font-bold text-slate-400 uppercase">Won</th>
-                                    <th className="text-right py-3 px-4 text-xs font-bold text-slate-400 uppercase">Lost</th>
-                                    <th className="text-right py-3 px-4 text-xs font-bold text-slate-400 uppercase">Revenue</th>
-                                    <th className="text-right py-3 px-4 text-xs font-bold text-slate-400 uppercase">Pipeline</th>
-                                    <th className="text-right py-3 px-4 text-xs font-bold text-slate-400 uppercase">Win Rate</th>
+                                <tr className="border-b border-slate-100 dark:border-slate-800">
+                                    <th className="text-left py-3 px-4 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase">Salesperson</th>
+                                    <th className="text-right py-3 px-4 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase">Total</th>
+                                    <th className="text-right py-3 px-4 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase">Open</th>
+                                    <th className="text-right py-3 px-4 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase">Won</th>
+                                    <th className="text-right py-3 px-4 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase">Lost</th>
+                                    <th className="text-right py-3 px-4 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase">Revenue</th>
+                                    <th className="text-right py-3 px-4 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase">Pipeline</th>
+                                    <th className="text-right py-3 px-4 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase">Win Rate</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {performers.map((p, i) => (
-                                    <tr key={i} className="border-b border-slate-50 hover:bg-slate-50/50">
-                                        <td className="py-3 px-4 font-bold text-slate-900">{p.userName || 'Unknown'}</td>
-                                        <td className="py-3 px-4 text-right text-slate-600">{p.totalDeals}</td>
-                                        <td className="py-3 px-4 text-right text-blue-600 font-semibold">{p.openDeals}</td>
-                                        <td className="py-3 px-4 text-right text-emerald-600 font-bold">{p.wonDeals}</td>
-                                        <td className="py-3 px-4 text-right text-red-500">{p.lostDeals}</td>
-                                        <td className="py-3 px-4 text-right font-black text-slate-900">{formatCurrency(p.totalRevenue)}</td>
-                                        <td className="py-3 px-4 text-right text-indigo-600 font-bold">{formatCurrency(p.pipelineValue)}</td>
+                                    <tr key={i} className="border-b border-slate-50 dark:border-slate-800/60 hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
+                                        <td className="py-3 px-4 font-bold text-slate-900 dark:text-slate-100">{p.userName || 'Unknown'}</td>
+                                        <td className="py-3 px-4 text-right text-slate-600 dark:text-slate-400">{p.totalDeals}</td>
+                                        <td className="py-3 px-4 text-right text-blue-600 dark:text-blue-400 font-semibold">{p.openDeals}</td>
+                                        <td className="py-3 px-4 text-right text-emerald-600 dark:text-emerald-400 font-bold">{p.wonDeals}</td>
+                                        <td className="py-3 px-4 text-right text-red-500 dark:text-red-400">{p.lostDeals}</td>
+                                        <td className="py-3 px-4 text-right font-black text-slate-900 dark:text-slate-100">{formatCurrency(p.totalRevenue)}</td>
+                                        <td className="py-3 px-4 text-right text-indigo-600 dark:text-indigo-400 font-bold">{formatCurrency(p.pipelineValue)}</td>
                                         <td className="py-3 px-4 text-right">
                                             <span className={`px-2 py-0.5 rounded-lg text-xs font-bold ${
                                                 p.conversionRate >= 50 ? 'bg-emerald-50 text-emerald-700' :

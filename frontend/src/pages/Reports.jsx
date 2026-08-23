@@ -177,6 +177,24 @@ const REVENUE_PLAN_COLORS = {
     black: '000000'
 };
 
+const REVENUE_PLAN_DARK_COLORS = {
+    filter: '1e293b',       // slate-800
+    title: '0f172a',        // slate-900
+    header: '1e293b',       // slate-800
+    utility: '064e3b',      // emerald-900
+    utilityContractor: '164e63', // cyan-900
+    industry: '334155',     // slate-700
+    export: '581c87',       // purple-900
+    productHeader: '450a0a',// rose-950
+    productMonth: '0c4a6e', // sky-950
+    productName: '713f12',  // amber-950
+    deferredHeader: '164e63',// cyan-900
+    deferredGroup: '7c2d12',// orange-950
+    deferredTotal: '78350f',// amber-900
+    white: '0f172a',        // slate-900
+    black: 'f8fafc'         // slate-50
+};
+
 const cell = (value = '', options = {}) => ({ value, ...options });
 const blankRow = (length) => Array.from({ length }, () => '');
 const sumValues = (rows = [], key) => rows.reduce((sum, row) => sum + Number(row?.[key] || 0), 0);
@@ -289,49 +307,52 @@ const toSheetRows = (rows) => rows.map(row => row.map(item => typeof item === 'o
 const normalizeHex = (hex = REVENUE_PLAN_COLORS.white) => `#${String(hex).replace('#', '')}`;
 const normalizeCellText = (value = '') => String(value || '').trim();
 const getRevenueRowLabel = (row = []) => normalizeCellText(row.find(item => normalizeCellText(item.value))?.value);
-const getRevenueSegmentFill = (value = '') => {
+const getRevenueSegmentFill = (value = '', isDarkMode = false) => {
+    const colors = isDarkMode ? REVENUE_PLAN_DARK_COLORS : REVENUE_PLAN_COLORS;
     const key = normalizeRevenueKey(value);
-    if (key === 'UTILITY') return REVENUE_PLAN_COLORS.utility;
-    if (key === 'UTILITYCONTRACTOR' || key === 'UC') return REVENUE_PLAN_COLORS.utilityContractor;
-    if (key === 'INDUSTRY' || key === 'NONUTILITYINDUSTRY' || key === 'IND') return REVENUE_PLAN_COLORS.industry;
-    if (key === 'EXPORT' || key === 'EXP') return REVENUE_PLAN_COLORS.export;
+    if (key === 'UTILITY') return colors.utility;
+    if (key === 'UTILITYCONTRACTOR' || key === 'UC') return colors.utilityContractor;
+    if (key === 'INDUSTRY' || key === 'NONUTILITYINDUSTRY' || key === 'IND') return colors.industry;
+    if (key === 'EXPORT' || key === 'EXP') return colors.export;
     return '';
 };
 
 const getRevenueCellFill = (sheetName = '', rowIndex = 0, cellIndex = 0, row = [], item = {}, options = {}) => {
+    const isDarkMode = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
+    const colors = isDarkMode ? REVENUE_PLAN_DARK_COLORS : REVENUE_PLAN_COLORS;
     const text = normalizeCellText(item.value);
     const rowLabel = getRevenueRowLabel(row);
 
     if (sheetName.includes('Summary FY') && !sheetName.includes('Qtr')) {
-        if (options.filterRows?.includes(rowIndex)) return REVENUE_PLAN_COLORS.filter;
-        if (text.includes('Summary of Revenue')) return REVENUE_PLAN_COLORS.title;
-        if (options.headerRows?.includes(rowIndex)) return REVENUE_PLAN_COLORS.header;
+        if (options.filterRows?.includes(rowIndex)) return colors.filter;
+        if (text.includes('Summary of Revenue')) return colors.title;
+        if (options.headerRows?.includes(rowIndex)) return colors.header;
         if (text === 'Total') return '';
-        if (rowLabel === 'Monthly Revenue') return REVENUE_PLAN_COLORS.title;
-        return getRevenueSegmentFill(rowLabel);
+        if (rowLabel === 'Monthly Revenue') return colors.title;
+        return getRevenueSegmentFill(rowLabel, isDarkMode);
     }
 
     if (sheetName.includes('Summary FY') && sheetName.includes('Qtr wise')) {
         if (options.filterRows?.includes(rowIndex)) return '';
-        if (text.includes('Summary of Revenue')) return REVENUE_PLAN_COLORS.title;
-        if (options.headerRows?.includes(rowIndex)) return REVENUE_PLAN_COLORS.header;
+        if (text.includes('Summary of Revenue')) return colors.title;
+        if (options.headerRows?.includes(rowIndex)) return colors.header;
         if (text === 'Total') return '';
-        return getRevenueSegmentFill(rowLabel);
+        return getRevenueSegmentFill(rowLabel, isDarkMode);
     }
 
     if (sheetName === 'Productwise') {
-        if (rowIndex === 0 && cellIndex >= 3) return REVENUE_PLAN_COLORS.productHeader;
-        if (rowIndex === 1 && cellIndex >= 3) return REVENUE_PLAN_COLORS.productMonth;
-        if (cellIndex === 1 && text) return REVENUE_PLAN_COLORS.productName;
-        if ((cellIndex === 0 || cellIndex === 2) && text) return getRevenueSegmentFill(text);
+        if (rowIndex === 0 && cellIndex >= 3) return colors.productHeader;
+        if (rowIndex === 1 && cellIndex >= 3) return colors.productMonth;
+        if (cellIndex === 1 && text) return colors.productName;
+        if ((cellIndex === 0 || cellIndex === 2) && text) return getRevenueSegmentFill(text, isDarkMode);
     }
 
     if (sheetName === 'Deffered account Temperarily') {
         if (text.includes('ULARIA')) return '';
-        if (options.headerRows?.includes(rowIndex)) return REVENUE_PLAN_COLORS.deferredHeader;
-        if (text === 'GRAND TOTAL') return REVENUE_PLAN_COLORS.deferredTotal;
-        if (text === 'Total') return REVENUE_PLAN_COLORS.productName;
-        return getRevenueSegmentFill(text) || (text.includes('Utility Contractor Segment') ? REVENUE_PLAN_COLORS.deferredGroup : '');
+        if (options.headerRows?.includes(rowIndex)) return colors.deferredHeader;
+        if (text === 'GRAND TOTAL') return colors.deferredTotal;
+        if (text === 'Total') return colors.productName;
+        return getRevenueSegmentFill(text, isDarkMode) || (text.includes('Utility Contractor Segment') ? colors.deferredGroup : '');
     }
 
     return '';
@@ -347,10 +368,14 @@ const getRevenueCellStyle = (sheetName, rowIndex, cellIndex, row, item, options 
     const isMonthlyRevenue = sheetName.includes('Summary FY') && !sheetName.includes('Qtr') && getRevenueRowLabel(row) === 'Monthly Revenue';
     const isFirstColumn = cellIndex === 0;
     const isBlank = !text;
+    const isDarkMode = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
+
+    let defaultBg = isDarkMode ? '#0f172a' : REVENUE_PLAN_COLORS.white;
+    let defaultTextColor = isDarkMode ? '#f8fafc' : REVENUE_PLAN_COLORS.black;
 
     return {
-        backgroundColor: fill ? normalizeHex(fill) : REVENUE_PLAN_COLORS.white,
-        color: normalizeHex(REVENUE_PLAN_COLORS.black),
+        backgroundColor: fill ? normalizeHex(fill) : defaultBg,
+        color: isDarkMode ? '#f8fafc' : (fill ? normalizeHex(REVENUE_PLAN_COLORS.black) : defaultTextColor),
         fontWeight: isTitle || isHeader || isFilter || isTotal || isMonthlyRevenue || isFirstColumn ? 800 : 500,
         textAlign: isTitle || isFilter || isFirstColumn ? 'left' : 'right',
         verticalAlign: 'middle',
@@ -757,20 +782,20 @@ const revenueSheetToWorksheet = (sheet) => {
 
 const StatCard = ({ icon, label, value, color = 'primary' }) => {
     const colorMap = {
-        primary: 'bg-primary-50 text-primary-600',
-        emerald: 'bg-emerald-50 text-emerald-600',
-        amber: 'bg-amber-50 text-amber-600',
-        rose: 'bg-rose-50 text-rose-600',
-        indigo: 'bg-indigo-50 text-indigo-600',
-        violet: 'bg-violet-50 text-violet-600',
+        primary: 'bg-primary-50 dark:bg-primary-950/50 text-primary-600 dark:text-primary-400',
+        emerald: 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400',
+        amber: 'bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400',
+        rose: 'bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400',
+        indigo: 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400',
+        violet: 'bg-violet-50 dark:bg-violet-950/50 text-violet-600 dark:text-violet-400',
     };
     return (
-        <div className="p-6 bg-white border border-slate-100 rounded-[2rem] shadow-sm">
+        <div className="p-6 bg-white dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 rounded-[2rem] shadow-sm">
             <div className={`w-12 h-12 ${colorMap[color]} rounded-2xl flex items-center justify-center mb-4`}>
                 {icon}
             </div>
-            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{label}</h3>
-            <p className="text-2xl font-black text-slate-900 font-outfit tracking-tighter">{value}</p>
+            <h3 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">{label}</h3>
+            <p className="text-2xl font-black text-slate-900 dark:text-slate-100 font-outfit tracking-tighter">{value}</p>
         </div>
     );
 };
@@ -1112,12 +1137,12 @@ const Reports = () => {
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    <div className="lg:col-span-2 bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm">
+                    <div className="lg:col-span-2 bg-white dark:bg-slate-900/60 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm">
                         <div className="flex items-center justify-between mb-8">
-                            <h2 className="text-lg font-black text-slate-900 uppercase">Revenue Growth Trend</h2>
+                            <h2 className="text-lg font-black text-slate-900 dark:text-slate-100 uppercase">Revenue Growth Trend</h2>
                             <div className="flex items-center gap-2">
                                 <span className="w-3 h-3 bg-primary-600 rounded-full"></span>
-                                <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Monthly Sales</span>
+                                <span className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest">Monthly Sales</span>
                             </div>
                         </div>
                         <div className="h-72 w-full">
@@ -1137,16 +1162,16 @@ const Reports = () => {
                         </div>
                     </div>
 
-                    <div className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm">
-                        <h2 className="text-lg font-black text-slate-900 uppercase mb-8">Quotation Funnel</h2>
+                    <div className="bg-white dark:bg-slate-900/60 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm">
+                        <h2 className="text-lg font-black text-slate-900 dark:text-slate-100 uppercase mb-8">Quotation Funnel</h2>
                         <div className="space-y-4">
                             {Object.entries(reportData.summary.statusBreakdown || {}).map(([status, count]) => (
-                                <div key={status} className="p-5 bg-slate-50 rounded-2xl border border-slate-100">
+                                <div key={status} className="p-5 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-100 dark:border-slate-800">
                                     <div className="flex justify-between items-center mb-2">
-                                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">{status}</span>
-                                        <span className="text-lg font-black text-slate-900">{count}</span>
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">{status}</span>
+                                        <span className="text-lg font-black text-slate-900 dark:text-slate-100">{count}</span>
                                     </div>
-                                    <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
+                                    <div className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
                                         <div className={`h-full ${status === 'ordered' ? 'bg-emerald-500' : status === 'final' ? 'bg-primary-600' : 'bg-amber-400'}`}
                                             style={{ width: `${(count / (reportData.summary.totalQuotations || 1)) * 100}%` }}></div>
                                     </div>
@@ -1157,18 +1182,18 @@ const Reports = () => {
                 </div>
 
                 {/* Quotation table */}
-                <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden">
-                    <div className="p-6 border-b border-slate-50 bg-slate-50/30">
+                <div className="bg-white dark:bg-slate-900/60 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
+                    <div className="p-6 border-b border-slate-50 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-800/30">
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                             <div>
-                                <h2 className="text-lg font-black text-slate-900">Transaction Log</h2>
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Detailed quotation history</p>
+                                <h2 className="text-lg font-black text-slate-900 dark:text-slate-100">Transaction Log</h2>
+                                <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1">Detailed quotation history</p>
                             </div>
                             <div className="flex items-center gap-3">
                                 <div className="relative group">
-                                    <MdSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                                    <MdSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
                                     <input type="text" placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-                                        className="pl-11 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-primary-600/10 focus:border-primary-600 font-bold text-sm w-56 transition-all" />
+                                        className="pl-11 pr-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl outline-none focus:ring-4 focus:ring-primary-600/10 focus:border-primary-600 font-bold text-sm w-56 transition-all" />
                                 </div>
                             </div>
                         </div>
@@ -1176,25 +1201,25 @@ const Reports = () => {
                     <div className="overflow-x-auto">
                         <table className="w-full text-left">
                             <thead>
-                                <tr className="bg-white">
-                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Quote #</th>
-                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Customer</th>
-                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Company</th>
-                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Date</th>
-                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Net Value</th>
-                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
+                                <tr className="bg-white dark:bg-slate-900/40">
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Quote #</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Customer</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Company</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Date</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Net Value</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Status</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-50">
+                            <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
                                 {filteredQuotations.map(q => (
-                                    <tr key={q._id} className="hover:bg-slate-50 transition-colors">
-                                        <td className="px-6 py-4 text-sm font-black text-slate-900">#{q.quotationNo}</td>
-                                        <td className="px-6 py-4 text-sm font-bold text-slate-900">{q.customerId?.customerName || q.customerName}</td>
-                                        <td className="px-6 py-4 text-sm font-bold text-slate-500">{q.customerId?.companyName || 'N/A'}</td>
-                                        <td className="px-6 py-4 text-sm font-medium text-slate-400">{formatDate(q.createdAt)}</td>
-                                        <td className="px-6 py-4 text-sm font-black text-slate-900">{formatCurrency(q.grandTotal)}</td>
+                                    <tr key={q._id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                                        <td className="px-6 py-4 text-sm font-black text-slate-900 dark:text-slate-100">#{q.quotationNo}</td>
+                                        <td className="px-6 py-4 text-sm font-bold text-slate-900 dark:text-slate-100">{q.customerId?.customerName || q.customerName}</td>
+                                        <td className="px-6 py-4 text-sm font-bold text-slate-500 dark:text-slate-400">{q.customerId?.companyName || 'N/A'}</td>
+                                        <td className="px-6 py-4 text-sm font-medium text-slate-400 dark:text-slate-500">{formatDate(q.createdAt)}</td>
+                                        <td className="px-6 py-4 text-sm font-black text-slate-900 dark:text-slate-100">{formatCurrency(q.grandTotal)}</td>
                                         <td className="px-6 py-4">
-                                            <span className={`inline-flex px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${q.status === 'ordered' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : q.status === 'final' ? 'bg-primary-50 text-primary-600 border border-primary-100' : 'bg-amber-50 text-amber-600 border border-amber-100'}`}>
+                                            <span className={`inline-flex px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${q.status === 'ordered' ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/50' : q.status === 'final' ? 'bg-primary-50 dark:bg-primary-950/60 text-primary-600 dark:text-primary-400 border border-primary-100 dark:border-primary-900/50' : 'bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-900/50'}`}>
                                                 {q.status}
                                             </span>
                                         </td>
@@ -1223,16 +1248,16 @@ const Reports = () => {
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     {/* Stage distribution */}
-                    <div className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm">
-                        <h2 className="text-lg font-black text-slate-900 uppercase mb-6">Stage Distribution</h2>
+                    <div className="bg-white dark:bg-slate-900/60 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm">
+                        <h2 className="text-lg font-black text-slate-900 dark:text-slate-100 uppercase mb-6">Stage Distribution</h2>
                         {stageChartData.length > 0 ? (
                             <div className="h-72">
                                 <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                                     <BarChart data={stageChartData} layout="vertical">
-                                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+                                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#334155" />
                                         <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#94a3b8' }} />
-                                        <YAxis type="category" dataKey="name" width={120} axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 700, fill: '#475569' }} />
-                                        <Tooltip contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 25px -5px rgb(0 0 0 / 0.1)' }} />
+                                        <YAxis type="category" dataKey="name" width={120} axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 700, fill: '#94a3b8' }} />
+                                        <Tooltip contentStyle={{ borderRadius: '1rem', border: '1px solid #334155', backgroundColor: '#0f172a', color: '#f8fafc', boxShadow: '0 10px 25px -5px rgb(0 0 0 / 0.5)' }} />
                                         <Bar dataKey="value" radius={[0, 8, 8, 0]} barSize={28}>
                                             {stageChartData.map((entry, i) => (
                                                 <Cell key={i} fill={STATUS_COLORS[entry.name] || COLORS[i % COLORS.length]} />
@@ -1247,8 +1272,8 @@ const Reports = () => {
                     </div>
 
                     {/* Trends */}
-                    <div className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm">
-                        <h2 className="text-lg font-black text-slate-900 uppercase mb-6">Monthly Trends</h2>
+                    <div className="bg-white dark:bg-slate-900/60 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm">
+                        <h2 className="text-lg font-black text-slate-900 dark:text-slate-100 uppercase mb-6">Monthly Trends</h2>
                         {enquiryTrends.length > 0 ? (
                             <div className="h-72">
                                 <ResponsiveContainer width="100%" height="100%" minWidth={0}>
@@ -1263,10 +1288,10 @@ const Reports = () => {
                                                 <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
                                             </linearGradient>
                                         </defs>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" />
                                         <XAxis dataKey="_id" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#94a3b8' }} />
                                         <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#94a3b8' }} />
-                                        <Tooltip contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 25px -5px rgb(0 0 0 / 0.1)' }} />
+                                        <Tooltip contentStyle={{ borderRadius: '1rem', border: '1px solid #334155', backgroundColor: '#0f172a', color: '#f8fafc', boxShadow: '0 10px 25px -5px rgb(0 0 0 / 0.5)' }} />
                                         <Area type="monotone" dataKey="count" stroke="#6366f1" strokeWidth={2} fill="url(#colorEnquiries)" name="Enquiries" />
                                         <Area type="monotone" dataKey="wonCount" stroke="#10b981" strokeWidth={2} fill="url(#colorWon)" name="Won" />
                                     </AreaChart>
@@ -1279,30 +1304,30 @@ const Reports = () => {
                 </div>
 
                 {/* Stage breakdown table */}
-                <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden">
-                    <div className="p-6 border-b border-slate-50 bg-slate-50/30">
-                        <h2 className="text-lg font-black text-slate-900">Stage Breakdown</h2>
+                <div className="bg-white dark:bg-slate-900/60 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
+                    <div className="p-6 border-b border-slate-50 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-800/30">
+                        <h2 className="text-lg font-black text-slate-900 dark:text-slate-100">Stage Breakdown</h2>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left">
                             <thead>
-                                <tr className="bg-white">
-                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Stage</th>
-                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Count</th>
-                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">% of Total</th>
-                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Bar</th>
+                                <tr className="bg-white dark:bg-slate-900/40">
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Stage</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Count</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">% of Total</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Bar</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-50">
+                            <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
                                 {stageChartData.map(s => {
                                     const pct = enquirySummary.total > 0 ? ((s.value / enquirySummary.total) * 100).toFixed(1) : 0;
                                     return (
-                                        <tr key={s.name} className="hover:bg-slate-50">
-                                            <td className="px-6 py-4 text-sm font-bold text-slate-900">{s.name}</td>
-                                            <td className="px-6 py-4 text-sm font-black text-slate-900">{s.value}</td>
-                                            <td className="px-6 py-4 text-sm font-semibold text-slate-500">{pct}%</td>
+                                        <tr key={s.name} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                                            <td className="px-6 py-4 text-sm font-bold text-slate-900 dark:text-slate-100">{s.name}</td>
+                                            <td className="px-6 py-4 text-sm font-black text-slate-900 dark:text-slate-100">{s.value}</td>
+                                            <td className="px-6 py-4 text-sm font-semibold text-slate-500 dark:text-slate-400">{pct}%</td>
                                             <td className="px-6 py-4 w-48">
-                                                <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                                                <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
                                                     <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: STATUS_COLORS[s.name] || '#6366f1' }}></div>
                                                 </div>
                                             </td>
@@ -1343,53 +1368,53 @@ const Reports = () => {
                     <StatCard icon={<MdBarChart size={24} />} label="Best Win Ratio" value={bestWinRatio?._id || bestWinRatio?.vendorName || '-'} color="violet" />
                 </div>
 
-                <div className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm">
-                    <h2 className="text-lg font-black text-slate-900 uppercase mb-6">Top Vendors — Quotes vs Wins</h2>
+                <div className="bg-white dark:bg-slate-900/60 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm">
+                    <h2 className="text-lg font-black text-slate-900 dark:text-slate-100 uppercase mb-6">Top Vendors — Quotes vs Wins</h2>
                     <div className="h-72">
                         <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                             <BarChart data={chartData}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" />
                                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#94a3b8' }} />
                                 <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#94a3b8' }} />
-                                <Tooltip contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 25px -5px rgb(0 0 0 / 0.1)' }} />
-                                <Bar dataKey="quotes" fill="#e2e8f0" radius={[8, 8, 0, 0]} barSize={32} name="Quotes" />
+                                <Tooltip contentStyle={{ borderRadius: '1rem', border: '1px solid #334155', backgroundColor: '#0f172a', color: '#f8fafc', boxShadow: '0 10px 25px -5px rgb(0 0 0 / 0.5)' }} />
+                                <Bar dataKey="quotes" fill="#475569" radius={[8, 8, 0, 0]} barSize={32} name="Quotes" />
                                 <Bar dataKey="wins" fill="#10b981" radius={[8, 8, 0, 0]} barSize={32} name="Wins" />
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
                 </div>
 
-                <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden">
-                    <div className="p-6 border-b border-slate-50 bg-slate-50/30">
-                        <h2 className="text-lg font-black text-slate-900">Vendor Performance Table</h2>
+                <div className="bg-white dark:bg-slate-900/60 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
+                    <div className="p-6 border-b border-slate-50 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-800/30">
+                        <h2 className="text-lg font-black text-slate-900 dark:text-slate-100">Vendor Performance Table</h2>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left">
                             <thead>
-                                <tr className="bg-white">
-                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Vendor</th>
-                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Quotes</th>
-                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Wins</th>
-                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Losses</th>
-                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Win %</th>
-                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Avg Price</th>
+                                <tr className="bg-white dark:bg-slate-900/40">
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Vendor</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Quotes</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Wins</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Losses</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Win %</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Avg Price</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-50">
+                            <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
                                 {vendorData.map((v, i) => {
                                     const winPct = v.quoteCount ? ((v.winCount || 0) / v.quoteCount * 100).toFixed(1) : '0.0';
                                     return (
-                                        <tr key={i} className="hover:bg-slate-50">
-                                            <td className="px-6 py-4 text-sm font-bold text-slate-900">{v._id || v.vendorName}</td>
-                                            <td className="px-6 py-4 text-sm font-black text-slate-900">{v.quoteCount || 0}</td>
-                                            <td className="px-6 py-4 text-sm font-black text-emerald-600">{v.winCount || 0}</td>
-                                            <td className="px-6 py-4 text-sm font-black text-rose-500">{v.lossCount || 0}</td>
+                                        <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                                            <td className="px-6 py-4 text-sm font-bold text-slate-900 dark:text-slate-100">{v._id || v.vendorName}</td>
+                                            <td className="px-6 py-4 text-sm font-black text-slate-900 dark:text-slate-100">{v.quoteCount || 0}</td>
+                                            <td className="px-6 py-4 text-sm font-black text-emerald-600 dark:text-emerald-400">{v.winCount || 0}</td>
+                                            <td className="px-6 py-4 text-sm font-black text-rose-500 dark:text-rose-400">{v.lossCount || 0}</td>
                                             <td className="px-6 py-4">
-                                                <span className={`inline-flex px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${parseFloat(winPct) >= 50 ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
+                                                <span className={`inline-flex px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${parseFloat(winPct) >= 50 ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/50' : 'bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-900/50'}`}>
                                                     {winPct}%
                                                 </span>
                                             </td>
-                                            <td className="px-6 py-4 text-sm font-bold text-slate-500">{v.avgPrice ? formatCurrency(Math.round(v.avgPrice)) : '-'}</td>
+                                            <td className="px-6 py-4 text-sm font-bold text-slate-500 dark:text-slate-400">{v.avgPrice ? formatCurrency(Math.round(v.avgPrice)) : '-'}</td>
                                         </tr>
                                     );
                                 })}
@@ -1421,48 +1446,48 @@ const Reports = () => {
                     <StatCard icon={<MdBarChart size={24} />} label="Total Enquiries" value={productData.reduce((s, p) => s + (p.enquiryCount || 0), 0)} color="violet" />
                 </div>
 
-                <div className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm">
-                    <h2 className="text-lg font-black text-slate-900 uppercase mb-6">Top Products by Demand</h2>
+                <div className="bg-white dark:bg-slate-900/60 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm">
+                    <h2 className="text-lg font-black text-slate-900 dark:text-slate-100 uppercase mb-6">Top Products by Demand</h2>
                     <div className="h-72">
                         <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                             <BarChart data={chartData} layout="vertical">
-                                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+                                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#334155" />
                                 <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#94a3b8' }} />
-                                <YAxis type="category" dataKey="name" width={140} axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 700, fill: '#475569' }} />
-                                <Tooltip contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 25px -5px rgb(0 0 0 / 0.1)' }} />
+                                <YAxis type="category" dataKey="name" width={140} axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 700, fill: '#94a3b8' }} />
+                                <Tooltip contentStyle={{ borderRadius: '1rem', border: '1px solid #334155', backgroundColor: '#0f172a', color: '#f8fafc', boxShadow: '0 10px 25px -5px rgb(0 0 0 / 0.5)' }} />
                                 <Bar dataKey="enquiries" fill="#6366f1" radius={[0, 8, 8, 0]} barSize={22} name="Enquiries" />
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
                 </div>
 
-                <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden">
-                    <div className="p-6 border-b border-slate-50 bg-slate-50/30">
-                        <h2 className="text-lg font-black text-slate-900">Product Demand Table</h2>
+                <div className="bg-white dark:bg-slate-900/60 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
+                    <div className="p-6 border-b border-slate-50 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-800/30">
+                        <h2 className="text-lg font-black text-slate-900 dark:text-slate-100">Product Demand Table</h2>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left">
                             <thead>
-                                <tr className="bg-white">
-                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Product</th>
-                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Enquiries</th>
-                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Conversion %</th>
-                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Vendors</th>
-                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Lost</th>
+                                <tr className="bg-white dark:bg-slate-900/40">
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Product</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Enquiries</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Conversion %</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Vendors</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Lost</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-50">
+                            <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
                                 {productData.map((p, i) => (
-                                    <tr key={i} className="hover:bg-slate-50">
-                                        <td className="px-6 py-4 text-sm font-bold text-slate-900">{p._id || p.productName}</td>
-                                        <td className="px-6 py-4 text-sm font-black text-slate-900">{p.enquiryCount || 0}</td>
+                                    <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                                        <td className="px-6 py-4 text-sm font-bold text-slate-900 dark:text-slate-100">{p._id || p.productName}</td>
+                                        <td className="px-6 py-4 text-sm font-black text-slate-900 dark:text-slate-100">{p.enquiryCount || 0}</td>
                                         <td className="px-6 py-4">
-                                            <span className={`inline-flex px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${(p.conversionRate || 0) >= 50 ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
+                                            <span className={`inline-flex px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${(p.conversionRate || 0) >= 50 ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/50' : 'bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-900/50'}`}>
                                                 {(p.conversionRate || 0).toFixed(1)}%
                                             </span>
                                         </td>
-                                        <td className="px-6 py-4 text-sm font-bold text-slate-500">{p.vendorCount || 0}</td>
-                                        <td className="px-6 py-4 text-sm font-black text-rose-500">{p.lostCount || 0}</td>
+                                        <td className="px-6 py-4 text-sm font-bold text-slate-500 dark:text-slate-400">{p.vendorCount || 0}</td>
+                                        <td className="px-6 py-4 text-sm font-black text-rose-500 dark:text-rose-400">{p.lostCount || 0}</td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -1501,9 +1526,9 @@ const Reports = () => {
         return (
             <div className="space-y-8">
                 <div className="flex items-center gap-4">
-                    <label className="text-sm font-black text-slate-600 uppercase tracking-widest">Financial Year</label>
+                    <label className="text-sm font-black text-slate-600 dark:text-slate-300 uppercase tracking-widest">Financial Year</label>
                     <select value={planningFY} onChange={(e) => setPlanningFY(e.target.value)}
-                        className="px-4 py-2.5 bg-white border border-slate-200 rounded-xl font-bold text-sm focus:ring-4 focus:ring-primary-600/10 focus:border-primary-600 outline-none">
+                        className="px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl font-bold text-sm focus:ring-4 focus:ring-primary-600/10 focus:border-primary-600 outline-none">
                         {fyOptions.map(fy => <option key={fy} value={fy}>{fy}</option>)}
                     </select>
                     <button onClick={() => fetchTabData('planning')} className="px-4 py-2.5 bg-primary-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-primary-700 transition-colors">
@@ -1512,24 +1537,24 @@ const Reports = () => {
                 </div>
 
                 {planningReport ? (
-                    <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden">
-                        <div className="p-6 border-b border-slate-50 bg-slate-50/30">
-                            <h2 className="text-lg font-black text-slate-900">MGR Planning Report — FY {planningFY}</h2>
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Date-first breakdown, paired MGR 1 then MGR 2</p>
+                    <div className="bg-white dark:bg-slate-900/60 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
+                        <div className="p-6 border-b border-slate-50 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-800/30">
+                            <h2 className="text-lg font-black text-slate-900 dark:text-slate-100">MGR Planning Report — FY {planningFY}</h2>
+                            <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1">Date-first breakdown, paired MGR 1 then MGR 2</p>
                         </div>
                         <div className="overflow-hidden">
                             <table className="w-full text-left">
                                 <thead>
-                                    <tr className="bg-white">
-                                        <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest bg-white">Month</th>
-                                        <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest bg-white">Type</th>
+                                    <tr className="bg-white dark:bg-slate-900/40">
+                                        <th className="px-4 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest bg-white dark:bg-slate-900/40">Month</th>
+                                        <th className="px-4 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest bg-white dark:bg-slate-900/40">Type</th>
                                         {planningColumns.map(col => (
-                                            <th key={col} className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">{col}</th>
+                                            <th key={col} className="px-4 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-right">{col}</th>
                                         ))}
-                                        <th className="px-4 py-4 text-[10px] font-black text-slate-900 uppercase tracking-widest text-right">Total</th>
+                                        <th className="px-4 py-4 text-[10px] font-black text-slate-900 dark:text-slate-100 uppercase tracking-widest text-right">Total</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-slate-50">
+                                <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
                                     {visibleMonths.map(monthLabel => {
                                         const monthRow = monthRows.find(row => (row.monthLabel || row.month) === monthLabel) || { month: monthLabel, total: 0 };
                                         const monthSegments = segmentRows.filter(row => row.parentMonth === monthLabel);
@@ -1537,28 +1562,28 @@ const Reports = () => {
                                         return (
                                             <React.Fragment key={monthLabel}>
                                                 <tr
-                                                    className="bg-blue-50 font-bold cursor-pointer hover:bg-blue-100/60 transition-colors"
+                                                    className="bg-blue-50 dark:bg-blue-950/40 font-bold cursor-pointer hover:bg-blue-100/60 dark:hover:bg-blue-900/50 transition-colors"
                                                     onClick={() => togglePlanningMonth(monthLabel)}
                                                 >
-                                                    <td className="px-4 py-3 text-sm font-black text-slate-900">
+                                                    <td className="px-4 py-3 text-sm font-black text-slate-900 dark:text-slate-100">
                                                         <div className="flex items-center gap-2">
                                                             <MdKeyboardArrowDown
-                                                                className={`text-slate-700 transition-transform duration-300 ${!isOpen ? '-rotate-90' : ''}`}
+                                                                className={`text-slate-700 dark:text-slate-300 transition-transform duration-300 ${!isOpen ? '-rotate-90' : ''}`}
                                                                 size={18}
                                                             />
                                                             <span>{monthRow.month}</span>
                                                         </div>
                                                     </td>
-                                                    <td className="px-4 py-3 text-xs font-black uppercase tracking-widest text-blue-700">-</td>
+                                                    <td className="px-4 py-3 text-xs font-black uppercase tracking-widest text-blue-700 dark:text-blue-400">-</td>
                                                     {planningColumns.map(col => {
                                                         const cellValue = Number(monthRow[col] || 0);
                                                         return (
-                                                            <td key={`${monthLabel}-${col}`} className={`px-4 py-3 text-sm font-bold text-slate-900 text-right ${cellValue > 0 ? 'bg-blue-100/60' : ''}`}>
+                                                            <td key={`${monthLabel}-${col}`} className={`px-4 py-3 text-sm font-bold text-slate-900 dark:text-slate-100 text-right ${cellValue > 0 ? 'bg-blue-100/60 dark:bg-blue-900/60' : ''}`}>
                                                                 {formatReportValue(cellValue, 2)}
                                                             </td>
                                                         );
                                                     })}
-                                                    <td className={`px-4 py-3 text-sm font-black text-slate-900 text-right ${Number(monthRow.total || 0) > 0 ? 'bg-blue-100/60' : 'bg-slate-50'}`}>
+                                                    <td className={`px-4 py-3 text-sm font-black text-slate-900 dark:text-slate-100 text-right ${Number(monthRow.total || 0) > 0 ? 'bg-blue-100/60 dark:bg-blue-900/60' : 'bg-slate-50 dark:bg-slate-800/50'}`}>
                                                         {formatReportValue(monthRow.total || 0, 2)}
                                                     </td>
                                                 </tr>
@@ -1566,18 +1591,18 @@ const Reports = () => {
                                                     month: segment,
                                                     total: 0
                                                 }))).map(segmentRow => (
-                                                    <tr key={`${monthLabel}-${segmentRow.month}`} className="hover:bg-slate-50">
-                                                        <td className="px-4 py-3 pl-12 text-sm font-bold text-slate-700">{segmentRow.month}</td>
-                                                        <td className="px-4 py-3 text-xs font-black uppercase tracking-widest text-slate-400">-</td>
+                                                    <tr key={`${monthLabel}-${segmentRow.month}`} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                                                        <td className="px-4 py-3 pl-12 text-sm font-bold text-slate-700 dark:text-slate-300">{segmentRow.month}</td>
+                                                        <td className="px-4 py-3 text-xs font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">-</td>
                                                         {planningColumns.map(col => {
                                                             const cellValue = Number(segmentRow[col] || 0);
                                                             return (
-                                                                <td key={`${monthLabel}-${segmentRow.month}-${col}`} className={`px-4 py-3 text-sm font-semibold text-slate-600 text-right ${cellValue > 0 ? 'bg-blue-50/60' : ''}`}>
+                                                                <td key={`${monthLabel}-${segmentRow.month}-${col}`} className={`px-4 py-3 text-sm font-semibold text-slate-600 dark:text-slate-400 text-right ${cellValue > 0 ? 'bg-blue-50/60 dark:bg-blue-950/30 text-slate-900 dark:text-slate-100' : ''}`}>
                                                                     {formatReportValue(cellValue, 2)}
                                                                 </td>
                                                             );
                                                         })}
-                                                        <td className="px-4 py-3 text-sm font-black text-slate-900 text-right bg-slate-50">
+                                                        <td className="px-4 py-3 text-sm font-black text-slate-900 dark:text-slate-100 text-right bg-slate-50 dark:bg-slate-800/50">
                                                             {formatReportValue(segmentRow.total || 0, 2)}
                                                         </td>
                                                     </tr>
@@ -1586,19 +1611,19 @@ const Reports = () => {
                                         );
                                     })}
                                     {summaryRows.map((summaryRow, idx) => (
-                                        <tr key={idx} className="bg-slate-100 font-bold">
-                                            <td className="px-4 py-3 text-sm font-black text-slate-900">{summaryRow.month || summaryRow.label}</td>
-                                            <td className="px-4 py-3 text-xs font-black uppercase tracking-widest text-slate-700">-</td>
+                                        <tr key={idx} className="bg-slate-100 dark:bg-slate-800 font-bold">
+                                            <td className="px-4 py-3 text-sm font-black text-slate-900 dark:text-slate-100">{summaryRow.month || summaryRow.label}</td>
+                                            <td className="px-4 py-3 text-xs font-black uppercase tracking-widest text-slate-700 dark:text-slate-300">-</td>
                                             {planningColumns.map(col => {
                                                 const cellValue = Number(summaryRow[col] || 0);
                                                 const isPct = summaryRow.isPercentage || summaryRow.isTotalPercentage;
                                                 return (
-                                                    <td key={`summary-${idx}-${col}`} className="px-4 py-3 text-sm font-bold text-slate-900 text-right">
+                                                    <td key={`summary-${idx}-${col}`} className="px-4 py-3 text-sm font-bold text-slate-900 dark:text-slate-100 text-right">
                                                         {isPct ? formatReportPercentage(cellValue) : formatReportValue(cellValue, 2)}
                                                     </td>
                                                 );
                                             })}
-                                            <td className="px-4 py-3 text-sm font-black text-slate-900 text-right bg-slate-200">
+                                            <td className="px-4 py-3 text-sm font-black text-slate-900 dark:text-slate-100 text-right bg-slate-200 dark:bg-slate-700">
                                                 {summaryRow.isPercentage || summaryRow.isTotalPercentage
                                                     ? formatReportPercentage(summaryRow.total)
                                                     : formatReportValue(summaryRow.total || 0, 2)}
@@ -1635,7 +1660,7 @@ const Reports = () => {
                                     <td
                                         key={`${options.keyPrefix || 'cell'}-${rowIndex}-${cellIndex}`}
                                         colSpan={item.colSpan || 1}
-                                        className="border border-black px-3 py-2 whitespace-nowrap"
+                                        className="border border-slate-300 dark:border-slate-800 px-3 py-2 whitespace-nowrap"
                                         style={style}
                                     >
                                         {item.value}
@@ -1669,51 +1694,51 @@ const Reports = () => {
 
         return (
             <div className="space-y-6">
-                <div className="bg-white border border-black shadow-sm overflow-hidden">
-                    <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 p-4 border-b border-black" style={{ backgroundColor: normalizeHex(REVENUE_PLAN_COLORS.title) }}>
+                <div className="bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden rounded-2xl">
+                    <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 p-4 border-b border-slate-200 dark:border-slate-800 bg-[#FFFF00] dark:bg-slate-900">
                         <div>
-                            <h2 className="text-lg font-black text-black uppercase">Revenue Plan</h2>
-                            {revenuePlanError && <p className="text-xs font-bold text-red-700 mt-1">{revenuePlanError}</p>}
+                            <h2 className="text-lg font-black text-black dark:text-slate-100 uppercase">Revenue Plan</h2>
+                            {revenuePlanError && <p className="text-xs font-bold text-red-700 dark:text-red-400 mt-1">{revenuePlanError}</p>}
                         </div>
                         <div className="flex flex-wrap items-center gap-3">
                             <select
                                 value={revenuePlanFY}
                                 onChange={(e) => setRevenuePlanFY(e.target.value)}
-                                className="px-4 py-2.5 bg-white border border-black font-bold text-sm outline-none"
+                                className="px-4 py-2.5 bg-white dark:bg-slate-800 border border-black dark:border-slate-700 text-slate-900 dark:text-slate-100 font-bold text-sm outline-none rounded-xl"
                             >
                                 {fyOptions.map(fy => <option key={fy} value={fy}>{fy}</option>)}
                             </select>
-                            <button onClick={() => fetchTabData('revenuePlan')} className="px-4 py-2.5 bg-black text-white border border-black font-black text-xs uppercase tracking-widest hover:bg-slate-800 transition-colors">
+                            <button onClick={() => fetchTabData('revenuePlan')} className="px-4 py-2.5 bg-black dark:bg-primary-600 text-white border border-black dark:border-primary-600 font-black text-xs uppercase tracking-widest hover:bg-slate-800 dark:hover:bg-primary-700 transition-colors rounded-xl">
                                 Load Plan
                             </button>
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-[minmax(150px,1.2fr)_minmax(150px,1.2fr)_1fr_auto] gap-3 p-4 border-b border-black" style={{ backgroundColor: normalizeHex(REVENUE_PLAN_COLORS.filter) }}>
+                    <div className="grid grid-cols-1 lg:grid-cols-[minmax(150px,1.2fr)_minmax(150px,1.2fr)_1fr_auto] gap-3 p-4 border-b border-slate-200 dark:border-slate-800 bg-[#D99694] dark:bg-slate-800/80">
                         <div>
-                            <label className="block text-[9px] font-black uppercase tracking-widest text-black mb-1">MGR 1</label>
+                            <label className="block text-[9px] font-black uppercase tracking-widest text-black dark:text-slate-200 mb-1">MGR 1</label>
                             <select
                                 value={revenuePlanFilters.mgr1}
                                 onChange={(e) => setRevenuePlanFilters(prev => ({ ...prev, mgr1: e.target.value }))}
-                                className="w-full px-3 py-2 bg-white border border-black font-bold text-sm outline-none"
+                                className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-black dark:border-slate-700 text-slate-900 dark:text-slate-100 font-bold text-sm outline-none rounded-xl"
                             >
                                 <option value="">All MGR 1</option>
                                 {mgr1Options.map(option => <option key={option} value={option}>{option}</option>)}
                             </select>
                         </div>
                         <div>
-                            <label className="block text-[9px] font-black uppercase tracking-widest text-black mb-1">Segment</label>
+                            <label className="block text-[9px] font-black uppercase tracking-widest text-black dark:text-slate-200 mb-1">Segment</label>
                             <select
                                 value={revenuePlanFilters.segment}
                                 onChange={(e) => setRevenuePlanFilters(prev => ({ ...prev, segment: e.target.value }))}
-                                className="w-full px-3 py-2 bg-white border border-black font-bold text-sm outline-none"
+                                className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-black dark:border-slate-700 text-slate-900 dark:text-slate-100 font-bold text-sm outline-none rounded-xl"
                             >
                                 <option value="">All Segments</option>
                                 {segmentOptions.map(option => <option key={option} value={option}>{getRevenueSegmentLabel(option)}</option>)}
                             </select>
                         </div>
                         <div>
-                            <label className="block text-[9px] font-black uppercase tracking-widest text-black mb-1">Status</label>
+                            <label className="block text-[9px] font-black uppercase tracking-widest text-black dark:text-slate-200 mb-1">Status</label>
                             <div className="flex flex-wrap gap-1.5 items-center">
                                 {(statusOptions.length > 0 ? statusOptions : REVENUE_PLAN_STATUS_OPTIONS)
                                     .filter(status => {
@@ -1727,9 +1752,9 @@ const Reports = () => {
                                                 key={status}
                                                 type="button"
                                                 onClick={() => toggleRevenuePlanStatusFilter(status)}
-                                                className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-wider border border-black transition-all duration-150 ${isSelected
-                                                    ? 'bg-black text-white shadow-sm'
-                                                    : 'bg-white text-black hover:bg-slate-50'
+                                                className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-wider border border-black dark:border-slate-700 rounded-lg transition-all duration-150 ${isSelected
+                                                    ? 'bg-black dark:bg-primary-600 text-white shadow-sm'
+                                                    : 'bg-white dark:bg-slate-800 text-black dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700'
                                                     }`}
                                             >
                                                 {status}
@@ -1742,22 +1767,22 @@ const Reports = () => {
                             <button
                                 type="button"
                                 onClick={resetRevenuePlanFilters}
-                                className="w-full px-4 py-2.5 bg-white border border-black text-black font-black text-xs uppercase tracking-widest hover:bg-slate-100 transition-colors"
+                                className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-black dark:border-slate-700 text-black dark:text-slate-200 font-black text-xs uppercase tracking-widest hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors rounded-xl"
                             >
                                 Reset
                             </button>
                         </div>
                     </div>
 
-                    <div className="flex flex-wrap gap-1 p-2 bg-white border-b border-black">
+                    <div className="flex flex-wrap gap-1 p-2 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
                         {sheetNames.map(sheetName => (
                             <button
                                 key={sheetName}
                                 type="button"
                                 onClick={() => setRevenuePlanSheet(sheetName)}
-                                className={`px-4 py-2 border border-black text-[10px] font-black uppercase tracking-widest ${revenuePlanSheet === sheetName
-                                    ? 'bg-black text-white'
-                                    : 'bg-white text-black hover:bg-slate-100'
+                                className={`px-4 py-2 border border-black dark:border-slate-700 text-[10px] font-black uppercase tracking-widest rounded-lg ${revenuePlanSheet === sheetName
+                                    ? 'bg-black dark:bg-primary-600 text-white'
+                                    : 'bg-white dark:bg-slate-800 text-black dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700'
                                     }`}
                             >
                                 {sheetName}
@@ -1769,7 +1794,7 @@ const Reports = () => {
                 {!hasData ? (
                     <div className="text-center py-20 text-slate-400 font-semibold">Select a financial year and click Load Plan</div>
                 ) : (
-                    <div className="bg-white border border-black shadow-sm overflow-hidden">
+                    <div className="bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden rounded-2xl">
                         <div className="max-h-[72vh] overflow-auto p-3">
                             {activeSheet
                                 ? renderWorkbookTable(activeSheet.rows || [], {
@@ -1795,9 +1820,9 @@ const Reports = () => {
         ];
 
         const colorMap = {
-            rose: { bg: 'bg-rose-50', border: 'border-rose-100', text: 'text-rose-600', badge: 'bg-rose-100 text-rose-700' },
-            amber: { bg: 'bg-amber-50', border: 'border-amber-100', text: 'text-amber-600', badge: 'bg-amber-100 text-amber-700' },
-            blue: { bg: 'bg-blue-50', border: 'border-blue-100', text: 'text-blue-600', badge: 'bg-blue-100 text-blue-700' },
+            rose: { bg: 'bg-rose-50 dark:bg-rose-950/30', border: 'border-rose-100 dark:border-rose-900/40', text: 'text-rose-600 dark:text-rose-400', badge: 'bg-rose-100 dark:bg-rose-900/60 text-rose-700 dark:text-rose-300' },
+            amber: { bg: 'bg-amber-50 dark:bg-amber-950/30', border: 'border-amber-100 dark:border-amber-900/40', text: 'text-amber-600 dark:text-amber-400', badge: 'bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300' },
+            blue: { bg: 'bg-blue-50 dark:bg-blue-950/30', border: 'border-blue-100 dark:border-blue-900/40', text: 'text-blue-600 dark:text-blue-400', badge: 'bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300' },
         };
 
         return (
@@ -1811,39 +1836,39 @@ const Reports = () => {
                 {sections.map(section => {
                     const colors = colorMap[section.color];
                     return (
-                        <div key={section.key} className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden">
+                        <div key={section.key} className="bg-white dark:bg-slate-900/60 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
                             <div className={`p-6 border-b ${colors.border} ${colors.bg}`}>
                                 <div className="flex items-center gap-3">
                                     <span className={`inline-flex px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${colors.badge}`}>
                                         {section.label}
                                     </span>
-                                    <span className="text-sm font-black text-slate-600">{section.data.length} enquiries</span>
+                                    <span className="text-sm font-black text-slate-600 dark:text-slate-300">{section.data.length} enquiries</span>
                                 </div>
                             </div>
                             {section.data.length > 0 ? (
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-left">
                                         <thead>
-                                            <tr className="bg-white">
-                                                <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Enquiry #</th>
-                                                <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Customer</th>
-                                                <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Follow-up Date</th>
-                                                <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
-                                                <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Probability</th>
+                                            <tr className="bg-white dark:bg-slate-900/40">
+                                                <th className="px-6 py-3 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Enquiry #</th>
+                                                <th className="px-6 py-3 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Customer</th>
+                                                <th className="px-6 py-3 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Follow-up Date</th>
+                                                <th className="px-6 py-3 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Status</th>
+                                                <th className="px-6 py-3 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Probability</th>
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-slate-50">
+                                        <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
                                             {section.data.map((f, i) => (
-                                                <tr key={i} className="hover:bg-slate-50">
-                                                    <td className="px-6 py-3 text-sm font-black text-slate-900">{f.enquiryNo}</td>
-                                                    <td className="px-6 py-3 text-sm font-bold text-slate-700">{f.customerName}</td>
-                                                    <td className="px-6 py-3 text-sm font-semibold text-slate-500">{f.followUpDate ? formatDate(f.followUpDate) : '-'}</td>
+                                                <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                                                    <td className="px-6 py-3 text-sm font-black text-slate-900 dark:text-slate-100">{f.enquiryNo}</td>
+                                                    <td className="px-6 py-3 text-sm font-bold text-slate-700 dark:text-slate-300">{f.customerName}</td>
+                                                    <td className="px-6 py-3 text-sm font-semibold text-slate-500 dark:text-slate-400">{f.followUpDate ? formatDate(f.followUpDate) : '-'}</td>
                                                     <td className="px-6 py-3">
-                                                        <span className="inline-flex px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest bg-slate-100 text-slate-600">
+                                                        <span className="inline-flex px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
                                                             {f.status}
                                                         </span>
                                                     </td>
-                                                    <td className="px-6 py-3 text-sm font-black text-slate-900">{f.probability ? `${f.probability}%` : '-'}</td>
+                                                    <td className="px-6 py-3 text-sm font-black text-slate-900 dark:text-slate-100">{f.probability ? `${f.probability}%` : '-'}</td>
                                                 </tr>
                                             ))}
                                         </tbody>
@@ -1884,17 +1909,17 @@ const Reports = () => {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-black text-slate-900 tracking-tight font-outfit uppercase">Reports</h1>
-                    <p className="text-slate-500 font-semibold mt-1">Business performance across all modules</p>
+                    <h1 className="text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight font-outfit uppercase">Reports</h1>
+                    <p className="text-slate-500 dark:text-slate-400 font-semibold mt-1">Business performance across all modules</p>
                 </div>
                 <div className="flex items-center gap-3">
                     <button onClick={handleRefresh}
-                        className="flex items-center gap-2 bg-white border border-slate-200 text-slate-600 px-5 py-3 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-50 transition-all">
+                        className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 px-5 py-3 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-50 dark:hover:bg-slate-700 transition-all">
                         <MdRefresh size={18} />
                         Refresh
                     </button>
                     <button onClick={handleExport}
-                        className="flex items-center gap-2 bg-slate-900 text-white px-6 py-3 rounded-2xl font-black transition-all shadow-xl shadow-slate-900/20 uppercase text-xs tracking-widest active:scale-95">
+                        className="flex items-center gap-2 bg-slate-900 dark:bg-primary-600 text-white px-6 py-3 rounded-2xl font-black transition-all shadow-xl shadow-slate-900/20 dark:shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95">
                         <MdDownload size={18} />
                         Export Excel
                     </button>
@@ -1902,12 +1927,12 @@ const Reports = () => {
             </div>
 
             {/* Tab navigation */}
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-1.5 flex flex-wrap gap-1">
+            <div className="bg-white dark:bg-slate-900/60 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm p-1.5 flex flex-wrap gap-1">
                 {TABS.map(tab => (
                     <button key={tab.key} onClick={() => setActiveTab(tab.key)}
                         className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all ${activeTab === tab.key
                             ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/20'
-                            : 'text-slate-500 hover:bg-slate-50 hover:text-primary-600'
+                            : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-primary-600 dark:hover:text-primary-400'
                             }`}>
                         {tab.icon}
                         <span className="hidden sm:inline">{tab.label}</span>

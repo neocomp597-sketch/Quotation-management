@@ -10,7 +10,7 @@ import {
 import { toast } from 'react-toastify';
 import { enquiryService, userService, salespersonService, payrollService } from '../services/api';
 import Modal from '../components/Modal';
-import { formatDate } from '../utils/helpers';
+import { formatDate, buildSalesExecutiveList } from '../utils/helpers';
 import { useAuth } from '../context/AuthContext';
 
 const StatusPill = ({ status }) => {
@@ -150,88 +150,8 @@ const EnquiryDetail = () => {
             const fetchedUsers = Array.isArray(userData) ? userData : userData?.data || [];
             const fetchedEmployees = Array.isArray(empData) ? empData : empData?.data || [];
 
-            const empDesignationMap = new Map();
-            fetchedEmployees.forEach(emp => {
-                if (!emp) return;
-                const desig = String(emp.designation || '').trim();
-                if (emp.email) empDesignationMap.set(String(emp.email).toLowerCase().trim(), desig);
-                if (emp.userId) {
-                    const uId = typeof emp.userId === 'object' ? emp.userId._id : emp.userId;
-                    if (uId) empDesignationMap.set(String(uId), desig);
-                }
-            });
-
-            const isSalesExecutiveDesignation = (desigStr, roleStr) => {
-                const desigLower = (desigStr || '').toLowerCase().trim();
-                const roleLower = (roleStr || '').toLowerCase().trim().replace(/_/g, ' ');
-                if (desigLower) {
-                    return desigLower === 'sales executive' || desigLower === 'sales executive role' || desigLower === 'salesperson';
-                }
-                return roleLower === 'sales executive' || roleLower === 'sales executive role' || roleLower === 'sales' || roleLower === 'salesperson' || roleLower === 'sales_executive';
-            };
-
-            const mergedMap = new Map();
-            const getKey = (item) => {
-                if (item.email && String(item.email).trim()) {
-                    return String(item.email).toLowerCase().trim();
-                }
-                return String(item.name || '').toLowerCase().trim();
-            };
-
-            fetchedSalespersons.forEach(item => {
-                if (item && item._id) {
-                    const key = getKey(item);
-                    if (key && !mergedMap.has(key)) {
-                        const empDesig = item.email ? empDesignationMap.get(String(item.email).toLowerCase().trim()) : null;
-                        if (!empDesig || isSalesExecutiveDesignation(empDesig, 'Sales Executive')) {
-                            mergedMap.set(key, {
-                                _id: item._id.toString(),
-                                name: item.name,
-                                email: item.email,
-                                role: 'Sales Executive'
-                            });
-                        }
-                    }
-                }
-            });
-
-            fetchedUsers.forEach(item => {
-                if (item && item._id) {
-                    const key = getKey(item);
-                    if (key && !mergedMap.has(key)) {
-                        const emailStr = String(item.email || '').toLowerCase().trim();
-                        const empDesig = empDesignationMap.get(item._id.toString()) || empDesignationMap.get(emailStr);
-                        if (isSalesExecutiveDesignation(empDesig, item.role)) {
-                            mergedMap.set(key, {
-                                _id: item._id.toString(),
-                                name: item.name,
-                                email: item.email,
-                                role: 'Sales Executive'
-                            });
-                        }
-                    }
-                }
-            });
-
-            fetchedEmployees.forEach(emp => {
-                if (!emp || !emp.name) return;
-                const desig = String(emp.designation || '').trim();
-                if (isSalesExecutiveDesignation(desig, '')) {
-                    const key = getKey(emp);
-                    if (key && !mergedMap.has(key)) {
-                        const targetId = emp.userId ? (typeof emp.userId === 'object' ? emp.userId._id : emp.userId) : emp._id;
-                        const idStr = String(targetId);
-                        mergedMap.set(key, {
-                            _id: idStr,
-                            name: emp.name,
-                            email: emp.email || '',
-                            role: 'Sales Executive'
-                        });
-                    }
-                }
-            });
-
-            setUsers(Array.from(mergedMap.values()).sort((a, b) => a.name.localeCompare(b.name)));
+            const salesExecutives = buildSalesExecutiveList({ fetchedSalespersons, fetchedUsers, fetchedEmployees });
+            setUsers(salesExecutives);
         } catch (err) {
             console.error('Error fetching enquiry details:', err);
             toast.error('Failed to load enquiry details');
