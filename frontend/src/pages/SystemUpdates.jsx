@@ -270,14 +270,14 @@ const SystemUpdates = () => {
             </div>
 
             {/* Yellow Highlight Banner as per Mockup */}
-            <div className="bg-amber-100/90 border border-amber-300/80 text-amber-900 px-6 py-3 rounded-2xl text-center font-black text-sm tracking-wide shadow-sm">
+            <div className="bg-amber-100/90 dark:bg-amber-950/40 border border-amber-300/80 dark:border-amber-800/60 text-amber-900 dark:text-amber-300 px-6 py-3 rounded-2xl text-center font-black text-sm tracking-wide shadow-sm">
                 Daily crm changes update
             </div>
 
             {/* Filter Controls Bar (On Page) */}
-            <div className="bg-white p-5 rounded-[2rem] border border-slate-100 shadow-sm space-y-3">
-                <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-slate-700">
-                    <MdFilterList size={18} className="text-primary-600" />
+            <div className="bg-white dark:bg-slate-800/80 p-5 rounded-[2rem] border border-slate-100 dark:border-slate-700 shadow-sm space-y-3">
+                <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                    <MdFilterList size={18} className="text-primary-600 dark:text-primary-400" />
                     <span>FILTERS</span>
                 </div>
 
@@ -302,7 +302,7 @@ const SystemUpdates = () => {
                                 placeholder="Filter by submodule..."
                                 value={submoduleSearch}
                                 onChange={(e) => setSubmoduleSearch(e.target.value)}
-                                className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none"
+                                className="w-full pl-9 pr-3 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-primary-500 focus:bg-white dark:focus:bg-slate-900 transition-all outline-none"
                             />
                             <MdSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                         </div>
@@ -318,14 +318,14 @@ const SystemUpdates = () => {
                             placeholder="Search date (e.g. 17.07.2026)..."
                             value={dateSearch}
                             onChange={(e) => setDateSearch(e.target.value)}
-                            className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none"
+                            className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-primary-500 focus:bg-white dark:focus:bg-slate-900 transition-all outline-none"
                         />
                     </div>
                 </div>
             </div>
 
             {/* Main Table */}
-            <div className="bg-white rounded-[2rem] border border-slate-100 overflow-hidden shadow-sm">
+            <div className="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-100 dark:border-slate-800 overflow-hidden shadow-sm">
                 {loading ? (
                     <div className="p-12 text-center text-slate-400 font-bold text-sm">
                         <MdRefresh className="animate-spin inline-block mr-2" size={20} />
@@ -333,14 +333,14 @@ const SystemUpdates = () => {
                     </div>
                 ) : filteredChanges.length === 0 ? (
                     <div className="p-12 text-center space-y-2">
-                        <MdInfoOutline className="mx-auto text-slate-300" size={36} />
-                        <p className="text-slate-700 font-bold text-sm">No update logs found</p>
+                        <MdInfoOutline className="mx-auto text-slate-300 dark:text-slate-600" size={36} />
+                        <p className="text-slate-700 dark:text-slate-300 font-bold text-sm">No update logs found</p>
                         <p className="text-slate-400 text-xs">Try clearing search inputs or date filters.</p>
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
                         <table className="w-full text-left text-xs border-collapse">
-                            <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-widest font-black text-[10px]">
+                            <thead className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 uppercase tracking-widest font-black text-[10px]">
                                 <tr>
                                     <th className="w-10 px-3 py-4"></th>
                                     <th className="px-5 py-4 whitespace-nowrap">DATE</th>
@@ -349,36 +349,36 @@ const SystemUpdates = () => {
                                     <th className="px-5 py-4">CHANGES / MINUTE DETAIL</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-100 bg-white">
+                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
                                 {filteredChanges.map((row) => {
                                     const isExpanded = expandedRow === row.id;
                                     return (
                                         <React.Fragment key={row.id}>
                                             <tr
                                                 onClick={() => toggleRowExpand(row.id)}
-                                                className="hover:bg-slate-50/80 cursor-pointer transition-colors group"
+                                                className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 cursor-pointer transition-colors group"
                                             >
                                                 <td className="px-3 py-4 text-slate-400 group-hover:text-primary-600">
                                                     {isExpanded ? <MdExpandLess size={18} /> : <MdExpandMore size={18} />}
                                                 </td>
-                                                <td className="px-5 py-4 font-bold text-slate-600 whitespace-nowrap">{row.date}</td>
-                                                <td className="px-5 py-4 font-black text-slate-900">{row.module}</td>
+                                                <td className="px-5 py-4 font-bold text-slate-600 dark:text-slate-300 whitespace-nowrap">{row.date}</td>
+                                                <td className="px-5 py-4 font-black text-slate-900 dark:text-slate-100">{row.module}</td>
                                                 <td className="px-5 py-4">
-                                                    <span className="inline-flex items-center gap-1 font-bold text-emerald-800 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200/80 hover:bg-emerald-100 transition-colors">
+                                                    <span className="inline-flex items-center gap-1 font-bold text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/50 px-3 py-1 rounded-full border border-emerald-200/80 dark:border-emerald-800/60 hover:bg-emerald-100 transition-colors">
                                                         {row.submodule}
                                                     </span>
                                                 </td>
-                                                <td className="px-5 py-4 font-semibold text-slate-800">{row.changes}</td>
+                                                <td className="px-5 py-4 font-semibold text-slate-800 dark:text-slate-200">{row.changes}</td>
                                             </tr>
 
                                             {/* Expanded Details Sub-View */}
                                             {isExpanded && (
-                                                <tr className="bg-slate-50/70">
+                                                <tr className="bg-slate-50/70 dark:bg-slate-800/40">
                                                     <td colSpan="5" className="p-6 border-l-4 border-primary-600">
                                                         <div className="space-y-4">
-                                                            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 pb-3">
-                                                                <div className="flex items-center gap-2 text-xs font-black text-slate-900">
-                                                                    <MdLayers className="text-primary-600" size={18} />
+                                                            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 dark:border-slate-700 pb-3">
+                                                                <div className="flex items-center gap-2 text-xs font-black text-slate-900 dark:text-slate-100">
+                                                                    <MdLayers className="text-primary-600 dark:text-primary-400" size={18} />
                                                                     <span>Minute Detail Breakdown - {row.module} &gt; {row.submodule}</span>
                                                                 </div>
                                                                 <button
@@ -394,19 +394,19 @@ const SystemUpdates = () => {
                                                                 </button>
                                                             </div>
 
-                                                            <div className="text-xs text-slate-700 font-medium space-y-1.5">
-                                                                <p><strong className="font-bold text-slate-900">Change Detail:</strong> {row.changes}</p>
-                                                                <p><strong className="font-bold text-slate-900">Deployment Date:</strong> {row.date}</p>
-                                                                <p><strong className="font-bold text-slate-900">Deployed By:</strong> {row.deployedBy}</p>
+                                                            <div className="text-xs text-slate-700 dark:text-slate-300 font-medium space-y-1.5">
+                                                                <p><strong className="font-bold text-slate-900 dark:text-slate-100">Change Detail:</strong> {row.changes}</p>
+                                                                <p><strong className="font-bold text-slate-900 dark:text-slate-100">Deployment Date:</strong> {row.date}</p>
+                                                                <p><strong className="font-bold text-slate-900 dark:text-slate-100">Deployed By:</strong> {row.deployedBy}</p>
                                                             </div>
 
                                                             {row.releaseNotes && row.releaseNotes.length > 0 && (
                                                                 <div className="pt-2">
                                                                     <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Release Notes</span>
-                                                                    <ul className="mt-2 space-y-1.5 text-xs text-slate-800">
+                                                                    <ul className="mt-2 space-y-1.5 text-xs text-slate-800 dark:text-slate-200">
                                                                         {row.releaseNotes.map((note, nIdx) => (
                                                                             <li key={nIdx} className="flex items-start gap-2">
-                                                                                <MdCheckCircle className="text-emerald-600 mt-0.5 shrink-0" size={15} />
+                                                                                <MdCheckCircle className="text-emerald-600 dark:text-emerald-400 mt-0.5 shrink-0" size={15} />
                                                                                 <span className="font-semibold">{note}</span>
                                                                             </li>
                                                                         ))}

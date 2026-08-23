@@ -138,7 +138,7 @@ const Layout = ({ children }) => {
                         <button
                             type="button"
                             onClick={handleViewAllUpdates}
-                            className="w-full md:w-auto px-5 py-3 rounded-xl bg-white border border-slate-200 text-slate-600 font-black uppercase text-[10px] tracking-widest hover:bg-slate-50 transition-all"
+                            className="w-full md:w-auto px-5 py-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-black uppercase text-[10px] tracking-widest hover:bg-slate-50 dark:hover:bg-slate-700 transition-all"
                         >
                             View All Releases
                         </button>
@@ -154,29 +154,29 @@ const Layout = ({ children }) => {
             >
                 {latestUpdate && (
                     <div className="space-y-6">
-                        <div className="flex items-center gap-4 bg-gradient-to-r from-primary-50 to-indigo-50/50 p-4 rounded-2xl border border-primary-100/30">
-                            <div className="w-12 h-12 bg-primary-600 rounded-xl flex items-center justify-center text-white shadow-md shrink-0">
+                        <div className="flex items-center gap-4 bg-slate-100 dark:bg-slate-800/90 p-4 rounded-2xl border border-slate-200 dark:border-slate-700/80">
+                            <div className="w-12 h-12 bg-primary-600 dark:bg-primary-500 rounded-xl flex items-center justify-center text-white shadow-md shrink-0">
                                 <MdNewReleases size={24} />
                             </div>
                             <div>
-                                <h4 className="font-black text-slate-900 text-lg leading-tight">{latestUpdate.title}</h4>
-                                <p className="text-[10px] font-bold text-primary-700 mt-1 uppercase tracking-widest">Version {latestUpdate.version}</p>
+                                <h4 className="font-black text-slate-900 dark:text-slate-100 text-lg leading-tight">{latestUpdate.title}</h4>
+                                <p className="text-[10px] font-bold text-primary-600 dark:text-primary-400 mt-1 uppercase tracking-widest">Version {latestUpdate.version}</p>
                             </div>
                         </div>
 
                         <div>
-                            <p className="text-slate-600 text-sm font-medium leading-relaxed">
+                            <p className="text-slate-600 dark:text-slate-300 text-sm font-medium leading-relaxed">
                                 {latestUpdate.message}
                             </p>
                         </div>
 
                         {latestUpdate.releaseNotes && latestUpdate.releaseNotes.length > 0 && (
                             <div className="space-y-3">
-                                <h5 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Release Notes</h5>
+                                <h5 className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-400">Release Notes</h5>
                                 <ul className="space-y-2">
                                     {latestUpdate.releaseNotes.map((note, idx) => (
-                                        <li key={idx} className="flex items-start gap-2.5 text-sm font-bold text-slate-800">
-                                            <MdCheckCircle className="text-emerald-500 mt-0.5 shrink-0" size={16} />
+                                        <li key={idx} className="flex items-start gap-2.5 text-sm font-bold text-slate-800 dark:text-slate-200">
+                                            <MdCheckCircle className="text-emerald-500 dark:text-emerald-400 mt-0.5 shrink-0" size={16} />
                                             <span>{note}</span>
                                         </li>
                                     ))}
@@ -185,24 +185,24 @@ const Layout = ({ children }) => {
                         )}
 
                         {/* Seeding & Demo Setup */}
-                        <div className="border-t border-slate-100 pt-5 mt-5 space-y-3">
-                            <h5 className="text-[10px] font-black uppercase tracking-widest text-slate-400">System Seeding Shortcuts</h5>
+                        <div className="border-t border-slate-100 dark:border-slate-800 pt-5 mt-5 space-y-3">
+                            <h5 className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-400">System Seeding Shortcuts</h5>
                             <div className="grid grid-cols-2 gap-4">
                                 <button
                                     onClick={handleSeedMh}
                                     disabled={seedingMh}
-                                    className="px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-left hover:bg-slate-100 hover:border-slate-300 transition-all flex flex-col gap-0.5 disabled:opacity-50"
+                                    className="px-4 py-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-left hover:bg-slate-100 dark:hover:bg-slate-700/80 transition-all flex flex-col gap-0.5 disabled:opacity-50"
                                 >
-                                    <span className="text-xs font-black text-slate-900">⚡ Seed MH Utility</span>
-                                    <span className="text-[9px] text-slate-400 font-medium">Assets, tickets, & AMCs</span>
+                                    <span className="text-xs font-black text-slate-900 dark:text-slate-100">⚡ Seed MH Utility</span>
+                                    <span className="text-[9px] text-slate-400 dark:text-slate-400 font-medium">Assets, tickets, & AMCs</span>
                                 </button>
                                 <button
                                     onClick={handleSeedKb}
                                     disabled={seedingKb}
-                                    className="px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-left hover:bg-slate-100 hover:border-slate-300 transition-all flex flex-col gap-0.5 disabled:opacity-50"
+                                    className="px-4 py-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-left hover:bg-slate-100 dark:hover:bg-slate-700/80 transition-all flex flex-col gap-0.5 disabled:opacity-50"
                                 >
-                                    <span className="text-xs font-black text-slate-900">📚 Seed KB FAQs</span>
-                                    <span className="text-[9px] text-slate-400 font-medium">Substation troubleshooting manuals</span>
+                                    <span className="text-xs font-black text-slate-900 dark:text-slate-100">📚 Seed KB FAQs</span>
+                                    <span className="text-[9px] text-slate-400 dark:text-slate-400 font-medium">Substation troubleshooting manuals</span>
                                 </button>
                             </div>
                         </div>
