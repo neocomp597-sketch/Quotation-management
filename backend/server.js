@@ -864,6 +864,52 @@ const startBackgroundServices = async () => {
       },
       { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
     );
+    await SystemUpdate.findOneAndUpdate(
+      { version: "v4.9.0-enquiry-auth-gstin-refinements" },
+      {
+        version: "v4.9.0-enquiry-auth-gstin-refinements",
+        title: "Enquiry Executive Deduplication, Authorization Password Management & Unified GSTIN Validation",
+        message: "We have deduplicated executive entries in Enquiry registers, restored authorization password management, cleaned redundant landing page spinners, and unified GSTIN state code validations across all modules.",
+        releaseNotes: [
+          "Deduplicated Sales Executive dropdown and register entries across Enquiry management",
+          "Restored password update modal and password reset workflow inside Authorization dashboard",
+          "Removed redundant background loading spinners on landing and dashboard routes",
+          "Standardized GSTIN regex validation to support all valid Indian state codes (01-37, 38, 97, 99) across Branch, Contact, Customer, Vendor, and Enquiry forms"
+        ],
+        detailedChanges: [
+          { date: "22.08.2026", module: "CRM Core", submodule: "Enquiry Register", changes: "Deduplicated Sales Executive list entries in Enquiry creation and filtering." },
+          { date: "22.08.2026", module: "Authentication", submodule: "Authorization Dashboard", changes: "Restored user password update functionality into the Authorization management panel." },
+          { date: "22.08.2026", module: "Master Management", submodule: "GSTIN Validation", changes: "Updated GSTIN regex standard across validation.js, BranchMaster, Contacts, Customers, Vendors, and CreateEnquiry." }
+        ],
+        deployedBy: "Super Admin",
+        deployedAt: new Date("2026-08-22T18:00:00+05:30"),
+        isActive: true
+      },
+      { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
+    );
+    await SystemUpdate.findOneAndUpdate(
+      { version: "v5.0.0-reports-dark-mode-standardization" },
+      {
+        version: "v5.0.0-reports-dark-mode-standardization",
+        title: "Reports Module Dark Mode Standardization & Theme-Aware Analytics",
+        message: "We have completed the application-wide Dark Mode transition for the Reports module, featuring theme-aware Recharts data visualizations, dynamic dark financial spreadsheet tables, and standardized contrast styling.",
+        releaseNotes: [
+          "Completed full Dark Mode styling across all Reports tab renderers: Quotations, Enquiries, Vendors, Products, Planning, Revenue Plan, and Follow-Ups",
+          "Integrated theme-aware Recharts configurations with dark grid lines, subtle tick colors, and #0f172a dark tooltip cards",
+          "Implemented REVENUE_PLAN_DARK_COLORS and dynamic theme detection for financial spreadsheet tables and Excel export parity",
+          "Standardized all report container card backgrounds to dark:bg-slate-900/60, borders to dark:border-slate-800, and row hover states to dark:hover:bg-slate-800/40"
+        ],
+        detailedChanges: [
+          { date: "23.08.2026", module: "Reports", submodule: "Tab Renderers Dark Mode", changes: "Applied Tailwind dark: utility classes to container cards, stats, tables, and tab navigation." },
+          { date: "23.08.2026", module: "Reports", submodule: "Recharts Visualization", changes: "Configured theme-aware CartesianGrid, XAxis, YAxis, and Tooltip styling for all report charts." },
+          { date: "23.08.2026", module: "Reports", submodule: "Revenue Plan Spreadsheet", changes: "Added REVENUE_PLAN_DARK_COLORS palette and dynamic dark theme background detection in cell fill functions." }
+        ],
+        deployedBy: "Super Admin",
+        deployedAt: new Date("2026-08-23T18:00:00+05:30"),
+        isActive: true
+      },
+      { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
+    );
   } catch (err) {
     console.error("[Release Seed Error] Failed to seed system update:", err.message);
   }
