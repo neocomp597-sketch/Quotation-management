@@ -50,11 +50,15 @@ const BranchMaster = ({ isCreatePage, isEditPage }) => {
         try {
             const [branchRes, stateRes] = await Promise.all([
                 branchService.getAll(),
-                stateMasterService.getAll()
+                stateMasterService.getAll().catch(err => {
+                    console.warn('[BranchMaster] StateMaster fetch warning:', err);
+                    return { data: { data: [] } };
+                })
             ]);
             setBranches(branchRes.data || []);
-            setStateList(stateRes.data?.data || []);
+            setStateList(stateRes.data?.data || stateRes.data || []);
         } catch (err) {
+            console.error('[BranchMaster] fetchBranches error:', err);
             toast.error(err.response?.data?.message || 'Failed to load branches');
         } finally {
             setLoading(false);
@@ -379,20 +383,20 @@ const BranchMaster = ({ isCreatePage, isEditPage }) => {
             ) : (
                 <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in duration-200">
                         {/* Header bar */}
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm">
                             <div className="flex items-center gap-4">
                                 <button
                                     type="button"
                                     onClick={() => handleCloseModal()}
-                                    className="p-3 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-2xl transition-all border border-slate-200"
+                                    className="p-3 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-2xl transition-all border border-slate-200 dark:border-slate-700"
                                 >
                                     <MdArrowBack size={20} />
                                 </button>
                                 <div>
-                                    <h1 className="text-xl font-black text-slate-900">
+                                    <h1 className="text-xl font-black text-slate-900 dark:text-slate-100">
                                         {editingBranch ? 'Edit Branch Master' : 'Create New Branch'}
                                     </h1>
-                                    <p className="text-xs text-slate-500 font-medium mt-0.5">
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">
                                         {editingBranch ? `Update branch parameters for ${editingBranch.name}` : 'Add a new office branch location'}
                                     </p>
                                 </div>
@@ -401,7 +405,7 @@ const BranchMaster = ({ isCreatePage, isEditPage }) => {
                                 <button
                                     type="button"
                                     onClick={() => handleCloseModal()}
-                                    className="px-6 py-3 rounded-2xl border border-slate-200 text-slate-600 font-black uppercase text-xs tracking-widest hover:bg-slate-50 transition-all"
+                                    className="px-6 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-black uppercase text-xs tracking-widest hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
                                 >
                                     Cancel
                                 </button>
@@ -417,11 +421,11 @@ const BranchMaster = ({ isCreatePage, isEditPage }) => {
                         </div>
 
                         {/* Form Card Body */}
-                        <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
+                        <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm">
                             <form id="branch-master-form" onSubmit={handleSubmit} className="space-y-6">
                                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-6">
                                     <div className="sm:col-span-1">
-                                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                                             Branch Name <span className="text-rose-500">*</span>
                                         </label>
                                         <input
@@ -430,12 +434,12 @@ const BranchMaster = ({ isCreatePage, isEditPage }) => {
                                             placeholder="e.g. Nashik Office"
                                             value={formData.name}
                                             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                            className="w-full px-3.5 py-3 bg-slate-50 rounded-xl border border-slate-200 text-sm font-semibold text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20 outline-none"
+                                            className="w-full px-3.5 py-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20 outline-none"
                                         />
                                     </div>
 
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                                             Branch Code <span className="text-rose-500">*</span>
                                         </label>
                                         <input
@@ -444,12 +448,12 @@ const BranchMaster = ({ isCreatePage, isEditPage }) => {
                                             placeholder="e.g. NSK-01"
                                             value={formData.code}
                                             onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
-                                            className="w-full px-3.5 py-3 bg-slate-50 rounded-xl border border-slate-200 text-sm font-semibold uppercase text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20 outline-none"
+                                            className="w-full px-3.5 py-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-semibold uppercase text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20 outline-none"
                                         />
                                     </div>
 
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                                             Branch Prefix <span className="text-rose-500">*</span>
                                         </label>
                                         <input
@@ -459,13 +463,13 @@ const BranchMaster = ({ isCreatePage, isEditPage }) => {
                                             placeholder="e.g. NSK, PN, MUM"
                                             value={formData.branchPrefix}
                                             onChange={(e) => setFormData({ ...formData, branchPrefix: e.target.value.toUpperCase() })}
-                                            className="w-full px-3.5 py-3 bg-slate-50 rounded-xl border border-slate-200 text-sm font-black uppercase tracking-wider text-primary-600 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20 outline-none"
+                                            className="w-full px-3.5 py-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-black uppercase tracking-wider text-primary-600 dark:text-primary-400 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20 outline-none"
                                         />
                                         <span className="text-[10px] font-semibold text-slate-400">Prefix for Auto IDs (e.g. MUM)</span>
                                     </div>
 
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                                             Emp ID Starting Number
                                         </label>
                                         <input
@@ -474,7 +478,7 @@ const BranchMaster = ({ isCreatePage, isEditPage }) => {
                                             placeholder="e.g. 5001, 6001"
                                             value={formData.startEmployeeSeq || 1001}
                                             onChange={(e) => setFormData({ ...formData, startEmployeeSeq: e.target.value })}
-                                            className="w-full px-3.5 py-3 bg-slate-50 rounded-xl border border-slate-200 text-sm font-bold text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20 outline-none"
+                                            className="w-full px-3.5 py-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-bold text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20 outline-none"
                                         />
                                         <span className="text-[10px] font-semibold text-slate-400">Sequence start (e.g. 5001 ➔ MUM5001)</span>
                                     </div>
@@ -482,7 +486,7 @@ const BranchMaster = ({ isCreatePage, isEditPage }) => {
 
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                                             Address
                                         </label>
                                         <input
@@ -490,7 +494,7 @@ const BranchMaster = ({ isCreatePage, isEditPage }) => {
                                             placeholder="Office Street Address"
                                             value={formData.address}
                                             onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                                            className="w-full px-3.5 py-3 bg-slate-50 rounded-xl border border-slate-200 text-sm font-semibold text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20 outline-none"
+                                            className="w-full px-3.5 py-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20 outline-none"
                                         />
                                     </div>
                                     <CascadingLocationSelector
@@ -526,7 +530,7 @@ const BranchMaster = ({ isCreatePage, isEditPage }) => {
 
                                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-6">
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                                             Pincode
                                         </label>
                                         <input
@@ -535,11 +539,11 @@ const BranchMaster = ({ isCreatePage, isEditPage }) => {
                                             placeholder="400001"
                                             value={formData.pincode}
                                             onChange={(e) => setFormData({ ...formData, pincode: e.target.value.replace(/[^\d]/g, '').slice(0, 6) })}
-                                            className="w-full px-3.5 py-3 bg-slate-50 rounded-xl border border-slate-200 text-sm font-semibold text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20 outline-none"
+                                            className="w-full px-3.5 py-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20 outline-none"
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                                             Contact Phone
                                         </label>
                                         <input
@@ -548,11 +552,11 @@ const BranchMaster = ({ isCreatePage, isEditPage }) => {
                                             placeholder="10-digit contact phone"
                                             value={formData.contactNo}
                                             onChange={(e) => setFormData({ ...formData, contactNo: e.target.value.replace(/[^\d]/g, '').slice(0, 10) })}
-                                            className="w-full px-3.5 py-3 bg-slate-50 rounded-xl border border-slate-200 text-sm font-semibold text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20 outline-none"
+                                            className="w-full px-3.5 py-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20 outline-none"
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                                             Email Address
                                         </label>
                                         <input
@@ -560,11 +564,11 @@ const BranchMaster = ({ isCreatePage, isEditPage }) => {
                                             placeholder="branch@company.com"
                                             value={formData.email}
                                             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                            className="w-full px-3.5 py-3 bg-slate-50 rounded-xl border border-slate-200 text-sm font-semibold text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20 outline-none"
+                                            className="w-full px-3.5 py-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20 outline-none"
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                                             GST Number
                                         </label>
                                         <input
@@ -573,14 +577,14 @@ const BranchMaster = ({ isCreatePage, isEditPage }) => {
                                             placeholder="27AAAAA0000A1Z5"
                                             value={formData.gstNo}
                                             onChange={(e) => setFormData({ ...formData, gstNo: e.target.value.toUpperCase().slice(0, 15) })}
-                                            className="w-full px-3.5 py-3 bg-slate-50 rounded-xl border border-slate-200 text-sm font-semibold uppercase text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20 outline-none font-mono"
+                                            className="w-full px-3.5 py-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-semibold uppercase text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20 outline-none font-mono"
                                         />
                                     </div>
                                 </div>
 
                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                                     <div className="sm:col-span-2">
-                                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                                             Branch Logo URL (For Invoices/Quotes Branding)
                                         </label>
                                         <input
@@ -588,11 +592,11 @@ const BranchMaster = ({ isCreatePage, isEditPage }) => {
                                             placeholder="https://example.com/logo.png"
                                             value={formData.logoUrl}
                                             onChange={(e) => setFormData({ ...formData, logoUrl: e.target.value })}
-                                            className="w-full px-3.5 py-3 bg-slate-50 rounded-xl border border-slate-200 text-sm font-semibold text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20 outline-none"
+                                            className="w-full px-3.5 py-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20 outline-none"
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                                             Branch Manager
                                         </label>
                                         <input
@@ -600,19 +604,19 @@ const BranchMaster = ({ isCreatePage, isEditPage }) => {
                                             placeholder="Manager Name"
                                             value={formData.managerName}
                                             onChange={(e) => setFormData({ ...formData, managerName: e.target.value })}
-                                            className="w-full px-3.5 py-3 bg-slate-50 rounded-xl border border-slate-200 text-sm font-semibold text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20 outline-none"
+                                            className="w-full px-3.5 py-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20 outline-none"
                                         />
                                     </div>
                                 </div>
 
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                                         Status
                                     </label>
                                     <select
                                         value={formData.status}
                                         onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                                        className="w-full px-3.5 py-3 bg-slate-50 rounded-xl border border-slate-200 text-sm font-semibold text-slate-900 focus:ring-2 focus:ring-primary-500/20 outline-none"
+                                        className="w-full px-3.5 py-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-primary-500/20 outline-none"
                                     >
                                         <option value="Active">Active</option>
                                         <option value="Inactive">Inactive</option>

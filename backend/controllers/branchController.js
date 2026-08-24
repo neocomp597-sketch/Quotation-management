@@ -104,7 +104,7 @@ exports.createBranch = async (req, res) => {
 
 exports.updateBranch = async (req, res) => {
     try {
-        const companyId = req.user?.companyId;
+        const companyId = await getEffectiveCompanyId(req);
         const { id } = req.params;
         const { name, code, branchPrefix, address, country, city, state, stateShortCode, countryDialCode, pincode, contactNo, email, gstNo, logoUrl, managerName, status, startEmployeeSeq } = req.body;
 
@@ -188,15 +188,18 @@ exports.updateBranch = async (req, res) => {
 
 exports.deleteBranch = async (req, res) => {
     try {
-        const companyId = req.user?.companyId;
+        const companyId = await getEffectiveCompanyId(req);
         const { id } = req.params;
 
-        const branch = await Branch.findOne({ _id: id, companyId });
+        const query = { _id: id };
+        if (companyId) query.companyId = companyId;
+
+        const branch = await Branch.findOne(query);
         if (!branch) {
             return res.status(404).json({ message: 'Branch not found' });
         }
 
-        await Branch.deleteOne({ _id: id, companyId });
+        await Branch.deleteOne(query);
         res.json({ message: 'Branch deleted successfully' });
     } catch (error) {
         console.error('[deleteBranch] Error:', error);
@@ -206,7 +209,7 @@ exports.deleteBranch = async (req, res) => {
 
 exports.getNextEmployeeId = async (req, res) => {
     try {
-        const companyId = req.user?.companyId;
+        const companyId = await getEffectiveCompanyId(req);
         const { id: branchId } = req.params;
 
         const { generateNextUniqueEmployeeId } = require('../utils/employeeIdHelper');

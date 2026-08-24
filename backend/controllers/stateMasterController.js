@@ -2,6 +2,7 @@ const StateMaster = require('../models/StateMaster');
 const Customer = require('../models/Customer');
 const Vendor = require('../models/Vendor');
 const Branch = require('../models/Branch');
+const Company = require('../models/Company');
 
 const DEFAULT_INDIAN_STATES = [
     { state: 'Andhra Pradesh', shortCode: 'AP', gstCode: '37' },
@@ -48,9 +49,20 @@ const normalizeStateName = (name) => {
     return name.trim().replace(/\s+/g, ' ').toLowerCase();
 };
 
+const getEffectiveCompanyId = async (req) => {
+    let companyId = req.user?.companyId;
+    if (!companyId) {
+        const firstCompany = await Company.findOne().lean();
+        if (firstCompany) {
+            companyId = firstCompany._id.toString();
+        }
+    }
+    return companyId;
+};
+
 exports.getAll = async (req, res) => {
     try {
-        const companyId = req.user?.companyId;
+        const companyId = await getEffectiveCompanyId(req);
         const query = companyId ? { companyId } : {};
         let states = await StateMaster.find(query).sort({ state: 1 }).lean();
         
@@ -66,18 +78,18 @@ exports.getAll = async (req, res) => {
                 city: '',
                 status: 'Active'
             }));
-            states = await StateMaster.insertMany(docsToInsert);
+            states = await StateMaster.insertMany(docsToInsert, { bypassTenant: true });
         }
         res.json({ success: true, data: states });
     } catch (error) {
         console.error('Error fetching state master:', error);
-        res.status(500).json({ success: false, message: 'Server error', error: error.message });
+        res.status(500).json({ success: false, message: 'Failed to load states', error: error.message });
     }
 };
 
 exports.create = async (req, res) => {
     try {
-        const companyId = req.user?.companyId;
+        const companyId = await getEffectiveCompanyId(req);
         const { country, dialCode, state, shortCode, gstCode, city, status } = req.body;
         if (!state || !shortCode) {
             return res.status(400).json({ success: false, message: 'State and Short Code are required' });
@@ -111,14 +123,14 @@ exports.create = async (req, res) => {
         res.status(201).json({ success: true, data: newState, message: 'State created successfully' });
     } catch (error) {
         console.error('Error creating state:', error);
-        res.status(500).json({ success: false, message: 'Server error', error: error.message });
+        res.status(500).json({ success: false, message: 'Failed to create state', error: error.message });
     }
 };
 
 exports.update = async (req, res) => {
     try {
         const { id } = req.params;
-        const companyId = req.user?.companyId;
+        const companyId = await getEffectiveCompanyId(req);
         const { country, dialCode, state, shortCode, gstCode, city, status } = req.body;
         const query = { _id: id };
         if (companyId) query.companyId = companyId;
@@ -178,14 +190,14 @@ exports.update = async (req, res) => {
         res.json({ success: true, data: updated, message: 'State updated successfully' });
     } catch (error) {
         console.error('Error updating state:', error);
-        res.status(500).json({ success: false, message: 'Server error', error: error.message });
+        res.status(500).json({ success: false, message: 'Failed to update state', error: error.message });
     }
 };
 
 exports.delete = async (req, res) => {
     try {
         const { id } = req.params;
-        const companyId = req.user?.companyId;
+        const companyId = await getEffectiveCompanyId(req);
         const query = { _id: id };
         if (companyId) query.companyId = companyId;
 
@@ -212,6 +224,7 @@ exports.delete = async (req, res) => {
         res.json({ success: true, message: 'State deleted successfully' });
     } catch (error) {
         console.error('Error deleting state:', error);
-        res.status(500).json({ success: false, message: 'Server error', error: error.message });
+        res.status(500).json({ success: false, message: 'Failed to delete state', error: error.message });
     }
 };
+
