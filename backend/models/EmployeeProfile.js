@@ -63,6 +63,8 @@ const EmployeeProfileSchema = new mongoose.Schema({
     dob: { type: Date },
     department: { type: String, trim: true },
     designation: { type: String, trim: true },
+    workerType: { type: String, trim: true, default: 'PERMANENT WORKER' },
+    employeeType: { type: String, trim: true, default: 'ONSITE' },
     status: { type: String, enum: ['Active', 'Hold', 'Resigned', 'Vacant'], default: 'Active' },
     isVacant: { type: Boolean, default: false },
     familyDetails: [FamilyMemberSchema],

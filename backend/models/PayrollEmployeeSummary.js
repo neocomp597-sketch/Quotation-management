@@ -21,7 +21,9 @@ const PayrollEmployeeSummarySchema = new mongoose.Schema({
         accountNumber: String,
         ifscCode: String,
         department: String,
-        designation: String
+        designation: String,
+        workerType: String,
+        employeeType: String
     },
     
     baseStructure: { type: mongoose.Schema.Types.Mixed }, // Copy of original salaryStructure

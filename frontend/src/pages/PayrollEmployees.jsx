@@ -33,7 +33,7 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
 
     // Form states
     const [basicForm, setBasicForm] = useState({
-        branchId: '', employeeId: '', externalEmployeeCode: '', gender: 'Male', name: '', email: '', mobile: '', reportingTo: '', dob: '', joiningDate: '', lastWorkingDate: '', department: '', designation: '', status: 'Active',
+        branchId: '', employeeId: '', externalEmployeeCode: '', gender: 'Male', name: '', email: '', mobile: '', reportingTo: '', dob: '', joiningDate: '', lastWorkingDate: '', department: '', designation: '', workerType: 'PERMANENT WORKER', employeeType: 'ONSITE', status: 'Active',
         photo: '', familyDetails: [],
         pan: '', aadhaar: '', uan: '', pfNumber: '', esiNumber: '',
         bankName: '', accountNumber: '', ifscCode: ''
@@ -209,7 +209,7 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
             setSelectedEmp(null);
             setBasicForm({
                 branchId: '', employeeId: '', externalEmployeeCode: '', gender: 'Male', name: '', email: '', mobile: '', reportingTo: '', dob: '', joiningDate: new Date().toISOString().substring(0, 10), lastWorkingDate: '',
-                department: '', designation: '', status: 'Active',
+                department: '', designation: '', workerType: 'PERMANENT WORKER', employeeType: 'ONSITE', status: 'Active',
                 photo: '', familyDetails: [],
                 pan: '', aadhaar: '', uan: '', pfNumber: '', esiNumber: '',
                 bankName: '', accountNumber: '', ifscCode: ''
@@ -235,6 +235,8 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                     lastWorkingDate: emp.lastWorkingDate ? new Date(emp.lastWorkingDate).toISOString().substring(0, 10) : '',
                     department: emp.department || '',
                     designation: emp.designation || '',
+                    workerType: emp.workerType || 'PERMANENT WORKER',
+                    employeeType: emp.employeeType || 'ONSITE',
                     status: emp.status || 'Active',
                     photo: emp.photo || '',
                     familyDetails: Array.isArray(emp.familyDetails) ? emp.familyDetails : [],
@@ -480,6 +482,8 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
             'DOB': emp.dob ? new Date(emp.dob).toISOString().substring(0, 10) : '',
             'Department': emp.department || '',
             'Designation': emp.designation || '',
+            'Worker Type': emp.workerType || 'PERMANENT WORKER',
+            'Employee Type': emp.employeeType || 'ONSITE',
             'Status': emp.status || 'Active',
             'Basic Salary': emp.salaryStructure?.basic || 0,
             'HRA': emp.salaryStructure?.hra || 0,
@@ -639,6 +643,16 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                                             {emp.gender && (
                                                                 <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 font-bold text-[10px] rounded-lg">
                                                                     {emp.gender}
+                                                                </span>
+                                                            )}
+                                                            {emp.workerType && (
+                                                                <span className="px-1.5 py-0.5 bg-amber-50 text-amber-700 font-bold text-[10px] rounded-lg border border-amber-100">
+                                                                    {emp.workerType}
+                                                                </span>
+                                                            )}
+                                                            {emp.employeeType && (
+                                                                <span className="px-1.5 py-0.5 bg-purple-50 text-purple-700 font-bold text-[10px] rounded-lg border border-purple-100">
+                                                                    {emp.employeeType}
                                                                 </span>
                                                             )}
                                                         </div>
@@ -980,6 +994,29 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                                     <option value="Active">Active</option>
                                                     <option value="Hold">On Hold</option>
                                                     <option value="Resigned">Resigned</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className={labelClass}>Worker Type</label>
+                                                <select
+                                                    value={basicForm.workerType || 'PERMANENT WORKER'}
+                                                    onChange={(e) => setBasicForm({ ...basicForm, workerType: e.target.value })}
+                                                    className={inputClass}
+                                                >
+                                                    <option value="PERMANENT WORKER">PERMANENT WORKER</option>
+                                                    <option value="CONTRACTUAL WORKER">CONTRACTUAL WORKER</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className={labelClass}>Type of Employee</label>
+                                                <select
+                                                    value={basicForm.employeeType || 'ONSITE'}
+                                                    onChange={(e) => setBasicForm({ ...basicForm, employeeType: e.target.value })}
+                                                    className={inputClass}
+                                                >
+                                                    <option value="ONSITE">ONSITE</option>
+                                                    <option value="OFFSITE">OFFSITE</option>
+                                                    <option value="WORK FROM HOME">WORK FROM HOME</option>
                                                 </select>
                                             </div>
                                         </div>

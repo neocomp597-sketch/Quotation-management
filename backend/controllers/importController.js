@@ -2384,6 +2384,8 @@ const importEmployees = async (req, res) => {
                 const dobStr = pickFirstNonEmpty(row['DOB'], row.dob);
                 const department = pickFirstNonEmpty(row['Department'], row.dept);
                 const designation = pickFirstNonEmpty(row['Designation'], row.desig);
+                const workerType = pickFirstNonEmpty(row['Worker Type'], row.workerType) || 'PERMANENT WORKER';
+                const employeeType = pickFirstNonEmpty(row['Employee Type'], row.employeeType) || 'ONSITE';
                 const status = pickFirstNonEmpty(row['Status'], row.status) || 'Active';
 
                 const joiningDate = joiningDateStr ? new Date(joiningDateStr) : new Date();
@@ -2409,6 +2411,8 @@ const importEmployees = async (req, res) => {
                     dob,
                     department,
                     designation,
+                    workerType,
+                    employeeType,
                     status,
                     salaryStructure: {
                         basic, hra, da, specialAllowance
@@ -2476,6 +2480,8 @@ const getEmployeeTemplate = async (req, res) => {
                 'DOB': '1990-05-15',
                 'Department': 'Engineering',
                 'Designation': 'Software Engineer',
+                'Worker Type': 'PERMANENT WORKER',
+                'Employee Type': 'ONSITE',
                 'Status': 'Active',
                 'Basic Salary': 30000,
                 'HRA': 12000,

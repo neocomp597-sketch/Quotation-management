@@ -437,7 +437,9 @@ exports.createRun = async (req, res) => {
                     accountNumber: emp.accountNumber,
                     ifscCode: emp.ifscCode,
                     department: emp.department,
-                    designation: emp.designation
+                    designation: emp.designation,
+                    workerType: emp.workerType || 'PERMANENT WORKER',
+                    employeeType: emp.employeeType || 'ONSITE'
                 },
                 baseStructure,
                 adjustments: defaultAdjustments,
