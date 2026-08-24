@@ -1,13 +1,24 @@
 const Branch = require('../models/Branch');
 const Counter = require('../models/Counter');
 
+const Company = require('../models/Company');
+
+const getEffectiveCompanyId = async (req) => {
+    let companyId = req.user?.companyId;
+    if (!companyId) {
+        const firstCompany = await Company.findOne().lean();
+        if (firstCompany) {
+            companyId = firstCompany._id.toString();
+        }
+    }
+    return companyId;
+};
+
 exports.getAllBranches = async (req, res) => {
     try {
-        const companyId = req.user?.companyId;
-        if (!companyId) {
-            return res.status(400).json({ message: 'Company context missing' });
-        }
-        const branches = await Branch.find({ companyId })
+        const companyId = await getEffectiveCompanyId(req);
+        const query = companyId ? { companyId } : {};
+        const branches = await Branch.find(query)
             .sort({ name: 1 })
             .lean();
         res.json(branches);
@@ -19,8 +30,10 @@ exports.getAllBranches = async (req, res) => {
 
 exports.getBranchById = async (req, res) => {
     try {
-        const companyId = req.user?.companyId;
-        const branch = await Branch.findOne({ _id: req.params.id, companyId }).lean();
+        const companyId = await getEffectiveCompanyId(req);
+        const query = { _id: req.params.id };
+        if (companyId) query.companyId = companyId;
+        const branch = await Branch.findOne(query).lean();
         if (!branch) {
             return res.status(404).json({ message: 'Branch not found' });
         }
@@ -32,7 +45,7 @@ exports.getBranchById = async (req, res) => {
 
 exports.createBranch = async (req, res) => {
     try {
-        const companyId = req.user?.companyId;
+        const companyId = await getEffectiveCompanyId(req);
         if (!companyId) {
             return res.status(400).json({ message: 'Company context missing' });
         }

@@ -71,7 +71,9 @@ exports.protect = async (req, res, next) => {
                 if (queryCompanyId) {
                     resolvedCompanyId = queryCompanyId.toString();
                 }
-            } else if (!resolvedCompanyId && user.role === 'admin') {
+            }
+
+            if (!resolvedCompanyId) {
                 const Company = require('../models/Company');
                 const firstCompany = await Company.findOne().lean();
                 if (firstCompany) {

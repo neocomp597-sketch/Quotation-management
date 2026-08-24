@@ -3,7 +3,7 @@ const fs = require('fs');
 
 async function seedData() {
     try {
-        fs.writeFileSync(path.join(__dirname, 'debug.txt'), 'HELLO FROM NEW SEED ' + new Date().toISOString());
+        fs.writeFileSync(path.join(__dirname, 'debug.txt'), 'HELLO FROM SEED ' + new Date().toISOString());
     } catch (err) {
         fs.writeFileSync(path.join(__dirname, 'debug.txt'), 'Error: ' + err.message);
     } finally {

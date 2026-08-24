@@ -1,0 +1,84 @@
+[
+  {
+    "_id": "6a436edd85c2326e160ce3d1",
+    "productCode": "84137090",
+    "productName": "CPVC Pipe 20mm",
+    "hsnCode": "85013120",
+    "gstPercentage": 18,
+    "basePrice": 1570,
+    "mrp": 4050,
+    "uom": "Nos",
+    "productImageUrl": "https://example.com/images/product2.jpg",
+    "status": "Active",
+    "attributes": [],
+    "catalogType": "Product",
+    "subscriptionDetails": {
+      "setupFee": 0
+    },
+    "rentalDetails": {
+      "minLeaseTerm": 1,
+      "securityDeposit": 0,
+      "baseRatePerDay": 0,
+      "baseRatePerMonth": 0
+    },
+    "inventory": {
+      "currentStock": 0,
+      "reservedStock": 0,
+      "availableStock": 0,
+      "warehouse": "Main Warehouse"
+    },
+    "pricing": {
+      "baseCost": 0,
+      "minPrice": 0,
+      "maxPrice": 0,
+      "marginPercent": 0,
+      "currency": "INR"
+    },
+    "companyId": "6a0b44ab81a41f89dab23668",
+    "vendors": [],
+    "createdAt": "2026-06-30T07:23:09.242Z",
+    "updatedAt": "2026-06-30T07:23:09.243Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a436edd85c2326e160ce3d2",
+    "productCode": "85076000",
+    "productName": "UPVC Pipe 32mm",
+    "hsnCode": "85389000",
+    "gstPercentage": 18,
+    "basePrice": 1407.2,
+    "mrp": 4560,
+    "uom": "Nos",
+    "productImageUrl": "https://example.com/images/product1.jpg",
+    "status": "Active",
+    "attributes": [],
+    "catalogType": "Product",
+    "subscriptionDetails": {
+      "setupFee": 0
+    },
+    "rentalDetails": {
+      "minLeaseTerm": 1,
+      "securityDeposit": 0,
+      "baseRatePerDay": 0,
+      "baseRatePerMonth": 0
+    },
+    "inventory": {
+      "currentStock": 0,
+      "reservedStock": 0,
+      "availableStock": 0,
+      "warehouse": "Main Warehouse"
+    },
+    "pricing": {
+      "baseCost": 0,
+      "minPrice": 0,
+      "maxPrice": 0,
+      "marginPercent": 0,
+      "currency": "INR"
+    },
+    "companyId": "6a0b44ab81a41f89dab23668",
+    "vendors": [],
+    "createdAt": "2026-06-30T07:23:09.946Z",
+    "updatedAt": "2026-06-30T07:23:09.946Z",
+    "__v": 0
+  }
+]

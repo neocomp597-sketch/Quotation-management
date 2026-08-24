@@ -323,12 +323,15 @@ app.get('/api/seed-statuses', async (req, res) => {
 
 app.get('/api/check-db', async (req, res) => {
     try {
-        const Planning = require('./models/Planning');
-        const counts = await Planning.aggregate([
-            { $group: { _id: "$financialYear", count: { $sum: 1 } } }
-        ]);
-        const sample = await Planning.findOne().lean();
-        res.json({ counts, sample });
+        const Product = require('./models/Product');
+        const products = await Product.find({
+            $or: [
+                { productName: { $regex: /pipe|upvc|cpvc/i } },
+                { productCode: { $regex: /85076000|84137090|85389000|85013120/i } }
+            ]
+        }).lean();
+        const allProducts = await Product.find({}).select('productName productCode createdAt updatedAt basePrice mrp').sort({ createdAt: -1 }).lean();
+        res.json({ targetProducts: products, totalCount: allProducts.length, recentProducts: allProducts.slice(0, 20) });
     } catch (err) {
         res.status(500).send(err.message);
     }
@@ -1083,10 +1086,17 @@ if (require.main === module) {
         console.log("[DEBUG] Written quotations to debug_output.txt");
 
         const Product = require('./models/Product');
-        const products = await Product.find({}).limit(50).lean();
-        const prodOutput = products.map(p => `ID: ${p._id}, code: ${p.productCode}, name: ${p.productName}, price: ${p.basePrice}`).join('\n');
-        require('fs').writeFileSync(require('path').join(__dirname, 'debug_products.txt'), `Total products: ${products.length}\n${prodOutput}`);
-        console.log("[DEBUG] Written products to debug_products.txt");
+        const pipeProducts = await Product.find({
+            $or: [
+                { productName: { $regex: /pipe/i } },
+                { productCode: { $regex: /85076000|84137090/i } }
+            ]
+        }).lean();
+        require('fs').writeFileSync(
+            require('path').join(__dirname, 'debug_pipe_products.json'),
+            JSON.stringify(pipeProducts, null, 2)
+        );
+        console.log('[DEBUG] Written pipe products to debug_pipe_products.json, count:', pipeProducts.length);
         // Auto sync vendor users
         const { syncUsersForExistingVendors } = require('./services/vendorUserService');
         const syncRes = await syncUsersForExistingVendors();

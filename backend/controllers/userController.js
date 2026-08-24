@@ -22,13 +22,25 @@ const validateReportsTo = async ({ reportsTo, userId, companyId }) => {
     return normalized;
 };
 
+const Company = require('../models/Company');
+
+const getEffectiveCompanyId = async (req) => {
+    let companyId = req.user?.companyId || getTenantId?.();
+    if (!companyId) {
+        const firstCompany = await Company.findOne().lean();
+        if (firstCompany) {
+            companyId = firstCompany._id.toString();
+        }
+    }
+    return companyId;
+};
+
 exports.getAllUsers = async (req, res) => {
     try {
-        if (!req.user?.companyId) {
-            return res.status(400).json({ message: 'Company context missing' });
-        }
+        const companyId = await getEffectiveCompanyId(req);
+        const query = companyId ? { companyId } : {};
 
-        const users = await User.find({ companyId: req.user.companyId })
+        const users = await User.find(query)
             .select('_id name email role reportsTo branchId status companyId customPermissions vendorId createdAt')
             .populate('reportsTo', 'name email')
             .populate('branchId', 'name code branchPrefix')
@@ -47,7 +59,7 @@ exports.createUser = async (req, res) => {
     try {
         const { name, email, password, role = 'sales', status = true, reportsTo, branchId, vendorId } = req.body;
 
-        const companyId = req.user?.companyId || getTenantId?.();
+        const companyId = await getEffectiveCompanyId(req);
         if (!companyId) {
             return res.status(400).json({ message: 'Company context missing' });
         }

@@ -1,3 +1,230 @@
-Call to getAllUsers:
-User: {"id":"695a75e7ac70ed0e6a2ffba5","name":"Admin","email":"Admin@gmail.com","role":"admin","companyId":"6a0b44ab81a41f89dab23668"}
-Time: 2026-05-27T16:39:07.207Z
+{
+  "pipeProductsCount": 2,
+  "pipeProducts": [
+    {
+      "id": "6a436edd85c2326e160ce3d1",
+      "productCode": "84137090",
+      "productName": "CPVC Pipe 20mm",
+      "hsnCode": "85013120",
+      "basePrice": 1570,
+      "mrp": 4050,
+      "createdAt": "2026-06-30T07:23:09.242Z",
+      "updatedAt": "2026-06-30T07:23:09.243Z",
+      "createdBy": null
+    },
+    {
+      "id": "6a436edd85c2326e160ce3d2",
+      "productCode": "85076000",
+      "productName": "UPVC Pipe 32mm",
+      "hsnCode": "85389000",
+      "basePrice": 1407.2,
+      "mrp": 4560,
+      "createdAt": "2026-06-30T07:23:09.946Z",
+      "updatedAt": "2026-06-30T07:23:09.946Z",
+      "createdBy": null
+    }
+  ],
+  "totalProductsInDb": 2883,
+  "recent20Products": [
+    {
+      "_id": "6a46854005b07595e650e841",
+      "productCode": "PROD-1050",
+      "productName": "Test Product 50",
+      "hsnCode": "HSN-2050",
+      "basePrice": 5000,
+      "mrp": 6000,
+      "createdAt": "2026-07-02T15:35:28.708Z",
+      "updatedAt": "2026-07-02T15:35:28.708Z"
+    },
+    {
+      "_id": "6a46854005b07595e650e840",
+      "productCode": "PROD-1049",
+      "productName": "Test Product 49",
+      "hsnCode": "HSN-2049",
+      "basePrice": 4900,
+      "mrp": 5880,
+      "createdAt": "2026-07-02T15:35:28.603Z",
+      "updatedAt": "2026-07-02T15:35:28.603Z"
+    },
+    {
+      "_id": "6a46854005b07595e650e83f",
+      "productCode": "PROD-1048",
+      "productName": "Test Product 48",
+      "hsnCode": "HSN-2048",
+      "basePrice": 4800,
+      "mrp": 5760,
+      "createdAt": "2026-07-02T15:35:28.488Z",
+      "updatedAt": "2026-07-02T15:35:28.488Z"
+    },
+    {
+      "_id": "6a46854005b07595e650e83e",
+      "productCode": "PROD-1047",
+      "productName": "Test Product 47",
+      "hsnCode": "HSN-2047",
+      "basePrice": 4700,
+      "mrp": 5640,
+      "createdAt": "2026-07-02T15:35:28.449Z",
+      "updatedAt": "2026-07-02T15:35:28.450Z"
+    },
+    {
+      "_id": "6a46854005b07595e650e83d",
+      "productCode": "PROD-1046",
+      "productName": "Test Product 46",
+      "hsnCode": "HSN-2046",
+      "basePrice": 4600,
+      "mrp": 5520,
+      "createdAt": "2026-07-02T15:35:28.347Z",
+      "updatedAt": "2026-07-02T15:35:28.348Z"
+    },
+    {
+      "_id": "6a46854005b07595e650e83c",
+      "productCode": "PROD-1045",
+      "productName": "Test Product 45",
+      "hsnCode": "HSN-2045",
+      "basePrice": 4500,
+      "mrp": 5400,
+      "createdAt": "2026-07-02T15:35:28.308Z",
+      "updatedAt": "2026-07-02T15:35:28.308Z"
+    },
+    {
+      "_id": "6a46854005b07595e650e83b",
+      "productCode": "PROD-1044",
+      "productName": "Test Product 44",
+      "hsnCode": "HSN-2044",
+      "basePrice": 4400,
+      "mrp": 5280,
+      "createdAt": "2026-07-02T15:35:28.203Z",
+      "updatedAt": "2026-07-02T15:35:28.203Z"
+    },
+    {
+      "_id": "6a46854005b07595e650e83a",
+      "productCode": "PROD-1043",
+      "productName": "Test Product 43",
+      "hsnCode": "HSN-2043",
+      "basePrice": 4300,
+      "mrp": 5160,
+      "createdAt": "2026-07-02T15:35:28.166Z",
+      "updatedAt": "2026-07-02T15:35:28.166Z"
+    },
+    {
+      "_id": "6a46854005b07595e650e839",
+      "productCode": "PROD-1042",
+      "productName": "Test Product 42",
+      "hsnCode": "HSN-2042",
+      "basePrice": 4200,
+      "mrp": 5040,
+      "createdAt": "2026-07-02T15:35:28.044Z",
+      "updatedAt": "2026-07-02T15:35:28.044Z"
+    },
+    {
+      "_id": "6a46854005b07595e650e838",
+      "productCode": "PROD-1041",
+      "productName": "Test Product 41",
+      "hsnCode": "HSN-2041",
+      "basePrice": 4100,
+      "mrp": 4920,
+      "createdAt": "2026-07-02T15:35:28.006Z",
+      "updatedAt": "2026-07-02T15:35:28.006Z"
+    },
+    {
+      "_id": "6a46853f05b07595e650e837",
+      "productCode": "PROD-1040",
+      "productName": "Test Product 40",
+      "hsnCode": "HSN-2040",
+      "basePrice": 4000,
+      "mrp": 4800,
+      "createdAt": "2026-07-02T15:35:27.895Z",
+      "updatedAt": "2026-07-02T15:35:27.895Z"
+    },
+    {
+      "_id": "6a46853f05b07595e650e836",
+      "productCode": "PROD-1039",
+      "productName": "Test Product 39",
+      "hsnCode": "HSN-2039",
+      "basePrice": 3900,
+      "mrp": 4680,
+      "createdAt": "2026-07-02T15:35:27.857Z",
+      "updatedAt": "2026-07-02T15:35:27.857Z"
+    },
+    {
+      "_id": "6a46853f05b07595e650e835",
+      "productCode": "PROD-1038",
+      "productName": "Test Product 38",
+      "hsnCode": "HSN-2038",
+      "basePrice": 3800,
+      "mrp": 4560,
+      "createdAt": "2026-07-02T15:35:27.738Z",
+      "updatedAt": "2026-07-02T15:35:27.739Z"
+    },
+    {
+      "_id": "6a46853f05b07595e650e834",
+      "productCode": "PROD-1037",
+      "productName": "Test Product 37",
+      "hsnCode": "HSN-2037",
+      "basePrice": 3700,
+      "mrp": 4440,
+      "createdAt": "2026-07-02T15:35:27.612Z",
+      "updatedAt": "2026-07-02T15:35:27.612Z"
+    },
+    {
+      "_id": "6a46853f05b07595e650e833",
+      "productCode": "PROD-1036",
+      "productName": "Test Product 36",
+      "hsnCode": "HSN-2036",
+      "basePrice": 3600,
+      "mrp": 4320,
+      "createdAt": "2026-07-02T15:35:27.575Z",
+      "updatedAt": "2026-07-02T15:35:27.575Z"
+    },
+    {
+      "_id": "6a46853f05b07595e650e832",
+      "productCode": "PROD-1035",
+      "productName": "Test Product 35",
+      "hsnCode": "HSN-2035",
+      "basePrice": 3500,
+      "mrp": 4200,
+      "createdAt": "2026-07-02T15:35:27.468Z",
+      "updatedAt": "2026-07-02T15:35:27.468Z"
+    },
+    {
+      "_id": "6a46853f05b07595e650e831",
+      "productCode": "PROD-1034",
+      "productName": "Test Product 34",
+      "hsnCode": "HSN-2034",
+      "basePrice": 3400,
+      "mrp": 4080,
+      "createdAt": "2026-07-02T15:35:27.431Z",
+      "updatedAt": "2026-07-02T15:35:27.432Z"
+    },
+    {
+      "_id": "6a46853f05b07595e650e830",
+      "productCode": "PROD-1033",
+      "productName": "Test Product 33",
+      "hsnCode": "HSN-2033",
+      "basePrice": 3300,
+      "mrp": 3960,
+      "createdAt": "2026-07-02T15:35:27.324Z",
+      "updatedAt": "2026-07-02T15:35:27.324Z"
+    },
+    {
+      "_id": "6a46853f05b07595e650e82f",
+      "productCode": "PROD-1032",
+      "productName": "Test Product 32",
+      "hsnCode": "HSN-2032",
+      "basePrice": 3200,
+      "mrp": 3840,
+      "createdAt": "2026-07-02T15:35:27.215Z",
+      "updatedAt": "2026-07-02T15:35:27.215Z"
+    },
+    {
+      "_id": "6a46853f05b07595e650e82e",
+      "productCode": "PROD-1031",
+      "productName": "Test Product 31",
+      "hsnCode": "HSN-2031",
+      "basePrice": 3100,
+      "mrp": 3720,
+      "createdAt": "2026-07-02T15:35:27.172Z",
+      "updatedAt": "2026-07-02T15:35:27.173Z"
+    }
+  ]
+}
