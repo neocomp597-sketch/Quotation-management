@@ -41,6 +41,7 @@ const TABS = [
     { key: 'products', label: 'Products', icon: <MdInventory size={18} /> },
     { key: 'planning', label: 'Planning', icon: <MdCalendarMonth size={18} /> },
     { key: 'revenuePlan', label: 'Revenue Plan', icon: <MdBarChart size={18} /> },
+    { key: 'dailyReport', label: 'Daily Report', icon: <MdPeople size={18} /> },
     { key: 'followups', label: 'Follow-ups', icon: <MdNotifications size={18} /> },
 ];
 
@@ -780,6 +781,96 @@ const revenueSheetToWorksheet = (sheet) => {
     return ws;
 };
 
+const DEFAULT_DAILY_REPORT = {
+    company: "Stelmec Ltd. (SBU 2A)",
+    department: "HUMAN RESOURCES",
+    date: new Date().toISOString().split('T')[0],
+    staffSummary: [
+        { name: "STAFF", plan: 118, actual: "-", monthlyPlan: 118, otYesterday: "-", otMtd: "-", otYtd: "-", isHeader: true },
+        { name: "A. Usgaon based", plan: 90, actual: "", monthlyPlan: 90, otYesterday: "", otMtd: "", otYtd: "" },
+        { name: "B. Site based", plan: 28, actual: "", monthlyPlan: 28, otYesterday: "", otMtd: "", otYtd: "" }
+    ],
+    permanentWorkerSummary: [
+        { name: "PERMANENT WORKER", plan: 88, actual: 0, monthlyPlan: 88, otYesterday: 0, otMtd: 0, otYtd: 0, isHeader: true },
+        { name: "A. Production", plan: 78, actual: "", monthlyPlan: 78, otYesterday: "", otMtd: "", otYtd: "" },
+        { name: "B. Testing", plan: 3, actual: "", monthlyPlan: 3, otYesterday: "", otMtd: "", otYtd: "" },
+        { name: "C. Others", plan: 7, actual: "", monthlyPlan: 7, otYesterday: "", otMtd: "", otYtd: "" }
+    ],
+    contractualWorkerSummary: [
+        { name: "CONTRACTUAL WORKER", plan: 15, actual: 15, monthlyPlan: 15, otYesterday: 0, otMtd: 0, otYtd: 0, isHeader: true },
+        { name: "A. Production", plan: "", actual: "", monthlyPlan: "", otYesterday: "", otMtd: "", otYtd: "" },
+        { name: "B. House-Keeping", plan: 15, actual: 15, monthlyPlan: 15, otYesterday: "", otMtd: "", otYtd: "" },
+        { name: "C. Others", plan: "", actual: "", monthlyPlan: "", otYesterday: "", otMtd: "", otYtd: "" }
+    ],
+    totalManpower: { name: "TOTAL MANPOWER", plan: 221, actual: 15, monthlyPlan: 221, otYesterday: 0, otMtd: 0, otYtd: 0 },
+    departmentBreakdown: [
+        { name: "1- Accounts & Finance", plan: 4, actual: "", monthlyPlan: 4 },
+        { name: "2- Administration", plan: 4, actual: "", monthlyPlan: 4 },
+        { name: "3- Customer Care ", plan: 28, actual: "", monthlyPlan: 28 },
+        { name: "4- Design & Development", plan: 7, actual: "", monthlyPlan: 7 },
+        { name: "5- EDP/IT", plan: 1, actual: "", monthlyPlan: 1 },
+        { name: "6- Engineering", plan: 10, actual: "", monthlyPlan: 10 },
+        { name: "7- General Mgmt. & Oper.", plan: 1, actual: "", monthlyPlan: 1 },
+        { name: "8- Human Resources", plan: 1, actual: "", monthlyPlan: 1 },
+        { name: "9- Logistics", plan: 3, actual: "", monthlyPlan: 3 },
+        { name: "10- Production", plan: 18, actual: "", monthlyPlan: 18 },
+        { name: "11- Purchase", plan: 8, actual: "", monthlyPlan: 8 },
+        { name: "12- Project Mgmt.", plan: 3, actual: "", monthlyPlan: 3 },
+        { name: "13- Stores", plan: 4, actual: "", monthlyPlan: 4 },
+        { name: "14- Testing", plan: 20, actual: "", monthlyPlan: 20 },
+        { name: "15- Quality", plan: 6, actual: "", monthlyPlan: 6 }
+    ],
+    totalDeptStaff: { name: "TOTAL DEPARTMENT STAFF", plan: 118, actual: 0, monthlyPlan: 118, otYesterday: 0, otMtd: 0, otYtd: 0 },
+    sideMetrics: {
+        atrMonthly: { live: 5, closed: 0 },
+        attrition: { count: 0, pct: 0 },
+        absenteeism: { count: 0, pct: 0 },
+        joiner: { count: 0, pct: 0 },
+        trainingMonthly: { planned: 2, actual: 0 },
+        expenses: { mtd: "-", ytd: "-" },
+        lateComerPct: { count: "-", pct: "-" },
+        otherIssues: "-"
+    }
+};
+
+const buildDailyReportWorkbookSheet = (data = DEFAULT_DAILY_REPORT) => {
+    const rows = [
+        [cell(data.company, { colSpan: 7 }), cell('(SBU 2A)', { colSpan: 3 })],
+        [cell(data.department, { colSpan: 10 })],
+        ['DEPT.', 'YESTERDAY DATA (PLAN)', 'YESTERDAY DATA (ACTUAL)', 'MONTHLY PLAN', 'OT Hrs. (Yesterday)', 'OT Hrs. (MTD)', 'OT Hrs. (YTD)', 'METRIC / CATEGORY', 'LIVE / PLANNED / COUNT', 'CLOSED / ACTUAL / %'],
+        ['STAFF', 118, '-', 118, '-', '-', '-', 'ATR (Monthly)', '', ''],
+        ['  A. Usgaon based', 90, '', 90, '', '', '', 'LIVE', 'CLOSED'],
+        ['  B. Site based', 28, '', 28, '', '', '', 5, 0],
+        ['PERMANENT WORKER', 88, 0, 88, 0, 0, 0, 'ATTRITION', '', ''],
+        ['  A. Production', 78, '', 78, '', '', '', 'COUNT', '%'],
+        ['  B. Testing', 3, '', 3, '', '', '', 0, '0%'],
+        ['  C. Others', 7, '', 7, '', '', '', 'ABSENTEEISM', '', ''],
+        ['CONTRACTUAL WORKER', 15, 15, 15, 0, 0, 0, 'COUNT', '%'],
+        ['  A. Production', '', '', '', '', '', '', 0, '0%'],
+        ['  B. House-Keeping', 15, 15, 15, '', '', '', 'JOINER', '', ''],
+        ['  C. Others', '', '', '', '', '', '', 'COUNT', '%'],
+        ['', '', '', '', '', '', '', 0, '0%'],
+        ['TOTAL MANPOWER', 221, '', 221, '', '', '', 'TRAINING (Monthly)', '', ''],
+        ['1- Accounts & Finance', 4, '', 4, '', '', '', 'PLANNED', 'ACTUAL'],
+        ['2- Administration', 4, '', 4, '', '', '', 2, 0],
+        ['3- Customer Care ', 28, '', 28, '', '', '', 'EXPENSES', '', ''],
+        ['4- Design & Development', 7, '', 7, '', '', '', 'MTD', 'YTD'],
+        ['5- EDP/IT', 1, '', 1, '', '', '', '-', '-'],
+        ['6- Engineering', 10, '', 10, '', '', '', 'LATE COMER %', '', ''],
+        ['7- General Mgmt. & Oper.', 1, '', 1, '', '', '', 'COUNT', '%'],
+        ['8- Human Resources', 1, '', 1, '', '', '', '-', '-'],
+        ['9- Logistics', 3, '', 3, '', '', '', 'OTHER ISSUES', '', ''],
+        ['10- Production', 18, '', 18, '', '', '', '-', '-', ''],
+        ['11- Purchase', 8, '', 8, '', '', '', '', '', ''],
+        ['12- Project Mgmt.', 3, '', 3, '', '', '', '', '', ''],
+        ['13- Stores', 4, '', 4, '', '', '', '', '', ''],
+        ['14- Testing', 20, '', 20, '', '', '', '', '', ''],
+        ['15- Quality', 6, '', 6, '', '', '', '', '', ''],
+        ['TOTAL DEPARTMENT STAFF', 118, 0, 118, 0, 0, 0, '', '', '']
+    ];
+    return { name: 'Daily HR Report', rows: toSheetRows(rows) };
+};
+
 const StatCard = ({ icon, label, value, color = 'primary' }) => {
     const colorMap = {
         primary: 'bg-primary-50 dark:bg-primary-950/50 text-primary-600 dark:text-primary-400',
@@ -828,6 +919,9 @@ const Reports = () => {
 
     // Follow-up data
     const [followUpData, setFollowUpData] = useState(null);
+
+    // Daily report data
+    const [dailyReportData, setDailyReportData] = useState(DEFAULT_DAILY_REPORT);
 
     // Revenue plan data
     const [revenuePlanReport, setRevenuePlanReport] = useState(null);
@@ -961,6 +1055,20 @@ const Reports = () => {
                         ]);
                         setRevenuePlanReport(reportRes.data);
                         setRevenuePlanEntries(entriesRes.data?.data || []);
+                    }
+                    break;
+                }
+                case 'dailyReport': {
+                    try {
+                        const res = await analyticsService.getDailyReport();
+                        if (res.data) {
+                            setDailyReportData(res.data);
+                        } else {
+                            setDailyReportData(DEFAULT_DAILY_REPORT);
+                        }
+                    } catch (err) {
+                        console.error("Error fetching daily report:", err);
+                        setDailyReportData(DEFAULT_DAILY_REPORT);
                     }
                     break;
                 }
@@ -1108,6 +1216,12 @@ const Reports = () => {
                 });
                 XLSX.writeFile(wb, `Revenue_Plan_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
                 return;
+            }
+            case 'dailyReport': {
+                const sheet = buildDailyReportWorkbookSheet(dailyReportData);
+                ws = revenueSheetToWorksheet(sheet);
+                fileName = 'Daily_HR_Report';
+                break;
             }
         }
 
@@ -1884,6 +1998,223 @@ const Reports = () => {
         );
     };
 
+    const renderDailyReport = () => {
+        const data = dailyReportData || DEFAULT_DAILY_REPORT;
+
+        return (
+            <div className="space-y-8">
+                {/* Header Banner & Filter */}
+                <div className="bg-white dark:bg-slate-900/60 p-6 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <div className="flex items-center gap-2">
+                            <span className="px-3 py-1 bg-primary-50 dark:bg-primary-950/60 text-primary-600 dark:text-primary-400 border border-primary-100 dark:border-primary-900/50 rounded-full text-[10px] font-black uppercase tracking-widest">
+                                {data.company}
+                            </span>
+                            <span className="px-3 py-1 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/50 rounded-full text-[10px] font-black uppercase tracking-widest">
+                                {data.department}
+                            </span>
+                        </div>
+                        <h2 className="text-xl font-black text-slate-900 dark:text-slate-100 uppercase tracking-tight font-outfit mt-2">
+                            Daily Manpower & HR Report
+                        </h2>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/80 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700">
+                            <MdCalendarMonth className="text-slate-400" size={18} />
+                            <input
+                                type="date"
+                                value={data.date}
+                                onChange={async (e) => {
+                                    const selectedDate = e.target.value;
+                                    setDailyReportData(prev => ({ ...prev, date: selectedDate }));
+                                    try {
+                                        const res = await analyticsService.getDailyReport(selectedDate);
+                                        if (res.data) setDailyReportData(res.data);
+                                    } catch (err) {
+                                        console.error("Failed to fetch daily report for selected date", err);
+                                    }
+                                }}
+                                className="bg-transparent text-sm font-bold text-slate-800 dark:text-slate-200 outline-none"
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                {/* Top KPI Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <StatCard icon={<MdPeople size={24} />} label="Total Manpower Plan" value={`${data.totalManpower.plan}`} color="primary" />
+                    <StatCard icon={<MdPeople size={24} />} label="Staff Plan (Usgaon/Site)" value={`${data.staffSummary[0].plan}`} color="emerald" />
+                    <StatCard icon={<MdPeople size={24} />} label="Permanent Workers Plan" value={`${data.permanentWorkerSummary[0].plan}`} color="amber" />
+                    <StatCard icon={<MdPeople size={24} />} label="Contractual Workers" value={`${data.contractualWorkerSummary[0].plan}`} color="violet" />
+                </div>
+
+                {/* Main Content Grid (Left Table & Right Side Cards) */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    {/* Left 2 Cols: Main Manpower & Dept Tables */}
+                    <div className="lg:col-span-2 space-y-8">
+                        {/* Table 1: Manpower Summary */}
+                        <div className="bg-white dark:bg-slate-900/60 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
+                            <div className="p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30">
+                                <h3 className="text-base font-black text-slate-900 dark:text-slate-100 uppercase font-outfit">Manpower Summary & OT Hours</h3>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Staffing categorization and overtime tracking</p>
+                            </div>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left">
+                                    <thead>
+                                        <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-100 dark:border-slate-800">
+                                            <th className="px-6 py-3.5 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">DEPT / CATEGORY</th>
+                                            <th className="px-4 py-3.5 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-right">PLAN (YEST)</th>
+                                            <th className="px-4 py-3.5 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-right">ACTUAL</th>
+                                            <th className="px-4 py-3.5 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-right">MONTHLY PLAN</th>
+                                            <th className="px-4 py-3.5 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-right">OT (YEST)</th>
+                                            <th className="px-4 py-3.5 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-right">OT (MTD)</th>
+                                            <th className="px-4 py-3.5 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-right">OT (YTD)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                                        {[
+                                            ...data.staffSummary,
+                                            ...data.permanentWorkerSummary,
+                                            ...data.contractualWorkerSummary,
+                                            data.totalManpower
+                                        ].map((row, idx) => {
+                                            const isMainCategory = row.isHeader || row.name === 'TOTAL MANPOWER';
+                                            return (
+                                                <tr key={idx} className={isMainCategory ? 'bg-slate-50/80 dark:bg-slate-800/40 font-black' : 'hover:bg-slate-50/50 dark:hover:bg-slate-800/20'}>
+                                                    <td className={`px-6 py-3 text-sm ${isMainCategory ? 'font-black text-slate-900 dark:text-slate-100 uppercase' : 'font-semibold text-slate-700 dark:text-slate-300 pl-10'}`}>
+                                                        {row.name}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-sm font-bold text-slate-900 dark:text-slate-100 text-right">{row.plan !== "" ? row.plan : '-'}</td>
+                                                    <td className="px-4 py-3 text-sm font-bold text-slate-600 dark:text-slate-400 text-right">{row.actual !== "" ? row.actual : '-'}</td>
+                                                    <td className="px-4 py-3 text-sm font-bold text-primary-600 dark:text-primary-400 text-right">{row.monthlyPlan !== "" ? row.monthlyPlan : '-'}</td>
+                                                    <td className="px-4 py-3 text-sm font-semibold text-slate-500 dark:text-slate-400 text-right">{row.otYesterday !== "" ? row.otYesterday : '-'}</td>
+                                                    <td className="px-4 py-3 text-sm font-semibold text-slate-500 dark:text-slate-400 text-right">{row.otMtd !== "" ? row.otMtd : '-'}</td>
+                                                    <td className="px-4 py-3 text-sm font-semibold text-slate-500 dark:text-slate-400 text-right">{row.otYtd !== "" ? row.otYtd : '-'}</td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        {/* Table 2: Department Breakdown */}
+                        <div className="bg-white dark:bg-slate-900/60 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
+                            <div className="p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30">
+                                <h3 className="text-base font-black text-slate-900 dark:text-slate-100 uppercase font-outfit">Staff Departmental Distribution</h3>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Granular staff headcount by department</p>
+                            </div>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left">
+                                    <thead>
+                                        <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-100 dark:border-slate-800">
+                                            <th className="px-6 py-3.5 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">DEPARTMENT NAME</th>
+                                            <th className="px-4 py-3.5 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-right">PLAN</th>
+                                            <th className="px-4 py-3.5 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-right">ACTUAL</th>
+                                            <th className="px-4 py-3.5 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-right">MONTHLY PLAN</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                                        {data.departmentBreakdown.map((dept, i) => (
+                                            <tr key={i} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20">
+                                                <td className="px-6 py-3 text-sm font-semibold text-slate-800 dark:text-slate-200">{dept.name}</td>
+                                                <td className="px-4 py-3 text-sm font-bold text-slate-900 dark:text-slate-100 text-right">{dept.plan}</td>
+                                                <td className="px-4 py-3 text-sm font-semibold text-slate-500 dark:text-slate-400 text-right">{dept.actual !== "" ? dept.actual : '-'}</td>
+                                                <td className="px-4 py-3 text-sm font-bold text-primary-600 dark:text-primary-400 text-right">{dept.monthlyPlan}</td>
+                                            </tr>
+                                        ))}
+                                        <tr className="bg-slate-50/90 dark:bg-slate-800/50 font-black">
+                                            <td className="px-6 py-4 text-sm font-black text-slate-900 dark:text-slate-100 uppercase">{data.totalDeptStaff.name}</td>
+                                            <td className="px-4 py-4 text-sm font-black text-slate-900 dark:text-slate-100 text-right">{data.totalDeptStaff.plan}</td>
+                                            <td className="px-4 py-4 text-sm font-black text-slate-600 dark:text-slate-400 text-right">{data.totalDeptStaff.actual}</td>
+                                            <td className="px-4 py-4 text-sm font-black text-primary-600 dark:text-primary-400 text-right">{data.totalDeptStaff.monthlyPlan}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Right Col: Side Metrics Dashboard */}
+                    <div className="space-y-6">
+                        {/* ATR Monthly Card */}
+                        <div className="bg-white dark:bg-slate-900/60 p-6 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm space-y-4">
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">ATR (Monthly)</h3>
+                                <span className="p-2 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 rounded-xl">
+                                    <MdTrendingUp size={18} />
+                                </span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">LIVE</span>
+                                    <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">{data.sideMetrics.atrMonthly.live}</p>
+                                </div>
+                                <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">CLOSED</span>
+                                    <p className="text-2xl font-black text-slate-700 dark:text-slate-300 mt-1">{data.sideMetrics.atrMonthly.closed}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Attrition & Absenteeism Grid */}
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="bg-white dark:bg-slate-900/60 p-5 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm">
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">ATTRITION</span>
+                                <p className="text-xl font-black text-slate-900 dark:text-slate-100 mt-1">{data.sideMetrics.attrition.count}</p>
+                                <span className="text-[11px] font-bold text-slate-400">Rate: {data.sideMetrics.attrition.pct}%</span>
+                            </div>
+                            <div className="bg-white dark:bg-slate-900/60 p-5 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm">
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">ABSENTEEISM</span>
+                                <p className="text-xl font-black text-slate-900 dark:text-slate-100 mt-1">{data.sideMetrics.absenteeism.count}</p>
+                                <span className="text-[11px] font-bold text-slate-400">Rate: {data.sideMetrics.absenteeism.pct}%</span>
+                            </div>
+                        </div>
+
+                        {/* Joiner & Training Cards */}
+                        <div className="bg-white dark:bg-slate-900/60 p-6 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm space-y-4">
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Training (Monthly)</h3>
+                                <span className="p-2 bg-primary-50 dark:bg-primary-950/50 text-primary-600 rounded-xl">
+                                    <MdAssignment size={18} />
+                                </span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">PLANNED</span>
+                                    <p className="text-2xl font-black text-primary-600 dark:text-primary-400 mt-1">{data.sideMetrics.trainingMonthly.planned}</p>
+                                </div>
+                                <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">ACTUAL</span>
+                                    <p className="text-2xl font-black text-slate-700 dark:text-slate-300 mt-1">{data.sideMetrics.trainingMonthly.actual}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Expenses & Late Comers */}
+                        <div className="bg-white dark:bg-slate-900/60 p-6 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm space-y-4">
+                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Expenses & Attendance</h3>
+                            <div className="space-y-3">
+                                <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl">
+                                    <span className="text-xs font-bold text-slate-500">Expenses (MTD / YTD)</span>
+                                    <span className="text-xs font-black text-slate-900 dark:text-slate-100">{data.sideMetrics.expenses.mtd} / {data.sideMetrics.expenses.ytd}</span>
+                                </div>
+                                <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl">
+                                    <span className="text-xs font-bold text-slate-500">Late Comer %</span>
+                                    <span className="text-xs font-black text-slate-900 dark:text-slate-100">{data.sideMetrics.lateComerPct.count} ({data.sideMetrics.lateComerPct.pct})</span>
+                                </div>
+                                <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl">
+                                    <span className="text-xs font-bold text-slate-500">Other Issues</span>
+                                    <span className="text-xs font-black text-slate-900 dark:text-slate-100">{data.sideMetrics.otherIssues}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
     const renderTabContent = () => {
         if (loading) {
             return (
@@ -1899,6 +2230,7 @@ const Reports = () => {
             case 'products': return renderProducts();
             case 'planning': return renderPlanning();
             case 'revenuePlan': return renderRevenuePlan();
+            case 'dailyReport': return renderDailyReport();
             case 'followups': return renderFollowUps();
             default: return null;
         }

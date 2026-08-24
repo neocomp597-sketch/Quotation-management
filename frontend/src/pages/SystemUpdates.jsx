@@ -183,6 +183,7 @@ const SystemUpdates = () => {
         // Sample fallback updates if none in DB yet
         if (list.length === 0) {
             return [
+                { id: 'rep_daily1', date: '24.08.2026', module: 'Reports', submodule: 'Daily HR & Manpower Summary', changes: 'Integrated Daily HR Report tab with exact Excel spreadsheet structure from Test (1).xlsx including Staff, Permanent & Contractual Workers, Department breakdown, and side metrics dashboard.', version: 'v5.1.0', deployedBy: 'Super Admin' },
                 { id: 'rep1', date: '23.08.2026', module: 'Reports', submodule: 'Dark Mode Standardization', changes: 'Applied dark: Tailwind classes across all tab renderers, container cards, stats cards, and table hover states.', version: 'v5.0.0', deployedBy: 'Super Admin' },
                 { id: 'rep2', date: '23.08.2026', module: 'Reports', submodule: 'Recharts Visualizations', changes: 'Configured theme-aware CartesianGrid, XAxis, YAxis, and #0f172a Tooltip popups across all charts.', version: 'v5.0.0', deployedBy: 'Super Admin' },
                 { id: 'rep3', date: '23.08.2026', module: 'Reports', submodule: 'Revenue Plan Spreadsheet', changes: 'Implemented REVENUE_PLAN_DARK_COLORS and dynamic dark mode cell fill logic for financial tables and Excel export parity.', version: 'v5.0.0', deployedBy: 'Super Admin' },

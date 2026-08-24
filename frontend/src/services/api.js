@@ -565,6 +565,7 @@ export const analyticsService = {
   getHealth: (params) => api.get("/analytics/health", { params }),
   exportReport: (type, params) =>
     api.get("/analytics/export", { params: { type, ...params } }),
+  getDailyReport: (date) => api.get("/analytics/daily-report", { params: { date } }),
 };
 
 export const planningService = {

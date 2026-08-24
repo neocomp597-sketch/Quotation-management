@@ -9,10 +9,7 @@ async function seedData() {
     } finally {
         try {
             delete require.cache[require.resolve('./seed_data_direct')];
-            console.log('Cleared seed_data_direct cache entry.');
-        } catch (cacheErr) {
-            console.error('Failed to clear cache:', cacheErr.message);
-        }
+        } catch (cacheErr) {}
     }
 }
 
