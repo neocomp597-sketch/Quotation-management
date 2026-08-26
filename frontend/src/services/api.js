@@ -565,7 +565,8 @@ export const analyticsService = {
   getHealth: (params) => api.get("/analytics/health", { params }),
   exportReport: (type, params) =>
     api.get("/analytics/export", { params: { type, ...params } }),
-  getDailyReport: (date) => api.get("/analytics/daily-report", { params: { date } }),
+  getDailyReport: (date) => api.get("/analytics/daily-report", { params: date ? { date } : {} }),
+  saveDailyReport: (data) => api.put("/analytics/daily-report", data),
 };
 
 export const planningService = {
@@ -981,10 +982,6 @@ export const vendorCatalogService = {
   }
 };
 
-export const analyticsService = {
-  getDailyReport: (date) => api.get("/analytics/daily-report", { params: date ? { date } : {} }),
-  saveDailyReport: (data) => api.put("/analytics/daily-report", data),
-};
 
 export const landingPlanService = {
   getAll: () => api.get("/landing-plans"),
