@@ -7,6 +7,7 @@ const VendorProductCatalogSchema = new mongoose.Schema({
     productName: { type: String, required: true, trim: true },
     brand: { type: String, default: '', trim: true },
     category: { type: String, default: '', trim: true },
+    hsnCode: { type: String, default: '', trim: true },
     description: { type: String, default: '' },
     specification: { type: String, default: '' },
     price: { type: Number, default: 0, min: 0 },

@@ -37,6 +37,7 @@ const defaultCatalogForm = {
     productName: '',
     brand: '',
     category: '',
+    hsnCode: '',
     price: '',
     MOQ: 1,
     UOM: 'Nos',
@@ -105,6 +106,7 @@ const Vendor360Workspace = () => {
                 productName: prod.productName || '',
                 brand: prod.brand || '',
                 category: prod.category || '',
+                hsnCode: prod.hsnCode || '',
                 price: prod.price ?? '',
                 MOQ: prod.MOQ ?? 1,
                 UOM: prod.UOM || 'Nos',
@@ -390,7 +392,7 @@ const Vendor360Workspace = () => {
                                     <tr>
                                         <th className="px-6 py-4">Product Name</th>
                                         <th className="px-6 py-4">Brand</th>
-                                        <th className="px-6 py-4">Category</th>
+                                        <th className="px-6 py-4">Category / HSN</th>
                                         <th className="px-6 py-4 text-right">Price</th>
                                         <th className="px-6 py-4 text-center">MOQ / UOM</th>
                                         <th className="px-6 py-4 text-center">Status</th>
@@ -405,7 +407,10 @@ const Vendor360Workspace = () => {
                                                 {p.description && <div className="text-[10px] text-slate-400 font-medium truncate max-w-xs">{p.description}</div>}
                                             </td>
                                             <td className="px-6 py-4 text-slate-600">{p.brand || '-'}</td>
-                                            <td className="px-6 py-4 text-slate-500">{p.category || '-'}</td>
+                                            <td className="px-6 py-4 text-slate-500">
+                                                <div>{p.category || '-'}</div>
+                                                {p.hsnCode && <div className="text-[10px] font-mono text-slate-400 font-bold">HSN: {p.hsnCode}</div>}
+                                            </td>
                                             <td className="px-6 py-4 text-right font-mono font-black text-slate-900">₹{(p.price || 0).toLocaleString()}</td>
                                             <td className="px-6 py-4 text-center font-mono text-slate-600">{p.MOQ || 1} {p.UOM || 'Nos'}</td>
                                             <td className="px-6 py-4 text-center">
@@ -607,7 +612,7 @@ const Vendor360Workspace = () => {
                         />
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="space-y-1">
                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Brand / Manufacturer</label>
                             <input
@@ -624,7 +629,17 @@ const Vendor360Workspace = () => {
                                 type="text"
                                 value={catalogFormData.category}
                                 onChange={(e) => setCatalogFormData({ ...catalogFormData, category: e.target.value })}
-                                placeholder="e.g. Switchgear, Transformers"
+                                placeholder="e.g. Switchgear"
+                                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none"
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">HSN Code</label>
+                            <input
+                                type="text"
+                                value={catalogFormData.hsnCode}
+                                onChange={(e) => setCatalogFormData({ ...catalogFormData, hsnCode: e.target.value })}
+                                placeholder="e.g. 84818020"
                                 className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none"
                             />
                         </div>

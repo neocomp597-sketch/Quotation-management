@@ -10,6 +10,7 @@ import PortalDropdown from '../components/PortalDropdown';
 import Modal from '../components/Modal';
 import SearchableSelect from '../components/SearchableSelect';
 import { useSubmitGuard } from '../hooks/useSubmitGuard';
+import { isValidMobile } from '../utils/validation';
 
 const statusStyles = {
     'Open': 'bg-emerald-50 text-emerald-600 border-emerald-200',
@@ -646,6 +647,10 @@ const CSMTickets = () => {
             toast.error('Contact Person is required');
             return;
         }
+        if (formData.contactPhone && !isValidMobile(formData.contactPhone)) {
+            toast.error('Invalid Mobile Number. Please enter a valid 10-digit mobile number');
+            return;
+        }
         if (!formData.issueTitle.trim()) {
             toast.error('Subject is required');
             return;
@@ -723,6 +728,10 @@ const CSMTickets = () => {
 
     const { isSubmitting: isSavingManualTicket, execute: handleCreateManualTicket } = useSubmitGuard(async (e) => {
         e.preventDefault();
+        if (manualFormData.contactPhone && !isValidMobile(manualFormData.contactPhone)) {
+            toast.error('Invalid Mobile Number. Please enter a valid 10-digit mobile number');
+            return;
+        }
         if (!manualFormData.pincode || !manualFormData.pincode.trim()) {
             toast.error('Pincode is required');
             return;
@@ -1282,6 +1291,10 @@ const CSMTickets = () => {
         e.preventDefault();
         if (!formData.customerId) {
             toast.error('Select a customer first');
+            return;
+        }
+        if (contactFormData.mobileNo && !isValidMobile(contactFormData.mobileNo)) {
+            toast.error('Invalid Mobile Number. Please enter a valid 10-digit mobile number');
             return;
         }
 

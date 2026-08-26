@@ -15,5 +15,7 @@ router.get('/probability', protect, analyticsController.getProbabilityIntelligen
 router.get('/health', protect, analyticsController.getHealthScores);
 router.get('/export', protect, analyticsController.exportReport);
 router.get('/daily-report', protect, analyticsController.getDailyReport);
+router.put('/daily-report', protect, analyticsController.saveDailyReport);
+router.post('/daily-report', protect, analyticsController.saveDailyReport);
 
 module.exports = router;

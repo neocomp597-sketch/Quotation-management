@@ -98,7 +98,7 @@ exports.createVendorCatalogProduct = async (req, res) => {
             return res.status(404).json({ message: 'Vendor not found' });
         }
 
-        const { productName, brand, category, description, specification, price, MOQ, UOM, images, productImageUrl, attachments, status } = req.body;
+        const { productName, brand, category, hsnCode, description, specification, price, MOQ, UOM, images, productImageUrl, attachments, status } = req.body;
 
         if (!productName || !String(productName).trim()) {
             return res.status(400).json({ message: 'Product Name is required' });
@@ -110,6 +110,7 @@ exports.createVendorCatalogProduct = async (req, res) => {
             productName: String(productName).trim(),
             brand: brand || '',
             category: category || '',
+            hsnCode: hsnCode || '',
             description: description || '',
             specification: specification || '',
             price: Number(price) || 0,
@@ -143,7 +144,7 @@ exports.updateVendorCatalogProduct = async (req, res) => {
             return res.status(403).json({ message: 'Forbidden: You cannot modify products belonging to another vendor' });
         }
 
-        const fields = ['productName', 'brand', 'category', 'description', 'specification', 'price', 'MOQ', 'UOM', 'images', 'productImageUrl', 'attachments', 'status'];
+        const fields = ['productName', 'brand', 'category', 'hsnCode', 'description', 'specification', 'price', 'MOQ', 'UOM', 'images', 'productImageUrl', 'attachments', 'status'];
         fields.forEach(field => {
             if (req.body[field] !== undefined) {
                 existing[field] = req.body[field];
@@ -214,6 +215,7 @@ exports.importVendorCatalog = async (req, res) => {
 
                 const brand = String(row['Brand'] || row.brand || '').trim();
                 const category = String(row['Category'] || row.category || '').trim();
+                const hsnCode = String(row['HSN Code'] || row['HSN'] || row.hsnCode || row.hsn || '').trim();
                 const description = String(row['Description'] || row.description || '').trim();
                 const specification = String(row['Specification'] || row.specification || row.specs || '').trim();
                 const price = Number(row['Price'] || row.price || row.rate || 0);
@@ -230,6 +232,7 @@ exports.importVendorCatalog = async (req, res) => {
                 if (existing) {
                     existing.brand = brand || existing.brand;
                     existing.category = category || existing.category;
+                    existing.hsnCode = hsnCode || existing.hsnCode;
                     existing.description = description || existing.description;
                     existing.specification = specification || existing.specification;
                     existing.price = price >= 0 ? price : existing.price;
@@ -245,6 +248,7 @@ exports.importVendorCatalog = async (req, res) => {
                         productName,
                         brand,
                         category,
+                        hsnCode,
                         description,
                         specification,
                         price,

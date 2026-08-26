@@ -718,10 +718,28 @@ exports.exportReport = async (req, res) => {
     }
 };
 
+const dailyReportsStore = new Map();
+
+exports.saveDailyReport = async (req, res) => {
+    try {
+        const { date, reportData } = req.body;
+        const targetDateStr = date || new Date().toISOString().split('T')[0];
+        dailyReportsStore.set(targetDateStr, reportData);
+        return res.json({ success: true, message: 'Daily report saved successfully', data: reportData });
+    } catch (err) {
+        console.error('[Analytics Error] saveDailyReport:', err);
+        return res.status(500).json({ message: err.message });
+    }
+};
+
 exports.getDailyReport = async (req, res) => {
     try {
         const companyId = req.companyId || req.user?.companyId;
         const targetDate = req.query.date ? new Date(req.query.date) : new Date();
+        const dateKey = targetDate.toISOString().split('T')[0];
+        if (dailyReportsStore.has(dateKey)) {
+            return res.json(dailyReportsStore.get(dateKey));
+        }
 
         // Fetch Company details
         let companyName = "Stelmec Ltd. (SBU 2A)";

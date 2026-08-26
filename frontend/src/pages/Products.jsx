@@ -1388,7 +1388,7 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                                 </div>
                                 <div className="grid grid-cols-2 gap-6">
                                     <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Serial/Product Code <span className="text-rose-500">*</span></label>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Product Code <span className="text-rose-500">*</span></label>
                                         <div className="relative">
                                             <MdQrCode className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
                                             <input

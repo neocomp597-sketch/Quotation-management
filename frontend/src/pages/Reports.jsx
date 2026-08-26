@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { toast } from 'react-toastify';
 import {
     MdTrendingUp,
     MdDescription,
@@ -922,6 +923,25 @@ const Reports = () => {
 
     // Daily report data
     const [dailyReportData, setDailyReportData] = useState(DEFAULT_DAILY_REPORT);
+    const [isEditingDailyReport, setIsEditingDailyReport] = useState(false);
+    const [savingDailyReport, setSavingDailyReport] = useState(false);
+
+    const handleSaveDailyReport = async () => {
+        setSavingDailyReport(true);
+        try {
+            await analyticsService.saveDailyReport({
+                date: dailyReportData.date,
+                reportData: dailyReportData
+            });
+            toast.success('Daily report updated successfully!');
+            setIsEditingDailyReport(false);
+        } catch (err) {
+            console.error('Failed to save daily report:', err);
+            toast.error(err.response?.data?.message || 'Failed to save daily report');
+        } finally {
+            setSavingDailyReport(false);
+        }
+    };
 
     // Revenue plan data
     const [revenuePlanReport, setRevenuePlanReport] = useState(null);
@@ -2001,6 +2021,38 @@ const Reports = () => {
     const renderDailyReport = () => {
         const data = dailyReportData || DEFAULT_DAILY_REPORT;
 
+        const updateStaffRow = (listKey, index, field, value) => {
+            setDailyReportData(prev => {
+                const list = [...(prev[listKey] || [])];
+                if (list[index]) {
+                    list[index] = { ...list[index], [field]: value };
+                }
+                return { ...prev, [listKey]: list };
+            });
+        };
+
+        const updateDeptRow = (index, field, value) => {
+            setDailyReportData(prev => {
+                const list = [...(prev.departmentBreakdown || [])];
+                if (list[index]) {
+                    list[index] = { ...list[index], [field]: value };
+                }
+                return { ...prev, departmentBreakdown: list };
+            });
+        };
+
+        const updateSideMetric = (parentKey, subField, value) => {
+            setDailyReportData(prev => ({
+                ...prev,
+                sideMetrics: {
+                    ...prev.sideMetrics,
+                    [parentKey]: typeof prev.sideMetrics?.[parentKey] === 'object'
+                        ? { ...prev.sideMetrics[parentKey], [subField]: value }
+                        : value
+                }
+            }));
+        };
+
         return (
             <div className="space-y-8">
                 {/* Header Banner & Filter */}
@@ -2037,6 +2089,25 @@ const Reports = () => {
                                 className="bg-transparent text-sm font-bold text-slate-800 dark:text-slate-200 outline-none"
                             />
                         </div>
+                        <button
+                            onClick={isEditingDailyReport ? handleSaveDailyReport : () => setIsEditingDailyReport(true)}
+                            disabled={savingDailyReport}
+                            className={`px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center gap-2 ${
+                                isEditingDailyReport
+                                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/20'
+                                    : 'bg-primary-600 hover:bg-primary-700 text-white shadow-md shadow-primary-600/20'
+                            }`}
+                        >
+                            {isEditingDailyReport ? (savingDailyReport ? 'Saving...' : 'Save Daily Report') : 'Edit Report'}
+                        </button>
+                        {isEditingDailyReport && (
+                            <button
+                                onClick={() => setIsEditingDailyReport(false)}
+                                className="px-4 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-300 transition-all"
+                            >
+                                Cancel
+                            </button>
+                        )}
                     </div>
                 </div>
 
@@ -2054,9 +2125,16 @@ const Reports = () => {
                     <div className="lg:col-span-2 space-y-8">
                         {/* Table 1: Manpower Summary */}
                         <div className="bg-white dark:bg-slate-900/60 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
-                            <div className="p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30">
-                                <h3 className="text-base font-black text-slate-900 dark:text-slate-100 uppercase font-outfit">Manpower Summary & OT Hours</h3>
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Staffing categorization and overtime tracking</p>
+                            <div className="p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex items-center justify-between">
+                                <div>
+                                    <h3 className="text-base font-black text-slate-900 dark:text-slate-100 uppercase font-outfit">Manpower Summary & OT Hours</h3>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Staffing categorization and overtime tracking</p>
+                                </div>
+                                {isEditingDailyReport && (
+                                    <span className="px-3 py-1 bg-amber-50 text-amber-600 border border-amber-200 rounded-full text-[10px] font-black uppercase">
+                                        Editing Mode Active
+                                    </span>
+                                )}
                             </div>
                             <div className="overflow-x-auto">
                                 <table className="w-full text-left">
@@ -2073,26 +2151,90 @@ const Reports = () => {
                                     </thead>
                                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
                                         {[
-                                            ...data.staffSummary,
-                                            ...data.permanentWorkerSummary,
-                                            ...data.contractualWorkerSummary,
-                                            data.totalManpower
-                                        ].map((row, idx) => {
-                                            const isMainCategory = row.isHeader || row.name === 'TOTAL MANPOWER';
-                                            return (
-                                                <tr key={idx} className={isMainCategory ? 'bg-slate-50/80 dark:bg-slate-800/40 font-black' : 'hover:bg-slate-50/50 dark:hover:bg-slate-800/20'}>
-                                                    <td className={`px-6 py-3 text-sm ${isMainCategory ? 'font-black text-slate-900 dark:text-slate-100 uppercase' : 'font-semibold text-slate-700 dark:text-slate-300 pl-10'}`}>
-                                                        {row.name}
-                                                    </td>
-                                                    <td className="px-4 py-3 text-sm font-bold text-slate-900 dark:text-slate-100 text-right">{row.plan !== "" ? row.plan : '-'}</td>
-                                                    <td className="px-4 py-3 text-sm font-bold text-slate-600 dark:text-slate-400 text-right">{row.actual !== "" ? row.actual : '-'}</td>
-                                                    <td className="px-4 py-3 text-sm font-bold text-primary-600 dark:text-primary-400 text-right">{row.monthlyPlan !== "" ? row.monthlyPlan : '-'}</td>
-                                                    <td className="px-4 py-3 text-sm font-semibold text-slate-500 dark:text-slate-400 text-right">{row.otYesterday !== "" ? row.otYesterday : '-'}</td>
-                                                    <td className="px-4 py-3 text-sm font-semibold text-slate-500 dark:text-slate-400 text-right">{row.otMtd !== "" ? row.otMtd : '-'}</td>
-                                                    <td className="px-4 py-3 text-sm font-semibold text-slate-500 dark:text-slate-400 text-right">{row.otYtd !== "" ? row.otYtd : '-'}</td>
-                                                </tr>
-                                            );
-                                        })}
+                                            { listKey: 'staffSummary', rows: data.staffSummary },
+                                            { listKey: 'permanentWorkerSummary', rows: data.permanentWorkerSummary },
+                                            { listKey: 'contractualWorkerSummary', rows: data.contractualWorkerSummary }
+                                        ].map(({ listKey, rows }) =>
+                                            rows.map((row, idx) => {
+                                                const isMainCategory = row.isHeader;
+                                                return (
+                                                    <tr key={`${listKey}-${idx}`} className={isMainCategory ? 'bg-slate-50/80 dark:bg-slate-800/40 font-black' : 'hover:bg-slate-50/50 dark:hover:bg-slate-800/20'}>
+                                                        <td className={`px-6 py-3 text-sm ${isMainCategory ? 'font-black text-slate-900 dark:text-slate-100 uppercase' : 'font-semibold text-slate-700 dark:text-slate-300 pl-10'}`}>
+                                                            {row.name}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-sm font-bold text-slate-900 dark:text-slate-100 text-right">
+                                                            {isEditingDailyReport ? (
+                                                                <input
+                                                                    type="text"
+                                                                    value={row.plan}
+                                                                    onChange={(e) => updateStaffRow(listKey, idx, 'plan', e.target.value)}
+                                                                    className="w-16 px-2 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded text-right text-xs font-bold outline-none"
+                                                                />
+                                                            ) : (row.plan !== "" ? row.plan : '-')}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-sm font-bold text-slate-600 dark:text-slate-400 text-right">
+                                                            {isEditingDailyReport ? (
+                                                                <input
+                                                                    type="text"
+                                                                    value={row.actual}
+                                                                    onChange={(e) => updateStaffRow(listKey, idx, 'actual', e.target.value)}
+                                                                    className="w-16 px-2 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded text-right text-xs font-bold outline-none"
+                                                                />
+                                                            ) : (row.actual !== "" ? row.actual : '-')}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-sm font-bold text-primary-600 dark:text-primary-400 text-right">
+                                                            {isEditingDailyReport ? (
+                                                                <input
+                                                                    type="text"
+                                                                    value={row.monthlyPlan}
+                                                                    onChange={(e) => updateStaffRow(listKey, idx, 'monthlyPlan', e.target.value)}
+                                                                    className="w-16 px-2 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded text-right text-xs font-bold outline-none"
+                                                                />
+                                                            ) : (row.monthlyPlan !== "" ? row.monthlyPlan : '-')}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-sm font-semibold text-slate-500 dark:text-slate-400 text-right">
+                                                            {isEditingDailyReport ? (
+                                                                <input
+                                                                    type="text"
+                                                                    value={row.otYesterday}
+                                                                    onChange={(e) => updateStaffRow(listKey, idx, 'otYesterday', e.target.value)}
+                                                                    className="w-16 px-2 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded text-right text-xs font-bold outline-none"
+                                                                />
+                                                            ) : (row.otYesterday !== "" ? row.otYesterday : '-')}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-sm font-semibold text-slate-500 dark:text-slate-400 text-right">
+                                                            {isEditingDailyReport ? (
+                                                                <input
+                                                                    type="text"
+                                                                    value={row.otMtd}
+                                                                    onChange={(e) => updateStaffRow(listKey, idx, 'otMtd', e.target.value)}
+                                                                    className="w-16 px-2 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded text-right text-xs font-bold outline-none"
+                                                                />
+                                                            ) : (row.otMtd !== "" ? row.otMtd : '-')}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-sm font-semibold text-slate-500 dark:text-slate-400 text-right">
+                                                            {isEditingDailyReport ? (
+                                                                <input
+                                                                    type="text"
+                                                                    value={row.otYtd}
+                                                                    onChange={(e) => updateStaffRow(listKey, idx, 'otYtd', e.target.value)}
+                                                                    className="w-16 px-2 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded text-right text-xs font-bold outline-none"
+                                                                />
+                                                            ) : (row.otYtd !== "" ? row.otYtd : '-')}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })
+                                        )}
+                                        <tr className="bg-slate-50/90 dark:bg-slate-800/50 font-black">
+                                            <td className="px-6 py-4 text-sm font-black text-slate-900 dark:text-slate-100 uppercase">{data.totalManpower.name}</td>
+                                            <td className="px-4 py-4 text-sm font-black text-slate-900 dark:text-slate-100 text-right">{data.totalManpower.plan}</td>
+                                            <td className="px-4 py-4 text-sm font-black text-slate-600 dark:text-slate-400 text-right">{data.totalManpower.actual}</td>
+                                            <td className="px-4 py-4 text-sm font-black text-primary-600 dark:text-primary-400 text-right">{data.totalManpower.monthlyPlan}</td>
+                                            <td className="px-4 py-4 text-sm font-black text-slate-500 text-right">{data.totalManpower.otYesterday}</td>
+                                            <td className="px-4 py-4 text-sm font-black text-slate-500 text-right">{data.totalManpower.otMtd}</td>
+                                            <td className="px-4 py-4 text-sm font-black text-slate-500 text-right">{data.totalManpower.otYtd}</td>
+                                        </tr>
                                     </tbody>
                                 </table>
                             </div>
@@ -2118,9 +2260,36 @@ const Reports = () => {
                                         {data.departmentBreakdown.map((dept, i) => (
                                             <tr key={i} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20">
                                                 <td className="px-6 py-3 text-sm font-semibold text-slate-800 dark:text-slate-200">{dept.name}</td>
-                                                <td className="px-4 py-3 text-sm font-bold text-slate-900 dark:text-slate-100 text-right">{dept.plan}</td>
-                                                <td className="px-4 py-3 text-sm font-semibold text-slate-500 dark:text-slate-400 text-right">{dept.actual !== "" ? dept.actual : '-'}</td>
-                                                <td className="px-4 py-3 text-sm font-bold text-primary-600 dark:text-primary-400 text-right">{dept.monthlyPlan}</td>
+                                                <td className="px-4 py-3 text-sm font-bold text-slate-900 dark:text-slate-100 text-right">
+                                                    {isEditingDailyReport ? (
+                                                        <input
+                                                            type="text"
+                                                            value={dept.plan}
+                                                            onChange={(e) => updateDeptRow(i, 'plan', e.target.value)}
+                                                            className="w-16 px-2 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded text-right text-xs font-bold outline-none"
+                                                        />
+                                                    ) : dept.plan}
+                                                </td>
+                                                <td className="px-4 py-3 text-sm font-semibold text-slate-500 dark:text-slate-400 text-right">
+                                                    {isEditingDailyReport ? (
+                                                        <input
+                                                            type="text"
+                                                            value={dept.actual}
+                                                            onChange={(e) => updateDeptRow(i, 'actual', e.target.value)}
+                                                            className="w-16 px-2 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded text-right text-xs font-bold outline-none"
+                                                        />
+                                                    ) : (dept.actual !== "" ? dept.actual : '-')}
+                                                </td>
+                                                <td className="px-4 py-3 text-sm font-bold text-primary-600 dark:text-primary-400 text-right">
+                                                    {isEditingDailyReport ? (
+                                                        <input
+                                                            type="text"
+                                                            value={dept.monthlyPlan}
+                                                            onChange={(e) => updateDeptRow(i, 'monthlyPlan', e.target.value)}
+                                                            className="w-16 px-2 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded text-right text-xs font-bold outline-none"
+                                                        />
+                                                    ) : dept.monthlyPlan}
+                                                </td>
                                             </tr>
                                         ))}
                                         <tr className="bg-slate-50/90 dark:bg-slate-800/50 font-black">
@@ -2148,11 +2317,29 @@ const Reports = () => {
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
                                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">LIVE</span>
-                                    <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">{data.sideMetrics.atrMonthly.live}</p>
+                                    {isEditingDailyReport ? (
+                                        <input
+                                            type="text"
+                                            value={data.sideMetrics.atrMonthly.live}
+                                            onChange={(e) => updateSideMetric('atrMonthly', 'live', e.target.value)}
+                                            className="w-full mt-1 px-3 py-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-lg font-black text-emerald-600 outline-none"
+                                        />
+                                    ) : (
+                                        <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">{data.sideMetrics.atrMonthly.live}</p>
+                                    )}
                                 </div>
                                 <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
                                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">CLOSED</span>
-                                    <p className="text-2xl font-black text-slate-700 dark:text-slate-300 mt-1">{data.sideMetrics.atrMonthly.closed}</p>
+                                    {isEditingDailyReport ? (
+                                        <input
+                                            type="text"
+                                            value={data.sideMetrics.atrMonthly.closed}
+                                            onChange={(e) => updateSideMetric('atrMonthly', 'closed', e.target.value)}
+                                            className="w-full mt-1 px-3 py-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-lg font-black text-slate-700 outline-none"
+                                        />
+                                    ) : (
+                                        <p className="text-2xl font-black text-slate-700 dark:text-slate-300 mt-1">{data.sideMetrics.atrMonthly.closed}</p>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -2161,13 +2348,55 @@ const Reports = () => {
                         <div className="grid grid-cols-2 gap-4">
                             <div className="bg-white dark:bg-slate-900/60 p-5 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm">
                                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">ATTRITION</span>
-                                <p className="text-xl font-black text-slate-900 dark:text-slate-100 mt-1">{data.sideMetrics.attrition.count}</p>
-                                <span className="text-[11px] font-bold text-slate-400">Rate: {data.sideMetrics.attrition.pct}%</span>
+                                {isEditingDailyReport ? (
+                                    <div className="mt-1 space-y-1">
+                                        <input
+                                            type="text"
+                                            value={data.sideMetrics.attrition.count}
+                                            onChange={(e) => updateSideMetric('attrition', 'count', e.target.value)}
+                                            placeholder="Count"
+                                            className="w-full px-2 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded text-xs font-bold outline-none"
+                                        />
+                                        <input
+                                            type="text"
+                                            value={data.sideMetrics.attrition.pct}
+                                            onChange={(e) => updateSideMetric('attrition', 'pct', e.target.value)}
+                                            placeholder="Rate %"
+                                            className="w-full px-2 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded text-xs font-bold outline-none"
+                                        />
+                                    </div>
+                                ) : (
+                                    <>
+                                        <p className="text-xl font-black text-slate-900 dark:text-slate-100 mt-1">{data.sideMetrics.attrition.count}</p>
+                                        <span className="text-[11px] font-bold text-slate-400">Rate: {data.sideMetrics.attrition.pct}%</span>
+                                    </>
+                                )}
                             </div>
                             <div className="bg-white dark:bg-slate-900/60 p-5 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm">
                                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">ABSENTEEISM</span>
-                                <p className="text-xl font-black text-slate-900 dark:text-slate-100 mt-1">{data.sideMetrics.absenteeism.count}</p>
-                                <span className="text-[11px] font-bold text-slate-400">Rate: {data.sideMetrics.absenteeism.pct}%</span>
+                                {isEditingDailyReport ? (
+                                    <div className="mt-1 space-y-1">
+                                        <input
+                                            type="text"
+                                            value={data.sideMetrics.absenteeism.count}
+                                            onChange={(e) => updateSideMetric('absenteeism', 'count', e.target.value)}
+                                            placeholder="Count"
+                                            className="w-full px-2 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded text-xs font-bold outline-none"
+                                        />
+                                        <input
+                                            type="text"
+                                            value={data.sideMetrics.absenteeism.pct}
+                                            onChange={(e) => updateSideMetric('absenteeism', 'pct', e.target.value)}
+                                            placeholder="Rate %"
+                                            className="w-full px-2 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded text-xs font-bold outline-none"
+                                        />
+                                    </div>
+                                ) : (
+                                    <>
+                                        <p className="text-xl font-black text-slate-900 dark:text-slate-100 mt-1">{data.sideMetrics.absenteeism.count}</p>
+                                        <span className="text-[11px] font-bold text-slate-400">Rate: {data.sideMetrics.absenteeism.pct}%</span>
+                                    </>
+                                )}
                             </div>
                         </div>
 
@@ -2182,11 +2411,29 @@ const Reports = () => {
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
                                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">PLANNED</span>
-                                    <p className="text-2xl font-black text-primary-600 dark:text-primary-400 mt-1">{data.sideMetrics.trainingMonthly.planned}</p>
+                                    {isEditingDailyReport ? (
+                                        <input
+                                            type="text"
+                                            value={data.sideMetrics.trainingMonthly.planned}
+                                            onChange={(e) => updateSideMetric('trainingMonthly', 'planned', e.target.value)}
+                                            className="w-full mt-1 px-3 py-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-lg font-black text-primary-600 outline-none"
+                                        />
+                                    ) : (
+                                        <p className="text-2xl font-black text-primary-600 dark:text-primary-400 mt-1">{data.sideMetrics.trainingMonthly.planned}</p>
+                                    )}
                                 </div>
                                 <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
                                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">ACTUAL</span>
-                                    <p className="text-2xl font-black text-slate-700 dark:text-slate-300 mt-1">{data.sideMetrics.trainingMonthly.actual}</p>
+                                    {isEditingDailyReport ? (
+                                        <input
+                                            type="text"
+                                            value={data.sideMetrics.trainingMonthly.actual}
+                                            onChange={(e) => updateSideMetric('trainingMonthly', 'actual', e.target.value)}
+                                            className="w-full mt-1 px-3 py-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-lg font-black text-slate-700 outline-none"
+                                        />
+                                    ) : (
+                                        <p className="text-2xl font-black text-slate-700 dark:text-slate-300 mt-1">{data.sideMetrics.trainingMonthly.actual}</p>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -2197,15 +2444,59 @@ const Reports = () => {
                             <div className="space-y-3">
                                 <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl">
                                     <span className="text-xs font-bold text-slate-500">Expenses (MTD / YTD)</span>
-                                    <span className="text-xs font-black text-slate-900 dark:text-slate-100">{data.sideMetrics.expenses.mtd} / {data.sideMetrics.expenses.ytd}</span>
+                                    {isEditingDailyReport ? (
+                                        <div className="flex gap-1">
+                                            <input
+                                                type="text"
+                                                value={data.sideMetrics.expenses.mtd}
+                                                onChange={(e) => updateSideMetric('expenses', 'mtd', e.target.value)}
+                                                className="w-16 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded text-xs font-bold outline-none text-right"
+                                            />
+                                            <span className="text-slate-400">/</span>
+                                            <input
+                                                type="text"
+                                                value={data.sideMetrics.expenses.ytd}
+                                                onChange={(e) => updateSideMetric('expenses', 'ytd', e.target.value)}
+                                                className="w-16 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded text-xs font-bold outline-none text-right"
+                                            />
+                                        </div>
+                                    ) : (
+                                        <span className="text-xs font-black text-slate-900 dark:text-slate-100">{data.sideMetrics.expenses.mtd} / {data.sideMetrics.expenses.ytd}</span>
+                                    )}
                                 </div>
                                 <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl">
                                     <span className="text-xs font-bold text-slate-500">Late Comer %</span>
-                                    <span className="text-xs font-black text-slate-900 dark:text-slate-100">{data.sideMetrics.lateComerPct.count} ({data.sideMetrics.lateComerPct.pct})</span>
+                                    {isEditingDailyReport ? (
+                                        <div className="flex gap-1">
+                                            <input
+                                                type="text"
+                                                value={data.sideMetrics.lateComerPct.count}
+                                                onChange={(e) => updateSideMetric('lateComerPct', 'count', e.target.value)}
+                                                className="w-14 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded text-xs font-bold outline-none text-right"
+                                            />
+                                            <input
+                                                type="text"
+                                                value={data.sideMetrics.lateComerPct.pct}
+                                                onChange={(e) => updateSideMetric('lateComerPct', 'pct', e.target.value)}
+                                                className="w-14 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded text-xs font-bold outline-none text-right"
+                                            />
+                                        </div>
+                                    ) : (
+                                        <span className="text-xs font-black text-slate-900 dark:text-slate-100">{data.sideMetrics.lateComerPct.count} ({data.sideMetrics.lateComerPct.pct})</span>
+                                    )}
                                 </div>
                                 <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl">
                                     <span className="text-xs font-bold text-slate-500">Other Issues</span>
-                                    <span className="text-xs font-black text-slate-900 dark:text-slate-100">{data.sideMetrics.otherIssues}</span>
+                                    {isEditingDailyReport ? (
+                                        <input
+                                            type="text"
+                                            value={data.sideMetrics.otherIssues}
+                                            onChange={(e) => updateSideMetric('otherIssues', null, e.target.value)}
+                                            className="w-24 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded text-xs font-bold outline-none text-right"
+                                        />
+                                    ) : (
+                                        <span className="text-xs font-black text-slate-900 dark:text-slate-100">{data.sideMetrics.otherIssues}</span>
+                                    )}
                                 </div>
                             </div>
                         </div>
