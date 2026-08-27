@@ -380,13 +380,24 @@ const CatalogSubmodule = ({ mode = 'products' }) => {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <div>
                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Selling Rate</label>
                             <input
                                 type="number"
                                 name="basePrice"
                                 value={formData.basePrice}
+                                onChange={handleFormChange}
+                                required
+                                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-semibold"
+                            />
+                        </div>
+                        <div>
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">HSN Code</label>
+                            <input
+                                type="text"
+                                name="hsnCode"
+                                value={formData.hsnCode}
                                 onChange={handleFormChange}
                                 required
                                 className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-semibold"

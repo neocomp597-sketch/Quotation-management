@@ -195,6 +195,7 @@ export const categoryService = {
 
 export const productService = {
   getAll: (params) => api.get("/products", { params }),
+  getById: (id) => api.get(`/products/${id}`),
   getVendors: (id, availableOnly = false) =>
     api.get(`/products/${id}/vendors${availableOnly ? "?available=true" : ""}`),
   updateVendor: (productId, vendorId, data) =>

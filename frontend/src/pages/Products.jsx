@@ -235,6 +235,7 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                     productName: item.productName,
                     productCode: item.productCode || item.brand || '-',
                     brand: item.brand,
+                    hsnCode: item.hsnCode || '',
                     category: item.category,
                     categoryId: { name: item.category || 'Vendor Catalog' },
                     basePrice: item.price || 0,
@@ -317,55 +318,42 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
             setIsModalOpen(true);
         } else if (isEditPage && routeId) {
             setIsModalOpen(true);
-            const found = products.find(p => p._id === routeId);
-            if (found) {
-                setEditingProduct(found);
+            const populateForm = (item) => {
+                setEditingProduct(item);
                 setFormData({
-                    ...found,
-                    categoryId: found.categoryId?._id || found.categoryId || '',
-                    mgr1: found.mgr1?._id || found.mgr1 || '',
-                    mgr2: found.mgr2?._id || found.mgr2 || '',
-                    mgr3: found.mgr3?._id || found.mgr3 || '',
-                    mgr4: found.mgr4?._id || found.mgr4 || '',
-                    mgr5: found.mgr5?._id || found.mgr5 || '',
-                    attributes: (found.attributes || []).map(a => a._id || a),
-                    vendors: found.vendors?.length ? found.vendors.map(v => ({
+                    ...item,
+                    hsnCode: item.hsnCode || item.hsn || '',
+                    productCode: item.productCode || '',
+                    productName: item.productName || '',
+                    categoryId: item.categoryId?._id || item.categoryId || '',
+                    mgr1: item.mgr1?._id || item.mgr1 || '',
+                    mgr2: item.mgr2?._id || item.mgr2 || '',
+                    mgr3: item.mgr3?._id || item.mgr3 || '',
+                    mgr4: item.mgr4?._id || item.mgr4 || '',
+                    mgr5: item.mgr5?._id || item.mgr5 || '',
+                    attributes: (item.attributes || []).map(a => a._id || a),
+                    vendors: item.vendors?.length ? item.vendors.map(v => ({
                         vendorId: v.vendorId?._id || v.vendorId,
                         price: v.price || '',
                         stock: v.stock || 0,
                         isPrimary: v.isPrimary || false
                     })) : [emptyVendorRow()]
                 });
-                if (found.mgr3?._id || found.mgr3) {
-                    fetchAvailableAttributes(found.mgr3?._id || found.mgr3);
+                if (item.mgr3?._id || item.mgr3) {
+                    fetchAvailableAttributes(item.mgr3?._id || item.mgr3);
                 }
+            };
+
+            const found = products.find(p => p._id === routeId);
+            if (found) {
+                populateForm(found);
             } else {
-                productService.getAll({ limit: 1000 }).then(res => {
-                    const list = Array.isArray(res.data) ? res.data : res.data?.data || [];
-                    const item = list.find(p => p._id === routeId);
+                productService.getById(routeId).then(res => {
+                    const item = res.data?.data || res.data;
                     if (item) {
-                        setEditingProduct(item);
-                        setFormData({
-                            ...item,
-                            categoryId: item.categoryId?._id || item.categoryId || '',
-                            mgr1: item.mgr1?._id || item.mgr1 || '',
-                            mgr2: item.mgr2?._id || item.mgr2 || '',
-                            mgr3: item.mgr3?._id || item.mgr3 || '',
-                            mgr4: item.mgr4?._id || item.mgr4 || '',
-                            mgr5: item.mgr5?._id || item.mgr5 || '',
-                            attributes: (item.attributes || []).map(a => a._id || a),
-                            vendors: item.vendors?.length ? item.vendors.map(v => ({
-                                vendorId: v.vendorId?._id || v.vendorId,
-                                price: v.price || '',
-                                stock: v.stock || 0,
-                                isPrimary: v.isPrimary || false
-                            })) : [emptyVendorRow()]
-                        });
-                        if (item.mgr3?._id || item.mgr3) {
-                            fetchAvailableAttributes(item.mgr3?._id || item.mgr3);
-                        }
+                        populateForm(item);
                     }
-                }).catch(err => console.error("Failed to load product", err));
+                }).catch(err => console.error("Failed to load product details", err));
             }
         }
     }, [isCreatePage, isEditPage, routeId]);
@@ -456,6 +444,7 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                 const catalogPayload = {
                     productName: formData.productName,
                     brand: formData.brand || '',
+                    hsnCode: formData.hsnCode || '',
                     category: typeof formData.categoryId === 'object' ? formData.categoryId?.name : formData.categoryId || '',
                     price: Number(formData.basePrice || formData.mrp || 0),
                     MOQ: Number(formData.inventory?.currentStock || 1),
