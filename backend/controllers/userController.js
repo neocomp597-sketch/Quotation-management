@@ -41,9 +41,10 @@ exports.getAllUsers = async (req, res) => {
         const query = companyId ? { companyId } : {};
 
         const users = await User.find(query)
-            .select('_id name email role reportsTo branchId status companyId customPermissions vendorId createdAt')
+            .select('_id name email role reportsTo branchId assignedBranches status companyId customPermissions vendorId createdAt')
             .populate('reportsTo', 'name email')
             .populate('branchId', 'name code branchPrefix')
+            .populate('assignedBranches', 'name code branchPrefix')
             .populate('vendorId', 'name code companyName')
             .sort({ createdAt: -1 })
             .lean();
@@ -57,7 +58,7 @@ exports.getAllUsers = async (req, res) => {
 
 exports.createUser = async (req, res) => {
     try {
-        const { name, email, password, role = 'sales', status = true, reportsTo, branchId, vendorId } = req.body;
+        const { name, email, password, role = 'sales', status = true, reportsTo, branchId, assignedBranches, vendorId } = req.body;
 
         const companyId = await getEffectiveCompanyId(req);
         if (!companyId) {
@@ -97,13 +98,18 @@ exports.createUser = async (req, res) => {
 
         const salt = await bcrypt.genSalt(10);
         const passwordHash = await bcrypt.hash(password, salt);
+        
+        const branchesList = Array.isArray(assignedBranches) ? assignedBranches : (branchId ? [branchId] : []);
+        const primaryBranch = branchId || (branchesList.length > 0 ? branchesList[0] : null);
+
         const user = await User.create({
             name,
             email: normalizedEmail,
             passwordHash,
             role,
             reportsTo: validatedReportsTo,
-            branchId: branchId || null,
+            branchId: primaryBranch,
+            assignedBranches: branchesList,
             vendorId: vendorId || null,
             status,
             companyId,
@@ -116,6 +122,7 @@ exports.createUser = async (req, res) => {
             role: user.role,
             reportsTo: user.reportsTo,
             branchId: user.branchId,
+            assignedBranches: user.assignedBranches,
             vendorId: user.vendorId,
             customPermissions: user.customPermissions || {},
             status: user.status,
@@ -218,7 +225,7 @@ exports.updateUserRole = async (req, res) => {
 exports.updateUser = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, email, password, role, reportsTo, branchId, vendorId } = req.body;
+        const { name, email, password, role, reportsTo, branchId, assignedBranches, vendorId } = req.body;
 
         const user = await User.findOne({ _id: id, companyId: req.user.companyId });
         if (!user) {
@@ -239,6 +246,12 @@ exports.updateUser = async (req, res) => {
 
         if (name) user.name = name;
         if (branchId !== undefined) user.branchId = branchId || null;
+        if (assignedBranches !== undefined) {
+            user.assignedBranches = Array.isArray(assignedBranches) ? assignedBranches : (branchId ? [branchId] : []);
+            if (!user.branchId && user.assignedBranches.length > 0) {
+                user.branchId = user.assignedBranches[0];
+            }
+        }
         if (vendorId !== undefined) user.vendorId = vendorId || null;
         if (password) {
             const salt = await bcrypt.genSalt(10);
@@ -289,6 +302,7 @@ exports.updateUser = async (req, res) => {
             role: updatedUser.role,
             reportsTo: updatedUser.reportsTo,
             branchId: updatedUser.branchId,
+            assignedBranches: updatedUser.assignedBranches,
             vendorId: updatedUser.vendorId,
             customPermissions: updatedUser.customPermissions || {},
             status: updatedUser.status,

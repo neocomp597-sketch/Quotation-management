@@ -207,14 +207,22 @@ const [logoUploading, setLogoUploading] = useState(false);
         setLogoUploading(true);
         try {
             const res = await uploadService.uploadImage(file);
-            setCompanySettings({
+            const newLogoUrl = res.data.imageUrl;
+            
+            const updatedSettings = {
                 ...companySettings,
-                logoUrl: res.data.imageUrl
-            });
-            toast.success('Logo uploaded successfully!');
+                logoUrl: newLogoUrl
+            };
+            setCompanySettings(updatedSettings);
+
+            // Auto-save settings to database so logo persists immediately
+            await companySettingsService.update(updatedSettings);
+            toast.success('Logo updated and saved successfully!');
+            window.dispatchEvent(new Event('brandingUpdated'));
         } catch (error) {
             console.error('Error uploading logo:', error);
-            toast.error('Failed to upload logo');
+            const errorMsg = error.response?.data?.message || 'Failed to upload logo';
+            toast.error(errorMsg);
         } finally {
             setLogoUploading(false);
         }
@@ -227,17 +235,25 @@ const [logoUploading, setLogoUploading] = useState(false);
         setSignatureUploading(true);
         try {
             const res = await uploadService.uploadImage(file);
-            setCompanySettings({
+            const newSigUrl = res.data.imageUrl;
+
+            const updatedSettings = {
                 ...companySettings,
                 authorizedSignatory: {
                     ...companySettings.authorizedSignatory,
-                    signatureImageUrl: res.data.imageUrl
+                    signatureImageUrl: newSigUrl
                 }
-            });
-            toast.success('Signature uploaded successfully!');
+            };
+            setCompanySettings(updatedSettings);
+
+            // Auto-save settings to database so signature persists immediately
+            await companySettingsService.update(updatedSettings);
+            toast.success('Signature updated and saved successfully!');
+            window.dispatchEvent(new Event('brandingUpdated'));
         } catch (error) {
             console.error('Error uploading signature:', error);
-            toast.error('Failed to upload signature');
+            const errorMsg = error.response?.data?.message || 'Failed to upload signature';
+            toast.error(errorMsg);
         } finally {
             setSignatureUploading(false);
         }
@@ -249,9 +265,13 @@ const [logoUploading, setLogoUploading] = useState(false);
         setMessage(null);
 
         try {
-            await companySettingsService.update(companySettings);
+            const res = await companySettingsService.update(companySettings);
+            if (res.data) {
+                setCompanySettings(prev => ({ ...prev, ...res.data }));
+            }
             setMessage({ type: 'success', text: 'Company settings saved successfully!' });
             toast.success('Company settings saved successfully!');
+            window.dispatchEvent(new Event('brandingUpdated'));
         } catch (error) {
             console.error('Error saving company settings:', error);
             const errorMsg = error.response?.data?.message || 'Failed to save company settings';

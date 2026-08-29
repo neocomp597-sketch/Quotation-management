@@ -288,7 +288,16 @@ exports.getTickets = async (req, res) => {
         if (req.query.customerId) filter.customerId = req.query.customerId;
         if (req.query.status) filter.status = req.query.status;
         if (req.query.priorityId) filter.priorityId = req.query.priorityId;
-        if (req.query.branchId) filter.branchId = req.query.branchId;
+
+        const { getScopedBranchIds } = require('../utils/accessControl');
+        const userBranchIds = getScopedBranchIds(req.user);
+        const isAdmin = ['SUPER_ADMIN', 'ADMIN', 'COMPANY_ADMIN'].includes((req.user?.role || '').toUpperCase());
+
+        if (req.query.branchId) {
+            filter.branchId = req.query.branchId;
+        } else if (!isAdmin && userBranchIds.length > 0) {
+            filter.branchId = { $in: userBranchIds };
+        }
 
         const andConditions = [];
         

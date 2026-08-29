@@ -129,6 +129,9 @@ import CustomerPricingDashboard from './pages/CustomerPricingDashboard';
 import CustomerAnalytics from './pages/CustomerAnalytics';
 import Customer360Workspace from './pages/Customer360Workspace';
 
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
+
 function App() {
   return (
     <AuthProvider>
@@ -155,6 +158,8 @@ function App() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password/:token" element={<ResetPassword />} />
 
           {/* Protected Routes */}
           <Route element={<ProtectedRoute />}>

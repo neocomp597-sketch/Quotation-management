@@ -12,6 +12,7 @@ const UserSchema = new mongoose.Schema({
     role: { type: String, default: 'sales' },
     reportsTo: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null },
+    assignedBranches: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Branch' }],
     status: { type: Boolean, default: true },
     isActive: { type: Boolean, default: true },
     personalNote: { type: String, default: '' },
@@ -25,6 +26,8 @@ const UserSchema = new mongoose.Schema({
     },
     vendorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Vendor', default: null },
     customPermissions: { type: Map, of: Boolean, default: {} },
+    resetPasswordToken: { type: String, default: null },
+    resetPasswordExpires: { type: Date, default: null },
     createdAt: { type: Date, default: Date.now },
 });
 

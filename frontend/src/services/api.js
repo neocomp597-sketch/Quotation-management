@@ -253,6 +253,8 @@ export const salespersonService = {
 export const authService = {
   login: (data) => api.post("/auth/login", data),
   register: (data) => api.post("/auth/register", data),
+  forgotPassword: (data) => api.post("/auth/forgot-password", data),
+  resetPassword: (token, data) => api.post(`/auth/reset-password/${token}`, data),
   refresh: () => refreshAccessToken(),
   logout: () => api.post("/auth/logout", {}, { skipAuthRefresh: true }),
   logoutAll: () => api.post("/auth/logout-all"),
@@ -748,7 +750,7 @@ export const salesService = {
 };
 
 export const csmService = {
-  getStats: () => api.get("/csm/dashboard"),
+  getStats: (params = {}) => api.get("/csm/dashboard", { params }),
   getTicketCustomers: () => api.get("/csm/tickets/customers"),
   getTickets: (params = {}) => api.get("/csm/tickets", { params }),
   getTicketById: (id) => api.get(`/csm/tickets/${id}`),

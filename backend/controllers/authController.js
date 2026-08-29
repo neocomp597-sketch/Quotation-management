@@ -444,3 +444,118 @@ exports.changePassword = async (req, res) => {
         res.status(500).json({ message: 'Failed to change password', error: error.message });
     }
 };
+
+const sendEmail = require('../utils/sendEmail');
+
+exports.forgotPassword = async (req, res) => {
+    try {
+        const { email } = req.body;
+        const normalizedEmail = email ? String(email).trim().toLowerCase() : '';
+
+        if (!normalizedEmail) {
+            return res.status(400).json({ message: 'Please provide a valid email address' });
+        }
+
+        const user = await User.findOne({ email: { $regex: new RegExp("^" + normalizedEmail.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + "$", "i") } });
+
+        // Always return positive security response to prevent user enumeration
+        if (!user) {
+            return res.json({ 
+                success: true,
+                message: 'If an account exists for this email address, a password reset link has been sent. Please check your inbox.' 
+            });
+        }
+
+        // Generate unhashed reset token & store hashed version in DB
+        const resetToken = crypto.randomBytes(32).toString('hex');
+        const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+
+        user.resetPasswordToken = hashedToken;
+        user.resetPasswordExpires = Date.now() + 3600000; // 1 hour validity
+        await user.save();
+
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        const resetUrl = `${frontendUrl}/reset-password/${resetToken}`;
+
+        // Send Email via Nodemailer SMTP
+        const emailResult = await sendEmail({
+            to: user.email,
+            subject: 'Password Reset Request - Acczite',
+            html: `
+                <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff;">
+                    <div style="text-align: center; margin-bottom: 24px;">
+                        <h2 style="color: #0d9488; margin: 0; font-size: 24px; font-weight: 800;">Acczite Management</h2>
+                        <p style="color: #64748b; font-size: 14px; margin-top: 4px;">Password Reset Request</p>
+                    </div>
+                    <p style="color: #334155; font-size: 15px; line-height: 1.6;">Hello <strong>${user.name}</strong>,</p>
+                    <p style="color: #334155; font-size: 15px; line-height: 1.6;">We received a request to reset your password for your account associated with <strong>${user.email}</strong>.</p>
+                    <p style="color: #334155; font-size: 15px; line-height: 1.6;">Click the button below to set a new password. This link will expire in <strong>1 hour</strong>.</p>
+                    <div style="text-align: center; margin: 32px 0;">
+                        <a href="${resetUrl}" target="_blank" style="background-color: #0d9488; color: #ffffff; padding: 14px 32px; text-decoration: none; border-radius: 12px; font-weight: 700; font-size: 15px; display: inline-block; box-shadow: 0 4px 12px rgba(13, 148, 136, 0.25);">Reset Password</a>
+                    </div>
+                    <p style="font-size: 12px; color: #64748b; line-height: 1.5; word-break: break-all;">
+                        If the button above does not work, copy and paste this link into your browser:<br/>
+                        <a href="${resetUrl}" style="color: #0d9488;">${resetUrl}</a>
+                    </p>
+                    <hr style="border: 0; border-top: 1px solid #f1f5f9; margin: 24px 0;" />
+                    <p style="font-size: 12px; color: #94a3b8; text-align: center; margin: 0;">If you did not request a password reset, please ignore this email.</p>
+                </div>
+            `
+        });
+
+        res.json({ 
+            success: true,
+            message: 'Password reset link sent to your email address! Please check your inbox.',
+            resetToken // Provided for dev convenience if SMTP not configured locally
+        });
+    } catch (error) {
+        console.error('Forgot Password Error:', error);
+        res.status(500).json({ message: 'Failed to process password reset request', error: error.message });
+    }
+};
+
+exports.resetPassword = async (req, res) => {
+    try {
+        const { token } = req.params;
+        const { password, newPassword } = req.body;
+        const passwordToSet = password || newPassword;
+
+        if (!token) {
+            return res.status(400).json({ message: 'Reset token is required' });
+        }
+
+        if (!passwordToSet || passwordToSet.length < 6) {
+            return res.status(400).json({ message: 'Password must be at least 6 characters long' });
+        }
+
+        // Hash token to query database
+        const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+        const user = await User.findOne({
+            resetPasswordToken: hashedToken,
+            resetPasswordExpires: { $gt: Date.now() }
+        });
+
+        if (!user) {
+            return res.status(400).json({ message: 'Invalid or expired password reset link. Please request a new password reset.' });
+        }
+
+        // Update user password and clear token fields
+        const salt = await bcrypt.genSalt(10);
+        user.passwordHash = await bcrypt.hash(passwordToSet, salt);
+        user.resetPasswordToken = undefined;
+        user.resetPasswordExpires = undefined;
+        user.mustChangePassword = false;
+        user.passwordChangedAt = new Date();
+        await user.save();
+
+        res.json({
+            success: true,
+            message: 'Password reset successfully! You can now log in with your new password.'
+        });
+    } catch (error) {
+        console.error('Reset Password Error:', error);
+        res.status(500).json({ message: 'Failed to reset password', error: error.message });
+    }
+};
+

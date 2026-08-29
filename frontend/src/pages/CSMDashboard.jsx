@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { csmService } from '../services/api';
+import { csmService, branchService } from '../services/api';
 import { 
     ResponsiveContainer, PieChart, Pie, Cell, 
-    BarChart, Bar, XAxis, YAxis, Tooltip, Legend 
+    BarChart, Bar, XAxis, YAxis, Tooltip
 } from 'recharts';
 import { 
     MdAssignment, MdHourglassEmpty, MdWarning, 
     MdCheckCircle, MdTimer, MdTrendingUp, MdRefresh,
-    MdFlashOn, MdLocationOn, MdPerson, MdBuild, MdStorage
+    MdFlashOn, MdLocationOn, MdPerson, MdFilterList,
+    MdAssignmentInd, MdCalendarToday, MdBusiness
 } from 'react-icons/md';
 import { toast } from 'react-toastify';
 
@@ -27,14 +28,50 @@ const CSMDashboard = () => {
     const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState(null);
     const [visits, setVisits] = useState([]);
+    const [branches, setBranches] = useState([]);
     const [seeding, setSeeding] = useState(false);
+
+    // Filter states
+    const [selectedBranch, setSelectedBranch] = useState('');
+    const [quickRange, setQuickRange] = useState('');
+    const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
+    const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+    const [startDay, setStartDay] = useState('');
+    const [endDay, setEndDay] = useState('');
+    const [customMode, setCustomMode] = useState(false);
+
+    const loadBranches = async () => {
+        try {
+            const res = await branchService.getAll();
+            const branchList = res.data?.data || res.data || [];
+            setBranches(Array.isArray(branchList) ? branchList : []);
+        } catch (err) {
+            console.error('Failed to load branches for filter:', err);
+        }
+    };
+
+    const buildFilterParams = () => {
+        const params = {};
+        if (selectedBranch) params.branchId = selectedBranch;
+        
+        if (quickRange) {
+            params.quickRange = quickRange;
+        } else if (customMode) {
+            params.month = selectedMonth;
+            params.year = selectedYear;
+            if (startDay) params.startDay = startDay;
+            if (endDay) params.endDay = endDay;
+        }
+        return params;
+    };
 
     const loadStats = async (showLoadingSpinner = true) => {
         if (showLoadingSpinner) setLoading(true);
         try {
+            const params = buildFilterParams();
             const [statsRes, visitsRes] = await Promise.all([
-                csmService.getStats(),
-                csmService.getVisits()
+                csmService.getStats(params),
+                csmService.getVisits(params)
             ]);
             setStats(statsRes.data);
             setVisits(visitsRes.data || []);
@@ -72,6 +109,7 @@ const CSMDashboard = () => {
     };
 
     useEffect(() => {
+        loadBranches();
         loadStats();
 
         const handleSeeded = () => loadStats(false);
@@ -81,7 +119,11 @@ const CSMDashboard = () => {
         };
     }, []);
 
-    if (loading) {
+    useEffect(() => {
+        loadStats(false);
+    }, [selectedBranch, quickRange, selectedMonth, selectedYear, startDay, endDay, customMode]);
+
+    if (loading && !stats) {
         return (
             <div className="flex flex-col items-center justify-center py-32 space-y-4">
                 <div className="w-16 h-16 border-4 border-teal-200 border-t-teal-600 rounded-full animate-spin"></div>
@@ -90,25 +132,27 @@ const CSMDashboard = () => {
         );
     }
 
-    const metrics = stats?.metrics || { open: 0, pending: 0, overdue: 0, resolvedToday: 0 };
+    const metrics = stats?.metrics || { open: 0, unassigned: 0, pending: 0, overdue: 0, resolvedToday: 0 };
     const statusData = stats?.statusBreakdown || [];
-    const priorityData = stats?.priorityBreakdown || [];
     const categoryData = stats?.categoryBreakdown || [];
     const complianceData = stats?.slaCompliance || [];
     const engineers = stats?.engineerPerformance || [];
 
     const isDashboardEmpty = 
         metrics.open === 0 && 
+        metrics.unassigned === 0 &&
         metrics.pending === 0 && 
         metrics.overdue === 0 && 
         metrics.resolvedToday === 0 && 
         visits.length === 0;
 
+    // Requirement 3: Unassigned Tickets block added
     const metricCards = [
-        { label: 'Active Tickets', value: metrics.open, icon: <MdAssignment size={26} />, color: 'from-teal-500 to-emerald-600' },
-        { label: 'Pending Customer', value: metrics.pending, icon: <MdHourglassEmpty size={26} />, color: 'from-amber-400 to-orange-500' },
-        { label: 'Overdue SLA', value: metrics.overdue, icon: <MdWarning size={26} />, color: 'from-rose-500 to-red-600' },
-        { label: 'Resolved Today', value: metrics.resolvedToday, icon: <MdCheckCircle size={26} />, color: 'from-sky-500 to-indigo-600' }
+        { label: 'Active Tickets', value: metrics.open, icon: <MdAssignment size={24} />, color: 'from-teal-500 to-emerald-600' },
+        { label: 'Unassigned Tickets', value: metrics.unassigned || 0, icon: <MdAssignmentInd size={24} />, color: 'from-purple-500 to-indigo-600' },
+        { label: 'Pending Customer', value: metrics.pending, icon: <MdHourglassEmpty size={24} />, color: 'from-amber-400 to-orange-500' },
+        { label: 'Overdue SLA', value: metrics.overdue, icon: <MdWarning size={24} />, color: 'from-rose-500 to-red-600' },
+        { label: 'Resolved Today', value: metrics.resolvedToday, icon: <MdCheckCircle size={24} />, color: 'from-sky-500 to-cyan-600' }
     ];
 
     // Compute SLA compliance percentage
@@ -144,6 +188,11 @@ const CSMDashboard = () => {
         }
     };
 
+    const monthNames = [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+
     return (
         <div className="p-6 space-y-6 max-w-7xl mx-auto animate-fade-in-up">
             {/* Header */}
@@ -159,12 +208,158 @@ const CSMDashboard = () => {
                 <div className="flex items-center gap-2">
                     <button
                         onClick={() => loadStats(true)}
-                        className="p-3 text-slate-600 hover:text-slate-900 bg-white border border-slate-200 rounded-2xl shadow-sm hover:bg-slate-50 transition-all"
+                        className="p-3 text-slate-600 hover:text-slate-900 bg-white border border-slate-200 rounded-2xl shadow-sm hover:bg-slate-50 transition-all flex items-center gap-1 font-bold text-xs"
                         title="Refresh Stats"
                     >
-                        <MdRefresh size={20} />
+                        <MdRefresh size={18} /> Refresh
                     </button>
                 </div>
+            </div>
+
+            {/* Filter Toolbar (Requirements 6, 7 & 8) */}
+            <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 font-black text-xs uppercase text-slate-500 tracking-wider">
+                        <MdFilterList size={18} className="text-teal-600" /> Filter View:
+                    </div>
+
+                    {/* Quick Range Selector */}
+                    <div className="flex flex-wrap items-center gap-1.5">
+                        <button
+                            onClick={() => { setQuickRange(''); setCustomMode(false); }}
+                            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all ${
+                                !quickRange && !customMode
+                                    ? 'bg-teal-600 text-white shadow-md'
+                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                        >
+                            All Time
+                        </button>
+                        <button
+                            onClick={() => { setQuickRange('today'); setCustomMode(false); }}
+                            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all ${
+                                quickRange === 'today'
+                                    ? 'bg-teal-600 text-white shadow-md'
+                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                        >
+                            Today
+                        </button>
+                        <button
+                            onClick={() => { setQuickRange('yesterday'); setCustomMode(false); }}
+                            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all ${
+                                quickRange === 'yesterday'
+                                    ? 'bg-teal-600 text-white shadow-md'
+                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                        >
+                            Yesterday
+                        </button>
+                        <button
+                            onClick={() => { setQuickRange('thisMonth'); setCustomMode(false); }}
+                            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all ${
+                                quickRange === 'thisMonth'
+                                    ? 'bg-teal-600 text-white shadow-md'
+                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                        >
+                            This Month
+                        </button>
+                        <button
+                            onClick={() => { setQuickRange('lastMonth'); setCustomMode(false); }}
+                            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all ${
+                                quickRange === 'lastMonth'
+                                    ? 'bg-teal-600 text-white shadow-md'
+                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                        >
+                            Last Month
+                        </button>
+                        <button
+                            onClick={() => { setQuickRange(''); setCustomMode(true); }}
+                            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center gap-1 ${
+                                customMode
+                                    ? 'bg-teal-600 text-white shadow-md'
+                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                        >
+                            <MdCalendarToday size={14} /> Month / Day Range
+                        </button>
+                    </div>
+
+                    {/* Branch Filter Dropdown */}
+                    {branches.length > 0 && (
+                        <div className="flex items-center gap-2">
+                            <MdBusiness className="text-slate-400" size={16} />
+                            <select
+                                value={selectedBranch}
+                                onChange={(e) => setSelectedBranch(e.target.value)}
+                                className="bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 font-bold text-xs rounded-xl px-3 py-1.5 outline-none focus:ring-2 focus:ring-teal-500"
+                            >
+                                <option value="">All Branches</option>
+                                {branches.map((b) => (
+                                    <option key={b._id} value={b._id}>
+                                        {b.name || b.code}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+                </div>
+
+                {/* Custom Month-wise & Day Range Selection (Requirement 7) */}
+                {customMode && (
+                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center gap-3 text-xs">
+                        <div className="flex items-center gap-2">
+                            <span className="font-bold text-slate-600">Month:</span>
+                            <select
+                                value={selectedMonth}
+                                onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                                className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 font-semibold outline-none"
+                            >
+                                {monthNames.map((m, idx) => (
+                                    <option key={idx} value={idx + 1}>{m}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            <span className="font-bold text-slate-600">Year:</span>
+                            <select
+                                value={selectedYear}
+                                onChange={(e) => setSelectedYear(Number(e.target.value))}
+                                className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 font-semibold outline-none"
+                            >
+                                {[2024, 2025, 2026, 2027].map((y) => (
+                                    <option key={y} value={y}>{y}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            <span className="font-bold text-slate-600">Day Range (1-31):</span>
+                            <input
+                                type="number"
+                                min="1"
+                                max="31"
+                                placeholder="From Day"
+                                value={startDay}
+                                onChange={(e) => setStartDay(e.target.value)}
+                                className="w-20 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 font-semibold outline-none text-center"
+                            />
+                            <span>to</span>
+                            <input
+                                type="number"
+                                min="1"
+                                max="31"
+                                placeholder="To Day"
+                                value={endDay}
+                                onChange={(e) => setEndDay(e.target.value)}
+                                className="w-20 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 font-semibold outline-none text-center"
+                            />
+                        </div>
+                    </div>
+                )}
             </div>
 
             {isDashboardEmpty ? (
@@ -176,7 +371,7 @@ const CSMDashboard = () => {
                     <div className="space-y-2">
                         <h3 className="text-2xl font-black font-outfit">No Service Data Registered</h3>
                         <p className="text-teal-200/80 text-sm max-w-md mx-auto leading-relaxed font-medium">
-                            It looks like your company hasn't logged any customer tickets, electrical assets, AMCs, or field engineer service visits yet.
+                            No tickets or service logs matched the selected filters.
                         </p>
                     </div>
                     <div className="pt-2">
@@ -196,18 +391,18 @@ const CSMDashboard = () => {
                 </div>
             ) : (
                 <>
-                    {/* Metrics Row */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {/* Requirement 3: Metrics Row with Unassigned Tickets block */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                         {metricCards.map((card, i) => (
                             <div 
                                 key={i}
-                                className="glass shadow-premium rounded-[2rem] p-6 hover-lift border border-slate-100/80 bg-white dark:bg-slate-900/60 dark:border-slate-800 relative overflow-hidden flex items-center justify-between"
+                                className="glass shadow-sm rounded-2xl p-4 border border-slate-100/80 bg-white dark:bg-slate-900/60 dark:border-slate-800 flex items-center justify-between"
                             >
-                                <div className="space-y-1">
-                                    <span className="text-xs font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest">{card.label}</span>
-                                    <h2 className="text-4xl font-black text-slate-900 dark:text-slate-100 font-outfit">{card.value}</h2>
+                                <div className="space-y-0.5">
+                                    <span className="text-[11px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-wider">{card.label}</span>
+                                    <h2 className="text-3xl font-black text-slate-900 dark:text-slate-100 font-outfit">{card.value}</h2>
                                 </div>
-                                <div className={`w-14 h-14 bg-gradient-to-br ${card.color} rounded-2xl flex items-center justify-center text-white shadow-lg`}>
+                                <div className={`w-12 h-12 bg-gradient-to-br ${card.color} rounded-xl flex items-center justify-center text-white shadow-sm`}>
                                     {card.icon}
                                 </div>
                             </div>
@@ -265,7 +460,6 @@ const CSMDashboard = () => {
                                             <Tooltip />
                                         </PieChart>
                                     </ResponsiveContainer>
-                                    {/* Centered Compliance Rating */}
                                     <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                                         <span className="text-2xl font-black text-slate-800 dark:text-slate-100 font-outfit leading-none">{complianceRate}%</span>
                                         <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1">SLA Met</span>
@@ -359,7 +553,7 @@ const CSMDashboard = () => {
                         <h3 className="text-sm font-black text-slate-900 dark:text-slate-100 uppercase tracking-widest mb-4">Top Performing Engineers</h3>
                         {engineers.length === 0 ? (
                             <div className="text-center py-8 text-slate-400 text-sm font-bold">
-                                No closed tickets resolved by engineers yet.
+                                No closed tickets resolved by engineers yet for selected filters.
                             </div>
                         ) : (
                             <div className="overflow-x-auto">

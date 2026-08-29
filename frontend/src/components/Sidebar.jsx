@@ -67,6 +67,9 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             } catch (e) { /* ignore */ }
         };
         fetchBranding();
+
+        window.addEventListener('brandingUpdated', fetchBranding);
+        return () => window.removeEventListener('brandingUpdated', fetchBranding);
     }, []);
 
     const toggleMenu = (key) => {

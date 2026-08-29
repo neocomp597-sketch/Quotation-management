@@ -45,6 +45,7 @@ const EmployeeProfileSchema = new mongoose.Schema({
     gender: { type: String, enum: ['Male', 'Female', 'Other'], default: 'Male' },
     photo: { type: String, default: '' },
     branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null },
+    assignedBranches: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Branch' }],
     branchPrefix: { type: String, trim: true, uppercase: true },
     name: { type: String, required: true },
     email: { type: String, trim: true },

@@ -63,15 +63,10 @@ const Dashboard = () => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (!isManagerOrAdmin) {
-            setLoading(false);
-            return;
-        }
-
         const fetchDashboardData = async () => {
             try {
                 const response = await quotationService.getReports();
-                const { summary, recentQuotations } = response.data;
+                const { summary, recentQuotations } = response.data || {};
 
                 setStats({
                     totalQuotations: summary?.totalQuotations || 0,
@@ -98,18 +93,34 @@ const Dashboard = () => {
 
         window.addEventListener('onCrmSocketUpdate', handleRealtimeUpdate);
         return () => window.removeEventListener('onCrmSocketUpdate', handleRealtimeUpdate);
-    }, [isManagerOrAdmin]);
+    }, []);
 
     // Regular Employee View
     if (!isManagerOrAdmin) {
         const employeeCards = [
             {
-                title: "My Payslips",
-                value: "Salary Slips",
-                subValue: "Download & print monthly payslips",
-                icon: <MdReceipt size={28} />,
+                title: "My Quotations",
+                value: stats.totalQuotations,
+                subValue: "Quotations created by you/team",
+                icon: <MdDescription size={28} />,
                 color: "bg-gradient-to-br from-teal-500 to-emerald-600",
-                to: "/payroll/payslips"
+                to: "/quotations"
+            },
+            {
+                title: "Quotation Value",
+                value: formatCurrency(stats.totalValue, 0),
+                subValue: "Total active quote value",
+                icon: <MdAttachMoney size={28} />,
+                color: "bg-gradient-to-br from-primary-600 to-accent",
+                to: "/quotations"
+            },
+            {
+                title: "Draft Quotes",
+                value: stats.pendingDrafts,
+                subValue: "Quotes requiring completion",
+                icon: <MdSchedule size={28} />,
+                color: "bg-gradient-to-br from-amber-400 to-orange-500",
+                to: "/quotations?status=draft"
             },
             {
                 title: "Support Tickets",
@@ -120,12 +131,12 @@ const Dashboard = () => {
                 to: "/csm/tickets"
             },
             {
-                title: "Knowledge Base",
-                value: "Help Articles",
-                subValue: "Browse troubleshooting guides",
-                icon: <MdHelpOutline size={28} />,
+                title: "My Payslips",
+                value: "Salary Slips",
+                subValue: "Download & print monthly payslips",
+                icon: <MdReceipt size={28} />,
                 color: "bg-gradient-to-br from-purple-500 to-fuchsia-600",
-                to: "/csm/kb"
+                to: "/payroll/payslips"
             },
             {
                 title: "Account Security",

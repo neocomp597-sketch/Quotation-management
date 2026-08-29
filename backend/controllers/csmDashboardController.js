@@ -1,40 +1,58 @@
 const Ticket = require('../models/Ticket');
 const User = require('../models/User');
+const { buildAccessScopeQuery } = require('../utils/accessControl');
 
 exports.getStats = async (req, res) => {
     try {
-        const companyId = req.user?.companyId;
         const now = new Date();
+
+        // Build base scope query for user, role/org chart, branch, and date range
+        const baseScope = await buildAccessScopeQuery(req, {
+            branchField: 'branchId',
+            userField: 'createdBy',
+            engineerField: 'assignedEngineerId'
+        });
+
+        // 1. Unassigned Tickets count (Requirement 3)
+        // Tickets that are not resolved/closed/cancelled and have no engineer assigned
+        const unassignedQuery = {
+            ...baseScope,
+            status: { $nin: ['Resolved', 'Closed', 'Cancelled'] },
+            $or: [{ assignedEngineerId: null }, { assignedEngineerId: { $exists: false } }]
+        };
+        const unassignedCount = await Ticket.countDocuments(unassignedQuery);
+
+        // Core metric counters
+        const openCount = await Ticket.countDocuments({ ...baseScope, status: 'Open' });
+        const assignedCount = await Ticket.countDocuments({ ...baseScope, status: 'Assigned' });
+        const inProgressCount = await Ticket.countDocuments({ ...baseScope, status: 'In Progress' });
+        const pendingCount = await Ticket.countDocuments({ ...baseScope, status: 'Pending Customer' });
+
         const startOfToday = new Date();
         startOfToday.setHours(0, 0, 0, 0);
 
-        // Core metric counters
-        const openCount = await Ticket.countDocuments({ status: 'Open', companyId });
-        const assignedCount = await Ticket.countDocuments({ status: 'Assigned', companyId });
-        const inProgressCount = await Ticket.countDocuments({ status: 'In Progress', companyId });
-        const pendingCount = await Ticket.countDocuments({ status: 'Pending Customer', companyId });
         const resolvedTodayCount = await Ticket.countDocuments({
+            ...baseScope,
             status: 'Resolved',
-            resolvedAt: { $gte: startOfToday },
-            companyId
+            resolvedAt: { $gte: startOfToday }
         });
 
         // Overdue tickets (any unresolved ticket past resolution due time)
         const overdueCount = await Ticket.countDocuments({
+            ...baseScope,
             status: { $nin: ['Resolved', 'Closed', 'Cancelled'] },
-            slaResolutionDue: { $lt: now },
-            companyId
+            slaResolutionDue: { $lt: now }
         });
 
         // Status breakdown
         const statusBreakdown = await Ticket.aggregate([
-            { $match: { companyId } },
+            { $match: baseScope },
             { $group: { _id: '$status', count: { $sum: 1 } } }
         ]);
 
         // Priority breakdown
         const priorityBreakdown = await Ticket.aggregate([
-            { $match: { companyId } },
+            { $match: baseScope },
             {
                 $lookup: {
                     from: 'priorities',
@@ -49,7 +67,7 @@ exports.getStats = async (req, res) => {
 
         // Category breakdown
         const categoryBreakdown = await Ticket.aggregate([
-            { $match: { companyId } },
+            { $match: baseScope },
             {
                 $lookup: {
                     from: 'ticketcategories',
@@ -64,20 +82,20 @@ exports.getStats = async (req, res) => {
 
         // SLA compliance breach ratios
         const slaCompliantRes = await Ticket.countDocuments({
+            ...baseScope,
             'isSlaBreached.resolution': false,
-            status: { $in: ['Resolved', 'Closed'] },
-            companyId
+            status: { $in: ['Resolved', 'Closed'] }
         });
         const slaBreachedRes = await Ticket.countDocuments({
-            'isSlaBreached.resolution': true,
-            companyId
+            ...baseScope,
+            'isSlaBreached.resolution': true
         });
 
         // Average resolution time in hours
         const resolvedTickets = await Ticket.find({
+            ...baseScope,
             status: { $in: ['Resolved', 'Closed'] },
-            resolvedAt: { $exists: true },
-            companyId
+            resolvedAt: { $exists: true }
         }).select('createdAt resolvedAt').lean();
 
         let avgResolutionHours = 0;
@@ -91,7 +109,7 @@ exports.getStats = async (req, res) => {
 
         // Leaderboard: engineer performance
         const engineerPerformance = await Ticket.aggregate([
-            { $match: { companyId, assignedEngineerId: { $ne: null }, status: { $in: ['Resolved', 'Closed'] } } },
+            { $match: { ...baseScope, assignedEngineerId: { $ne: null }, status: { $in: ['Resolved', 'Closed'] } } },
             {
                 $group: {
                     _id: '$assignedEngineerId',
@@ -120,19 +138,20 @@ exports.getStats = async (req, res) => {
         ]);
 
         const totalResolvedOrClosed = await Ticket.countDocuments({
-            status: { $in: ['Resolved', 'Closed'] },
-            companyId
+            ...baseScope,
+            status: { $in: ['Resolved', 'Closed'] }
         });
         const totalFCR = await Ticket.countDocuments({
+            ...baseScope,
             status: { $in: ['Resolved', 'Closed'] },
-            isFirstCallResolved: true,
-            companyId
+            isFirstCallResolved: true
         });
         const fcrRate = totalResolvedOrClosed > 0 ? parseFloat(((totalFCR / totalResolvedOrClosed) * 100).toFixed(1)) : 0;
 
         res.json({
             metrics: {
                 open: openCount + assignedCount + inProgressCount,
+                unassigned: unassignedCount,
                 pending: pendingCount,
                 overdue: overdueCount,
                 resolvedToday: resolvedTodayCount,
@@ -156,15 +175,15 @@ exports.getStats = async (req, res) => {
 
 exports.getReportData = async (req, res) => {
     try {
-        const companyId = req.user?.companyId;
-        const { startDate, endDate, priorityId, categoryId, assignedEngineerId } = req.query;
+        const { priorityId, categoryId, assignedEngineerId } = req.query;
 
-        const filter = { companyId };
-        if (startDate || endDate) {
-            filter.createdAt = {};
-            if (startDate) filter.createdAt.$gte = new Date(startDate);
-            if (endDate) filter.createdAt.$lte = new Date(endDate);
-        }
+        const baseScope = await buildAccessScopeQuery(req, {
+            branchField: 'branchId',
+            userField: 'createdBy',
+            engineerField: 'assignedEngineerId'
+        });
+
+        const filter = { ...baseScope };
         if (priorityId) filter.priorityId = priorityId;
         if (categoryId) filter.categoryId = categoryId;
         if (assignedEngineerId) filter.assignedEngineerId = assignedEngineerId;
@@ -233,13 +252,13 @@ exports.getReportData = async (req, res) => {
         // 4. Escalated Cases Report
         const escalatedTickets = tickets.filter(t => t.status === 'Escalated' || t.escalationLevel > 0);
 
-        // 5. Customer Complaints Report (where typeName is Complaint or categoryName is Complaint)
+        // 5. Customer Complaints Report
         const complaintsTickets = tickets.filter(t => 
             t.typeId?.name?.toLowerCase().includes('complaint') || 
             t.categoryId?.name?.toLowerCase().includes('complaint')
         );
 
-        // 6. Service Request Analysis (tickets count by category)
+        // 6. Service Request Analysis
         const categoryCounts = {};
         tickets.forEach(t => {
             const catName = t.categoryId?.name || 'Unknown';
@@ -255,7 +274,6 @@ exports.getReportData = async (req, res) => {
         const fcrResolvedCount = closedTickets.filter(t => t.isFirstCallResolved).length;
         const overallFcrRate = totalResolved > 0 ? parseFloat(((fcrResolvedCount / totalResolved) * 100).toFixed(1)) : 0;
 
-        // FCR Trend
         const fcrTrend = {};
         closedTickets.forEach(t => {
             if (t.resolvedAt) {
@@ -275,9 +293,8 @@ exports.getReportData = async (req, res) => {
         }));
 
         // 8. Service Engineer Productivity
-        // Let's query all engineers from the Engineer Master
         const Engineer = require('../models/Engineer');
-        const engineers = await Engineer.find({ companyId }).select('name email').lean();
+        const engineers = await Engineer.find({ companyId: req.user?.companyId }).select('name email').lean();
         const engineerMap = {};
         engineers.forEach(eng => {
             engineerMap[eng._id.toString()] = {
@@ -291,7 +308,6 @@ exports.getReportData = async (req, res) => {
             };
         });
 
-        // Loop through all tickets to build engineer stats
         tickets.forEach(t => {
             if (t.assignedEngineerId) {
                 const engId = t.assignedEngineerId._id.toString();

@@ -15,6 +15,7 @@ const Login = () => {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -49,14 +50,12 @@ const Login = () => {
       const session = await login(res.data);
 
       toast.success(
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <div style={{ padding: "4px" }}>
-            <span style={{ fontSize: "1.2rem", fontWeight: "bold" }}>
-              Welcome Back!
-            </span>
-            <div style={{ fontSize: "0.9rem", opacity: 0.8 }}>
-              Login successful
-            </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+          <span style={{ fontSize: "1.1rem", fontWeight: "bold" }}>
+            Welcome Back!
+          </span>
+          <div style={{ fontSize: "0.85rem", opacity: 0.8 }}>
+            Login successful
           </div>
         </div>,
         {
@@ -117,7 +116,20 @@ const Login = () => {
             />
           </div>
           <div className="form-group">
-            <label>Password</label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <label style={{ marginBottom: 0 }}>Password</label>
+              <Link
+                to="/forgot-password"
+                style={{
+                  color: '#0d9488',
+                  fontSize: '0.85rem',
+                  fontWeight: '700',
+                  textDecoration: 'none'
+                }}
+              >
+                Forgot Password?
+              </Link>
+            </div>
             <div className="password-input-wrapper">
               <input
                 type={showPassword ? "text" : "password"}
