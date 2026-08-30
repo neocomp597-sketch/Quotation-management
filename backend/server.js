@@ -31,20 +31,7 @@ process.on('uncaughtException', (error) => {
 });
 
 // Connect to Database
-const dbStartupPromise = connectDB().then(async () => {
-  try {
-    const fixMobileAndEmail = require("./scratch/fix_sbu2_mobile_email");
-    await fixMobileAndEmail();
-    const assignSBU2Branch = require("./scratch/assign_sbu2_branch");
-    await assignSBU2Branch();
-    const clearRohitHead = require("./scratch/clear_rohit_dixit_head");
-    await clearRohitHead();
-    const fixCompanyIds = require("./scratch/fix_dept_designation_company_id");
-    await fixCompanyIds();
-  } catch (err) {
-    console.error("[Startup SBU2 Sync] Error:", err.message);
-  }
-});
+const dbStartupPromise = connectDB();
 const redisStartupPromise = connectRedis().then(() => {
   console.log("Redis connected");
   return true;
@@ -1169,6 +1156,70 @@ const startBackgroundServices = async () => {
         ],
         deployedBy: "Super Admin",
         deployedAt: new Date("2026-08-23T18:00:00+05:30"),
+        isActive: true
+      },
+      { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
+    );
+    await SystemUpdate.findOneAndUpdate(
+      { version: "v5.1.0-email-system-and-saas-branding-overhaul" },
+      {
+        version: "v5.1.0-email-system-and-saas-branding-overhaul",
+        title: "Standardized SaaS Transactional Email System & ARCRM Branding Overhaul",
+        message: "We have upgraded backend transactional email services to Gmail Native SMTP transport with automatic SSL port 465 fallback, sanitized credentials, persistent password reset tokens, and redesigned password reset templates featuring modern ARCRM SaaS styling.",
+        releaseNotes: [
+          "Upgraded email service to native Gmail transport with SSL port 465 fallback and Google App Password whitespace sanitization",
+          "Redesigned password reset emails with modern, professional ARCRM SaaS layout (Stripe-inspired UI), replacing legacy placeholders",
+          "Fixed reset password token persistence bug to ensure 1-hour lifecycle token security",
+          "Integrated production fallback options for uninterrupted email delivery across all environments"
+        ],
+        detailedChanges: [
+          { date: "30.08.2026", module: "Email System", submodule: "SMTP Transport & Security", changes: "Integrated Gmail native transport with SSL port 465 fallback and sanitized credentials." },
+          { date: "30.08.2026", module: "Authentication", submodule: "Password Reset Email", changes: "Redesigned password reset template with modern ARCRM SaaS styling and persistent 1-hour tokens." }
+        ],
+        deployedBy: "Super Admin",
+        deployedAt: new Date("2026-08-30T14:00:00+05:30"),
+        isActive: true
+      },
+      { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
+    );
+    await SystemUpdate.findOneAndUpdate(
+      { version: "v5.2.0-sbu2-employee-sync-and-branch-assignment" },
+      {
+        version: "v5.2.0-sbu2-employee-sync-and-branch-assignment",
+        title: "Bulk Employee Mobile/Email Reconciliation & Multi-Branch SBU-II Scoping",
+        message: "Automated employee data synchronization from SBU2 Excel spreadsheets, reconciling missing contact fields, and bulk assigning employee and engineer records to branch SBU-II (Code: USGOAN, Prefix: USG).",
+        releaseNotes: [
+          "Reconciled mobile numbers and email addresses across EmployeeProfile, User, and Engineer collections from Excel source files",
+          "Mass-assigned all employee profiles, user logins, and field engineers to Branch SBU-II (Code: USGOAN, Prefix: USG)",
+          "Enhanced Excel bulk importer header parsing to automatically extract diverse mobile/email spreadsheet header conventions"
+        ],
+        detailedChanges: [
+          { date: "30.08.2026", module: "Employee Management", submodule: "Bulk Excel Import & Data Sync", changes: "Enhanced importController header parser for flexible mobile/email spreadsheet imports." },
+          { date: "30.08.2026", module: "Branch Management", submodule: "SBU-II Branch Assignment", changes: "Synchronized employee profiles, user accounts, and engineer masters under Branch SBU-II (USGOAN/USG)." }
+        ],
+        deployedBy: "Super Admin",
+        deployedAt: new Date("2026-08-30T16:00:00+05:30"),
+        isActive: true
+      },
+      { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
+    );
+    await SystemUpdate.findOneAndUpdate(
+      { version: "v5.3.0-department-master-tenant-scoping-fix" },
+      {
+        version: "v5.3.0-department-master-tenant-scoping-fix",
+        title: "Multi-Tenant Organization ID Scoping & Department Management Refinement",
+        message: "Applied explicit company context (companyId) scoping across Department and Designation masters, removed hardcoded fallback personnel names, and ensured seamless multi-tenant database compliance.",
+        releaseNotes: [
+          "Applied explicit tenant companyId scoping to all Department and Designation backend queries and creation handlers",
+          "Fixed frontend fallback logic in Department Overview and Department Master to replace static sample names with dynamic 'Unassigned' state",
+          "Backfilled companyId on legacy Department and Designation records for 100% tenant isolation across organizations"
+        ],
+        detailedChanges: [
+          { date: "30.08.2026", module: "Payroll & HR", submodule: "Department & Designation Masters", changes: "Enforced companyId scoping across Department and Designation models and backend controllers." },
+          { date: "30.08.2026", module: "Frontend UI", submodule: "Department Management Component", changes: "Replaced hardcoded fallback strings with dynamic tenant data and Unassigned status." }
+        ],
+        deployedBy: "Super Admin",
+        deployedAt: new Date("2026-08-30T21:00:00+05:30"),
         isActive: true
       },
       { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
