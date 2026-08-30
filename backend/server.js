@@ -37,6 +37,10 @@ const dbStartupPromise = connectDB().then(async () => {
     await fixMobileAndEmail();
     const assignSBU2Branch = require("./scratch/assign_sbu2_branch");
     await assignSBU2Branch();
+    const clearRohitHead = require("./scratch/clear_rohit_dixit_head");
+    await clearRohitHead();
+    const fixCompanyIds = require("./scratch/fix_dept_designation_company_id");
+    await fixCompanyIds();
   } catch (err) {
     console.error("[Startup SBU2 Sync] Error:", err.message);
   }

@@ -862,31 +862,38 @@ exports.getAuditLogs = async (req, res) => {
 
 exports.getDepartments = async (req, res) => {
     try {
-        let departments = await Department.find().sort({ name: 1 }).lean();
+        const companyId = req.user?.companyId;
+        let query = companyId ? { companyId } : {};
+        let departments = await Department.find(query).sort({ name: 1 }).lean();
         if (departments.length === 0) {
             const defaults = [
-                { name: 'Sales Department', description: 'Sales and business development' },
-                { name: 'Support Department', description: 'Customer support and service' },
-                { name: 'Marketing Department', description: 'Marketing and brand management' },
-                { name: 'Accounts Department', description: 'Finance, accounts, and tax' },
-                { name: 'HR Department', description: 'Human resources and recruitment' }
+                { name: 'Sales Department', description: 'Sales and business development', companyId },
+                { name: 'Support Department', description: 'Customer support and service', companyId },
+                { name: 'Marketing Department', description: 'Marketing and brand management', companyId },
+                { name: 'Accounts Department', description: 'Finance, accounts, and tax', companyId },
+                { name: 'HR Department', description: 'Human resources and recruitment', companyId }
             ];
             await Department.insertMany(defaults);
-            departments = await Department.find().sort({ name: 1 }).lean();
+            departments = await Department.find(query).sort({ name: 1 }).lean();
         }
         res.json(departments);
     } catch (error) {
+        console.error('getDepartments error:', error);
         res.status(500).json({ message: 'Failed to load departments', error: error.message });
     }
 };
 
 exports.createDepartment = async (req, res) => {
     try {
-        const existing = await Department.findOne({ name: { $regex: new RegExp(`^${req.body.name.trim()}$`, 'i') } }).lean();
+        const companyId = req.user?.companyId;
+        const existing = await Department.findOne({
+            ...(companyId ? { companyId } : {}),
+            name: { $regex: new RegExp(`^${req.body.name.trim()}$`, 'i') }
+        }).lean();
         if (existing) {
             return res.status(400).json({ message: 'Department with this name already exists' });
         }
-        const dept = await Department.create(req.body);
+        const dept = await Department.create({ ...req.body, companyId });
         broadcastCrmUpdate('DEPARTMENT', 'CREATE', dept);
         res.status(201).json(dept);
     } catch (error) {
@@ -896,8 +903,10 @@ exports.createDepartment = async (req, res) => {
 
 exports.updateDepartment = async (req, res) => {
     try {
+        const companyId = req.user?.companyId;
         if (req.body.name) {
             const existing = await Department.findOne({
+                ...(companyId ? { companyId } : {}),
                 _id: { $ne: req.params.id },
                 name: { $regex: new RegExp(`^${req.body.name.trim()}$`, 'i') }
             }).lean();
@@ -915,11 +924,15 @@ exports.updateDepartment = async (req, res) => {
 
 exports.deleteDepartment = async (req, res) => {
     try {
+        const companyId = req.user?.companyId;
         const dept = await Department.findById(req.params.id);
         if (!dept) {
             return res.status(404).json({ message: 'Department not found' });
         }
-        const empCount = await EmployeeProfile.countDocuments({ department: dept.name });
+        const empCount = await EmployeeProfile.countDocuments({
+            ...(companyId ? { companyId } : {}),
+            department: dept.name
+        });
         if (empCount > 0) {
             return res.status(400).json({ message: `Cannot delete department because it is currently assigned to ${empCount} employee(s)` });
         }
@@ -935,31 +948,38 @@ exports.deleteDepartment = async (req, res) => {
 
 exports.getDesignations = async (req, res) => {
     try {
-        let designations = await Designation.find().sort({ name: 1 }).lean();
+        const companyId = req.user?.companyId;
+        let query = companyId ? { companyId } : {};
+        let designations = await Designation.find(query).sort({ name: 1 }).lean();
         if (designations.length === 0) {
             const defaults = [
-                { name: 'Sales Executive', description: 'Sales executive role' },
-                { name: 'Sales Manager', description: 'Managing sales team' },
-                { name: 'Accounts Executive', description: 'Finance and billing executive' },
-                { name: 'HR Manager', description: 'Human resources head' },
-                { name: 'Software Engineer', description: 'Developer and engineering role' }
+                { name: 'Sales Executive', description: 'Sales executive role', companyId },
+                { name: 'Sales Manager', description: 'Managing sales team', companyId },
+                { name: 'Accounts Executive', description: 'Finance and billing executive', companyId },
+                { name: 'HR Manager', description: 'Human resources head', companyId },
+                { name: 'Software Engineer', description: 'Developer and engineering role', companyId }
             ];
             await Designation.insertMany(defaults);
-            designations = await Designation.find().sort({ name: 1 }).lean();
+            designations = await Designation.find(query).sort({ name: 1 }).lean();
         }
         res.json(designations);
     } catch (error) {
+        console.error('getDesignations error:', error);
         res.status(500).json({ message: 'Failed to load designations', error: error.message });
     }
 };
 
 exports.createDesignation = async (req, res) => {
     try {
-        const existing = await Designation.findOne({ name: { $regex: new RegExp(`^${req.body.name.trim()}$`, 'i') } }).lean();
+        const companyId = req.user?.companyId;
+        const existing = await Designation.findOne({
+            ...(companyId ? { companyId } : {}),
+            name: { $regex: new RegExp(`^${req.body.name.trim()}$`, 'i') }
+        }).lean();
         if (existing) {
             return res.status(400).json({ message: 'Designation with this name already exists' });
         }
-        const des = await Designation.create(req.body);
+        const des = await Designation.create({ ...req.body, companyId });
         res.status(201).json(des);
     } catch (error) {
         res.status(500).json({ message: 'Failed to create designation', error: error.message });
@@ -968,8 +988,10 @@ exports.createDesignation = async (req, res) => {
 
 exports.updateDesignation = async (req, res) => {
     try {
+        const companyId = req.user?.companyId;
         if (req.body.name) {
             const existing = await Designation.findOne({
+                ...(companyId ? { companyId } : {}),
                 _id: { $ne: req.params.id },
                 name: { $regex: new RegExp(`^${req.body.name.trim()}$`, 'i') }
             }).lean();
@@ -986,11 +1008,15 @@ exports.updateDesignation = async (req, res) => {
 
 exports.deleteDesignation = async (req, res) => {
     try {
+        const companyId = req.user?.companyId;
         const des = await Designation.findById(req.params.id);
         if (!des) {
             return res.status(404).json({ message: 'Designation not found' });
         }
-        const empCount = await EmployeeProfile.countDocuments({ designation: des.name });
+        const empCount = await EmployeeProfile.countDocuments({
+            ...(companyId ? { companyId } : {}),
+            designation: des.name
+        });
         if (empCount > 0) {
             return res.status(400).json({ message: `Cannot delete designation because it is currently assigned to ${empCount} employee(s)` });
         }

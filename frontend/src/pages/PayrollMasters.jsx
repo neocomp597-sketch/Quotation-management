@@ -727,7 +727,7 @@ const PayrollMasters = ({ isCreatePage, isEditPage }) => {
                                                     {dept.name}
                                                 </h3>
                                                 <p className="text-xs font-semibold text-slate-500 mt-1">
-                                                    Head: <span className="text-slate-800 font-bold">{dept.head || 'Rohit Dixit'}</span>
+                                                    Head: <span className="text-slate-800 font-bold">{dept.head || 'Unassigned'}</span>
                                                 </p>
                                             </div>
                                             <span className="bg-primary-600 text-white font-black text-xs px-3 py-1 rounded-full shadow-sm">
@@ -1034,7 +1034,7 @@ const PayrollMasters = ({ isCreatePage, isEditPage }) => {
                                             <tr key={dept._id} className="hover:bg-slate-50/60 transition-colors">
                                                 <td className="px-6 py-4 font-mono font-bold text-slate-500">{deptCode}</td>
                                                 <td className="px-6 py-4 font-bold text-slate-900">{dept.name}</td>
-                                                <td className="px-6 py-4 text-slate-600">{dept.head || 'Rohit Dixit'}</td>
+                                                <td className="px-6 py-4 text-slate-600">{dept.head || 'Unassigned'}</td>
                                                 <td className="px-6 py-4 text-center">
                                                     <span className="bg-slate-100 text-slate-800 text-xs font-bold px-3 py-1 rounded-full border border-slate-200">
                                                         {count} Employees
