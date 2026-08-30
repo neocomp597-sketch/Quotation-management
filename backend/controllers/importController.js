@@ -2371,7 +2371,8 @@ const importEmployees = async (req, res) => {
                     throw new Error('Employee Name is required');
                 }
 
-                const email = pickFirstNonEmpty(row['Email'], row.email);
+                const email = pickFirstNonEmpty(row['Email'], row['EMAIL'], row['Email ID'], row['EMAIL ID'], row['Email Id'], row['Official Email'], row['Personal Email'], row.email);
+                const mobile = pickFirstNonEmpty(row['Mobile'], row['MOBILE'], row['Mobile Number'], row['MOBILE NO'], row['Mobile No.'], row['Phone'], row['PHONE'], row['Phone Number'], row['Contact'], row['CONTACT NO'], row['Contact No.'], row['Cell'], row['CONTACT'], row.mobile, row.phone);
                 const pan = pickFirstNonEmpty(row['PAN'], row.pan);
                 const aadhaar = pickFirstNonEmpty(row['Aadhaar'], row.aadhaar);
                 const uan = pickFirstNonEmpty(row['UAN'], row.uan);
@@ -2399,6 +2400,9 @@ const importEmployees = async (req, res) => {
                 const empData = {
                     name,
                     email,
+                    mobile,
+                    phone: mobile,
+                    contactNumber: mobile,
                     pan,
                     aadhaar,
                     uan,

@@ -31,7 +31,16 @@ process.on('uncaughtException', (error) => {
 });
 
 // Connect to Database
-const dbStartupPromise = connectDB();
+const dbStartupPromise = connectDB().then(async () => {
+  try {
+    const fixMobileAndEmail = require("./scratch/fix_sbu2_mobile_email");
+    await fixMobileAndEmail();
+    const assignSBU2Branch = require("./scratch/assign_sbu2_branch");
+    await assignSBU2Branch();
+  } catch (err) {
+    console.error("[Startup SBU2 Sync] Error:", err.message);
+  }
+});
 const redisStartupPromise = connectRedis().then(() => {
   console.log("Redis connected");
   return true;
