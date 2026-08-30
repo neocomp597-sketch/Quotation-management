@@ -2,6 +2,7 @@ let nodemailer;
 try {
     nodemailer = require('nodemailer');
 } catch (err) {
+    console.error('[Email Service] Failed to load nodemailer package:', err.message);
     nodemailer = null;
 }
 
@@ -22,9 +23,9 @@ const sendEmail = async ({ to, subject, html, text }) => {
     const from = process.env.SMTP_FROM || process.env.EMAIL_FROM || `"ARCRM Support" <${user}>`;
     const secure = process.env.SMTP_SECURE === 'true' || port === 465;
 
-    console.log(`[Email Service] Attempting to send email to: ${to} | Subject: "${subject}"`);
+    console.log(`[Email Service] Initiating email send to: ${to} | Sender: ${user} | Host: ${host}:${port}`);
 
-    if (nodemailer && (host || user) && pass) {
+    if (nodemailer && host && user && pass) {
         const isGmail = (host && host.includes('gmail')) || user.endsWith('@gmail.com');
         
         let transporter;
@@ -101,3 +102,4 @@ const sendEmail = async ({ to, subject, html, text }) => {
 };
 
 module.exports = sendEmail;
+

