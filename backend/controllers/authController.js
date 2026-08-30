@@ -474,7 +474,9 @@ exports.forgotPassword = async (req, res) => {
         user.resetPasswordExpires = Date.now() + 3600000; // 1 hour validity
         await user.save();
 
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        const requestOrigin = req.get('origin');
+        const defaultFrontend = process.env.FRONTEND_URL || 'https://arcrm.co.in';
+        const frontendUrl = (requestOrigin && !requestOrigin.includes('null')) ? requestOrigin.replace(/\/$/, '') : defaultFrontend;
         const resetUrl = `${frontendUrl}/reset-password/${resetToken}`;
 
         // Send Email via Nodemailer SMTP
