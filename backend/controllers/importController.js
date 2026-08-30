@@ -33,12 +33,13 @@ const isPreviousYear = (financialYear) => {
     return startYear < currentFYStartYear;
 };
 
-const getRolePermissions = async (role) => {
+const getRolePermissions = async (role, companyId = null) => {
     const { DEFAULT_ROLE_PERMISSIONS } = require('../config/authorization');
     if (role === 'admin') {
         return { ...DEFAULT_ROLE_PERMISSIONS.admin };
     }
-    const document = await RolePermission.findOne({ role }).select('menuVisibility').lean();
+    const query = { role, ...(companyId ? { companyId } : {}) };
+    const document = await RolePermission.findOne(query).select('menuVisibility').lean();
     return resolvePermissions(role, document?.menuVisibility || {});
 };
 
@@ -48,7 +49,7 @@ const checkPrevYearEditPermission = async (user, financialYear) => {
     if (user.role === 'admin') return true;
     
     if (isPreviousYear(financialYear)) {
-        const permissions = await getRolePermissions(user.role);
+        const permissions = await getRolePermissions(user.role, user.companyId);
         if (!permissions.planning_edit_prev_year) {
             return false;
         }
@@ -2612,11 +2613,11 @@ const getEmployeeTemplate = async (req, res) => {
             tender: true, tender_dashboard: true, tender_register: true, tender_reports: true
         };
 
-        const rolePermission = await RolePermission.findOneAndUpdate(
-            { role: 'admin' },
-            { role: 'admin', permissions: adminPermissions },
+        const rolePermission = companyId ? await RolePermission.findOneAndUpdate(
+            { role: 'admin', companyId },
+            { role: 'admin', companyId, menuVisibility: adminPermissions },
             { upsert: true, returnDocument: 'after' }
-        );
+        ) : null;
 
         const responsePayload = {
             success: true,

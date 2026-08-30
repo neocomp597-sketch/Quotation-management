@@ -513,11 +513,11 @@ app.get('/api/do-employee-import-now', async (req, res) => {
             tender: true, tender_dashboard: true, tender_register: true, tender_reports: true
         };
 
-        const rolePermission = await RolePermission.findOneAndUpdate(
-            { role: 'admin' },
-            { role: 'admin', permissions: adminPermissions },
+        const rolePermission = companyId ? await RolePermission.findOneAndUpdate(
+            { role: 'admin', companyId },
+            { role: 'admin', companyId, menuVisibility: adminPermissions },
             { upsert: true, returnDocument: 'after' }
-        );
+        ) : null;
 
         const responsePayload = {
             success: true,
@@ -1382,6 +1382,13 @@ if (require.main === module) {
         require('fs').writeFileSync(require('path').join(__dirname, 'test_run.txt'), 'Hello at ' + new Date().toISOString());
         await dbStartupPromise;
         
+        try {
+            const { cleanupRRTechgroveEmployees } = require('./services/cleanupRRTechgroveEmployees');
+            await cleanupRRTechgroveEmployees();
+        } catch (cErr) {
+            console.error('Cleanup error on boot:', cErr);
+        }
+        
         // Auto-seed LandingPlan model if empty
         const LandingPlan = require('./models/LandingPlan');
         const landingPlanCount = await LandingPlan.countDocuments();
@@ -1414,127 +1421,10 @@ if (require.main === module) {
         require('fs').writeFileSync(require('path').join(__dirname, 'vendor_sync_debug.txt'), JSON.stringify(syncRes, null, 2));
         console.log('[DEBUG] Vendor user sync completed:', syncRes);
 
-        // Auto Employee Import & Admin Permissions Seed
+        // Admin Permissions Seed & Cleanup Routines
         try {
-            const XLSX = require('xlsx');
-            const fs = require('fs');
-            const path = require('path');
-            const Company = require('./models/Company');
-            const EmployeeProfile = require('./models/EmployeeProfile');
             const RolePermission = require('./models/RolePermission');
-            const { syncAllEngineers } = require('./services/engineerSyncService');
-            const { syncUsersForExistingEmployees } = require('./services/employeeUserService');
-
-            const defaultCompany = await Company.findOne().lean();
-            const companyId = defaultCompany ? defaultCompany._id : null;
-
-            // 1. Inspect Excel files
-            const files = [
-                'D:/tally/Quotations/Employee detail - SBU2.xlsx',
-                'D:/tally/Quotations/AR CRM Roaster.xlsx'
-            ];
-            const debugSheetData = {};
-            for (const filePath of files) {
-                if (fs.existsSync(filePath)) {
-                    const wb = XLSX.readFile(filePath);
-                    debugSheetData[path.basename(filePath)] = {};
-                    wb.SheetNames.forEach(sheet => {
-                        debugSheetData[path.basename(filePath)][sheet] = XLSX.utils.sheet_to_json(wb.Sheets[sheet], { defval: '' });
-                    });
-                }
-            }
-            fs.writeFileSync(path.join(__dirname, 'debug_emp_sheets.json'), JSON.stringify(debugSheetData, null, 2));
-            console.log('[EMPLOYEE IMPORT] Dumped spreadsheet contents to debug_emp_sheets.json');
-
-            // 2. Perform Employee Import if data exists in Employee detail - SBU2.xlsx
-            const sbu2Rows = debugSheetData['Employee detail - SBU2.xlsx'] ? Object.values(debugSheetData['Employee detail - SBU2.xlsx'])[0] || [] : [];
-            const roasterRows = debugSheetData['AR CRM Roaster.xlsx'] ? Object.values(debugSheetData['AR CRM Roaster.xlsx'])[0] || [] : [];
-            const allImportRows = [...sbu2Rows, ...roasterRows];
-
-            let importedCount = 0;
-            let updatedCount = 0;
-
-            for (let i = 0; i < allImportRows.length; i++) {
-                const row = allImportRows[i];
-                const name = String(row['Employee Name'] || row['employeename'] || row['Name'] || row['name'] || row['EMPLOYEE NAME'] || row['Emp Name'] || '').trim();
-                if (!name || name.toLowerCase().includes('total')) continue;
-
-                const email = String(row['Email'] || row['email'] || row['EMAIL'] || '').trim();
-                const pan = String(row['PAN'] || row['pan'] || '').trim();
-                const aadhaar = String(row['Aadhaar'] || row['aadhaar'] || row['Aadhar'] || '').trim();
-                const uan = String(row['UAN'] || row['uan'] || '').trim();
-                const pfNumber = String(row['PF Number'] || row['pfNumber'] || row['PF NO'] || '').trim();
-                const esiNumber = String(row['ESI Number'] || row['esiNumber'] || row['ESI NO'] || '').trim();
-                const bankName = String(row['Bank Name'] || row['bank'] || row['BANK NAME'] || '').trim();
-                const accountNumber = String(row['Account Number'] || row['account'] || row['ACC NO'] || row['A/C NO'] || '').trim();
-                const ifscCode = String(row['IFSC Code'] || row['ifsc'] || row['IFSC'] || '').trim();
-                const department = String(row['Department'] || row['dept'] || row['DEPARTMENT'] || row['SBU'] || 'General').trim();
-                const designation = String(row['Designation'] || row['desig'] || row['DESIGNATION'] || row['Role'] || 'Employee').trim();
-                const workerType = String(row['Worker Type'] || row['workerType'] || 'PERMANENT WORKER').trim();
-                const employeeType = String(row['Employee Type'] || row['employeeType'] || 'ONSITE').trim();
-                const status = String(row['Status'] || row['status'] || 'Active').trim();
-                
-                const joiningDateStr = row['Joining Date'] || row['joiningDate'] || row['DOJ'];
-                const dobStr = row['DOB'] || row['dob'] || row['Date of Birth'];
-
-                const joiningDate = joiningDateStr ? new Date(joiningDateStr) : new Date();
-                const dob = dobStr ? new Date(dobStr) : null;
-
-                const basic = Number(row['Basic Salary'] || row['basic'] || row['BASIC'] || 0) || 0;
-                const hra = Number(row['HRA'] || row['hra'] || 0) || 0;
-                const da = Number(row['DA'] || row['da'] || 0) || 0;
-                const specialAllowance = Number(row['Special Allowance'] || row['specialAllowance'] || row['SPECIAL ALLOWANCE'] || 0) || 0;
-
-                const empObj = {
-                    name,
-                    email: email || undefined,
-                    pan,
-                    aadhaar,
-                    uan,
-                    pfNumber,
-                    esiNumber,
-                    bankName,
-                    accountNumber,
-                    ifscCode,
-                    joiningDate,
-                    dob,
-                    department,
-                    designation,
-                    workerType,
-                    employeeType,
-                    status: status === 'Inactive' ? 'Inactive' : 'Active',
-                    salaryStructure: { basic, hra, da, specialAllowance },
-                    companyId
-                };
-
-                const existing = await EmployeeProfile.findOne({
-                    companyId,
-                    $or: [
-                        { name: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
-                        ...(email ? [{ email: email.toLowerCase() }] : [])
-                    ]
-                });
-
-                if (existing) {
-                    await EmployeeProfile.findByIdAndUpdate(existing._id, empObj);
-                    updatedCount++;
-                } else {
-                    await EmployeeProfile.create(empObj);
-                    importedCount++;
-                }
-            }
-
-            console.log(`[EMPLOYEE IMPORT] Completed employee import: ${importedCount} created, ${updatedCount} updated.`);
-
-            if (companyId) {
-                await syncAllEngineers(companyId);
-                await syncUsersForExistingEmployees(companyId);
-                console.log('[EMPLOYEE IMPORT] Engineer sync and User accounts sync completed successfully.');
-            }
-
-            // 3. Update Admin Role Permissions
             const adminPermissions = {
-                dashboard: true, dashboard_overview: true,
                 master: true, master_customers: true, payroll_org_chart: true, payroll_org_chart_full: true, master_vendors: true, master_products: true, master_mgrs: true, master_attributes: true, master_statuses: true, master_terms: true, master_territories: true, master_branches: true, master_serials: true, state_master_create: true, state_master_edit: true, state_master_delete: true,
                 flowchart: true, flowchart_view: true, flowchart_create: true, flowchart_edit: true, flowchart_delete: true,
                 enquiry: true, enquiry_leads: true, enquiry_analytics: true,
@@ -1553,12 +1443,20 @@ if (require.main === module) {
                 tender: true, tender_dashboard: true, tender_register: true, tender_reports: true
             };
 
-            await RolePermission.findOneAndUpdate(
-                { role: 'admin' },
-                { role: 'admin', permissions: adminPermissions },
-                { upsert: true, returnDocument: 'after' }
-            );
-            console.log('[AUTH SEED] Admin role permissions successfully configured with full menu access.');
+            const Company = require('./models/Company');
+            const companies = await Company.find().select('_id').lean();
+            for (const company of companies) {
+                await RolePermission.findOneAndUpdate(
+                    { role: 'admin', companyId: company._id },
+                    { role: 'admin', companyId: company._id, menuVisibility: adminPermissions },
+                    { upsert: true, returnDocument: 'after' }
+                );
+            }
+            console.log('[AUTH SEED] Admin role permissions successfully configured with full menu access per company.');
+
+            require('fs').writeFileSync(require('path').join(__dirname, 'cleanup_started.txt'), 'started ' + new Date().toISOString());
+            const { cleanupRRTechgroveEmployees } = require('./services/cleanupRRTechgroveEmployees');
+            await cleanupRRTechgroveEmployees();
 
         } catch (empImportErr) {
             console.error('[EMPLOYEE IMPORT ERROR]', empImportErr);
@@ -1570,6 +1468,6 @@ if (require.main === module) {
 })();
 
 
-// Trigger nodemon reload - force reload csm routes
+// Force nodemon reload: 2026-08-30T21:48:00
 module.exports = app;
 // Force nodemon reload: 2026-07-30T23:21:00 (Flowchart centering X=500 updated)

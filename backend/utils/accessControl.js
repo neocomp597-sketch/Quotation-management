@@ -58,7 +58,7 @@ const buildAccessScopeQuery = async (req, {
     const user = req.user;
     if (!user) return {};
 
-    const companyId = customCompanyId || user.companyId;
+    const companyId = customCompanyId || req.query?.companyId || req.headers?.['x-company-id'] || user.companyId;
     const query = {};
 
     if (companyId) {

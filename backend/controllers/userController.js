@@ -25,14 +25,14 @@ const validateReportsTo = async ({ reportsTo, userId, companyId }) => {
 const Company = require('../models/Company');
 
 const getEffectiveCompanyId = async (req) => {
-    let companyId = req.user?.companyId || getTenantId?.();
+    let companyId = req.query?.companyId || req.headers?.['x-company-id'] || req.body?.companyId || req.user?.companyId || getTenantId?.();
     if (!companyId) {
         const firstCompany = await Company.findOne().lean();
         if (firstCompany) {
             companyId = firstCompany._id.toString();
         }
     }
-    return companyId;
+    return companyId?.toString ? companyId.toString() : companyId;
 };
 
 exports.getAllUsers = async (req, res) => {
@@ -70,7 +70,7 @@ exports.createUser = async (req, res) => {
         }
 
         const isBuiltIn = ROLE_OPTIONS.includes(role);
-        const customRole = !isBuiltIn ? await RolePermission.findOne({ role }).select('_id').lean() : null;
+        const customRole = !isBuiltIn ? await RolePermission.findOne({ role, companyId }).select('_id').lean() : null;
         if (!isBuiltIn && !customRole) {
             return res.status(400).json({ message: 'Invalid role supplied' });
         }
@@ -174,8 +174,9 @@ exports.updateUserRole = async (req, res) => {
         const { id } = req.params;
         const { role } = req.body;
 
+        const companyId = await getEffectiveCompanyId(req);
         const isBuiltIn = ROLE_OPTIONS.includes(role);
-        const customRole = !isBuiltIn ? await RolePermission.findOne({ role }).select('_id').lean() : null;
+        const customRole = !isBuiltIn ? await RolePermission.findOne({ role, companyId }).select('_id').lean() : null;
 
         if (!isBuiltIn && !customRole) {
             return res.status(400).json({ message: 'Invalid role supplied' });
@@ -273,7 +274,7 @@ exports.updateUser = async (req, res) => {
             }
 
             const isBuiltIn = ROLE_OPTIONS.includes(role);
-            const customRole = !isBuiltIn ? await RolePermission.findOne({ role }).select('_id').lean() : null;
+            const customRole = !isBuiltIn ? await RolePermission.findOne({ role, companyId: user.companyId }).select('_id').lean() : null;
             if (!isBuiltIn && !customRole) {
                 return res.status(400).json({ message: 'Invalid role supplied' });
             }

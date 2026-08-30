@@ -1,0 +1,114 @@
+{
+  "success": true,
+  "summary": {
+    "timestamp": "2026-08-30T16:18:16.153Z",
+    "superCompanyId": "6a8bf304ac99b5d51a116954",
+    "matchedCount": 393,
+    "toDeleteCount": 194,
+    "matchedDetails": [
+      {
+        "id": "6a942a7556029d2285ba8615",
+        "name": "Ramakrishnan Eshwaramoothy Pillai",
+        "companyId": "6a0b44ab81a41f89dab23668"
+      },
+      {
+        "id": "6a942a7656029d2285ba861b",
+        "name": "Ashok Dattatrey Warghade",
+        "companyId": "6a0b44ab81a41f89dab23668"
+      },
+      {
+        "id": "6a942a7756029d2285ba861f",
+        "name": "Mangesh Ladaku Jadhav",
+        "companyId": "6a0b44ab81a41f89dab23668"
+      },
+      {
+        "id": "6a942a7856029d2285ba8625",
+        "name": "Amol Shashikant Dalvi",
+        "companyId": "6a0b44ab81a41f89dab23668"
+      },
+      {
+        "id": "6a942a7956029d2285ba862b",
+        "name": "Manoj Gajanan Jadhav",
+        "companyId": "6a0b44ab81a41f89dab23668"
+      },
+      {
+        "id": "6a942a7a56029d2285ba8631",
+        "name": "Sushil Sonu Parab",
+        "companyId": "6a0b44ab81a41f89dab23668"
+      },
+      {
+        "id": "6a942a7b56029d2285ba8637",
+        "name": "Sugathavel Maharaja Pillai",
+        "companyId": "6a0b44ab81a41f89dab23668"
+      },
+      {
+        "id": "6a942a7c56029d2285ba863d",
+        "name": "Bidhubhusan Biswal",
+        "companyId": "6a0b44ab81a41f89dab23668"
+      },
+      {
+        "id": "6a942a7d56029d2285ba8643",
+        "name": "Radhakrishnan Padmanabha Pillai",
+        "companyId": "6a0b44ab81a41f89dab23668"
+      },
+      {
+        "id": "6a942a7e56029d2285ba8649",
+        "name": "Atul Gopal Bhoir",
+        "companyId": "6a0b44ab81a41f89dab23668"
+      },
+      {
+        "id": "6a942a7f56029d2285ba864f",
+        "name": "Nilesh Manohar Ayare",
+        "companyId": "6a0b44ab81a41f89dab23668"
+      },
+      {
+        "id": "6a942a8056029d2285ba8655",
+        "name": "Divan Sukhram Singh",
+        "companyId": "6a0b44ab81a41f89dab23668"
+      },
+      {
+        "id": "6a942a8156029d2285ba865b",
+        "name": "Sunil Subhash Gawad",
+        "companyId": "6a0b44ab81a41f89dab23668"
+      },
+      {
+        "id": "6a942a8256029d2285ba8661",
+        "name": "Vishwanath Rajaram Ayare",
+        "companyId": "6a0b44ab81a41f89dab23668"
+      },
+      {
+        "id": "6a942a8356029d2285ba8667",
+        "name": "Jitendra Dwarkanath Godade",
+        "companyId": "6a0b44ab81a41f89dab23668"
+      },
+      {
+        "id": "6a942a8456029d2285ba866d",
+        "name": "Senthilkumar Balakrishnan",
+        "companyId": "6a0b44ab81a41f89dab23668"
+      },
+      {
+        "id": "6a942a8556029d2285ba8673",
+        "name": "Sivathanu Mathevan Pillai",
+        "companyId": "6a0b44ab81a41f89dab23668"
+      },
+      {
+        "id": "6a942a8656029d2285ba8679",
+        "name": "Dayanand Jadhav",
+        "companyId": "6a0b44ab81a41f89dab23668"
+      },
+      {
+        "id": "6a942a8756029d2285ba867f",
+        "name": "Sanjay Bhau Gorhekar",
+        "companyId": "6a0b44ab81a41f89dab23668"
+      },
+      {
+        "id": "6a942a8856029d2285ba8685",
+        "name": "Viraj Moreshwar Naik",
+        "companyId": "6a0b44ab81a41f89dab23668"
+      }
+    ],
+    "deletedEmployeesCount": 194,
+    "deletedUsersCount": 0,
+    "deletedEngineersCount": 0
+  }
+}

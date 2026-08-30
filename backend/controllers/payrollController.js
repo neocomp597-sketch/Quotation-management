@@ -6,8 +6,21 @@ const PayrollLetter = require('../models/PayrollLetter');
 const PayrollAuditLog = require('../models/PayrollAuditLog');
 const Department = require('../models/Department');
 const Designation = require('../models/Designation');
+const Company = require('../models/Company');
+const { getTenantId } = require('../middlewares/tenantContext');
 const mongoose = require('mongoose');
 const { broadcastCrmUpdate } = require('../config/socket');
+
+const getEffectiveCompanyId = async (req) => {
+    let companyId = req.query?.companyId || req.headers?.['x-company-id'] || req.body?.companyId || req.user?.companyId || getTenantId?.();
+    if (!companyId) {
+        const firstCompany = await Company.findOne().lean();
+        if (firstCompany) {
+            companyId = firstCompany._id;
+        }
+    }
+    return companyId?.toString ? companyId.toString() : companyId;
+};
 
 // Helper to write to PayrollAuditLog
 const writePayrollAudit = async (req, action, details, targetId = null, targetType = null) => {
@@ -89,7 +102,8 @@ const calculateEmployeePayrollValues = (baseStructure, adjustments, settings) =>
 
 exports.getEmployees = async (req, res) => {
     try {
-        const query = {};
+        const companyId = await getEffectiveCompanyId(req);
+        const query = companyId ? { companyId } : {};
         if (req.query.status) {
             query.status = req.query.status;
         }
@@ -409,17 +423,19 @@ exports.createRun = async (req, res) => {
             return res.status(400).json({ message: 'Month is required' });
         }
 
+        const companyId = await getEffectiveCompanyId(req);
+
         // Check if run already exists
-        const existingRun = await PayrollRun.findOne({ month }).lean();
+        const existingRun = await PayrollRun.findOne({ month, companyId }).lean();
         if (existingRun) {
             return res.status(400).json({ message: `Payroll run for ${month} already exists` });
         }
 
         // Fetch settings
-        const settings = await PayrollSettings.findOne().lean() || { calculationType: 'fixed', pfEnabled: true, esiEnabled: true, ptEnabled: true, tdsEnabled: true };
+        const settings = await PayrollSettings.findOne({ companyId }).lean() || { calculationType: 'fixed', pfEnabled: true, esiEnabled: true, ptEnabled: true, tdsEnabled: true };
 
-        // Fetch all active/hold employees
-        const employees = await EmployeeProfile.find({ status: { $in: ['Active', 'Hold'] } }).lean();
+        // Fetch all active/hold employees for this organization
+        const employees = await EmployeeProfile.find({ companyId, status: { $in: ['Active', 'Hold'] } }).lean();
         if (employees.length === 0) {
             return res.status(400).json({ message: 'No active employees to generate payroll for' });
         }
@@ -862,8 +878,11 @@ exports.getAuditLogs = async (req, res) => {
 
 exports.getDepartments = async (req, res) => {
     try {
-        const companyId = req.user?.companyId;
-        let query = companyId ? { companyId } : {};
+        const companyId = await getEffectiveCompanyId(req);
+        if (!companyId) {
+            return res.status(400).json({ message: 'Company context missing' });
+        }
+        let query = { companyId };
         let departments = await Department.find(query).sort({ name: 1 }).lean();
         if (departments.length === 0) {
             const defaults = [
@@ -873,7 +892,7 @@ exports.getDepartments = async (req, res) => {
                 { name: 'Accounts Department', description: 'Finance, accounts, and tax', companyId },
                 { name: 'HR Department', description: 'Human resources and recruitment', companyId }
             ];
-            await Department.insertMany(defaults);
+            await Department.insertMany(defaults, { bypassTenant: true });
             departments = await Department.find(query).sort({ name: 1 }).lean();
         }
         res.json(departments);
@@ -885,7 +904,7 @@ exports.getDepartments = async (req, res) => {
 
 exports.createDepartment = async (req, res) => {
     try {
-        const companyId = req.user?.companyId;
+        const companyId = await getEffectiveCompanyId(req);
         const existing = await Department.findOne({
             ...(companyId ? { companyId } : {}),
             name: { $regex: new RegExp(`^${req.body.name.trim()}$`, 'i') }
@@ -903,7 +922,7 @@ exports.createDepartment = async (req, res) => {
 
 exports.updateDepartment = async (req, res) => {
     try {
-        const companyId = req.user?.companyId;
+        const companyId = await getEffectiveCompanyId(req);
         if (req.body.name) {
             const existing = await Department.findOne({
                 ...(companyId ? { companyId } : {}),
@@ -924,7 +943,7 @@ exports.updateDepartment = async (req, res) => {
 
 exports.deleteDepartment = async (req, res) => {
     try {
-        const companyId = req.user?.companyId;
+        const companyId = await getEffectiveCompanyId(req);
         const dept = await Department.findById(req.params.id);
         if (!dept) {
             return res.status(404).json({ message: 'Department not found' });
@@ -948,8 +967,11 @@ exports.deleteDepartment = async (req, res) => {
 
 exports.getDesignations = async (req, res) => {
     try {
-        const companyId = req.user?.companyId;
-        let query = companyId ? { companyId } : {};
+        const companyId = await getEffectiveCompanyId(req);
+        if (!companyId) {
+            return res.status(400).json({ message: 'Company context missing' });
+        }
+        let query = { companyId };
         let designations = await Designation.find(query).sort({ name: 1 }).lean();
         if (designations.length === 0) {
             const defaults = [
@@ -959,7 +981,7 @@ exports.getDesignations = async (req, res) => {
                 { name: 'HR Manager', description: 'Human resources head', companyId },
                 { name: 'Software Engineer', description: 'Developer and engineering role', companyId }
             ];
-            await Designation.insertMany(defaults);
+            await Designation.insertMany(defaults, { bypassTenant: true });
             designations = await Designation.find(query).sort({ name: 1 }).lean();
         }
         res.json(designations);
@@ -971,7 +993,7 @@ exports.getDesignations = async (req, res) => {
 
 exports.createDesignation = async (req, res) => {
     try {
-        const companyId = req.user?.companyId;
+        const companyId = await getEffectiveCompanyId(req);
         const existing = await Designation.findOne({
             ...(companyId ? { companyId } : {}),
             name: { $regex: new RegExp(`^${req.body.name.trim()}$`, 'i') }
@@ -988,7 +1010,7 @@ exports.createDesignation = async (req, res) => {
 
 exports.updateDesignation = async (req, res) => {
     try {
-        const companyId = req.user?.companyId;
+        const companyId = await getEffectiveCompanyId(req);
         if (req.body.name) {
             const existing = await Designation.findOne({
                 ...(companyId ? { companyId } : {}),

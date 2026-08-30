@@ -1,5 +1,7 @@
 const RolePermission = require('../models/RolePermission');
 const User = require('../models/User');
+const Company = require('../models/Company');
+const { getTenantId } = require('../middlewares/tenantContext');
 const {
     MENU_GROUPS,
     ROLE_OPTIONS,
@@ -9,6 +11,17 @@ const {
     resolvePermissions,
     buildPermissions
 } = require('../config/authorization');
+
+const getEffectiveCompanyId = async (req) => {
+    let companyId = req.query?.companyId || req.headers?.['x-company-id'] || req.body?.companyId || req.user?.companyId || getTenantId?.();
+    if (!companyId) {
+        const firstCompany = await Company.findOne().lean();
+        if (firstCompany) {
+            companyId = firstCompany._id;
+        }
+    }
+    return companyId?.toString ? companyId.toString() : companyId;
+};
 
 /**
  * Robustly converts a Mongoose Map / plain object / native Map into a
@@ -43,13 +56,16 @@ const buildRolePayload = (doc) => {
 // ─── GET /authorization ────────────────────────────────────────────────────
 exports.getAuthorizationMatrix = async (req, res) => {
     try {
-        // Fetch ALL role documents (built-in + custom)
-        const documents = await RolePermission.find()
-            .select('role label description isCustom menuVisibility createdAt')
+        const companyId = await getEffectiveCompanyId(req);
+        const query = companyId ? { companyId } : {};
+
+        // Fetch role documents for this company (built-in + custom)
+        const documents = await RolePermission.find(query)
+            .select('role label description isCustom menuVisibility createdAt companyId')
             .sort({ createdAt: 1 })
             .lean();
 
-        // Also ensure the 3 built-in roles exist in the response even if not in DB
+        // Also ensure the built-in roles exist in the response even if not in DB for this company
         const foundRoles = new Set(documents.map((d) => d.role));
         const syntheticBuiltIns = ROLE_OPTIONS
             .filter((r) => !foundRoles.has(r))
@@ -64,7 +80,6 @@ exports.getAuthorizationMatrix = async (req, res) => {
         const allDocs = [...syntheticBuiltIns, ...documents];
         const roles   = allDocs.map(buildRolePayload);
 
-        // Send updated MENU_GROUPS including Org Chart under Master
         res.json({ menuGroups: MENU_GROUPS, roles });
     } catch (error) {
         console.error('getAuthorizationMatrix error:', error);
@@ -75,8 +90,9 @@ exports.getAuthorizationMatrix = async (req, res) => {
 // ─── GET /authorization/me ─────────────────────────────────────────────────
 exports.getMyPermissions = async (req, res) => {
     try {
+        const companyId = await getEffectiveCompanyId(req);
         const role     = req.user?.role || 'sales';
-        const document = await RolePermission.findOne({ role }).select('menuVisibility').lean();
+        const document = await RolePermission.findOne({ role, ...(companyId ? { companyId } : {}) }).select('menuVisibility').lean();
         const rolePerms = resolvePermissions(role, toPermissionObject(document?.menuVisibility));
 
         let userCustom = {};
@@ -102,11 +118,15 @@ exports.getMyPermissions = async (req, res) => {
 exports.updateRolePermissions = async (req, res) => {
     try {
         const { role } = req.params;
+        const companyId = await getEffectiveCompanyId(req);
+        if (!companyId) {
+            return res.status(400).json({ message: 'Company context missing' });
+        }
 
         const sanitizedPermissions = sanitizePermissions(req.body?.permissions || {});
         const doc = await RolePermission.findOneAndUpdate(
-            { role },
-            { $set: { menuVisibility: sanitizedPermissions } },
+            { role, companyId },
+            { $set: { menuVisibility: sanitizedPermissions, companyId } },
             { returnDocument: 'after', upsert: true, setDefaultsOnInsert: true, runValidators: false }
         );
 
@@ -121,6 +141,10 @@ exports.updateRolePermissions = async (req, res) => {
 // Creates a new custom role with a slug key, display label and description.
 exports.createRole = async (req, res) => {
     try {
+        const companyId = await getEffectiveCompanyId(req);
+        if (!companyId) {
+            return res.status(400).json({ message: 'Company context missing' });
+        }
         const { label, description } = req.body || {};
         if (!label || !label.trim()) {
             return res.status(400).json({ message: 'Role label is required' });
@@ -132,7 +156,7 @@ exports.createRole = async (req, res) => {
             return res.status(400).json({ message: 'Invalid label — could not create a valid key' });
         }
 
-        const existing = await RolePermission.findOne({ role }).select('_id').lean();
+        const existing = await RolePermission.findOne({ role, companyId }).select('_id').lean();
         if (existing) {
             return res.status(409).json({ message: `Role "${role}" already exists` });
         }
@@ -144,7 +168,8 @@ exports.createRole = async (req, res) => {
             label:         label.trim(),
             description:   (description || '').trim(),
             isCustom:      true,
-            menuVisibility: defaultPerms
+            menuVisibility: defaultPerms,
+            companyId
         });
 
         res.status(201).json(buildRolePayload(doc));
@@ -159,9 +184,10 @@ exports.createRole = async (req, res) => {
 exports.updateRoleMeta = async (req, res) => {
     try {
         const { role } = req.params;
+        const companyId = await getEffectiveCompanyId(req);
         const { label, description } = req.body || {};
 
-        const doc = await RolePermission.findOne({ role });
+        const doc = await RolePermission.findOne({ role, ...(companyId ? { companyId } : {}) });
         if (!doc) return res.status(404).json({ message: 'Role not found' });
         if (!doc.isCustom) return res.status(400).json({ message: 'Only custom roles can be renamed' });
 
@@ -180,10 +206,11 @@ exports.updateRoleMeta = async (req, res) => {
 exports.deleteRole = async (req, res) => {
     try {
         const { role } = req.params;
+        const companyId = await getEffectiveCompanyId(req);
         if (ROLE_OPTIONS.includes(role)) {
             return res.status(400).json({ message: 'Built-in roles cannot be deleted' });
         }
-        await RolePermission.deleteOne({ role });
+        await RolePermission.deleteOne({ role, ...(companyId ? { companyId } : {}) });
         res.json({ message: `Role "${role}" deleted` });
     } catch (error) {
         console.error('deleteRole error:', error);
@@ -194,22 +221,25 @@ exports.deleteRole = async (req, res) => {
 // ─── POST /authorization/initialize ───────────────────────────────────────
 exports.initializeDefaults = async (req, res) => {
     try {
+        const companyId = await getEffectiveCompanyId(req);
+        if (!companyId) {
+            return res.status(400).json({ message: 'Company context missing' });
+        }
         const rolesToSeed = ROLE_OPTIONS;
         const results = [];
         for (const role of rolesToSeed) {
             const defaultPerms = sanitizePermissions(DEFAULT_ROLE_PERMISSIONS[role] || {});
             
-            // Use updateOne with upsert to avoid E11000 duplicate key race conditions
-            // when React StrictMode double-mounts and calls initialize twice concurrently.
             const result = await RolePermission.updateOne(
-                { role },
+                { role, companyId },
                 {
                     $setOnInsert: {
                         role,
                         label: ROLE_LABELS[role] || role,
                         description: '',
                         isCustom: false,
-                        menuVisibility: defaultPerms
+                        menuVisibility: defaultPerms,
+                        companyId
                     }
                 },
                 { upsert: true }

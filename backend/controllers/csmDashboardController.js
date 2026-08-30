@@ -294,7 +294,8 @@ exports.getReportData = async (req, res) => {
 
         // 8. Service Engineer Productivity
         const Engineer = require('../models/Engineer');
-        const engineers = await Engineer.find({ companyId: req.user?.companyId }).select('name email').lean();
+        const companyIdFilter = baseScope.companyId || req.query?.companyId || req.user?.companyId;
+        const engineers = await Engineer.find(companyIdFilter ? { companyId: companyIdFilter } : {}).select('name email').lean();
         const engineerMap = {};
         engineers.forEach(eng => {
             engineerMap[eng._id.toString()] = {

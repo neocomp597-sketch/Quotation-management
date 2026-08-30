@@ -41,12 +41,13 @@ const isPreviousYear = (financialYear) => {
 };
 
 
-const getRolePermissions = async (role) => {
+const getRolePermissions = async (role, companyId = null) => {
     const { DEFAULT_ROLE_PERMISSIONS } = require('../config/authorization');
     if (role === 'admin') {
         return { ...DEFAULT_ROLE_PERMISSIONS.admin };
     }
-    const document = await RolePermission.findOne({ role }).select('menuVisibility').lean();
+    const query = { role, ...(companyId ? { companyId } : {}) };
+    const document = await RolePermission.findOne(query).select('menuVisibility').lean();
     return resolvePermissions(role, document?.menuVisibility || {});
 };
 
@@ -55,7 +56,7 @@ const checkPrevYearEditPermission = async (user, financialYear) => {
     if (user.role === 'admin') return true;
     
     if (isPreviousYear(financialYear)) {
-        const permissions = await getRolePermissions(user.role);
+        const permissions = await getRolePermissions(user.role, user.companyId);
         if (!permissions.planning_edit_prev_year) {
             return false;
         }

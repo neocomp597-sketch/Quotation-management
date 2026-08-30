@@ -4,14 +4,14 @@ const Counter = require('../models/Counter');
 const Company = require('../models/Company');
 
 const getEffectiveCompanyId = async (req) => {
-    let companyId = req.user?.companyId;
+    let companyId = req.query?.companyId || req.headers?.['x-company-id'] || req.body?.companyId || req.user?.companyId;
     if (!companyId) {
         const firstCompany = await Company.findOne().lean();
         if (firstCompany) {
             companyId = firstCompany._id.toString();
         }
     }
-    return companyId;
+    return companyId?.toString ? companyId.toString() : companyId;
 };
 
 exports.getAllBranches = async (req, res) => {

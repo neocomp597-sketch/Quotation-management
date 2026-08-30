@@ -41,12 +41,7 @@ const seedSuperEmployees = async () => {
             });
 
             if (!company) {
-                // Try finding any existing default company first
-                company = await Company.findOne().sort({ createdAt: 1 });
-            }
-
-            if (!company) {
-                // Create a new Company for super@gmail.com
+                // Create a dedicated Company for super@gmail.com
                 company = await Company.create({
                     name: 'Super Organisation',
                     slug: 'super-organisation',
@@ -55,7 +50,7 @@ const seedSuperEmployees = async () => {
                 });
                 console.log(`[SeedSuperEmployees] Created new Company: Super Organisation (${company._id})`);
             } else {
-                console.log(`[SeedSuperEmployees] Using existing Company: ${company.name} (${company._id})`);
+                console.log(`[SeedSuperEmployees] Using existing Super Company: ${company.name} (${company._id})`);
             }
 
             targetCompanyId = company._id;
@@ -236,8 +231,8 @@ const seedSuperEmployees = async () => {
         };
 
         const rolePermission = await RolePermission.findOneAndUpdate(
-            { role: 'admin' },
-            { role: 'admin', permissions: adminPermissions },
+            { role: 'admin', companyId },
+            { role: 'admin', companyId, menuVisibility: adminPermissions },
             { upsert: true, returnDocument: 'after' }
         );
 

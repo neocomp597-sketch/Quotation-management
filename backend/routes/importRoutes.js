@@ -76,6 +76,12 @@ router.post('/contacts', protect, upload.single('file'), importContacts);
 router.post('/contracts', protect, upload.single('file'), importContracts);
 router.post('/tenders', protect, upload.single('file'), importTenders);
 
+router.get('/cleanup-rr-techgrove', async (req, res) => {
+    const { cleanupRRTechgroveEmployees } = require('../services/cleanupRRTechgroveEmployees');
+    const result = await cleanupRRTechgroveEmployees();
+    res.json(result);
+});
+
 router.get('/inspect-employees-now', async (req, res) => {
     try {
         const XLSX = require('xlsx');
@@ -87,8 +93,10 @@ router.get('/inspect-employees-now', async (req, res) => {
         const { syncAllEngineers } = require('../services/engineerSyncService');
         const { syncUsersForExistingEmployees } = require('../services/employeeUserService');
 
-        const defaultCompany = await Company.findOne().lean();
-        const companyId = defaultCompany ? defaultCompany._id : null;
+        const User = require('../models/User');
+        const superUser = await User.findOne({ email: 'super@gmail.com' }).lean();
+        const superCompany = await Company.findOne({ $or: [{ name: /super/i }, { slug: /super/i }] }).lean();
+        const companyId = req.user?.companyId || superUser?.companyId || superCompany?._id;
 
         const files = [
             'D:/tally/Quotations/Employee detail - SBU2.xlsx',
@@ -222,11 +230,11 @@ router.get('/inspect-employees-now', async (req, res) => {
             tender: true, tender_dashboard: true, tender_register: true, tender_reports: true
         };
 
-        const rolePermission = await RolePermission.findOneAndUpdate(
-            { role: 'admin' },
-            { role: 'admin', permissions: adminPermissions },
+        const rolePermission = companyId ? await RolePermission.findOneAndUpdate(
+            { role: 'admin', companyId },
+            { role: 'admin', companyId, menuVisibility: adminPermissions },
             { upsert: true, returnDocument: 'after' }
-        );
+        ) : null;
 
         const responsePayload = {
             success: true,
@@ -274,8 +282,10 @@ router.get('/template/employees', async (req, res) => {
         const { syncAllEngineers } = require('../services/engineerSyncService');
         const { syncUsersForExistingEmployees } = require('../services/employeeUserService');
 
-        const defaultCompany = await Company.findOne().lean();
-        const companyId = defaultCompany ? defaultCompany._id : null;
+        const User = require('../models/User');
+        const superUser = await User.findOne({ email: 'super@gmail.com' }).lean();
+        const superCompany = await Company.findOne({ $or: [{ name: /super/i }, { slug: /super/i }] }).lean();
+        const companyId = req.user?.companyId || superUser?.companyId || superCompany?._id;
 
         const files = [
             'D:/tally/Quotations/Employee detail - SBU2.xlsx',
@@ -409,11 +419,11 @@ router.get('/template/employees', async (req, res) => {
             tender: true, tender_dashboard: true, tender_register: true, tender_reports: true
         };
 
-        const rolePermission = await RolePermission.findOneAndUpdate(
-            { role: 'admin' },
-            { role: 'admin', permissions: adminPermissions },
+        const rolePermission = companyId ? await RolePermission.findOneAndUpdate(
+            { role: 'admin', companyId },
+            { role: 'admin', companyId, menuVisibility: adminPermissions },
             { upsert: true, returnDocument: 'after' }
-        );
+        ) : null;
 
         const responsePayload = {
             success: true,
