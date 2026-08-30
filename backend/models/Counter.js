@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const CounterSchema = new mongoose.Schema({
     type: { type: String, required: true },
     prefix: { type: String, required: true },
-    year: { type: Number, required: true },
+    year: { type: Number, default: 0 },
     seq: { type: Number, default: 0 },
     updatedAt: { type: Date, default: Date.now },
 });

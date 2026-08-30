@@ -95,10 +95,28 @@ exports.createBranch = async (req, res) => {
             companyId
         });
 
+        // Initialize Counter for employee sequence for this branch prefix
+        const counterQuery = { type: 'employee', prefix: cleanPrefix, year: 0 };
+        if (companyId) counterQuery.companyId = companyId;
+
+        await Counter.findOneAndUpdate(
+            counterQuery,
+            { 
+                $set: {
+                    ...(companyId && { companyId }),
+                    type: 'employee',
+                    prefix: cleanPrefix,
+                    year: 0,
+                    seq: parsedStartSeq - 1
+                }
+            },
+            { upsert: true, new: true }
+        );
+
         res.status(201).json(branch);
     } catch (error) {
         console.error('[createBranch] Error:', error);
-        res.status(500).json({ message: 'Failed to create branch', error: error.message });
+        res.status(500).json({ message: error.message || 'Failed to create branch', error: error.message });
     }
 };
 
@@ -162,16 +180,19 @@ exports.updateBranch = async (req, res) => {
                 branch.startEmployeeSeq = parsedSeq;
                 // Reset Counter for this branch prefix to parsedSeq - 1 so the next code auto-starts from parsedSeq
                 const Counter = require('../models/Counter');
-                const counterQuery = { type: 'employee', prefix: branch.branchPrefix };
+                const counterQuery = { type: 'employee', prefix: branch.branchPrefix, year: 0 };
                 if (companyId) counterQuery.companyId = companyId;
 
                 await Counter.findOneAndUpdate(
                     counterQuery,
                     { 
-                        ...(companyId && { companyId }),
-                        type: 'employee',
-                        prefix: branch.branchPrefix,
-                        seq: parsedSeq - 1 
+                        $set: {
+                            ...(companyId && { companyId }),
+                            type: 'employee',
+                            prefix: branch.branchPrefix,
+                            year: 0,
+                            seq: parsedSeq - 1 
+                        }
                     },
                     { upsert: true, new: true }
                 );
@@ -182,7 +203,7 @@ exports.updateBranch = async (req, res) => {
         res.json(updatedBranch);
     } catch (error) {
         console.error('[updateBranch] Error:', error);
-        res.status(500).json({ message: 'Failed to update branch', error: error.message });
+        res.status(500).json({ message: error.message || 'Failed to update branch', error: error.message });
     }
 };
 

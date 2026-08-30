@@ -13,6 +13,7 @@ const { invalidateQuotationCaches } = require('../utils/cacheInvalidation');
 const { getCachedJson, makeCacheKey, setCachedJson } = require('../utils/apiCache');
 const { createCompanyNotifications } = require('../utils/notificationHelper');
 const { broadcastCrmUpdate } = require('../config/socket');
+const { buildAccessScopeQuery } = require('../utils/accessControl');
 
 const DRAFT_TTL_SECONDS = 24 * 60 * 60;
 const DASHBOARD_TTL_SECONDS = 60;
@@ -1052,8 +1053,9 @@ module.exports = {
     },
     getReports: async (req, res) => {
         try {
-            let query = {};
-            if (req.user && req.user.role !== 'admin' && req.user.role !== 'manager') {
+            let query = await buildAccessScopeQuery(req, { userField: 'createdBy', branchField: 'branchId' });
+
+            if (req.user && req.user.role !== 'admin' && req.user.role !== 'manager' && req.user.role !== 'super_admin' && req.user.role !== 'company_admin') {
                 const Territory = require('../models/Territory');
                 const userTerritories = await Territory.find({
                     $or: [
@@ -1063,11 +1065,19 @@ module.exports = {
                 }).select('_id').lean();
                 
                 const territoryIds = userTerritories.map(t => t._id);
-                
-                query.$or = [
-                    { territory: { $in: territoryIds } },
-                    { createdBy: req.user.id }
-                ];
+                if (territoryIds.length > 0) {
+                    query = {
+                        $and: [
+                            query,
+                            {
+                                $or: [
+                                    { territory: { $in: territoryIds } },
+                                    { createdBy: req.user.id }
+                                ]
+                            }
+                        ]
+                    };
+                }
             }
 
             const cacheScope = (req.user?.role === 'admin' || req.user?.role === 'manager')

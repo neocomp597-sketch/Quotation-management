@@ -108,6 +108,7 @@ const BranchMaster = ({ isCreatePage, isEditPage }) => {
                             name: item.name || '',
                             code: item.code || '',
                             branchPrefix: item.branchPrefix || '',
+                            startEmployeeSeq: item.startEmployeeSeq || 1001,
                             address: item.address || '',
                             country: item.country || 'India',
                             city: item.city || '',
