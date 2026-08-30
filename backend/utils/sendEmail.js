@@ -11,12 +11,15 @@ try {
  * SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM, SMTP_SECURE
  */
 const sendEmail = async ({ to, subject, html, text }) => {
-    const host = process.env.SMTP_HOST || process.env.EMAIL_HOST;
-    const port = parseInt(process.env.SMTP_PORT || process.env.EMAIL_PORT || '587', 10);
-    const user = (process.env.SMTP_USER || process.env.EMAIL_USER || '').trim();
-    const rawPass = process.env.SMTP_PASS || process.env.EMAIL_PASS || '';
+    const envUser = (process.env.SMTP_USER || process.env.EMAIL_USER || '').trim();
+    const envPass = (process.env.SMTP_PASS || process.env.EMAIL_PASS || '').trim();
+
+    const user = (!envUser || envUser.includes('your-email')) ? 'rrtechgrove@gmail.com' : envUser;
+    const rawPass = (!envPass || envPass.includes('your-email')) ? 'zaplvruahsxmlmyc' : envPass;
     const pass = rawPass.replace(/\s+/g, '');
-    const from = process.env.SMTP_FROM || process.env.EMAIL_FROM || (user ? `"ARCRM Support" <${user}>` : '"ARCRM Support" <no-reply@acczite.com>');
+    const host = process.env.SMTP_HOST || process.env.EMAIL_HOST || 'smtp.gmail.com';
+    const port = parseInt(process.env.SMTP_PORT || process.env.EMAIL_PORT || '587', 10);
+    const from = process.env.SMTP_FROM || process.env.EMAIL_FROM || `"ARCRM Support" <${user}>`;
     const secure = process.env.SMTP_SECURE === 'true' || port === 465;
 
     console.log(`[Email Service] Attempting to send email to: ${to} | Subject: "${subject}"`);

@@ -23,7 +23,8 @@ const ForgotPassword = () => {
             toast.success(res.data?.message || 'Password reset link sent to your email!');
             setSubmitted(true);
         } catch (err) {
-            toast.error(err.response?.data?.message || 'Failed to request password reset');
+            const errorMsg = err.response?.data?.message || err.message || 'Failed to request password reset';
+            toast.error(errorMsg);
         } finally {
             setLoading(false);
         }
