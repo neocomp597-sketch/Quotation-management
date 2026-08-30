@@ -505,10 +505,16 @@ exports.forgotPassword = async (req, res) => {
             `
         });
 
+        if (!emailResult || (!emailResult.success && !emailResult.simulated)) {
+            console.error('[forgotPassword] Email dispatch failed:', emailResult?.error);
+            return res.status(500).json({ 
+                message: `Failed to send password reset email: ${emailResult?.error || 'Email service error'}` 
+            });
+        }
+
         res.json({ 
             success: true,
-            message: 'Password reset link sent to your email address! Please check your inbox.',
-            resetToken // Provided for dev convenience if SMTP not configured locally
+            message: 'Password reset link sent to your email address! Please check your inbox.'
         });
     } catch (error) {
         console.error('Forgot Password Error:', error);

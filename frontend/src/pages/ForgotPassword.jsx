@@ -9,7 +9,6 @@ const ForgotPassword = () => {
     const [email, setEmail] = useState('');
     const [loading, setLoading] = useState(false);
     const [submitted, setSubmitted] = useState(false);
-    const [devResetToken, setDevResetToken] = useState(null);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -23,9 +22,6 @@ const ForgotPassword = () => {
             const res = await authService.forgotPassword({ email: email.trim() });
             toast.success(res.data?.message || 'Password reset link sent to your email!');
             setSubmitted(true);
-            if (res.data?.resetToken) {
-                setDevResetToken(res.data.resetToken);
-            }
         } catch (err) {
             toast.error(err.response?.data?.message || 'Failed to request password reset');
         } finally {
@@ -58,44 +54,23 @@ const ForgotPassword = () => {
                     </p>
                 </div>
 
-                {submitted ? (
-                    <div style={{ textAlign: 'center', padding: '16px 0' }}>
-                        <div style={{
-                            backgroundColor: '#f0fdf4',
-                            border: '1px solid #bbf7d0',
-                            borderRadius: '16px',
-                            padding: '24px',
-                            marginBottom: '24px'
-                        }}>
-                            <CheckCircle2 size={48} color="#16a34a" style={{ margin: '0 auto 12px auto' }} />
-                            <h3 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#14532d', marginBottom: '8px' }}>
-                                Reset Link Sent!
-                            </h3>
-                            <p style={{ fontSize: '0.875rem', color: '#15803d', margin: 0, lineHeight: '1.5' }}>
-                                We've sent password reset instructions to <strong>{email}</strong>. Please check your inbox and follow the link.
-                            </p>
-
-                            {devResetToken && (
+                        {submitted ? (
+                            <div style={{ textAlign: 'center', padding: '16px 0' }}>
                                 <div style={{
-                                    marginTop: '16px',
-                                    padding: '12px',
-                                    background: '#ffffff',
-                                    borderRadius: '12px',
-                                    border: '1px border-dashed #86efac',
-                                    textAlign: 'left'
+                                    backgroundColor: '#f0fdf4',
+                                    border: '1px solid #bbf7d0',
+                                    borderRadius: '16px',
+                                    padding: '24px',
+                                    marginBottom: '24px'
                                 }}>
-                                    <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#047857', display: 'block', marginBottom: '4px' }}>
-                                        DEV QUICK-TEST LINK:
-                                    </span>
-                                    <Link 
-                                        to={`/reset-password/${devResetToken}`}
-                                        style={{ fontSize: '0.8rem', color: '#0d9488', fontWeight: '600', wordBreak: 'break-all' }}
-                                    >
-                                        Click here to reset password directly
-                                    </Link>
+                                    <CheckCircle2 size={48} color="#16a34a" style={{ margin: '0 auto 12px auto' }} />
+                                    <h3 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#14532d', marginBottom: '8px' }}>
+                                        Reset Link Sent!
+                                    </h3>
+                                    <p style={{ fontSize: '0.875rem', color: '#15803d', margin: 0, lineHeight: '1.5' }}>
+                                        We've sent password reset instructions to <strong>{email}</strong>. Please check your inbox and follow the link.
+                                    </p>
                                 </div>
-                            )}
-                        </div>
 
                         <Link
                             to="/login"
