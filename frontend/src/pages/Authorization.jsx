@@ -11,7 +11,7 @@ import { ROLE_LABELS as BUILTIN_ROLE_LABELS, MENU_PERMISSION_GROUPS } from '../c
 import { useAuth } from '../context/AuthContext';
 import Modal from '../components/Modal';
 
-const childKeysFor = (group) => (group.children || []).map((child) => child.key);
+const childKeysFor = (group) => Array.from(new Set((group.children || []).map((child) => child.key)));
 
 const buildPermissionsFromEnabledSections = (groups, enabledSections = []) => {
     const enabled = new Set(enabledSections);
@@ -1471,3 +1471,4 @@ const Authorization = () => {
 };
 
 export default Authorization;
+

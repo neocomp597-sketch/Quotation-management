@@ -45,7 +45,9 @@ exports.protect = async (req, res, next) => {
             let user = cachedUser;
 
             if (!user) {
-                user = await User.findById(decoded.id).select('_id name email role tokenVersion companyId status isActive vendorId').lean();
+                user = await User.findById(decoded.id)
+                    .select('_id name email role tokenVersion companyId branchId assignedBranches status isActive vendorId customPermissions reportsTo')
+                    .lean();
                 if (user) {
                     await setCachedJson(redis, cacheKey, user, AUTH_USER_CACHE_TTL_SECONDS);
                 }
@@ -104,7 +106,11 @@ exports.protect = async (req, res, next) => {
                 email: user.email,
                 role: user.role,
                 companyId: resolvedCompanyId,
-                vendorId: resolvedVendorId
+                vendorId: resolvedVendorId,
+                branchId: user.branchId,
+                assignedBranches: user.assignedBranches || [],
+                customPermissions: user.customPermissions || {},
+                reportsTo: user.reportsTo || null
             };
 
             runWithTenant(req.user.companyId, () => next(), { bypassTenant: isSuperAdmin });
@@ -144,3 +150,5 @@ exports.superAdmin = (req, res, next) => {
 };
 
 exports.isSuperAdminRole = isSuperAdminRole;
+
+

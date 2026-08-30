@@ -926,11 +926,16 @@ const [logoUploading, setLogoUploading] = useState(false);
                                         <p className="text-[9px] font-bold text-slate-400 -mt-0.5 truncate">{companySettings.tagline || 'Always Ready CRM'}</p>
                                     </div>
                                 </div>
-                                {/* Bottom row: Client company logo + name */}
+                                {/* Bottom row: Client company logo */}
                                 {companySettings.showDualBranding !== false && companySettings.logoUrl && (
-                                    <div className="flex items-center gap-2.5 mt-2.5 pt-2.5 border-t border-slate-100">
-                                        <img src={resolveImageUrl(companySettings.logoUrl)} alt="Company" className="h-7 w-7 object-contain rounded-lg border border-slate-100 shrink-0 bg-white" />
-                                        <span className="text-[11px] font-bold text-slate-600 truncate">{companySettings.companyName || 'Your Company'}</span>
+                                    <div className="mt-2.5 pt-2.5 border-t border-slate-100 flex items-center justify-center">
+                                        <div className="w-full bg-white py-1 px-2.5 rounded-xl border border-slate-100 shadow-sm flex items-center justify-center overflow-hidden">
+                                            <img
+                                                src={resolveImageUrl(companySettings.logoUrl)}
+                                                alt="Company Logo"
+                                                className="max-h-8 w-auto object-contain"
+                                            />
+                                        </div>
                                     </div>
                                 )}
                             </div>

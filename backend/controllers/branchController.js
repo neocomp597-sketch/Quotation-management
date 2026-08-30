@@ -103,14 +103,10 @@ exports.createBranch = async (req, res) => {
             counterQuery,
             { 
                 $set: {
-                    ...(companyId && { companyId }),
-                    type: 'employee',
-                    prefix: cleanPrefix,
-                    year: 0,
                     seq: parsedStartSeq - 1
                 }
             },
-            { upsert: true, new: true }
+            { upsert: true, new: true, setDefaultsOnInsert: true }
         );
 
         res.status(201).json(branch);
@@ -187,14 +183,10 @@ exports.updateBranch = async (req, res) => {
                     counterQuery,
                     { 
                         $set: {
-                            ...(companyId && { companyId }),
-                            type: 'employee',
-                            prefix: branch.branchPrefix,
-                            year: 0,
                             seq: parsedSeq - 1 
                         }
                     },
-                    { upsert: true, new: true }
+                    { upsert: true, new: true, setDefaultsOnInsert: true }
                 );
             }
         }

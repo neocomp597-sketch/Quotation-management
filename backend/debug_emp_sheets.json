@@ -1,0 +1,2830 @@
+{
+  "Employee detail - SBU2.xlsx": {
+    "Sheet1": [
+      {
+        "SN": 1,
+        "EMP Code": "SBUII2",
+        "Branch": "SBUII",
+        "Employee Name": "Ramakrishnan Eshwaramoothy Pillai",
+        "Designation": "Vice President ",
+        "Department": "Common",
+        "Contact": "7506700184",
+        "Official Mail Id": "eramakrishnan@stelmec.com"
+      },
+      {
+        "SN": 2,
+        "EMP Code": "SBUII6",
+        "Branch": "SBUII",
+        "Employee Name": "Ashok Dattatrey Warghade",
+        "Designation": "Supervisor",
+        "Department": "Production",
+        "Contact": "7506700195",
+        "Official Mail Id": "production.stel2@stelmec.com"
+      },
+      {
+        "SN": 3,
+        "EMP Code": "HO127",
+        "Branch": "SBUII",
+        "Employee Name": "Mangesh Ladaku Jadhav",
+        "Designation": "Technician",
+        "Department": "Sales & Order Exe.",
+        "Contact": "9271517418",
+        "Official Mail Id": "sales.usgaon@stelmec.com"
+      },
+      {
+        "SN": 4,
+        "EMP Code": "SBUII11",
+        "Branch": "SBUII",
+        "Employee Name": "Amol Shashikant Dalvi",
+        "Designation": "Senior Technician ",
+        "Department": "Quality",
+        "Contact": "9869767750",
+        "Official Mail Id": "qc.stel2@stelmec.com"
+      },
+      {
+        "SN": 5,
+        "EMP Code": "SBUII12",
+        "Branch": "SBUII",
+        "Employee Name": "Manoj Gajanan Jadhav",
+        "Designation": "Assistant Manager",
+        "Department": "Admin.",
+        "Contact": "7506700192",
+        "Official Mail Id": "manoj.jadhv@stelmec.com"
+      },
+      {
+        "SN": 6,
+        "EMP Code": "SBUII16",
+        "Branch": "SBUII",
+        "Employee Name": "Sushil Sonu Parab",
+        "Designation": "Assistant Manager",
+        "Department": "Purchase",
+        "Contact": "7506700197",
+        "Official Mail Id": "sushil.parab@stelmec.com"
+      },
+      {
+        "SN": 7,
+        "EMP Code": "SBUII13",
+        "Branch": "SBUII",
+        "Employee Name": "Sugathavel Maharaja Pillai",
+        "Designation": "Manager",
+        "Department": "Testing",
+        "Contact": "7506700154",
+        "Official Mail Id": "sugathavel@stelmec.com"
+      },
+      {
+        "SN": 8,
+        "EMP Code": "SBUII14",
+        "Branch": "SBUII",
+        "Employee Name": "Bidhubhusan Biswal",
+        "Designation": "Engineer",
+        "Department": "Customer Care",
+        "Contact": "8328803853",
+        "Official Mail Id": "service.stel2@stelmec.com"
+      },
+      {
+        "SN": 9,
+        "EMP Code": "SBUII17",
+        "Branch": "SBUII",
+        "Employee Name": "Radhakrishnan Padmanabha Pillai",
+        "Designation": "Supervisor",
+        "Department": "RMU",
+        "Contact": "9764334145",
+        "Official Mail Id": "productionrmu@stelmec.com"
+      },
+      {
+        "SN": 10,
+        "EMP Code": "SBUII19",
+        "Branch": "SBUII",
+        "Employee Name": "Atul Gopal Bhoir",
+        "Designation": "Senior Engineer",
+        "Department": "Production",
+        "Contact": "9890407138",
+        "Official Mail Id": "atul.bhoir@stelmec.com"
+      },
+      {
+        "SN": 11,
+        "EMP Code": "SBUII22",
+        "Branch": "SBUII",
+        "Employee Name": "Nilesh Manohar Ayare",
+        "Designation": "Senior Executive",
+        "Department": "Acc. & Fin.",
+        "Contact": "9221930872",
+        "Official Mail Id": "accounts.usgaon@stelmec.com"
+      },
+      {
+        "SN": 12,
+        "EMP Code": "SBUII24",
+        "Branch": "SBUII",
+        "Employee Name": "Divan Sukhram Singh",
+        "Designation": "Senior Engineer",
+        "Department": "Customer Care",
+        "Contact": "8209660830",
+        "Official Mail Id": "service.stel2@stelmec.com"
+      },
+      {
+        "SN": 13,
+        "EMP Code": "SBUII25",
+        "Branch": "SBUII",
+        "Employee Name": "Sunil Subhash Gawad",
+        "Designation": "Senior Draughtsman ",
+        "Department": "Engineering",
+        "Contact": "7798191661",
+        "Official Mail Id": "engg.stel2@stelmec.com"
+      },
+      {
+        "SN": 14,
+        "EMP Code": "SBUII26",
+        "Branch": "SBUII",
+        "Employee Name": "Vishwanath Rajaram Ayare",
+        "Designation": "Manager ",
+        "Department": "Logistics",
+        "Contact": "7506700142",
+        "Official Mail Id": "v.ayare@stelmec.com"
+      },
+      {
+        "SN": 15,
+        "EMP Code": "SBUII27",
+        "Branch": "SBUII",
+        "Employee Name": "Jitendra Dwarkanath Godade",
+        "Designation": "Senior Executive",
+        "Department": "EDP",
+        "Contact": "9637556656",
+        "Official Mail Id": "jitendra.godade@stelmec.com"
+      },
+      {
+        "SN": 16,
+        "EMP Code": "SBUII29",
+        "Branch": "SBUII",
+        "Employee Name": "Senthilkumar Balakrishnan",
+        "Designation": "Deputy General Manager",
+        "Department": "Engineering",
+        "Contact": "7506700188",
+        "Official Mail Id": "senthil@stelmec.com"
+      },
+      {
+        "SN": 17,
+        "EMP Code": "SBUII32",
+        "Branch": "SBUII",
+        "Employee Name": "Sivathanu Mathevan Pillai",
+        "Designation": "Dy. Manager",
+        "Department": "Purchase",
+        "Contact": "8806046339",
+        "Official Mail Id": "shivathanu.pillai@stelmec.com"
+      },
+      {
+        "SN": 18,
+        "EMP Code": "SBUII349",
+        "Branch": "SBUII",
+        "Employee Name": "Dayanand Jadhav",
+        "Designation": "Technician",
+        "Department": "Production",
+        "Contact": "9764084655",
+        "Official Mail Id": "production.stel2@stelmec.com"
+      },
+      {
+        "SN": 19,
+        "EMP Code": "SBUII33",
+        "Branch": "SBUII",
+        "Employee Name": "Sanjay Bhau Gorhekar",
+        "Designation": "Senior Executive ",
+        "Department": "Stores",
+        "Contact": "7057595666",
+        "Official Mail Id": "stores.stel2@stelmec.com"
+      },
+      {
+        "SN": 20,
+        "EMP Code": "SBUII36",
+        "Branch": "SBUII",
+        "Employee Name": "Viraj Moreshwar Naik",
+        "Designation": "Inspector ",
+        "Department": "Quality",
+        "Contact": "9673923355",
+        "Official Mail Id": "qc.stel2@stelmec.com"
+      },
+      {
+        "SN": 21,
+        "EMP Code": "SBUII41",
+        "Branch": "SBUII",
+        "Employee Name": "Prashant Prakash Kanade",
+        "Designation": "Senior Executive ",
+        "Department": "Logistics",
+        "Contact": "8291937046",
+        "Official Mail Id": "excise@stelmec.com"
+      },
+      {
+        "SN": 22,
+        "EMP Code": "SBUII42",
+        "Branch": "SBUII",
+        "Employee Name": "Rupesh Gajanan Bhoir",
+        "Designation": "Officer",
+        "Department": "Admin.",
+        "Contact": "9823161032",
+        "Official Mail Id": "rupesh.bhoir@stelmec.com"
+      },
+      {
+        "SN": 23,
+        "EMP Code": "SBUII44",
+        "Branch": "SBUII",
+        "Employee Name": "Prashant Kumar Shrutisagar Rai",
+        "Designation": "Manager",
+        "Department": "Production",
+        "Contact": "9769949419",
+        "Official Mail Id": "prashant.rai@stelmec.com"
+      },
+      {
+        "SN": 24,
+        "EMP Code": "SBUII45",
+        "Branch": "SBUII",
+        "Employee Name": "Jayesh Jagan Harnya",
+        "Designation": "Assistant Manager",
+        "Department": "Acc. & Fin.",
+        "Contact": "9209213283",
+        "Official Mail Id": "jayesh.harnya@stelmec.com"
+      },
+      {
+        "SN": 25,
+        "EMP Code": "SBUII48",
+        "Branch": "SBUII",
+        "Employee Name": "Subrat Kumar Narasingha Acharaya",
+        "Designation": "Senior Manager",
+        "Department": "Customer Care",
+        "Contact": "9951459531",
+        "Official Mail Id": "subratacharya@stelmec.com"
+      },
+      {
+        "SN": 26,
+        "EMP Code": "SBUII47",
+        "Branch": "SBUII",
+        "Employee Name": "Nadim Akhtar",
+        "Designation": "Senior Technician",
+        "Department": "Customer Care",
+        "Contact": "9554492924",
+        "Official Mail Id": "service.stel2@stelmec.com"
+      },
+      {
+        "SN": 27,
+        "EMP Code": "SBUII49",
+        "Branch": "SBUII",
+        "Employee Name": "Harish Kumar Saraswat",
+        "Designation": "Senior Engineer",
+        "Department": "Customer Care",
+        "Contact": "8750283489",
+        "Official Mail Id": "service.stel2@stelmec.com"
+      },
+      {
+        "SN": 28,
+        "EMP Code": "SBUII51",
+        "Branch": "SBUII",
+        "Employee Name": "Rasmi Ranjan Jenamani",
+        "Designation": "Manager",
+        "Department": "Purchase",
+        "Contact": "8249847371",
+        "Official Mail Id": "rasmi.ranjan@stelmec.com"
+      },
+      {
+        "SN": 29,
+        "EMP Code": "SBUII57",
+        "Branch": "SBUII",
+        "Employee Name": "Rajesh Vijaykumar Vijayan",
+        "Designation": "Senior Executive",
+        "Department": "Customer Care",
+        "Contact": "9975781447",
+        "Official Mail Id": "service.stel2@stelmec.com"
+      },
+      {
+        "SN": 30,
+        "EMP Code": "SBUII65",
+        "Branch": "SBUII",
+        "Employee Name": "Ranjeet Ramdhari Saroj",
+        "Designation": "Assistant Manager",
+        "Department": "Customer Care",
+        "Contact": "8080655520",
+        "Official Mail Id": "ranjeet.saroj@stelmec.com"
+      },
+      {
+        "SN": 31,
+        "EMP Code": "SBUII70",
+        "Branch": "SBUII",
+        "Employee Name": "Neeraj kumar Singh",
+        "Designation": "Assistant Manager",
+        "Department": "Purchase",
+        "Contact": "8381092175",
+        "Official Mail Id": "neeraj.singh@stelmec.com"
+      },
+      {
+        "SN": 32,
+        "EMP Code": "SBUII78",
+        "Branch": "SBUII",
+        "Employee Name": "Manoj Kumar Vishwanath Chaudhary",
+        "Designation": "Assistant General Manager",
+        "Department": "Customer Care",
+        "Contact": "7506700220",
+        "Official Mail Id": "mkchoudhary@stelmec.com"
+      },
+      {
+        "SN": 33,
+        "EMP Code": "SBUII79",
+        "Branch": "SBUII",
+        "Employee Name": "Ramakant Tukaram Ubale",
+        "Designation": "Technician ",
+        "Department": "RMU",
+        "Contact": "7066707559",
+        "Official Mail Id": "productionrmu@stelmec.com"
+      },
+      {
+        "SN": 34,
+        "EMP Code": "SBUII120",
+        "Branch": "SBUII",
+        "Employee Name": "Swapan Ganguly",
+        "Designation": "Deputy General Manager ",
+        "Department": "D&D",
+        "Contact": "7506700199",
+        "Official Mail Id": "s.ganguly@stelmec.com"
+      },
+      {
+        "SN": 35,
+        "EMP Code": "SBUII129",
+        "Branch": "SBUII",
+        "Employee Name": "Pratik Ramesh Bhoi",
+        "Designation": "Senior Engineer",
+        "Department": "Testing",
+        "Contact": "7757894148",
+        "Official Mail Id": "testing.stel2@stelmec.com"
+      },
+      {
+        "SN": 36,
+        "EMP Code": "SBUII153",
+        "Branch": "SBUII",
+        "Employee Name": "Nivrutti Ganpat Bhoir",
+        "Designation": "Senior Engineer",
+        "Department": "Production",
+        "Contact": "8446423069",
+        "Official Mail Id": "nivrutti.bhoir@stelmec.com"
+      },
+      {
+        "SN": 37,
+        "EMP Code": "SBUII148",
+        "Branch": "SBUII",
+        "Employee Name": "Suresh Arumugam",
+        "Designation": "Assistant Manager",
+        "Department": "Customer Care",
+        "Contact": "9444233062",
+        "Official Mail Id": "service.stel2@stelmec.com"
+      },
+      {
+        "SN": 38,
+        "EMP Code": "SBUII149",
+        "Branch": "SBUII",
+        "Employee Name": "Vishnu Devendra Singhal",
+        "Designation": "Manager",
+        "Department": "Engineering",
+        "Contact": "7045687109",
+        "Official Mail Id": "vishnu.singhal@stelmec.com"
+      },
+      {
+        "SN": 39,
+        "EMP Code": "SBUII171",
+        "Branch": "SBUII",
+        "Employee Name": "Akhilesh Pandagre",
+        "Designation": "Engineer",
+        "Department": "Customer Care",
+        "Contact": "9907642515",
+        "Official Mail Id": "service.stel2@stelmec.com"
+      },
+      {
+        "SN": 40,
+        "EMP Code": "SBUII167",
+        "Branch": "SBUII",
+        "Employee Name": "Sainath Ramesh Patil",
+        "Designation": "Senior Engineer",
+        "Department": "Testing",
+        "Contact": "8007297751",
+        "Official Mail Id": "testing.stel2@stelmec.com"
+      },
+      {
+        "SN": 41,
+        "EMP Code": "SBUII189",
+        "Branch": "SBUII",
+        "Employee Name": "Pranit Sukhadev Jondhale",
+        "Designation": "Senior Engineer",
+        "Department": "Purchase",
+        "Contact": "7507021408",
+        "Official Mail Id": "pranit.jondhale@stelmec.com"
+      },
+      {
+        "SN": 42,
+        "EMP Code": "SBUII168",
+        "Branch": "SBUII",
+        "Employee Name": "Milan Kumar Poria",
+        "Designation": "Senior Engineer",
+        "Department": "Customer Care",
+        "Contact": "9064677608",
+        "Official Mail Id": "service.stel2@stelmec.com"
+      },
+      {
+        "SN": 43,
+        "EMP Code": "SBUII178",
+        "Branch": "SBUII",
+        "Employee Name": "Saurabh Ashok Pugaliya",
+        "Designation": "Senior Engineer",
+        "Department": "Customer Care",
+        "Contact": "7208723448",
+        "Official Mail Id": "service.stel2@stelmec.com"
+      },
+      {
+        "SN": 44,
+        "EMP Code": "SBUII183",
+        "Branch": "SBUII",
+        "Employee Name": "Rajesh Trilokinath Gupta",
+        "Designation": "Assistant Manager",
+        "Department": "Testing",
+        "Contact": "9028322214",
+        "Official Mail Id": "testing.stel2@stelmec.com"
+      },
+      {
+        "SN": 45,
+        "EMP Code": "SBUII184",
+        "Branch": "SBUII",
+        "Employee Name": "Ajay Kumar",
+        "Designation": "Engineer",
+        "Department": "Customer Care",
+        "Contact": "9559418939",
+        "Official Mail Id": "service.stel2@stelmec.com"
+      },
+      {
+        "SN": 46,
+        "EMP Code": "SBUII197",
+        "Branch": "SBUII",
+        "Employee Name": "Praful Krishna Shetty",
+        "Designation": "Executive",
+        "Department": "Logistics",
+        "Contact": "9637769106",
+        "Official Mail Id": "excise@stelmec.com"
+      },
+      {
+        "SN": 47,
+        "EMP Code": "SBUII198",
+        "Branch": "SBUII",
+        "Employee Name": "Govind Ramashankar Gupta",
+        "Designation": "Assistant Manager",
+        "Department": "Production",
+        "Contact": "9930907905",
+        "Official Mail Id": "govind.gupta@stelmec.com"
+      },
+      {
+        "SN": 48,
+        "EMP Code": "SBUII201",
+        "Branch": "SBUII",
+        "Employee Name": "Ranajeet Suryamani Yadav",
+        "Designation": "Senior Engineer",
+        "Department": "Testing",
+        "Contact": "8007489102",
+        "Official Mail Id": "testing.stel2@stelmec.com"
+      },
+      {
+        "SN": 49,
+        "EMP Code": "SBUII217",
+        "Branch": "SBUII",
+        "Employee Name": "Kalpesh Bhoir",
+        "Designation": "Senior Engineer",
+        "Department": "Testing",
+        "Contact": "9158173161",
+        "Official Mail Id": "testing.stel2@stelmec.com"
+      },
+      {
+        "SN": 50,
+        "EMP Code": "SBUII231",
+        "Branch": "SBUII",
+        "Employee Name": "Saichandredy Kasam",
+        "Designation": "Senior Engineer",
+        "Department": "Customer Care",
+        "Contact": "9493300174",
+        "Official Mail Id": "service.stel2@stelmec.com"
+      },
+      {
+        "SN": 51,
+        "EMP Code": "SBUII232",
+        "Branch": "SBUII",
+        "Employee Name": "Manas Ranjan Khandayatray",
+        "Designation": "Engineer",
+        "Department": "Customer Care",
+        "Contact": "9861511797",
+        "Official Mail Id": "service.stel2@stelmec.com"
+      },
+      {
+        "SN": 52,
+        "EMP Code": "SBUII235",
+        "Branch": "SBUII",
+        "Employee Name": "Lalit Moolchand Yadav",
+        "Designation": "Junior Engineer",
+        "Department": "Customer Care",
+        "Contact": "7400833662",
+        "Official Mail Id": "service.stel2@stelmec.com"
+      },
+      {
+        "SN": 53,
+        "EMP Code": "SBUII236",
+        "Branch": "SBUII",
+        "Employee Name": "Pankaj Kumar Sharma",
+        "Designation": "Junior Engineer",
+        "Department": "Customer Care",
+        "Contact": "8006489891",
+        "Official Mail Id": "service.stel2@stelmec.com"
+      },
+      {
+        "SN": 54,
+        "EMP Code": "SBUII248",
+        "Branch": "SBUII",
+        "Employee Name": "Mustakeem Khan",
+        "Designation": "Sr. Engineer",
+        "Department": "Engineering",
+        "Contact": "8839810548",
+        "Official Mail Id": "khanmustakeem1993@outlook.com"
+      },
+      {
+        "SN": 55,
+        "EMP Code": "SBUII271",
+        "Branch": "SBUII",
+        "Employee Name": "Jagruti Khandagale",
+        "Designation": "Executive",
+        "Department": "Acc. & Fin.",
+        "Contact": "9765090837",
+        "Official Mail Id": "jagruti.khandagale@stelmec.com"
+      },
+      {
+        "SN": 56,
+        "EMP Code": "SBUII272",
+        "Branch": "SBUII",
+        "Employee Name": "Vikas Pujare",
+        "Designation": "Assistant",
+        "Department": "Stores",
+        "Contact": "7066085624",
+        "Official Mail Id": "stores.stel2@stelmec.com"
+      },
+      {
+        "SN": 57,
+        "EMP Code": "SBUII274",
+        "Branch": "SBUII",
+        "Employee Name": "Ajit Dinkar Patil",
+        "Designation": "Assistant",
+        "Department": "Stores",
+        "Contact": "9096053069",
+        "Official Mail Id": "stores.stel2@stelmec.com"
+      },
+      {
+        "SN": 58,
+        "EMP Code": "SBUII273",
+        "Branch": "SBUII",
+        "Employee Name": "Ayush Vijay Kumar",
+        "Designation": "Junior Engineer",
+        "Department": "Customer Care",
+        "Contact": "7004209684",
+        "Official Mail Id": "service.stel2@stelmec.com"
+      },
+      {
+        "SN": 59,
+        "EMP Code": "SBUII286",
+        "Branch": "SBUII",
+        "Employee Name": "Saravanan M R",
+        "Designation": "Senior Manager",
+        "Department": "Sales & Order Exe.",
+        "Contact": "9321341577",
+        "Official Mail Id": "saravanan.mr@stelmec.com"
+      },
+      {
+        "SN": 60,
+        "EMP Code": "SBUII292",
+        "Branch": "SBUII",
+        "Employee Name": "Mahesh Sitaram Palkar",
+        "Designation": "Assistant Manager",
+        "Department": "Acc. & Fin.",
+        "Contact": "9930904640",
+        "Official Mail Id": "mahesh.palkar@stelmec.com"
+      },
+      {
+        "SN": 61,
+        "EMP Code": "SBUII304",
+        "Branch": "SBUII",
+        "Employee Name": "Soubhagya Baishnaba Moharana",
+        "Designation": "Junior Engineer",
+        "Department": "Customer Care",
+        "Contact": "7008664626",
+        "Official Mail Id": "service.stel2@stelmec.com"
+      },
+      {
+        "SN": 62,
+        "EMP Code": "SBUII308",
+        "Branch": "SBUII",
+        "Employee Name": "Sandeep Kumar Idala",
+        "Designation": "Assistant Manager",
+        "Department": "Sales & Order Exe.",
+        "Contact": "8754459170",
+        "Official Mail Id": "sandeep.idala@stelmec.com"
+      },
+      {
+        "SN": 63,
+        "EMP Code": "SBUII314",
+        "Branch": "SBUII",
+        "Employee Name": "Rapaka Srinivas Gowtham",
+        "Designation": "Junior Engineer",
+        "Department": "Customer Care",
+        "Contact": "9121847377",
+        "Official Mail Id": "service.stel2@stelmec.com"
+      },
+      {
+        "SN": 64,
+        "EMP Code": "SBUII318",
+        "Branch": "SBUII",
+        "Employee Name": "Rajesh Kumar Singh",
+        "Designation": "Engineer",
+        "Department": "Customer Care",
+        "Contact": "8582015503",
+        "Official Mail Id": "service.stel2@stelmec.com"
+      },
+      {
+        "SN": 65,
+        "EMP Code": "SBUIII435",
+        "Branch": "SBUII",
+        "Employee Name": "Manoj Krishna Patil",
+        "Designation": "Engineer",
+        "Department": "Production",
+        "Contact": "8446337091",
+        "Official Mail Id": "production.stel2@stelmec.com"
+      },
+      {
+        "SN": 66,
+        "EMP Code": "SBUII324",
+        "Branch": "SBUII",
+        "Employee Name": "Pradip Kumar Panda",
+        "Designation": "Engineer",
+        "Department": "Customer Care",
+        "Contact": "8908138812",
+        "Official Mail Id": "service.stel2@stelmec.com"
+      },
+      {
+        "SN": 67,
+        "EMP Code": "SBUII325",
+        "Branch": "SBUII",
+        "Employee Name": "Nagmote Vivek Kailash",
+        "Designation": "Assistant Manager",
+        "Department": "Quality",
+        "Contact": "9028862187",
+        "Official Mail Id": "vivek.nagmote@stelmec.com"
+      },
+      {
+        "SN": 68,
+        "EMP Code": "SBUII326",
+        "Branch": "SBUII",
+        "Employee Name": "Mrityunjay Kumar Nirala",
+        "Designation": "Engineer",
+        "Department": "Customer Care",
+        "Contact": "7761952204",
+        "Official Mail Id": "service.stel2@stelmec.com"
+      },
+      {
+        "SN": 69,
+        "EMP Code": "SBUII336",
+        "Branch": "SBUII",
+        "Employee Name": "Sudhan Kannan",
+        "Designation": "Engineer",
+        "Department": "Engineering",
+        "Contact": "9003597333",
+        "Official Mail Id": "sap.stel2@stelmec.com"
+      },
+      {
+        "SN": 70,
+        "EMP Code": "SBUII337",
+        "Branch": "SBUII",
+        "Employee Name": "Hitesh Dinesh Gharat",
+        "Designation": "Engineer",
+        "Department": "Production",
+        "Contact": "8408927904",
+        "Official Mail Id": "production.stel2@stelmec.com"
+      },
+      {
+        "SN": 71,
+        "EMP Code": "SBUII339",
+        "Branch": "SBUII",
+        "Employee Name": "Ganesh Shinde",
+        "Designation": "Senior Engineer",
+        "Department": "Customer Care",
+        "Contact": "7350425402",
+        "Official Mail Id": "service.stel2@stelmec.com"
+      },
+      {
+        "SN": 72,
+        "EMP Code": "SBUII340",
+        "Branch": "SBUII",
+        "Employee Name": "Kanchan Monde",
+        "Designation": "Executive",
+        "Department": "Purchase",
+        "Contact": "8007649880",
+        "Official Mail Id": "purchase.stel2@stelmec.com"
+      },
+      {
+        "SN": 73,
+        "EMP Code": "SBUII345",
+        "Branch": "SBUII",
+        "Employee Name": "Mayuresh Maralidhar Devhare",
+        "Designation": "Engineer",
+        "Department": "Testing",
+        "Contact": "9049566069",
+        "Official Mail Id": "testing.stel2@stelmec.com"
+      },
+      {
+        "SN": 74,
+        "EMP Code": "SBUII351",
+        "Branch": "SBUII",
+        "Employee Name": "Nalini Suryaprakash Shukla",
+        "Designation": "Co-ordinator",
+        "Department": "Sales & Order Exe.",
+        "Contact": "9930906690",
+        "Official Mail Id": "sales.usgaon@stelmec.com"
+      },
+      {
+        "SN": 75,
+        "EMP Code": "SBUII354",
+        "Branch": "SBUII",
+        "Employee Name": "Yogesh Mhatre",
+        "Designation": "Junior Executive",
+        "Department": "Acc. & Fin.",
+        "Contact": "8208261071",
+        "Official Mail Id": "accounts.usgaon@stelmec.com"
+      },
+      {
+        "SN": 76,
+        "EMP Code": "SBUII355",
+        "Branch": "SBUII",
+        "Employee Name": "Rajaram Bhagoji Mundekar",
+        "Designation": "Senior Executive",
+        "Department": "Stores",
+        "Contact": "9967193650",
+        "Official Mail Id": "rajaram.mundekar@stelmec.com"
+      },
+      {
+        "SN": 77,
+        "EMP Code": "SBUII356",
+        "Branch": "SBUII",
+        "Employee Name": "Rishu Rajesh",
+        "Designation": "Engineer",
+        "Department": "Engineering",
+        "Contact": "7080461919",
+        "Official Mail Id": "engg.stel2@stelmec.com"
+      },
+      {
+        "SN": 78,
+        "EMP Code": "SBUII357",
+        "Branch": "SBUII",
+        "Employee Name": "Aditya Eknath",
+        "Designation": "Engineer",
+        "Department": "Testing",
+        "Contact": "7066510595",
+        "Official Mail Id": "testing.stel2@stelmec.com"
+      },
+      {
+        "SN": 79,
+        "EMP Code": "SBUII359",
+        "Branch": "SBUII",
+        "Employee Name": "Dhiraj Patil",
+        "Designation": "Engineer",
+        "Department": "Engineering",
+        "Contact": "9067956992",
+        "Official Mail Id": "engg.stel2@stelmec.com"
+      },
+      {
+        "SN": 80,
+        "EMP Code": "SBUII360",
+        "Branch": "SBUII",
+        "Employee Name": "Vivek Shukla",
+        "Designation": "Senior Manager",
+        "Department": "HR",
+        "Contact": 9867737674,
+        "Official Mail Id": "vivek.shukla@stelmec.com"
+      },
+      {
+        "SN": 81,
+        "EMP Code": "SBUII362",
+        "Branch": "SBUII",
+        "Employee Name": "Vishnu",
+        "Designation": "Engineer",
+        "Department": "Engineering",
+        "Contact": "9159699543",
+        "Official Mail Id": "engg.stel2@stelmec.com"
+      },
+      {
+        "SN": 82,
+        "EMP Code": "SBUII364",
+        "Branch": "SBUII",
+        "Employee Name": "Harshad Bhat",
+        "Designation": "Engineer",
+        "Department": "Quality",
+        "Contact": "9561531852",
+        "Official Mail Id": "qc.stel2@stelmec.com"
+      },
+      {
+        "SN": 83,
+        "EMP Code": "SBUII366",
+        "Branch": "SBUII",
+        "Employee Name": "Harshala Kudu",
+        "Designation": "Executive",
+        "Department": "Purchase",
+        "Contact": "9730460449",
+        "Official Mail Id": "purchase.stel2@stelmec.com"
+      },
+      {
+        "SN": 84,
+        "EMP Code": "SBUII370",
+        "Branch": "SBUII",
+        "Employee Name": "Mayur Amritkar",
+        "Designation": "Engineer",
+        "Department": "Quality",
+        "Contact": "7588303820",
+        "Official Mail Id": "qc.stel2@stelmec.com"
+      },
+      {
+        "SN": 85,
+        "EMP Code": "SBUII371",
+        "Branch": "SBUII",
+        "Employee Name": "Pratham Bari",
+        "Designation": "Engineer",
+        "Department": "Production",
+        "Contact": "8446377767",
+        "Official Mail Id": "production.stel2@stelmec.com"
+      },
+      {
+        "SN": 86,
+        "EMP Code": "SBUII372",
+        "Branch": "SBUII",
+        "Employee Name": "Tejas Pawar",
+        "Designation": "Senior Engineer",
+        "Department": "Production",
+        "Contact": "9960996900",
+        "Official Mail Id": "production.stel2@stelmec.com"
+      },
+      {
+        "SN": 87,
+        "EMP Code": "SBUII381",
+        "Branch": "SBUII",
+        "Employee Name": "Ved Prakash Tiwari",
+        "Designation": "Engineer",
+        "Department": "Customer Care",
+        "Contact": "9667336958",
+        "Official Mail Id": "service.stel2@stelmec.com"
+      },
+      {
+        "SN": 88,
+        "EMP Code": "SBUII384",
+        "Branch": "SBUII",
+        "Employee Name": "Mukund Shriram Khonde",
+        "Designation": "Deputy General Manager",
+        "Department": "Customer Care",
+        "Contact": "6358754145",
+        "Official Mail Id": "mukund.khonde@stelmec.com"
+      },
+      {
+        "SN": 89,
+        "EMP Code": "SBUII385",
+        "Branch": "SBUII",
+        "Employee Name": "Prashant Baban Shinde",
+        "Designation": "Senior Manager",
+        "Department": "Purchase",
+        "Contact": "9820186677",
+        "Official Mail Id": "prashant.shinde@stelmec.com"
+      },
+      {
+        "SN": 90,
+        "EMP Code": "SBUII391",
+        "Branch": "SBUII",
+        "Employee Name": "Rakesh Kumar",
+        "Designation": "Engineer",
+        "Department": "Customer Care",
+        "Contact": "8051527179",
+        "Official Mail Id": "service.stel2@stelmec.com"
+      },
+      {
+        "SN": 91,
+        "EMP Code": "SBUII392",
+        "Branch": "SBUII",
+        "Employee Name": "Noorul Haque Ansari",
+        "Designation": "Junior Engineer",
+        "Department": "Customer Care",
+        "Contact": "9554789705",
+        "Official Mail Id": "service.stel2@stelmec.com"
+      },
+      {
+        "SN": 92,
+        "EMP Code": "SBUII393",
+        "Branch": "SBUII",
+        "Employee Name": "Suvidha Chaudhari",
+        "Designation": "Assistant Manager",
+        "Department": "Engineering",
+        "Contact": "9892971657",
+        "Official Mail Id": "suvidha.chaudhari@stelmec.com"
+      },
+      {
+        "SN": 93,
+        "EMP Code": "SBUII396",
+        "Branch": "SBUII",
+        "Employee Name": "Deepak Shivaji Nagam",
+        "Designation": "Assistant",
+        "Department": "Purchase",
+        "Contact": "8087930340",
+        "Official Mail Id": "purchase.stel2@stelmec.com"
+      },
+      {
+        "SN": 94,
+        "EMP Code": "SBUII399",
+        "Branch": "SBUII",
+        "Employee Name": "Sejal Subhash Pashte",
+        "Designation": "Engineer",
+        "Department": "Engineering",
+        "Contact": "7038442170",
+        "Official Mail Id": "engg.stel2@stelmec.com"
+      },
+      {
+        "SN": 95,
+        "EMP Code": "SBUIII464",
+        "Branch": "SBUII",
+        "Employee Name": "Monali Dilip Patil",
+        "Designation": "Receptionist",
+        "Department": "Admin.",
+        "Contact": "9673927677",
+        "Official Mail Id": "reception.stel2@stelmec.com"
+      },
+      {
+        "SN": 96,
+        "EMP Code": "SBUII403",
+        "Branch": "SBUII",
+        "Employee Name": "Sandesh Shashikant Tare",
+        "Designation": "Senior Executive",
+        "Department": "Production",
+        "Contact": "8983739874",
+        "Official Mail Id": "Sandesh.tare@stelmec.com"
+      },
+      {
+        "SN": 97,
+        "EMP Code": "SBUII404",
+        "Branch": "SBUII",
+        "Employee Name": "Snehal Subhash Pashte",
+        "Designation": "Engineer",
+        "Department": "Engineering",
+        "Contact": "7517022170",
+        "Official Mail Id": "rmu.stel2@stelmec.com"
+      },
+      {
+        "SN": 98,
+        "EMP Code": "SBUII406",
+        "Branch": "SBUII",
+        "Employee Name": "Abhinav Himen Sarmah",
+        "Designation": "Senior Manager",
+        "Department": "Quality",
+        "Contact": "9321476632",
+        "Official Mail Id": "abhinav.sarmah@stelmec.com"
+      },
+      {
+        "SN": 99,
+        "EMP Code": "SBUII407",
+        "Branch": "SBUII",
+        "Employee Name": "Saurabh Surendra Shrivastava",
+        "Designation": "Assistant General Manager",
+        "Department": "D&D",
+        "Contact": "7738076557",
+        "Official Mail Id": "saurabh.shrivastava@stelmec.com"
+      },
+      {
+        "SN": 100,
+        "EMP Code": "SBUII408",
+        "Branch": "SBUII",
+        "Employee Name": "Aftab Alam",
+        "Designation": "GET",
+        "Department": "Testing",
+        "Contact": "7033960443",
+        "Official Mail Id": "testing.stel2@stelmec.com"
+      },
+      {
+        "SN": 101,
+        "EMP Code": "SBUII409",
+        "Branch": "SBUII",
+        "Employee Name": "Deepak Kumar",
+        "Designation": "Engineer",
+        "Department": "Purchase",
+        "Contact": "9340670372",
+        "Official Mail Id": "deepak.kumar@stelmec.com"
+      },
+      {
+        "SN": 102,
+        "EMP Code": "SBUII414",
+        "Branch": "SBUII",
+        "Employee Name": "Tanay Mahendra Gotarane",
+        "Designation": "Engineer",
+        "Department": "Engineering",
+        "Contact": "9028999684",
+        "Official Mail Id": "engg.stel2@stelmec.com"
+      },
+      {
+        "SN": 103,
+        "EMP Code": "SBUII411",
+        "Branch": "SBUII",
+        "Employee Name": "Siddhant Sunil Parulekar",
+        "Designation": "Engineer",
+        "Department": "D&D",
+        "Contact": "9637999608",
+        "Official Mail Id": "rnd.stel2@stelmec.com"
+      },
+      {
+        "SN": 104,
+        "EMP Code": "SBUII412",
+        "Branch": "SBUII",
+        "Employee Name": "Ashish Mahendra Pawar",
+        "Designation": "Engineer",
+        "Department": "Testing",
+        "Contact": "9082855215",
+        "Official Mail Id": "testing.stel2@stelmec.com"
+      },
+      {
+        "SN": 105,
+        "EMP Code": "SBUII413",
+        "Branch": "SBUII",
+        "Employee Name": "Pratik Ramesh Patil",
+        "Designation": "Engineer",
+        "Department": "Testing",
+        "Contact": "7770099010",
+        "Official Mail Id": "testing.stel2@stelmec.com"
+      },
+      {
+        "SN": 106,
+        "EMP Code": "SBUII415",
+        "Branch": "SBUII",
+        "Employee Name": "Pradeep Uday Narayan Pandey",
+        "Designation": "Assistant Manager",
+        "Department": "RMU",
+        "Contact": "9213829042",
+        "Official Mail Id": "pradeep.pandey@stelmec.com"
+      },
+      {
+        "SN": 107,
+        "EMP Code": "SBUII418",
+        "Branch": "SBUII",
+        "Employee Name": "Yash Tanaji Jadhav",
+        "Designation": "Executive",
+        "Department": "HR",
+        "Contact": "7718994948",
+        "Official Mail Id": "yash.jadhav@stelmec.com"
+      },
+      {
+        "SN": 108,
+        "EMP Code": "SBUII419",
+        "Branch": "SBUII",
+        "Employee Name": "Amit Prakash Modale",
+        "Designation": "Assistant Manager",
+        "Department": "Sales & Order Exe.",
+        "Contact": "9923705828",
+        "Official Mail Id": "amit.modale@stelmec.com"
+      },
+      {
+        "SN": 109,
+        "EMP Code": "SBUII420",
+        "Branch": "SBUII",
+        "Employee Name": "Saurabh Narendra Patil",
+        "Designation": "Senior Executive",
+        "Department": "Stores",
+        "Contact": "8956101620",
+        "Official Mail Id": "saurabh.patil@stelmec.com"
+      },
+      {
+        "SN": 110,
+        "EMP Code": "SBUII422",
+        "Branch": "SBUII",
+        "Employee Name": "Akshay Sudam Pawar",
+        "Designation": "Officer",
+        "Department": "Admin.",
+        "Contact": "7499936466",
+        "Official Mail Id": "admin.stel2@stelmec.com"
+      },
+      {
+        "SN": 111,
+        "EMP Code": "SBUII421",
+        "Branch": "SBUII",
+        "Employee Name": "Bhartendu Vasudeo Chaudhary",
+        "Designation": "Senior Manager",
+        "Department": "RMU",
+        "Contact": "9890361262",
+        "Official Mail Id": "productionrmu@stelmec.com"
+      },
+      {
+        "SN": 112,
+        "EMP Code": "SBUII426",
+        "Branch": "SBUII",
+        "Employee Name": "Lalit Govind Joshi",
+        "Designation": "Safety Officer",
+        "Department": "Admin.",
+        "Contact": "7057442343",
+        "Official Mail Id": "safety.stel2@stelmec.com"
+      },
+      {
+        "SN": 113,
+        "EMP Code": "SBUII424",
+        "Branch": "SBUII",
+        "Employee Name": "Akash K J",
+        "Designation": "Engineer",
+        "Department": "Testing",
+        "Contact": "8056551538",
+        "Official Mail Id": "testing.stel2@stelmec.com"
+      },
+      {
+        "SN": 114,
+        "EMP Code": "SBUII428",
+        "Branch": "SBUII",
+        "Employee Name": "Yogesh Dadarao Solunke",
+        "Designation": "Assistant Manager",
+        "Department": "Acc. & Fin.",
+        "Contact": "7350910037",
+        "Official Mail Id": "yogesh.solunke@stelmec.com"
+      },
+      {
+        "SN": 115,
+        "EMP Code": "SBUII427",
+        "Branch": "SBUII",
+        "Employee Name": "Swapnil Sadanand Salvi",
+        "Designation": "Assistant Manager",
+        "Department": "RMU",
+        "Contact": "9819966983",
+        "Official Mail Id": "swapnil.salvi@stelmec.com"
+      },
+      {
+        "SN": 116,
+        "EMP Code": "SBUII432",
+        "Branch": "SBUII",
+        "Employee Name": "Ajay Naresh Jadhav",
+        "Designation": "Executive",
+        "Department": "Logistics",
+        "Contact": "8788590941",
+        "Official Mail Id": "excise@stelmec.com"
+      },
+      {
+        "SN": 117,
+        "EMP Code": "SBUII435",
+        "Branch": "SBUII",
+        "Employee Name": "Anushka Sachin Warishe",
+        "Designation": "Junior Executive",
+        "Department": "Quality",
+        "Contact": "7666245820",
+        "Official Mail Id": "qc.stel2@stelmec.com"
+      },
+      {
+        "SN": 118,
+        "EMP Code": "SBUII434",
+        "Branch": "SBUII",
+        "Employee Name": "Vibhav Kumar Mishra",
+        "Designation": "Junior Executive",
+        "Department": "Logistics",
+        "Contact": "8400346879",
+        "Official Mail Id": "excise@stelmec.com"
+      },
+      {
+        "SN": 119,
+        "EMP Code": "SBUII436",
+        "Branch": "SBUII",
+        "Employee Name": "Priyanka Mahesh Hegde",
+        "Designation": "Executive",
+        "Department": "Acc. & Fin.",
+        "Contact": "9309379353",
+        "Official Mail Id": "priyanka.hegde@stelmec.com"
+      },
+      {
+        "SN": 120,
+        "EMP Code": "SBUII437",
+        "Branch": "SBUII",
+        "Employee Name": "Ankit Kumar Vishwakarma",
+        "Designation": "GET",
+        "Department": "Testing",
+        "Contact": "7007800176",
+        "Official Mail Id": "testing.stel2@stelmec.com"
+      },
+      {
+        "SN": 121,
+        "EMP Code": "SBUII438",
+        "Branch": "SBUII",
+        "Employee Name": "Anirban Mahato",
+        "Designation": "GET",
+        "Department": "Testing",
+        "Contact": "8637548912",
+        "Official Mail Id": "testing.stel2@stelmec.com"
+      },
+      {
+        "SN": 122,
+        "EMP Code": "SBUII439",
+        "Branch": "SBUII",
+        "Employee Name": "Vishal Prakash Sawant",
+        "Designation": "Draughtsman",
+        "Department": "D&D",
+        "Contact": "8600971489",
+        "Official Mail Id": "rnd.stel2@stelmec.com"
+      },
+      {
+        "SN": 123,
+        "EMP Code": "SBUII440",
+        "Branch": "SBUII",
+        "Employee Name": "Rambabu Kumar Yadav",
+        "Designation": "Senior Technician",
+        "Department": "RMU",
+        "Contact": "8340736967",
+        "Official Mail Id": "productionrmu@stelmec.com"
+      },
+      {
+        "SN": 124,
+        "EMP Code": "SBUII441",
+        "Branch": "SBUII",
+        "Employee Name": "Pawan Kumar",
+        "Designation": "Engineer",
+        "Department": "RMU",
+        "Contact": "8368074422",
+        "Official Mail Id": "pawan.kumar@stelmec.com"
+      },
+      {
+        "SN": 125,
+        "EMP Code": "SBUII444",
+        "Branch": "SBUII",
+        "Employee Name": "Navaj Najir Shaikh",
+        "Designation": "Junior Engineer",
+        "Department": "Production",
+        "Contact": "9373409487",
+        "Official Mail Id": "production.stel2@stelmec.com"
+      },
+      {
+        "SN": 126,
+        "EMP Code": "SBUII445",
+        "Branch": "SBUII",
+        "Employee Name": "Nivrutti Sudhakar Patil",
+        "Designation": "Executive",
+        "Department": "Testing",
+        "Contact": "8552932886",
+        "Official Mail Id": "testing.stel2@stelmec.com"
+      },
+      {
+        "SN": 127,
+        "EMP Code": "SBUII446",
+        "Branch": "SBUII",
+        "Employee Name": "Santosh Ashok Naphade",
+        "Designation": "Executive",
+        "Department": "Stores",
+        "Contact": "9356797123",
+        "Official Mail Id": "stores.stel2@stelmec.com"
+      },
+      {
+        "SN": 128,
+        "EMP Code": "SBUII443",
+        "Branch": "SBUII",
+        "Employee Name": "Taher Ahmed Zahoor Ahmed Shaikh",
+        "Designation": "Dy. Manager",
+        "Department": "Admin.",
+        "Contact": "9284994182",
+        "Official Mail Id": "taher.shaikh@stelmec.com"
+      },
+      {
+        "SN": 129,
+        "EMP Code": "SBUII447",
+        "Branch": "SBUII",
+        "Employee Name": "Prashant Kumar Brijesh Nayak",
+        "Designation": "Civil Engineer ",
+        "Department": "Admin.",
+        "Contact": "9867209435",
+        "Official Mail Id": "prashant.nayak@stelmec.com"
+      },
+      {
+        "SN": 130,
+        "EMP Code": "SBUII449",
+        "Branch": "SBUII",
+        "Employee Name": "Prabin S",
+        "Designation": "Jr. Engineer ",
+        "Department": "Testing",
+        "Contact": "9043316781",
+        "Official Mail Id": "testing.stel2@stelmec.com"
+      },
+      {
+        "SN": 131,
+        "EMP Code": "SBUII451",
+        "Branch": "SBUII",
+        "Employee Name": "Siddheshvar Balkrishna Ghogale",
+        "Designation": "Draughtsman ",
+        "Department": "Engineering",
+        "Contact": "9967778475",
+        "Official Mail Id": "rmu.stel2@stelmec.com"
+      },
+      {
+        "SN": 132,
+        "EMP Code": "SBUII453",
+        "Branch": "SBUII",
+        "Employee Name": "Vykundaraja S.",
+        "Designation": "Engineer",
+        "Department": "Sales & Order Exe.",
+        "Contact": "8122538367",
+        "Official Mail Id": "marketing.stel2@stelmec.com"
+      },
+      {
+        "SN": 133,
+        "EMP Code": "SBUII450",
+        "Branch": "SBUII",
+        "Employee Name": "Chetan Nana Jadhav",
+        "Designation": "Engineer ",
+        "Department": "Customer Care",
+        "Contact": "9960319095",
+        "Official Mail Id": "service.stel2@stelmec.com"
+      },
+      {
+        "SN": 134,
+        "EMP Code": "SBUII456",
+        "Branch": "SBUII",
+        "Employee Name": "Yash Nivrutti Patil",
+        "Designation": "GET",
+        "Department": "D&D",
+        "Contact": "8600588730",
+        "Official Mail Id": "rnd.stel2@stelmec.com"
+      },
+      {
+        "SN": 135,
+        "EMP Code": "SBUII458",
+        "Branch": "SBUII",
+        "Employee Name": "Vijay Bajirao Bhawale",
+        "Designation": "Engineer ",
+        "Department": "Engineering",
+        "Contact": "7304087146",
+        "Official Mail Id": "rmu.stel2@stelmec.com"
+      },
+      {
+        "SN": 136,
+        "EMP Code": "SBUII459",
+        "Branch": "SBUII",
+        "Employee Name": "Kiran Bhaskar Karale",
+        "Designation": "Engineer",
+        "Department": "Production",
+        "Contact": "9588454523",
+        "Official Mail Id": "production.stel2@stelmec.com"
+      },
+      {
+        "SN": 137,
+        "EMP Code": "SBUII460",
+        "Branch": "SBUII",
+        "Employee Name": "Dhanay Santosh Patil",
+        "Designation": "GET",
+        "Department": "Engineering",
+        "Contact": "9209672962",
+        "Official Mail Id": "rmu.stel2@stelmec.com"
+      },
+      {
+        "SN": 138,
+        "EMP Code": "SBUII461",
+        "Branch": "SBUII",
+        "Employee Name": "Sandeepkumar Brijmohan Rajak",
+        "Designation": "Engineer ",
+        "Department": "Testing",
+        "Contact": "8976794352",
+        "Official Mail Id": "testing.stel2@stelmec.com"
+      },
+      {
+        "SN": 139,
+        "EMP Code": "SBUII464",
+        "Branch": "SBUII",
+        "Employee Name": "Balram Kumar",
+        "Designation": "Technician",
+        "Department": "Customer Care",
+        "Contact": "8797345965",
+        "Official Mail Id": "service.stel2@stelmec.com"
+      },
+      {
+        "SN": 140,
+        "EMP Code": "SBUII465",
+        "Branch": "SBUII",
+        "Employee Name": "Prathamesh Anil Potdar",
+        "Designation": "Engineer",
+        "Department": "Testing",
+        "Contact": "7757974708",
+        "Official Mail Id": "testing.stel2@stelmec.com"
+      },
+      {
+        "SN": 141,
+        "EMP Code": "SBUII467",
+        "Branch": "SBUII",
+        "Employee Name": "Dipak Agarwal",
+        "Designation": "Senior Engineer",
+        "Department": "Customer Care",
+        "Contact": "7976271905",
+        "Official Mail Id": "service.stel2@stelmec.com"
+      },
+      {
+        "SN": 142,
+        "EMP Code": "SBUII466",
+        "Branch": "SBUII",
+        "Employee Name": "Manish Kumar Singh",
+        "Designation": "Engineer ",
+        "Department": "Purchase",
+        "Contact": "8617697398",
+        "Official Mail Id": "manish.singh@stelmec.com"
+      },
+      {
+        "SN": 143,
+        "EMP Code": "SBUII469",
+        "Branch": "SBUII",
+        "Employee Name": "Sanket Mondal",
+        "Designation": "Engineer ",
+        "Department": "Testing",
+        "Contact": "8927993073",
+        "Official Mail Id": "testing.stel2@stelmec.com"
+      },
+      {
+        "SN": 144,
+        "EMP Code": "SBUII470",
+        "Branch": "SBUII",
+        "Employee Name": "Bhalchandra Narayan Varade",
+        "Designation": "Deputy General Manager",
+        "Department": "D&D",
+        "Contact": "8806157000",
+        "Official Mail Id": "bhalchandra.varade@stelmec.com"
+      },
+      {
+        "SN": 145,
+        "EMP Code": "SBUII473",
+        "Branch": "SBUII",
+        "Employee Name": "Nilesh Kumbhare",
+        "Designation": "General Manager",
+        "Department": "D&D",
+        "Contact": "9662535479",
+        "Official Mail Id": "nilesh.kumbhare@stelmec.com"
+      },
+      {
+        "SN": 146,
+        "EMP Code": "SBUII471",
+        "Branch": "SBUII",
+        "Employee Name": "Anjani Rajendra Pandey",
+        "Designation": "Assistant General Manager",
+        "Department": "Acc. & Fin.",
+        "Contact": "9004290007",
+        "Official Mail Id": "anjani.pandey@stelmec.com"
+      },
+      {
+        "SN": 147,
+        "EMP Code": "SBUII476",
+        "Branch": "SBUII",
+        "Employee Name": "Rahul Damodar Palkar",
+        "Designation": "Junior Executive",
+        "Department": "Logistics",
+        "Contact": "9049792559",
+        "Official Mail Id": "excise@stelmec.com"
+      },
+      {
+        "SN": 148,
+        "EMP Code": "SBUII477",
+        "Branch": "SBUII",
+        "Employee Name": "Swapnil Vishnu Jadhav",
+        "Designation": "Senior Engineer ",
+        "Department": "Quality",
+        "Contact": "9029901018",
+        "Official Mail Id": "swapnil.jadhav@stelmec.com"
+      },
+      {
+        "SN": 149,
+        "EMP Code": "SBUII479",
+        "Branch": "SBUII",
+        "Employee Name": "Sanjay Kumar Barik",
+        "Designation": "Assistant Manager",
+        "Department": "Purchase",
+        "Contact": "7757889953",
+        "Official Mail Id": "sanjay.barik@stelmec.com"
+      },
+      {
+        "SN": 150,
+        "EMP Code": "SBUII480",
+        "Branch": "SBUII",
+        "Employee Name": "Akshay Jayram Karande",
+        "Designation": "Engineer",
+        "Department": "D&D",
+        "Contact": "7350896221",
+        "Official Mail Id": "rnd.stel2@stelmec.com"
+      },
+      {
+        "SN": 151,
+        "EMP Code": "SBUII481",
+        "Branch": "SBUII",
+        "Employee Name": "Satish Gangadhar Sankhe",
+        "Designation": "Manager ",
+        "Department": "Stores",
+        "Contact": "9764956227",
+        "Official Mail Id": "satish.sankhe@stelmec.com"
+      },
+      {
+        "SN": 152,
+        "EMP Code": "SBUII482",
+        "Branch": "SBUII",
+        "Employee Name": "Kanagajeyanthi M",
+        "Designation": "GET",
+        "Department": "Engineering",
+        "Contact": "9345351198",
+        "Official Mail Id": "engg.stel2@stelmec.com"
+      },
+      {
+        "SN": 153,
+        "EMP Code": "SBUII483",
+        "Branch": "SBUII",
+        "Employee Name": "Jagannath Budhya Wagh",
+        "Designation": "Engineer",
+        "Department": "Quality",
+        "Contact": "8999862627",
+        "Official Mail Id": "qc.stel2@stelmec.com"
+      },
+      {
+        "SN": 154,
+        "EMP Code": "SBUII485",
+        "Branch": "SBUII",
+        "Employee Name": "Shashank Rajesh Waghela",
+        "Designation": "GET",
+        "Department": "Purchase",
+        "Contact": "9930473914",
+        "Official Mail Id": "purchase.stel2@stelmec.com"
+      },
+      {
+        "SN": 155,
+        "EMP Code": "SBUII486",
+        "Branch": "SBUII",
+        "Employee Name": "Amisha Dnyaneshwar Bhoir",
+        "Designation": "GET",
+        "Department": "Engineering",
+        "Contact": "9082243693",
+        "Official Mail Id": "engg.stel2@stelmec.com"
+      },
+      {
+        "SN": 156,
+        "EMP Code": "SBUII490",
+        "Branch": "SBUII",
+        "Employee Name": "Gautam Kumar",
+        "Designation": "Engineer",
+        "Department": "Engineering",
+        "Contact": "8406932602",
+        "Official Mail Id": "engg.stel2@stelmec.com"
+      },
+      {
+        "SN": 157,
+        "EMP Code": "SBUII489",
+        "Branch": "SBUII",
+        "Employee Name": "Nitin Bhaskarrao Magar",
+        "Designation": "Engineer",
+        "Department": "RMU",
+        "Contact": "9175299963",
+        "Official Mail Id": "nitin.magar@stelmec.com"
+      },
+      {
+        "SN": 158,
+        "EMP Code": "SBUII491",
+        "Branch": "SBUII",
+        "Employee Name": "Pranay Vikas More",
+        "Designation": "Executive",
+        "Department": "Production",
+        "Contact": "9373132708",
+        "Official Mail Id": "production.stel2@stelmec.com"
+      },
+      {
+        "SN": 159,
+        "EMP Code": "SBUII492",
+        "Branch": "SBUII",
+        "Employee Name": "Tejas Arjun Kale",
+        "Designation": "Engineer",
+        "Department": "Testing",
+        "Contact": "7875137537",
+        "Official Mail Id": "testing.stel2@stelmec.com"
+      },
+      {
+        "SN": 160,
+        "EMP Code": "SBUII493",
+        "Branch": "SBUII",
+        "Employee Name": "Nandkishor Shrikant Gupta",
+        "Designation": "GET",
+        "Department": "Testing",
+        "Contact": "9762475935",
+        "Official Mail Id": "testing.stel2@stelmec.com"
+      },
+      {
+        "SN": 161,
+        "EMP Code": "SBUII495",
+        "Branch": "SBUII",
+        "Employee Name": "Bhargavkumar Chandrakantbhai Shukla",
+        "Designation": "Manager",
+        "Department": "Engineering",
+        "Contact": "8866200884",
+        "Official Mail Id": "bhargav.shukla@stelmec.com"
+      },
+      {
+        "SN": 162,
+        "EMP Code": "SBUII494",
+        "Branch": "SBUII",
+        "Employee Name": "Uttam Ashok Raut",
+        "Designation": "Senior Technician",
+        "Department": "RMU",
+        "Contact": "9209565331",
+        "Official Mail Id": "productionrmu@stelmec.com"
+      },
+      {
+        "SN": 163,
+        "EMP Code": "SBUII496",
+        "Branch": "SBUII",
+        "Employee Name": "Abhishek Singh Chauhan",
+        "Designation": "GET",
+        "Department": "Customer Care",
+        "Contact": 8467804718,
+        "Official Mail Id": "service.stel2@stelmec.com"
+      },
+      {
+        "SN": 164,
+        "EMP Code": "SBUII497",
+        "Branch": "SBUII",
+        "Employee Name": "Shubham Singh",
+        "Designation": "GET",
+        "Department": "Customer Care",
+        "Contact": "9110072400",
+        "Official Mail Id": "service.stel2@stelmec.com"
+      },
+      {
+        "SN": 165,
+        "EMP Code": "SBUII498",
+        "Branch": "SBUII",
+        "Employee Name": "Anil Yuvraj Ahire",
+        "Designation": "Asst. Manager",
+        "Department": "Testing",
+        "Contact": 8888869708,
+        "Official Mail Id": "testing.stel2@stelmec.com"
+      },
+      {
+        "SN": 166,
+        "EMP Code": "SBUII499",
+        "Branch": "SBUII",
+        "Employee Name": "Gaurav Arun Gawai",
+        "Designation": "Engineer",
+        "Department": "Production",
+        "Contact": 8390945052,
+        "Official Mail Id": "production.stel2@stelmec.com"
+      },
+      {
+        "SN": 167,
+        "EMP Code": "SBUII500",
+        "Branch": "SBUII",
+        "Employee Name": "Abhay Man Singh",
+        "Designation": "DET",
+        "Department": "Customer Care",
+        "Contact": "6387480488",
+        "Official Mail Id": "service.stel2@stelmec.com"
+      },
+      {
+        "SN": 168,
+        "EMP Code": "SBUII501",
+        "Branch": "SBUII",
+        "Employee Name": "SK Masidur Rahaman",
+        "Designation": "Engineer ",
+        "Department": "D&D",
+        "Contact": "8670946732",
+        "Official Mail Id": "rnd.stel2@stelmec.com"
+      },
+      {
+        "SN": 169,
+        "EMP Code": "SBUII502",
+        "Branch": "SBUII",
+        "Employee Name": "Kalpak Kiran Waghmare",
+        "Designation": "GET",
+        "Department": "RMU",
+        "Contact": "9890537396",
+        "Official Mail Id": "productionrmu@stelmec.com"
+      },
+      {
+        "SN": 170,
+        "EMP Code": "SBUII503",
+        "Branch": "SBUII",
+        "Employee Name": "Aman Rameshwar Ramagade",
+        "Designation": "GET",
+        "Department": "RMU",
+        "Contact": "8180899295",
+        "Official Mail Id": "productionrmu@stelmec.com"
+      },
+      {
+        "SN": 171,
+        "EMP Code": "SBUII504",
+        "Branch": "SBUII",
+        "Employee Name": "Sumit Ganesh Jumde",
+        "Designation": "GET",
+        "Department": "Testing",
+        "Contact": 8767851324,
+        "Official Mail Id": "testing.stel2@stelmec.com"
+      },
+      {
+        "SN": 172,
+        "EMP Code": "SBUII505",
+        "Branch": "SBUII",
+        "Employee Name": "Abhinay Avdhut Chapake",
+        "Designation": "GET",
+        "Department": "Customer Care",
+        "Contact": "8010384661",
+        "Official Mail Id": "service.stel2@stelmec.com"
+      },
+      {
+        "SN": 173,
+        "EMP Code": "SBUII506",
+        "Branch": "SBUII",
+        "Employee Name": "Harshal Mahendra Malik",
+        "Designation": "GET",
+        "Department": "D&D",
+        "Contact": "8421895479",
+        "Official Mail Id": "rnd.stel2@stelmec.com"
+      },
+      {
+        "SN": 174,
+        "EMP Code": "SBUII507",
+        "Branch": "SBUII",
+        "Employee Name": "Abhijeet Dinesh Nanotkar",
+        "Designation": "GET",
+        "Department": "D&D",
+        "Contact": "801027890",
+        "Official Mail Id": "rnd.stel2@stelmec.com"
+      },
+      {
+        "SN": 175,
+        "EMP Code": "SBUII508",
+        "Branch": "SBUII",
+        "Employee Name": "Kshitija Prashant Deshmukh",
+        "Designation": "GET",
+        "Department": "D&D",
+        "Contact": "8805640611",
+        "Official Mail Id": "rnd.stel2@stelmec.com"
+      },
+      {
+        "SN": 176,
+        "EMP Code": "SBUII509",
+        "Branch": "SBUII",
+        "Employee Name": "Prachi Ashok Itnare",
+        "Designation": "GET",
+        "Department": "D&D",
+        "Contact": "7875892527",
+        "Official Mail Id": "rnd.stel2@stelmec.com"
+      },
+      {
+        "SN": 177,
+        "EMP Code": "SBUII510",
+        "Branch": "SBUII",
+        "Employee Name": "Ayush Pravin Harne",
+        "Designation": "GET",
+        "Department": "Production",
+        "Contact": "7796164931",
+        "Official Mail Id": "production.stel2@stelmec.com"
+      },
+      {
+        "SN": 178,
+        "EMP Code": "SBUII511",
+        "Branch": "SBUII",
+        "Employee Name": "Vedant Gajanan Hiwale",
+        "Designation": "GET",
+        "Department": "Testing",
+        "Contact": "9130962691",
+        "Official Mail Id": "testing.stel2@stelmec.com"
+      },
+      {
+        "SN": 179,
+        "EMP Code": "SBUII512",
+        "Branch": "SBUII",
+        "Employee Name": "Om Ashok Bhedurkar",
+        "Designation": "GET",
+        "Department": "Purchase",
+        "Contact": "8421396425",
+        "Official Mail Id": "purchase.stel2@stelmec.com"
+      },
+      {
+        "SN": 180,
+        "EMP Code": "SBUII513",
+        "Branch": "SBUII",
+        "Employee Name": "Vijay Gajanan Sonune",
+        "Designation": "GET",
+        "Department": "RMU",
+        "Contact": "9322503183",
+        "Official Mail Id": "productionrmu@stelmec.com"
+      },
+      {
+        "SN": 181,
+        "EMP Code": "SBUII514",
+        "Branch": "SBUII",
+        "Employee Name": "Gaurav Tukaram Pande",
+        "Designation": "GET",
+        "Department": "Purchase",
+        "Contact": "7499685230",
+        "Official Mail Id": "purchase.stel2@stelmec.com"
+      },
+      {
+        "SN": 182,
+        "EMP Code": "SBUII515",
+        "Branch": "SBUII",
+        "Employee Name": "Dhawal Jagdishrao Lokhande",
+        "Designation": "GET",
+        "Department": "Purchase",
+        "Contact": "9834410250",
+        "Official Mail Id": "purchase.stel2@stelmec.com"
+      },
+      {
+        "SN": 183,
+        "EMP Code": "SBUII516",
+        "Branch": "SBUII",
+        "Employee Name": "Adinath Girish Udgirkar",
+        "Designation": "GET",
+        "Department": "Quality",
+        "Contact": "9766564356",
+        "Official Mail Id": "qc.stel2@stelmec.com"
+      },
+      {
+        "SN": 184,
+        "EMP Code": "SBUII517",
+        "Branch": "SBUII",
+        "Employee Name": "Sanika Vivekrao Deshmukh",
+        "Designation": "GET",
+        "Department": "Quality",
+        "Contact": "9322627453",
+        "Official Mail Id": "qc.stel2@stelmec.com"
+      },
+      {
+        "SN": 185,
+        "EMP Code": "SBUII518",
+        "Branch": "SBUII",
+        "Employee Name": "Pragati Kamlakar Sonone",
+        "Designation": "GET",
+        "Department": "Quality",
+        "Contact": "8668757582",
+        "Official Mail Id": "qc.stel2@stelmec.com"
+      },
+      {
+        "SN": 186,
+        "EMP Code": "SBUII519",
+        "Branch": "SBUII",
+        "Employee Name": "Yash Sanjay Kalyankar",
+        "Designation": "GET",
+        "Department": "Testing",
+        "Contact": "8208055706",
+        "Official Mail Id": "testing.stel2@stelmec.com"
+      },
+      {
+        "SN": 187,
+        "EMP Code": "SBUII520",
+        "Branch": "SBUII",
+        "Employee Name": "Himanshu Vijay Karale",
+        "Designation": "GET",
+        "Department": "Testing",
+        "Contact": "9307454763",
+        "Official Mail Id": "testing.stel2@stelmec.com"
+      },
+      {
+        "SN": 188,
+        "EMP Code": "SBUII522",
+        "Branch": "SBUII",
+        "Employee Name": "Gaurav Sanjay Zade",
+        "Designation": "GET",
+        "Department": "Testing",
+        "Contact": "8275209740",
+        "Official Mail Id": "testing.stel2@stelmec.com"
+      },
+      {
+        "SN": 189,
+        "EMP Code": "SBUII523",
+        "Branch": "SBUII",
+        "Employee Name": "Vedant Pradeep Gawande",
+        "Designation": "GET",
+        "Department": "Testing",
+        "Contact": "9011458540",
+        "Official Mail Id": "testing.stel2@stelmec.com"
+      },
+      {
+        "SN": 190,
+        "EMP Code": "SBUII524",
+        "Branch": "SBUII",
+        "Employee Name": "Simrankaur Gurmitsingh Chavan",
+        "Designation": "GET",
+        "Department": "Testing",
+        "Contact": "8983713613",
+        "Official Mail Id": "testing.stel2@stelmec.com"
+      },
+      {
+        "SN": 191,
+        "EMP Code": "SBUII525",
+        "Branch": "SBUII",
+        "Employee Name": "Sakshi Vishnudas Bhosle",
+        "Designation": "GET",
+        "Department": "Testing",
+        "Contact": "9604933089",
+        "Official Mail Id": "testing.stel2@stelmec.com"
+      },
+      {
+        "SN": 192,
+        "EMP Code": "SBUII526",
+        "Branch": "SBUII",
+        "Employee Name": "Sharvari Sharad Deshmukh",
+        "Designation": "GET",
+        "Department": "Engineering",
+        "Contact": "8830992133",
+        "Official Mail Id": "rmu.stel2@stelmec.com"
+      },
+      {
+        "SN": 193,
+        "EMP Code": "SBUIII487",
+        "Branch": "SBUII",
+        "Employee Name": "Shani Suresh Kumar Sharma",
+        "Designation": "AGM",
+        "Department": "Engineering",
+        "Contact": "9779242273",
+        "Official Mail Id": "shani.sharma@stelmec.com"
+      },
+      {
+        "SN": 194,
+        "EMP Code": "SBUII527",
+        "Branch": "SBUII",
+        "Employee Name": "Surjit Singh",
+        "Designation": "Senior General Manager ",
+        "Department": "RMU - Operations",
+        "Contact": "7060380770",
+        "Official Mail Id": "surjit.singh@stelmec.com"
+      },
+      {
+        "SN": 195,
+        "EMP Code": "SBUII528",
+        "Branch": "SBUII",
+        "Employee Name": "Mizba Abidali Shaikh",
+        "Designation": "Management Trainee",
+        "Department": "HR",
+        "Contact": "7387941504",
+        "Official Mail Id": "mizba.shaikh@stelmec.com"
+      },
+      {
+        "SN": 196,
+        "EMP Code": "SBUII529",
+        "Branch": "SBUII",
+        "Employee Name": "Sayali Rajaram Narkar",
+        "Designation": "Jr. Executive",
+        "Department": "Customer Care",
+        "Contact": "8055530628",
+        "Official Mail Id": "service.stel2@stelmec.com"
+      },
+      {
+        "SN": 197,
+        "EMP Code": "SBUII530",
+        "Branch": "SBUII",
+        "Employee Name": "Minal Purushottam Chaudhari ",
+        "Designation": "Senior Engineer ",
+        "Department": "RMU",
+        "Contact": 9579054381,
+        "Official Mail Id": "minal.chaudhari@stelmec.com"
+      },
+      {
+        "SN": 198,
+        "EMP Code": "SBUII531",
+        "Branch": "SBUII",
+        "Employee Name": "Brahmankar Sachin Madhukar ",
+        "Designation": "Deputy General Manager",
+        "Department": "Project Management ",
+        "Contact": 9049995447,
+        "Official Mail Id": "sachin.brahmankar@stelmec.com"
+      },
+      {
+        "SN": 199,
+        "EMP Code": "SBUIII472",
+        "Branch": "SBUII",
+        "Employee Name": "Pradipbhai Devabhai Purohit ",
+        "Designation": "Deputy Manager ",
+        "Department": "Acc. & Fin.",
+        "Contact": 9727462908,
+        "Official Mail Id": "pradip.purohit@stelmec.com"
+      }
+    ]
+  },
+  "AR CRM Roaster.xlsx": {
+    "Sheet1": [
+      {
+        "CRM Feature / Module": "Lead Management",
+        "AR CRM": "Yes",
+        "__EMPTY": ""
+      },
+      {
+        "CRM Feature / Module": "Contact Management",
+        "AR CRM": "",
+        "__EMPTY": ""
+      },
+      {
+        "CRM Feature / Module": "Account / Customer Management",
+        "AR CRM": "Yes",
+        "__EMPTY": ""
+      },
+      {
+        "CRM Feature / Module": "Opportunity Management",
+        "AR CRM": "Yes",
+        "__EMPTY": ""
+      },
+      {
+        "CRM Feature / Module": "Sales Pipeline Tracking",
+        "AR CRM": "",
+        "__EMPTY": ""
+      },
+      {
+        "CRM Feature / Module": "Activity Management",
+        "AR CRM": "",
+        "__EMPTY": ""
+      },
+      {
+        "CRM Feature / Module": "Task & Calendar Management",
+        "AR CRM": "Yes",
+        "__EMPTY": ""
+      },
+      {
+        "CRM Feature / Module": "Email Integration",
+        "AR CRM": "Yes",
+        "__EMPTY": ""
+      },
+      {
+        "CRM Feature / Module": "Telephony Integration",
+        "AR CRM": "",
+        "__EMPTY": ""
+      },
+      {
+        "CRM Feature / Module": "Workflow Automation",
+        "AR CRM": "",
+        "__EMPTY": ""
+      },
+      {
+        "CRM Feature / Module": "Approval Workflows",
+        "AR CRM": "",
+        "__EMPTY": ""
+      },
+      {
+        "CRM Feature / Module": "Quote Management",
+        "AR CRM": "Yes",
+        "__EMPTY": ""
+      },
+      {
+        "CRM Feature / Module": "Order Management",
+        "AR CRM": "",
+        "__EMPTY": ""
+      },
+      {
+        "CRM Feature / Module": "Contract Management",
+        "AR CRM": "Yes",
+        "__EMPTY": ""
+      },
+      {
+        "CRM Feature / Module": "Customer Service Management",
+        "AR CRM": "",
+        "__EMPTY": ""
+      },
+      {
+        "CRM Feature / Module": "Case/Ticket Management",
+        "AR CRM": "",
+        "__EMPTY": ""
+      },
+      {
+        "CRM Feature / Module": "Knowledge Base",
+        "AR CRM": "",
+        "__EMPTY": ""
+      },
+      {
+        "CRM Feature / Module": "Campaign Management",
+        "AR CRM": "",
+        "__EMPTY": ""
+      },
+      {
+        "CRM Feature / Module": "Marketing Automation",
+        "AR CRM": "",
+        "__EMPTY": ""
+      },
+      {
+        "CRM Feature / Module": "Social Media Integration",
+        "AR CRM": "",
+        "__EMPTY": ""
+      },
+      {
+        "CRM Feature / Module": "Customer Portal",
+        "AR CRM": "",
+        "__EMPTY": ""
+      },
+      {
+        "CRM Feature / Module": "Mobile App",
+        "AR CRM": "",
+        "__EMPTY": ""
+      },
+      {
+        "CRM Feature / Module": "AI Assistant",
+        "AR CRM": "",
+        "__EMPTY": ""
+      },
+      {
+        "CRM Feature / Module": "Sales Forecasting",
+        "AR CRM": "",
+        "__EMPTY": ""
+      },
+      {
+        "CRM Feature / Module": "Territory Management",
+        "AR CRM": "",
+        "__EMPTY": ""
+      },
+      {
+        "CRM Feature / Module": "CPQ (Configure Price Quote)",
+        "AR CRM": "",
+        "__EMPTY": ""
+      },
+      {
+        "CRM Feature / Module": "Product Catalog",
+        "AR CRM": "",
+        "__EMPTY": ""
+      },
+      {
+        "CRM Feature / Module": "Price Book Management",
+        "AR CRM": "",
+        "__EMPTY": ""
+      },
+      {
+        "CRM Feature / Module": "Dashboard & Analytics",
+        "AR CRM": "",
+        "__EMPTY": ""
+      },
+      {
+        "CRM Feature / Module": "Reports & Dashboard",
+        "AR CRM": "",
+        "__EMPTY": ""
+      },
+      {
+        "CRM Feature / Module": "Role-Based Access Control",
+        "AR CRM": "",
+        "__EMPTY": ""
+      },
+      {
+        "CRM Feature / Module": "Audit Trail",
+        "AR CRM": "",
+        "__EMPTY": ""
+      },
+      {
+        "CRM Feature / Module": "Multi-Company Support",
+        "AR CRM": "",
+        "__EMPTY": ""
+      },
+      {
+        "CRM Feature / Module": "Multi-Currency Support",
+        "AR CRM": "",
+        "__EMPTY": ""
+      },
+      {
+        "CRM Feature / Module": "API Integration",
+        "AR CRM": "Yes",
+        "__EMPTY": ""
+      },
+      {
+        "CRM Feature / Module": "ERP Integration",
+        "AR CRM": "Yes",
+        "__EMPTY": ""
+      },
+      {
+        "CRM Feature / Module": "WhatsApp Integration",
+        "AR CRM": "",
+        "__EMPTY": ""
+      },
+      {
+        "CRM Feature / Module": "Document Management",
+        "AR CRM": "Yes",
+        "__EMPTY": ""
+      },
+      {
+        "CRM Feature / Module": "e-Signature Integration",
+        "AR CRM": "",
+        "__EMPTY": ""
+      },
+      {
+        "CRM Feature / Module": "Customer 360 View",
+        "AR CRM": "",
+        "__EMPTY": ""
+      },
+      {
+        "CRM Feature / Module": "Field Service Management",
+        "AR CRM": "Yes",
+        "__EMPTY": ""
+      },
+      {
+        "CRM Feature / Module": "Partner / Channel Management",
+        "AR CRM": "",
+        "__EMPTY": ""
+      },
+      {
+        "CRM Feature / Module": "Complaint Management",
+        "AR CRM": "Yes",
+        "__EMPTY": ""
+      },
+      {
+        "CRM Feature / Module": "SLA Management",
+        "AR CRM": "",
+        "__EMPTY": ""
+      },
+      {
+        "CRM Feature / Module": "Enquiry",
+        "AR CRM": "",
+        "__EMPTY": ""
+      },
+      {
+        "CRM Feature / Module": "Follow-up Management",
+        "AR CRM": "",
+        "__EMPTY": ""
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Lead Management",
+        "__EMPTY": "Lead Aging Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Lead Management",
+        "__EMPTY": "Lead Source Analysis"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Lead Management",
+        "__EMPTY": "Lead Conversion Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Lead Management",
+        "__EMPTY": "Lead Status Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Lead Management",
+        "__EMPTY": "Unassigned Leads Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Lead Management",
+        "__EMPTY": "Follow-up Due Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Lead Management",
+        "__EMPTY": "Dormant Leads Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Lead Management",
+        "__EMPTY": "Campaign-wise Leads Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Lead Management",
+        "__EMPTY": "Lead Funnel Analysis"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Lead Management",
+        "__EMPTY": "Lead Response Time Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Opportunity Management",
+        "__EMPTY": "Open Opportunities Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Opportunity Management",
+        "__EMPTY": "Opportunity Aging Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Opportunity Management",
+        "__EMPTY": "Opportunity Pipeline Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Opportunity Management",
+        "__EMPTY": "Won vs Lost Analysis"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Opportunity Management",
+        "__EMPTY": "Stage-wise Opportunity Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Opportunity Management",
+        "__EMPTY": "High Value Opportunity Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Opportunity Management",
+        "__EMPTY": "Opportunity Forecast Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Opportunity Management",
+        "__EMPTY": "Competitor Analysis Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Opportunity Management",
+        "__EMPTY": "Product-wise Opportunity Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Opportunity Management",
+        "__EMPTY": "Salesperson-wise Opportunity Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Sales Management",
+        "__EMPTY": "Sales Dashboard"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Sales Management",
+        "__EMPTY": "Revenue Achievement Dashboard"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Sales Management",
+        "__EMPTY": "Sales Target vs Achievement"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Sales Management",
+        "__EMPTY": "Sales Forecast Dashboard"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Sales Management",
+        "__EMPTY": "Pipeline Coverage Dashboard"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Sales Management",
+        "__EMPTY": "Monthly Sales Trend"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Sales Management",
+        "__EMPTY": "Sales by Product"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Sales Management",
+        "__EMPTY": "Sales by Region"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Sales Management",
+        "__EMPTY": "Sales by Branch"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Sales Management",
+        "__EMPTY": "Sales by Salesperson"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Sales Management",
+        "__EMPTY": "Top Customers Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Sales Management",
+        "__EMPTY": "Top Products Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Customer Management",
+        "__EMPTY": "Customer Dashboard"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Customer Management",
+        "__EMPTY": "Active Customers Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Customer Management",
+        "__EMPTY": "New Customers Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Customer Management",
+        "__EMPTY": "Customer Growth Trend"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Customer Management",
+        "__EMPTY": "Customer Retention Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Customer Management",
+        "__EMPTY": "Customer Lifetime Value Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Customer Management",
+        "__EMPTY": "Customer Segmentation Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Customer Management",
+        "__EMPTY": "Customer Satisfaction Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Customer Management",
+        "__EMPTY": "Repeat Business Analysis"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Activity Management",
+        "__EMPTY": "Daily Activity Dashboard"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Activity Management",
+        "__EMPTY": "Calls Completed Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Activity Management",
+        "__EMPTY": "Meetings Conducted Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Activity Management",
+        "__EMPTY": "Customer Visit Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Activity Management",
+        "__EMPTY": "Pending Tasks Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Activity Management",
+        "__EMPTY": "Overdue Activities Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Activity Management",
+        "__EMPTY": "Employee Productivity Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Activity Management",
+        "__EMPTY": "Follow-up Effectiveness Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Activity Management",
+        "__EMPTY": "Activity Trend Analysis"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Marketing Management",
+        "__EMPTY": "Campaign Performance Dashboard"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Marketing Management",
+        "__EMPTY": "Campaign ROI Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Marketing Management",
+        "__EMPTY": "Leads Generated by Campaign"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Marketing Management",
+        "__EMPTY": "Cost Per Lead Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Marketing Management",
+        "__EMPTY": "Email Campaign Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Marketing Management",
+        "__EMPTY": "Email Open Rate Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Marketing Management",
+        "__EMPTY": "Email Click Rate Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Marketing Management",
+        "__EMPTY": "Event Participation Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Marketing Management",
+        "__EMPTY": "Social Media Engagement Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Marketing Management",
+        "__EMPTY": "Marketing Funnel Dashboard"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Service Management",
+        "__EMPTY": "Open Ticket Dashboard"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Service Management",
+        "__EMPTY": "Closed Ticket Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Service Management",
+        "__EMPTY": "SLA Compliance Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Service Management",
+        "__EMPTY": "Average Resolution Time Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Service Management",
+        "__EMPTY": "Escalated Cases Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Service Management",
+        "__EMPTY": "Customer Complaints Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Service Management",
+        "__EMPTY": "Service Request Analysis"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Service Management",
+        "__EMPTY": "First Call Resolution Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Service Management",
+        "__EMPTY": "Service Engineer Productivity"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Service Management",
+        "__EMPTY": "Customer Satisfaction Dashboard"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Quotation Management",
+        "__EMPTY": "Quotation Register"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Quotation Management",
+        "__EMPTY": "Pending Quotations"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Quotation Management",
+        "__EMPTY": "Approved Quotations"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Quotation Management",
+        "__EMPTY": "Rejected Quotations"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Quotation Management",
+        "__EMPTY": "Quote Conversion Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Contract Management",
+        "__EMPTY": "Active Contracts Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Contract Management",
+        "__EMPTY": "Expiring Contracts Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Contract Management",
+        "__EMPTY": "Contract Renewal Tracker"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Contract Management",
+        "__EMPTY": "Contract Value Analysis"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Contract Management",
+        "__EMPTY": "Contract Status Dashboard"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Dealer Management",
+        "__EMPTY": "Dealer Performance Dashboard"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Dealer Management",
+        "__EMPTY": "Dealer Sales Analysis"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Dealer Management",
+        "__EMPTY": "Dealer Growth Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Dealer Management",
+        "__EMPTY": "Dealer Visit Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Dealer Management",
+        "__EMPTY": "Dealer Outstanding Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "OEM Management",
+        "__EMPTY": "OEM-wise Sales Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "OEM Management",
+        "__EMPTY": "OEM Performance Dashboard"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "OEM Management",
+        "__EMPTY": "OEM Opportunity Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "OEM Management",
+        "__EMPTY": "OEM Product Performance"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "OEM Management",
+        "__EMPTY": "OEM Margin Analysis"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Tender Management",
+        "__EMPTY": "Tender Pipeline Dashboard"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Tender Management",
+        "__EMPTY": "Tender Register"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Tender Management",
+        "__EMPTY": "Tender Win Ratio"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Tender Management",
+        "__EMPTY": "Tender Loss Analysis"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Tender Management",
+        "__EMPTY": "Tender Value Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Channel Management",
+        "__EMPTY": "Channel Partner Dashboard"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Channel Management",
+        "__EMPTY": "Partner Performance Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Channel Management",
+        "__EMPTY": "Incentive Utilization Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Channel Management",
+        "__EMPTY": "Scheme Performance Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Channel Management",
+        "__EMPTY": "Partner Growth Analysis"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Warranty & RMA",
+        "__EMPTY": "Warranty Claims Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Warranty & RMA",
+        "__EMPTY": "RMA Status Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Warranty & RMA",
+        "__EMPTY": "Product Failure Analysis"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Warranty & RMA",
+        "__EMPTY": "Warranty Cost Analysis"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Warranty & RMA",
+        "__EMPTY": "Service Closure Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Collection Management",
+        "__EMPTY": "Outstanding Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Collection Management",
+        "__EMPTY": "Overdue Receivables Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Collection Management",
+        "__EMPTY": "Collection Follow-up Report"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Collection Management",
+        "__EMPTY": "Credit Limit Utilization"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Collection Management",
+        "__EMPTY": "Customer Aging Analysis"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Executive Dashboard",
+        "__EMPTY": "CEO Dashboard"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Executive Dashboard",
+        "__EMPTY": "CFO Dashboard"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Executive Dashboard",
+        "__EMPTY": "COO Dashboard"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Executive Dashboard",
+        "__EMPTY": "Sales Head Dashboard"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Executive Dashboard",
+        "__EMPTY": "Business Unit Dashboard"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Executive Dashboard",
+        "__EMPTY": "Gross Margin Dashboard"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Executive Dashboard",
+        "__EMPTY": "Forecast Accuracy Dashboard"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Executive Dashboard",
+        "__EMPTY": "Business Growth Dashboard"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Executive Dashboard",
+        "__EMPTY": "Revenue by Region Dashboard"
+      },
+      {
+        "CRM Feature / Module": "Report & Dashboard",
+        "AR CRM": "Executive Dashboard",
+        "__EMPTY": "Revenue by Product Dashboard"
+      }
+    ]
+  }
+}

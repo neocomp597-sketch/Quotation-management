@@ -10,23 +10,24 @@ const MENU_GROUPS = [
     {
         key: 'master',
         label: 'Master',
-        description: 'Customers, vendors, products, MGRs, attributes and terms',
+        description: 'Customers, employees, vendors, contacts, products, branches, state/city, MGRs, and masters',
         children: [
             { key: 'master_customers', label: 'Customers', description: 'Customer master records' },
-            { key: 'payroll_org_chart', label: 'Org Chart', description: 'Employee hierarchy and org chart module' },
-            { key: 'payroll_org_chart_full', label: 'Full Org Chart View', description: 'Full company org chart access' },
+            { key: 'payroll_employees', label: 'Employees', description: 'Employee directory and profile management' },
+            { key: 'payroll_org_chart', label: 'Org Chart', description: 'Direct reporting org chart access' },
+            { key: 'payroll_org_chart_full', label: 'Org Chart (Full Company)', description: 'Full company org chart access' },
             { key: 'master_vendors', label: 'Vendors', description: 'Vendor master records' },
             { key: 'master_products', label: 'Products', description: 'Product master records' },
-            { key: 'master_mgrs', label: 'MGRs', description: 'MGR master hierarchy' },
+            { key: 'master_contacts', label: 'Contacts', description: 'Contact management records' },
+            { key: 'master_mgrs', label: 'MGR Master', description: 'MGR master hierarchy' },
             { key: 'master_attributes', label: 'Attributes', description: 'Attribute master definitions' },
             { key: 'master_statuses', label: 'Status Master', description: 'Status master definitions for planning' },
-            { key: 'master_terms', label: 'Terms', description: 'Terms and conditions master' },
-            { key: 'master_territories', label: 'Territories', description: 'Territory master management' },
+            { key: 'master_terms', label: 'Terms & Conditions', description: 'Terms and conditions master' },
+            { key: 'master_territories', label: 'Territory Master', description: 'Territory master management' },
             { key: 'master_branches', label: 'Branch Master', description: 'Branch master management' },
             { key: 'master_serials', label: 'Serial No. Master', description: 'Serial number and asset master record management' },
-            { key: 'state_master_create', label: 'Create State Master', description: 'Create state records' },
-            { key: 'state_master_edit', label: 'Edit State Master', description: 'Modify state records' },
-            { key: 'state_master_delete', label: 'Delete State Master', description: 'Delete state records' }
+            { key: 'state_master_create', label: 'State Master', description: 'State master management' },
+            { key: 'city_master', label: 'City Master', description: 'City master management' }
         ]
     },
     {
@@ -66,10 +67,10 @@ const MENU_GROUPS = [
     },
     {
         key: 'meetings',
-        label: 'Meetings',
+        label: 'Appointments',
         description: 'Meeting schedule and appointment management',
         children: [
-            { key: 'meetings_list', label: 'Meetings List', description: 'Schedule and view meetings' }
+            { key: 'meetings_list', label: 'Appointments Register', description: 'Schedule and view appointments' }
         ]
     },
     {
@@ -97,27 +98,27 @@ const MENU_GROUPS = [
     },
     {
         key: 'purchase',
-        label: 'Purchase',
+        label: 'Material',
         description: 'Purchase and GRN navigation group',
         children: [
-            { key: 'purchase_grn', label: 'GRN', description: 'Goods receipt note screens' }
+            { key: 'purchase_grn', label: 'GRN Register', description: 'Goods receipt note and material tracking screens' }
         ]
     },
     {
         key: 'inventory',
-        label: 'Inventory Management',
+        label: 'Inventory',
         description: 'Stock ledger, multi-warehouse stock, transfers, adjustments, physical audit, and alerts',
         children: [
-            { key: 'inventory_dashboard', label: 'Inventory Dashboard', description: 'KPI cards, stock valuation, movement feed' },
+            { key: 'inventory_dashboard', label: 'Dashboard', description: 'Stock valuation, movement feed, and KPI metrics' },
             { key: 'inventory_items', label: 'Items & Stock Matrix', description: 'Warehouse-wise stock and batch details' },
-            { key: 'inventory_warehouses', label: 'Warehouse Master', description: 'Manage warehouses and bins' },
+            { key: 'inventory_warehouses', label: 'Warehouses', description: 'Manage warehouses and storage bins' },
             { key: 'inventory_stock_in', label: 'Stock In / GRN', description: 'Record inward goods receipts' },
             { key: 'inventory_stock_out', label: 'Stock Out / Dispatch', description: 'Record outward material issues' },
             { key: 'inventory_transfers', label: 'Stock Transfers', description: 'Inter-warehouse transfers and approvals' },
             { key: 'inventory_adjustments', label: 'Stock Adjustments', description: 'Damage, loss, and physical audit adjustments' },
-            { key: 'inventory_stock_counts', label: 'Stock Count Audits', description: 'Physical count sessions and reconciliation' },
+            { key: 'inventory_stock_counts', label: 'Physical Audit', description: 'Physical count sessions and reconciliation' },
             { key: 'inventory_alerts', label: 'Stock Alerts', description: 'Low-stock and expiry notification setup' },
-            { key: 'inventory_reports', label: 'Inventory Reports', description: 'Stock ledger, valuation, and dead-stock reports' }
+            { key: 'inventory_reports', label: 'Valuation & Reports', description: 'Stock ledger, valuation, and dead-stock reports' }
         ]
     },
     {
@@ -164,8 +165,8 @@ const MENU_GROUPS = [
         description: 'Manage payroll settings, runs, calculations, and letters',
         children: [
             { key: 'payroll_payslips', label: 'My Payslips', description: 'View and download monthly payslips' },
-            { key: 'payroll_employees', label: 'Employee Profiles', description: 'Manage employee salary profiles and structures' },
-            { key: 'payroll_org_chart', label: 'Org Chart', description: 'Employee hierarchy and org chart module' },
+            { key: 'payroll_employees', label: 'Employees', description: 'Employee directory and profile management' },
+            { key: 'payroll_org_chart', label: 'Org Chart', description: 'Direct reporting org chart access' },
             { key: 'payroll_masters', label: 'Department & Designation Masters', description: 'Manage departments and designations' },
             { key: 'payroll_runs', label: 'Run Payroll', description: 'Create and run monthly payroll batches' },
             { key: 'payroll_payments', label: 'Payments', description: 'Record payment slips and transaction references' },
@@ -180,21 +181,23 @@ const MENU_GROUPS = [
         description: 'Manage support tickets, service visits, warranties, AMCs, knowledge base, and feedback',
         children: [
             { key: 'csm_dashboard', label: 'CSM Dashboard', description: 'Overview and service analytics' },
-            { key: 'csm_tickets', label: 'Tickets Management', description: 'View, create, and resolve customer support tickets' },
-            { key: 'csm_visits', label: 'Field Service Visits', description: 'Schedule and manage service engineer visits' },
+            { key: 'csm_tickets', label: 'Tickets Register', description: 'View, create, and resolve customer support tickets' },
+            { key: 'csm_tickets', label: 'My Complaints', description: 'Complaints created by or assigned to the logged-in user' },
+            { key: 'csm_tickets', label: 'My Team Complaints', description: 'Complaints for the logged-in user reporting hierarchy' },
+            { key: 'csm_visits', label: 'Service Visits', description: 'Schedule and manage service engineer visits' },
             { key: 'csm_warranties_amc', label: 'Warranty & AMC', description: 'Manage customer warranty details and AMC contracts' },
             { key: 'csm_kb', label: 'Knowledge Base', description: 'Manage troubleshooting articles and FAQs' },
-            { key: 'csm_masters', label: 'CSM Masters', description: 'Configure categories, priorities, teams, and SLAs' },
+            { key: 'csm_masters', label: 'CSM Config', description: 'Configure categories, priorities, teams, and SLAs' },
             { key: 'csm_reports', label: 'Service Reports', description: 'Customer service analytics and resolution reports' }
         ]
     },
     {
         key: 'tender',
-        label: 'Tender Management',
+        label: 'Tenders',
         description: 'Tender dashboard, pipelines, registers, and analysis reports',
         children: [
             { key: 'tender_dashboard', label: 'Tender Dashboard', description: 'Tender KPI dashboard and charts' },
-            { key: 'tender_register', label: 'Tender Register', description: 'Tender list register and management' },
+            { key: 'tender_register', label: 'Tenders Register', description: 'Tender list register and management' },
             { key: 'tender_reports', label: 'Tender Reports', description: 'Tender pipeline and win/loss reports' }
         ]
     }
@@ -319,3 +322,5 @@ module.exports = {
     sanitizePermissions,
     resolvePermissions
 };
+
+

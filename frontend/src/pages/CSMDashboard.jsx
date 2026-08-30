@@ -38,7 +38,7 @@ const CSMDashboard = () => {
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
     const [startDay, setStartDay] = useState('');
     const [endDay, setEndDay] = useState('');
-    const [customMode, setCustomMode] = useState(false);
+    const [customMode, setCustomMode] = useState(true);
 
     const loadBranches = async () => {
         try {
@@ -192,6 +192,8 @@ const CSMDashboard = () => {
         'January', 'February', 'March', 'April', 'May', 'June',
         'July', 'August', 'September', 'October', 'November', 'December'
     ];
+    const daysInSelectedMonth = new Date(selectedYear, selectedMonth, 0).getDate();
+    const dayOptions = Array.from({ length: daysInSelectedMonth }, (_, idx) => idx + 1);
 
     return (
         <div className="p-6 space-y-6 max-w-7xl mx-auto animate-fade-in-up">
@@ -273,7 +275,7 @@ const CSMDashboard = () => {
                                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                             }`}
                         >
-                            Last Month
+                            Previous Month
                         </button>
                         <button
                             onClick={() => { setQuickRange(''); setCustomMode(true); }}
@@ -337,26 +339,24 @@ const CSMDashboard = () => {
                         </div>
 
                         <div className="flex items-center gap-2">
-                            <span className="font-bold text-slate-600">Day Range (1-31):</span>
-                            <input
-                                type="number"
-                                min="1"
-                                max="31"
-                                placeholder="From Day"
+                            <span className="font-bold text-slate-600">Day Range:</span>
+                            <select
                                 value={startDay}
                                 onChange={(e) => setStartDay(e.target.value)}
-                                className="w-20 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 font-semibold outline-none text-center"
-                            />
+                                className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 font-semibold outline-none"
+                            >
+                                <option value="">1</option>
+                                {dayOptions.map(day => <option key={day} value={day}>{day}</option>)}
+                            </select>
                             <span>to</span>
-                            <input
-                                type="number"
-                                min="1"
-                                max="31"
-                                placeholder="To Day"
+                            <select
                                 value={endDay}
                                 onChange={(e) => setEndDay(e.target.value)}
-                                className="w-20 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 font-semibold outline-none text-center"
-                            />
+                                className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 font-semibold outline-none"
+                            >
+                                <option value="">{daysInSelectedMonth}</option>
+                                {dayOptions.map(day => <option key={day} value={day}>{day}</option>)}
+                            </select>
                         </div>
                     </div>
                 )}
@@ -596,3 +596,7 @@ const CSMDashboard = () => {
 };
 
 export default CSMDashboard;
+
+
+
+

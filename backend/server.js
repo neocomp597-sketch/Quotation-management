@@ -186,6 +186,16 @@ app.use("/api/cpq", cpqRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/clm", clmRoutes);
 
+app.get('/api/seed-super-employees', async (req, res) => {
+    try {
+        const { seedSuperEmployees } = require('./services/seedSuperEmployeesService');
+        const result = await seedSuperEmployees();
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
 app.get('/api/trigger-seed-landing', async (req, res) => {
     try {
         const landingPlanController = require('./controllers/landingPlanController');
@@ -194,6 +204,41 @@ app.get('/api/trigger-seed-landing', async (req, res) => {
         res.status(500).send(err.message);
     }
 });
+
+app.get('/api/run-employee-inspect', async (req, res) => {
+    try {
+        const XLSX = require('xlsx');
+        const fs = require('fs');
+        const path = require('path');
+        const files = [
+            'D:/tally/Quotations/Employee detail - SBU2.xlsx',
+            'D:/tally/Quotations/AR CRM Roaster.xlsx'
+        ];
+        const output = {};
+        for (const file of files) {
+            if (fs.existsSync(file)) {
+                try {
+                    const wb = XLSX.readFile(file);
+                    output[path.basename(file)] = {};
+                    wb.SheetNames.forEach(sheet => {
+                        const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheet], { defval: '' });
+                        output[path.basename(file)][sheet] = rows.slice(0, 50); // first 50 rows
+                    });
+                } catch (e) {
+                    output[path.basename(file)] = { error: e.message };
+                }
+            } else {
+                output[path.basename(file)] = { status: 'File does not exist' };
+            }
+        }
+        res.json(output);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+
+
 
 app.get('/api/trigger-seed', async (req, res) => {
     try {
@@ -322,21 +367,214 @@ app.get('/api/seed-statuses', async (req, res) => {
     }
 });
 
-app.get('/api/check-db', async (req, res) => {
+app.get('/api/do-employee-import-now', async (req, res) => {
     try {
-        const Product = require('./models/Product');
-        const products = await Product.find({
-            $or: [
-                { productName: { $regex: /pipe|upvc|cpvc/i } },
-                { productCode: { $regex: /85076000|84137090|85389000|85013120/i } }
-            ]
-        }).lean();
-        const allProducts = await Product.find({}).select('productName productCode createdAt updatedAt basePrice mrp').sort({ createdAt: -1 }).lean();
-        res.json({ targetProducts: products, totalCount: allProducts.length, recentProducts: allProducts.slice(0, 20) });
+        const XLSX = require('xlsx');
+        const fs = require('fs');
+        const path = require('path');
+        const Company = require('./models/Company');
+        const EmployeeProfile = require('./models/EmployeeProfile');
+        const RolePermission = require('./models/RolePermission');
+        const { syncAllEngineers } = require('./services/engineerSyncService');
+        const { syncUsersForExistingEmployees } = require('./services/employeeUserService');
+
+        const defaultCompany = await Company.findOne().lean();
+        const companyId = defaultCompany ? defaultCompany._id : null;
+
+        const files = [
+            'D:/tally/Quotations/Employee detail - SBU2.xlsx',
+            'D:/tally/Quotations/AR CRM Roaster.xlsx'
+        ];
+
+        const fileSummaries = {};
+        let totalCreated = 0;
+        let totalUpdated = 0;
+        const processedEmployees = [];
+
+        for (const filePath of files) {
+            if (!fs.existsSync(filePath)) {
+                fileSummaries[path.basename(filePath)] = { status: 'File not found' };
+                continue;
+            }
+
+            const wb = XLSX.readFile(filePath);
+            let fileCreated = 0;
+            let fileUpdated = 0;
+
+            for (const sheetName of wb.SheetNames) {
+                const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { defval: '' });
+
+                for (let i = 0; i < rows.length; i++) {
+                    const row = rows[i];
+                    const name = String(
+                        row['Employee Name'] || row['employeename'] || row['Name'] || row['name'] ||
+                        row['EMPLOYEE NAME'] || row['Emp Name'] || row['EMPLOYEE'] || ''
+                    ).trim();
+
+                    if (!name || name.toLowerCase().includes('total') || name.toLowerCase().includes('header')) continue;
+
+                    const email = String(row['Email'] || row['email'] || row['EMAIL'] || '').trim();
+                    const pan = String(row['PAN'] || row['pan'] || '').trim();
+                    const aadhaar = String(row['Aadhaar'] || row['aadhaar'] || row['Aadhar'] || '').trim();
+                    const uan = String(row['UAN'] || row['uan'] || '').trim();
+                    const pfNumber = String(row['PF Number'] || row['pfNumber'] || row['PF NO'] || '').trim();
+                    const esiNumber = String(row['ESI Number'] || row['esiNumber'] || row['ESI NO'] || '').trim();
+                    const bankName = String(row['Bank Name'] || row['bank'] || row['BANK NAME'] || '').trim();
+                    const accountNumber = String(row['Account Number'] || row['account'] || row['ACC NO'] || row['A/C NO'] || '').trim();
+                    const ifscCode = String(row['IFSC Code'] || row['ifsc'] || row['IFSC'] || '').trim();
+                    const department = String(row['Department'] || row['dept'] || row['DEPARTMENT'] || row['SBU'] || 'General').trim();
+                    const designation = String(row['Designation'] || row['desig'] || row['DESIGNATION'] || row['Role'] || 'Employee').trim();
+                    const workerType = String(row['Worker Type'] || row['workerType'] || 'PERMANENT WORKER').trim();
+                    const employeeType = String(row['Employee Type'] || row['employeeType'] || 'ONSITE').trim();
+                    const status = String(row['Status'] || row['status'] || 'Active').trim();
+
+                    const joiningDateStr = row['Joining Date'] || row['joiningDate'] || row['DOJ'];
+                    const dobStr = row['DOB'] || row['dob'] || row['Date of Birth'];
+
+                    const joiningDate = joiningDateStr ? new Date(joiningDateStr) : new Date();
+                    const dob = dobStr ? new Date(dobStr) : null;
+
+                    const basic = Number(row['Basic Salary'] || row['basic'] || row['BASIC'] || 0) || 0;
+                    const hra = Number(row['HRA'] || row['hra'] || 0) || 0;
+                    const da = Number(row['DA'] || row['da'] || 0) || 0;
+                    const specialAllowance = Number(row['Special Allowance'] || row['specialAllowance'] || row['SPECIAL ALLOWANCE'] || 0) || 0;
+
+                    const empObj = {
+                        name,
+                        email: email || undefined,
+                        pan,
+                        aadhaar,
+                        uan,
+                        pfNumber,
+                        esiNumber,
+                        bankName,
+                        accountNumber,
+                        ifscCode,
+                        joiningDate,
+                        dob,
+                        department,
+                        designation,
+                        workerType,
+                        employeeType,
+                        status: status === 'Inactive' ? 'Inactive' : 'Active',
+                        salaryStructure: { basic, hra, da, specialAllowance },
+                        companyId
+                    };
+
+                    const existing = await EmployeeProfile.findOne({
+                        companyId,
+                        $or: [
+                            { name: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+                            ...(email ? [{ email: email.toLowerCase() }] : [])
+                        ]
+                    });
+
+                    if (existing) {
+                        await EmployeeProfile.findByIdAndUpdate(existing._id, empObj);
+                        fileUpdated++;
+                        totalUpdated++;
+                    } else {
+                        await EmployeeProfile.create(empObj);
+                        fileCreated++;
+                        totalCreated++;
+                    }
+                    processedEmployees.push({ name, email, department, designation });
+                }
+            }
+
+            fileSummaries[path.basename(filePath)] = { created: fileCreated, updated: fileUpdated };
+        }
+
+        let engineerSyncResult = null;
+        let userSyncResult = null;
+        if (companyId) {
+            engineerSyncResult = await syncAllEngineers(companyId);
+            userSyncResult = await syncUsersForExistingEmployees(companyId);
+        }
+
+        // Configure Admin Permissions matrix
+        const adminPermissions = {
+            dashboard: true, dashboard_overview: true,
+            master: true, master_customers: true, payroll_org_chart: true, payroll_org_chart_full: true, master_vendors: true, master_products: true, master_mgrs: true, master_attributes: true, master_statuses: true, master_terms: true, master_territories: true, master_branches: true, master_serials: true, state_master_create: true, state_master_edit: true, state_master_delete: true,
+            flowchart: true, flowchart_view: true, flowchart_create: true, flowchart_edit: true, flowchart_delete: true,
+            enquiry: true, enquiry_leads: true, enquiry_analytics: true,
+            sales_pipeline: true, sales_dashboard: true, sales_deals: true, sales_pipelines: true, sales_forecasting: true, sales_activities: true, sales_targets: true, sales_reports: true, sales_analytics: true,
+            meetings: true, meetings_list: true,
+            quotation: true, sales_catalog: true, sales_price_management: true, sales_cpq: true, quotation_list: true, sales_approvals: true, sales_contracts: true, sales_orders: true, sales_revenue_analytics: true, sales_competitors: true, sales_ai_pricing: true,
+            sale: true,
+            purchase: true, purchase_grn: true,
+            inventory: true, inventory_dashboard: true, inventory_items: true, inventory_warehouses: true, inventory_stock_in: true, inventory_stock_out: true, inventory_transfers: true, inventory_adjustments: true, inventory_stock_counts: true, inventory_alerts: true, inventory_reports: true,
+            planning: true, planning_screen: true, planning_simulations: true, planning_edit_prev_year: true, planning_view_sbu_wise: true, planning_view_segment_wise: true, planning_view_status_breakdown: true,
+            reports: true, reports_main: true,
+            settings: true, settings_profile: true,
+            admin: true, admin_authorization: true, admin_salespersons: true,
+            payroll: true, payroll_payslips: true, payroll_employees: true, payroll_masters: true, payroll_runs: true, payroll_payments: true, payroll_settings: true, payroll_letters: true, payroll_reports: true,
+            csm: true, csm_dashboard: true, csm_tickets: true, csm_visits: true, csm_warranties_amc: true, csm_kb: true, csm_masters: true, csm_reports: true,
+            tender: true, tender_dashboard: true, tender_register: true, tender_reports: true
+        };
+
+        const rolePermission = await RolePermission.findOneAndUpdate(
+            { role: 'admin' },
+            { role: 'admin', permissions: adminPermissions },
+            { upsert: true, returnDocument: 'after' }
+        );
+
+        const responsePayload = {
+            success: true,
+            message: `Employee import & Admin permissions processing complete. Total Created: ${totalCreated}, Total Updated: ${totalUpdated}`,
+            summary: {
+                totalCreated,
+                totalUpdated,
+                fileSummaries,
+                engineerSyncResult,
+                userSyncResult,
+                adminRolePermissions: rolePermission ? rolePermission.role : 'Updated'
+            },
+            processedEmployeesCount: processedEmployees.length,
+            processedEmployeesSample: processedEmployees.slice(0, 15)
+        };
+
+        res.json(responsePayload);
     } catch (err) {
-        res.status(500).send(err.message);
+        res.status(500).json({ success: false, error: err.message, stack: err.stack });
     }
 });
+
+
+
+app.get('/api/run-employee-inspect', async (req, res) => {
+    try {
+        const XLSX = require('xlsx');
+        const fs = require('fs');
+        const path = require('path');
+        const files = [
+            'D:/tally/Quotations/Employee detail - SBU2.xlsx',
+            'D:/tally/Quotations/AR CRM Roaster.xlsx'
+        ];
+        const output = {};
+        for (const file of files) {
+            if (fs.existsSync(file)) {
+                try {
+                    const wb = XLSX.readFile(file);
+                    output[path.basename(file)] = {};
+                    wb.SheetNames.forEach(sheet => {
+                        const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheet], { defval: '' });
+                        output[path.basename(file)][sheet] = rows.slice(0, 50); // first 50 rows
+                    });
+                } catch (e) {
+                    output[path.basename(file)] = { error: e.message };
+                }
+            } else {
+                output[path.basename(file)] = { status: 'File does not exist' };
+            }
+        }
+        fs.writeFileSync('D:/tally/Quotations/scratch_inspect.txt', JSON.stringify(output, null, 2));
+        res.json({ message: 'Inspection saved', keys: Object.keys(output) });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 
 app.get('/api/debug-last-error', (req, res) => {
     res.json({ success: true, lastServerError });
@@ -412,6 +650,14 @@ app.get('/api/git-revert', (req, res) => {
 const startBackgroundServices = async () => {
   await dbStartupPromise;
   const redisReady = await redisStartupPromise;
+
+  // Seed employees for super@gmail.com organisation
+  try {
+    const { seedSuperEmployees } = require("./services/seedSuperEmployeesService");
+    await seedSuperEmployees();
+  } catch (err) {
+    console.error("Error auto-seeding super@gmail.com employees:", err);
+  }
 
   // Seed current platform release notes
   try {
@@ -1103,11 +1349,162 @@ if (require.main === module) {
         const syncRes = await syncUsersForExistingVendors();
         require('fs').writeFileSync(require('path').join(__dirname, 'vendor_sync_debug.txt'), JSON.stringify(syncRes, null, 2));
         console.log('[DEBUG] Vendor user sync completed:', syncRes);
+
+        // Auto Employee Import & Admin Permissions Seed
+        try {
+            const XLSX = require('xlsx');
+            const fs = require('fs');
+            const path = require('path');
+            const Company = require('./models/Company');
+            const EmployeeProfile = require('./models/EmployeeProfile');
+            const RolePermission = require('./models/RolePermission');
+            const { syncAllEngineers } = require('./services/engineerSyncService');
+            const { syncUsersForExistingEmployees } = require('./services/employeeUserService');
+
+            const defaultCompany = await Company.findOne().lean();
+            const companyId = defaultCompany ? defaultCompany._id : null;
+
+            // 1. Inspect Excel files
+            const files = [
+                'D:/tally/Quotations/Employee detail - SBU2.xlsx',
+                'D:/tally/Quotations/AR CRM Roaster.xlsx'
+            ];
+            const debugSheetData = {};
+            for (const filePath of files) {
+                if (fs.existsSync(filePath)) {
+                    const wb = XLSX.readFile(filePath);
+                    debugSheetData[path.basename(filePath)] = {};
+                    wb.SheetNames.forEach(sheet => {
+                        debugSheetData[path.basename(filePath)][sheet] = XLSX.utils.sheet_to_json(wb.Sheets[sheet], { defval: '' });
+                    });
+                }
+            }
+            fs.writeFileSync(path.join(__dirname, 'debug_emp_sheets.json'), JSON.stringify(debugSheetData, null, 2));
+            console.log('[EMPLOYEE IMPORT] Dumped spreadsheet contents to debug_emp_sheets.json');
+
+            // 2. Perform Employee Import if data exists in Employee detail - SBU2.xlsx
+            const sbu2Rows = debugSheetData['Employee detail - SBU2.xlsx'] ? Object.values(debugSheetData['Employee detail - SBU2.xlsx'])[0] || [] : [];
+            const roasterRows = debugSheetData['AR CRM Roaster.xlsx'] ? Object.values(debugSheetData['AR CRM Roaster.xlsx'])[0] || [] : [];
+            const allImportRows = [...sbu2Rows, ...roasterRows];
+
+            let importedCount = 0;
+            let updatedCount = 0;
+
+            for (let i = 0; i < allImportRows.length; i++) {
+                const row = allImportRows[i];
+                const name = String(row['Employee Name'] || row['employeename'] || row['Name'] || row['name'] || row['EMPLOYEE NAME'] || row['Emp Name'] || '').trim();
+                if (!name || name.toLowerCase().includes('total')) continue;
+
+                const email = String(row['Email'] || row['email'] || row['EMAIL'] || '').trim();
+                const pan = String(row['PAN'] || row['pan'] || '').trim();
+                const aadhaar = String(row['Aadhaar'] || row['aadhaar'] || row['Aadhar'] || '').trim();
+                const uan = String(row['UAN'] || row['uan'] || '').trim();
+                const pfNumber = String(row['PF Number'] || row['pfNumber'] || row['PF NO'] || '').trim();
+                const esiNumber = String(row['ESI Number'] || row['esiNumber'] || row['ESI NO'] || '').trim();
+                const bankName = String(row['Bank Name'] || row['bank'] || row['BANK NAME'] || '').trim();
+                const accountNumber = String(row['Account Number'] || row['account'] || row['ACC NO'] || row['A/C NO'] || '').trim();
+                const ifscCode = String(row['IFSC Code'] || row['ifsc'] || row['IFSC'] || '').trim();
+                const department = String(row['Department'] || row['dept'] || row['DEPARTMENT'] || row['SBU'] || 'General').trim();
+                const designation = String(row['Designation'] || row['desig'] || row['DESIGNATION'] || row['Role'] || 'Employee').trim();
+                const workerType = String(row['Worker Type'] || row['workerType'] || 'PERMANENT WORKER').trim();
+                const employeeType = String(row['Employee Type'] || row['employeeType'] || 'ONSITE').trim();
+                const status = String(row['Status'] || row['status'] || 'Active').trim();
+                
+                const joiningDateStr = row['Joining Date'] || row['joiningDate'] || row['DOJ'];
+                const dobStr = row['DOB'] || row['dob'] || row['Date of Birth'];
+
+                const joiningDate = joiningDateStr ? new Date(joiningDateStr) : new Date();
+                const dob = dobStr ? new Date(dobStr) : null;
+
+                const basic = Number(row['Basic Salary'] || row['basic'] || row['BASIC'] || 0) || 0;
+                const hra = Number(row['HRA'] || row['hra'] || 0) || 0;
+                const da = Number(row['DA'] || row['da'] || 0) || 0;
+                const specialAllowance = Number(row['Special Allowance'] || row['specialAllowance'] || row['SPECIAL ALLOWANCE'] || 0) || 0;
+
+                const empObj = {
+                    name,
+                    email: email || undefined,
+                    pan,
+                    aadhaar,
+                    uan,
+                    pfNumber,
+                    esiNumber,
+                    bankName,
+                    accountNumber,
+                    ifscCode,
+                    joiningDate,
+                    dob,
+                    department,
+                    designation,
+                    workerType,
+                    employeeType,
+                    status: status === 'Inactive' ? 'Inactive' : 'Active',
+                    salaryStructure: { basic, hra, da, specialAllowance },
+                    companyId
+                };
+
+                const existing = await EmployeeProfile.findOne({
+                    companyId,
+                    $or: [
+                        { name: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+                        ...(email ? [{ email: email.toLowerCase() }] : [])
+                    ]
+                });
+
+                if (existing) {
+                    await EmployeeProfile.findByIdAndUpdate(existing._id, empObj);
+                    updatedCount++;
+                } else {
+                    await EmployeeProfile.create(empObj);
+                    importedCount++;
+                }
+            }
+
+            console.log(`[EMPLOYEE IMPORT] Completed employee import: ${importedCount} created, ${updatedCount} updated.`);
+
+            if (companyId) {
+                await syncAllEngineers(companyId);
+                await syncUsersForExistingEmployees(companyId);
+                console.log('[EMPLOYEE IMPORT] Engineer sync and User accounts sync completed successfully.');
+            }
+
+            // 3. Update Admin Role Permissions
+            const adminPermissions = {
+                dashboard: true, dashboard_overview: true,
+                master: true, master_customers: true, payroll_org_chart: true, payroll_org_chart_full: true, master_vendors: true, master_products: true, master_mgrs: true, master_attributes: true, master_statuses: true, master_terms: true, master_territories: true, master_branches: true, master_serials: true, state_master_create: true, state_master_edit: true, state_master_delete: true,
+                flowchart: true, flowchart_view: true, flowchart_create: true, flowchart_edit: true, flowchart_delete: true,
+                enquiry: true, enquiry_leads: true, enquiry_analytics: true,
+                sales_pipeline: true, sales_dashboard: true, sales_deals: true, sales_pipelines: true, sales_forecasting: true, sales_activities: true, sales_targets: true, sales_reports: true, sales_analytics: true,
+                meetings: true, meetings_list: true,
+                quotation: true, sales_catalog: true, sales_price_management: true, sales_cpq: true, quotation_list: true, sales_approvals: true, sales_contracts: true, sales_orders: true, sales_revenue_analytics: true, sales_competitors: true, sales_ai_pricing: true,
+                sale: true,
+                purchase: true, purchase_grn: true,
+                inventory: true, inventory_dashboard: true, inventory_items: true, inventory_warehouses: true, inventory_stock_in: true, inventory_stock_out: true, inventory_transfers: true, inventory_adjustments: true, inventory_stock_counts: true, inventory_alerts: true, inventory_reports: true,
+                planning: true, planning_screen: true, planning_simulations: true, planning_edit_prev_year: true, planning_view_sbu_wise: true, planning_view_segment_wise: true, planning_view_status_breakdown: true,
+                reports: true, reports_main: true,
+                settings: true, settings_profile: true,
+                admin: true, admin_authorization: true, admin_salespersons: true,
+                payroll: true, payroll_payslips: true, payroll_employees: true, payroll_masters: true, payroll_runs: true, payroll_payments: true, payroll_settings: true, payroll_letters: true, payroll_reports: true,
+                csm: true, csm_dashboard: true, csm_tickets: true, csm_visits: true, csm_warranties_amc: true, csm_kb: true, csm_masters: true, csm_reports: true,
+                tender: true, tender_dashboard: true, tender_register: true, tender_reports: true
+            };
+
+            await RolePermission.findOneAndUpdate(
+                { role: 'admin' },
+                { role: 'admin', permissions: adminPermissions },
+                { upsert: true, returnDocument: 'after' }
+            );
+            console.log('[AUTH SEED] Admin role permissions successfully configured with full menu access.');
+
+        } catch (empImportErr) {
+            console.error('[EMPLOYEE IMPORT ERROR]', empImportErr);
+        }
     } catch (err) {
         require('fs').writeFileSync(require('path').join(__dirname, 'debug_error.txt'), `Error: ${err.message}\nStack: ${err.stack}`);
         console.error("[DEBUG] Error writing quotations/products:", err);
     }
 })();
+
 
 // Trigger nodemon reload - force reload csm routes
 module.exports = app;

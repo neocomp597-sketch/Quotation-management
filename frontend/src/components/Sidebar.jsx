@@ -389,36 +389,39 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             <div
                 className={`fixed top-0 left-0 h-full bg-white dark:bg-slate-900 transition-all duration-300 z-50 shadow-2xl border-r border-slate-100 dark:border-slate-800 transform flex flex-col ${isOpen ? 'translate-x-0 w-64' : '-translate-x-full md:translate-x-0 md:w-20 w-64'}`}
             >
-                <div className={`flex items-center justify-between px-5 border-b border-slate-50 dark:border-slate-800 shrink-0 ${brandSettings?.showDualBranding !== false && brandSettings?.logoUrl ? 'py-4' : 'h-24'}`}>
-                    <div className={`flex-1 min-w-0 overflow-hidden transition-all duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 w-0 md:opacity-0 md:w-0'}`}>
-                        {/* Top row: ARCRM badge + App title */}
-                        <div className="flex items-center gap-3">
-                            <div className="w-11 h-11 rounded-2xl flex items-center justify-center shadow-lg shadow-primary-600/30 shrink-0" style={{ background: brandSettings?.primaryBrandColor ? `linear-gradient(135deg, ${brandSettings.primaryBrandColor}, ${brandSettings.primaryBrandColor}cc)` : 'linear-gradient(135deg, var(--color-primary-600), var(--color-accent))' }}>
-                                <span className="text-white font-black text-2xl">A</span>
+                <div className={`px-4 border-b border-slate-50 dark:border-slate-800 shrink-0 ${brandSettings?.showDualBranding !== false && brandSettings?.logoUrl ? 'py-3' : 'h-24 flex items-center'}`}>
+                    <div className={`w-full overflow-hidden transition-all duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 w-0 md:opacity-0 md:w-0'}`}>
+                        {/* Top row: ARCRM badge + App title + collapse button */}
+                        <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                                <div className="w-10 h-10 rounded-2xl flex items-center justify-center shadow-md shadow-primary-600/20 shrink-0" style={{ background: brandSettings?.primaryBrandColor ? `linear-gradient(135deg, ${brandSettings.primaryBrandColor}, ${brandSettings.primaryBrandColor}cc)` : 'linear-gradient(135deg, var(--color-primary-600), var(--color-accent))' }}>
+                                    <span className="text-white font-black text-xl">A</span>
+                                </div>
+                                <div className="min-w-0 text-slate-900 dark:text-slate-100 font-outfit uppercase">
+                                    <p className="text-lg font-black tracking-tight leading-none truncate">{brandSettings?.whitelabelAppTitle || 'ARCRM'}</p>
+                                    <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-0.5 truncate tracking-wide">{brandSettings?.tagline || 'Always Ready CRM'}</p>
+                                </div>
                             </div>
-                            <div className="min-w-0 text-slate-900 dark:text-slate-100 font-outfit uppercase">
-                                <p className="text-xl font-black tracking-tight leading-none truncate">{brandSettings?.whitelabelAppTitle || 'ARCRM'}</p>
-                                <p className="text-xs font-bold text-slate-400 dark:text-slate-500 mt-0.5 truncate tracking-wide">{brandSettings?.tagline || 'Always Ready CRM'}</p>
-                            </div>
+                            <button
+                                onClick={toggleSidebar}
+                                className="p-1.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-400 dark:text-slate-400 hover:text-primary-600 dark:hover:text-primary-400 transition-all shrink-0"
+                            >
+                                <MdChevronLeft size={22} className={`transition-transform duration-300 ${!isOpen ? 'rotate-180' : ''}`} />
+                            </button>
                         </div>
-                        {/* Bottom row: Client company logo + name (dual branding) */}
+                        {/* Bottom row: Client company logo */}
                         {brandSettings?.showDualBranding !== false && brandSettings?.logoUrl && (
-                            <div className="flex items-center gap-3 mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
-                                <img
-                                    src={resolveImageUrl(brandSettings.logoUrl)}
-                                    alt={brandSettings.companyName || 'Company'}
-                                    className="h-11 w-11 object-contain rounded-2xl border border-slate-200 dark:border-slate-700 shrink-0 bg-white p-1 shadow-md"
-                                />
-                                <span className="text-base font-black text-slate-900 dark:text-slate-100 truncate tracking-tight">{brandSettings.companyName || 'Your Company'}</span>
+                            <div className="mt-2.5 pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-center">
+                                <div className="w-full bg-white dark:bg-slate-800 py-1.5 px-3 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center justify-center overflow-hidden">
+                                    <img
+                                        src={resolveImageUrl(brandSettings.logoUrl)}
+                                        alt={brandSettings.companyName || 'Company Logo'}
+                                        className="max-h-9 w-auto object-contain"
+                                    />
+                                </div>
                             </div>
                         )}
                     </div>
-                    <button
-                        onClick={toggleSidebar}
-                        className="p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-400 dark:text-slate-400 hover:text-primary-600 dark:hover:text-primary-400 transition-all ml-2 shrink-0"
-                    >
-                        <MdChevronLeft size={24} className={`transition-transform duration-300 ${!isOpen ? 'rotate-180' : ''}`} />
-                    </button>
                 </div>
 
                 <nav className="flex-1 overflow-y-auto overflow-x-hidden py-4 px-3 space-y-1 custom-scrollbar">

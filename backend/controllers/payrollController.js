@@ -94,7 +94,10 @@ exports.getEmployees = async (req, res) => {
             query.status = req.query.status;
         }
         if (req.query.branchId) {
-            query.branchId = req.query.branchId;
+            query.$or = [
+                { branchId: req.query.branchId },
+                { assignedBranches: req.query.branchId }
+            ];
         }
         if (req.query.search) {
             query.name = { $regex: req.query.search, $options: 'i' };
@@ -103,6 +106,7 @@ exports.getEmployees = async (req, res) => {
         const employees = await EmployeeProfile.find(query)
             .populate('reportingTo', 'name email designation')
             .populate('branchId', 'name code branchPrefix')
+            .populate('assignedBranches', 'name code branchPrefix')
             .sort({ name: 1 })
             .lean();
         res.json(employees);
@@ -116,6 +120,7 @@ exports.getEmployee = async (req, res) => {
         const employee = await EmployeeProfile.findById(req.params.id)
             .populate('reportingTo', 'name email designation')
             .populate('branchId', 'name code branchPrefix')
+            .populate('assignedBranches', 'name code branchPrefix')
             .lean();
         if (!employee) {
             return res.status(404).json({ message: 'Employee not found' });
@@ -192,6 +197,15 @@ exports.createEmployee = async (req, res) => {
             return res.status(400).json({ message: validationError });
         }
 
+        if (Array.isArray(employeeData.assignedBranches)) {
+            employeeData.assignedBranches = Array.from(new Set(employeeData.assignedBranches.filter(Boolean)));
+        } else if (employeeData.branchId) {
+            employeeData.assignedBranches = [employeeData.branchId];
+        }
+        if (!employeeData.branchId && employeeData.assignedBranches?.length) {
+            employeeData.branchId = employeeData.assignedBranches[0];
+        }
+
         if (employeeData.branchId) {
             const { generateNextUniqueEmployeeId } = require('../utils/employeeIdHelper');
             const { employeeId, branchPrefix } = await generateNextUniqueEmployeeId(employeeData.companyId, employeeData.branchId);
@@ -223,6 +237,7 @@ exports.createEmployee = async (req, res) => {
         const populatedEmployee = await EmployeeProfile.findById(employee._id)
             .populate('reportingTo', 'name email designation')
             .populate('branchId', 'name code branchPrefix')
+            .populate('assignedBranches', 'name code branchPrefix')
             .lean();
         res.status(201).json(populatedEmployee || employee);
     } catch (error) {
@@ -233,7 +248,14 @@ exports.createEmployee = async (req, res) => {
 exports.updateEmployee = async (req, res) => {
     try {
         const updateData = { ...req.body };
-        delete updateData.employeeId; // Rule 4: If branch is changed later, Employee ID should NOT change.
+        delete updateData.employeeId;
+        if (Array.isArray(updateData.assignedBranches)) {
+            updateData.assignedBranches = Array.from(new Set(updateData.assignedBranches.filter(Boolean)));
+            updateData.branchId = updateData.branchId || updateData.assignedBranches[0] || null;
+        } else if (updateData.branchId) {
+            updateData.assignedBranches = [updateData.branchId];
+        }
+        // Rule 4: If branch is changed later, Employee ID should NOT change.
 
         // Validate formats
         const validationError = validateEmployeeFieldsBackend(updateData);
@@ -247,7 +269,8 @@ exports.updateEmployee = async (req, res) => {
             { new: true }
         )
         .populate('reportingTo', 'name email designation')
-        .populate('branchId', 'name code branchPrefix');
+        .populate('branchId', 'name code branchPrefix')
+        .populate('assignedBranches', 'name code branchPrefix');
         
         if (!employee) {
             return res.status(404).json({ message: 'Employee not found' });
@@ -1113,6 +1136,7 @@ exports.updateReportingManager = async (req, res) => {
         const populated = await EmployeeProfile.findById(id)
             .populate('reportingTo', 'name email designation')
             .populate('branchId', 'name code branchPrefix')
+            .populate('assignedBranches', 'name code branchPrefix')
             .lean();
 
         await writePayrollAudit(req, 'REPORTING_MANAGER_UPDATED', `Reassigned reporting manager for ${emp.name}`, emp._id, 'EmployeeProfile');
@@ -1145,6 +1169,7 @@ exports.createVacantPosition = async (req, res) => {
         const populated = await EmployeeProfile.findById(vacantEmp._id)
             .populate('reportingTo', 'name email designation')
             .populate('branchId', 'name code branchPrefix')
+            .populate('assignedBranches', 'name code branchPrefix')
             .lean();
 
         await writePayrollAudit(req, 'VACANT_POSITION_CREATED', `Created vacant position ${vacantEmp.name}`, vacantEmp._id, 'EmployeeProfile');
@@ -1176,4 +1201,7 @@ exports.updateEmployeeKra = async (req, res) => {
         res.status(500).json({ message: 'Failed to update KRA', error: error.message });
     }
 };
+
+
+
 

@@ -33,7 +33,7 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
 
     // Form states
     const [basicForm, setBasicForm] = useState({
-        branchId: '', employeeId: '', externalEmployeeCode: '', gender: 'Male', name: '', email: '', mobile: '', reportingTo: '', dob: '', joiningDate: '', lastWorkingDate: '', department: '', designation: '', workerType: 'PERMANENT WORKER', employeeType: 'ONSITE', status: 'Active',
+        branchId: '', assignedBranches: [], employeeId: '', externalEmployeeCode: '', gender: 'Male', name: '', email: '', mobile: '', reportingTo: '', dob: '', joiningDate: '', lastWorkingDate: '', department: '', designation: '', workerType: 'PERMANENT WORKER', employeeType: 'ONSITE', status: 'Active',
         photo: '', familyDetails: [],
         pan: '', aadhaar: '', uan: '', pfNumber: '', esiNumber: '',
         bankName: '', accountNumber: '', ifscCode: ''
@@ -160,7 +160,12 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
     }, []);
 
     const handleBranchSelect = async (branchId) => {
-        setBasicForm(prev => ({ ...prev, branchId }));
+        setBasicForm(prev => {
+            const assignedBranches = branchId
+                ? Array.from(new Set([branchId, ...(prev.assignedBranches || [])]))
+                : (prev.assignedBranches || []);
+            return { ...prev, branchId, assignedBranches };
+        });
         if (modalMode === 'add' && branchId) {
             try {
                 const res = await branchService.getNextEmployeeId(branchId);
@@ -171,6 +176,20 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
         }
     };
 
+
+    const handleAssignedBranchToggle = (branchId) => {
+        setBasicForm(prev => {
+            const current = Array.isArray(prev.assignedBranches) ? prev.assignedBranches : [];
+            const exists = current.includes(branchId);
+            const assignedBranches = exists
+                ? current.filter(id => id !== branchId)
+                : [...current, branchId];
+            const primaryBranch = assignedBranches.includes(prev.branchId)
+                ? prev.branchId
+                : (assignedBranches[0] || '');
+            return { ...prev, assignedBranches, branchId: primaryBranch };
+        });
+    };
     const handleOpenSeqModal = () => {
         if (!basicForm.branchId) {
             toast.warn('Please select a branch first');
@@ -208,7 +227,7 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
         if (isCreatePage) {
             setSelectedEmp(null);
             setBasicForm({
-                branchId: '', employeeId: '', externalEmployeeCode: '', gender: 'Male', name: '', email: '', mobile: '', reportingTo: '', dob: '', joiningDate: new Date().toISOString().substring(0, 10), lastWorkingDate: '',
+                branchId: '', assignedBranches: [], employeeId: '', externalEmployeeCode: '', gender: 'Male', name: '', email: '', mobile: '', reportingTo: '', dob: '', joiningDate: new Date().toISOString().substring(0, 10), lastWorkingDate: '',
                 department: '', designation: '', workerType: 'PERMANENT WORKER', employeeType: 'ONSITE', status: 'Active',
                 photo: '', familyDetails: [],
                 pan: '', aadhaar: '', uan: '', pfNumber: '', esiNumber: '',
@@ -223,6 +242,9 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                 setSelectedEmp(emp);
                 setBasicForm({
                     branchId: emp.branchId?._id || emp.branchId || '',
+                    assignedBranches: Array.isArray(emp.assignedBranches) && emp.assignedBranches.length
+                        ? emp.assignedBranches.map(branch => branch._id || branch).filter(Boolean)
+                        : (emp.branchId ? [emp.branchId._id || emp.branchId] : []),
                     employeeId: emp.employeeId || '',
                     externalEmployeeCode: emp.externalEmployeeCode || '',
                     gender: emp.gender || 'Male',
@@ -822,20 +844,39 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
 
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                             <div>
-                                                <label className={labelClass}>Branch *</label>
+                                                <label className={labelClass}>Primary Branch *</label>
                                                 <select
                                                     required
                                                     value={basicForm.branchId || ''}
                                                     onChange={(e) => handleBranchSelect(e.target.value)}
                                                     className={inputClass}
                                                 >
-                                                    <option value="">-- Select Branch First --</option>
+                                                    <option value="">-- Select Primary Branch --</option>
                                                     {branches.map(b => (
                                                         <option key={b._id} value={b._id}>
                                                             {b.name} ({b.branchPrefix || b.code})
                                                         </option>
                                                     ))}
                                                 </select>
+                                            </div>
+                                            <div className="md:col-span-2">
+                                                <label className={labelClass}>Assigned Branches *</label>
+                                                <div className="min-h-[42px] bg-slate-50 border border-slate-200 rounded-xl p-2 flex flex-wrap gap-2">
+                                                    {branches.map(b => {
+                                                        const checked = (basicForm.assignedBranches || []).includes(b._id);
+                                                        return (
+                                                            <button
+                                                                type="button"
+                                                                key={b._id}
+                                                                onClick={() => handleAssignedBranchToggle(b._id)}
+                                                                className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${checked ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-slate-600 border-slate-200 hover:border-teal-300'}`}
+                                                            >
+                                                                {checked && <MdCheck size={14} className="inline mr-1" />}
+                                                                {b.name} ({b.branchPrefix || b.code})
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
                                             </div>
                                             <div>
                                                 <div className="flex items-center justify-between gap-2 mb-1.5">
@@ -1684,3 +1725,5 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
 };
 
 export default PayrollEmployees;
+
+
