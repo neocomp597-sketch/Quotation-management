@@ -1,13 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { MdBusiness, MdPerson, MdLocationOn, MdAccountBalance, MdDescription, MdCloudUpload, MdSave, MdEdit, MdVisibility, MdVisibilityOff, MdColorLens, MdAccountTree } from 'react-icons/md';
+import { MdBusiness, MdPerson, MdLocationOn, MdAccountBalance, MdDescription, MdCloudUpload, MdSave, MdEdit, MdVisibility, MdVisibilityOff, MdColorLens } from 'react-icons/md';
 import { userService, companySettingsService, uploadService, footerPageService } from '../services/api';
 import { resolveImageUrl } from '../utils/helpers';
 import { useAuth } from '../context/AuthContext';
 import { ROLE_LABELS } from '../constants/menuPermissions';
 import RichTextEditor from '../components/RichTextEditor';
-import OrgChart from './OrgChart';
 
 const Settings = () => {
     const navigate = useNavigate();
@@ -290,8 +289,7 @@ const [logoUploading, setLogoUploading] = useState(false);
     }, [searchParams]);
 
     const tabs = [
-        { id: 'profile', label: 'Profile', icon: MdPerson },
-        { id: 'org-chart', label: 'Org Chart & My Team', icon: MdAccountTree }
+        { id: 'profile', label: 'Profile', icon: MdPerson }
     ];
     if (isAdminOrManager) {
         tabs.push(
@@ -422,13 +420,6 @@ const [logoUploading, setLogoUploading] = useState(false);
                             </button>
                         </div>
                     </form>
-                </div>
-            )}
-
-            {/* Org Chart & My Team Tab */}
-            {activeTab === 'org-chart' && (
-                <div className="bg-white dark:bg-slate-900 rounded-[2rem] shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden p-4 md:p-6">
-                    <OrgChart />
                 </div>
             )}
 
