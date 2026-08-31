@@ -30,7 +30,15 @@ const syncUserForEmployee = async (employeeOrId) => {
             email: { $regex: new RegExp("^" + escapedEmail + "$", "i") }
         });
 
+        const branchId = employee.branchId || (Array.isArray(employee.assignedBranches) ? employee.assignedBranches[0] : null);
+        const assignedBranches = Array.isArray(employee.assignedBranches) && employee.assignedBranches.length
+            ? employee.assignedBranches
+            : (branchId ? [branchId] : []);
+
         if (existingUser) {
+            existingUser.branchId = branchId;
+            existingUser.assignedBranches = assignedBranches;
+            await existingUser.save();
             return existingUser;
         }
 
@@ -45,6 +53,8 @@ const syncUserForEmployee = async (employeeOrId) => {
             mustChangePassword: true,
             role: 'employee',
             companyId: employee.companyId || null,
+            branchId,
+            assignedBranches,
             status: employee.status === 'Active' || employee.status === undefined,
             isActive: employee.status === 'Active' || employee.status === undefined
         });

@@ -159,25 +159,8 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
         fetchMasters();
     }, []);
 
-    const handleBranchSelect = async (branchId) => {
-        setBasicForm(prev => {
-            const assignedBranches = branchId
-                ? Array.from(new Set([branchId, ...(prev.assignedBranches || [])]))
-                : (prev.assignedBranches || []);
-            return { ...prev, branchId, assignedBranches };
-        });
-        if (modalMode === 'add' && branchId) {
-            try {
-                const res = await branchService.getNextEmployeeId(branchId);
-                setBasicForm(prev => ({ ...prev, branchId, employeeId: res.data?.employeeId || '' }));
-            } catch (err) {
-                console.error('Failed to fetch next Employee ID', err);
-            }
-        }
-    };
-
-
-    const handleAssignedBranchToggle = (branchId) => {
+    const handleAssignedBranchToggle = async (branchId) => {
+        let updatedPrimary = '';
         setBasicForm(prev => {
             const current = Array.isArray(prev.assignedBranches) ? prev.assignedBranches : [];
             const exists = current.includes(branchId);
@@ -187,8 +170,20 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
             const primaryBranch = assignedBranches.includes(prev.branchId)
                 ? prev.branchId
                 : (assignedBranches[0] || '');
+            updatedPrimary = primaryBranch;
             return { ...prev, assignedBranches, branchId: primaryBranch };
         });
+
+        if (modalMode === 'add' && updatedPrimary) {
+            try {
+                const res = await branchService.getNextEmployeeId(updatedPrimary);
+                if (res.data?.employeeId) {
+                    setBasicForm(prev => ({ ...prev, employeeId: res.data.employeeId }));
+                }
+            } catch (err) {
+                console.error('Failed to fetch next Employee ID', err);
+            }
+        }
     };
     const handleOpenSeqModal = () => {
         if (!basicForm.branchId) {
@@ -321,6 +316,11 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
 
     const validateEmployeeProfile = (form) => {
         const errors = {};
+
+        // 0. Branch assignment validation
+        if (!form.assignedBranches || form.assignedBranches.length === 0) {
+            errors.assignedBranches = 'Please assign at least one branch to the employee.';
+        }
 
         // 1. Mobile Number validation
         if (form.mobile && form.mobile.trim()) {
@@ -691,11 +691,17 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                                 <p className="text-slate-800">{emp.designation || 'N/A'}</p>
                                                 <div className="flex items-center gap-2 mt-0.5">
                                                     <span className="text-xs text-slate-400">{emp.department || 'N/A'}</span>
-                                                    {emp.branchId?.name && (
-                                                        <span className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-bold text-[10px] rounded">
-                                                            📍 {emp.branchId.name}
-                                                        </span>
-                                                    )}
+                                                     {Array.isArray(emp.assignedBranches) && emp.assignedBranches.length > 0 ? (
+                                                         emp.assignedBranches.map(b => (
+                                                             <span key={b._id || b} className="px-1.5 py-0.5 bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 font-bold text-[10px] rounded border border-teal-100 dark:border-teal-900/60">
+                                                                 📍 {b.name || b.branchPrefix || b.code || 'Branch'}
+                                                             </span>
+                                                         ))
+                                                     ) : emp.branchId?.name ? (
+                                                         <span className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-bold text-[10px] rounded">
+                                                             📍 {emp.branchId.name}
+                                                         </span>
+                                                     ) : null}
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 text-sm text-slate-500">
@@ -843,40 +849,61 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                         </div>
 
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                            <div>
-                                                <label className={labelClass}>Primary Branch *</label>
-                                                <select
-                                                    required
-                                                    value={basicForm.branchId || ''}
-                                                    onChange={(e) => handleBranchSelect(e.target.value)}
-                                                    className={inputClass}
-                                                >
-                                                    <option value="">-- Select Primary Branch --</option>
-                                                    {branches.map(b => (
-                                                        <option key={b._id} value={b._id}>
-                                                            {b.name} ({b.branchPrefix || b.code})
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                            <div className="md:col-span-2">
-                                                <label className={labelClass}>Assigned Branches *</label>
-                                                <div className="min-h-[42px] bg-slate-50 border border-slate-200 rounded-xl p-2 flex flex-wrap gap-2">
-                                                    {branches.map(b => {
-                                                        const checked = (basicForm.assignedBranches || []).includes(b._id);
-                                                        return (
-                                                            <button
-                                                                type="button"
-                                                                key={b._id}
-                                                                onClick={() => handleAssignedBranchToggle(b._id)}
-                                                                className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${checked ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-slate-600 border-slate-200 hover:border-teal-300'}`}
-                                                            >
-                                                                {checked && <MdCheck size={14} className="inline mr-1" />}
-                                                                {b.name} ({b.branchPrefix || b.code})
-                                                            </button>
-                                                        );
-                                                    })}
+                                            <div className="md:col-span-3 bg-slate-50/80 p-4 border border-slate-200 rounded-2xl space-y-3">
+                                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <label className={labelClass} style={{ marginBottom: 0 }}>Assign Branch *</label>
+                                                        <span className="px-2.5 py-0.5 bg-teal-100 dark:bg-teal-950 text-teal-800 dark:text-teal-300 font-extrabold text-[11px] rounded-full border border-teal-200/60">
+                                                            {(basicForm.assignedBranches || []).length} Assigned
+                                                        </span>
+                                                    </div>
+                                                    <span className="text-[11px] text-slate-500 font-semibold">
+                                                        Toggle button(s) to assign employee to single or multiple branches
+                                                    </span>
                                                 </div>
+
+                                                {branches.length === 0 ? (
+                                                    <p className="text-xs text-slate-400 italic">No active branches found in Master configuration.</p>
+                                                ) : (
+                                                    <div className="flex flex-wrap gap-3 pt-1">
+                                                        {branches.map(b => {
+                                                            const checked = (basicForm.assignedBranches || []).includes(b._id);
+                                                            const isPrimary = basicForm.branchId === b._id;
+                                                            return (
+                                                                <button
+                                                                    type="button"
+                                                                    key={b._id}
+                                                                    onClick={() => handleAssignedBranchToggle(b._id)}
+                                                                    className={`group relative px-3.5 py-2.5 rounded-2xl text-xs font-extrabold border transition-all duration-200 flex items-center gap-3 cursor-pointer select-none active:scale-95 shadow-xs ${
+                                                                        checked
+                                                                            ? 'bg-gradient-to-r from-teal-600 to-emerald-600 text-white border-teal-600 shadow-md shadow-teal-500/20 ring-2 ring-teal-500/30'
+                                                                            : 'bg-white text-slate-700 border-slate-200 hover:border-teal-400 hover:bg-teal-50/60'
+                                                                    }`}
+                                                                >
+                                                                    <div className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                                                                        checked ? 'bg-white/30' : 'bg-slate-200 dark:bg-slate-700'
+                                                                    }`}>
+                                                                        <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                                                                            checked ? 'translate-x-4' : 'translate-x-0'
+                                                                        }`} />
+                                                                    </div>
+
+                                                                    <span className="tracking-tight">{b.name} ({b.branchPrefix || b.code})</span>
+
+                                                                    {isPrimary && checked && (
+                                                                        <span className="px-2 py-0.5 bg-black/20 text-white font-black text-[9px] uppercase tracking-wider rounded-md border border-white/20">
+                                                                            PRIMARY
+                                                                        </span>
+                                                                    )}
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                )}
+
+                                                {formErrors.assignedBranches && (
+                                                    <p className="text-[11px] font-semibold text-rose-500 mt-1">{formErrors.assignedBranches}</p>
+                                                )}
                                             </div>
                                             <div>
                                                 <div className="flex items-center justify-between gap-2 mb-1.5">

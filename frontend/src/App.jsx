@@ -131,6 +131,7 @@ import Customer360Workspace from './pages/Customer360Workspace';
 
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
+import SelectBranch from './pages/SelectBranch';
 
 function App() {
   return (
@@ -160,6 +161,9 @@ function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password/:token" element={<ResetPassword />} />
+
+          {/* Branch Selection Route */}
+          <Route path="/select-branch" element={<ProtectedRoute><SelectBranch /></ProtectedRoute>} />
 
           {/* Protected Routes */}
           <Route element={<ProtectedRoute />}>

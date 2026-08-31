@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useState, useMemo } from "react";
 import { useDispatch } from "react-redux";
 import { authService, authorizationService, setAccessToken } from "../services/api";
 import { MENU_PERMISSION_GROUPS } from "../constants/menuPermissions";
@@ -69,10 +69,48 @@ export const AuthProvider = ({ children }) => {
     const [permissions, setPermissions] = useState({});
     const [loading, setLoading] = useState(true);
 
+    const [activeBranchId, setActiveBranchIdState] = useState(() => localStorage.getItem("activeBranchId") || null);
+    const [activeBranch, setActiveBranchState] = useState(() => {
+        try {
+            const raw = localStorage.getItem("activeBranch");
+            return raw ? JSON.parse(raw) : null;
+        } catch {
+            return null;
+        }
+    });
+
+    const setActiveBranch = useCallback((branchOrId) => {
+        if (!branchOrId) {
+            setActiveBranchIdState(null);
+            setActiveBranchState(null);
+            localStorage.removeItem("activeBranchId");
+            localStorage.removeItem("activeBranch");
+            return;
+        }
+
+        if (typeof branchOrId === "object") {
+            const id = branchOrId._id || branchOrId.id;
+            setActiveBranchIdState(id);
+            setActiveBranchState(branchOrId);
+            localStorage.setItem("activeBranchId", id);
+            localStorage.setItem("activeBranch", JSON.stringify(branchOrId));
+        } else {
+            setActiveBranchIdState(branchOrId);
+            localStorage.setItem("activeBranchId", branchOrId);
+        }
+
+        window.dispatchEvent(new CustomEvent('onActiveBranchChange', { detail: { branchId: typeof branchOrId === "object" ? branchOrId._id : branchOrId } }));
+        window.dispatchEvent(new CustomEvent('onCrmSocketUpdate', { detail: { entity: 'BRANCH', action: 'BRANCH_SWITCH' } }));
+    }, []);
+
     const clearSession = useCallback(() => {
         setAccessToken(null);
         localStorage.removeItem("user");
+        localStorage.removeItem("activeBranchId");
+        localStorage.removeItem("activeBranch");
         setUser(null);
+        setActiveBranchIdState(null);
+        setActiveBranchState(null);
         setPermissions({});
         dispatch(clearCredentials());
     }, [dispatch]);
@@ -264,6 +302,17 @@ export const AuthProvider = ({ children }) => {
         });
     }, []);
 
+    const assignedBranches = useMemo(() => {
+        if (!user) return [];
+        if (Array.isArray(user.assignedBranches) && user.assignedBranches.length > 0) {
+            return user.assignedBranches;
+        }
+        if (user.branchId) {
+            return [user.branchId];
+        }
+        return [];
+    }, [user]);
+
     return (
         <AuthContext.Provider
             value={{
@@ -275,6 +324,10 @@ export const AuthProvider = ({ children }) => {
                 refreshSession,
                 updateUser,
                 hasAccess,
+                activeBranch,
+                activeBranchId,
+                setActiveBranch,
+                assignedBranches,
                 isAdmin: user?.role === "admin" || user?.role === "Admin",
                 isSuperAdmin: user?.role === "SUPER_ADMIN" || user?.role === "super_admin",
             }}

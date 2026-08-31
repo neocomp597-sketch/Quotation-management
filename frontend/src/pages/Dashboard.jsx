@@ -131,14 +131,6 @@ const Dashboard = () => {
                 to: "/csm/tickets"
             },
             {
-                title: "My Payslips",
-                value: "Salary Slips",
-                subValue: "Download & print monthly payslips",
-                icon: <MdReceipt size={28} />,
-                color: "bg-gradient-to-br from-purple-500 to-fuchsia-600",
-                to: "/payroll/payslips"
-            },
-            {
                 title: "Account Security",
                 value: "My Settings",
                 subValue: "Update password and details",
@@ -160,18 +152,12 @@ const Dashboard = () => {
                             Welcome Back, {user?.name || user?.email}!
                         </h1>
                         <p className="text-teal-100 font-medium text-sm mt-2 leading-relaxed">
-                            Access your personal salary slips, track support requests, or manage your account credentials.
+                            Track support requests, manage active quotations, or update your account credentials.
                         </p>
                         <div className="flex flex-wrap gap-3 mt-6">
                             <Link
-                                to="/payroll/payslips"
-                                className="px-5 py-3 bg-white text-teal-800 hover:bg-teal-50 rounded-2xl text-sm font-black transition-all shadow-lg shadow-black/10 flex items-center gap-2"
-                            >
-                                <MdReceipt size={18} /> View My Payslips
-                            </Link>
-                            <Link
                                 to="/csm/tickets"
-                                className="px-5 py-3 bg-teal-700/60 hover:bg-teal-700 text-white rounded-2xl text-sm font-bold transition-all flex items-center gap-2"
+                                className="px-5 py-3 bg-white text-teal-800 hover:bg-teal-50 rounded-2xl text-sm font-black transition-all shadow-lg shadow-black/10 flex items-center gap-2"
                             >
                                 <MdPendingActions size={18} /> Support Tickets
                             </Link>

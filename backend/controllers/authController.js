@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const User = require('../models/User');
 const Company = require('../models/Company');
+const Branch = require('../models/Branch');
 const { getRedis } = require('../config/redis');
 const { enqueueLegacyRefreshSession } = require('../queues/authSessionQueue');
 const { isSuperAdminRole } = require('../middlewares/authMiddleware');
@@ -16,15 +17,28 @@ const DEVICE_COOKIE_NAME = 'deviceId';
 const getJwtSecret = () => process.env.JWT_SECRET || 'secret123';
 const getRefreshSecret = () => process.env.JWT_REFRESH_SECRET || `${getJwtSecret()}_refresh`;
 
-const normalizeUser = (user) => ({
-    id: user._id,
-    name: user.name,
-    email: user.email,
-    role: user.role,
-    companyId: user.companyId,
-    vendorId: user.vendorId || null,
-    mustChangePassword: !!user.mustChangePassword,
-});
+const normalizeUser = (user, fallbackBranches = []) => {
+    let assigned = [];
+    if (Array.isArray(user.assignedBranches) && user.assignedBranches.length > 0) {
+        assigned = user.assignedBranches;
+    } else if (fallbackBranches && fallbackBranches.length > 0) {
+        assigned = fallbackBranches;
+    } else if (user.branchId) {
+        assigned = [user.branchId];
+    }
+
+    return {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        companyId: user.companyId,
+        branchId: user.branchId?._id || user.branchId || (assigned[0]?._id || assigned[0] || null),
+        assignedBranches: assigned,
+        vendorId: user.vendorId || null,
+        mustChangePassword: !!user.mustChangePassword,
+    };
+};
 
 const ensureLoginAllowed = async (user) => {
     if (user.status === false || user.isActive === false) {
@@ -234,7 +248,15 @@ const issueSession = async (user, res, req, deviceId = getDeviceId(req)) => {
 
     setDeviceCookie(res, deviceId, req);
     setRefreshCookie(res, refreshToken, req);
-    return { accessToken, deviceId, user: normalizeUser(user) };
+
+    let fallbackBranches = [];
+    if ((!user.assignedBranches || user.assignedBranches.length === 0) && user.companyId) {
+        fallbackBranches = await Branch.find({ companyId: user.companyId, status: { $ne: 'Inactive' } })
+            .select('_id name code branchPrefix address city state')
+            .lean();
+    }
+
+    return { accessToken, deviceId, user: normalizeUser(user, fallbackBranches) };
 };
 
 exports.register = async (req, res) => {
@@ -282,7 +304,9 @@ exports.login = async (req, res) => {
         const { email, password } = req.body;
         const normalizedEmail = email ? String(email).trim().toLowerCase() : '';
 
-        const user = await User.findOne({ email: { $regex: new RegExp("^" + normalizedEmail.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + "$", "i") } });
+        const user = await User.findOne({ email: { $regex: new RegExp("^" + normalizedEmail.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + "$", "i") } })
+            .populate('assignedBranches', '_id name code branchPrefix address city state')
+            .populate('branchId', '_id name code branchPrefix address city state');
         if (!user) {
             return res.status(400).json({ message: 'Invalid credentials' });
         }
@@ -314,7 +338,9 @@ exports.refresh = async (req, res) => {
         }
 
         const decoded = jwt.verify(refreshToken, getRefreshSecret());
-        const user = await User.findById(decoded.id);
+        const user = await User.findById(decoded.id)
+            .populate('assignedBranches', '_id name code branchPrefix address city state')
+            .populate('branchId', '_id name code branchPrefix address city state');
         const deviceId = getDeviceId(req, decoded);
         const redisSession = await loadRefreshSession(decoded.id, deviceId);
         const hasValidRedisSession = redisSession?.tokenHash === hashToken(refreshToken);

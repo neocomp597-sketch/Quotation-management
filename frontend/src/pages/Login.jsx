@@ -71,6 +71,8 @@ const Login = () => {
         },
       );
 
+      const assigned = session.user?.assignedBranches || [];
+
       setTimeout(() => {
         const storedReturnTo = sessionStorage.getItem("arcrm:returnTo");
         if (storedReturnTo) {
@@ -86,7 +88,19 @@ const Login = () => {
           ? storedReturnTo
           : location.state?.from?.pathname || fallbackTarget;
 
-        navigate(target, { replace: true });
+        if (assigned.length > 1) {
+          navigate("/select-branch", { state: { returnTo: target }, replace: true });
+        } else {
+          if (assigned.length === 1) {
+            const b = assigned[0];
+            const bId = b._id || b.id || b;
+            localStorage.setItem("activeBranchId", bId);
+            if (typeof b === "object") {
+              localStorage.setItem("activeBranch", JSON.stringify(b));
+            }
+          }
+          navigate(target, { replace: true });
+        }
       }, 800);
     } catch (err) {
       const errorMessage = err.response?.data?.message || "Login failed";

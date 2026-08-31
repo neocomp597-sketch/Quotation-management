@@ -411,12 +411,13 @@ const moduleSubmodulesMap = {
 
 const Header = ({ sidebarOpen, toggleSidebar }) => {
     const navigate = useNavigate();
-    const { user, logout, isAdmin, isSuperAdmin, hasAccess, updateUser } = useAuth();
+    const { user, logout, isAdmin, isSuperAdmin, hasAccess, updateUser, activeBranch, activeBranchId, setActiveBranch, assignedBranches } = useAuth();
     const { isDarkMode, toggleTheme } = useTheme();
     const { isReconnecting } = useSocket();
 
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [isNotifOpen, setIsNotifOpen] = useState(false);
+    const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState(false);
     const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
     const [mustChangePasswordModal, setMustChangePasswordModal] = useState(false);
 
@@ -447,6 +448,7 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
     const dropdownRef = useRef(null);
     const notifRef = useRef(null);
     const searchRef = useRef(null);
+    const branchDropdownRef = useRef(null);
 
     const handleLogout = () => {
         logout();
@@ -512,6 +514,9 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
             }
             if (searchRef.current && !searchRef.current.contains(event.target)) {
                 setIsSearchOpen(false);
+            }
+            if (branchDropdownRef.current && !branchDropdownRef.current.contains(event.target)) {
+                setIsBranchDropdownOpen(false);
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
@@ -771,6 +776,60 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
                     </div>
 
                     <div className="flex items-center gap-2 sm:gap-3">
+                        {/* Active Branch Switcher */}
+                        {assignedBranches && assignedBranches.length > 0 && (
+                            <div className="relative" ref={branchDropdownRef}>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsBranchDropdownOpen(!isBranchDropdownOpen)}
+                                    title="Active Branch Scope"
+                                    className="flex items-center gap-2 px-3 py-2 rounded-2xl bg-primary-50/80 dark:bg-primary-950/40 border border-primary-200 dark:border-primary-800 text-primary-700 dark:text-primary-300 hover:bg-primary-100 dark:hover:bg-primary-900/60 transition-all font-bold text-xs shadow-sm"
+                                >
+                                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                                    <span className="hidden sm:inline font-extrabold uppercase tracking-wide text-[11px]">Branch:</span>
+                                    <span className="font-black truncate max-w-[120px]">
+                                        {activeBranch?.name || assignedBranches.find(b => (b._id || b.id) === activeBranchId)?.name || 'Select Branch'}
+                                    </span>
+                                    {assignedBranches.length > 1 && (
+                                        <MdExpandMore size={16} className={`transition-transform duration-200 ${isBranchDropdownOpen ? 'rotate-180' : ''}`} />
+                                    )}
+                                </button>
+
+                                {isBranchDropdownOpen && assignedBranches.length > 1 && (
+                                    <div className="absolute top-full right-0 mt-3 w-64 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-2xl rounded-2xl py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                                        <div className="px-4 py-2 border-b border-slate-50 dark:border-slate-800 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                            Switch Active Working Branch
+                                        </div>
+                                        <div className="p-1 max-h-56 overflow-y-auto">
+                                            {assignedBranches.map((b) => {
+                                                const bId = b._id || b.id;
+                                                const isActive = (activeBranch?._id || activeBranch?.id || activeBranchId) === bId;
+                                                return (
+                                                    <button
+                                                        key={bId}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setActiveBranch(b);
+                                                            setIsBranchDropdownOpen(false);
+                                                            toast.info(`Switched active branch to ${b.name}`);
+                                                        }}
+                                                        className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-between transition-colors ${
+                                                            isActive
+                                                                ? 'bg-primary-50 dark:bg-primary-950/60 text-primary-600 dark:text-primary-400'
+                                                                : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                                                        }`}
+                                                    >
+                                                        <span className="truncate">{b.name} ({b.branchPrefix || b.code || 'BR'})</span>
+                                                        {isActive && <MdCheck size={16} className="text-primary-600 dark:text-primary-400 shrink-0" />}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         {/* Socket Reconnecting Badge */}
                         {isReconnecting && (
                             <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs font-bold rounded-full animate-pulse">
