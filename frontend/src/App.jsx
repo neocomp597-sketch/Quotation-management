@@ -162,11 +162,9 @@ function App() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password/:token" element={<ResetPassword />} />
 
-          {/* Branch Selection Route */}
-          <Route path="/select-branch" element={<ProtectedRoute><SelectBranch /></ProtectedRoute>} />
-
           {/* Protected Routes */}
           <Route element={<ProtectedRoute />}>
+            <Route path="/select-branch" element={<SelectBranch />} />
             <Route path="/dashboard" element={<PermissionRoute permissionKey="dashboard_overview"><Layout><Dashboard /></Layout></PermissionRoute>} />
             <Route path="/salespersons" element={<PermissionRoute permissionKey="admin_salespersons"><Layout><Salespersons /></Layout></PermissionRoute>} />
             <Route path="/salespersons/new" element={<PermissionRoute permissionKey="admin_salespersons"><Layout><Salespersons isCreatePage={true} /></Layout></PermissionRoute>} />
@@ -253,7 +251,7 @@ function App() {
             <Route path="/system-updates" element={<PermissionRoute><Layout><SystemUpdates /></Layout></PermissionRoute>} />
 
             {/* Developer Portal Routes */}
-            <Route path="/developer" element={<ProtectedRoute><DeveloperLayout /></ProtectedRoute>}>
+            <Route path="/developer" element={<DeveloperLayout />}>
               <Route index element={<Navigate to="/developer/overview" replace />} />
               <Route path="overview" element={<DeveloperOverview />} />
               <Route path="quick-start" element={<DeveloperQuickStart />} />
