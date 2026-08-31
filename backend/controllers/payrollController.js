@@ -211,8 +211,18 @@ exports.createEmployee = async (req, res) => {
             return res.status(400).json({ message: validationError });
         }
 
+        // Clean up empty strings for ObjectId fields
+        if (employeeData.reportingTo === '' || employeeData.reportingTo === null) {
+            employeeData.reportingTo = null;
+        }
+        if (employeeData.branchId === '' || employeeData.branchId === null) {
+            employeeData.branchId = null;
+        }
+
         if (Array.isArray(employeeData.assignedBranches)) {
-            employeeData.assignedBranches = Array.from(new Set(employeeData.assignedBranches.filter(Boolean)));
+            employeeData.assignedBranches = employeeData.assignedBranches
+                .map(b => (b && typeof b === 'object' && b._id ? b._id : b))
+                .filter(b => b && mongoose.Types.ObjectId.isValid(b));
         } else if (employeeData.branchId) {
             employeeData.assignedBranches = [employeeData.branchId];
         }
@@ -255,6 +265,7 @@ exports.createEmployee = async (req, res) => {
             .lean();
         res.status(201).json(populatedEmployee || employee);
     } catch (error) {
+        console.error('Failed to create employee profile:', error);
         res.status(500).json({ message: 'Failed to create employee profile', error: error.message });
     }
 };
@@ -263,8 +274,19 @@ exports.updateEmployee = async (req, res) => {
     try {
         const updateData = { ...req.body };
         delete updateData.employeeId;
+
+        // Clean up empty strings for ObjectId fields
+        if (updateData.reportingTo === '' || updateData.reportingTo === null) {
+            updateData.reportingTo = null;
+        }
+        if (updateData.branchId === '' || updateData.branchId === null) {
+            updateData.branchId = null;
+        }
+
         if (Array.isArray(updateData.assignedBranches)) {
-            updateData.assignedBranches = Array.from(new Set(updateData.assignedBranches.filter(Boolean)));
+            updateData.assignedBranches = updateData.assignedBranches
+                .map(b => (b && typeof b === 'object' && b._id ? b._id : b))
+                .filter(b => b && mongoose.Types.ObjectId.isValid(b));
             updateData.branchId = updateData.branchId || updateData.assignedBranches[0] || null;
         } else if (updateData.branchId) {
             updateData.assignedBranches = [updateData.branchId];
@@ -302,6 +324,7 @@ exports.updateEmployee = async (req, res) => {
         broadcastCrmUpdate('EMPLOYEE', 'UPDATE', employee);
         res.json(employee);
     } catch (error) {
+        console.error('Failed to update employee details:', error);
         res.status(500).json({ message: 'Failed to update employee details', error: error.message });
     }
 };

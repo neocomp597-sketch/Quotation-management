@@ -30,14 +30,25 @@ const syncUserForEmployee = async (employeeOrId) => {
             email: { $regex: new RegExp("^" + escapedEmail + "$", "i") }
         });
 
-        const branchId = employee.branchId || (Array.isArray(employee.assignedBranches) ? employee.assignedBranches[0] : null);
-        const assignedBranches = Array.isArray(employee.assignedBranches) && employee.assignedBranches.length
-            ? employee.assignedBranches
-            : (branchId ? [branchId] : []);
+        // Safely extract ObjectId reference for branchId & assignedBranches (handling populated objects)
+        const mongoose = require('mongoose');
+        const rawBranchId = employee.branchId?._id || (typeof employee.branchId === 'string' || employee.branchId instanceof mongoose.Types.ObjectId ? employee.branchId : null);
+
+        let rawAssignedBranches = [];
+        if (Array.isArray(employee.assignedBranches) && employee.assignedBranches.length > 0) {
+            rawAssignedBranches = employee.assignedBranches
+                .map(b => (b && typeof b === 'object' && b._id ? b._id : b))
+                .filter(b => b && mongoose.Types.ObjectId.isValid(b));
+        }
+
+        const finalBranchId = rawBranchId || (rawAssignedBranches.length > 0 ? rawAssignedBranches[0] : null);
+        if (rawAssignedBranches.length === 0 && finalBranchId) {
+            rawAssignedBranches = [finalBranchId];
+        }
 
         if (existingUser) {
-            existingUser.branchId = branchId;
-            existingUser.assignedBranches = assignedBranches;
+            existingUser.branchId = finalBranchId;
+            existingUser.assignedBranches = rawAssignedBranches;
             await existingUser.save();
             return existingUser;
         }
@@ -53,8 +64,8 @@ const syncUserForEmployee = async (employeeOrId) => {
             mustChangePassword: true,
             role: 'employee',
             companyId: employee.companyId || null,
-            branchId,
-            assignedBranches,
+            branchId: finalBranchId,
+            assignedBranches: rawAssignedBranches,
             status: employee.status === 'Active' || employee.status === undefined,
             isActive: employee.status === 'Active' || employee.status === undefined
         });
