@@ -180,36 +180,23 @@ const SystemUpdates = () => {
             }
         });
 
+        // Ensure 31.08.2026 updates are always prepended if not already present
+        const todayFallbackList = [
+            { id: 'sb_fix1', date: '31.08.2026', module: 'Authentication', submodule: 'Select Active Branch Page', changes: 'Fixed blank screen routing on /select-branch by properly embedding SelectBranch inside nested ProtectedRoute parent layout. Redesigned SelectBranch with dynamic light mode defaults and dark styling (dark: classes) using a rich Teal & Emerald palette. Added string ID vs object payload branch normalization for multi-branch assignment sessions.', version: 'v6.0.0', deployedBy: 'Super Admin' },
+            { id: 'emp_mb1', date: '31.08.2026', module: 'Employee Master', submodule: 'Multi-Branch Assignment Toggle', changes: 'Fixed frontend/backend assignedBranches multi-selection toggle in EmployeeProfile and PayrollEmployees. Refactored authController and employeeController to guarantee array-based branch assignment persistence and multi-tenant context consistency.', version: 'v6.0.0', deployedBy: 'Super Admin' },
+            { id: 'csm_sc1', date: '31.08.2026', module: 'CSM Support', submodule: 'Branch-Scoped Ticket Analytics', changes: 'Integrated buildAccessScopeQuery into CSM controllers (csmDashboardController, ticketController) enforcing strict user-to-branch data isolation, engineer ticket assignment scoping, and status tracking.', version: 'v6.0.0', deployedBy: 'Super Admin' },
+            { id: 'hsn_sync1', date: '31.08.2026', module: 'Master Management', submodule: 'Product HSN Synchronization', changes: 'Fixed data persistence gap between Products.jsx and productController.js to ensure hsnCode is reliably stored and rendered across Product Master table and form views.', version: 'v6.0.0', deployedBy: 'Super Admin' }
+        ];
+
+        todayFallbackList.reverse().forEach(fb => {
+            if (!list.some(item => item.submodule === fb.submodule || item.changes === fb.changes)) {
+                list.unshift(fb);
+            }
+        });
+
         // Sample fallback updates if none in DB yet
         if (list.length === 0) {
-            return [
-                { id: 'rep_daily1', date: '24.08.2026', module: 'Reports', submodule: 'Daily HR & Manpower Summary', changes: 'Integrated Daily HR Report tab with exact Excel spreadsheet structure from Test (1).xlsx including Staff, Permanent & Contractual Workers, Department breakdown, and side metrics dashboard.', version: 'v5.1.0', deployedBy: 'Super Admin' },
-                { id: 'rep1', date: '23.08.2026', module: 'Reports', submodule: 'Dark Mode Standardization', changes: 'Applied dark: Tailwind classes across all tab renderers, container cards, stats cards, and table hover states.', version: 'v5.0.0', deployedBy: 'Super Admin' },
-                { id: 'rep2', date: '23.08.2026', module: 'Reports', submodule: 'Recharts Visualizations', changes: 'Configured theme-aware CartesianGrid, XAxis, YAxis, and #0f172a Tooltip popups across all charts.', version: 'v5.0.0', deployedBy: 'Super Admin' },
-                { id: 'rep3', date: '23.08.2026', module: 'Reports', submodule: 'Revenue Plan Spreadsheet', changes: 'Implemented REVENUE_PLAN_DARK_COLORS and dynamic dark mode cell fill logic for financial tables and Excel export parity.', version: 'v5.0.0', deployedBy: 'Super Admin' },
-                { id: 'enq_auth1', date: '22.08.2026', module: 'CRM Core', submodule: 'Sales Executive Deduplication', changes: 'Deduplicated Sales Executive list entries in Enquiry creation, filtering, and assignment dropdowns.', version: 'v4.9.0', deployedBy: 'Super Admin' },
-                { id: 'enq_auth2', date: '22.08.2026', module: 'Authentication', submodule: 'Password Management', changes: 'Restored user password update modal and password reset workflow inside Authorization management panel.', version: 'v4.9.0', deployedBy: 'Super Admin' },
-                { id: 'enq_auth3', date: '22.08.2026', module: 'Master Management', submodule: 'GSTIN Validation Standard', changes: 'Expanded GSTIN regex pattern to support all Indian state codes (01-37, 38, 97, 99) across Branch, Contact, Customer, Vendor, and Enquiry forms.', version: 'v4.9.0', deployedBy: 'Super Admin' },
-                { id: 'auth1', date: '20.08.2026', module: 'Authentication', submodule: 'Permission Overrides & Dark Mode', changes: 'Added per-user permission overrides, accordion permission UI, Vendor Logins tab, and dark mode audit.', version: 'v4.8.0', deployedBy: 'Super Admin' },
-                { id: 'inv2', date: '21.08.2026', module: 'Warehouse Master', submodule: 'Full-Page Form & API Fix', changes: 'Added standalone WarehouseForm component with bin/rack layout editor and resolved API endpoint base URL integration.', version: 'v5.2.0', deployedBy: 'Super Admin' },
-                { id: 'inv3', date: '21.08.2026', module: 'Stock Matrix', submodule: 'Product Stock Detail Page', changes: 'Replaced modal popup with full-page ProductStockDetail view showing location-wise and bin-wise breakdowns.', version: 'v5.2.0', deployedBy: 'Super Admin' },
-                { id: 'enq1', date: '16.08.2026', module: 'CRM Core', submodule: 'Manual Product Entry', changes: 'Added custom product option and free-text code/description entry for non-mastered items.', version: 'v4.7.0', deployedBy: 'Super Admin' },
-                { id: 'enq2', date: '16.08.2026', module: 'CRM Core', submodule: 'Role Filtering', changes: 'Filtered assigned executive selection exclusively to users with Sales Executive role.', version: 'v4.7.0', deployedBy: 'Super Admin' },
-                { id: 'enq3', date: '16.08.2026', module: 'CRM Core', submodule: 'Enquiry Status Workflow', changes: 'Standardized status dropdown with Open, Assigned, In Progress, Pending Customer, Resolved, Closed, Cancelled enums.', version: 'v4.7.0', deployedBy: 'Super Admin' },
-                { id: 'enq4', date: '16.08.2026', module: 'CRM Core', submodule: 'Product Value Calculation', changes: 'Automated line item values and header summary totals (Subtotal, Freight, Other Charges, Grand Total).', version: 'v4.7.0', deployedBy: 'Super Admin' },
-                { id: 'u1', date: '01.08.2026', module: 'State Master', submodule: 'Field Sequence & Layout', changes: 'Rearranged field order to Country -> Country Dial Code -> State / UT -> Short Code -> GST Code -> City Name with balanced 2-column grid layout.', version: 'v2.5.0', deployedBy: 'GitHub main (569278f)' },
-                { id: 'u2', date: '01.08.2026', module: 'State Master', submodule: 'Dependent City Dropdown', changes: 'Implemented state-wise dependent City dropdown with auto-reset on State change and disabled state validation.', version: 'v2.5.0', deployedBy: 'GitHub main (569278f)' },
-                { id: 'u3', date: '01.08.2026', module: 'State Master', submodule: 'Auto-Fill Logic', changes: 'Added auto-fill for Country Dial Code (+91, +1, etc.), State Short Code (MH, GJ, etc.) and GST Code (27, 24, etc.).', version: 'v2.5.0', deployedBy: 'GitHub main (569278f)' },
-                { id: 'u4', date: '01.08.2026', module: 'Employee Master', submodule: 'Family Information', changes: 'Added Aadhaar Number field in Family Information with numeric-only input and 12-digit validation.', version: 'v2.5.0', deployedBy: 'GitHub main (569278f)' },
-                { id: 'u5', date: '01.08.2026', module: 'Employee Master', submodule: 'Accordion Panel', changes: 'Converted Family Information section into a collapsible/expandable accordion panel with independent per-entry toggle.', version: 'v2.5.0', deployedBy: 'GitHub main (569278f)' },
-                { id: 'u6', date: '01.08.2026', module: 'Employee Master', submodule: 'Backend Schema', changes: 'Updated Mongoose FamilyMemberSchema in EmployeeProfile model to persist family member Aadhaar numbers.', version: 'v2.5.0', deployedBy: 'GitHub main (569278f)' },
-                { id: 's1', date: '17.07.2026', module: 'Reports', submodule: 'Sales target', changes: 'Alignment modified', version: 'v2.1.0', deployedBy: 'System Admin' },
-                { id: 's2', date: '18.07.2026', module: 'Reports', submodule: 'added new report', changes: 'Added new report', version: 'v2.1.0', deployedBy: 'System Admin' },
-                { id: 's3', date: '19.07.2026', module: 'Reports', submodule: 'design', changes: 'redesign', version: 'v2.2.0', deployedBy: 'System Admin' },
-                { id: 's4', date: '19.07.2026', module: 'Dashboard', submodule: 'Theme Management', changes: 'Added dark/light mode toggle', version: 'v2.2.0', deployedBy: 'System Admin' },
-                { id: 's5', date: '19.07.2026', module: 'Dashboard', submodule: 'Global Search', changes: 'Enquiry submodule hierarchy search', version: 'v2.2.0', deployedBy: 'System Admin' },
-                { id: 's6', date: '19.07.2026', module: 'CRM Core', submodule: 'Real-Time', changes: 'Socket.io live data synchronization', version: 'v2.2.0', deployedBy: 'System Admin' }
-            ];
+            return todayFallbackList;
         }
 
         return list;

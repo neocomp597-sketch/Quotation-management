@@ -27,6 +27,8 @@ router.post('/tickets/:id/comments', protect, ticketController.addComment);
 router.post('/tickets/:id/reassign', protect, ticketController.reassignTicket);
 router.patch('/tickets/:id/escalate', protect, ticketController.escalateTicket);
 router.post('/tickets/:id/feedback', protect, ticketController.submitFeedback);
+router.patch('/tickets/:id/location', protect, ticketController.updateTicketLocation);
+router.patch('/tickets/:id/close', protect, ticketController.closeTicket);
 
 // Customer contacts for ticket auto-fill
 router.post('/customer-contacts', protect, customerContactController.create);

@@ -1493,7 +1493,7 @@ const CSMTickets = () => {
                     }`}
                 >
                     <MdPeople size={18} />
-                    My Complaints
+                    My Tickets
                 </button>
 
                 <button
@@ -1505,7 +1505,7 @@ const CSMTickets = () => {
                     }`}
                 >
                     <MdAccountTree size={18} />
-                    My Team Complaints
+                    My Team Tickets
                 </button>
 
                 {isManagerOrAdmin && (
@@ -1518,7 +1518,7 @@ const CSMTickets = () => {
                         }`}
                     >
                         <MdCorporateFare size={18} />
-                        All Complaints
+                        All Tickets
                     </button>
                 )}
             </div>

@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import {
     MdLock, MdRefresh, MdPeople,
     MdShield, MdExpandMore, MdExpandLess, MdAdd, MdDelete, MdSave, MdEdit, MdClose,
-    MdBusiness, MdStorefront, MdKey, MdCheckCircle, MdTune, MdVpnKey
+    MdBusiness, MdStorefront, MdKey, MdCheckCircle, MdTune, MdVpnKey, MdSearch
 } from 'react-icons/md';
 import { authorizationService, userService, superAdminService, vendorService } from '../services/api';
 import { ROLE_LABELS as BUILTIN_ROLE_LABELS, MENU_PERMISSION_GROUPS } from '../constants/menuPermissions';
@@ -36,6 +36,7 @@ const Authorization = () => {
     const [menuGroups, setMenuGroups] = useState([]);
     const [users, setUsers] = useState([]);
     const [vendors, setVendors] = useState([]);
+    const [userSearch, setUserSearch] = useState('');
     
     const [loading, setLoading] = useState(true);
     const [usersLoading, setUsersLoading] = useState(true);
@@ -162,6 +163,18 @@ const Authorization = () => {
     // Filter Team Users (Internal company staff only) vs Vendor Login Users
     const teamUsers = users.filter((u) => u.role !== 'vendor' && !u.vendorId);
     const vendorUsers = users.filter((u) => u.role === 'vendor' || Boolean(u.vendorId));
+
+    const filteredTeamUsers = teamUsers.filter((u) => {
+        if (!userSearch.trim()) return true;
+        const q = userSearch.toLowerCase().trim();
+        return (
+            (u.name && u.name.toLowerCase().includes(q)) ||
+            (u.email && u.email.toLowerCase().includes(q)) ||
+            (u.role && u.role.toLowerCase().includes(q)) ||
+            (u.department && u.department.toLowerCase().includes(q)) ||
+            (u.designation && u.designation.toLowerCase().includes(q))
+        );
+    });
 
     // Calculate total count of granular permission items
     const totalPermissionItemsCount = displayGroups.reduce((count, group) => {
@@ -842,95 +855,46 @@ const Authorization = () => {
                     {activeTab === 'team' && (
                         <div className="space-y-6 animate-fade-in">
                             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-xs">
-                                <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                    <div>
-                                        <h2 className="text-lg font-bold text-slate-900 dark:text-white">Team Users & Custom Permissions</h2>
-                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Internal staff accounts. Click "Individual Permissions 🔽" on any user to expand and customize specific permissions beyond default role settings.</p>
-                                    </div>
-                                    <button
-                                        onClick={() => setShowNewUserForm((prev) => !prev)}
-                                        className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-xl font-bold text-xs hover:bg-primary-700 transition-all shadow-xs"
-                                    >
-                                        {showNewUserForm ? 'Cancel' : <><MdAdd size={18} /> Add Team User</>}
-                                    </button>
+                                <div className="p-6 border-b border-slate-100 dark:border-slate-800">
+                                    <h2 className="text-lg font-bold text-slate-900 dark:text-white">Team Users & Custom Permissions</h2>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                        Employees are managed through <Link to="/payroll/employees" className="text-primary-600 font-bold hover:underline">Employee Master</Link>. Search an employee below to view or edit individual authorization permissions.
+                                    </p>
                                 </div>
 
-                                {/* Create Team User Form */}
-                                {showNewUserForm && (
-                                    <form onSubmit={handleCreateUser} className="p-6 bg-primary-50/20 dark:bg-slate-900 border-b border-primary-100 dark:border-slate-800 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4 items-end">
-                                        <div>
-                                            <label className="block text-xs font-bold text-primary-600 dark:text-primary-400 mb-1.5 ml-1">Name</label>
-                                            <input
-                                                type="text"
-                                                required
-                                                value={newUserData.name}
-                                                onChange={(e) => setNewUserData((prev) => ({ ...prev, name: e.target.value }))}
-                                                className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-primary-100 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-slate-100 outline-none focus:border-primary-600 transition-colors"
-                                                placeholder="Full name"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-bold text-primary-600 dark:text-primary-400 mb-1.5 ml-1">Email</label>
-                                            <input
-                                                type="email"
-                                                required
-                                                value={newUserData.email}
-                                                onChange={(e) => setNewUserData((prev) => ({ ...prev, email: e.target.value }))}
-                                                className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-primary-100 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-slate-100 outline-none focus:border-primary-600 transition-colors"
-                                                placeholder="name@company.com"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-bold text-primary-600 dark:text-primary-400 mb-1.5 ml-1">Password</label>
-                                            <input
-                                                type="password"
-                                                required
-                                                minLength={6}
-                                                value={newUserData.password}
-                                                onChange={(e) => setNewUserData((prev) => ({ ...prev, password: e.target.value }))}
-                                                className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-primary-100 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-slate-100 outline-none focus:border-primary-600 transition-colors"
-                                                placeholder="Temporary password"
-                                                autoComplete="new-password"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-bold text-primary-600 dark:text-primary-400 mb-1.5 ml-1">Role</label>
-                                            <select
-                                                value={newUserData.role}
-                                                onChange={(e) => setNewUserData((prev) => ({ ...prev, role: e.target.value }))}
-                                                className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-primary-100 dark:border-slate-700 rounded-xl text-sm font-bold text-slate-900 dark:text-slate-100 outline-none focus:border-primary-600 transition-colors cursor-pointer"
+                                {/* Employee Search Bar */}
+                                <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                    <div className="relative flex-1">
+                                        <MdSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                                        <input
+                                            type="text"
+                                            value={userSearch}
+                                            onChange={(e) => setUserSearch(e.target.value)}
+                                            placeholder="Search Employee by name, email, role, department or designation..."
+                                            className="w-full pl-10 pr-10 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-800 dark:text-slate-200 outline-none focus:border-primary-600 transition-colors"
+                                        />
+                                        {userSearch && (
+                                            <button
+                                                onClick={() => setUserSearch('')}
+                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
                                             >
-                                                {roles.map((role) => (
-                                                    <option key={role.role} value={role.role}>{role.label}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-bold text-primary-600 dark:text-primary-400 mb-1.5 ml-1">Reports To</label>
-                                            <select
-                                                value={newUserData.reportsTo}
-                                                onChange={(e) => setNewUserData((prev) => ({ ...prev, reportsTo: e.target.value }))}
-                                                className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-primary-100 dark:border-slate-700 rounded-xl text-sm font-bold text-slate-900 dark:text-slate-100 outline-none focus:border-primary-600 transition-colors cursor-pointer"
-                                            >
-                                                <option value="">No senior</option>
-                                                {teamUsers.map((user) => (
-                                                    <option key={user._id} value={user._id}>{user.name}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                        <button
-                                            type="submit"
-                                            disabled={creatingUser}
-                                            className="px-6 py-2.5 bg-primary-600 text-white rounded-xl font-bold text-sm hover:bg-primary-700 disabled:opacity-50 transition-colors shadow-xs"
-                                        >
-                                            {creatingUser ? 'Creating...' : 'Create User'}
-                                        </button>
-                                    </form>
-                                )}
+                                                <MdClose size={16} />
+                                            </button>
+                                        )}
+                                    </div>
+                                    <div className="text-xs font-bold text-slate-500 dark:text-slate-400 shrink-0">
+                                        Showing {filteredTeamUsers.length} of {teamUsers.length} employees
+                                    </div>
+                                </div>
 
                                 {/* Users Table with Expandable Individual Permissions Accordion */}
                                 <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                                    {teamUsers.map((user) => {
+                                    {filteredTeamUsers.length === 0 ? (
+                                        <div className="p-12 text-center text-slate-400 dark:text-slate-500 text-xs font-bold">
+                                            {userSearch ? `No employees found matching "${userSearch}".` : 'No team users found. Create employees in Employee Master first.'}
+                                        </div>
+                                    ) : (
+                                        filteredTeamUsers.map((user) => {
                                         const isMe = currentUser?.id === user._id;
                                         const isUpdating = updatingUserId === user._id;
                                         const isEditing = editingUserId === user._id;
@@ -1183,7 +1147,7 @@ const Authorization = () => {
                                                 )}
                                             </div>
                                         );
-                                    })}
+                                    }))}
                                 </div>
                             </div>
                         </div>

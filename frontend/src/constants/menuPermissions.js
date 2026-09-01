@@ -159,8 +159,8 @@ export const MENU_PERMISSION_GROUPS = [
         children: [
             { key: 'csm_dashboard', label: 'CSM Dashboard', description: 'Overview and customer service analytics', defaultRoute: '/csm/dashboard' },
             { key: 'csm_tickets', label: 'Tickets Register', description: 'View, create, and resolve customer support tickets', defaultRoute: '/csm/tickets' },
-            { key: 'csm_tickets', label: 'My Complaints', description: 'Complaints created by or assigned to the logged-in user', defaultRoute: '/csm/tickets?tab=my' },
-            { key: 'csm_tickets', label: 'My Team Complaints', description: 'Complaints for the logged-in user reporting hierarchy', defaultRoute: '/csm/tickets?tab=team' },
+            { key: 'csm_tickets', label: 'My Tickets', description: 'Tickets created by or assigned to the logged-in user', defaultRoute: '/csm/tickets?tab=my' },
+            { key: 'csm_tickets', label: 'My Team Tickets', description: 'Tickets for the logged-in user reporting hierarchy', defaultRoute: '/csm/tickets?tab=team' },
             { key: 'csm_visits', label: 'Service Visits', description: 'Schedule and manage service engineer visits', defaultRoute: '/csm/visits' },
             { key: 'csm_warranties_amc', label: 'Warranty & AMC', description: 'Manage customer warranty details and AMC contracts', defaultRoute: '/csm/warranties-amc' },
             { key: 'csm_kb', label: 'Knowledge Base', description: 'Manage troubleshooting articles and FAQs', defaultRoute: '/csm/kb' },

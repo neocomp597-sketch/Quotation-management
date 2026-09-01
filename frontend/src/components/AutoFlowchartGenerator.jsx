@@ -3,7 +3,7 @@ import { MdAutoGraph, MdFlashOn, MdLightbulb } from 'react-icons/md';
 import { flowchartService } from '../services/api';
 import { toast } from 'react-toastify';
 
-const SAMPLE_STEPS = `Receive Customer Complaint
+const SAMPLE_STEPS = `Receive Customer Support Ticket
 Check Warranty & AMC Status
 If Active Warranty
 Dispatch Service Engineer

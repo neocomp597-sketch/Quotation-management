@@ -32,7 +32,7 @@ const TABS = [
     { key: 'sla_compliance', label: 'SLA Compliance', icon: <MdTimer size={18} /> },
     { key: 'resolution_time', label: 'Resolution Time', icon: <MdTrendingUp size={18} /> },
     { key: 'escalations', label: 'Escalations', icon: <MdWarning size={18} /> },
-    { key: 'complaints', label: 'Complaints', icon: <MdFeedback size={18} /> },
+    { key: 'complaints', label: 'Tickets', icon: <MdFeedback size={18} /> },
     { key: 'service_requests', label: 'Service Requests', icon: <MdBuild size={18} /> },
     { key: 'fcr', label: 'First Call Resolution', icon: <MdFlashOn size={18} /> },
     { key: 'productivity', label: 'Engineer Productivity', icon: <MdPerson size={18} /> },
@@ -780,13 +780,13 @@ const CSMReports = () => {
                         </div>
                     )}
 
-                    {/* Tab 5: COMPLAINTS */}
+                    {/* Tab 5: COMPLAINTS / TICKETS */}
                     {activeTab === 'complaints' && (
                         <div className="space-y-6">
                             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                                 <div>
-                                    <h3 className="font-outfit font-black text-lg text-slate-900 uppercase">Customer Complaints Report</h3>
-                                    <p className="text-xs text-slate-500 font-semibold">Cases registered under the Complaint type ({complaintsTickets.length} cases)</p>
+                                    <h3 className="font-outfit font-black text-lg text-slate-900 uppercase">Customer Tickets Report</h3>
+                                    <p className="text-xs text-slate-500 font-semibold">Cases registered under customer support tickets ({complaintsTickets.length} cases)</p>
                                 </div>
                                 <button
                                     onClick={() => handleExportCSV(
@@ -794,14 +794,14 @@ const CSMReports = () => {
                                         {
                                             ticketNo: 'Ticket No',
                                             'customerId.customerName': 'Customer',
-                                            issueTitle: 'Complaint Title',
-                                            description: 'Complaint details',
+                                            issueTitle: 'Ticket Title',
+                                            description: 'Ticket details',
                                             'priorityId.name': 'Priority',
                                             status: 'Status',
                                             'assignedEngineerId.name': 'Engineer',
                                             createdAt: 'Created At'
                                         },
-                                        'Customer_Complaints_Report.csv'
+                                        'Customer_Tickets_Report.csv'
                                     )}
                                     className="flex items-center gap-1.5 px-4 py-2 bg-teal-50 hover:bg-teal-100 text-teal-600 rounded-xl text-xs font-black uppercase tracking-wider transition-all"
                                 >
@@ -815,7 +815,7 @@ const CSMReports = () => {
                                         <tr className="text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-50">
                                             <th className="pb-3 pl-4">Ticket</th>
                                             <th className="pb-3">Customer</th>
-                                            <th className="pb-3">Complaint Details</th>
+                                            <th className="pb-3">Ticket Details</th>
                                             <th className="pb-3">Status</th>
                                             <th className="pb-3">Assigned Executive</th>
                                             <th className="pb-3 text-right pr-4">Created Date</th>
@@ -825,7 +825,7 @@ const CSMReports = () => {
                                         {complaintsTickets.length === 0 ? (
                                             <tr>
                                                 <td colSpan="6" className="text-center py-12 text-slate-400 text-xs font-bold">
-                                                    No complaints logged in this period.
+                                                    No tickets logged in this period.
                                                 </td>
                                             </tr>
                                         ) : (

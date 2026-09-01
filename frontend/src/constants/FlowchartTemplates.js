@@ -38,7 +38,7 @@ Generate PDF & send to Customer`,
     },
     {
         id: 'tmpl_complaint',
-        title: 'Customer Support Complaint Resolution',
+        title: 'Customer Support Ticket Resolution',
         category: 'Customer Service',
         description: 'End-to-end ticketing and warranty troubleshooting resolution workflow.',
         rawSteps: `Customer files support ticket

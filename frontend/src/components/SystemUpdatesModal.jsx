@@ -74,11 +74,24 @@ const SystemUpdatesModal = ({ isOpen, onClose }) => {
                         changes: note,
                         version: u.version,
                         deployedBy: u.deployedBy || 'System Admin',
-                        releaseNotes: u.releaseNotes || []
                     });
                 });
             }
         });
+
+        const todayFallbackList = [
+            { id: 'sb_fix1', date: '31.08.2026', module: 'Authentication', submodule: 'Select Active Branch Page', changes: 'Fixed blank screen routing on /select-branch by properly embedding SelectBranch inside nested ProtectedRoute parent layout. Redesigned SelectBranch with dynamic light mode defaults and dark styling (dark: classes) using a rich Teal & Emerald palette. Added string ID vs object payload branch normalization for multi-branch assignment sessions.', version: 'v6.0.0', deployedBy: 'Super Admin' },
+            { id: 'emp_mb1', date: '31.08.2026', module: 'Employee Master', submodule: 'Multi-Branch Assignment Toggle', changes: 'Fixed frontend/backend assignedBranches multi-selection toggle in EmployeeProfile and PayrollEmployees. Refactored authController and employeeController to guarantee array-based branch assignment persistence and multi-tenant context consistency.', version: 'v6.0.0', deployedBy: 'Super Admin' },
+            { id: 'csm_sc1', date: '31.08.2026', module: 'CSM Support', submodule: 'Branch-Scoped Ticket Analytics', changes: 'Integrated buildAccessScopeQuery into CSM controllers (csmDashboardController, ticketController) enforcing strict user-to-branch data isolation, engineer ticket assignment scoping, and status tracking.', version: 'v6.0.0', deployedBy: 'Super Admin' },
+            { id: 'hsn_sync1', date: '31.08.2026', module: 'Master Management', submodule: 'Product HSN Synchronization', changes: 'Fixed data persistence gap between Products.jsx and productController.js to ensure hsnCode is reliably stored and rendered across Product Master table and form views.', version: 'v6.0.0', deployedBy: 'Super Admin' }
+        ];
+
+        todayFallbackList.reverse().forEach(fb => {
+            if (!list.some(item => item.submodule === fb.submodule || item.changes === fb.changes)) {
+                list.unshift(fb);
+            }
+        });
+
         return list;
     }, [updates]);
 

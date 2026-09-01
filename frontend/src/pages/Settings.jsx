@@ -914,18 +914,23 @@ const [logoUploading, setLogoUploading] = useState(false);
                                     </div>
                                     <div className="min-w-0 uppercase">
                                         <p className="text-base font-black tracking-tighter text-slate-900 leading-tight truncate">{companySettings.whitelabelAppTitle || 'ARCRM'}</p>
-                                        <p className="text-[9px] font-bold text-slate-400 -mt-0.5 truncate">{companySettings.tagline || 'Always Ready CRM'}</p>
+                                        <p className="text-[9px] font-bold text-slate-400 -mt-0.5 truncate">Always Ready CRM</p>
                                     </div>
                                 </div>
-                                {/* Bottom row: Client company logo */}
+                                {/* Bottom row: Client company logo & tagline */}
                                 {companySettings.showDualBranding !== false && companySettings.logoUrl && (
-                                    <div className="mt-2.5 pt-2.5 border-t border-slate-100 flex items-center justify-center">
-                                        <div className="w-full bg-white py-1 px-2.5 rounded-xl border border-slate-100 shadow-sm flex items-center justify-center overflow-hidden">
+                                    <div className="mt-3 pt-3 border-t border-slate-100 flex flex-col items-center justify-center">
+                                        <div className="w-full bg-white p-3 rounded-2xl border border-slate-200 shadow-sm flex flex-col items-center justify-center gap-2 overflow-visible">
                                             <img
                                                 src={resolveImageUrl(companySettings.logoUrl)}
                                                 alt="Company Logo"
-                                                className="max-h-8 w-auto object-contain"
+                                                className="h-14 max-w-full object-contain mx-auto transition-all"
                                             />
+                                            {companySettings.tagline && (
+                                                <p className="text-[11px] font-bold text-slate-500 tracking-wider uppercase leading-tight text-center break-words px-1">
+                                                    {companySettings.tagline}
+                                                </p>
+                                            )}
                                         </div>
                                     </div>
                                 )}

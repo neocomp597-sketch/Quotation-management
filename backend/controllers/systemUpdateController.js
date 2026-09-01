@@ -94,6 +94,52 @@ exports.createUpdate = async (req, res) => {
  */
 exports.getAllUpdates = async (req, res) => {
     try {
+        // Ensure v6.0.0 exists in DB
+        let v600 = await SystemUpdate.findOne({ version: 'v6.0.0' });
+        if (!v600) {
+            v600 = new SystemUpdate({
+                version: 'v6.0.0',
+                title: 'Select Branch Blank Screen Fix, Dynamic Light/Dark Mode Teal Theme, Multi-Branch Employee Assignment & CSM Scoping',
+                message: 'Release Updates (31 Aug 2026): Fixed blank screen issue on /select-branch route by embedding inside ProtectedRoute parent route layout. Redesigned SelectBranch page with dynamic light theme defaults and dark mode compatibility featuring a rich Teal & Emerald palette. Resolved multi-branch employee assignment persistence across backend controllers and frontend toggles. Enforced branch-scoped ticket analytics in CSM Dashboard.',
+                releaseNotes: [
+                    'Branch Selection Routing: Resolved blank screen error on /select-branch route by properly embedding component within ProtectedRoute nested route hierarchy',
+                    'Select Branch Theme: Updated SelectBranch UI to light mode default with dark mode toggle support using rich Teal & Emerald visual accents',
+                    'Multi-Branch Assignment: Fixed assignedBranches array persistence in employee controllers and resolved frontend toggle state sync in Payroll & Employee Profile',
+                    'CSM Data Scoping: Integrated buildAccessScopeQuery in CSM Dashboard & Ticket Controllers for strict multi-tenant branch isolation',
+                    'Product HSN Persistence: Synchronized hsnCode field persistence between Product Master frontend and productController'
+                ],
+                detailedChanges: [
+                    {
+                        date: '31.08.2026',
+                        module: 'Authentication',
+                        submodule: 'Select Active Branch Page',
+                        changes: 'Fixed blank screen routing on /select-branch by properly embedding SelectBranch inside nested ProtectedRoute parent layout. Redesigned SelectBranch with dynamic light mode defaults and dark styling (dark: classes) using a rich Teal & Emerald palette. Added string ID vs object payload branch normalization for multi-branch assignment sessions.'
+                    },
+                    {
+                        date: '31.08.2026',
+                        module: 'Employee Master',
+                        submodule: 'Multi-Branch Assignment Toggle',
+                        changes: 'Fixed frontend/backend assignedBranches multi-selection toggle in EmployeeProfile and PayrollEmployees. Refactored authController and employeeController to guarantee array-based branch assignment persistence and multi-tenant context consistency.'
+                    },
+                    {
+                        date: '31.08.2026',
+                        module: 'CSM Support',
+                        submodule: 'Branch-Scoped Ticket Analytics',
+                        changes: 'Integrated buildAccessScopeQuery into CSM controllers (csmDashboardController, ticketController) enforcing strict user-to-branch data isolation, engineer ticket assignment scoping, and status tracking.'
+                    },
+                    {
+                        date: '31.08.2026',
+                        module: 'Master Management',
+                        submodule: 'Product HSN Synchronization',
+                        changes: 'Fixed data persistence gap between Products.jsx and productController.js to ensure hsnCode is reliably stored and rendered across Product Master table and form views.'
+                    }
+                ],
+                deployedBy: 'Super Admin',
+                deployedAt: new Date()
+            });
+            await v600.save();
+        }
+
         let updates = await SystemUpdate.find({ isActive: true })
             .sort({ deployedAt: -1 })
             .lean();

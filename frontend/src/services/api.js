@@ -763,6 +763,8 @@ export const csmService = {
   reassignTicket: (id, data) => api.post(`/csm/tickets/${id}/reassign`, data),
   escalateTicket: (id) => api.patch(`/csm/tickets/${id}/escalate`),
   submitFeedback: (id, data) => api.post(`/csm/tickets/${id}/feedback`, data),
+  updateTicketLocation: (id, data) => api.patch(`/csm/tickets/${id}/location`, data),
+  closeTicket: (id, data) => api.patch(`/csm/tickets/${id}/close`, data),
 
   getVisits: (params = {}) => api.get("/csm/visits", { params }),
   getVisitById: (id) => api.get(`/csm/visits/${id}`),

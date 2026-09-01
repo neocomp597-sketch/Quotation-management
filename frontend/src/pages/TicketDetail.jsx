@@ -5,7 +5,8 @@ import { toast } from 'react-toastify';
 import { 
     MdAssignment, MdPerson, MdCalendarMonth, 
     MdFeedback, MdArrowBack, MdSave, 
-    MdWarning, MdCheckCircleOutline, MdChat 
+    MdWarning, MdCheckCircleOutline, MdCheckCircle, MdChat,
+    MdMyLocation, MdLocationOn, MdStar, MdStarBorder, MdMap
 } from 'react-icons/md';
 import Modal from '../components/Modal';
 import { useSubmitGuard } from '../hooks/useSubmitGuard';
@@ -43,16 +44,29 @@ const TicketDetail = () => {
     const [visitEngineer, setVisitEngineer] = useState('');
     const [activeVisit, setActiveVisit] = useState(null);
 
-    // Complaint Reassignment Form
+    // Ticket Reassignment Form
     const [showReassignModal, setShowReassignModal] = useState(false);
     const [reassignEngineer, setReassignEngineer] = useState('');
     const [reassignReason, setReassignReason] = useState('Leave');
     const [reassignNotes, setReassignNotes] = useState('');
 
+    // GPS & Location Tracking State
+    const [isCapturingGps, setIsCapturingGps] = useState(false);
+    const [manualAddress, setManualAddress] = useState('');
+
+    // Ticket Closing Modal State
+    const [showCloseModal, setShowCloseModal] = useState(false);
+    const [closeResolutionNotes, setCloseResolutionNotes] = useState('');
+    const [closeIsFcr, setCloseIsFcr] = useState(true);
+    const [closeRating, setCloseRating] = useState(5);
+    const [closeFeedbackComment, setCloseFeedbackComment] = useState('');
+    const [closeGps, setCloseGps] = useState(null);
+    const [isClosingTicket, setIsClosingTicket] = useState(false);
+
     const handleReassignSubmit = async (e) => {
         if (e) e.preventDefault();
         if (!reassignEngineer) {
-            toast.error('Please select an engineer to reassign complaint');
+            toast.error('Please select an engineer to reassign ticket');
             return;
         }
         try {
@@ -61,12 +75,97 @@ const TicketDetail = () => {
                 reason: reassignReason,
                 notes: reassignNotes
             });
-            toast.success('Complaint reassigned successfully!');
+            toast.success('Ticket reassigned successfully!');
             setShowReassignModal(false);
             setReassignNotes('');
             fetchTicketDetails();
         } catch (error) {
             toast.error(error.response?.data?.message || 'Reassignment failed');
+        }
+    };
+
+    const handleCaptureGps = () => {
+        if (!navigator.geolocation) {
+            toast.error('Geolocation is not supported by your browser');
+            return;
+        }
+        setIsCapturingGps(true);
+        navigator.geolocation.getCurrentPosition(
+            async (position) => {
+                try {
+                    const { latitude, longitude } = position.coords;
+                    await csmService.updateTicketLocation(id, {
+                        latitude,
+                        longitude,
+                        address: manualAddress || ''
+                    });
+                    toast.success('GPS Location updated successfully!');
+                    setIsCapturingGps(false);
+                    fetchTicketDetails();
+                } catch (err) {
+                    toast.error(err.response?.data?.message || 'Failed to update GPS location');
+                    setIsCapturingGps(false);
+                }
+            },
+            (error) => {
+                toast.error(`GPS Location error: ${error.message}`);
+                setIsCapturingGps(false);
+            },
+            { enableHighAccuracy: true, timeout: 15000 }
+        );
+    };
+
+    const handleCaptureGpsForClose = () => {
+        if (!navigator.geolocation) {
+            toast.error('Geolocation is not supported by your browser');
+            return;
+        }
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const { latitude, longitude } = position.coords;
+                setCloseGps({
+                    latitude,
+                    longitude,
+                    address: manualAddress || ''
+                });
+                toast.success('GPS coordinates attached for closing!');
+            },
+            (err) => {
+                toast.error(`GPS Error: ${err.message}`);
+            },
+            { enableHighAccuracy: true }
+        );
+    };
+
+    const handleCloseTicketSubmit = async (e) => {
+        if (e) e.preventDefault();
+        if (!closeResolutionNotes.trim()) {
+            toast.error('Please enter resolution notes to close the ticket');
+            return;
+        }
+        try {
+            setIsClosingTicket(true);
+            const locData = closeGps ? {
+                latitude: closeGps.latitude,
+                longitude: closeGps.longitude,
+                address: closeGps.address || manualAddress || ''
+            } : {};
+
+            await csmService.closeTicket(id, {
+                resolutionNotes: closeResolutionNotes,
+                isFirstCallResolved: closeIsFcr,
+                rating: closeRating,
+                comment: closeFeedbackComment,
+                ...locData
+            });
+
+            toast.success('Ticket closed successfully!');
+            setShowCloseModal(false);
+            fetchTicketDetails();
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Failed to close ticket');
+        } finally {
+            setIsClosingTicket(false);
         }
     };
 
@@ -393,12 +492,100 @@ const TicketDetail = () => {
                                     Save Status
                                 </button>
                             )}
+
+                            {ticket.status !== 'Closed' ? (
+                                <button
+                                    onClick={() => {
+                                        setCloseResolutionNotes('');
+                                        setCloseIsFcr(ticket.isFirstCallResolved || false);
+                                        setCloseGps(ticket.location?.latitude ? ticket.location : null);
+                                        setShowCloseModal(true);
+                                    }}
+                                    className="w-full flex items-center justify-center gap-2 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md active:scale-95"
+                                >
+                                    <MdCheckCircle size={16} />
+                                    Close Ticket
+                                </button>
+                            ) : (
+                                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-center">
+                                    <span className="text-xs font-black text-emerald-800 flex items-center justify-center gap-1.5">
+                                        <MdCheckCircle size={16} /> Ticket Closed
+                                    </span>
+                                    {ticket.closedAt && (
+                                        <p className="text-[10px] text-emerald-600 font-semibold mt-0.5">
+                                            {new Date(ticket.closedAt).toLocaleString()}
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+
                             <button
                                 onClick={handleEscalate}
                                 className="w-full flex items-center justify-center gap-2 py-3 bg-rose-50 hover:bg-rose-100/50 text-rose-600 border border-rose-200 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
                             >
                                 <MdWarning size={16} />
                                 Escalate Ticket
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* GPS & Location Tracking Card */}
+                    <div className="glass shadow-premium rounded-[2rem] p-6 bg-white border border-slate-100 space-y-4">
+                        <div className="flex items-center justify-between border-b border-slate-50 pb-2">
+                            <h3 className="font-outfit font-black text-sm text-slate-900 uppercase tracking-widest flex items-center gap-2">
+                                <MdLocationOn className="text-emerald-600" size={18} />
+                                GPS & Location
+                            </h3>
+                            {ticket.location?.latitude && (
+                                <span className="bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-2 py-0.5 rounded-full">
+                                    Captured
+                                </span>
+                            )}
+                        </div>
+
+                        {ticket.location?.latitude ? (
+                            <div className="p-4 bg-emerald-50/50 border border-emerald-100 rounded-xl space-y-2 text-xs">
+                                <div className="flex items-center justify-between text-emerald-900 font-bold">
+                                    <span>Lat: {ticket.location.latitude.toFixed(6)}</span>
+                                    <span>Lng: {ticket.location.longitude.toFixed(6)}</span>
+                                </div>
+                                {ticket.location.address && (
+                                    <p className="text-slate-600 font-medium">{ticket.location.address}</p>
+                                )}
+                                {ticket.location.updatedAt && (
+                                    <p className="text-[10px] text-slate-400">
+                                        Updated: {new Date(ticket.location.updatedAt).toLocaleString()}
+                                    </p>
+                                )}
+                                <a
+                                    href={`https://www.google.com/maps?q=${ticket.location.latitude},${ticket.location.longitude}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:text-emerald-900 underline mt-1"
+                                >
+                                    <MdMap size={14} /> Open in Google Maps
+                                </a>
+                            </div>
+                        ) : (
+                            <p className="text-xs text-slate-500 font-medium">No GPS location recorded for this ticket yet.</p>
+                        )}
+
+                        <div className="space-y-2">
+                            <input
+                                type="text"
+                                placeholder="Optional address / location notes..."
+                                value={manualAddress}
+                                onChange={(e) => setManualAddress(e.target.value)}
+                                className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl outline-none focus:border-emerald-600"
+                            />
+                            <button
+                                type="button"
+                                onClick={handleCaptureGps}
+                                disabled={isCapturingGps}
+                                className="w-full flex items-center justify-center gap-2 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm disabled:opacity-50"
+                            >
+                                <MdMyLocation size={14} className={isCapturingGps ? 'animate-spin' : ''} />
+                                {isCapturingGps ? 'Capturing Location...' : 'Capture GPS Location'}
                             </button>
                         </div>
                     </div>
@@ -499,7 +686,7 @@ const TicketDetail = () => {
                                 className="w-full flex items-center justify-center gap-2 py-3 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all mt-2"
                             >
                                 <MdAssignment size={16} />
-                                <span>Reassign Complaint</span>
+                                <span>Reassign Ticket</span>
                             </button>
                         </div>
                     </div>
@@ -792,11 +979,11 @@ const TicketDetail = () => {
                 </form>
             </Modal>
 
-            {/* Reassign Complaint Modal */}
+            {/* Reassign Ticket Modal */}
             <Modal
                 isOpen={showReassignModal}
                 onClose={() => setShowReassignModal(false)}
-                title="Reassign Complaint"
+                title="Reassign Ticket"
                 footer={
                     <div className="flex items-center justify-end gap-3 w-full">
                         <button
@@ -808,7 +995,7 @@ const TicketDetail = () => {
                         </button>
                         <button
                             type="submit"
-                            form="reassign-complaint-form"
+                            form="reassign-ticket-form"
                             className="px-6 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-black uppercase text-xs tracking-widest rounded-xl transition-all shadow-md active:scale-95"
                         >
                             Reassign Ticket
@@ -816,7 +1003,7 @@ const TicketDetail = () => {
                     </div>
                 }
             >
-                <form id="reassign-complaint-form" onSubmit={handleReassignSubmit} className="space-y-4">
+                <form id="reassign-ticket-form" onSubmit={handleReassignSubmit} className="space-y-4">
                     <div>
                         <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Original Engineer</label>
                         <input
@@ -864,6 +1051,110 @@ const TicketDetail = () => {
                             onChange={(e) => setReassignNotes(e.target.value)}
                             className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-medium"
                         />
+                    </div>
+                </form>
+            </Modal>
+
+            {/* Close Ticket Modal */}
+            <Modal
+                isOpen={showCloseModal}
+                onClose={() => setShowCloseModal(false)}
+                title="Close Ticket & Record Resolution"
+                footer={
+                    <div className="flex items-center justify-end gap-3 w-full">
+                        <button
+                            type="button"
+                            onClick={() => setShowCloseModal(false)}
+                            className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold uppercase text-xs hover:bg-slate-50 transition-all"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleCloseTicketSubmit}
+                            disabled={isClosingTicket}
+                            className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase text-xs tracking-widest rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50 flex items-center gap-2"
+                        >
+                            <MdCheckCircle size={16} />
+                            {isClosingTicket ? 'Closing Ticket...' : 'Confirm & Close Ticket'}
+                        </button>
+                    </div>
+                }
+            >
+                <form onSubmit={handleCloseTicketSubmit} className="space-y-4">
+                    <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Resolution Summary / Notes *</label>
+                        <textarea
+                            required
+                            rows={3}
+                            placeholder="Describe how the ticket was resolved..."
+                            value={closeResolutionNotes}
+                            onChange={(e) => setCloseResolutionNotes(e.target.value)}
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-medium outline-none focus:border-emerald-600"
+                        />
+                    </div>
+
+                    <div className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                        <div>
+                            <span className="text-xs font-bold text-slate-900 block">First Call Resolved (FCR)</span>
+                            <span className="text-[10px] text-slate-500">Was the issue resolved on the first interaction?</span>
+                        </div>
+                        <input
+                            type="checkbox"
+                            checked={closeIsFcr}
+                            onChange={(e) => setCloseIsFcr(e.target.checked)}
+                            className="h-5 w-5 text-emerald-600 rounded focus:ring-emerald-500 border-slate-300 cursor-pointer"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Customer Feedback Rating</label>
+                        <div className="flex items-center gap-2 py-2">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                                <button
+                                    key={star}
+                                    type="button"
+                                    onClick={() => setCloseRating(star)}
+                                    className="p-1 text-amber-400 hover:scale-125 transition-transform"
+                                >
+                                    {star <= closeRating ? <MdStar size={24} /> : <MdStarBorder size={24} />}
+                                </button>
+                            ))}
+                            <span className="text-xs font-bold text-slate-700 ml-2">{closeRating} / 5 Stars</span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Feedback Remarks (Optional)</label>
+                        <input
+                            type="text"
+                            placeholder="Customer remarks..."
+                            value={closeFeedbackComment}
+                            onChange={(e) => setCloseFeedbackComment(e.target.value)}
+                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-medium outline-none focus:border-emerald-600"
+                        />
+                    </div>
+
+                    <div className="p-3 bg-emerald-50/60 border border-emerald-100 rounded-xl space-y-2">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
+                                <MdLocationOn size={16} /> Attach Geolocation Stamp
+                            </span>
+                            <button
+                                type="button"
+                                onClick={handleCaptureGpsForClose}
+                                className="px-3 py-1 bg-emerald-600 text-white rounded-lg text-[10px] font-extrabold uppercase hover:bg-emerald-700 transition-all"
+                            >
+                                Capture GPS
+                            </button>
+                        </div>
+                        {closeGps ? (
+                            <p className="text-[11px] font-semibold text-emerald-800">
+                                📍 Lat: {closeGps.latitude.toFixed(6)}, Lng: {closeGps.longitude.toFixed(6)}
+                            </p>
+                        ) : (
+                            <p className="text-[10px] text-slate-500 font-medium">Click Capture GPS to attach live coordinates to this closure.</p>
+                        )}
                     </div>
                 </form>
             </Modal>

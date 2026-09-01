@@ -83,6 +83,12 @@ const TicketSchema = new mongoose.Schema({
         comment: { type: String, default: '' },
         submittedAt: { type: Date }
     },
+    location: {
+        latitude: { type: Number },
+        longitude: { type: Number },
+        address: { type: String, default: '' },
+        updatedAt: { type: Date }
+    },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
 });

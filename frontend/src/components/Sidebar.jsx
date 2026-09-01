@@ -282,8 +282,8 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             children: [
                 { key: 'csm_dashboard', name: 'CSM Dashboard', icon: <MdDashboard size={18} />, path: '/csm/dashboard' },
                 { key: 'csm_tickets', name: 'Tickets Register', icon: <MdAssignment size={18} />, path: '/csm/tickets' },
-                { key: 'csm_tickets', name: 'My Complaints', icon: <MdPeople size={18} />, path: '/csm/tickets?tab=my' },
-                { key: 'csm_tickets', name: 'My Team Complaints', icon: <MdAccountTree size={18} />, path: '/csm/tickets?tab=team' },
+                { key: 'csm_tickets', name: 'My Tickets', icon: <MdPeople size={18} />, path: '/csm/tickets?tab=my' },
+                { key: 'csm_tickets', name: 'My Team Tickets', icon: <MdAccountTree size={18} />, path: '/csm/tickets?tab=team' },
                 { key: 'csm_visits', name: 'Service Visits', icon: <MdLocalShipping size={18} />, path: '/csm/visits' },
                 { key: 'csm_warranties_amc', name: 'Warranty & AMC', icon: <MdStorefront size={18} />, path: '/csm/warranties-amc' },
                 { key: 'csm_kb', name: 'Knowledge Base', icon: <MdDescription size={18} />, path: '/csm/kb' },
@@ -399,7 +399,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                                 </div>
                                 <div className="min-w-0 text-slate-900 dark:text-slate-100 font-outfit uppercase">
                                     <p className="text-lg font-black tracking-tight leading-none truncate">{brandSettings?.whitelabelAppTitle || 'ARCRM'}</p>
-                                    <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-0.5 truncate tracking-wide">{brandSettings?.tagline || 'Always Ready CRM'}</p>
+                                    <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-0.5 truncate tracking-wide">Always Ready CRM</p>
                                 </div>
                             </div>
                             <button
@@ -409,15 +409,20 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                                 <MdChevronLeft size={22} className={`transition-transform duration-300 ${!isOpen ? 'rotate-180' : ''}`} />
                             </button>
                         </div>
-                        {/* Bottom row: Client company logo */}
+                        {/* Bottom row: Client company logo & tagline */}
                         {brandSettings?.showDualBranding !== false && brandSettings?.logoUrl && (
-                            <div className="mt-2.5 pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-center">
-                                <div className="w-full bg-white dark:bg-slate-800 py-1.5 px-3 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center justify-center overflow-hidden">
+                            <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-col items-center justify-center">
+                                <div className="w-full bg-white dark:bg-slate-800 p-3 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col items-center justify-center gap-2 overflow-visible">
                                     <img
                                         src={resolveImageUrl(brandSettings.logoUrl)}
                                         alt={brandSettings.companyName || 'Company Logo'}
-                                        className="max-h-9 w-auto object-contain"
+                                        className="h-14 md:h-16 max-w-full object-contain mx-auto transition-all"
                                     />
+                                    {brandSettings?.tagline && (
+                                        <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 tracking-wider uppercase leading-tight text-center break-words px-1">
+                                            {brandSettings.tagline}
+                                        </p>
+                                    )}
                                 </div>
                             </div>
                         )}

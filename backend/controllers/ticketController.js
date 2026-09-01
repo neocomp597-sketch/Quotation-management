@@ -887,6 +887,90 @@ exports.submitFeedback = async (req, res) => {
     }
 };
 
+exports.updateTicketLocation = async (req, res) => {
+    try {
+        const { latitude, longitude, address } = req.body;
+        const companyId = req.user?.companyId;
+
+        const ticket = await Ticket.findOne({ _id: req.params.id, companyId });
+        if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
+
+        ticket.location = {
+            latitude: Number(latitude),
+            longitude: Number(longitude),
+            address: address || '',
+            updatedAt: new Date()
+        };
+
+        const validUserId = mongoose.Types.ObjectId.isValid(req.user?.id) ? req.user.id : null;
+        ticket.timeline.push({
+            activityType: 'LocationUpdate',
+            description: `GPS Location updated: ${address || `${latitude}, ${longitude}`}`,
+            performedBy: validUserId
+        });
+
+        await ticket.save();
+        broadcastCrmUpdate('TICKET', 'UPDATE', ticket);
+        res.json(ticket);
+    } catch (error) {
+        console.error('Update ticket location error:', error);
+        res.status(500).json({ message: error.message || 'Error updating location' });
+    }
+};
+
+exports.closeTicket = async (req, res) => {
+    try {
+        const { resolutionNotes, isFirstCallResolved, rating, comment, latitude, longitude, address } = req.body;
+        const companyId = req.user?.companyId;
+
+        const ticket = await Ticket.findOne({ _id: req.params.id, companyId });
+        if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
+
+        const now = new Date();
+        ticket.status = 'Closed';
+        ticket.closedAt = now;
+        if (!ticket.resolvedAt) {
+            ticket.resolvedAt = now;
+        }
+
+        if (typeof isFirstCallResolved !== 'undefined') {
+            ticket.isFirstCallResolved = Boolean(isFirstCallResolved);
+        }
+
+        if (latitude && longitude) {
+            ticket.location = {
+                latitude: Number(latitude),
+                longitude: Number(longitude),
+                address: address || '',
+                updatedAt: now
+            };
+        }
+
+        if (rating) {
+            ticket.feedback = {
+                rating: Number(rating),
+                comment: comment || '',
+                submittedAt: now
+            };
+        }
+
+        const validUserId = mongoose.Types.ObjectId.isValid(req.user?.id) ? req.user.id : null;
+        const desc = `Ticket closed${resolutionNotes ? `: ${resolutionNotes}` : ''}`;
+        ticket.timeline.push({
+            activityType: 'Closed',
+            description: desc,
+            performedBy: validUserId
+        });
+
+        await ticket.save();
+        broadcastCrmUpdate('TICKET', 'UPDATE', ticket);
+        res.json(ticket);
+    } catch (error) {
+        console.error('Close ticket error:', error);
+        res.status(500).json({ message: error.message || 'Error closing ticket' });
+    }
+};
+
 exports.getTicketCustomers = async (req, res) => {
     try {
         const companyId = req.user?.companyId;
