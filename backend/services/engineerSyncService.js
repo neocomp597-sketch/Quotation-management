@@ -6,7 +6,8 @@ const EmployeeProfile = require('../models/EmployeeProfile');
  */
 const isServiceEngineerDesignation = (designation) => {
     if (!designation) return false;
-    return designation.trim().toLowerCase() === 'service engineer';
+    const norm = designation.trim().toLowerCase();
+    return norm === 'service engineer' || norm === 'service engineer employee' || norm.includes('service engineer');
 };
 
 /**
@@ -46,7 +47,9 @@ const syncEmployeeToEngineer = async (employeeOrId) => {
                 engineer.email = employee.email;
                 engineer.mobile = employee.mobile || '';
                 engineer.status = targetStatus;
-                if (primaryTerritory) engineer.territoryId = primaryTerritory;
+                if (primaryTerritory && !engineer.territoryId) {
+                    engineer.territoryId = primaryTerritory;
+                }
                 await engineer.save();
             } else {
                 engineer = await Engineer.create({
@@ -56,7 +59,7 @@ const syncEmployeeToEngineer = async (employeeOrId) => {
                     email: employee.email,
                     mobile: employee.mobile || '',
                     status: targetStatus,
-                    territoryId: primaryTerritory,
+                    territoryId: primaryTerritory || null,
                     pincodes: []
                 });
             }

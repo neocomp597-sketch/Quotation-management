@@ -115,6 +115,11 @@ const CSMMasters = ({ isCreatePage, isEditPage }) => {
 
     useEffect(() => {
         if (isCreatePage) {
+            if (activeTab === 'engineers') {
+                toast.info('Engineers are automatically created from Employee Master when designation is set to "Service Engineer". Manual creation is disabled.');
+                navigate('/csm/masters?tab=engineers');
+                return;
+            }
             setEditId(null);
             setFormData({ 
                 name: '', 
@@ -150,7 +155,7 @@ const CSMMasters = ({ isCreatePage, isEditPage }) => {
                 });
             }
         }
-    }, [isCreatePage, isEditPage, routeId, items]);
+    }, [isCreatePage, isEditPage, routeId, items, activeTab, navigate]);
 
     const handleOpenModal = (item = null) => {
         if (item) {
@@ -170,6 +175,10 @@ const CSMMasters = ({ isCreatePage, isEditPage }) => {
             });
             setShowModal(true);
         } else {
+            if (activeTab === 'engineers') {
+                toast.info('Engineers are automatically created from Employee Master when designation is set to "Service Engineer".');
+                return;
+            }
             navigate('/csm/masters/new');
         }
     };
@@ -190,32 +199,39 @@ const CSMMasters = ({ isCreatePage, isEditPage }) => {
                 if (editId) await csmService.updateTeam(editId, formData);
                 else await csmService.createTeam(formData);
             } else if (activeTab === 'engineers') {
+                if (!editId) {
+                    toast.error('Manual creation of engineers is disabled. Create a Service Engineer in Employee Master.');
+                    return;
+                }
                 const payload = {
-                    employeeId: formData.employeeId,
-                    status: formData.status,
                     territoryId: formData.territoryId || null,
-                    pincodes: formData.pincodes.split(',').map(p => p.trim()).filter(Boolean)
+                    pincodes: typeof formData.pincodes === 'string'
+                        ? formData.pincodes.split(',').map(p => p.trim()).filter(Boolean)
+                        : (formData.pincodes || []),
+                    status: formData.status
                 };
-                if (editId) await csmService.updateEngineer(editId, payload);
-                else await csmService.createEngineer(payload);
+                await csmService.updateEngineer(editId, payload);
             }
             toast.success('Saved successfully');
             setShowModal(false);
             fetchItems();
-            navigate('/csm/masters');
+            navigate('/csm/masters?tab=' + activeTab);
         } catch (error) {
             toast.error(error.response?.data?.message || 'Save failed');
         }
     };
 
     const handleDelete = async (id) => {
+        if (activeTab === 'engineers') {
+            toast.info('Engineers are managed via Employee Master.');
+            return;
+        }
         if (!window.confirm('Are you sure you want to delete this master item?')) return;
         try {
             if (activeTab === 'categories') await csmService.deleteCategory(id);
             else if (activeTab === 'types') await csmService.deleteType(id);
             else if (activeTab === 'priorities') await csmService.deletePriority(id);
             else if (activeTab === 'teams') await csmService.deleteTeam(id);
-            else if (activeTab === 'engineers') await csmService.deleteEngineer(id);
             toast.success('Deleted successfully');
             fetchItems();
         } catch (error) {
@@ -245,13 +261,15 @@ const CSMMasters = ({ isCreatePage, isEditPage }) => {
                         <MdCloudDownload size={18} />
                         Seed Defaults
                     </button>
-                    <button
-                        onClick={() => handleOpenModal()}
-                        className="flex items-center gap-2 px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-[10px] tracking-widest rounded-2xl transition-all shadow-lg shadow-primary-600/20 active:scale-95"
-                    >
-                        <MdAdd size={18} />
-                        Add New
-                    </button>
+                    {activeTab !== 'engineers' && (
+                        <button
+                            onClick={() => handleOpenModal()}
+                            className="flex items-center gap-2 px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-[10px] tracking-widest rounded-2xl transition-all shadow-lg shadow-primary-600/20 active:scale-95"
+                        >
+                            <MdAdd size={18} />
+                            Add New
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -276,13 +294,13 @@ const CSMMasters = ({ isCreatePage, isEditPage }) => {
             {/* List View */}
             <div className="glass shadow-premium rounded-[2rem] p-6 bg-white border border-slate-100">
                 {activeTab === 'engineers' && (
-                    <div className="mb-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl flex items-center justify-between gap-3 text-xs font-semibold text-blue-900 shadow-sm">
+                    <div className="mb-4 p-4 bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-100 rounded-2xl flex items-center justify-between gap-3 text-xs font-semibold text-teal-900 shadow-sm">
                         <div className="flex items-center gap-2.5">
                             <span className="flex h-2.5 w-2.5 relative">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-600"></span>
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-teal-600"></span>
                             </span>
-                            <span><strong>Auto-Sync Active:</strong> Employees saved with designation <em>"Service Engineer"</em> in Employee Master automatically appear here with Name, Email, and Mobile populated.</span>
+                            <span><strong>Service Engineer Source:</strong> Employees created with designation <em>"Service Engineer"</em> in Employee Master automatically appear here. Use <strong>Edit</strong> to assign territories. Manual creation is disabled.</span>
                         </div>
                     </div>
                 )}
@@ -366,16 +384,19 @@ const CSMMasters = ({ isCreatePage, isEditPage }) => {
                                             <div className="flex items-center justify-center gap-3">
                                                 <button
                                                     onClick={() => handleOpenModal(item)}
+                                                    title={activeTab === 'engineers' ? "Edit Engineer & Assign Territory" : "Edit Item"}
                                                     className="p-2 rounded-xl text-slate-400 hover:text-primary-600 hover:bg-slate-50 transition-all"
                                                 >
                                                     <MdEdit size={18} />
                                                 </button>
-                                                <button
-                                                    onClick={() => handleDelete(item._id)}
-                                                    className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50/50 transition-all"
-                                                >
-                                                    <MdDelete size={18} />
-                                                </button>
+                                                {activeTab !== 'engineers' && (
+                                                    <button
+                                                        onClick={() => handleDelete(item._id)}
+                                                        className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50/50 transition-all"
+                                                    >
+                                                        <MdDelete size={18} />
+                                                    </button>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>
@@ -400,10 +421,10 @@ const CSMMasters = ({ isCreatePage, isEditPage }) => {
                                 </button>
                                 <div>
                                     <h1 className="text-xl font-black text-slate-900">
-                                        {editId ? (activeTab === 'engineers' ? 'Edit Engineer' : 'Edit Configuration') : (activeTab === 'engineers' ? 'Create Engineer' : 'Create Configuration')}
+                                        {editId ? (activeTab === 'engineers' ? 'Edit Engineer & Assign Territory' : 'Edit Configuration') : (activeTab === 'engineers' ? 'Engineer Details' : 'Create Configuration')}
                                     </h1>
                                     <p className="text-xs text-slate-500 font-medium mt-0.5">
-                                        {editId ? 'Update master configuration details' : `Add new ${activeTab} item`}
+                                        {activeTab === 'engineers' ? 'Assign territory and direct pincodes for this Service Engineer' : (editId ? 'Update master configuration details' : `Add new ${activeTab} item`)}
                                     </p>
                                 </div>
                             </div>
@@ -452,42 +473,39 @@ const CSMMasters = ({ isCreatePage, isEditPage }) => {
                                 )}
                                 {activeTab === 'engineers' && (
                                     <>
-                                        <div className="space-y-1">
-                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Select Employee *</label>
-                                            <SearchableSelect
-                                                options={employeesList.map(emp => ({
-                                                    value: emp._id,
-                                                    label: `${emp.name}${emp.email ? ` (${emp.email})` : ''}`
-                                                }))}
-                                                value={formData.employeeId}
-                                                onChange={(val) => {
-                                                    const selectedEmp = employeesList.find(e => e._id === val);
-                                                    setFormData({
-                                                        ...formData,
-                                                        employeeId: val,
-                                                        name: selectedEmp?.name || '',
-                                                        email: selectedEmp?.email || '',
-                                                        mobile: selectedEmp?.mobile || ''
-                                                    });
-                                                }}
-                                                placeholder="Search & Select Employee..."
-                                            />
-                                            {formData.employeeId && (
-                                                <div className="mt-2 p-3 bg-teal-50/80 border border-teal-100 rounded-xl space-y-1 animate-fade-in">
-                                                    <p className="text-[8px] font-black uppercase tracking-wider text-teal-600">Employee Details (Auto-Synced)</p>
-                                                    <p className="text-sm font-bold text-slate-900">{formData.name || '—'}</p>
-                                                    <p className="text-xs text-slate-500 font-semibold">{formData.email || 'No email'} • {formData.mobile || 'No mobile'}</p>
+                                        <div className="p-5 bg-teal-50/60 border border-teal-100 rounded-2xl space-y-3">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-[10px] font-black uppercase tracking-wider text-teal-700">
+                                                    🛠️ Service Engineer Profile (Auto-Synced from Employee Master)
+                                                </span>
+                                                <span className="px-2.5 py-1 bg-teal-100 text-teal-800 text-[10px] font-black uppercase tracking-wider rounded-lg">
+                                                    Employee Master Sourced
+                                                </span>
+                                            </div>
+                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
+                                                <div>
+                                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-0.5">Engineer Name</span>
+                                                    <span className="font-bold text-slate-900 text-sm">{formData.name || '—'}</span>
                                                 </div>
-                                            )}
+                                                <div>
+                                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-0.5">Email</span>
+                                                    <span className="text-slate-600 font-semibold text-xs">{formData.email || '—'}</span>
+                                                </div>
+                                                <div>
+                                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-0.5">Mobile</span>
+                                                    <span className="text-slate-600 font-semibold text-xs">{formData.mobile || '—'}</span>
+                                                </div>
+                                            </div>
                                         </div>
+
                                         <div className="space-y-1">
-                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Territory</label>
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Assign Territory</label>
                                             <select
                                                 value={formData.territoryId}
                                                 onChange={(e) => setFormData({ ...formData, territoryId: e.target.value })}
                                                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-semibold cursor-pointer"
                                             >
-                                                <option value="">-- No Assigned Territory --</option>
+                                                <option value="">-- Select Territory --</option>
                                                 {territories.map(t => (
                                                     <option key={t._id} value={t._id}>{t.name}</option>
                                                 ))}

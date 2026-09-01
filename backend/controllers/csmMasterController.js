@@ -747,29 +747,9 @@ exports.designations = createCrudEndpoints(Designation, 'Designation');
 
 exports.engineers = {
     create: async (req, res) => {
-        try {
-            const EmployeeProfile = require('../models/EmployeeProfile');
-            const employee = await EmployeeProfile.findById(req.body.employeeId).lean();
-            if (!employee) {
-                return res.status(400).json({ message: 'Selected employee not found' });
-            }
-
-            const engineerData = {
-                employeeId: req.body.employeeId,
-                name: employee.name,
-                email: employee.email,
-                mobile: employee.mobile || '',
-                status: req.body.status || 'Active',
-                territoryId: req.body.territoryId || null,
-                pincodes: req.body.pincodes || [],
-                companyId: req.user?.companyId
-            };
-
-            const doc = await Engineer.create(engineerData);
-            res.status(201).json(doc);
-        } catch (error) {
-            res.status(400).json({ message: 'Error creating Engineer: ' + error.message });
-        }
+        return res.status(403).json({
+            message: 'Manual creation of Engineers is disabled. Service Engineer Employees created in Employee Master automatically populate here.'
+        });
     },
     getAll: async (req, res) => {
         try {
@@ -823,40 +803,49 @@ exports.engineers = {
     },
     update: async (req, res) => {
         try {
-            const EmployeeProfile = require('../models/EmployeeProfile');
-            const employee = await EmployeeProfile.findById(req.body.employeeId).lean();
-            if (!employee) {
-                return res.status(400).json({ message: 'Selected employee not found' });
+            const updateData = {};
+            if (req.body.territoryId !== undefined) {
+                updateData.territoryId = req.body.territoryId || null;
             }
-
-            const updateData = {
-                employeeId: req.body.employeeId,
-                name: employee.name,
-                email: employee.email,
-                mobile: employee.mobile || '',
-                status: req.body.status,
-                territoryId: req.body.territoryId || null,
-                pincodes: req.body.pincodes || []
-            };
+            if (req.body.pincodes !== undefined) {
+                updateData.pincodes = Array.isArray(req.body.pincodes)
+                    ? req.body.pincodes
+                    : (typeof req.body.pincodes === 'string' ? req.body.pincodes.split(',').map(p => p.trim()).filter(Boolean) : []);
+            }
+            if (req.body.status) {
+                updateData.status = req.body.status;
+            }
 
             const doc = await Engineer.findOneAndUpdate(
                 { _id: req.params.id, companyId: req.user?.companyId },
                 updateData,
                 { new: true, runValidators: true }
-            );
+            ).populate('employeeId').populate('territoryId', 'name rules');
+
             if (!doc) return res.status(404).json({ message: 'Engineer not found' });
-            res.json(doc);
+
+            if (doc.employeeId && req.body.territoryId) {
+                const EmployeeProfile = require('../models/EmployeeProfile');
+                await EmployeeProfile.findByIdAndUpdate(doc.employeeId._id || doc.employeeId, {
+                    $addToSet: { assignedTerritories: req.body.territoryId }
+                });
+            }
+
+            const result = doc.toObject ? doc.toObject() : doc;
+            if (result.employeeId) {
+                result.name = result.employeeId.name;
+                result.email = result.employeeId.email;
+                result.mobile = result.employeeId.mobile || '';
+            }
+
+            res.json(result);
         } catch (error) {
             res.status(400).json({ message: 'Error updating Engineer: ' + error.message });
         }
     },
     delete: async (req, res) => {
-        try {
-            const doc = await Engineer.findOneAndDelete({ _id: req.params.id, companyId: req.user?.companyId });
-            if (!doc) return res.status(404).json({ message: 'Engineer not found' });
-            res.json({ message: 'Engineer deleted successfully' });
-        } catch (error) {
-            res.status(500).json({ message: 'Error deleting Engineer: ' + error.message });
-        }
+        return res.status(403).json({
+            message: 'Manual deletion of Engineers is disabled. Engineer records are managed via Employee Master.'
+        });
     }
 };
