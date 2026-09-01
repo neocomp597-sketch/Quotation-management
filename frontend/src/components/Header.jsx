@@ -634,7 +634,11 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
             <header className={`fixed top-0 right-0 h-20 bg-white/80 dark:bg-slate-900/90 backdrop-blur-xl border-b border-slate-100 dark:border-slate-800 z-40 transition-all duration-300 left-0 ${sidebarOpen ? 'md:left-64' : 'md:left-20'}`}>
                 <div className="h-full px-6 flex items-center justify-between gap-4">
                     <div className="flex items-center gap-4 flex-1">
-                        <button onClick={toggleSidebar} className="p-2 -ml-2 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl md:hidden transition-colors">
+                        <button
+                            onClick={toggleSidebar}
+                            className="p-2 -ml-2 text-slate-500 dark:text-slate-400 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all cursor-pointer"
+                            title={sidebarOpen ? "Collapse Sidebar" : "Expand Sidebar"}
+                        >
                             <MdMenu size={24} />
                         </button>
 
