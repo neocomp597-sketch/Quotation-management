@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { MdEmail, MdPhone, MdEdit, MdAdd, MdLocationOn, MdClose, MdArrowBack } from 'react-icons/md';
+import { MdEmail, MdPhone, MdEdit, MdAdd, MdLocationOn, MdClose, MdArrowBack, MdFormatListBulleted, MdGridView, MdSearch } from 'react-icons/md';
 import PaginationControls from '../components/PaginationControls';
 import { salespersonService, territoryService } from '../services/api';
 import Modal from '../components/Modal';
@@ -16,6 +16,8 @@ const Salespersons = ({ isCreatePage, isEditPage }) => {
     const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(1);
     const [pagination, setPagination] = useState({ page: 1, limit: LIST_PAGE_SIZE, total: 0, pages: 1 });
+    const [viewMode, setViewMode] = useState('card');
+    const [searchQuery, setSearchQuery] = useState('');
 
     // Modal & Form State
     const [showModal, setShowModal] = useState(false);
@@ -130,92 +132,219 @@ const Salespersons = ({ isCreatePage, isEditPage }) => {
         }
     };
 
+    const filteredSalespersons = salespersons.filter(sp => {
+        if (!searchQuery.trim()) return true;
+        const q = searchQuery.toLowerCase();
+        const name = sp.name?.toLowerCase() || '';
+        const email = sp.email?.toLowerCase() || '';
+        const mobile = sp.mobile?.toLowerCase() || '';
+        const territory = sp.territoryId?.name?.toLowerCase() || '';
+        return name.includes(q) || email.includes(q) || mobile.includes(q) || territory.includes(q);
+    });
+
     return (
         <div className="space-y-6">
             {!(showModal || isCreatePage || isEditPage) ? (
                 <>
                     {/* Header */}
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-black text-slate-900 tracking-tight font-outfit uppercase">
-                        Salesperson Master
-                    </h1>
-                    <p className="text-slate-500 font-semibold text-sm">
-                        Manage sales staff, profiles, and their territory mapping.
-                    </p>
-                </div>
-                <button
-                    onClick={() => navigate('/salespersons/new')}
-                    className="flex items-center gap-2 px-6 py-4 bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-[10px] tracking-widest rounded-2xl transition-all shadow-lg shadow-primary-600/20 active:scale-95 self-start md:self-auto animate-fade-in-up"
-                >
-                    <MdAdd size={18} />
-                    New Salesperson
-                </button>
-            </div>
+                        <div>
+                            <h1 className="text-3xl font-black text-slate-900 tracking-tight font-outfit uppercase">
+                                Salesperson Master
+                            </h1>
+                            <p className="text-slate-500 font-semibold text-sm">
+                                Manage sales staff, profiles, and their territory mapping.
+                            </p>
+                        </div>
+                        <button
+                            onClick={() => navigate('/salespersons/new')}
+                            className="flex items-center gap-2 px-6 py-4 bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-[10px] tracking-widest rounded-2xl transition-all shadow-lg shadow-primary-600/20 active:scale-95 self-start md:self-auto animate-fade-in-up cursor-pointer"
+                        >
+                            <MdAdd size={18} />
+                            New Salesperson
+                        </button>
+                    </div>
 
-            {/* Grid display */}
-            <div className="mobile-master-shell bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden p-6">
-                {loading ? (
-                    <div className="flex flex-col items-center justify-center py-20 space-y-3">
-                        <div className="w-12 h-12 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin"></div>
-                        <p className="text-slate-400 font-bold uppercase text-xs tracking-widest">Loading...</p>
+                    {/* Filter & View Mode Toggle Bar */}
+                    <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+                        <div className="flex-1 relative w-full">
+                            <MdSearch className="absolute left-3.5 top-3.5 text-slate-400" size={20} />
+                            <input
+                                type="text"
+                                placeholder="Search salesperson by name, email, mobile or territory..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:ring-2 focus:ring-primary-500 transition-all font-semibold text-slate-700 text-sm"
+                            />
+                        </div>
+
+                        {/* List / Card View Toggle */}
+                        <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/80 shrink-0">
+                            <button
+                                type="button"
+                                onClick={() => setViewMode('list')}
+                                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                                    viewMode === 'list'
+                                        ? 'bg-white text-slate-900 shadow-xs'
+                                        : 'text-slate-500 hover:text-slate-800'
+                                }`}
+                                title="List View"
+                            >
+                                <MdFormatListBulleted size={16} />
+                                <span className="hidden sm:inline">List</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setViewMode('card')}
+                                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                                    viewMode === 'card'
+                                        ? 'bg-white text-slate-900 shadow-xs'
+                                        : 'text-slate-500 hover:text-slate-800'
+                                }`}
+                                title="Card View"
+                            >
+                                <MdGridView size={16} />
+                                <span className="hidden sm:inline">Card</span>
+                            </button>
+                        </div>
                     </div>
-                ) : salespersons.length === 0 ? (
-                    <div className="text-center py-20 text-slate-400">
-                        <p className="text-lg font-bold">No salespersons configured yet.</p>
-                        <p className="text-sm">Click "New Salesperson" to get started.</p>
-                    </div>
-                ) : (
-                    <>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {salespersons.map(user => (
-                            <div key={user._id} className="mobile-master-card p-6 border border-slate-100 rounded-2xl flex items-start gap-4 hover:shadow-md transition-shadow relative bg-white">
-                                <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-xl flex-shrink-0 ${user.role === 'admin' ? 'bg-primary-700' : 'bg-primary-600'}`}>
-                                    {user.name ? user.name.charAt(0).toUpperCase() : 'S'}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <h3 className="font-bold text-slate-900 truncate pr-8">{user.name}</h3>
-                                    
-                                    <div className="mt-2 space-y-1 text-xs text-slate-500">
-                                        <div className="flex items-center gap-1.5 truncate">
-                                            <MdEmail size={14} className="text-slate-400" /> {user.email || 'No email'}
-                                        </div>
-                                        {user.mobile && (
-                                            <div className="flex items-center gap-1.5">
-                                                <MdPhone size={14} className="text-slate-400" /> {user.mobile}
-                                            </div>
-                                        )}
-                                        <div className="flex items-center gap-1.5 text-primary-600 font-bold mt-1.5">
-                                            <MdLocationOn size={14} /> 
-                                            <span className="truncate">Territory: {user.territoryId?.name || 'Unmapped'}</span>
-                                        </div>
-                                    </div>
-                                    
-                                    <div className="flex items-center gap-2 mt-3">
-                                        <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded ${user.role === 'admin' ? 'bg-primary-100 text-primary-800' : 'bg-primary-50 text-primary-600'}`}>
-                                            {user.role || 'Sales'}
-                                        </span>
-                                        <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded ${user.status === 'Active' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}`}>
-                                            {user.status || 'Active'}
-                                        </span>
-                                    </div>
-                                </div>
-                                
-                                <button
-                                    onClick={() => navigate(`/salespersons/edit/${user._id}`)}
-                                    className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-xl transition-all"
-                                    title="Edit Salesperson"
-                                >
-                                    <MdEdit size={16} />
-                                </button>
+
+                    {/* Master Shell */}
+                    <div className="mobile-master-shell bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden p-6">
+                        {loading ? (
+                            <div className="flex flex-col items-center justify-center py-20 space-y-3">
+                                <div className="w-12 h-12 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin"></div>
+                                <p className="text-slate-400 font-bold uppercase text-xs tracking-widest">Loading...</p>
                             </div>
-                        ))}
+                        ) : filteredSalespersons.length === 0 ? (
+                            <div className="text-center py-20 text-slate-400">
+                                <p className="text-lg font-bold">No salespersons found.</p>
+                                <p className="text-sm">Try adjusting search or click "New Salesperson" to add one.</p>
+                            </div>
+                        ) : viewMode === 'card' ? (
+                            /* CARD VIEW */
+                            <>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    {filteredSalespersons.map(user => (
+                                        <div key={user._id} className="mobile-master-card p-6 border border-slate-100 rounded-2xl flex items-start gap-4 hover:shadow-md transition-shadow relative bg-white">
+                                            <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-xl flex-shrink-0 ${user.role === 'admin' ? 'bg-primary-700' : 'bg-primary-600'}`}>
+                                                {user.name ? user.name.charAt(0).toUpperCase() : 'S'}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <h3 className="font-bold text-slate-900 truncate pr-8">{user.name}</h3>
+                                                
+                                                <div className="mt-2 space-y-1 text-xs text-slate-500">
+                                                    <div className="flex items-center gap-1.5 truncate">
+                                                        <MdEmail size={14} className="text-slate-400" /> {user.email || 'No email'}
+                                                    </div>
+                                                    {user.mobile && (
+                                                        <div className="flex items-center gap-1.5">
+                                                            <MdPhone size={14} className="text-slate-400" /> {user.mobile}
+                                                        </div>
+                                                    )}
+                                                    <div className="flex items-center gap-1.5 text-primary-600 font-bold mt-1.5">
+                                                        <MdLocationOn size={14} /> 
+                                                        <span className="truncate">Territory: {user.territoryId?.name || 'Unmapped'}</span>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div className="flex items-center gap-2 mt-3">
+                                                    <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded ${user.role === 'admin' ? 'bg-primary-100 text-primary-800' : 'bg-primary-50 text-primary-600'}`}>
+                                                        {user.role || 'Sales'}
+                                                    </span>
+                                                    <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded ${user.status === 'Active' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}`}>
+                                                        {user.status || 'Active'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            
+                                            <button
+                                                onClick={() => navigate(`/salespersons/edit/${user._id}`)}
+                                                className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-xl transition-all cursor-pointer"
+                                                title="Edit Salesperson"
+                                            >
+                                                <MdEdit size={16} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                                <PaginationControls pagination={pagination} onPageChange={setPage} className="-mx-6 mt-6 mb-[-1.5rem]" />
+                            </>
+                        ) : (
+                            /* LIST VIEW TABLE */
+                            <>
+                                <div className="overflow-x-auto -mx-6 -my-6">
+                                    <table className="w-full text-left border-collapse">
+                                        <thead>
+                                            <tr className="bg-slate-50/70 text-slate-400 font-bold text-xs uppercase tracking-wider border-b border-slate-100">
+                                                <th className="px-6 py-4">Salesperson</th>
+                                                <th className="px-6 py-4">Contact Information</th>
+                                                <th className="px-6 py-4">Territory</th>
+                                                <th className="px-6 py-4">Role</th>
+                                                <th className="px-6 py-4">Status</th>
+                                                <th className="px-6 py-4 text-center">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
+                                            {filteredSalespersons.map((user) => (
+                                                <tr key={user._id} className="hover:bg-slate-50/50 transition-colors">
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0 ${user.role === 'admin' ? 'bg-primary-700' : 'bg-primary-600'}`}>
+                                                                {user.name ? user.name.charAt(0).toUpperCase() : 'S'}
+                                                            </div>
+                                                            <div>
+                                                                <p className="text-slate-900 font-bold text-sm">{user.name}</p>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-xs">
+                                                        <div className="space-y-0.5">
+                                                            <div className="flex items-center gap-1.5 text-slate-600">
+                                                                <MdEmail size={13} className="text-slate-400" /> {user.email || 'No email'}
+                                                            </div>
+                                                            {user.mobile && (
+                                                                <div className="flex items-center gap-1.5 text-slate-500">
+                                                                    <MdPhone size={13} className="text-slate-400" /> {user.mobile}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-xs font-bold text-primary-600">
+                                                        <div className="flex items-center gap-1">
+                                                            <MdLocationOn size={14} />
+                                                            <span>{user.territoryId?.name || 'Unmapped'}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded ${user.role === 'admin' ? 'bg-primary-100 text-primary-800' : 'bg-primary-50 text-primary-600'}`}>
+                                                            {user.role || 'Sales'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded ${user.status === 'Active' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}`}>
+                                                            {user.status || 'Active'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-center">
+                                                        <button
+                                                            onClick={() => navigate(`/salespersons/edit/${user._id}`)}
+                                                            className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
+                                                            title="Edit Salesperson"
+                                                        >
+                                                            <MdEdit size={16} />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <PaginationControls pagination={pagination} onPageChange={setPage} className="-mx-6 mt-6 mb-[-1.5rem]" />
+                            </>
+                        )}
                     </div>
-                    <PaginationControls pagination={pagination} onPageChange={setPage} className="-mx-6 mt-6 mb-[-1.5rem]" />
-                    </>
-                )}
-            </div>
-            </>
+                </>
             ) : (
                 <div className="max-w-3xl mx-auto space-y-6 animate-in fade-in duration-200">
                         {/* Header bar */}
