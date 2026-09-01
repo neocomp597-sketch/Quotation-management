@@ -45,7 +45,7 @@ const ServiceVisits = () => {
         setLoading(true);
         try {
             const res = await csmService.getVisits();
-            const data = res.data || [];
+            const data = Array.isArray(res.data) ? res.data : (res.data?.data || []);
             setVisits(data);
             if (data.length > 0 && !selectedVisit) {
                 setSelectedVisit(data[0]);
@@ -60,7 +60,8 @@ const ServiceVisits = () => {
     const fetchEngineers = async () => {
         try {
             const res = await csmService.getEngineers();
-            setEngineers(res.data || []);
+            const data = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+            setEngineers(data);
         } catch (error) {
             console.error('Failed to load engineers', error);
         }
@@ -69,9 +70,12 @@ const ServiceVisits = () => {
     const fetchTickets = async () => {
         try {
             const res = await csmService.getTickets();
-            setTickets(res.data || []);
+            const data = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+            setTickets(data);
+            return data;
         } catch (error) {
             console.error('Failed to load tickets', error);
+            return [];
         }
     };
 
@@ -82,9 +86,10 @@ const ServiceVisits = () => {
     }, []);
 
     // Open create visit modal
-    const handleOpenCreateModal = (preselectedTicketId = '') => {
-        fetchTickets();
-        const availableTicket = preselectedTicketId || (tickets.length > 0 ? tickets[0]._id : '');
+    const handleOpenCreateModal = async (preselectedTicketId = '') => {
+        const fetchedTickets = await fetchTickets();
+        const currentTickets = (Array.isArray(fetchedTickets) && fetchedTickets.length > 0) ? fetchedTickets : (Array.isArray(tickets) ? tickets : []);
+        const availableTicket = preselectedTicketId || (currentTickets.length > 0 ? currentTickets[0]._id : '');
         setCreateTicketId(availableTicket);
         setCreateEngineerId(engineers.length > 0 ? engineers[0]._id : '');
         const next = new Date(Date.now() + 2 * 3600 * 1000);
@@ -872,7 +877,7 @@ const ServiceVisits = () => {
                             className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
                         >
                             <option value="">-- Select Ticket --</option>
-                            {tickets.map(t => (
+                            {(Array.isArray(tickets) ? tickets : []).map(t => (
                                 <option key={t._id} value={t._id}>
                                     {t.ticketNo} - {t.issueTitle} ({t.customerId?.customerName || 'Customer'})
                                 </option>
@@ -898,7 +903,7 @@ const ServiceVisits = () => {
                             className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
                         >
                             <option value="">-- Select Engineer --</option>
-                            {engineers.map(u => <option key={u._id} value={u._id}>{u.name}</option>)}
+                            {(Array.isArray(engineers) ? engineers : []).map(u => <option key={u._id} value={u._id}>{u.name}</option>)}
                         </select>
                     </div>
                     <div>
