@@ -46,6 +46,7 @@ const EmployeeProfileSchema = new mongoose.Schema({
     photo: { type: String, default: '' },
     branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null },
     assignedBranches: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Branch' }],
+    assignedTerritories: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Territory' }],
     branchPrefix: { type: String, trim: true, uppercase: true },
     name: { type: String, required: true },
     email: { type: String, trim: true },

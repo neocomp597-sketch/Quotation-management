@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { payrollService, importService, branchService } from '../services/api';
+import { payrollService, importService, branchService, territoryService } from '../services/api';
 import { toast } from 'react-toastify';
 import Modal from '../components/Modal';
 import ImportModal from '../components/ImportModal';
@@ -10,7 +10,7 @@ import * as XLSX from 'xlsx';
 import { 
     MdPeople, MdAdd, MdSearch, MdEdit, MdDelete, 
     MdSave, MdAccountBalance, MdAssignment, MdUploadFile, MdDownload, MdBusiness, MdAccountTree, MdArrowBack, MdSettings,
-    MdPhotoCamera, MdContactPhone, MdCheck
+    MdPhotoCamera, MdContactPhone, MdCheck, MdFormatListBulleted, MdGridView, MdLocationOn, MdHelpOutline, MdClose
 } from 'react-icons/md';
 
 const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
@@ -18,22 +18,35 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
     const { id: routeId } = useParams();
     const [employees, setEmployees] = useState([]);
     const [branches, setBranches] = useState([]);
+    const [territories, setTerritories] = useState([]);
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState('');
     const [branchFilter, setBranchFilter] = useState('');
     const [loading, setLoading] = useState(true);
     const [departments, setDepartments] = useState([]);
     const [designations, setDesignations] = useState([]);
+    const [viewMode, setViewMode] = useState('list'); // 'list' | 'card'
 
     // Modal state
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+    const [showSaveConfirmModal, setShowSaveConfirmModal] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
     const [modalMode, setModalMode] = useState('add'); // 'add' | 'edit' | 'structure'
     const [selectedEmp, setSelectedEmp] = useState(null);
 
+    // Helper for DOB -> 18 Years age calculation
+    const calculateMinJoiningDate = (dobStr) => {
+        if (!dobStr) return '';
+        const dob = new Date(dobStr);
+        if (isNaN(dob.getTime())) return '';
+        const minDate = new Date(dob.getFullYear() + 18, dob.getMonth(), dob.getDate());
+        return minDate.toISOString().substring(0, 10);
+    };
+
     // Form states
     const [basicForm, setBasicForm] = useState({
-        branchId: '', assignedBranches: [], employeeId: '', externalEmployeeCode: '', gender: 'Male', name: '', email: '', mobile: '', reportingTo: '', dob: '', joiningDate: '', lastWorkingDate: '', department: '', designation: '', workerType: 'PERMANENT WORKER', employeeType: 'ONSITE', status: 'Active',
+        branchId: '', assignedBranches: [], assignedTerritories: [], employeeId: '', externalEmployeeCode: '', gender: 'Male', name: '', email: '', mobile: '', reportingTo: '', dob: '', joiningDate: '', lastWorkingDate: '', department: '', designation: '', workerType: 'PERMANENT WORKER', employeeType: 'ONSITE', status: 'Active',
         photo: '', familyDetails: [],
         pan: '', aadhaar: '', uan: '', pfNumber: '', esiNumber: '',
         bankName: '', accountNumber: '', ifscCode: ''
@@ -142,22 +155,35 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
 
     const fetchMasters = async () => {
         try {
-            const [deptRes, desRes, branchRes] = await Promise.all([
+            const [deptRes, desRes, branchRes, territoryRes] = await Promise.all([
                 payrollService.getDepartments(),
                 payrollService.getDesignations(),
-                branchService.getAll()
+                branchService.getAll(),
+                territoryService.getAll()
             ]);
             setDepartments(deptRes.data || []);
             setDesignations(desRes.data || []);
             setBranches(branchRes.data || []);
+            setTerritories(territoryRes.data || []);
         } catch (error) {
-            console.error('Failed to load department, designation, or branch masters', error);
+            console.error('Failed to load department, designation, branch, or territory masters', error);
         }
     };
 
     useEffect(() => {
         fetchMasters();
     }, []);
+
+    const handleAssignedTerritoryToggle = (territoryId) => {
+        setBasicForm(prev => {
+            const current = Array.isArray(prev.assignedTerritories) ? prev.assignedTerritories : [];
+            const exists = current.includes(territoryId);
+            const updated = exists
+                ? current.filter(id => id !== territoryId)
+                : [...current, territoryId];
+            return { ...prev, assignedTerritories: updated };
+        });
+    };
 
     const handleAssignedBranchToggle = async (branchId) => {
         let updatedPrimary = '';
@@ -222,7 +248,7 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
         if (isCreatePage) {
             setSelectedEmp(null);
             setBasicForm({
-                branchId: '', assignedBranches: [], employeeId: '', externalEmployeeCode: '', gender: 'Male', name: '', email: '', mobile: '', reportingTo: '', dob: '', joiningDate: new Date().toISOString().substring(0, 10), lastWorkingDate: '',
+                branchId: '', assignedBranches: [], assignedTerritories: [], employeeId: '', externalEmployeeCode: '', gender: 'Male', name: '', email: '', mobile: '', reportingTo: '', dob: '', joiningDate: new Date().toISOString().substring(0, 10), lastWorkingDate: '',
                 department: '', designation: '', workerType: 'PERMANENT WORKER', employeeType: 'ONSITE', status: 'Active',
                 photo: '', familyDetails: [],
                 pan: '', aadhaar: '', uan: '', pfNumber: '', esiNumber: '',
@@ -240,6 +266,9 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                     assignedBranches: Array.isArray(emp.assignedBranches) && emp.assignedBranches.length
                         ? emp.assignedBranches.map(branch => branch._id || branch).filter(Boolean)
                         : (emp.branchId ? [emp.branchId._id || emp.branchId] : []),
+                    assignedTerritories: Array.isArray(emp.assignedTerritories)
+                        ? emp.assignedTerritories.map(t => t._id || t).filter(Boolean)
+                        : [],
                     employeeId: emp.employeeId || '',
                     externalEmployeeCode: emp.externalEmployeeCode || '',
                     gender: emp.gender || 'Male',
@@ -420,11 +449,19 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
             });
         }
 
+        // DOB -> Joining Date 18+ years validation
+        if (form.dob && form.joiningDate) {
+            const minJd = calculateMinJoiningDate(form.dob);
+            if (minJd && form.joiningDate < minJd) {
+                errors.joiningDate = "Joining Date must be on or after the employee's 18th birthday.";
+            }
+        }
+
         return errors;
     };
 
-    const handleBasicSubmit = async (e) => {
-        e.preventDefault();
+    const handleBasicSubmit = (e) => {
+        if (e) e.preventDefault();
 
         // Perform validations
         const errors = validateEmployeeProfile(basicForm);
@@ -436,20 +473,29 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
             return;
         }
 
+        // Open pre-save confirmation modal
+        setShowSaveConfirmModal(true);
+    };
+
+    const confirmAndSaveEmployee = async () => {
         try {
+            setIsSaving(true);
             if (modalMode === 'add') {
                 await payrollService.createEmployee(basicForm);
-                toast.success('Employee salary profile created!');
+                toast.success('Employee profile created successfully!');
             } else {
                 await payrollService.updateEmployee(selectedEmp._id, basicForm);
-                toast.success('Employee profile details updated!');
+                toast.success('Employee profile details updated successfully!');
             }
+            setShowSaveConfirmModal(false);
             setIsModalOpen(false);
             fetchEmployees();
             navigate('/payroll/employees');
         } catch (error) {
             console.error('Save employee error', error);
             toast.error(error.response?.data?.message || 'Failed to save employee profile');
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -579,9 +625,9 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                 </div>
             </div>
 
-            {/* Filter Bar */}
-            <div className="flex flex-col md:flex-row gap-4 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
-                <div className="flex-1 relative">
+            {/* Filter Bar with View Mode Toggle */}
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+                <div className="flex-1 relative w-full">
                     <MdSearch className="absolute left-3.5 top-3.5 text-slate-400" size={20} />
                     <input
                         type="text"
@@ -591,31 +637,200 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                         className="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:ring-2 focus:ring-primary-500 transition-all font-medium text-slate-700 text-sm"
                     />
                 </div>
-                <div className="w-full md:w-48">
-                    <select
-                        value={statusFilter}
-                        onChange={(e) => setStatusFilter(e.target.value)}
-                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:ring-2 focus:ring-primary-500 transition-all font-bold text-slate-500 text-sm"
-                    >
-                        <option value="">All Statuses</option>
-                        <option value="Active">Active</option>
-                        <option value="Hold">On Hold</option>
-                        <option value="Resigned">Resigned</option>
-                    </select>
+                <div className="flex items-center gap-3 w-full md:w-auto">
+                    <div className="w-full md:w-48">
+                        <select
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value)}
+                            className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:ring-2 focus:ring-primary-500 transition-all font-bold text-slate-500 text-sm"
+                        >
+                            <option value="">All Statuses</option>
+                            <option value="Active">Active</option>
+                            <option value="Hold">On Hold</option>
+                            <option value="Resigned">Resigned</option>
+                        </select>
+                    </div>
+
+                    {/* List / Card View Toggle */}
+                    <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200/80 shrink-0">
+                        <button
+                            type="button"
+                            onClick={() => setViewMode('list')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                                viewMode === 'list'
+                                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
+                                    : 'text-slate-500 hover:text-slate-800'
+                            }`}
+                            title="List View"
+                        >
+                            <MdFormatListBulleted size={16} />
+                            <span className="hidden sm:inline">List</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setViewMode('card')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                                viewMode === 'card'
+                                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
+                                    : 'text-slate-500 hover:text-slate-800'
+                            }`}
+                            title="Card View"
+                        >
+                            <MdGridView size={16} />
+                            <span className="hidden sm:inline">Card</span>
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            {/* Employee Register Table */}
-            <div className="bg-white border border-slate-100 shadow-sm rounded-3xl overflow-hidden">
-                {loading && employees.length === 0 ? (
-                    <div className="flex items-center justify-center py-20">
-                        <div className="animate-spin rounded-full h-8 w-8 border-4 border-primary-500 border-t-transparent"></div>
-                    </div>
-                ) : employees.length === 0 ? (
-                    <div className="p-16 text-center text-slate-400 font-bold">
-                        No employee salary profiles found matching filter query.
-                    </div>
-                ) : (
+            {/* Employee Register Content (List / Card View) */}
+            {loading && employees.length === 0 ? (
+                <div className="flex items-center justify-center py-20 bg-white rounded-3xl border border-slate-100">
+                    <div className="animate-spin rounded-full h-8 w-8 border-4 border-primary-500 border-t-transparent"></div>
+                </div>
+            ) : employees.length === 0 ? (
+                <div className="p-16 text-center text-slate-400 font-bold bg-white rounded-3xl border border-slate-100">
+                    No employee salary profiles found matching filter query.
+                </div>
+            ) : viewMode === 'card' ? (
+                /* CARD VIEW GRID */
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {employees.map((emp) => {
+                        const grossBase = Object.keys(emp.salaryStructure || {}).reduce((acc, curr) => {
+                            const earnings = ['basic', 'hra', 'da', 'specialAllowance', 'bonus', 'incentive', 'reimbursement'];
+                            if (earnings.includes(curr)) {
+                                return acc + (emp.salaryStructure[curr] || 0);
+                            }
+                            return acc;
+                        }, 0);
+
+                        return (
+                            <div key={emp._id} className="bg-white border border-slate-200/80 rounded-3xl p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-4">
+                                <div>
+                                    {/* Card Header */}
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="flex items-center gap-3">
+                                            {emp.photo ? (
+                                                <img src={emp.photo} alt={emp.name} className="w-12 h-12 rounded-2xl object-cover border-2 border-teal-500 shadow-xs shrink-0" />
+                                            ) : (
+                                                <div className="w-12 h-12 rounded-2xl bg-teal-100 text-teal-800 font-black text-base flex items-center justify-center shrink-0 border border-teal-200 shadow-xs">
+                                                    {emp.name ? emp.name.charAt(0).toUpperCase() : 'E'}
+                                                </div>
+                                            )}
+                                            <div>
+                                                <h3 className="font-bold text-slate-900 text-base line-clamp-1">{emp.name}</h3>
+                                                <p className="text-xs text-slate-500 font-medium">{emp.designation || 'No Designation'}</p>
+                                                <p className="text-[11px] text-slate-400 font-medium">{emp.department || 'No Department'}</p>
+                                            </div>
+                                        </div>
+                                        <span className={`px-2.5 py-0.5 border rounded-full text-[10px] font-black uppercase tracking-wider shrink-0 ${getStatusClass(emp.status)}`}>
+                                            {emp.status}
+                                        </span>
+                                    </div>
+
+                                    {/* Badges */}
+                                    <div className="flex items-center gap-1.5 flex-wrap mt-3">
+                                        {emp.employeeId && (
+                                            <span className="px-2 py-0.5 bg-primary-50 text-primary-700 font-black text-[10px] rounded-lg border border-primary-100">
+                                                ID: {emp.employeeId}
+                                            </span>
+                                        )}
+                                        {emp.externalEmployeeCode && (
+                                            <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 font-mono font-bold text-[10px] rounded-lg border border-indigo-100">
+                                                Ext: {emp.externalEmployeeCode}
+                                            </span>
+                                        )}
+                                        {emp.workerType && (
+                                            <span className="px-1.5 py-0.5 bg-amber-50 text-amber-700 font-bold text-[10px] rounded-lg border border-amber-100">
+                                                {emp.workerType}
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    {/* Details */}
+                                    <div className="mt-4 pt-3 border-t border-slate-100 space-y-1.5 text-xs text-slate-600">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-slate-400 font-medium">Email:</span>
+                                            <span className="font-semibold text-slate-800 truncate max-w-[180px]">{emp.email || 'N/A'}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-slate-400 font-medium">Mobile:</span>
+                                            <span className="font-semibold text-slate-800">{emp.mobile || 'N/A'}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-slate-400 font-medium">Joining Date:</span>
+                                            <span className="font-semibold text-slate-800">{emp.joiningDate ? formatDate(emp.joiningDate) : 'N/A'}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-slate-400 font-medium">Monthly Gross:</span>
+                                            <span className="font-bold text-slate-900">₹{grossBase.toLocaleString('en-IN')}</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Assigned Branches & Territories */}
+                                    <div className="mt-3 pt-3 border-t border-slate-100 space-y-2">
+                                        {Array.isArray(emp.assignedBranches) && emp.assignedBranches.length > 0 && (
+                                            <div>
+                                                <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Assigned Branches</p>
+                                                <div className="flex flex-wrap gap-1">
+                                                    {emp.assignedBranches.map(b => (
+                                                        <span key={b._id || b} className="px-2 py-0.5 bg-teal-50 text-teal-700 font-bold text-[10px] rounded border border-teal-100">
+                                                            📍 {b.name || b.branchPrefix || b.code || 'Branch'}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {Array.isArray(emp.assignedTerritories) && emp.assignedTerritories.length > 0 && (
+                                            <div>
+                                                <p className="text-[10px] font-bold text-emerald-600 uppercase mb-1">Assigned Territories</p>
+                                                <div className="flex flex-wrap gap-1">
+                                                    {emp.assignedTerritories.map(t => (
+                                                        <span key={t._id || t} className="px-2 py-0.5 bg-emerald-50 text-emerald-700 font-bold text-[10px] rounded border border-emerald-200">
+                                                            🗺️ {t.name || t.code || 'Territory'}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Actions */}
+                                <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleOpenStructure(emp)}
+                                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-teal-50 hover:bg-teal-600 text-teal-700 hover:text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
+                                    >
+                                        <MdAssignment size={15} />
+                                        Structure
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleOpenEdit(emp)}
+                                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-primary-50 hover:bg-primary-600 text-primary-700 hover:text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
+                                    >
+                                        <MdEdit size={15} />
+                                        Edit
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleDeleteEmployee(emp._id)}
+                                        className="p-2 bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white rounded-xl text-xs transition-all cursor-pointer"
+                                        title="Delete Profile"
+                                    >
+                                        <MdDelete size={16} />
+                                    </button>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            ) : (
+                /* LIST VIEW TABLE */
+                <div className="bg-white border border-slate-100 shadow-sm rounded-3xl overflow-hidden">
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse">
                             <thead>
@@ -689,19 +904,26 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                             </td>
                                             <td className="px-6 py-4">
                                                 <p className="text-slate-800">{emp.designation || 'N/A'}</p>
-                                                <div className="flex items-center gap-2 mt-0.5">
+                                                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                                                     <span className="text-xs text-slate-400">{emp.department || 'N/A'}</span>
-                                                     {Array.isArray(emp.assignedBranches) && emp.assignedBranches.length > 0 ? (
-                                                         emp.assignedBranches.map(b => (
-                                                             <span key={b._id || b} className="px-1.5 py-0.5 bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 font-bold text-[10px] rounded border border-teal-100 dark:border-teal-900/60">
-                                                                 📍 {b.name || b.branchPrefix || b.code || 'Branch'}
-                                                             </span>
-                                                         ))
-                                                     ) : emp.branchId?.name ? (
-                                                         <span className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-bold text-[10px] rounded">
-                                                             📍 {emp.branchId.name}
-                                                         </span>
-                                                     ) : null}
+                                                    {Array.isArray(emp.assignedBranches) && emp.assignedBranches.length > 0 ? (
+                                                        emp.assignedBranches.map(b => (
+                                                            <span key={b._id || b} className="px-1.5 py-0.5 bg-teal-50 text-teal-700 font-bold text-[10px] rounded border border-teal-100">
+                                                                📍 {b.name || b.branchPrefix || b.code || 'Branch'}
+                                                            </span>
+                                                        ))
+                                                    ) : emp.branchId?.name ? (
+                                                        <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 font-bold text-[10px] rounded">
+                                                            📍 {emp.branchId.name}
+                                                        </span>
+                                                    ) : null}
+                                                    {Array.isArray(emp.assignedTerritories) && emp.assignedTerritories.length > 0 && (
+                                                        emp.assignedTerritories.map(t => (
+                                                            <span key={t._id || t} className="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 font-bold text-[10px] rounded border border-emerald-200">
+                                                                🗺️ {t.name || t.code || 'Territory'}
+                                                            </span>
+                                                        ))
+                                                    )}
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 text-sm text-slate-500">
@@ -747,8 +969,8 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                             </tbody>
                         </table>
                     </div>
-                )}
-            </div>
+                </div>
+            )}
             </>
             ) : (
                 <div className="max-w-5xl mx-auto space-y-6 animate-in fade-in duration-200">
@@ -852,8 +1074,8 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                             <div className="md:col-span-3 bg-slate-50/80 p-4 border border-slate-200 rounded-2xl space-y-3">
                                                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                                                     <div className="flex items-center gap-2">
-                                                        <label className={labelClass} style={{ marginBottom: 0 }}>Assign Branch *</label>
-                                                        <span className="px-2.5 py-0.5 bg-teal-100 dark:bg-teal-950 text-teal-800 dark:text-teal-300 font-extrabold text-[11px] rounded-full border border-teal-200/60">
+                                                        <label className={labelClass} style={{ marginBottom: 0 }}>Assign Branch</label>
+                                                        <span className="px-2.5 py-0.5 bg-teal-100 text-teal-800 font-extrabold text-[11px] rounded-full border border-teal-200/60">
                                                             {(basicForm.assignedBranches || []).length} Assigned
                                                         </span>
                                                     </div>
@@ -929,7 +1151,7 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                                 />
                                             </div>
                                             <div>
-                                                <label className={labelClass}>* External Employee Code</label>
+                                                <label className={labelClass}>External Employee Code</label>
                                                 <input
                                                     type="text"
                                                     value={basicForm.externalEmployeeCode || ''}
@@ -951,7 +1173,7 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                                 </select>
                                             </div>
                                             <div>
-                                                <label className={labelClass}>Employee Name *</label>
+                                                <label className={labelClass}>Employee Name</label>
                                                 <input
                                                     type="text"
                                                     required
@@ -1011,19 +1233,30 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                                 <input
                                                     type="date"
                                                     value={basicForm.dob}
-                                                    onChange={(e) => setBasicForm({ ...basicForm, dob: e.target.value })}
+                                                    onChange={(e) => {
+                                                        const newDob = e.target.value;
+                                                        setBasicForm({ ...basicForm, dob: newDob });
+                                                        if (formErrors.joiningDate) setFormErrors({ ...formErrors, joiningDate: null });
+                                                    }}
                                                     className={inputClass}
                                                 />
                                             </div>
                                             <div>
-                                                <label className={labelClass}>Joining Date *</label>
+                                                <label className={labelClass}>Joining Date</label>
                                                 <input
                                                     type="date"
                                                     required
                                                     value={basicForm.joiningDate}
-                                                    onChange={(e) => setBasicForm({ ...basicForm, joiningDate: e.target.value })}
-                                                    className={inputClass}
+                                                    min={calculateMinJoiningDate(basicForm.dob)}
+                                                    onChange={(e) => {
+                                                        setBasicForm({ ...basicForm, joiningDate: e.target.value });
+                                                        if (formErrors.joiningDate) setFormErrors({ ...formErrors, joiningDate: null });
+                                                    }}
+                                                    className={`${inputClass} ${formErrors.joiningDate ? 'border-rose-500 ring-2 ring-rose-500/20 bg-rose-50/20' : ''}`}
                                                 />
+                                                {formErrors.joiningDate && (
+                                                    <p className="text-[11px] font-semibold text-rose-500 mt-1">{formErrors.joiningDate}</p>
+                                                )}
                                             </div>
                                             <div>
                                                 <label className={labelClass}>Last Working Date</label>
@@ -1052,6 +1285,52 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                                     placeholder="Select Designation"
                                                 />
                                             </div>
+
+                                            {/* Assign Territory - Conditionally shown for Service Engineer */}
+                                            {basicForm.designation && basicForm.designation.trim().toLowerCase() === 'service engineer' && (
+                                                <div className="md:col-span-3 bg-emerald-50/80 p-4 border border-emerald-200 rounded-2xl space-y-3 transition-all">
+                                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                                                        <div className="flex items-center gap-2">
+                                                            <label className="text-xs font-bold text-emerald-800 uppercase tracking-wider">Assign Territory</label>
+                                                            <span className="px-2.5 py-0.5 bg-emerald-200/70 text-emerald-900 font-extrabold text-[11px] rounded-full border border-emerald-300">
+                                                                {(basicForm.assignedTerritories || []).length} Assigned
+                                                            </span>
+                                                        </div>
+                                                        <span className="text-[11px] text-emerald-700 font-medium">
+                                                            Assign one or multiple territories to this Service Engineer
+                                                        </span>
+                                                    </div>
+
+                                                    {territories.length === 0 ? (
+                                                        <p className="text-xs text-slate-500 italic">No active territories found in Master configuration.</p>
+                                                    ) : (
+                                                        <div className="flex flex-wrap gap-2.5 pt-1">
+                                                            {territories.map(t => {
+                                                                const checked = (basicForm.assignedTerritories || []).includes(t._id);
+                                                                return (
+                                                                    <button
+                                                                        type="button"
+                                                                        key={t._id}
+                                                                        onClick={() => handleAssignedTerritoryToggle(t._id)}
+                                                                        className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition-all flex items-center gap-2 cursor-pointer select-none active:scale-95 ${
+                                                                            checked
+                                                                                ? 'bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-600/20 ring-2 ring-emerald-500/30'
+                                                                                : 'bg-white text-slate-700 border-slate-200 hover:border-emerald-400 hover:bg-emerald-50/50'
+                                                                        }`}
+                                                                    >
+                                                                        <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${
+                                                                            checked ? 'bg-white text-emerald-600 border-white' : 'border-slate-300 bg-white'
+                                                                        }`}>
+                                                                            {checked && <MdCheck size={12} className="stroke-[3]" />}
+                                                                        </div>
+                                                                        <span>{t.name} ({t.code || 'TERR'})</span>
+                                                                    </button>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
                                             <div>
                                                 <label className={labelClass}>Profile Status</label>
                                                 <select
@@ -1747,6 +2026,59 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                     );
                 })()}
             </Modal>
+
+            {/* Save Confirmation Dialog Modal */}
+            {showSaveConfirmModal && (
+                <Modal
+                    isOpen={showSaveConfirmModal}
+                    onClose={() => setShowSaveConfirmModal(false)}
+                    title="Confirm Save Information"
+                    maxWidth="max-w-md"
+                >
+                    <div className="space-y-5 p-2">
+                        <div className="flex items-center gap-4 bg-teal-50/80 p-4 rounded-2xl border border-teal-100">
+                            <div className="w-12 h-12 rounded-2xl bg-teal-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-teal-600/20">
+                                <MdSave size={24} />
+                            </div>
+                            <div>
+                                <h3 className="font-extrabold text-slate-900 text-base">Save Employee Information</h3>
+                                <p className="text-xs text-slate-600 font-medium mt-0.5">
+                                    Are you sure you want to save this information?
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center justify-end gap-3 pt-2">
+                            <button
+                                type="button"
+                                onClick={() => setShowSaveConfirmModal(false)}
+                                disabled={isSaving}
+                                className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 transition-all cursor-pointer"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={confirmAndSaveEmployee}
+                                disabled={isSaving}
+                                className="px-6 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-bold text-xs transition-all shadow-md shadow-teal-600/20 flex items-center gap-2 cursor-pointer active:scale-95"
+                            >
+                                {isSaving ? (
+                                    <>
+                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                        <span>Saving...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <MdCheck size={16} />
+                                        <span>Save</span>
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </Modal>
+            )}
         </div>
     );
 };

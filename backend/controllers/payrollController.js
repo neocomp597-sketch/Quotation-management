@@ -121,6 +121,7 @@ exports.getEmployees = async (req, res) => {
             .populate('reportingTo', 'name email designation')
             .populate('branchId', 'name code branchPrefix')
             .populate('assignedBranches', 'name code branchPrefix')
+            .populate('assignedTerritories', 'name code type')
             .sort({ name: 1 })
             .lean();
         res.json(employees);
@@ -135,6 +136,7 @@ exports.getEmployee = async (req, res) => {
             .populate('reportingTo', 'name email designation')
             .populate('branchId', 'name code branchPrefix')
             .populate('assignedBranches', 'name code branchPrefix')
+            .populate('assignedTerritories', 'name code type')
             .lean();
         if (!employee) {
             return res.status(404).json({ message: 'Employee not found' });
@@ -246,6 +248,12 @@ exports.createEmployee = async (req, res) => {
             }
         }
 
+        if (Array.isArray(employeeData.assignedTerritories)) {
+            employeeData.assignedTerritories = employeeData.assignedTerritories
+                .map(t => (t && typeof t === 'object' && t._id ? t._id : t))
+                .filter(t => t && mongoose.Types.ObjectId.isValid(t));
+        }
+
         const employee = await EmployeeProfile.create(employeeData);
         
         // Requirement: Auto User Creation on Employee Addition
@@ -262,6 +270,7 @@ exports.createEmployee = async (req, res) => {
             .populate('reportingTo', 'name email designation')
             .populate('branchId', 'name code branchPrefix')
             .populate('assignedBranches', 'name code branchPrefix')
+            .populate('assignedTerritories', 'name code type')
             .lean();
         res.status(201).json(populatedEmployee || employee);
     } catch (error) {
@@ -291,7 +300,12 @@ exports.updateEmployee = async (req, res) => {
         } else if (updateData.branchId) {
             updateData.assignedBranches = [updateData.branchId];
         }
-        // Rule 4: If branch is changed later, Employee ID should NOT change.
+
+        if (Array.isArray(updateData.assignedTerritories)) {
+            updateData.assignedTerritories = updateData.assignedTerritories
+                .map(t => (t && typeof t === 'object' && t._id ? t._id : t))
+                .filter(t => t && mongoose.Types.ObjectId.isValid(t));
+        }
 
         // Validate formats
         const validationError = validateEmployeeFieldsBackend(updateData);
@@ -306,7 +320,8 @@ exports.updateEmployee = async (req, res) => {
         )
         .populate('reportingTo', 'name email designation')
         .populate('branchId', 'name code branchPrefix')
-        .populate('assignedBranches', 'name code branchPrefix');
+        .populate('assignedBranches', 'name code branchPrefix')
+        .populate('assignedTerritories', 'name code type');
         
         if (!employee) {
             return res.status(404).json({ message: 'Employee not found' });

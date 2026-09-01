@@ -36,6 +36,9 @@ const syncEmployeeToEngineer = async (employeeOrId) => {
 
         if (isServiceEng) {
             const targetStatus = isActiveEmployee ? 'Active' : 'Inactive';
+            const primaryTerritory = (Array.isArray(employee.assignedTerritories) && employee.assignedTerritories.length > 0)
+                ? (employee.assignedTerritories[0]?._id || employee.assignedTerritories[0])
+                : null;
 
             if (engineer) {
                 engineer.employeeId = employee._id;
@@ -43,6 +46,7 @@ const syncEmployeeToEngineer = async (employeeOrId) => {
                 engineer.email = employee.email;
                 engineer.mobile = employee.mobile || '';
                 engineer.status = targetStatus;
+                if (primaryTerritory) engineer.territoryId = primaryTerritory;
                 await engineer.save();
             } else {
                 engineer = await Engineer.create({
@@ -52,7 +56,7 @@ const syncEmployeeToEngineer = async (employeeOrId) => {
                     email: employee.email,
                     mobile: employee.mobile || '',
                     status: targetStatus,
-                    territoryId: null,
+                    territoryId: primaryTerritory,
                     pincodes: []
                 });
             }
