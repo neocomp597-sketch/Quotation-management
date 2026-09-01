@@ -27,7 +27,7 @@ const TicketDetail = () => {
     
     // Assignment Form State
     const [assignTeam, setAssignTeam] = useState('');
-    const [assignEngineer, setAssignEngineer] = useState('');
+    const [assignEngineers, setAssignEngineers] = useState([]);
 
     // Operations states
     const [commentText, setCommentText] = useState('');
@@ -177,7 +177,11 @@ const TicketDetail = () => {
             setSelectedStatus(ticketData.status);
             setIsFirstCallResolved(ticketData.isFirstCallResolved || false);
             setAssignTeam(ticketData.assignedTeamId?._id || '');
-            setAssignEngineer(ticketData.assignedEngineerId?._id || '');
+            const currentEngIds = (ticketData.assignedEngineerIds || []).map(e => e._id || e);
+            if (currentEngIds.length === 0 && ticketData.assignedEngineerId) {
+                currentEngIds.push(ticketData.assignedEngineerId._id || ticketData.assignedEngineerId);
+            }
+            setAssignEngineers(currentEngIds);
 
             // Verify entitlements if product is linked
             if (ticketData.customerId?._id && ticketData.productId?._id) {
@@ -225,9 +229,10 @@ const TicketDetail = () => {
         try {
             await csmService.assignTicket(id, {
                 assignedTeamId: assignTeam || null,
-                assignedEngineerId: assignEngineer || null
+                assignedEngineerIds: assignEngineers,
+                assignedEngineerId: assignEngineers.length > 0 ? assignEngineers[0] : null
             });
-            toast.success('Assignment updated');
+            toast.success('Assignments updated successfully');
             fetchTicketDetails();
         } catch (error) {
             toast.error(error.response?.data?.message || 'Assignment failed');
@@ -403,16 +408,37 @@ const TicketDetail = () => {
                                 </div>
                             )}
 
-                            {ticket.assignedEngineerId && (
-                                <div className="p-4 rounded-2xl bg-teal-50 border border-teal-100 space-y-1.5 mt-3">
-                                    <span className="text-[10px] font-black uppercase tracking-widest text-teal-600 block">🛠️ Assigned Service Engineer</span>
-                                    <p className="text-sm font-black text-teal-900">{ticket.assignedEngineerId.name}</p>
-                                    <div className="text-xs text-slate-600 font-semibold space-y-0.5">
-                                        {ticket.assignedEngineerId.email && <p>✉️ {ticket.assignedEngineerId.email}</p>}
-                                        {ticket.assignedEngineerId.mobile && <p>📞 {ticket.assignedEngineerId.mobile}</p>}
+                            {(() => {
+                                const assignedEngs = (ticket.assignedEngineerIds && ticket.assignedEngineerIds.length > 0)
+                                    ? ticket.assignedEngineerIds
+                                    : (ticket.assignedEngineerId ? [ticket.assignedEngineerId] : []);
+
+                                if (assignedEngs.length === 0) return null;
+
+                                return (
+                                    <div className="p-4 rounded-2xl bg-teal-50 border border-teal-100 space-y-2 mt-3">
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-teal-600 block">
+                                            🛠️ Assigned Service Engineer{assignedEngs.length > 1 ? 's' : ''} ({assignedEngs.length})
+                                        </span>
+                                        <div className="space-y-2">
+                                            {assignedEngs.map((eng, idx) => (
+                                                <div key={eng._id || idx} className="bg-white/80 p-2.5 rounded-xl border border-teal-200/60 space-y-0.5">
+                                                    <div className="flex items-center justify-between">
+                                                        <p className="text-xs font-black text-teal-900">{eng.name}</p>
+                                                        {idx === 0 && assignedEngs.length > 1 && (
+                                                            <span className="text-[9px] font-black text-teal-700 bg-teal-200/60 px-1.5 py-0.5 rounded uppercase">Lead</span>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-[11px] text-slate-600 font-semibold space-y-0.5">
+                                                        {eng.email && <p>✉️ {eng.email}</p>}
+                                                        {eng.mobile && <p>📞 {eng.mobile}</p>}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
-                                </div>
-                            )}
+                                );
+                            })()}
                         </div>
                     </div>
 
@@ -609,18 +635,37 @@ const TicketDetail = () => {
                                 </div>
                             )}
 
-                            {ticket.assignedEngineerId && (
-                                <div>
-                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Assigned Engineer</label>
-                                    <div className="px-4 py-3.5 bg-teal-50/50 border border-teal-100/60 rounded-xl text-xs font-bold text-teal-900 flex items-center gap-2">
-                                        <span>🛠️</span>
-                                        <div>
-                                            <p className="font-black">{ticket.assignedEngineerId.name}</p>
-                                            {ticket.assignedEngineerId.mobile && <p className="text-[10px] text-slate-500 font-semibold">{ticket.assignedEngineerId.mobile}</p>}
+                            {(() => {
+                                const assignedEngs = (ticket.assignedEngineerIds && ticket.assignedEngineerIds.length > 0)
+                                    ? ticket.assignedEngineerIds
+                                    : (ticket.assignedEngineerId ? [ticket.assignedEngineerId] : []);
+
+                                if (assignedEngs.length === 0) return null;
+
+                                return (
+                                    <div>
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                                            Currently Assigned ({assignedEngs.length})
+                                        </label>
+                                        <div className="space-y-1.5">
+                                            {assignedEngs.map((eng, idx) => (
+                                                <div key={eng._id || idx} className="px-3.5 py-2.5 bg-teal-50/70 border border-teal-100/80 rounded-xl text-xs font-bold text-teal-900 flex items-center justify-between">
+                                                    <div className="flex items-center gap-2">
+                                                        <span>🛠️</span>
+                                                        <div>
+                                                            <p className="font-black text-slate-800">{eng.name}</p>
+                                                            {eng.mobile && <p className="text-[10px] text-slate-500 font-semibold">{eng.mobile}</p>}
+                                                        </div>
+                                                    </div>
+                                                    {idx === 0 && assignedEngs.length > 1 && (
+                                                        <span className="text-[9px] font-extrabold px-2 py-0.5 bg-teal-200/60 text-teal-800 rounded-full uppercase">Lead</span>
+                                                    )}
+                                                </div>
+                                            ))}
                                         </div>
                                     </div>
-                                </div>
-                            )}
+                                );
+                            })()}
                             <div>
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Service Team</label>
                                 <select
@@ -634,15 +679,19 @@ const TicketDetail = () => {
                             </div>
                             <div>
                                 <div className="flex justify-between items-center mb-1">
-                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Engineer</label>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                        Assign Engineers ({assignEngineers.length} selected)
+                                    </label>
                                     {ticket.pincode && (
                                         <span className="text-[9px] font-bold text-slate-400 uppercase">PIN: {ticket.pincode}</span>
                                     )}
                                 </div>
                                 {(() => {
                                     const ticketPincode = ticket.pincode ? String(ticket.pincode).trim() : '';
+                                    const currentEngIds = ticket.assignedEngineerIds?.map(e => e._id || e) || (ticket.assignedEngineerId ? [ticket.assignedEngineerId._id || ticket.assignedEngineerId] : []);
+
                                     const eligibleEngineers = engineers.filter(eng => {
-                                        if (ticket.assignedEngineerId && (ticket.assignedEngineerId._id === eng._id || ticket.assignedEngineerId === eng._id)) return true;
+                                        if (currentEngIds.includes(eng._id)) return true;
                                         if (activeVisit && (activeVisit.engineerId?._id === eng._id || activeVisit.engineerId === eng._id)) return true;
                                         if (!ticketPincode) return true;
                                         if (Array.isArray(eng.pincodes) && eng.pincodes.includes(ticketPincode)) return true;
@@ -651,20 +700,58 @@ const TicketDetail = () => {
                                         return false;
                                     });
 
+                                    const toggleEngineer = (engId) => {
+                                        if (assignEngineers.includes(engId)) {
+                                            setAssignEngineers(assignEngineers.filter(id => id !== engId));
+                                        } else {
+                                            setAssignEngineers([...assignEngineers, engId]);
+                                        }
+                                    };
+
                                     return (
-                                        <>
-                                            <select
-                                                value={assignEngineer}
-                                                onChange={(e) => setAssignEngineer(e.target.value)}
-                                                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold"
-                                            >
-                                                <option value="">Unassigned</option>
-                                                {eligibleEngineers.map(u => <option key={u._id} value={u._id}>{u.name}</option>)}
-                                            </select>
+                                        <div className="space-y-2">
+                                            <div className="max-h-48 overflow-y-auto pr-1 space-y-1.5 custom-scrollbar border border-slate-200 rounded-xl p-2 bg-slate-50/50">
+                                                {eligibleEngineers.length === 0 ? (
+                                                    <p className="text-[11px] font-semibold text-slate-400 p-2 text-center">
+                                                        No eligible engineers for PIN {ticketPincode || 'N/A'}.
+                                                    </p>
+                                                ) : (
+                                                    eligibleEngineers.map(eng => {
+                                                        const isSelected = assignEngineers.includes(eng._id);
+                                                        return (
+                                                            <div
+                                                                key={eng._id}
+                                                                onClick={() => toggleEngineer(eng._id)}
+                                                                className={`flex items-center justify-between p-2.5 rounded-lg border text-xs font-bold cursor-pointer transition-all ${
+                                                                    isSelected
+                                                                        ? 'bg-primary-50 border-primary-300 text-primary-900 shadow-xs'
+                                                                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                                                                }`}
+                                                            >
+                                                                <div className="flex items-center gap-2">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={isSelected}
+                                                                        onChange={() => {}}
+                                                                        className="w-4 h-4 rounded text-primary-600 focus:ring-primary-500 border-slate-300 cursor-pointer"
+                                                                    />
+                                                                    <div>
+                                                                        <span className="font-bold">{eng.name}</span>
+                                                                        {eng.mobile && <span className="text-[10px] text-slate-400 block">{eng.mobile}</span>}
+                                                                    </div>
+                                                                </div>
+                                                                {isSelected && (
+                                                                    <span className="text-[10px] font-black text-primary-600 bg-primary-100/70 px-2 py-0.5 rounded-md">Selected</span>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })
+                                                )}
+                                            </div>
                                             {ticketPincode && eligibleEngineers.length === 0 && (
                                                 <p className="text-[10px] font-bold text-amber-600 mt-1">No engineers assigned for pincode {ticketPincode}.</p>
                                             )}
-                                        </>
+                                        </div>
                                     );
                                 })()}
                             </div>
@@ -674,12 +761,12 @@ const TicketDetail = () => {
                                 className="w-full flex items-center justify-center gap-2 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 <MdSave size={16} />
-                                {isAssigning ? 'Updating...' : 'Update Assignee'}
+                                {isAssigning ? 'Updating...' : 'Update Assignees'}
                             </button>
                             <button
                                 type="button"
                                 onClick={() => {
-                                    setReassignEngineer(ticket.assignedEngineerId?._id || '');
+                                    setReassignEngineer(ticket.assignedEngineerId?._id || (ticket.assignedEngineerIds && ticket.assignedEngineerIds[0]?._id) || '');
                                     setReassignReason('Leave');
                                     setShowReassignModal(true);
                                 }}

@@ -17,7 +17,9 @@ const ServiceVisits = () => {
     const [billing, setBilling] = useState('Paid');
     const [expenses, setExpenses] = useState([]);
     const [expDesc, setExpDesc] = useState('');
-    const [expAmt, setExpAmt] = useState('');
+    const [expQty, setExpQty] = useState(1);
+    const [expRate, setExpRate] = useState('');
+    const [nextAction, setNextAction] = useState('');
     
     // Signature drawing state
     const canvasRef = useRef(null);
@@ -131,10 +133,22 @@ const ServiceVisits = () => {
 
     const handleAddExpense = (e) => {
         e.preventDefault();
-        if (!expDesc.trim() || !expAmt) return;
-        setExpenses([...expenses, { description: expDesc.trim(), amount: Number(expAmt) }]);
+        if (!expDesc.trim()) {
+            toast.error('Please enter Part/Charge name');
+            return;
+        }
+        const qty = Number(expQty) || 1;
+        const rate = Number(expRate) || 0;
+        const amount = qty * rate;
+        setExpenses([...expenses, { 
+            description: expDesc.trim(), 
+            quantity: qty, 
+            rate: rate, 
+            amount: amount 
+        }]);
         setExpDesc('');
-        setExpAmt('');
+        setExpQty(1);
+        setExpRate('');
     };
 
     const handleRemoveExpense = (idx) => {
@@ -165,9 +179,19 @@ const ServiceVisits = () => {
         }
     };
 
-    const handleCheckOut = async (e) => {
-        e.preventDefault();
-        
+    const handleCheckOut = async (actionType) => {
+        if (!report.trim()) {
+            toast.error('Visit Report / Actions Taken is required');
+            return;
+        }
+
+        if (actionType === 'close_visit') {
+            if (!nextAction.trim()) {
+                toast.error('Please specify mandatory "Next Action / Next Step" to Close Visit');
+                return;
+            }
+        }
+
         // Extract signature canvas to base64
         let signatureData = '';
         const canvas = canvasRef.current;
@@ -183,17 +207,25 @@ const ServiceVisits = () => {
                 visitReport: report,
                 customerSignature: signatureData,
                 billingStatus: billing,
-                expenses
+                expenses,
+                actionType,
+                nextAction: actionType === 'close_visit' ? nextAction.trim() : ''
             });
 
-            toast.success('Field Visit closed. Ticket status set to Resolved.');
+            if (actionType === 'close_visit') {
+                toast.success(`Visit closed! Next action "${nextAction.trim()}" logged to timeline. Complaint remains Open.`);
+            } else {
+                toast.success('Field Visit completed. Ticket closed permanently as resolved.');
+            }
+
             setSelectedVisit(null);
             setReport('');
+            setNextAction('');
             setBilling('Paid');
             setExpenses([]);
             fetchVisits();
         } catch (error) {
-            toast.error('Check-out failed');
+            toast.error(error.response?.data?.message || 'Check-out failed');
         }
     };
 
@@ -339,7 +371,7 @@ const ServiceVisits = () => {
 
                             {/* Check-Out Mode */}
                             {selectedVisit.status === 'Started' && (
-                                <form onSubmit={handleCheckOut} className="space-y-4">
+                                <div className="space-y-4">
                                     <h4 className="font-outfit font-black text-slate-900 uppercase text-sm border-b border-slate-50 pb-2">
                                         Completion & Check-Out
                                     </h4>
@@ -370,44 +402,102 @@ const ServiceVisits = () => {
                                     </div>
 
                                     {/* Expenses Array Log */}
-                                    <div className="space-y-2 p-3 bg-slate-50 rounded-2xl border border-slate-200/60">
-                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Log Expense (Parts/Allowance)</label>
-                                        <div className="flex gap-2">
-                                            <input 
-                                                type="text" 
-                                                placeholder="Part/Charge" 
-                                                value={expDesc} 
-                                                onChange={e => setExpDesc(e.target.value)} 
-                                                className="flex-1 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold"
-                                            />
-                                            <input 
-                                                type="number" 
-                                                placeholder="Amt" 
-                                                value={expAmt} 
-                                                onChange={e => setExpAmt(e.target.value)} 
-                                                className="w-20 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold"
-                                            />
-                                            <button 
-                                                type="button"
-                                                onClick={handleAddExpense}
-                                                className="px-3 bg-slate-800 text-white rounded-lg text-xs font-bold"
-                                            >
-                                                Add
-                                            </button>
+                                    <div className="space-y-2 p-3.5 bg-slate-50 rounded-2xl border border-slate-200/60">
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">LOG EXPENSE (PARTS/ALLOWANCE)</label>
+                                        <div className="grid grid-cols-12 gap-1.5 items-center">
+                                            <div className="col-span-4">
+                                                <input 
+                                                    type="text" 
+                                                    placeholder="Part/Charge" 
+                                                    value={expDesc} 
+                                                    onChange={e => setExpDesc(e.target.value)} 
+                                                    className="w-full px-2.5 py-2 rounded-lg border border-slate-200 text-xs font-semibold"
+                                                />
+                                            </div>
+                                            <div className="col-span-2">
+                                                <input 
+                                                    type="number" 
+                                                    min="1"
+                                                    placeholder="Qty" 
+                                                    value={expQty} 
+                                                    onChange={e => setExpQty(e.target.value)} 
+                                                    className="w-full px-1.5 py-2 rounded-lg border border-slate-200 text-xs font-semibold text-center"
+                                                />
+                                            </div>
+                                            <div className="col-span-3">
+                                                <input 
+                                                    type="number" 
+                                                    min="0"
+                                                    placeholder="Rate" 
+                                                    value={expRate} 
+                                                    onChange={e => setExpRate(e.target.value)} 
+                                                    className="w-full px-1.5 py-2 rounded-lg border border-slate-200 text-xs font-semibold text-center"
+                                                />
+                                            </div>
+                                            <div className="col-span-3">
+                                                <button 
+                                                    type="button"
+                                                    onClick={handleAddExpense}
+                                                    className="w-full py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-bold transition-all"
+                                                >
+                                                    Add
+                                                </button>
+                                            </div>
                                         </div>
+
+                                        <div className="text-right px-1 pt-1">
+                                            <span className="text-[10px] font-black uppercase text-slate-400">Amount (Auto): </span>
+                                            <span className="text-xs font-black text-teal-700">₹{(Number(expQty) || 0) * (Number(expRate) || 0)}</span>
+                                        </div>
+
                                         {expenses.length > 0 && (
-                                            <div className="space-y-1 pt-2">
+                                            <div className="space-y-1.5 pt-2">
                                                 {expenses.map((ex, idx) => (
-                                                    <div key={idx} className="flex justify-between items-center text-xs font-bold text-slate-600 bg-white p-2 rounded-lg border border-slate-100">
-                                                        <span>{ex.description}</span>
+                                                    <div key={idx} className="flex justify-between items-center text-xs font-bold text-slate-600 bg-white p-2 rounded-lg border border-slate-100 shadow-sm">
+                                                        <div>
+                                                            <span className="text-slate-900 font-extrabold">{ex.description}</span>
+                                                            <span className="text-[10px] text-slate-400 font-semibold ml-2">({ex.quantity || 1} x ₹{ex.rate || 0})</span>
+                                                        </div>
                                                         <div className="flex items-center gap-2">
-                                                            <span>₹{ex.amount}</span>
-                                                            <button type="button" onClick={() => handleRemoveExpense(idx)} className="text-red-500"><MdDelete /></button>
+                                                            <span className="text-teal-700 font-black">₹{ex.amount}</span>
+                                                            <button type="button" onClick={() => handleRemoveExpense(idx)} className="text-rose-500 hover:text-rose-700"><MdDelete /></button>
                                                         </div>
                                                     </div>
                                                 ))}
                                             </div>
                                         )}
+                                    </div>
+
+                                    {/* Next Action / Next Step Field (Mandatory for Close Visit) */}
+                                    <div className="p-3.5 bg-amber-50/50 rounded-2xl border border-amber-200/60 space-y-2">
+                                        <div className="flex justify-between items-center">
+                                            <label className="block text-[10px] font-black text-amber-800 uppercase tracking-widest">
+                                                Next Action / Next Step <span className="text-rose-600 font-black">* (Mandatory for Close Visit)</span>
+                                            </label>
+                                        </div>
+                                        <input
+                                            type="text"
+                                            placeholder="e.g. Need Painter, Need Material, Customer Not Available..."
+                                            value={nextAction}
+                                            onChange={(e) => setNextAction(e.target.value)}
+                                            className="w-full px-3.5 py-2 rounded-xl border border-amber-200 bg-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500"
+                                        />
+                                        <div className="flex flex-wrap gap-1.5 pt-1">
+                                            {['Need Painter', 'Need Material', 'Customer Not Available', 'Part Required', 'Follow-up Visit'].map((preset) => (
+                                                <button
+                                                    key={preset}
+                                                    type="button"
+                                                    onClick={() => setNextAction(preset)}
+                                                    className={`px-2.5 py-1 rounded-md text-[9px] font-bold transition-all border ${
+                                                        nextAction === preset
+                                                            ? 'bg-amber-600 text-white border-amber-600 shadow-sm'
+                                                            : 'bg-white text-amber-900 border-amber-200 hover:bg-amber-100'
+                                                    }`}
+                                                >
+                                                    + {preset}
+                                                </button>
+                                            ))}
+                                        </div>
                                     </div>
 
                                     {/* Canvas Signature Pad */}
@@ -435,13 +525,26 @@ const ServiceVisits = () => {
                                         />
                                     </div>
 
-                                    <button
-                                        type="submit"
-                                        className="w-full py-3.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg active:scale-95"
-                                    >
-                                        Complete & Check-Out
-                                    </button>
-                                </form>
+                                    {/* Two Action Buttons: Close Visit & Close Ticket */}
+                                    <div className="pt-2 grid grid-cols-2 gap-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleCheckOut('close_visit')}
+                                            className="py-3 px-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-md active:scale-95 flex items-center justify-center gap-1.5"
+                                        >
+                                            <MdEvent size={16} />
+                                            Close Visit
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleCheckOut('close_ticket')}
+                                            className="py-3 px-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-md active:scale-95 flex items-center justify-center gap-1.5"
+                                        >
+                                            <MdCheckCircle size={16} />
+                                            Close Ticket
+                                        </button>
+                                    </div>
+                                </div>
                             )}
                         </div>
                     ) : (

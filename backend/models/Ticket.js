@@ -64,6 +64,7 @@ const TicketSchema = new mongoose.Schema({
     },
     assignedTeamId: { type: mongoose.Schema.Types.ObjectId, ref: 'ServiceTeam' },
     assignedEngineerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Engineer' },
+    assignedEngineerIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Engineer' }],
     slaResponseDue: { type: Date },
     slaResolutionDue: { type: Date },
     firstResponseAt: { type: Date },
@@ -101,6 +102,7 @@ TicketSchema.index({ ticketNo: 1 });
 TicketSchema.index({ customerId: 1, ticketNo: 1 });
 TicketSchema.index({ status: 1 });
 TicketSchema.index({ assignedEngineerId: 1 });
+TicketSchema.index({ assignedEngineerIds: 1 });
 TicketSchema.index({ companyId: 1, ticketNo: 1 }, { unique: true });
 
 TicketSchema.plugin(tenantPlugin);

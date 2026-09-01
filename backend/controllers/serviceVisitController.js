@@ -160,7 +160,7 @@ exports.checkIn = async (req, res) => {
 
 exports.checkOut = async (req, res) => {
     try {
-        const { latitude, longitude, address, visitReport, customerSignature, billingStatus, expenses } = req.body;
+        const { latitude, longitude, address, visitReport, nextAction, customerSignature, billingStatus, expenses, actionType } = req.body;
         const companyId = req.user?.companyId;
 
         const visit = await ServiceVisit.findOne({ _id: req.params.id, companyId });
@@ -176,6 +176,9 @@ exports.checkOut = async (req, res) => {
         };
         visit.status = 'Completed';
         visit.visitReport = visitReport || '';
+        if (nextAction) {
+            visit.nextAction = nextAction;
+        }
         visit.customerSignature = customerSignature || '';
         visit.billingStatus = billingStatus || 'Paid';
         visit.expenses = expenses || [];
@@ -203,16 +206,28 @@ exports.checkOut = async (req, res) => {
 
         const ticket = await Ticket.findOne({ _id: visit.ticketId, companyId });
         if (ticket) {
-            ticket.status = 'Resolved';
-            ticket.resolvedAt = new Date();
-            if (ticket.slaResolutionDue && new Date() > ticket.slaResolutionDue) {
-                ticket.isSlaBreached.resolution = true;
+            if (actionType === 'close_visit') {
+                // Only current visit is closed, ticket remains OPEN
+                ticket.status = 'Open';
+                ticket.timeline.push({
+                    activityType: 'Visit Closed',
+                    description: `Service Visit (${visit.visitNo}) closed. Next Action: ${nextAction || 'Next visit required'}`,
+                    performedBy: req.user?.id
+                });
+            } else {
+                // Ticket is closed permanently as resolved
+                ticket.status = 'Closed';
+                ticket.resolvedAt = new Date();
+                ticket.closedAt = new Date();
+                if (ticket.slaResolutionDue && new Date() > ticket.slaResolutionDue) {
+                    ticket.isSlaBreached.resolution = true;
+                }
+                ticket.timeline.push({
+                    activityType: 'Ticket Closed',
+                    description: `Service Visit (${visit.visitNo}) completed and Ticket permanently closed as resolved.`,
+                    performedBy: req.user?.id
+                });
             }
-            ticket.timeline.push({
-                activityType: 'Resolved',
-                description: `Service visit completed. Resolution details logged. Customer signature captured.`,
-                performedBy: req.user?.id
-            });
             await ticket.save({ validateBeforeSave: false });
         }
 

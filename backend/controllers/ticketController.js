@@ -310,6 +310,7 @@ exports.getTickets = async (req, res) => {
             const myOr = [{ createdBy: { $in: selfUserObjIds } }];
             if (hierarchyInfo.selfEngineerIds.length > 0) {
                 myOr.push({ assignedEngineerId: { $in: hierarchyInfo.selfEngineerIds } });
+                myOr.push({ assignedEngineerIds: { $in: hierarchyInfo.selfEngineerIds } });
             }
             if (hierarchyInfo.selfSalespersonIds.length > 0) {
                 myOr.push({ assignedSalespersonId: { $in: hierarchyInfo.selfSalespersonIds } });
@@ -323,6 +324,7 @@ exports.getTickets = async (req, res) => {
             }
             if (hierarchyInfo.teamEngineerIds.length > 0) {
                 teamOr.push({ assignedEngineerId: { $in: hierarchyInfo.teamEngineerIds } });
+                teamOr.push({ assignedEngineerIds: { $in: hierarchyInfo.teamEngineerIds } });
             }
             if (hierarchyInfo.teamSalespersonIds.length > 0) {
                 teamOr.push({ assignedSalespersonId: { $in: hierarchyInfo.teamSalespersonIds } });
@@ -339,11 +341,17 @@ exports.getTickets = async (req, res) => {
                 const allEngIds = [...hierarchyInfo.selfEngineerIds, ...hierarchyInfo.teamEngineerIds];
                 const allSalesIds = [...hierarchyInfo.selfSalespersonIds, ...hierarchyInfo.teamSalespersonIds];
                 const allOr = [{ createdBy: { $in: allUserObjIds } }];
-                if (allEngIds.length > 0) allOr.push({ assignedEngineerId: { $in: allEngIds } });
+                if (allEngIds.length > 0) {
+                    allOr.push({ assignedEngineerId: { $in: allEngIds } });
+                    allOr.push({ assignedEngineerIds: { $in: allEngIds } });
+                }
                 if (allSalesIds.length > 0) allOr.push({ assignedSalespersonId: { $in: allSalesIds } });
                 andConditions.push({ $or: allOr });
             } else if (req.query.assignedEngineerId) {
-                filter.assignedEngineerId = req.query.assignedEngineerId;
+                filter.$or = [
+                    { assignedEngineerId: req.query.assignedEngineerId },
+                    { assignedEngineerIds: req.query.assignedEngineerId }
+                ];
             }
         } else {
             // Default handling when no tab specified
@@ -352,11 +360,17 @@ exports.getTickets = async (req, res) => {
                 const allEngIds = [...hierarchyInfo.selfEngineerIds, ...hierarchyInfo.teamEngineerIds];
                 const allSalesIds = [...hierarchyInfo.selfSalespersonIds, ...hierarchyInfo.teamSalespersonIds];
                 const visibilityOr = [{ createdBy: { $in: allUserObjIds } }];
-                if (allEngIds.length > 0) visibilityOr.push({ assignedEngineerId: { $in: allEngIds } });
+                if (allEngIds.length > 0) {
+                    visibilityOr.push({ assignedEngineerId: { $in: allEngIds } });
+                    visibilityOr.push({ assignedEngineerIds: { $in: allEngIds } });
+                }
                 if (allSalesIds.length > 0) visibilityOr.push({ assignedSalespersonId: { $in: allSalesIds } });
                 andConditions.push({ $or: visibilityOr });
             } else if (req.query.assignedEngineerId) {
-                filter.assignedEngineerId = req.query.assignedEngineerId;
+                filter.$or = [
+                    { assignedEngineerId: req.query.assignedEngineerId },
+                    { assignedEngineerIds: req.query.assignedEngineerId }
+                ];
             }
         }
 
@@ -410,6 +424,7 @@ exports.getTickets = async (req, res) => {
                 .populate('priorityId', 'name color')
                 .populate('assignedTeamId', 'name')
                 .populate('assignedEngineerId', 'name email mobile')
+                .populate('assignedEngineerIds', 'name email mobile status')
                 .populate('productId', 'productName productCode')
                 .populate('assetId', 'serialNumber')
                 .populate('assignedSalespersonId', 'name email mobile')
@@ -456,6 +471,7 @@ exports.getTicketById = async (req, res) => {
             .populate('priorityId')
             .populate('assignedTeamId')
             .populate('assignedEngineerId', 'name email mobile status')
+            .populate('assignedEngineerIds', 'name email mobile status')
             .populate('assignedSalespersonId')
             .populate('timeline.performedBy', 'name email role')
             .lean();
@@ -466,8 +482,15 @@ exports.getTicketById = async (req, res) => {
 
         if (!isAdminOrManagerUser(req.user)) {
             const engineer = await getEngineerForUser(req.user);
-            const ticketEngineerId = ticket.assignedEngineerId?._id?.toString() || ticket.assignedEngineerId?.toString();
-            if (!engineer || !ticketEngineerId || ticketEngineerId !== engineer._id.toString()) {
+            if (!engineer) {
+                return res.status(403).json({ message: 'Access denied: You can only view complaints assigned to you.' });
+            }
+            const engIdStr = engineer._id.toString();
+            const primaryEngIdStr = ticket.assignedEngineerId?._id?.toString() || ticket.assignedEngineerId?.toString();
+            const assignedEngIdsStr = (ticket.assignedEngineerIds || []).map(e => e._id?.toString() || e.toString());
+            const isAssigned = (primaryEngIdStr === engIdStr) || assignedEngIdsStr.includes(engIdStr);
+
+            if (!isAssigned) {
                 return res.status(403).json({ message: 'Access denied: You can only view complaints assigned to you.' });
             }
         }
@@ -490,7 +513,9 @@ exports.updateTicket = async (req, res) => {
         if (!isAdminOrManagerUser(req.user)) {
             const engineer = await getEngineerForUser(req.user);
             const ticketEngineerId = existingTicket.assignedEngineerId?.toString();
-            if (!engineer || !ticketEngineerId || ticketEngineerId !== engineer._id.toString()) {
+            const assignedEngIdsStr = (existingTicket.assignedEngineerIds || []).map(e => e.toString());
+            const isAssigned = engineer && (ticketEngineerId === engineer._id.toString() || assignedEngIdsStr.includes(engineer._id.toString()));
+            if (!isAssigned) {
                 return res.status(403).json({ message: 'Access denied: You can only update complaints assigned to you.' });
             }
         }
@@ -500,6 +525,15 @@ exports.updateTicket = async (req, res) => {
             if (ticketBody[field] === '') {
                 ticketBody[field] = null;
             }
+        }
+
+        if (Array.isArray(ticketBody.assignedEngineerIds)) {
+            ticketBody.assignedEngineerIds = ticketBody.assignedEngineerIds.filter(Boolean);
+            if (!ticketBody.assignedEngineerId && ticketBody.assignedEngineerIds.length > 0) {
+                ticketBody.assignedEngineerId = ticketBody.assignedEngineerIds[0];
+            }
+        } else if (ticketBody.assignedEngineerId) {
+            ticketBody.assignedEngineerIds = [ticketBody.assignedEngineerId];
         }
 
         // Validate pincode if provided and run auto-assignment
@@ -550,6 +584,7 @@ exports.updateTicket = async (req, res) => {
             }
             
             ticketBody.assignedEngineerId = assignedEngineerId;
+            ticketBody.assignedEngineerIds = assignedEngineerId ? [assignedEngineerId] : [];
             if (assignedEngineerId) {
                 ticketBody.status = 'Assigned';
             }
@@ -571,47 +606,59 @@ exports.updateTicket = async (req, res) => {
 
 exports.assignTicket = async (req, res) => {
     try {
-        const { assignedTeamId, assignedEngineerId } = req.body;
+        const { assignedTeamId, assignedEngineerId, assignedEngineerIds } = req.body;
         const companyId = req.user?.companyId;
 
         const ticket = await Ticket.findOne({ _id: req.params.id, companyId });
         if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
 
         const Engineer = require('../models/Engineer');
-        let oldEngineerName = 'Unassigned';
-        if (ticket.assignedEngineerId) {
-            const oldEng = await Engineer.findById(ticket.assignedEngineerId).select('name').lean();
-            if (oldEng) oldEngineerName = oldEng.name;
+
+        let rawEngIds = [];
+        if (Array.isArray(assignedEngineerIds)) {
+            rawEngIds = assignedEngineerIds.filter(Boolean);
+        } else if (assignedEngineerId) {
+            rawEngIds = [assignedEngineerId];
         }
 
-        const oldEngineerId = ticket.assignedEngineerId;
+        const validEngIds = [...new Set(rawEngIds)].filter(id => mongoose.Types.ObjectId.isValid(id));
+        const oldPrimaryEngineerId = ticket.assignedEngineerId;
+
         ticket.assignedTeamId = assignedTeamId || null;
-        ticket.assignedEngineerId = assignedEngineerId || null;
+        ticket.assignedEngineerIds = validEngIds;
+        ticket.assignedEngineerId = validEngIds.length > 0 ? validEngIds[0] : null;
         
-        if (ticket.status === 'Open' && (assignedTeamId || assignedEngineerId)) {
+        if (ticket.status === 'Open' && (assignedTeamId || validEngIds.length > 0)) {
             ticket.status = 'Assigned';
         }
 
         let desc = 'Ticket assignment updated';
-        let newEngineerName = 'Unassigned';
-        if (assignedEngineerId) {
-            const eng = await Engineer.findById(assignedEngineerId).select('name userId').lean();
-            if (eng) newEngineerName = eng.name;
-            desc = `Ticket assigned to engineer: ${newEngineerName}`;
+        let assignedEngNames = [];
+        if (validEngIds.length > 0) {
+            const engs = await Engineer.find({ _id: { $in: validEngIds } }).select('name').lean();
+            assignedEngNames = engs.map(e => e.name);
+            desc = `Ticket assigned to engineer(s): ${assignedEngNames.join(', ')}`;
         } else if (assignedTeamId) {
             desc = `Ticket assigned to team`;
         }
 
-        // Record history if engineer changed
-        if (assignedEngineerId && String(oldEngineerId || '') !== String(assignedEngineerId)) {
+        // Record history if primary engineer changed
+        const newPrimaryEngineerId = ticket.assignedEngineerId;
+        if (newPrimaryEngineerId && String(oldPrimaryEngineerId || '') !== String(newPrimaryEngineerId)) {
+            let oldEngineerName = 'Unassigned';
+            if (oldPrimaryEngineerId) {
+                const oldEng = await Engineer.findById(oldPrimaryEngineerId).select('name').lean();
+                if (oldEng) oldEngineerName = oldEng.name;
+            }
+            const primaryEng = await Engineer.findById(newPrimaryEngineerId).select('name').lean();
             const validUserId = mongoose.Types.ObjectId.isValid(req.user?.id) ? req.user.id : null;
             ticket.reassignmentHistory.push({
-                fromEngineerId: oldEngineerId || null,
+                fromEngineerId: oldPrimaryEngineerId || null,
                 fromEngineerName: oldEngineerName,
-                toEngineerId: assignedEngineerId,
-                toEngineerName: newEngineerName,
+                toEngineerId: newPrimaryEngineerId,
+                toEngineerName: primaryEng?.name || 'Assigned Engineer',
                 reason: 'Workload',
-                notes: 'Reassigned via ticket details',
+                notes: `Assigned engineer list updated (${assignedEngNames.join(', ')})`,
                 reassignedBy: validUserId,
                 reassignedByName: req.user?.name || 'System User',
                 reassignedAt: new Date()
@@ -626,8 +673,26 @@ exports.assignTicket = async (req, res) => {
         });
 
         await ticket.save();
-        broadcastCrmUpdate('TICKET', 'UPDATE', ticket);
-        res.json(ticket);
+
+        const updatedTicket = await Ticket.findById(ticket._id)
+            .populate('customerId')
+            .populate('contactId')
+            .populate('contactDesignationId')
+            .populate('productId')
+            .populate('assetId')
+            .populate('invoiceId')
+            .populate('categoryId')
+            .populate('typeId')
+            .populate('priorityId')
+            .populate('assignedTeamId')
+            .populate('assignedEngineerId', 'name email mobile status')
+            .populate('assignedEngineerIds', 'name email mobile status')
+            .populate('assignedSalespersonId')
+            .populate('timeline.performedBy', 'name email role')
+            .lean();
+
+        broadcastCrmUpdate('TICKET', 'UPDATE', updatedTicket);
+        res.json(updatedTicket);
     } catch (error) {
         console.error('Assign ticket error:', error);
         res.status(500).json({ message: error.message || 'Error assigning ticket' });

@@ -12,6 +12,8 @@ const VisitCheckLogSchema = new mongoose.Schema({
 
 const VisitExpenseSchema = new mongoose.Schema({
     description: { type: String, required: true },
+    quantity: { type: Number, default: 1 },
+    rate: { type: Number, default: 0 },
     amount: { type: Number, required: true }
 }, { _id: false });
 
@@ -28,6 +30,7 @@ const ServiceVisitSchema = new mongoose.Schema({
     checkIn: { type: VisitCheckLogSchema, default: null },
     checkOut: { type: VisitCheckLogSchema, default: null },
     visitReport: { type: String, default: '' },
+    nextAction: { type: String, default: '' },
     customerSignature: { type: String, default: '' },
     billingStatus: { 
         type: String, 
