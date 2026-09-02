@@ -13,7 +13,7 @@ const INITIAL_FORM = {
     date: new Date().toISOString().split('T')[0],
     department: 'Quality',
     priority: 'Medium',
-    status: 'Open',
+    status: 'In Progress',
     problemStatement: '',
     impact: '',
     fiveWhys: [
@@ -93,7 +93,7 @@ const CSMRcaReport = () => {
             date: report.date ? new Date(report.date).toISOString().split('T')[0] : '',
             department: report.department || 'Quality',
             priority: report.priority || 'Medium',
-            status: report.status || 'Open',
+            status: report.status || 'In Progress',
             problemStatement: report.problemStatement || '',
             impact: report.impact || '',
             fiveWhys: report.fiveWhys && report.fiveWhys.length === 5 ? report.fiveWhys : INITIAL_FORM.fiveWhys,
@@ -370,7 +370,6 @@ const CSMRcaReport = () => {
                                     'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800'
                                 }`}
                             >
-                                <option value="Open">Open</option>
                                 <option value="In Progress">In Progress</option>
                                 <option value="Closed">Closed</option>
                                 <option value="Resolved">Resolved</option>
