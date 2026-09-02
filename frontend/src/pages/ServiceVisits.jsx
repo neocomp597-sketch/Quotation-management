@@ -38,8 +38,8 @@ const Mgr5SearchSelect = ({ mgr5Parts, selectedId, onSelect, isCustomDesc }) => 
         <div className="relative w-full" ref={wrapperRef}>
             {/* Header Badge indicating MGR5 Fixated */}
             <div className="flex items-center justify-between mb-1">
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-teal-100/90 text-teal-800 text-[10px] font-black uppercase tracking-wider border border-teal-300/80 shadow-2xs">
-                    <MdPushPin className="text-teal-600" size={12} />
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 text-[10px] font-black uppercase tracking-wider border border-amber-300/80 shadow-2xs">
+                    <MdPushPin className="text-amber-600" size={12} />
                     MGR5 FIXATED CATALOG
                 </span>
                 <span className="text-[10px] text-slate-400 font-bold">
@@ -50,7 +50,7 @@ const Mgr5SearchSelect = ({ mgr5Parts, selectedId, onSelect, isCustomDesc }) => 
             {/* Selection Trigger / Search Input */}
             <div 
                 onClick={() => setIsOpen(!isOpen)}
-                className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-xl shadow-2xs flex items-center justify-between cursor-pointer hover:border-teal-500 transition-all group"
+                className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl shadow-2xs flex items-center justify-between cursor-pointer hover:border-teal-500 transition-all group"
             >
                 <div className="flex items-center gap-2 truncate pr-2">
                     <MdSearch className="text-slate-400 group-hover:text-teal-600 transition-colors shrink-0" size={18} />
@@ -89,7 +89,7 @@ const Mgr5SearchSelect = ({ mgr5Parts, selectedId, onSelect, isCustomDesc }) => 
 
             {/* Dropdown Menu with 2 Distinct Sections */}
             {isOpen && (
-                <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150 min-w-[320px]">
                     {/* Live Search Filter Input */}
                     <div className="p-2.5 bg-slate-50/90 border-b border-slate-100">
                         <div className="relative">
@@ -119,9 +119,12 @@ const Mgr5SearchSelect = ({ mgr5Parts, selectedId, onSelect, isCustomDesc }) => 
                         
                         {/* SECTION 1: MGR5 SPARE PARTS */}
                         <div className="p-2">
-                            <div className="px-2 py-1.5 text-[10px] font-black uppercase tracking-widest text-amber-700 bg-amber-50/70 rounded-lg flex items-center gap-1.5 mb-1">
-                                <MdBuild size={13} className="text-amber-600" />
-                                Section 1: MGR5 Spare Parts ({spareParts.length})
+                            <div className="px-2 py-1.5 text-[10px] font-black uppercase tracking-widest text-amber-700 bg-amber-50/70 rounded-lg flex items-center justify-between mb-1">
+                                <span className="flex items-center gap-1.5">
+                                    <MdBuild size={13} className="text-amber-600" />
+                                    Section 1: MGR5 Spare Parts ({spareParts.length})
+                                </span>
+                                <span className="text-[9px] font-bold text-amber-800 bg-amber-200/60 px-1.5 py-0.2 rounded">Fixated</span>
                             </div>
                             {spareParts.length === 0 ? (
                                 <div className="px-3 py-1.5 text-xs text-slate-400 italic">No MGR5 spare parts found</div>
@@ -161,9 +164,12 @@ const Mgr5SearchSelect = ({ mgr5Parts, selectedId, onSelect, isCustomDesc }) => 
 
                         {/* SECTION 2: PRODUCTS CATALOG */}
                         <div className="p-2">
-                            <div className="px-2 py-1.5 text-[10px] font-black uppercase tracking-widest text-indigo-700 bg-indigo-50/70 rounded-lg flex items-center gap-1.5 mb-1">
-                                <MdInventory2 size={13} className="text-indigo-600" />
-                                Section 2: Products Catalog ({productParts.length})
+                            <div className="px-2 py-1.5 text-[10px] font-black uppercase tracking-widest text-indigo-700 bg-indigo-50/70 rounded-lg flex items-center justify-between mb-1">
+                                <span className="flex items-center gap-1.5">
+                                    <MdInventory2 size={13} className="text-indigo-600" />
+                                    Section 2: Products Catalog ({productParts.length})
+                                </span>
+                                <span className="text-[9px] font-bold text-indigo-800 bg-indigo-200/60 px-1.5 py-0.2 rounded">Catalog</span>
                             </div>
                             {productParts.length === 0 ? (
                                 <div className="px-3 py-1.5 text-xs text-slate-400 italic">No products found</div>
@@ -919,7 +925,7 @@ const ServiceVisits = () => {
                                             </label>
                                         </div>
 
-                                        {/* Search Select for MGR5 (Fixated, with 2 sections: MGR5 Parts & Products Catalog) */}
+                                        {/* Full-width Search Select for MGR5 (Fixated, with 2 sections: MGR5 Parts & Products Catalog) */}
                                         <Mgr5SearchSelect
                                             mgr5Parts={mgr5Parts}
                                             selectedId={selectedMgr5PartId}
