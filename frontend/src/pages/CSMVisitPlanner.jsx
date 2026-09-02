@@ -144,13 +144,16 @@ const CSMVisitPlanner = () => {
             d1.getDate() === d2.getDate();
     };
 
-    // Open schedule modal
-    const handleOpenScheduleModal = () => {
+    // Open schedule modal for specific date or today
+    const handleOpenScheduleModal = (targetDate = null) => {
         setCreateTicketId(tickets.length > 0 ? tickets[0]._id : '');
         setCreateEngineerId(engineers.length > 0 ? engineers[0]._id : '');
-        const next = new Date(currentDate.getTime() + 2 * 3600 * 1000);
+        const d = targetDate ? new Date(targetDate) : new Date(currentDate.getTime() + 2 * 3600 * 1000);
+        if (targetDate) {
+            d.setHours(10, 0, 0, 0);
+        }
         const pad = (n) => String(n).padStart(2, '0');
-        const isoStr = `${next.getFullYear()}-${pad(next.getMonth() + 1)}-${pad(next.getDate())}T${pad(next.getHours())}:${pad(next.getMinutes())}`;
+        const isoStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
         setCreateScheduledDate(isoStr);
         setCreateBillingStatus('Paid');
         setShowScheduleModal(true);
@@ -368,12 +371,25 @@ const CSMVisitPlanner = () => {
                                                         isToday ? 'bg-primary-600 text-white' : 'text-slate-700'
                                                     }`}>
                                                         {day.getDate()}
-                                                    </span>
-                                                    {dayVisits.length > 0 && (
-                                                        <span className="text-[10px] font-black text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-md">
-                                                            {dayVisits.length} {dayVisits.length === 1 ? 'visit' : 'visits'}
-                                                        </span>
-                                                    )}
+                                                     </span>
+                                                    <div className="flex items-center gap-1">
+                                                        {dayVisits.length > 0 && (
+                                                            <span className="text-[10px] font-black text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-md">
+                                                                {dayVisits.length} {dayVisits.length === 1 ? 'visit' : 'visits'}
+                                                            </span>
+                                                        )}
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleOpenScheduleModal(day);
+                                                            }}
+                                                            title={`Schedule visit for ${day.toLocaleDateString()}`}
+                                                            className="w-5 h-5 rounded-md bg-primary-50 hover:bg-primary-600 text-primary-600 hover:text-white flex items-center justify-center transition-all opacity-80 hover:opacity-100 active:scale-95 shadow-2xs"
+                                                        >
+                                                            <MdAdd size={14} />
+                                                        </button>
+                                                    </div>
                                                 </div>
 
                                                 <div className="space-y-1 overflow-y-auto flex-1 pr-0.5 scrollbar-thin">
@@ -421,11 +437,24 @@ const CSMVisitPlanner = () => {
                                                 <p className="text-[10px] font-black uppercase text-slate-400">
                                                     {day.toLocaleDateString('en-US', { weekday: 'short' })}
                                                 </p>
-                                                <span className={`text-base font-black rounded-lg px-2 py-0.5 inline-block ${
-                                                    isToday ? 'bg-primary-600 text-white' : 'text-slate-900'
-                                                }`}>
-                                                    {day.getDate()}
-                                                </span>
+                                                <div className="flex items-center justify-center gap-1.5 mt-0.5">
+                                                    <span className={`text-base font-black rounded-lg px-2 py-0.5 inline-block ${
+                                                        isToday ? 'bg-primary-600 text-white' : 'text-slate-900'
+                                                    }`}>
+                                                        {day.getDate()}
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleOpenScheduleModal(day);
+                                                        }}
+                                                        title={`Schedule visit for ${day.toLocaleDateString()}`}
+                                                        className="w-5 h-5 rounded-md bg-primary-50 hover:bg-primary-600 text-primary-600 hover:text-white flex items-center justify-center transition-all opacity-80 hover:opacity-100 active:scale-95 shadow-2xs"
+                                                    >
+                                                        <MdAdd size={14} />
+                                                    </button>
+                                                </div>
                                             </div>
 
                                             <div className="space-y-2 flex-1 overflow-y-auto">

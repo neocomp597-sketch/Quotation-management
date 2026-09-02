@@ -82,8 +82,12 @@ exports.getVisits = async (req, res) => {
         const visits = await ServiceVisit.find(filter)
             .populate({
                 path: 'ticketId',
-                select: 'ticketNo issueTitle customerId status',
-                populate: { path: 'customerId', select: 'customerName companyName' }
+                select: 'ticketNo issueTitle customerId status invoiceId manualInvoiceNo assetId pincode',
+                populate: [
+                    { path: 'customerId', select: 'customerName companyName' },
+                    { path: 'invoiceId', select: 'voucherNumber invoiceNumber' },
+                    { path: 'assetId', select: 'serialNumber' }
+                ]
             })
             .populate('engineerId', 'name email')
             .sort({ scheduledDate: -1 })

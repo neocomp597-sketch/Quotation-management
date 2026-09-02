@@ -72,7 +72,8 @@ const CSMTickets = () => {
     }, [user, isAdmin, isSuperAdmin]);
 
     const [searchParams, setSearchParams] = useSearchParams();
-    const activeTab = searchParams.get('tab') || (isManagerOrAdmin ? 'all' : 'my');
+    const hasMetricFilter = searchParams.has('status') || searchParams.has('unassigned') || searchParams.has('slaBreached');
+    const activeTab = searchParams.get('tab') || (hasMetricFilter || isManagerOrAdmin ? 'all' : 'my');
 
     const handleTabChange = (newTab) => {
         setPage(1);
@@ -347,6 +348,13 @@ const CSMTickets = () => {
             console.error('Error preloading ticket forms:', error);
         }
     };
+
+    useEffect(() => {
+        const urlStatus = searchParams.get('status');
+        if (urlStatus !== null) {
+            setFilterStatus(urlStatus);
+        }
+    }, [searchParams]);
 
     useEffect(() => {
         fetchTickets();
@@ -1602,6 +1610,7 @@ const CSMTickets = () => {
                             className="bg-transparent border-none focus:outline-none text-xs font-bold text-slate-700 cursor-pointer"
                         >
                             <option value="">All Statuses</option>
+                            <option value="open_tickets">Open Tickets (In Process)</option>
                             <option value="Open">Open</option>
                             <option value="Assigned">Assigned</option>
                             <option value="In Progress">In Progress</option>
@@ -1692,14 +1701,6 @@ const CSMTickets = () => {
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <div className="flex justify-center items-center gap-2">
-                                                        {isManual && (
-                                                            <button
-                                                                onClick={() => handleOpenManualViewModal(t)}
-                                                                className="flex items-center gap-1 px-3.5 py-2 bg-teal-50 hover:bg-teal-100 text-teal-700 rounded-xl text-xs font-bold transition-all hover:scale-105 active:scale-95 shadow-sm"
-                                                            >
-                                                                View
-                                                            </button>
-                                                        )}
                                                         <button
                                                             onClick={() => navigate(`/csm/tickets/${t._id}`)}
                                                             className="flex items-center gap-1.5 px-4 py-2 hover:bg-primary-50 text-primary-600 rounded-xl transition-all hover:scale-105 active:scale-95"

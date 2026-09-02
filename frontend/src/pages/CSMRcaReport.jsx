@@ -341,35 +341,22 @@ const CSMRcaReport = () => {
                                 Customer Service & Technical Quality Root Cause Investigation
                             </p>
                         </div>
-                        <div className="flex flex-wrap items-center gap-3">
-                            <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/80 p-2 rounded-2xl border border-slate-200/60 dark:border-slate-700">
-                                <span className="font-extrabold text-xs text-slate-600 dark:text-slate-300 uppercase tracking-wider pl-1">Ticket No:</span>
-                                <input
-                                    type="text"
-                                    value={formData.ticketNo}
-                                    onChange={(e) => handleInputChange('ticketNo', e.target.value)}
-                                    placeholder="e.g. TCK-2026-0001"
-                                    className="px-3 py-1.5 rounded-xl font-bold text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all w-36 sm:w-44"
-                                />
-                            </div>
-
-                            <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/80 p-2 rounded-2xl border border-slate-200/60 dark:border-slate-700">
-                                <span className="font-extrabold text-xs text-slate-600 dark:text-slate-300 uppercase tracking-wider pl-1">Status:</span>
-                                <select
-                                    value={formData.status}
-                                    onChange={(e) => handleInputChange('status', e.target.value)}
-                                    className={`px-3 py-1.5 rounded-xl font-black text-xs border focus:outline-none transition-all ${
-                                        formData.status === 'Closed' || formData.status === 'Resolved' ? 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800' :
-                                        formData.status === 'In Progress' ? 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800' :
-                                        'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800'
-                                    }`}
-                                >
-                                    <option value="Open">Open</option>
-                                    <option value="In Progress">In Progress</option>
-                                    <option value="Closed">Closed</option>
-                                    <option value="Resolved">Resolved</option>
-                                </select>
-                            </div>
+                        <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/80 p-2 rounded-2xl border border-slate-200/60 dark:border-slate-700">
+                            <span className="font-extrabold text-xs text-slate-600 dark:text-slate-300 uppercase tracking-wider pl-1">Status:</span>
+                            <select
+                                value={formData.status}
+                                onChange={(e) => handleInputChange('status', e.target.value)}
+                                className={`px-3 py-1.5 rounded-xl font-black text-xs border focus:outline-none transition-all ${
+                                    formData.status === 'Closed' || formData.status === 'Resolved' ? 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800' :
+                                    formData.status === 'In Progress' ? 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800' :
+                                    'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800'
+                                }`}
+                            >
+                                <option value="Open">Open</option>
+                                <option value="In Progress">In Progress</option>
+                                <option value="Closed">Closed</option>
+                                <option value="Resolved">Resolved</option>
+                            </select>
                         </div>
                     </div>
 
@@ -402,7 +389,7 @@ const CSMRcaReport = () => {
                                     value={formData.ticketNo}
                                     onChange={(e) => handleInputChange('ticketNo', e.target.value)}
                                     className="w-full p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-semibold text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all outline-none"
-                                    placeholder="e.g. TCK-2026-0001"
+                                    placeholder="e.g. CSM-2026-0005"
                                 />
                             </div>
 

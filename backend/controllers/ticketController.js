@@ -305,7 +305,11 @@ exports.getTickets = async (req, res) => {
         const filter = { companyId };
 
         if (req.query.customerId) filter.customerId = req.query.customerId;
-        if (req.query.status) filter.status = req.query.status;
+        if (req.query.status === 'open_tickets' || req.query.status === 'Open Tickets') {
+            filter.status = { $nin: ['Closed', 'Cancelled', 'Resolved'] };
+        } else if (req.query.status) {
+            filter.status = req.query.status;
+        }
         if (req.query.priorityId) filter.priorityId = req.query.priorityId;
         if (req.query.unassigned === 'true') filter.assignedEngineerId = null;
         if (req.query.slaBreached === 'true') {

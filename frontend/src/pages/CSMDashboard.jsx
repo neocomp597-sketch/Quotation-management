@@ -150,11 +150,11 @@ const CSMDashboard = () => {
 
     // Requirement 3: Unassigned Tickets block added & clickable card links
     const metricCards = [
-        { label: 'Active Tickets', value: metrics.open, icon: <MdAssignment size={24} />, color: 'from-teal-500 to-emerald-600', link: '/csm/tickets?status=Open' },
-        { label: 'Unassigned Tickets', value: metrics.unassigned || 0, icon: <MdAssignmentInd size={24} />, color: 'from-purple-500 to-indigo-600', link: '/csm/tickets?unassigned=true' },
-        { label: 'Pending Customer', value: metrics.pending, icon: <MdHourglassEmpty size={24} />, color: 'from-amber-400 to-orange-500', link: '/csm/tickets?status=Pending Customer' },
-        { label: 'Overdue SLA', value: metrics.overdue, icon: <MdWarning size={24} />, color: 'from-rose-500 to-red-600', link: '/csm/tickets?slaBreached=true' },
-        { label: 'Resolved Today', value: metrics.resolvedToday, icon: <MdCheckCircle size={24} />, color: 'from-sky-500 to-cyan-600', link: '/csm/tickets?status=Resolved' }
+        { label: 'Open Tickets', value: metrics.open, icon: <MdAssignment size={24} />, color: 'from-teal-500 to-emerald-600', link: '/csm/tickets?status=open_tickets&tab=all' },
+        { label: 'Unassigned Tickets', value: metrics.unassigned || 0, icon: <MdAssignmentInd size={24} />, color: 'from-purple-500 to-indigo-600', link: '/csm/tickets?unassigned=true&tab=all' },
+        { label: 'Pending Customer', value: metrics.pending, icon: <MdHourglassEmpty size={24} />, color: 'from-amber-400 to-orange-500', link: '/csm/tickets?status=Pending Customer&tab=all' },
+        { label: 'Overdue SLA', value: metrics.overdue, icon: <MdWarning size={24} />, color: 'from-rose-500 to-red-600', link: '/csm/tickets?slaBreached=true&tab=all' },
+        { label: 'Resolved Today', value: metrics.resolvedToday, icon: <MdCheckCircle size={24} />, color: 'from-sky-500 to-cyan-600', link: '/csm/tickets?status=Resolved&tab=all' }
     ];
 
     // Compute SLA compliance percentage
