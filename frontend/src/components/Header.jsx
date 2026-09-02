@@ -632,7 +632,7 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
 
     return (
         <>
-            <header className={`fixed top-0 right-0 h-20 bg-white/80 dark:bg-slate-900/90 backdrop-blur-xl border-b border-slate-100 dark:border-slate-800 z-40 transition-all duration-300 left-0 ${sidebarOpen ? 'md:left-64' : 'md:left-20'}`}>
+            <header className={`fixed top-0 right-0 h-20 bg-white/80 dark:bg-slate-900/90 backdrop-blur-xl border-b border-slate-100 dark:border-slate-800 z-40 transition-all duration-300 left-0 no-print ${sidebarOpen ? 'md:left-64' : 'md:left-20'}`}>
                 <div className="h-full px-6 flex items-center justify-between gap-4">
                     <div className="flex items-center gap-4 flex-1">
                         <button

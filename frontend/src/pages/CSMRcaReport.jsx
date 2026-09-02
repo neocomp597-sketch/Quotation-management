@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 import { csmService } from '../services/api';
 import { 
     MdAssessment, MdAdd, MdPrint, MdRefresh, MdDelete, 
     MdEdit, MdArrowBack, MdSave, MdFormatListBulleted, MdCheckCircle,
-    MdTune, MdFactCheck, MdAssignmentTurnedIn, MdHistory
+    MdTune, MdFactCheck, MdAssignmentTurnedIn, MdHistory, MdVisibility,
+    MdPictureAsPdf, MdDownload
 } from 'react-icons/md';
 import { toast } from 'react-toastify';
 
@@ -13,7 +16,6 @@ const INITIAL_FORM = {
     date: new Date().toISOString().split('T')[0],
     department: 'Quality',
     priority: 'Medium',
-    status: 'In Progress',
     problemStatement: '',
     impact: '',
     fiveWhys: [
@@ -40,7 +42,7 @@ const CSMRcaReport = () => {
     const [isManualTicket, setIsManualTicket] = useState(false);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
-    const [viewMode, setViewMode] = useState('list'); // 'list' | 'form'
+    const [viewMode, setViewMode] = useState('list'); // 'list' | 'view' | 'form'
     const [selectedReportId, setSelectedReportId] = useState(null);
     const [formData, setFormData] = useState(INITIAL_FORM);
 
@@ -72,19 +74,7 @@ const CSMRcaReport = () => {
         fetchTickets();
     }, []);
 
-    const handleCreateNew = () => {
-        setSelectedReportId(null);
-        setIsManualTicket(false);
-        setFormData({
-            ...INITIAL_FORM,
-            rcaNumber: `RCA-2026-${String(reports.length + 1).padStart(3, '0')}`,
-            date: new Date().toISOString().split('T')[0]
-        });
-        setViewMode('form');
-    };
-
-    const handleEdit = (report) => {
-        setSelectedReportId(report._id);
+    const populateForm = (report) => {
         const existsInTickets = tickets.some(t => t.ticketNo === report.ticketNo);
         setIsManualTicket(Boolean(report.ticketNo && !existsInTickets));
         setFormData({
@@ -93,7 +83,6 @@ const CSMRcaReport = () => {
             date: report.date ? new Date(report.date).toISOString().split('T')[0] : '',
             department: report.department || 'Quality',
             priority: report.priority || 'Medium',
-            status: report.status || 'In Progress',
             problemStatement: report.problemStatement || '',
             impact: report.impact || '',
             fiveWhys: report.fiveWhys && report.fiveWhys.length === 5 ? report.fiveWhys : INITIAL_FORM.fiveWhys,
@@ -107,7 +96,95 @@ const CSMRcaReport = () => {
             effectiveness: report.effectiveness || 'Effective',
             verificationRemarks: report.verificationRemarks || ''
         });
+    };
+
+    const handleCreateNew = () => {
+        setSelectedReportId(null);
+        setIsManualTicket(false);
+        setFormData({
+            ...INITIAL_FORM,
+            rcaNumber: `RCA-2026-${String(reports.length + 1).padStart(3, '0')}`,
+            date: new Date().toISOString().split('T')[0]
+        });
         setViewMode('form');
+    };
+
+    const handleView = (report) => {
+        setSelectedReportId(report._id);
+        populateForm(report);
+        setViewMode('view');
+    };
+
+    const handleEdit = (report) => {
+        setSelectedReportId(report._id);
+        populateForm(report);
+        setViewMode('form');
+    };
+
+    const handleDownloadPdf = async (report) => {
+        const targetReport = report || (selectedReportId ? reports.find(r => r._id === selectedReportId) : null);
+        if (report) {
+            setSelectedReportId(report._id);
+            populateForm(report);
+        }
+        setViewMode('view');
+        toast.info('Generating PDF file download...');
+
+        setTimeout(async () => {
+            const element = document.getElementById('rca-document-sheet');
+            if (!element) {
+                toast.error('RCA document sheet container not found');
+                return;
+            }
+
+            try {
+                const canvas = await html2canvas(element, {
+                    scale: 2,
+                    useCORS: true,
+                    logging: false,
+                    backgroundColor: '#ffffff'
+                });
+
+                const imgData = canvas.toDataURL('image/png');
+                const pdf = new jsPDF('p', 'mm', 'a4');
+                const pdfWidth = pdf.internal.pageSize.getWidth();
+                const pdfHeight = pdf.internal.pageSize.getHeight();
+
+                const imgWidth = pdfWidth - 20; // 10mm left/right margin
+                const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+                let heightLeft = imgHeight;
+                let position = 10;
+
+                pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
+                heightLeft -= (pdfHeight - 20);
+
+                while (heightLeft > 0) {
+                    position = heightLeft - imgHeight + 10;
+                    pdf.addPage();
+                    pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
+                    heightLeft -= (pdfHeight - 20);
+                }
+
+                const docName = targetReport?.rcaNumber || formData.rcaNumber || 'RCA-Report';
+                pdf.save(`${docName.replace(/\//g, '-')}.pdf`);
+                toast.success('RCA Report downloaded successfully as PDF!');
+            } catch (err) {
+                console.error('PDF Download Error:', err);
+                toast.error('Failed to download PDF file');
+            }
+        }, 400);
+    };
+
+    const handlePrintReport = (report) => {
+        if (report) {
+            setSelectedReportId(report._id);
+            populateForm(report);
+        }
+        setViewMode('view');
+        setTimeout(() => {
+            window.print();
+        }, 300);
     };
 
     const handleTicketSelect = (selectedNo) => {
@@ -117,18 +194,6 @@ const CSMRcaReport = () => {
             ticketNo: selectedNo,
             problemStatement: prev.problemStatement || (found ? (found.issueTitle || found.description || '') : prev.problemStatement)
         }));
-    };
-
-    const handleDelete = async (id) => {
-        if (!window.confirm('Are you sure you want to delete this RCA report?')) return;
-        try {
-            await csmService.deleteRcaReport(id);
-            toast.success('RCA report deleted');
-            fetchReports();
-        } catch (error) {
-            console.error('Delete RCA error:', error);
-            toast.error('Failed to delete RCA report');
-        }
     };
 
     const handleInputChange = (field, value) => {
@@ -171,7 +236,7 @@ const CSMRcaReport = () => {
     const handleReset = () => {
         if (selectedReportId) {
             const report = reports.find(r => r._id === selectedReportId);
-            if (report) handleEdit(report);
+            if (report) populateForm(report);
         } else {
             handleCreateNew();
         }
@@ -199,10 +264,6 @@ const CSMRcaReport = () => {
         }
     };
 
-    const handlePrint = () => {
-        window.print();
-    };
-
     return (
         <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto animate-fade-in-up">
             {/* Top Navigation & Header */}
@@ -221,18 +282,45 @@ const CSMRcaReport = () => {
                     </p>
                 </div>
 
-                <div className="flex items-center gap-3">
-                    {viewMode === 'form' ? (
+                <div className="flex items-center gap-2 flex-wrap">
+                    {viewMode !== 'list' ? (
                         <>
                             <button
                                 onClick={() => setViewMode('list')}
-                                className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition-all"
+                                className="flex items-center gap-1.5 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition-all"
                             >
                                 <MdArrowBack size={18} /> Back to Register
                             </button>
+
+                            {viewMode === 'view' && (
+                                <button
+                                    onClick={() => setViewMode('form')}
+                                    className="flex items-center gap-1.5 px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
+                                >
+                                    <MdEdit size={18} /> Edit Report
+                                </button>
+                            )}
+
+                            {viewMode === 'form' && selectedReportId && (
+                                <button
+                                    onClick={() => setViewMode('view')}
+                                    className="flex items-center gap-1.5 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
+                                >
+                                    <MdVisibility size={18} /> View Document
+                                </button>
+                            )}
+
                             <button
-                                onClick={handlePrint}
-                                className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md"
+                                onClick={() => handleDownloadPdf()}
+                                className="flex items-center gap-1.5 px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md"
+                                title="Download / Save as PDF Document"
+                            >
+                                <MdPictureAsPdf size={18} /> Download PDF
+                            </button>
+
+                            <button
+                                onClick={() => handlePrintReport()}
+                                className="flex items-center gap-1.5 px-4 py-2.5 bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md"
                             >
                                 <MdPrint size={18} /> Print RCA
                             </button>
@@ -242,7 +330,7 @@ const CSMRcaReport = () => {
                             <button
                                 onClick={fetchReports}
                                 className="p-3 text-slate-600 dark:text-slate-300 hover:text-slate-900 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition-all"
-                                title="Refresh"
+                                title="Refresh Register"
                             >
                                 <MdRefresh size={20} />
                             </button>
@@ -314,21 +402,36 @@ const CSMRcaReport = () => {
                                                 </span>
                                             </td>
                                             <td className="py-4 text-xs font-bold text-slate-600 dark:text-slate-300">{report.category}</td>
-                                            <td className="py-4 text-right pr-4 space-x-2">
+                                            <td className="py-4 text-right pr-4 space-x-1.5">
+                                                {/* View Button */}
+                                                <button
+                                                    onClick={() => handleView(report)}
+                                                    className="p-2 text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 bg-indigo-50 dark:bg-indigo-950/60 rounded-xl hover:bg-indigo-100 transition-all border border-indigo-200/50 dark:border-indigo-800/50"
+                                                    title="View RCA Document"
+                                                >
+                                                    <MdVisibility size={16} />
+                                                </button>
+                                                {/* Edit Button */}
                                                 <button
                                                     onClick={() => handleEdit(report)}
                                                     className="p-2 text-teal-600 dark:text-teal-400 hover:text-teal-800 bg-teal-50 dark:bg-teal-950/60 rounded-xl hover:bg-teal-100 transition-all border border-teal-200/50 dark:border-teal-800/50"
-                                                    title="View / Edit RCA"
+                                                    title="Edit RCA Report"
                                                 >
                                                     <MdEdit size={16} />
                                                 </button>
+                                                {/* Download PDF Button */}
                                                 <button
-                                                    onClick={() => {
-                                                        handleEdit(report);
-                                                        setTimeout(() => window.print(), 300);
-                                                    }}
+                                                    onClick={() => handleDownloadPdf(report)}
+                                                    className="p-2 text-emerald-600 dark:text-emerald-400 hover:text-emerald-800 bg-emerald-50 dark:bg-emerald-950/60 rounded-xl hover:bg-emerald-100 transition-all border border-emerald-200/50 dark:border-emerald-800/50"
+                                                    title="Download PDF"
+                                                >
+                                                    <MdPictureAsPdf size={16} />
+                                                </button>
+                                                {/* Print Button */}
+                                                <button
+                                                    onClick={() => handlePrintReport(report)}
                                                     className="p-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-all border border-slate-200/60 dark:border-slate-700/60"
-                                                    title="Print / Download RCA Report"
+                                                    title="Print Report"
                                                 >
                                                     <MdPrint size={16} />
                                                 </button>
@@ -342,11 +445,179 @@ const CSMRcaReport = () => {
                 </div>
             )}
 
-            {/* FORM / REPORT DETAIL VIEW - Styled in Teal Theme */}
+            {/* VIEW READ-ONLY DOCUMENT MODE */}
+            {viewMode === 'view' && (
+                <div id="rca-document-sheet" className="bg-white border border-slate-200 rounded-3xl shadow-xl p-6 sm:p-10 space-y-6 print-container max-w-5xl mx-auto text-slate-900">
+                    {/* Quality Header Block */}
+                    <div className="border-b-2 border-slate-900 pb-4 flex justify-between items-end">
+                        <div>
+                            <span className="text-[10px] font-black uppercase text-teal-800 tracking-widest block mb-1">
+                                Quality & Technical Audit Document
+                            </span>
+                            <h2 className="text-2xl font-black font-outfit uppercase tracking-tight text-slate-900">
+                                ROOT CAUSE ANALYSIS (RCA) REPORT
+                            </h2>
+                            <p className="text-xs text-slate-500 font-semibold">
+                                Customer Service & Technical Quality Root Cause Investigation
+                            </p>
+                        </div>
+                        <div className="text-right">
+                            <div className="text-lg font-black text-slate-900">{formData.rcaNumber || 'RCA-DRAFT'}</div>
+                            <div className="text-xs font-bold text-slate-500">Date: {formData.date || new Date().toLocaleDateString()}</div>
+                        </div>
+                    </div>
+
+                    {/* Incident Information */}
+                    <div className="space-y-2">
+                        <div className="bg-slate-900 text-white px-4 py-2 font-black text-xs uppercase tracking-widest">
+                            1. Incident Overview
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs">
+                            <div>
+                                <span className="block text-[10px] font-black uppercase text-slate-400">Ticket No</span>
+                                <span className="font-extrabold text-teal-800">{formData.ticketNo || 'N/A'}</span>
+                            </div>
+                            <div>
+                                <span className="block text-[10px] font-black uppercase text-slate-400">Department</span>
+                                <span className="font-extrabold text-slate-800">{formData.department}</span>
+                            </div>
+                            <div>
+                                <span className="block text-[10px] font-black uppercase text-slate-400">Priority</span>
+                                <span className="font-extrabold text-slate-800">{formData.priority}</span>
+                            </div>
+                            <div>
+                                <span className="block text-[10px] font-black uppercase text-slate-400">Date</span>
+                                <span className="font-extrabold text-slate-800">{formData.date}</span>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                                <span className="block text-[10px] font-black uppercase text-slate-500 mb-1">Problem Statement</span>
+                                <p className="text-xs font-bold text-slate-800 whitespace-pre-wrap">{formData.problemStatement || 'None specified'}</p>
+                            </div>
+                            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                                <span className="block text-[10px] font-black uppercase text-slate-500 mb-1">Impact Analysis</span>
+                                <p className="text-xs font-bold text-slate-800 whitespace-pre-wrap">{formData.impact || 'None specified'}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 5-Why Analysis */}
+                    <div className="space-y-2">
+                        <div className="bg-slate-900 text-white px-4 py-2 font-black text-xs uppercase tracking-widest">
+                            2. 5-Why Root Cause Breakdown
+                        </div>
+                        <table className="w-full border-collapse border border-slate-200 text-xs">
+                            <thead>
+                                <tr className="bg-slate-100 font-black uppercase text-[10px] text-slate-600 border-b border-slate-200">
+                                    <th className="p-2 w-12 text-center border-r border-slate-200">Why #</th>
+                                    <th className="p-2 text-left">Analysis Description</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-200">
+                                {formData.fiveWhys.map((w) => (
+                                    <tr key={w.whyNo}>
+                                        <td className="p-2 text-center font-black bg-slate-50 border-r border-slate-200 text-teal-800">
+                                            Why {w.whyNo}
+                                        </td>
+                                        <td className="p-2 font-semibold text-slate-800">{w.analysis || '-'}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* Category & Final Root Cause */}
+                    <div className="space-y-2">
+                        <div className="bg-slate-900 text-white px-4 py-2 font-black text-xs uppercase tracking-widest">
+                            3. Categorization & Root Cause
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs">
+                            <div>
+                                <span className="block text-[10px] font-black uppercase text-slate-400 mb-0.5">Category</span>
+                                <span className="font-extrabold text-slate-900">{formData.category}</span>
+                            </div>
+                            <div>
+                                <span className="block text-[10px] font-black uppercase text-slate-400 mb-0.5">Confirmed Root Cause</span>
+                                <span className="font-extrabold text-rose-700">{formData.rootCause || 'Not specified'}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* CAPA Actions */}
+                    <div className="space-y-2">
+                        <div className="bg-slate-900 text-white px-4 py-2 font-black text-xs uppercase tracking-widest">
+                            4. Corrective & Preventive Actions (CAPA)
+                        </div>
+                        <table className="w-full border-collapse border border-slate-200 text-xs">
+                            <thead>
+                                <tr className="bg-slate-100 font-black uppercase text-[10px] text-slate-600 border-b border-slate-200">
+                                    <th className="p-2 text-left border-r border-slate-200">Action Type</th>
+                                    <th className="p-2 text-left border-r border-slate-200">Action Plan</th>
+                                    <th className="p-2 text-left border-r border-slate-200">Responsible</th>
+                                    <th className="p-2 text-left border-r border-slate-200">Target Date</th>
+                                    <th className="p-2 text-left">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-200 font-semibold text-slate-800">
+                                {formData.capaActions.map((c, i) => (
+                                    <tr key={i}>
+                                        <td className="p-2 font-black border-r border-slate-200 text-teal-800">{c.actionType || 'Action'}</td>
+                                        <td className="p-2 border-r border-slate-200">{c.action || '-'}</td>
+                                        <td className="p-2 border-r border-slate-200">{c.responsiblePerson || '-'}</td>
+                                        <td className="p-2 border-r border-slate-200">{c.targetDate || '-'}</td>
+                                        <td className="p-2 font-bold">{c.status}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* Verification */}
+                    <div className="space-y-2">
+                        <div className="bg-slate-900 text-white px-4 py-2 font-black text-xs uppercase tracking-widest">
+                            5. Effectiveness Verification
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs">
+                            <div>
+                                <span className="block text-[10px] font-black uppercase text-slate-400">Verification Date</span>
+                                <span className="font-extrabold text-slate-900">{formData.verificationDate || 'Pending'}</span>
+                            </div>
+                            <div>
+                                <span className="block text-[10px] font-black uppercase text-slate-400">Effectiveness</span>
+                                <span className="font-extrabold text-emerald-700">{formData.effectiveness}</span>
+                            </div>
+                            <div>
+                                <span className="block text-[10px] font-black uppercase text-slate-400">Remarks</span>
+                                <span className="font-bold text-slate-700">{formData.verificationRemarks || 'None'}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Sign-off / Print Footer */}
+                    <div className="pt-8 border-t border-slate-300 grid grid-cols-3 text-center text-[10px] font-black uppercase tracking-wider text-slate-500">
+                        <div>
+                            <div className="h-10"></div>
+                            <div className="border-t border-slate-300 pt-1">Prepared By (Quality Engg)</div>
+                        </div>
+                        <div>
+                            <div className="h-10"></div>
+                            <div className="border-t border-slate-300 pt-1">Reviewed By (HOD)</div>
+                        </div>
+                        <div>
+                            <div className="h-10"></div>
+                            <div className="border-t border-slate-300 pt-1">Approved By (Plant / CS Head)</div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* EDITABLE FORM MODE */}
             {viewMode === 'form' && (
                 <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-xl p-6 sm:p-8 space-y-8 print-container max-w-5xl mx-auto">
                     
-                    {/* Header Bar within Card */}
+                    {/* Header Bar within Card (Status Removed) */}
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-200 dark:border-slate-800 pb-5 gap-4">
                         <div>
                             <div className="flex items-center gap-2">
@@ -358,22 +629,6 @@ const CSMRcaReport = () => {
                             <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold pl-4 mt-0.5">
                                 Customer Service & Technical Quality Root Cause Investigation
                             </p>
-                        </div>
-                        <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/80 p-2 rounded-2xl border border-slate-200/60 dark:border-slate-700">
-                            <span className="font-extrabold text-xs text-slate-600 dark:text-slate-300 uppercase tracking-wider pl-1">Status:</span>
-                            <select
-                                value={formData.status}
-                                onChange={(e) => handleInputChange('status', e.target.value)}
-                                className={`px-3 py-1.5 rounded-xl font-black text-xs border focus:outline-none transition-all ${
-                                    formData.status === 'Closed' || formData.status === 'Resolved' ? 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800' :
-                                    formData.status === 'In Progress' ? 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800' :
-                                    'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800'
-                                }`}
-                            >
-                                <option value="In Progress">In Progress</option>
-                                <option value="Closed">Closed</option>
-                                <option value="Resolved">Resolved</option>
-                            </select>
                         </div>
                     </div>
 

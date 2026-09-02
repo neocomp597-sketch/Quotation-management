@@ -391,7 +391,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             />
 
             <div
-                className={`fixed top-0 left-0 h-full bg-white dark:bg-slate-900 transition-all duration-300 z-50 shadow-2xl border-r border-slate-100 dark:border-slate-800 transform flex flex-col ${isOpen ? 'translate-x-0 w-64' : '-translate-x-full md:translate-x-0 md:w-20 w-64'}`}
+                className={`fixed top-0 left-0 h-full bg-white dark:bg-slate-900 transition-all duration-300 z-50 shadow-2xl border-r border-slate-100 dark:border-slate-800 transform flex flex-col no-print ${isOpen ? 'translate-x-0 w-64' : '-translate-x-full md:translate-x-0 md:w-20 w-64'}`}
             >
                 <div className={`border-b border-slate-50 dark:border-slate-800 shrink-0 ${isOpen ? (brandSettings?.showDualBranding !== false && brandSettings?.logoUrl ? 'p-4' : 'h-24 px-4 flex items-center') : 'py-4 px-2 flex flex-col items-center justify-center'}`}>
                     {!isOpen ? (

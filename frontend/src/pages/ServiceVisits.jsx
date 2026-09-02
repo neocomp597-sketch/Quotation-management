@@ -4,9 +4,223 @@ import { toast } from 'react-toastify';
 import { 
     MdLocalShipping, MdMyLocation, MdCheckCircle, 
     MdAssignment, MdEvent, MdAttachMoney, MdDelete, MdAdd, MdCalendarMonth, MdPhotoCamera,
-    MdMap, MdOpenInNew
+    MdMap, MdOpenInNew, MdSearch, MdClose, MdExpandMore, MdBuild, MdInventory2, MdEdit, MdPushPin
 } from 'react-icons/md';
 import Modal from '../components/Modal';
+
+// Fixated MGR5 Search Select Component with 2 distinct sections (MGR5 Spare Parts & Products Catalog)
+const Mgr5SearchSelect = ({ mgr5Parts, selectedId, onSelect, isCustomDesc }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [query, setQuery] = useState('');
+    const wrapperRef = useRef(null);
+
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const selectedItem = mgr5Parts.find(p => p.id === selectedId);
+
+    const q = query.trim().toLowerCase();
+    const spareParts = mgr5Parts.filter(p => p.source === 'MGR5' && (
+        !q || p.name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q)
+    ));
+    const productParts = mgr5Parts.filter(p => p.source === 'Product' && (
+        !q || p.name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q)
+    ));
+
+    return (
+        <div className="relative w-full" ref={wrapperRef}>
+            {/* Header Badge indicating MGR5 Fixated */}
+            <div className="flex items-center justify-between mb-1">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-teal-100/90 text-teal-800 text-[10px] font-black uppercase tracking-wider border border-teal-300/80 shadow-2xs">
+                    <MdPushPin className="text-teal-600" size={12} />
+                    MGR5 FIXATED CATALOG
+                </span>
+                <span className="text-[10px] text-slate-400 font-bold">
+                    {spareParts.length + productParts.length} Items Available
+                </span>
+            </div>
+
+            {/* Selection Trigger / Search Input */}
+            <div 
+                onClick={() => setIsOpen(!isOpen)}
+                className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-xl shadow-2xs flex items-center justify-between cursor-pointer hover:border-teal-500 transition-all group"
+            >
+                <div className="flex items-center gap-2 truncate pr-2">
+                    <MdSearch className="text-slate-400 group-hover:text-teal-600 transition-colors shrink-0" size={18} />
+                    {selectedItem ? (
+                        <div className="truncate text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                            <span className={`px-1.5 py-0.2 rounded text-[9px] font-black uppercase ${selectedItem.source === 'MGR5' ? 'bg-amber-100 text-amber-800' : 'bg-indigo-100 text-indigo-800'}`}>
+                                {selectedItem.source === 'MGR5' ? 'MGR5 Spare' : 'Product'}
+                            </span>
+                            <span className="font-extrabold text-slate-900 truncate">{selectedItem.name}</span>
+                            <span className="text-slate-400 font-semibold shrink-0">({selectedItem.code})</span>
+                        </div>
+                    ) : isCustomDesc ? (
+                        <span className="text-xs font-bold text-amber-700">✍️ Custom Manual Entry Selected</span>
+                    ) : (
+                        <span className="text-xs font-semibold text-slate-400">Search & select MGR5 part or product...</span>
+                    )}
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                    {(selectedItem || isCustomDesc) && (
+                        <button
+                            type="button"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onSelect('');
+                                setQuery('');
+                            }}
+                            className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                            title="Clear Selection"
+                        >
+                            <MdClose size={14} />
+                        </button>
+                    )}
+                    <MdExpandMore className={`text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180 text-teal-600' : ''}`} size={20} />
+                </div>
+            </div>
+
+            {/* Dropdown Menu with 2 Distinct Sections */}
+            {isOpen && (
+                <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+                    {/* Live Search Filter Input */}
+                    <div className="p-2.5 bg-slate-50/90 border-b border-slate-100">
+                        <div className="relative">
+                            <MdSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                            <input
+                                type="text"
+                                autoFocus
+                                value={query}
+                                onChange={(e) => setQuery(e.target.value)}
+                                placeholder="Type to search parts, products or codes..."
+                                className="w-full pl-9 pr-8 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
+                            />
+                            {query && (
+                                <button
+                                    type="button"
+                                    onClick={() => setQuery('')}
+                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                                >
+                                    <MdClose size={14} />
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Scrollable List with 2 Sections */}
+                    <div className="max-h-64 overflow-y-auto divide-y divide-slate-100">
+                        
+                        {/* SECTION 1: MGR5 SPARE PARTS */}
+                        <div className="p-2">
+                            <div className="px-2 py-1.5 text-[10px] font-black uppercase tracking-widest text-amber-700 bg-amber-50/70 rounded-lg flex items-center gap-1.5 mb-1">
+                                <MdBuild size={13} className="text-amber-600" />
+                                Section 1: MGR5 Spare Parts ({spareParts.length})
+                            </div>
+                            {spareParts.length === 0 ? (
+                                <div className="px-3 py-1.5 text-xs text-slate-400 italic">No MGR5 spare parts found</div>
+                            ) : (
+                                spareParts.map((item) => {
+                                    const isSelected = selectedId === item.id;
+                                    return (
+                                        <div
+                                            key={item.id}
+                                            onClick={() => {
+                                                onSelect(item);
+                                                setIsOpen(false);
+                                            }}
+                                            className={`px-3 py-2 rounded-xl cursor-pointer text-xs transition-all flex items-center justify-between ${
+                                                isSelected 
+                                                    ? 'bg-teal-50 text-teal-900 font-bold border border-teal-200' 
+                                                    : 'hover:bg-amber-50/50 text-slate-700'
+                                            }`}
+                                        >
+                                            <div className="flex items-center gap-2 min-w-0 pr-2">
+                                                <span className="px-1.5 py-0.5 bg-amber-100 text-amber-800 font-black text-[9px] rounded uppercase shrink-0">
+                                                    MGR5
+                                                </span>
+                                                <div className="truncate">
+                                                    <span className="font-bold text-slate-900 block truncate">{item.name}</span>
+                                                    <span className="text-[10px] text-slate-400 font-mono">Code: {item.code}</span>
+                                                </div>
+                                            </div>
+                                            {item.rate > 0 && (
+                                                <span className="text-xs font-black text-teal-700 shrink-0">₹{item.rate}</span>
+                                            )}
+                                        </div>
+                                    );
+                                })
+                            )}
+                        </div>
+
+                        {/* SECTION 2: PRODUCTS CATALOG */}
+                        <div className="p-2">
+                            <div className="px-2 py-1.5 text-[10px] font-black uppercase tracking-widest text-indigo-700 bg-indigo-50/70 rounded-lg flex items-center gap-1.5 mb-1">
+                                <MdInventory2 size={13} className="text-indigo-600" />
+                                Section 2: Products Catalog ({productParts.length})
+                            </div>
+                            {productParts.length === 0 ? (
+                                <div className="px-3 py-1.5 text-xs text-slate-400 italic">No products found</div>
+                            ) : (
+                                productParts.map((item) => {
+                                    const isSelected = selectedId === item.id;
+                                    return (
+                                        <div
+                                            key={item.id}
+                                            onClick={() => {
+                                                onSelect(item);
+                                                setIsOpen(false);
+                                            }}
+                                            className={`px-3 py-2 rounded-xl cursor-pointer text-xs transition-all flex items-center justify-between ${
+                                                isSelected 
+                                                    ? 'bg-indigo-50 text-indigo-900 font-bold border border-indigo-200' 
+                                                    : 'hover:bg-indigo-50/40 text-slate-700'
+                                            }`}
+                                        >
+                                            <div className="flex items-center gap-2 min-w-0 pr-2">
+                                                <span className="px-1.5 py-0.5 bg-indigo-100 text-indigo-800 font-black text-[9px] rounded uppercase shrink-0">
+                                                    Product
+                                                </span>
+                                                <div className="truncate">
+                                                    <span className="font-bold text-slate-900 block truncate">{item.name}</span>
+                                                    <span className="text-[10px] text-slate-400 font-mono">Code: {item.code}</span>
+                                                </div>
+                                            </div>
+                                            {item.rate > 0 && (
+                                                <span className="text-xs font-black text-teal-700 shrink-0">₹{item.rate}</span>
+                                            )}
+                                        </div>
+                                    );
+                                })
+                            )}
+                        </div>
+
+                        {/* CUSTOM MANUAL ENTRY OPTION */}
+                        <div className="p-2 bg-slate-50/70 border-t border-slate-100">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    onSelect('__custom__');
+                                    setIsOpen(false);
+                                }}
+                                className="w-full text-left px-3 py-2 rounded-xl text-xs font-bold text-amber-800 hover:bg-amber-100/60 transition-all flex items-center gap-2"
+                            >
+                                <MdEdit size={14} className="text-amber-600" />
+                                <span>✍️ Custom Manual Entry...</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
 
 const ServiceVisits = () => {
     const [loading, setLoading] = useState(false);
@@ -94,7 +308,7 @@ const ServiceVisits = () => {
         try {
             const [mgrRes, prodRes] = await Promise.allSettled([
                 mgrService.getAll('MGR5'),
-                productService.getAll()
+                productService.getAll({ limit: 1000 })
             ]);
             
             let combined = [];
@@ -279,20 +493,31 @@ const ServiceVisits = () => {
     };
     const clearCanvas = clearSignature;
 
-    const handleSelectMgr5Part = (e) => {
-        const partId = e.target.value;
-        if (partId === '__custom__') {
-            setIsCustomExpDesc(true);
-            setSelectedMgr5PartId('');
-            setExpDesc('');
-            return;
-        }
-        setSelectedMgr5PartId(partId);
-        if (!partId) return;
-        const found = mgr5Parts.find(p => p.id === partId);
-        if (found) {
-            setExpDesc(`${found.name} (${found.code})`);
-            if (found.rate > 0) setExpRate(found.rate);
+    const handleSelectMgr5Part = (itemOrId) => {
+        if (typeof itemOrId === 'string') {
+            if (itemOrId === '__custom__') {
+                setIsCustomExpDesc(true);
+                setSelectedMgr5PartId('');
+                setExpDesc('');
+                return;
+            }
+            setSelectedMgr5PartId(itemOrId);
+            if (!itemOrId) {
+                setExpDesc('');
+                setExpRate('');
+                return;
+            }
+            const found = mgr5Parts.find(p => p.id === itemOrId);
+            if (found) {
+                setExpDesc(`${found.name} (${found.code})`);
+                if (found.rate > 0) setExpRate(found.rate);
+                setIsPartChange(true);
+                setIsCustomExpDesc(false);
+            }
+        } else if (itemOrId && typeof itemOrId === 'object') {
+            setSelectedMgr5PartId(itemOrId.id);
+            setExpDesc(`${itemOrId.name} (${itemOrId.code})`);
+            if (itemOrId.rate > 0) setExpRate(itemOrId.rate);
             setIsPartChange(true);
             setIsCustomExpDesc(false);
         }
@@ -674,90 +899,47 @@ const ServiceVisits = () => {
                                             className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold h-20"
                                         />
                                     </div>
-
                                     {/* Expenses Array Log */}
-                                    <div className="space-y-2 p-3.5 bg-slate-50 rounded-2xl border border-slate-200/60">
+                                    <div className="space-y-3 p-4 bg-slate-50/80 rounded-2xl border border-slate-200/60">
                                         <div className="flex justify-between items-center pb-1">
-                                            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                                                PART CHANGE & EXPENSE LOG (MGR5 CATALOG)
-                                            </label>
-                                            <label className="flex items-center gap-1 cursor-pointer">
+                                            <div>
+                                                <label className="block text-[10px] font-black text-slate-600 uppercase tracking-widest">
+                                                    PART CHANGE & EXPENSE LOG
+                                                </label>
+                                                <p className="text-[10px] text-slate-400 font-semibold">Select MGR5 parts or products to log field expenses</p>
+                                            </div>
+                                            <label className="flex items-center gap-1.5 cursor-pointer bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs">
                                                 <input 
                                                     type="checkbox" 
                                                     checked={isPartChange} 
                                                     onChange={(e) => setIsPartChange(e.target.checked)} 
                                                     className="h-3.5 w-3.5 text-teal-600 rounded border-slate-300 cursor-pointer"
                                                 />
-                                                <span className="text-[10px] font-bold text-teal-800 uppercase">Replaced Spare Part</span>
+                                                <span className="text-[10px] font-black text-teal-800 uppercase">Replaced Spare Part</span>
                                             </label>
                                         </div>
-                                        <div className="pb-1">
-                                            <select
-                                                value={selectedMgr5PartId}
-                                                onChange={handleSelectMgr5Part}
-                                                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-white shadow-xs focus:ring-2 focus:ring-teal-500 outline-none"
-                                            >
-                                                <option value="">-- Select Spare Part / MGR5 Product --</option>
-                                                {mgr5Parts.some(p => p.source === 'MGR5') && (
-                                                    <optgroup label="--- MGR5 SPARE PARTS ---">
-                                                        {mgr5Parts.filter(p => p.source === 'MGR5').map(p => (
-                                                            <option key={p.id} value={p.id}>{p.label}</option>
-                                                        ))}
-                                                    </optgroup>
-                                                )}
-                                                {mgr5Parts.some(p => p.source === 'Product') && (
-                                                    <optgroup label="--- MGR5 PRODUCTS CATALOG ---">
-                                                        {mgr5Parts.filter(p => p.source === 'Product').map(p => (
-                                                            <option key={p.id} value={p.id}>{p.label}</option>
-                                                        ))}
-                                                    </optgroup>
-                                                )}
-                                            </select>
-                                        </div>
-                                        <div className="grid grid-cols-12 gap-1.5 items-center">
-                                            <div className="col-span-4">
-                                                {isCustomExpDesc ? (
-                                                    <div className="relative flex items-center">
-                                                        <input 
-                                                            type="text" 
-                                                            placeholder="Part/Charge" 
-                                                            value={expDesc} 
-                                                            onChange={e => setExpDesc(e.target.value)} 
-                                                            className="w-full px-2.5 py-2 rounded-lg border border-slate-200 text-xs font-semibold pr-7"
-                                                        />
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setIsCustomExpDesc(false)}
-                                                            title="Switch to Dropdown"
-                                                            className="absolute right-1 text-[10px] font-bold text-slate-400 hover:text-teal-600 px-1"
-                                                        >
-                                                            ▼
-                                                        </button>
-                                                    </div>
-                                                ) : (
-                                                    <select
-                                                        value={selectedMgr5PartId || ''}
-                                                        onChange={handleSelectMgr5Part}
-                                                        className="w-full px-2 py-2 rounded-lg border border-slate-200 text-xs font-bold text-slate-700 bg-white shadow-xs focus:ring-2 focus:ring-teal-500 outline-none truncate"
-                                                    >
-                                                        <option value="">-- Select Spare/Part --</option>
-                                                        {mgr5Parts.some(p => p.source === 'MGR5') && (
-                                                            <optgroup label="--- MGR5 SPARE PARTS ---">
-                                                                {mgr5Parts.filter(p => p.source === 'MGR5').map(p => (
-                                                                    <option key={p.id} value={p.id}>{p.label}</option>
-                                                                ))}
-                                                            </optgroup>
-                                                        )}
-                                                        {mgr5Parts.some(p => p.source === 'Product') && (
-                                                            <optgroup label="--- MGR5 PRODUCTS CATALOG ---">
-                                                                {mgr5Parts.filter(p => p.source === 'Product').map(p => (
-                                                                    <option key={p.id} value={p.id}>{p.label}</option>
-                                                                ))}
-                                                            </optgroup>
-                                                        )}
-                                                        <option value="__custom__">✍️ Custom Manual Entry...</option>
-                                                    </select>
-                                                )}
+
+                                        {/* Search Select for MGR5 (Fixated, with 2 sections: MGR5 Parts & Products Catalog) */}
+                                        <Mgr5SearchSelect
+                                            mgr5Parts={mgr5Parts}
+                                            selectedId={selectedMgr5PartId}
+                                            onSelect={handleSelectMgr5Part}
+                                            isCustomDesc={isCustomExpDesc}
+                                        />
+
+                                        {/* Line Input Row (Part Description, Qty, Rate, Add Button) */}
+                                        <div className="grid grid-cols-12 gap-2 items-center pt-1">
+                                            <div className="col-span-5">
+                                                <input 
+                                                    type="text" 
+                                                    placeholder="Part / Charge Name" 
+                                                    value={expDesc} 
+                                                    onChange={e => {
+                                                        setExpDesc(e.target.value);
+                                                        if (!e.target.value) setSelectedMgr5PartId('');
+                                                    }} 
+                                                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 bg-white focus:ring-2 focus:ring-teal-500 outline-none"
+                                                />
                                             </div>
                                             <div className="col-span-2">
                                                 <input 
@@ -766,26 +948,27 @@ const ServiceVisits = () => {
                                                     placeholder="Qty" 
                                                     value={expQty} 
                                                     onChange={e => setExpQty(e.target.value)} 
-                                                    className="w-full px-1.5 py-2 rounded-lg border border-slate-200 text-xs font-semibold text-center"
+                                                    className="w-full px-2 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 text-center bg-white focus:ring-2 focus:ring-teal-500 outline-none"
                                                 />
                                             </div>
-                                            <div className="col-span-3">
+                                            <div className="col-span-2">
                                                 <input 
                                                     type="number" 
                                                     min="0"
-                                                    placeholder="Rate" 
+                                                    placeholder="Rate ₹" 
                                                     value={expRate} 
                                                     onChange={e => setExpRate(e.target.value)} 
-                                                    className="w-full px-1.5 py-2 rounded-lg border border-slate-200 text-xs font-semibold text-center"
+                                                    className="w-full px-2 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 text-center bg-white focus:ring-2 focus:ring-teal-500 outline-none"
                                                 />
                                             </div>
                                             <div className="col-span-3">
                                                 <button 
                                                     type="button"
                                                     onClick={handleAddExpense}
-                                                    className="w-full py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-bold transition-all"
+                                                    className="w-full py-2 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-sm active:scale-95 flex items-center justify-center gap-1"
                                                 >
-                                                    Add
+                                                    <MdAdd size={16} />
+                                                    Add Item
                                                 </button>
                                             </div>
                                         </div>

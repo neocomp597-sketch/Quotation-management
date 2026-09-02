@@ -690,5 +690,75 @@ html, body {
   overflow-x: hidden;
 }
 
+/* ==========================================================================
+   Print Styles (Fixes Print Preview & PDF Output)
+   ========================================================================== */
+@media print {
+  /* 1. Hide Navigation, Headers, Sidebars, Modals & Fixed Overlays */
+  aside, 
+  header, 
+  nav, 
+  footer, 
+  .no-print, 
+  button, 
+  .sidebar, 
+  .navbar,
+  div[class*="fixed top-0 left-0"],
+  div[class*="fixed top-0 right-0"],
+  div[class*="fixed inset-0"],
+  div[class*="backdrop-blur"] {
+    display: none !important;
+  }
+
+  /* 2. Reset Base Containers */
+  html, body, #root {
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* 3. Reset Layout Main Area Margins & Padding */
+  main {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: auto !important;
+  }
+
+  /* 4. Format RCA Printable Container */
+  .print-container, #rca-document-sheet {
+    display: block !important;
+    position: relative !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
+    padding: 10px !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  /* 5. Ensure readable print contrast */
+  #rca-document-sheet th {
+    background-color: #f1f5f9 !important;
+    color: #0f172a !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* 6. Page Break Controls */
+  tr, table, blockquote, div {
+    page-break-inside: avoid;
+  }
+}
+
 
 
