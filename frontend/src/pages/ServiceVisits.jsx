@@ -29,6 +29,7 @@ const ServiceVisits = () => {
     const [mgr5Parts, setMgr5Parts] = useState([]);
     const [selectedMgr5PartId, setSelectedMgr5PartId] = useState('');
     const [isPartChange, setIsPartChange] = useState(true);
+    const [isCustomExpDesc, setIsCustomExpDesc] = useState(false);
     
     // Signature drawing state
     const canvasRef = useRef(null);
@@ -112,8 +113,13 @@ const ServiceVisits = () => {
             }
             if (prodRes.status === 'fulfilled') {
                 const prodData = Array.isArray(prodRes.value.data) ? prodRes.value.data : (prodRes.value.data?.data || []);
-                prodData.forEach(p => {
-                    const mgr5Badge = p.mgr5?.code ? ` [MGR5: ${p.mgr5.code}]` : '';
+                // Prioritize products assigned to MGR5 category
+                const productsWithMgr5 = prodData.filter(p => p.mgr5 || p.mgr5Id);
+                const listToUse = productsWithMgr5.length > 0 ? productsWithMgr5 : prodData;
+
+                listToUse.forEach(p => {
+                    const mgr5Code = p.mgr5?.code || p.mgr5Id?.code || (typeof p.mgr5 === 'string' ? 'SP' : '');
+                    const mgr5Badge = mgr5Code ? ` [MGR5: ${mgr5Code}]` : '';
                     combined.push({
                         id: p._id,
                         code: p.productCode,
@@ -275,6 +281,12 @@ const ServiceVisits = () => {
 
     const handleSelectMgr5Part = (e) => {
         const partId = e.target.value;
+        if (partId === '__custom__') {
+            setIsCustomExpDesc(true);
+            setSelectedMgr5PartId('');
+            setExpDesc('');
+            return;
+        }
         setSelectedMgr5PartId(partId);
         if (!partId) return;
         const found = mgr5Parts.find(p => p.id === partId);
@@ -282,6 +294,7 @@ const ServiceVisits = () => {
             setExpDesc(`${found.name} (${found.code})`);
             if (found.rate > 0) setExpRate(found.rate);
             setIsPartChange(true);
+            setIsCustomExpDesc(false);
         }
     };
 
@@ -311,6 +324,7 @@ const ServiceVisits = () => {
         setExpQty(1);
         setExpRate('');
         setIsPartChange(true);
+        setIsCustomExpDesc(false);
     };
 
     const handleRemoveExpense = (idx) => {
@@ -702,13 +716,48 @@ const ServiceVisits = () => {
                                         </div>
                                         <div className="grid grid-cols-12 gap-1.5 items-center">
                                             <div className="col-span-4">
-                                                <input 
-                                                    type="text" 
-                                                    placeholder="Part/Charge" 
-                                                    value={expDesc} 
-                                                    onChange={e => setExpDesc(e.target.value)} 
-                                                    className="w-full px-2.5 py-2 rounded-lg border border-slate-200 text-xs font-semibold"
-                                                />
+                                                {isCustomExpDesc ? (
+                                                    <div className="relative flex items-center">
+                                                        <input 
+                                                            type="text" 
+                                                            placeholder="Part/Charge" 
+                                                            value={expDesc} 
+                                                            onChange={e => setExpDesc(e.target.value)} 
+                                                            className="w-full px-2.5 py-2 rounded-lg border border-slate-200 text-xs font-semibold pr-7"
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setIsCustomExpDesc(false)}
+                                                            title="Switch to Dropdown"
+                                                            className="absolute right-1 text-[10px] font-bold text-slate-400 hover:text-teal-600 px-1"
+                                                        >
+                                                            ▼
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <select
+                                                        value={selectedMgr5PartId || ''}
+                                                        onChange={handleSelectMgr5Part}
+                                                        className="w-full px-2 py-2 rounded-lg border border-slate-200 text-xs font-bold text-slate-700 bg-white shadow-xs focus:ring-2 focus:ring-teal-500 outline-none truncate"
+                                                    >
+                                                        <option value="">-- Select Spare/Part --</option>
+                                                        {mgr5Parts.some(p => p.source === 'MGR5') && (
+                                                            <optgroup label="--- MGR5 SPARE PARTS ---">
+                                                                {mgr5Parts.filter(p => p.source === 'MGR5').map(p => (
+                                                                    <option key={p.id} value={p.id}>{p.label}</option>
+                                                                ))}
+                                                            </optgroup>
+                                                        )}
+                                                        {mgr5Parts.some(p => p.source === 'Product') && (
+                                                            <optgroup label="--- MGR5 PRODUCTS CATALOG ---">
+                                                                {mgr5Parts.filter(p => p.source === 'Product').map(p => (
+                                                                    <option key={p.id} value={p.id}>{p.label}</option>
+                                                                ))}
+                                                            </optgroup>
+                                                        )}
+                                                        <option value="__custom__">✍️ Custom Manual Entry...</option>
+                                                    </select>
+                                                )}
                                             </div>
                                             <div className="col-span-2">
                                                 <input 
@@ -1119,7 +1168,7 @@ const ServiceVisits = () => {
                         </select>
                     </div>
                     <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Type of Ticket (Manual Entry)</label>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Type of Ticket</label>
                         <input
                             type="text"
                             placeholder="e.g. Product Breakdown, Maintenance, Installation, Repair..."
