@@ -35,22 +35,46 @@ exports.createTicket = async (req, res) => {
         const resolutionDue = new Date(now.getTime() + priority.resolutionSlaHours * 60 * 60 * 1000);
         const ticketBody = { ...req.body };
 
-        // ── Requirement 1: Prevent Duplicate Ticket Creation for Same Product Serial No. ──
-        const serialNo = (ticketBody.serialNumber || ticketBody.productSerialNo || '').trim();
-        if (serialNo) {
-            const activeTicket = await Ticket.findOne({
-                companyId,
-                $or: [
-                    { serialNumber: serialNo },
-                    { manualProductName: serialNo }
-                ],
-                status: { $in: ['Open', 'Assigned', 'In Progress', 'Pending Customer', 'Escalated', 'OPEN', 'ASSIGNED', 'IN-PROGRESS'] }
-            }).lean();
+        // ── Requirement: Prevent Duplicate Ticket Creation for Same Product Serial No. ──
+        let targetSerialNo = (ticketBody.serialNumber || ticketBody.productSerialNo || '').trim();
+        let targetAssetId = ticketBody.assetId || null;
 
-            if (activeTicket) {
-                return res.status(400).json({
-                    message: `An active ticket (${activeTicket.ticketNo}) already exists for Product Serial No. "${serialNo}". A new ticket cannot be created until the existing ticket is closed.`
-                });
+        if (targetAssetId) {
+            try {
+                const Asset = require('../models/Asset');
+                const assetObj = await Asset.findById(targetAssetId).lean();
+                if (assetObj && assetObj.serialNumber) {
+                    if (!targetSerialNo) {
+                        targetSerialNo = assetObj.serialNumber.trim();
+                    }
+                }
+            } catch (err) {
+                console.error('Error fetching asset for duplicate check:', err);
+            }
+        }
+
+        if (targetSerialNo || targetAssetId) {
+            const queryConditions = [];
+            if (targetAssetId) {
+                queryConditions.push({ assetId: targetAssetId });
+            }
+            if (targetSerialNo) {
+                queryConditions.push({ serialNumber: targetSerialNo });
+            }
+
+            if (queryConditions.length > 0) {
+                const activeTicket = await Ticket.findOne({
+                    companyId,
+                    $or: queryConditions,
+                    status: { $nin: ['Closed', 'Cancelled'] }
+                }).lean();
+
+                if (activeTicket) {
+                    const displaySerial = targetSerialNo || 'selected Product Serial No.';
+                    return res.status(400).json({
+                        message: `An active ticket (${activeTicket.ticketNo}) in status '${activeTicket.status}' already exists for Product Serial No. "${displaySerial}". A new ticket cannot be created until the existing ticket is closed.`
+                    });
+                }
             }
         }
 

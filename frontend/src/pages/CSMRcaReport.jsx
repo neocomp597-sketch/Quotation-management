@@ -36,6 +36,8 @@ const INITIAL_FORM = {
 
 const CSMRcaReport = () => {
     const [reports, setReports] = useState([]);
+    const [tickets, setTickets] = useState([]);
+    const [isManualTicket, setIsManualTicket] = useState(false);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [viewMode, setViewMode] = useState('list'); // 'list' | 'form'
@@ -55,12 +57,24 @@ const CSMRcaReport = () => {
         }
     };
 
+    const fetchTickets = async () => {
+        try {
+            const res = await csmService.getTickets({ limit: 200 });
+            const list = res.data?.tickets || res.data?.data || (Array.isArray(res.data) ? res.data : []);
+            setTickets(list);
+        } catch (error) {
+            console.error('Fetch tickets error:', error);
+        }
+    };
+
     useEffect(() => {
         fetchReports();
+        fetchTickets();
     }, []);
 
     const handleCreateNew = () => {
         setSelectedReportId(null);
+        setIsManualTicket(false);
         setFormData({
             ...INITIAL_FORM,
             rcaNumber: `RCA-2026-${String(reports.length + 1).padStart(3, '0')}`,
@@ -71,6 +85,8 @@ const CSMRcaReport = () => {
 
     const handleEdit = (report) => {
         setSelectedReportId(report._id);
+        const existsInTickets = tickets.some(t => t.ticketNo === report.ticketNo);
+        setIsManualTicket(Boolean(report.ticketNo && !existsInTickets));
         setFormData({
             rcaNumber: report.rcaNumber || '',
             ticketNo: report.ticketNo || '',
@@ -92,6 +108,15 @@ const CSMRcaReport = () => {
             verificationRemarks: report.verificationRemarks || ''
         });
         setViewMode('form');
+    };
+
+    const handleTicketSelect = (selectedNo) => {
+        const found = tickets.find(t => t.ticketNo === selectedNo);
+        setFormData(prev => ({
+            ...prev,
+            ticketNo: selectedNo,
+            problemStatement: prev.problemStatement || (found ? (found.issueTitle || found.description || '') : prev.problemStatement)
+        }));
     };
 
     const handleDelete = async (id) => {
@@ -267,7 +292,6 @@ const CSMRcaReport = () => {
                                         <th className="pb-3">Department</th>
                                         <th className="pb-3">Priority</th>
                                         <th className="pb-3">Category</th>
-                                        <th className="pb-3">Status</th>
                                         <th className="pb-3 text-right pr-4">Actions</th>
                                     </tr>
                                 </thead>
@@ -290,15 +314,6 @@ const CSMRcaReport = () => {
                                                 </span>
                                             </td>
                                             <td className="py-4 text-xs font-bold text-slate-600 dark:text-slate-300">{report.category}</td>
-                                            <td className="py-4">
-                                                <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                                                    report.status === 'Closed' || report.status === 'Resolved' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800' :
-                                                    report.status === 'In Progress' ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800' :
-                                                    'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
-                                                }`}>
-                                                    {report.status}
-                                                </span>
-                                            </td>
                                             <td className="py-4 text-right pr-4 space-x-2">
                                                 <button
                                                     onClick={() => handleEdit(report)}
@@ -381,16 +396,48 @@ const CSMRcaReport = () => {
                             </div>
 
                             <div>
-                                <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
-                                    Ticket No. (Manual)
-                                </label>
-                                <input
-                                    type="text"
-                                    value={formData.ticketNo}
-                                    onChange={(e) => handleInputChange('ticketNo', e.target.value)}
-                                    className="w-full p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-semibold text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all outline-none"
-                                    placeholder="e.g. CSM-2026-0005"
-                                />
+                                <div className="flex items-center justify-between mb-1.5">
+                                    <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                                        Ticket No.
+                                    </label>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsManualTicket(!isManualTicket)}
+                                        className="text-[10px] font-bold text-teal-600 dark:text-teal-400 hover:underline transition-all"
+                                    >
+                                        {isManualTicket ? '📋 Select Dropdown' : '✏️ Manual Entry'}
+                                    </button>
+                                </div>
+
+                                {!isManualTicket ? (
+                                    <select
+                                        value={formData.ticketNo}
+                                        onChange={(e) => {
+                                            if (e.target.value === '__MANUAL__') {
+                                                setIsManualTicket(true);
+                                            } else {
+                                                handleTicketSelect(e.target.value);
+                                            }
+                                        }}
+                                        className="w-full p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-semibold text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all outline-none"
+                                    >
+                                        <option value="">-- Select Ticket No. --</option>
+                                        {tickets.map((t) => (
+                                            <option key={t._id} value={t.ticketNo}>
+                                                {t.ticketNo} {t.issueTitle ? `- ${t.issueTitle}` : t.customerId?.customerName ? `- ${t.customerId.customerName}` : ''}
+                                            </option>
+                                        ))}
+                                        <option value="__MANUAL__">✍️ Type Custom / Manual Ticket No.</option>
+                                    </select>
+                                ) : (
+                                    <input
+                                        type="text"
+                                        value={formData.ticketNo}
+                                        onChange={(e) => handleInputChange('ticketNo', e.target.value)}
+                                        className="w-full p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-semibold text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all outline-none"
+                                        placeholder="e.g. CSM-2026-0005"
+                                    />
+                                )}
                             </div>
 
                             <div>

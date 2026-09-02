@@ -113,12 +113,12 @@ const ServiceVisits = () => {
             if (prodRes.status === 'fulfilled') {
                 const prodData = Array.isArray(prodRes.value.data) ? prodRes.value.data : (prodRes.value.data?.data || []);
                 prodData.forEach(p => {
-                    const mgr5Badge = p.mgr5?.code ? ` (MGR5: ${p.mgr5.code})` : '';
+                    const mgr5Badge = p.mgr5?.code ? ` [MGR5: ${p.mgr5.code}]` : '';
                     combined.push({
                         id: p._id,
                         code: p.productCode,
                         name: p.productName,
-                        label: `[Product] ${p.productName} (${p.productCode})${mgr5Badge}`,
+                        label: `[MGR5 Product] ${p.productName} (${p.productCode})${mgr5Badge}`,
                         rate: p.mrp || p.basePrice || 0,
                         source: 'Product'
                     });
@@ -683,10 +683,21 @@ const ServiceVisits = () => {
                                                 onChange={handleSelectMgr5Part}
                                                 className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-white shadow-xs focus:ring-2 focus:ring-teal-500 outline-none"
                                             >
-                                                <option value="">-- Select Replaced Spare Part from MGR5 Catalog --</option>
-                                                {mgr5Parts.map(p => (
-                                                    <option key={p.id} value={p.id}>{p.label}</option>
-                                                ))}
+                                                <option value="">-- Select Spare Part / MGR5 Product --</option>
+                                                {mgr5Parts.some(p => p.source === 'MGR5') && (
+                                                    <optgroup label="--- MGR5 SPARE PARTS ---">
+                                                        {mgr5Parts.filter(p => p.source === 'MGR5').map(p => (
+                                                            <option key={p.id} value={p.id}>{p.label}</option>
+                                                        ))}
+                                                    </optgroup>
+                                                )}
+                                                {mgr5Parts.some(p => p.source === 'Product') && (
+                                                    <optgroup label="--- MGR5 PRODUCTS CATALOG ---">
+                                                        {mgr5Parts.filter(p => p.source === 'Product').map(p => (
+                                                            <option key={p.id} value={p.id}>{p.label}</option>
+                                                        ))}
+                                                    </optgroup>
+                                                )}
                                             </select>
                                         </div>
                                         <div className="grid grid-cols-12 gap-1.5 items-center">

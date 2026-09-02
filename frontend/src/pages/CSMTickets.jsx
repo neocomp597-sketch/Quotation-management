@@ -706,6 +706,25 @@ const CSMTickets = () => {
             }
         });
 
+        // Client-side pre-check for active open ticket with same serial number / assetId
+        const checkSerial = (formData.serialNumber || generatedSerial || '').trim();
+        const activeDuplicate = tickets.find(t => {
+            const isClosed = ['closed', 'cancelled'].includes((t.status || '').toLowerCase());
+            if (isClosed) return false;
+
+            const tSerial = (t.serialNumber || t.assetId?.serialNumber || '').trim().toLowerCase();
+            const tAssetId = t.assetId?._id || t.assetId;
+
+            if (checkSerial && tSerial && tSerial === checkSerial.toLowerCase()) return true;
+            if (assetIdToSubmit && tAssetId && String(tAssetId) === String(assetIdToSubmit)) return true;
+            return false;
+        });
+
+        if (activeDuplicate) {
+            toast.error(`An active ticket (${activeDuplicate.ticketNo}) in status '${activeDuplicate.status}' already exists for Product Serial No. "${checkSerial || 'selected asset'}". Please close the existing ticket before raising a new one.`);
+            return;
+        }
+
         try {
             await csmService.createTicket(cleanedFormData);
             toast.success('Support ticket generated successfully!');
@@ -837,6 +856,26 @@ const CSMTickets = () => {
                     });
                     assetId = newAssetRes.data._id;
                     setAssets(prev => [...prev, newAssetRes.data]);
+                }
+            }
+
+            // Client-side pre-check for active open ticket with same serial number / assetId
+            if (cleanSerial || assetId) {
+                const activeDuplicate = tickets.find(t => {
+                    const isClosed = ['closed', 'cancelled'].includes((t.status || '').toLowerCase());
+                    if (isClosed) return false;
+
+                    const tSerial = (t.serialNumber || t.assetId?.serialNumber || '').trim().toLowerCase();
+                    const tAssetId = t.assetId?._id || t.assetId;
+
+                    if (cleanSerial && tSerial && tSerial === cleanSerial.toLowerCase()) return true;
+                    if (assetId && tAssetId && String(tAssetId) === String(assetId)) return true;
+                    return false;
+                });
+
+                if (activeDuplicate) {
+                    toast.error(`An active ticket (${activeDuplicate.ticketNo}) in status '${activeDuplicate.status}' already exists for Product Serial No. "${cleanSerial}". Please close the existing ticket before raising a new one.`);
+                    return;
                 }
             }
 
@@ -1641,15 +1680,15 @@ const CSMTickets = () => {
                             <table className="w-full text-left border-collapse">
                                 <thead>
                                     <tr className="bg-slate-50 text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100">
-                                        <th className="px-6 py-4">Ticket No</th>
-                                        <th className="px-6 py-4">Customer & Contact</th>
-                                        <th className="px-6 py-4">Subject</th>
-                                        <th className="px-6 py-4">Invoice No.</th>
-                                        <th className="px-6 py-4">Product Sr. No.</th>
-                                        <th className="px-6 py-4">Priority</th>
-                                        <th className="px-6 py-4">Status</th>
-                                        <th className="px-6 py-4">Engineer</th>
-                                        <th className="px-6 py-4 text-center">Action</th>
+                                        <th className="px-4 py-3 whitespace-nowrap">Ticket No</th>
+                                        <th className="px-4 py-3 whitespace-nowrap">Customer & Contact</th>
+                                        <th className="px-4 py-3 whitespace-nowrap">Subject</th>
+                                        <th className="px-4 py-3 whitespace-nowrap">Invoice No.</th>
+                                        <th className="px-4 py-3 whitespace-nowrap">Product Sr. No.</th>
+                                        <th className="px-4 py-3 whitespace-nowrap">Priority</th>
+                                        <th className="px-4 py-3 whitespace-nowrap">Status</th>
+                                        <th className="px-4 py-3 whitespace-nowrap">Engineer</th>
+                                        <th className="px-4 py-3 text-center whitespace-nowrap">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-50 text-sm font-semibold text-slate-700">
@@ -1659,40 +1698,42 @@ const CSMTickets = () => {
                                         const productSrNo = t.assetId?.serialNumber || 'N/A';
                                         return (
                                             <tr key={t._id} className="hover:bg-slate-50/50 transition-colors">
-                                                <td className="px-6 py-4 font-black text-slate-900">
-                                                    <div>{t.ticketNo}</div>
-                                                    <span className={`inline-block mt-1 text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-wider ${
-                                                        isManual 
-                                                            ? 'bg-amber-100 text-amber-800 border border-amber-200' 
-                                                            : 'bg-blue-100 text-blue-800 border border-blue-200'
-                                                    }`}>
-                                                        {isManual ? 'Manual' : 'System'}
-                                                    </span>
-                                                    {t.branchId?.name && (
-                                                        <span className="inline-block mt-1 ml-1 text-[9px] px-2 py-0.5 rounded-full font-black tracking-wider bg-purple-50 text-purple-700 border border-purple-200">
-                                                            📍 {t.branchId.name}
+                                                <td className="px-4 py-3 whitespace-nowrap">
+                                                    <div className="font-black text-slate-900 whitespace-nowrap">{t.ticketNo}</div>
+                                                    <div className="flex items-center gap-1 mt-1">
+                                                        <span className={`inline-block text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-wider ${
+                                                            isManual 
+                                                                ? 'bg-amber-100 text-amber-800 border border-amber-200' 
+                                                                : 'bg-blue-100 text-blue-800 border border-blue-200'
+                                                        }`}>
+                                                            {isManual ? 'Manual' : 'System'}
                                                         </span>
-                                                    )}
+                                                        {t.branchId?.name && (
+                                                            <span className="inline-block text-[9px] px-2 py-0.5 rounded-full font-black tracking-wider bg-purple-50 text-purple-700 border border-purple-200">
+                                                                📍 {t.branchId.name}
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </td>
-                                                <td className="px-6 py-4">
+                                                <td className="px-4 py-3">
                                                     <p className="font-bold text-slate-900">{t.customerId?.customerName || 'N/A'}</p>
                                                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">
                                                         {t.contactName || t.contactPhone || 'No Contact'}
                                                         {t.pincode ? ` | Pin: ${t.pincode}` : ''}
                                                     </p>
                                                 </td>
-                                                <td className="px-6 py-4 max-w-xs truncate">{t.issueTitle}</td>
-                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                <td className="px-4 py-3 max-w-xs truncate">{t.issueTitle}</td>
+                                                <td className="px-4 py-3 whitespace-nowrap">
                                                     <span className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-slate-100 text-slate-700 border border-slate-200">
                                                         {invoiceNo}
                                                     </span>
                                                 </td>
-                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                <td className="px-4 py-3 whitespace-nowrap">
                                                     <span className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-teal-50 text-teal-700 border border-teal-200">
                                                         {productSrNo}
                                                     </span>
                                                 </td>
-                                                <td className="px-6 py-4">
+                                                <td className="px-4 py-3 whitespace-nowrap">
                                                     <span 
                                                         className="px-3 py-1 rounded-full text-xs font-bold text-white shadow-sm"
                                                         style={{ backgroundColor: t.priorityId?.color || '#64748b' }}
@@ -1700,12 +1741,12 @@ const CSMTickets = () => {
                                                         {t.priorityId?.name || 'Medium'}
                                                     </span>
                                                 </td>
-                                                <td className="px-6 py-4">
-                                                    <span className={`px-3 py-1 rounded-full text-[10px] font-black border uppercase tracking-wider ${statusStyles[t.status] || 'bg-slate-50 text-slate-500 border-slate-200'}`}>
+                                                <td className="px-4 py-3 whitespace-nowrap">
+                                                    <span className={`inline-block px-3 py-1 rounded-full text-[10px] font-black border uppercase tracking-wider whitespace-nowrap ${statusStyles[t.status] || 'bg-slate-50 text-slate-500 border-slate-200'}`}>
                                                         {t.status}
                                                     </span>
                                                 </td>
-                                                <td className="px-6 py-4 text-slate-500">
+                                                <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
                                                     <div>{t.assignedEngineerId?.name || 'Unassigned'}</div>
                                                     {t.assignedSalespersonId && (
                                                         <div className="text-[10px] text-primary-600 font-black uppercase tracking-tight mt-1">
@@ -1713,7 +1754,7 @@ const CSMTickets = () => {
                                                         </div>
                                                     )}
                                                 </td>
-                                                <td className="px-6 py-4">
+                                                <td className="px-4 py-3 text-center whitespace-nowrap">
                                                     <div className="flex justify-center items-center gap-2">
                                                         <button
                                                             onClick={() => navigate(`/csm/tickets/${t._id}`)}
