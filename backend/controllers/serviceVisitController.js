@@ -147,9 +147,31 @@ exports.checkIn = async (req, res) => {
         const ticket = await Ticket.findOne({ _id: visit.ticketId, companyId });
         if (ticket) {
             ticket.status = 'In Progress';
+            
+            const now = new Date();
+            const day = String(now.getDate()).padStart(2, '0');
+            const monthNames = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+            const month = monthNames[now.getMonth()];
+            const year = now.getFullYear();
+            let hours = now.getHours();
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12 || 12;
+            const timeStr = `${day}/${month}/${year}, ${hours}:${minutes}:${seconds} ${ampm}`;
+
+            const locParts = [];
+            if (latitude != null && longitude != null && String(latitude).trim() !== '' && String(longitude).trim() !== '') {
+                locParts.push(`Lat: ${latitude}, Lng: ${longitude}`);
+            }
+            if (address && address.trim()) {
+                locParts.push(`(${address.trim()})`);
+            }
+            const locStr = locParts.length > 0 ? locParts.join(' ') : '';
+
             ticket.timeline.push({
                 activityType: 'StatusChange',
-                description: `Engineer checked-in for service visit (${visit.visitNo}) at location: ${address || 'GPS Coordinates'}`,
+                description: `Engineer checked-in (${visit.visitNo})${locStr ? ' ' + locStr : ''} ${timeStr}`,
                 performedBy: req.user?.id
             });
             await ticket.save({ validateBeforeSave: false });

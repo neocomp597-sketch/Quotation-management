@@ -1067,6 +1067,49 @@ const TicketDetail = () => {
                                         <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-3">Audit Activity Log</span>
                                         <div className="space-y-3 border-l-2 border-slate-100 ml-2 pl-4">
                                             {ticket.timeline?.map((t, idx) => {
+                                                let displayDesc = t.description || '';
+                                                if (displayDesc.toLowerCase().includes('engineer checked-in')) {
+                                                    const visitMatch = displayDesc.match(/VST-\d{4}-\d+/i);
+                                                    const visitNo = visitMatch ? visitMatch[0] : '';
+
+                                                    const coordMatch = displayDesc.match(/(?:Lat|latitude):\s*([0-9.-]+),\s*(?:Lng|longitude):\s*([0-9.-]+)/i);
+                                                    const lat = coordMatch ? coordMatch[1] : null;
+                                                    const lng = coordMatch ? coordMatch[2] : null;
+
+                                                    const dateMatch = displayDesc.match(/\d{2}\/[A-Z]{3}\/\d{4},\s*\d{1,2}:\d{2}:\d{2}\s*(?:AM|PM)/i);
+
+                                                    let dateStr = '';
+                                                    if (dateMatch) {
+                                                        dateStr = dateMatch[0];
+                                                    } else if (t.createdAt) {
+                                                        const d = new Date(t.createdAt);
+                                                        if (!isNaN(d.getTime())) {
+                                                            const day = String(d.getDate()).padStart(2, '0');
+                                                            const monthNames = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+                                                            const month = monthNames[d.getMonth()];
+                                                            const year = d.getFullYear();
+                                                            let hours = d.getHours();
+                                                            const minutes = String(d.getMinutes()).padStart(2, '0');
+                                                            const seconds = String(d.getSeconds()).padStart(2, '0');
+                                                            const ampm = hours >= 12 ? 'PM' : 'AM';
+                                                            hours = hours % 12 || 12;
+                                                            dateStr = `${day}/${month}/${year}, ${hours}:${minutes}:${seconds} ${ampm}`;
+                                                        }
+                                                    }
+
+                                                    const parts = ['Engineer checked-in'];
+                                                    if (visitNo) parts.push(`(${visitNo})`);
+                                                    if (lat && lng) parts.push(`Lat: ${lat}, Lng: ${lng}`);
+
+                                                    const addrMatch = displayDesc.match(/\(([^)]+)\)/);
+                                                    if (addrMatch && !addrMatch[1].startsWith('VST-')) {
+                                                        parts.push(`(${addrMatch[1]})`);
+                                                    }
+
+                                                    if (dateStr) parts.push(dateStr);
+                                                    displayDesc = parts.join(' ');
+                                                }
+
                                                 const coordMatch = t.description && t.description.match(/(?:Lat|latitude):\s*([0-9.-]+),\s*(?:Lng|longitude):\s*([0-9.-]+)/i);
                                                 const lat = coordMatch ? coordMatch[1] : null;
                                                 const lng = coordMatch ? coordMatch[2] : null;
@@ -1078,7 +1121,7 @@ const TicketDetail = () => {
                                                         <div className="text-xs flex items-start justify-between gap-3">
                                                             <div className="flex-1">
                                                                 <span className="font-bold text-slate-900">{t.activityType}: </span>
-                                                                <span className="text-slate-600 font-medium">{t.description}</span>
+                                                                <span className="text-slate-600 font-medium">{displayDesc}</span>
                                                                 <span className="text-[9px] text-slate-400 block mt-0.5">{new Date(t.createdAt).toLocaleString()}</span>
                                                             </div>
                                                             {mapUrl && (
