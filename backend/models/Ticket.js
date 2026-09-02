@@ -90,6 +90,19 @@ const TicketSchema = new mongoose.Schema({
         address: { type: String, default: '' },
         updatedAt: { type: Date }
     },
+    serialNumber: { type: String, default: '', index: true },
+    productImage: { type: String, default: '' },
+    rcaReport: {
+        problemDescription: { type: String, default: '' },
+        rootCause: { type: String, default: '' },
+        correctiveAction: { type: String, default: '' },
+        preventiveAction: { type: String, default: '' },
+        responsiblePerson: { type: String, default: '' },
+        targetDate: { type: Date },
+        rcaStatus: { type: String, enum: ['Draft', 'In Review', 'Approved', 'Closed'], default: 'Draft' },
+        rcaImages: [{ type: String }],
+        updatedAt: { type: Date }
+    },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
 });

@@ -86,7 +86,7 @@ const CSMTickets = () => {
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [search, setSearch] = useState('');
-    const [filterStatus, setFilterStatus] = useState('');
+    const [filterStatus, setFilterStatus] = useState(searchParams.get('status') || '');
     const [filterPriority, setFilterPriority] = useState('');
     const [filterInvoiceType, setFilterInvoiceType] = useState('');
     const [filterCustomer, setFilterCustomer] = useState('');
@@ -264,6 +264,12 @@ const CSMTickets = () => {
             }
             if (filterBranch) {
                 queryParams.branchId = filterBranch;
+            }
+            if (searchParams.get('unassigned') === 'true') {
+                queryParams.unassigned = 'true';
+            }
+            if (searchParams.get('slaBreached') === 'true') {
+                queryParams.slaBreached = 'true';
             }
             if (filterInvoiceType === 'manual') {
                 queryParams.isManual = 'true';

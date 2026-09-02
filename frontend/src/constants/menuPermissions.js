@@ -165,7 +165,8 @@ export const MENU_PERMISSION_GROUPS = [
             { key: 'csm_warranties_amc', label: 'Warranty & AMC', description: 'Manage customer warranty details and AMC contracts', defaultRoute: '/csm/warranties-amc' },
             { key: 'csm_kb', label: 'Knowledge Base', description: 'Manage troubleshooting articles and FAQs', defaultRoute: '/csm/kb' },
             { key: 'csm_masters', label: 'CSM Config', description: 'Configure categories, priorities, teams, and SLAs', defaultRoute: '/csm/masters' },
-            { key: 'csm_reports', label: 'Service Reports', description: 'Customer service analytics and resolution reports', defaultRoute: '/csm/reports' }
+            { key: 'csm_reports', label: 'Service Reports', description: 'Customer service analytics and resolution reports', defaultRoute: '/csm/reports' },
+            { key: 'csm_rca', label: 'RCA Report', description: 'Root Cause Analysis reports and CAPA management', defaultRoute: '/csm/rca' }
         ]
     },
     {

@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { csmService, userService } from '../services/api';
+import { csmService, userService, uploadService } from '../services/api';
 import { toast } from 'react-toastify';
 import { 
     MdAssignment, MdPerson, MdCalendarMonth, 
     MdFeedback, MdArrowBack, MdSave, 
     MdWarning, MdCheckCircleOutline, MdCheckCircle, MdChat,
-    MdMyLocation, MdLocationOn, MdStar, MdStarBorder, MdMap
+    MdMyLocation, MdLocationOn, MdStar, MdStarBorder, MdMap,
+    MdPhotoCamera, MdCloudUpload, MdDelete, MdAssignmentTurnedIn
 } from 'react-icons/md';
 import Modal from '../components/Modal';
 import { useSubmitGuard } from '../hooks/useSubmitGuard';
@@ -42,6 +43,7 @@ const TicketDetail = () => {
     const [showVisitModal, setShowVisitModal] = useState(false);
     const [visitDate, setVisitDate] = useState('');
     const [visitEngineer, setVisitEngineer] = useState('');
+    const [visitTicketType, setVisitTicketType] = useState('');
     const [activeVisit, setActiveVisit] = useState(null);
     const [ticketVisits, setTicketVisits] = useState([]);
 
@@ -62,7 +64,64 @@ const TicketDetail = () => {
     const [closeRating, setCloseRating] = useState(5);
     const [closeFeedbackComment, setCloseFeedbackComment] = useState('');
     const [closeGps, setCloseGps] = useState(null);
+    const [closeProductImage, setCloseProductImage] = useState('');
+    const [uploadingCloseImage, setUploadingCloseImage] = useState(false);
     const [isClosingTicket, setIsClosingTicket] = useState(false);
+
+    // RCA Report Form State
+    const [rcaForm, setRcaForm] = useState({
+        problemDescription: '',
+        rootCause: '',
+        correctiveAction: '',
+        preventiveAction: '',
+        responsiblePerson: '',
+        targetDate: '',
+        rcaStatus: 'Draft',
+        rcaImages: []
+    });
+    const [savingRca, setSavingRca] = useState(false);
+
+    const handleUploadCloseImage = async (file) => {
+        if (!file) return;
+        setUploadingCloseImage(true);
+        try {
+            const res = await uploadService.uploadImage(file);
+            setCloseProductImage(res.data.url);
+            toast.success('Product image uploaded successfully');
+        } catch (err) {
+            toast.error('Failed to upload product image');
+        } finally {
+            setUploadingCloseImage(false);
+        }
+    };
+
+    const handleUploadRcaImage = async (file) => {
+        if (!file) return;
+        try {
+            const res = await uploadService.uploadImage(file);
+            setRcaForm(prev => ({
+                ...prev,
+                rcaImages: [...prev.rcaImages, res.data.url]
+            }));
+            toast.success('RCA Image attached');
+        } catch (err) {
+            toast.error('Failed to upload RCA image');
+        }
+    };
+
+    const handleSaveRca = async (e) => {
+        if (e) e.preventDefault();
+        setSavingRca(true);
+        try {
+            await csmService.updateRca(id, rcaForm);
+            toast.success('Root Cause Analysis (RCA) report updated successfully');
+            fetchTicketDetails();
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Failed to update RCA report');
+        } finally {
+            setSavingRca(false);
+        }
+    };
 
     const handleReassignSubmit = async (e) => {
         if (e) e.preventDefault();
@@ -157,6 +216,7 @@ const TicketDetail = () => {
                 isFirstCallResolved: closeIsFcr,
                 rating: closeRating,
                 comment: closeFeedbackComment,
+                productImage: closeProductImage,
                 ...locData
             });
 
@@ -178,6 +238,22 @@ const TicketDetail = () => {
             setSelectedStatus(ticketData.status);
             setIsFirstCallResolved(ticketData.isFirstCallResolved || false);
             setAssignTeam(ticketData.assignedTeamId?._id || '');
+            
+            if (ticketData.rcaReport) {
+                setRcaForm({
+                    problemDescription: ticketData.rcaReport.problemDescription || '',
+                    rootCause: ticketData.rcaReport.rootCause || '',
+                    correctiveAction: ticketData.rcaReport.correctiveAction || '',
+                    preventiveAction: ticketData.rcaReport.preventiveAction || '',
+                    responsiblePerson: ticketData.rcaReport.responsiblePerson || '',
+                    targetDate: ticketData.rcaReport.targetDate ? new Date(ticketData.rcaReport.targetDate).toISOString().slice(0, 10) : '',
+                    rcaStatus: ticketData.rcaReport.rcaStatus || 'Draft',
+                    rcaImages: ticketData.rcaReport.rcaImages || []
+                });
+            }
+            if (ticketData.productImage) {
+                setCloseProductImage(ticketData.productImage);
+            }
             const currentEngIds = (ticketData.assignedEngineerIds || []).map(e => e._id || e);
             if (currentEngIds.length === 0 && ticketData.assignedEngineerId) {
                 currentEngIds.push(ticketData.assignedEngineerId._id || ticketData.assignedEngineerId);
@@ -296,7 +372,8 @@ const TicketDetail = () => {
             if (activeVisit) {
                 await csmService.rescheduleVisit(activeVisit._id, {
                     engineerId: visitEngineer,
-                    scheduledDate: visitDate
+                    scheduledDate: visitDate,
+                    ticketType: visitTicketType
                 });
                 toast.success('Service Visit rescheduled successfully');
             } else {
@@ -818,6 +895,17 @@ const TicketDetail = () => {
                             Field Visits
                         </button>
                         <button
+                            onClick={() => setActiveTab('rca')}
+                            className={`flex items-center gap-2 px-6 py-4 border-b-2 font-bold text-sm transition-all ${
+                                activeTab === 'rca'
+                                    ? 'border-primary-600 text-primary-600 font-black'
+                                    : 'border-transparent text-slate-500 hover:text-slate-700'
+                            }`}
+                        >
+                            <MdAssignmentTurnedIn size={18} />
+                            Root Cause Analysis (RCA)
+                        </button>
+                        <button
                             onClick={() => setActiveTab('feedback')}
                             className={`flex items-center gap-2 px-6 py-4 border-b-2 font-bold text-sm transition-all ${
                                 activeTab === 'feedback'
@@ -958,6 +1046,7 @@ const TicketDetail = () => {
                                                     onClick={() => {
                                                         setVisitDate(activeVisit.scheduledDate ? new Date(activeVisit.scheduledDate).toISOString().slice(0, 16) : '');
                                                         setVisitEngineer(activeVisit.engineerId?._id || activeVisit.engineerId || '');
+                                                        setVisitTicketType(activeVisit.ticketType || '');
                                                         setShowVisitModal(true);
                                                     }}
                                                     className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md"
@@ -1009,34 +1098,198 @@ const TicketDetail = () => {
                                         </div>
                                     )}
 
-                                    {/* History of Past Visits for this ticket */}
-                                    {ticketVisits.filter(v => v.status === 'Completed' || v.status === 'Cancelled').length > 0 && (
-                                        <div className="pt-4 border-t border-slate-100 space-y-3">
-                                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block">Past Visit Records</span>
-                                            {ticketVisits.filter(v => v.status === 'Completed' || v.status === 'Cancelled').map(v => (
-                                                <div key={v._id} className="p-4 rounded-2xl bg-white border border-slate-200/80 space-y-2 text-xs">
-                                                    <div className="flex justify-between items-center">
-                                                        <span className="font-black text-slate-900">{v.visitNo}</span>
-                                                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
-                                                            v.status === 'Completed' ? 'bg-teal-50 text-teal-700 border border-teal-200' : 'bg-rose-50 text-rose-700 border border-rose-200'
-                                                        }`}>
-                                                            {v.status}
-                                                        </span>
-                                                    </div>
-                                                    <div className="text-slate-600 font-medium">
-                                                        <p>Engineer: <strong>{v.engineerId?.name || 'Unassigned'}</strong></p>
-                                                        <p>Date: {new Date(v.scheduledDate).toLocaleString()}</p>
-                                                        {v.visitReport && <p className="mt-1 text-slate-800 bg-slate-50 p-2 rounded-xl border border-slate-100 font-semibold">{v.visitReport}</p>}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
+                                     {/* History of Past Visits for this ticket */}
+                                     {ticketVisits.filter(v => v.status === 'Completed' || v.status === 'Cancelled').length > 0 && (
+                                         <div className="pt-4 border-t border-slate-100 space-y-3">
+                                             <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block">Past Visit Records</span>
+                                             <div className="overflow-x-auto rounded-2xl border border-slate-200/80 bg-white shadow-xs">
+                                                 <table className="w-full text-left text-xs border-collapse">
+                                                     <thead>
+                                                         <tr className="bg-slate-50/80 border-b border-slate-100 text-[10px] font-black uppercase tracking-wider text-slate-400">
+                                                             <th className="py-3 px-4">Visit No</th>
+                                                             <th className="py-3 px-4">Engineer</th>
+                                                             <th className="py-3 px-4">Scheduled Date</th>
+                                                             <th className="py-3 px-4">Visit Report / Notes</th>
+                                                             <th className="py-3 px-4 text-right">Status</th>
+                                                         </tr>
+                                                     </thead>
+                                                     <tbody className="divide-y divide-slate-100">
+                                                         {ticketVisits.filter(v => v.status === 'Completed' || v.status === 'Cancelled').map(v => (
+                                                             <tr key={v._id} className="hover:bg-slate-50/50 transition-colors">
+                                                                 <td className="py-3.5 px-4 font-black text-slate-900 whitespace-nowrap">{v.visitNo}</td>
+                                                                 <td className="py-3.5 px-4 font-bold text-slate-700 whitespace-nowrap">{v.engineerId?.name || 'Unassigned'}</td>
+                                                                 <td className="py-3.5 px-4 text-slate-500 font-medium whitespace-nowrap">{new Date(v.scheduledDate).toLocaleString()}</td>
+                                                                 <td className="py-3.5 px-4 text-slate-600 font-medium min-w-[200px]">
+                                                                     {v.visitReport ? (
+                                                                         <span className="inline-block bg-slate-50 border border-slate-100 px-2.5 py-1 rounded-lg text-[11px] font-semibold text-slate-800">
+                                                                             {v.visitReport}
+                                                                         </span>
+                                                                     ) : (
+                                                                         <span className="text-slate-300">-</span>
+                                                                     )}
+                                                                 </td>
+                                                                 <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                                                                     <span className={`inline-block px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase ${
+                                                                         v.status === 'Completed' ? 'bg-teal-50 text-teal-700 border border-teal-200' : 'bg-rose-50 text-rose-700 border border-rose-200'
+                                                                     }`}>
+                                                                         {v.status}
+                                                                     </span>
+                                                                 </td>
+                                                             </tr>
+                                                         ))}
+                                                     </tbody>
+                                                 </table>
+                                             </div>
+                                         </div>
+                                     )}
                                 </div>
                             </div>
                         )}
 
-                        {/* Tab 3: Customer Feedback */}
+                        {/* Tab 3: Root Cause Analysis (RCA) */}
+                        {activeTab === 'rca' && (
+                            <form onSubmit={handleSaveRca} className="space-y-6 animate-fade-in">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-4 gap-4">
+                                    <div>
+                                        <h3 className="font-outfit font-black text-base text-slate-900 uppercase flex items-center gap-2">
+                                            <MdAssignmentTurnedIn className="text-teal-600" size={20} />
+                                            Root Cause Analysis (RCA) Report
+                                        </h3>
+                                        <p className="text-xs text-slate-500 font-medium mt-0.5">
+                                            Document problem root cause, corrective & preventive action plans, and audit evidence.
+                                        </p>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <select
+                                            value={rcaForm.rcaStatus}
+                                            onChange={(e) => setRcaForm(prev => ({ ...prev, rcaStatus: e.target.value }))}
+                                            className="bg-slate-50 border border-slate-200 text-xs font-bold rounded-xl px-3 py-2 outline-none focus:border-teal-600 cursor-pointer"
+                                        >
+                                            <option value="Draft">Draft</option>
+                                            <option value="In Progress">In Progress</option>
+                                            <option value="Verified">Verified</option>
+                                            <option value="Closed">Closed</option>
+                                        </select>
+                                        <button
+                                            type="submit"
+                                            disabled={savingRca}
+                                            className="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-md flex items-center gap-1.5 disabled:opacity-50 active:scale-95"
+                                        >
+                                            <MdSave size={16} />
+                                            {savingRca ? 'Saving RCA...' : 'Save RCA Report'}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-1">
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Problem Description *</label>
+                                        <textarea
+                                            rows={3}
+                                            placeholder="Detailed description of the issue encountered..."
+                                            value={rcaForm.problemDescription}
+                                            onChange={(e) => setRcaForm(prev => ({ ...prev, problemDescription: e.target.value }))}
+                                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-medium outline-none focus:border-teal-600"
+                                        />
+                                    </div>
+
+                                    <div className="space-y-1">
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Root Cause *</label>
+                                        <textarea
+                                            rows={3}
+                                            placeholder="Underlying root cause determined during investigation..."
+                                            value={rcaForm.rootCause}
+                                            onChange={(e) => setRcaForm(prev => ({ ...prev, rootCause: e.target.value }))}
+                                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-medium outline-none focus:border-teal-600"
+                                        />
+                                    </div>
+
+                                    <div className="space-y-1">
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Corrective Action Plan</label>
+                                        <textarea
+                                            rows={3}
+                                            placeholder="Immediate action taken to rectify the problem..."
+                                            value={rcaForm.correctiveAction}
+                                            onChange={(e) => setRcaForm(prev => ({ ...prev, correctiveAction: e.target.value }))}
+                                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-medium outline-none focus:border-teal-600"
+                                        />
+                                    </div>
+
+                                    <div className="space-y-1">
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Preventive Action Plan</label>
+                                        <textarea
+                                            rows={3}
+                                            placeholder="Long-term actions implemented to prevent recurrence..."
+                                            value={rcaForm.preventiveAction}
+                                            onChange={(e) => setRcaForm(prev => ({ ...prev, preventiveAction: e.target.value }))}
+                                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-medium outline-none focus:border-teal-600"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Responsible Engineer / Owner</label>
+                                        <input
+                                            type="text"
+                                            placeholder="e.g. John Doe (Sr. Technician)"
+                                            value={rcaForm.responsiblePerson}
+                                            onChange={(e) => setRcaForm(prev => ({ ...prev, responsiblePerson: e.target.value }))}
+                                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold outline-none focus:border-teal-600"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Target Completion Date</label>
+                                        <input
+                                            type="date"
+                                            value={rcaForm.targetDate}
+                                            onChange={(e) => setRcaForm(prev => ({ ...prev, targetDate: e.target.value }))}
+                                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold outline-none focus:border-teal-600"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* RCA Attachments / Photo Evidence */}
+                                <div className="space-y-3 pt-2 border-t border-slate-100">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">RCA Image Attachments & Evidence</span>
+                                        <label className="cursor-pointer px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-[10px] font-extrabold uppercase tracking-wider flex items-center gap-1.5 transition-all">
+                                            <MdCloudUpload size={14} /> Upload Image
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                className="hidden"
+                                                onChange={(e) => e.target.files?.[0] && handleUploadRcaImage(e.target.files[0])}
+                                            />
+                                        </label>
+                                    </div>
+
+                                    {rcaForm.rcaImages && rcaForm.rcaImages.length > 0 ? (
+                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                            {rcaForm.rcaImages.map((imgUrl, idx) => (
+                                                <div key={idx} className="relative group rounded-xl overflow-hidden border border-slate-200 bg-slate-50 h-28">
+                                                    <img src={imgUrl} alt={`RCA Evidence ${idx + 1}`} className="w-full h-full object-cover" />
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setRcaForm(prev => ({
+                                                            ...prev,
+                                                            rcaImages: prev.rcaImages.filter((_, i) => i !== idx)
+                                                        }))}
+                                                        className="absolute top-1 right-1 p-1 bg-rose-600 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                                                    >
+                                                        <MdDelete size={14} />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="p-4 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-center text-xs text-slate-400 font-medium">
+                                            No RCA evidence images attached. Click "Upload Image" to attach photos.
+                                        </div>
+                                    )}
+                                </div>
+                            </form>
+                        )}
                         {activeTab === 'feedback' && (
                             <div className="max-w-md mx-auto space-y-6">
                                 <h3 className="font-outfit font-black text-lg text-slate-900 uppercase text-center">
@@ -1132,6 +1385,16 @@ const TicketDetail = () => {
                             value={visitDate}
                             onChange={(e) => setVisitDate(e.target.value)}
                             className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Type of Ticket (Manual Entry)</label>
+                        <input
+                            type="text"
+                            placeholder="e.g. Product Breakdown, Maintenance, Installation, Repair..."
+                            value={visitTicketType}
+                            onChange={(e) => setVisitTicketType(e.target.value)}
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold outline-none focus:border-teal-500"
                         />
                     </div>
                     <div>
@@ -1332,6 +1595,45 @@ const TicketDetail = () => {
                             onChange={(e) => setCloseFeedbackComment(e.target.value)}
                             className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-medium outline-none focus:border-emerald-600"
                         />
+                    </div>
+
+                    {/* Requirement 4: Product Image Attachment */}
+                    <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                            Product Image Attachment (Optional)
+                        </label>
+                        <div className="flex items-center gap-3">
+                            <label className="cursor-pointer px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shrink-0">
+                                <MdPhotoCamera size={16} />
+                                {uploadingCloseImage ? 'Uploading...' : 'Upload Image'}
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    disabled={uploadingCloseImage}
+                                    onChange={(e) => e.target.files?.[0] && handleUploadCloseImage(e.target.files[0])}
+                                />
+                            </label>
+                            <input
+                                type="text"
+                                placeholder="Or paste Product Image URL..."
+                                value={closeProductImage}
+                                onChange={(e) => setCloseProductImage(e.target.value)}
+                                className="flex-1 px-3 py-2 text-xs border border-slate-200 rounded-xl outline-none focus:border-emerald-600 font-medium"
+                            />
+                        </div>
+                        {closeProductImage && (
+                            <div className="relative w-20 h-20 rounded-xl overflow-hidden border border-emerald-200 mt-2 group">
+                                <img src={closeProductImage} alt="Product Close Evidence" className="w-full h-full object-cover" />
+                                <button
+                                    type="button"
+                                    onClick={() => setCloseProductImage('')}
+                                    className="absolute top-1 right-1 p-1 bg-rose-600 text-white rounded-md opacity-90 hover:opacity-100 transition-opacity"
+                                >
+                                    <MdDelete size={12} />
+                                </button>
+                            </div>
+                        )}
                     </div>
 
                     <div className="p-3 bg-emerald-50/60 border border-emerald-100 rounded-xl space-y-2">

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { csmService, branchService } from '../services/api';
 import { 
     ResponsiveContainer, PieChart, Pie, Cell, 
@@ -25,6 +26,7 @@ const STATUS_COLORS = {
 };
 
 const CSMDashboard = () => {
+    const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState(null);
     const [visits, setVisits] = useState([]);
@@ -146,13 +148,13 @@ const CSMDashboard = () => {
         metrics.resolvedToday === 0 && 
         visits.length === 0;
 
-    // Requirement 3: Unassigned Tickets block added
+    // Requirement 3: Unassigned Tickets block added & clickable card links
     const metricCards = [
-        { label: 'Active Tickets', value: metrics.open, icon: <MdAssignment size={24} />, color: 'from-teal-500 to-emerald-600' },
-        { label: 'Unassigned Tickets', value: metrics.unassigned || 0, icon: <MdAssignmentInd size={24} />, color: 'from-purple-500 to-indigo-600' },
-        { label: 'Pending Customer', value: metrics.pending, icon: <MdHourglassEmpty size={24} />, color: 'from-amber-400 to-orange-500' },
-        { label: 'Overdue SLA', value: metrics.overdue, icon: <MdWarning size={24} />, color: 'from-rose-500 to-red-600' },
-        { label: 'Resolved Today', value: metrics.resolvedToday, icon: <MdCheckCircle size={24} />, color: 'from-sky-500 to-cyan-600' }
+        { label: 'Active Tickets', value: metrics.open, icon: <MdAssignment size={24} />, color: 'from-teal-500 to-emerald-600', link: '/csm/tickets?status=Open' },
+        { label: 'Unassigned Tickets', value: metrics.unassigned || 0, icon: <MdAssignmentInd size={24} />, color: 'from-purple-500 to-indigo-600', link: '/csm/tickets?unassigned=true' },
+        { label: 'Pending Customer', value: metrics.pending, icon: <MdHourglassEmpty size={24} />, color: 'from-amber-400 to-orange-500', link: '/csm/tickets?status=Pending Customer' },
+        { label: 'Overdue SLA', value: metrics.overdue, icon: <MdWarning size={24} />, color: 'from-rose-500 to-red-600', link: '/csm/tickets?slaBreached=true' },
+        { label: 'Resolved Today', value: metrics.resolvedToday, icon: <MdCheckCircle size={24} />, color: 'from-sky-500 to-cyan-600', link: '/csm/tickets?status=Resolved' }
     ];
 
     // Compute SLA compliance percentage
@@ -396,13 +398,14 @@ const CSMDashboard = () => {
                         {metricCards.map((card, i) => (
                             <div 
                                 key={i}
-                                className="glass shadow-sm rounded-2xl p-4 border border-slate-100/80 bg-white dark:bg-slate-900/60 dark:border-slate-800 flex items-center justify-between"
+                                onClick={() => card.link && navigate(card.link)}
+                                className="glass shadow-sm rounded-2xl p-4 border border-slate-100/80 bg-white dark:bg-slate-900/60 dark:border-slate-800 flex items-center justify-between cursor-pointer hover:scale-[1.02] hover:shadow-md transition-all active:scale-95 group"
                             >
                                 <div className="space-y-0.5">
-                                    <span className="text-[11px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-wider">{card.label}</span>
+                                    <span className="text-[11px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-wider group-hover:text-primary-600 transition-colors">{card.label}</span>
                                     <h2 className="text-3xl font-black text-slate-900 dark:text-slate-100 font-outfit">{card.value}</h2>
                                 </div>
-                                <div className={`w-12 h-12 bg-gradient-to-br ${card.color} rounded-xl flex items-center justify-center text-white shadow-sm`}>
+                                <div className={`w-12 h-12 bg-gradient-to-br ${card.color} rounded-xl flex items-center justify-center text-white shadow-sm group-hover:rotate-6 transition-transform`}>
                                     {card.icon}
                                 </div>
                             </div>

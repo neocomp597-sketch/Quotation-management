@@ -14,7 +14,18 @@ const VisitExpenseSchema = new mongoose.Schema({
     description: { type: String, required: true },
     quantity: { type: Number, default: 1 },
     rate: { type: Number, default: 0 },
-    amount: { type: Number, required: true }
+    amount: { type: Number, required: true },
+    isPartChange: { type: Boolean, default: false },
+    partCode: { type: String, default: '' },
+    partName: { type: String, default: '' },
+    mgr5Id: { type: mongoose.Schema.Types.ObjectId, ref: 'MGR', default: null }
+}, { _id: false });
+
+const RescheduleHistorySchema = new mongoose.Schema({
+    rescheduledDate: { type: Date, required: true },
+    engineerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Engineer' },
+    ticketType: { type: String, default: '' },
+    rescheduledAt: { type: Date, default: Date.now }
 }, { _id: false });
 
 const ServiceVisitSchema = new mongoose.Schema({
@@ -22,6 +33,8 @@ const ServiceVisitSchema = new mongoose.Schema({
     ticketId: { type: mongoose.Schema.Types.ObjectId, ref: 'Ticket', required: true },
     engineerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Engineer', required: true },
     scheduledDate: { type: Date, required: true },
+    ticketType: { type: String, default: '' },
+    rescheduleHistory: { type: [RescheduleHistorySchema], default: [] },
     status: { 
         type: String, 
         enum: ['Scheduled', 'In Transit', 'Started', 'Completed', 'Cancelled'], 
@@ -32,6 +45,7 @@ const ServiceVisitSchema = new mongoose.Schema({
     visitReport: { type: String, default: '' },
     nextAction: { type: String, default: '' },
     customerSignature: { type: String, default: '' },
+    productPhoto: { type: String, default: '' },
     billingStatus: { 
         type: String, 
         enum: ['Under Warranty', 'Under AMC', 'Paid', 'Free Service'], 

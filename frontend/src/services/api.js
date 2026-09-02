@@ -193,6 +193,7 @@ export const categoryService = {
   create: (data) => api.post("/categories", data),
 };
 
+
 export const productService = {
   getAll: (params) => api.get("/products", { params }),
   getById: (id) => api.get(`/products/${id}`),
@@ -764,7 +765,14 @@ export const csmService = {
   escalateTicket: (id) => api.patch(`/csm/tickets/${id}/escalate`),
   submitFeedback: (id, data) => api.post(`/csm/tickets/${id}/feedback`, data),
   updateTicketLocation: (id, data) => api.patch(`/csm/tickets/${id}/location`, data),
+  updateRca: (id, data) => api.patch(`/csm/tickets/${id}/rca`, data),
   closeTicket: (id, data) => api.patch(`/csm/tickets/${id}/close`, data),
+
+  getRcaReports: (params = {}) => api.get("/csm/rca-reports", { params }),
+  getRcaReportById: (id) => api.get(`/csm/rca-reports/${id}`),
+  createRcaReport: (data) => api.post("/csm/rca-reports", data),
+  updateRcaReport: (id, data) => api.put(`/csm/rca-reports/${id}`, data),
+  deleteRcaReport: (id) => api.delete(`/csm/rca-reports/${id}`),
 
   getVisits: (params = {}) => api.get("/csm/visits", { params }),
   getVisitById: (id) => api.get(`/csm/visits/${id}`),

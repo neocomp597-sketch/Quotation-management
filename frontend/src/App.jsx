@@ -77,10 +77,12 @@ import CSMDashboard from './pages/CSMDashboard';
 import CSMTickets from './pages/CSMTickets';
 import TicketDetail from './pages/TicketDetail';
 import ServiceVisits from './pages/ServiceVisits';
+import CSMVisitPlanner from './pages/CSMVisitPlanner';
 import WarrantyAMC from './pages/WarrantyAMC';
 import KnowledgeBase from './pages/KnowledgeBase';
 import CSMMasters from './pages/CSMMasters';
 import CSMReports from './pages/CSMReports';
+import CSMRcaReport from './pages/CSMRcaReport';
 
 import SalesDashboard from './pages/SalesDashboard';
 import DealBoard from './pages/DealBoard';
@@ -329,11 +331,13 @@ function App() {
             <Route path="/csm/tickets" element={<PermissionRoute permissionKey="csm_tickets"><Layout><CSMTickets /></Layout></PermissionRoute>} />
             <Route path="/csm/tickets/:id" element={<PermissionRoute permissionKey="csm_tickets"><Layout><TicketDetail /></Layout></PermissionRoute>} />
             <Route path="/csm/visits" element={<PermissionRoute permissionKey="csm_visits"><Layout><ServiceVisits /></Layout></PermissionRoute>} />
+            <Route path="/csm/visit-planner" element={<PermissionRoute permissionKey="csm_visits"><Layout><CSMVisitPlanner /></Layout></PermissionRoute>} />
             <Route path="/csm/warranties-amc" element={<PermissionRoute permissionKey="csm_warranties_amc"><Layout><WarrantyAMC /></Layout></PermissionRoute>} />
             <Route path="/csm/kb" element={<PermissionRoute permissionKey="csm_kb"><Layout><KnowledgeBase /></Layout></PermissionRoute>} />
             <Route path="/csm/masters" element={<PermissionRoute permissionKey="csm_masters"><Layout><CSMMasters /></Layout></PermissionRoute>} />
             <Route path="/csm/masters/new" element={<PermissionRoute permissionKey="csm_masters"><Layout><CSMMasters isCreatePage={true} /></Layout></PermissionRoute>} />
             <Route path="/csm/reports" element={<PermissionRoute permissionKey="csm_dashboard"><Layout><CSMReports /></Layout></PermissionRoute>} />
+            <Route path="/csm/rca" element={<PermissionRoute permissionKey="csm_dashboard"><Layout><CSMRcaReport /></Layout></PermissionRoute>} />
             
             {/* Tender Routes */}
             <Route path="/tender/dashboard" element={<PermissionRoute permissionKey="tender_dashboard"><Layout><TenderDashboard /></Layout></PermissionRoute>} />

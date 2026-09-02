@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { csmService } from '../services/api';
+import { csmService, mgrService, productService, uploadService } from '../services/api';
 import { toast } from 'react-toastify';
 import { 
     MdLocalShipping, MdMyLocation, MdCheckCircle, 
-    MdAssignment, MdEvent, MdAttachMoney, MdDelete, MdAdd, MdCalendarMonth
+    MdAssignment, MdEvent, MdAttachMoney, MdDelete, MdAdd, MdCalendarMonth, MdPhotoCamera
 } from 'react-icons/md';
 import Modal from '../components/Modal';
 
@@ -20,6 +20,13 @@ const ServiceVisits = () => {
     const [expQty, setExpQty] = useState(1);
     const [expRate, setExpRate] = useState('');
     const [nextAction, setNextAction] = useState('');
+    const [productPhoto, setProductPhoto] = useState('');
+    const [uploadingPhoto, setUploadingPhoto] = useState(false);
+    
+    // MGR5 Parts Catalog State
+    const [mgr5Parts, setMgr5Parts] = useState([]);
+    const [selectedMgr5PartId, setSelectedMgr5PartId] = useState('');
+    const [isPartChange, setIsPartChange] = useState(true);
     
     // Signature drawing state
     const canvasRef = useRef(null);
@@ -29,6 +36,7 @@ const ServiceVisits = () => {
     const [showRescheduleModal, setShowRescheduleModal] = useState(false);
     const [rescheduleDate, setRescheduleDate] = useState('');
     const [rescheduleEngineer, setRescheduleEngineer] = useState('');
+    const [rescheduleTicketType, setRescheduleTicketType] = useState('');
     const [engineers, setEngineers] = useState([]);
     const [rescheduling, setRescheduling] = useState(false);
 
@@ -79,10 +87,52 @@ const ServiceVisits = () => {
         }
     };
 
+    const fetchMgr5Parts = async () => {
+        try {
+            const [mgrRes, prodRes] = await Promise.allSettled([
+                mgrService.getAll('MGR5'),
+                productService.getAll()
+            ]);
+            
+            let combined = [];
+            if (mgrRes.status === 'fulfilled') {
+                const mgrData = Array.isArray(mgrRes.value.data) ? mgrRes.value.data : (mgrRes.value.data?.data || []);
+                mgrData.forEach(m => {
+                    combined.push({
+                        id: m._id,
+                        code: m.code,
+                        name: m.description,
+                        label: `[MGR5 Part] ${m.code} - ${m.description}`,
+                        rate: 0,
+                        source: 'MGR5'
+                    });
+                });
+            }
+            if (prodRes.status === 'fulfilled') {
+                const prodData = Array.isArray(prodRes.value.data) ? prodRes.value.data : (prodRes.value.data?.data || []);
+                prodData.forEach(p => {
+                    const mgr5Badge = p.mgr5?.code ? ` (MGR5: ${p.mgr5.code})` : '';
+                    combined.push({
+                        id: p._id,
+                        code: p.productCode,
+                        name: p.productName,
+                        label: `[Product] ${p.productName} (${p.productCode})${mgr5Badge}`,
+                        rate: p.mrp || p.basePrice || 0,
+                        source: 'Product'
+                    });
+                });
+            }
+            setMgr5Parts(combined);
+        } catch (error) {
+            console.error('Failed to load MGR5 catalog', error);
+        }
+    };
+
     useEffect(() => {
         fetchVisits();
         fetchEngineers();
         fetchTickets();
+        fetchMgr5Parts();
     }, []);
 
     // Open create visit modal
@@ -201,24 +251,44 @@ const ServiceVisits = () => {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
     };
 
+    const handleSelectMgr5Part = (e) => {
+        const partId = e.target.value;
+        setSelectedMgr5PartId(partId);
+        if (!partId) return;
+        const found = mgr5Parts.find(p => p.id === partId);
+        if (found) {
+            setExpDesc(`${found.name} (${found.code})`);
+            if (found.rate > 0) setExpRate(found.rate);
+            setIsPartChange(true);
+        }
+    };
+
     const handleAddExpense = (e) => {
         e.preventDefault();
         if (!expDesc.trim()) {
-            toast.error('Please enter Part/Charge name');
+            toast.error('Please select an MGR5 Part or enter Part/Charge name');
             return;
         }
         const qty = Number(expQty) || 1;
         const rate = Number(expRate) || 0;
         const amount = qty * rate;
+        const selectedPart = mgr5Parts.find(p => p.id === selectedMgr5PartId);
+
         setExpenses([...expenses, { 
             description: expDesc.trim(), 
             quantity: qty, 
             rate: rate, 
-            amount: amount 
+            amount: amount,
+            isPartChange: isPartChange,
+            partCode: selectedPart ? selectedPart.code : '',
+            partName: selectedPart ? selectedPart.name : expDesc.trim(),
+            mgr5Id: (selectedPart && selectedPart.source === 'MGR5') ? selectedPart.id : null
         }]);
         setExpDesc('');
+        setSelectedMgr5PartId('');
         setExpQty(1);
         setExpRate('');
+        setIsPartChange(true);
     };
 
     const handleRemoveExpense = (idx) => {
@@ -235,7 +305,8 @@ const ServiceVisits = () => {
         try {
             const res = await csmService.rescheduleVisit(selectedVisit._id, {
                 scheduledDate: rescheduleDate,
-                engineerId: rescheduleEngineer
+                engineerId: rescheduleEngineer,
+                ticketType: rescheduleTicketType
             });
             toast.success('Service Visit rescheduled successfully');
             setShowRescheduleModal(false);
@@ -246,6 +317,36 @@ const ServiceVisits = () => {
             toast.error(errMsg);
         } finally {
             setRescheduling(false);
+        }
+    };
+
+    const handlePhotoChange = async (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        setUploadingPhoto(true);
+        try {
+            const res = await uploadService.uploadImage(file);
+            const photoUrl = res.data?.url || res.data?.imageUrl;
+            if (photoUrl) {
+                setProductPhoto(photoUrl);
+                toast.success('Product photo uploaded successfully!');
+            } else {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    setProductPhoto(reader.result);
+                    toast.success('Product photo attached!');
+                };
+                reader.readAsDataURL(file);
+            }
+        } catch (err) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setProductPhoto(reader.result);
+                toast.success('Product photo attached!');
+            };
+            reader.readAsDataURL(file);
+        } finally {
+            setUploadingPhoto(false);
         }
     };
 
@@ -275,6 +376,7 @@ const ServiceVisits = () => {
                 address: selectedVisit.checkIn?.location?.address || 'Site Location Address',
                 visitReport: report,
                 customerSignature: signatureData,
+                productPhoto,
                 billingStatus: billing,
                 expenses,
                 actionType,
@@ -291,6 +393,7 @@ const ServiceVisits = () => {
             setNextAction('');
             setBilling('Paid');
             setExpenses([]);
+            setProductPhoto('');
             fetchVisits();
             if (res.data) setSelectedVisit(res.data);
         } catch (error) {
@@ -442,6 +545,7 @@ const ServiceVisits = () => {
                                         onClick={() => {
                                             setRescheduleDate(selectedVisit.scheduledDate ? new Date(selectedVisit.scheduledDate).toISOString().slice(0, 16) : '');
                                             setRescheduleEngineer(selectedVisit.engineerId?._id || selectedVisit.engineerId || '');
+                                            setRescheduleTicketType(selectedVisit.ticketType || '');
                                             setShowRescheduleModal(true);
                                         }}
                                         className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all border border-slate-200"
@@ -504,7 +608,32 @@ const ServiceVisits = () => {
 
                                     {/* Expenses Array Log */}
                                     <div className="space-y-2 p-3.5 bg-slate-50 rounded-2xl border border-slate-200/60">
-                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">LOG EXPENSE (PARTS/ALLOWANCE)</label>
+                                        <div className="flex justify-between items-center pb-1">
+                                            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                                                PART CHANGE & EXPENSE LOG (MGR5 CATALOG)
+                                            </label>
+                                            <label className="flex items-center gap-1 cursor-pointer">
+                                                <input 
+                                                    type="checkbox" 
+                                                    checked={isPartChange} 
+                                                    onChange={(e) => setIsPartChange(e.target.checked)} 
+                                                    className="h-3.5 w-3.5 text-teal-600 rounded border-slate-300 cursor-pointer"
+                                                />
+                                                <span className="text-[10px] font-bold text-teal-800 uppercase">Replaced Spare Part</span>
+                                            </label>
+                                        </div>
+                                        <div className="pb-1">
+                                            <select
+                                                value={selectedMgr5PartId}
+                                                onChange={handleSelectMgr5Part}
+                                                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-white shadow-xs focus:ring-2 focus:ring-teal-500 outline-none"
+                                            >
+                                                <option value="">-- Select Replaced Spare Part from MGR5 Catalog --</option>
+                                                {mgr5Parts.map(p => (
+                                                    <option key={p.id} value={p.id}>{p.label}</option>
+                                                ))}
+                                            </select>
+                                        </div>
                                         <div className="grid grid-cols-12 gap-1.5 items-center">
                                             <div className="col-span-4">
                                                 <input 
@@ -555,7 +684,12 @@ const ServiceVisits = () => {
                                             <div className="space-y-1.5 pt-2">
                                                 {expenses.map((ex, idx) => (
                                                     <div key={idx} className="flex justify-between items-center text-xs font-bold text-slate-600 bg-white p-2 rounded-lg border border-slate-100 shadow-sm">
-                                                        <div>
+                                                        <div className="flex items-center gap-2">
+                                                            {ex.isPartChange && (
+                                                                <span className="px-1.5 py-0.5 bg-teal-100 text-teal-800 text-[9px] font-black uppercase rounded tracking-wider">
+                                                                    Part Changed
+                                                                </span>
+                                                            )}
                                                             <span className="text-slate-900 font-extrabold">{ex.description}</span>
                                                             <span className="text-[10px] text-slate-400 font-semibold ml-2">({ex.quantity || 1} x ₹{ex.rate || 0})</span>
                                                         </div>
@@ -601,20 +735,54 @@ const ServiceVisits = () => {
                                         </div>
                                     </div>
 
-                                    {/* Canvas Signature Pad */}
-                                    <div>
-                                        <div className="flex justify-between items-center mb-1">
-                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Customer Approval Signature *</label>
-                                            <button 
-                                                type="button" 
-                                                onClick={clearCanvas} 
-                                                className="text-[9px] font-black text-rose-500 uppercase tracking-widest hover:underline"
-                                            >
-                                                Clear Sign
-                                            </button>
-                                        </div>
+                                     {/* ADD PRODUCT PICTURE */}
+                                     <div className="space-y-1.5">
+                                         <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                                             ADD PRODUCT PICTURE
+                                         </label>
+                                         
+                                         {productPhoto ? (
+                                             <div className="relative p-2.5 bg-slate-50 border-2 border-dashed border-teal-300 rounded-2xl flex flex-col items-center justify-center space-y-2">
+                                                 <img src={productPhoto} alt="Product Photo" className="max-h-40 rounded-xl object-contain shadow-xs" />
+                                                 <div className="flex items-center gap-2">
+                                                     <label className="px-3 py-1 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-bold cursor-pointer transition-all shadow-xs">
+                                                         Change Photo
+                                                         <input type="file" accept="image/*" capture="environment" onChange={handlePhotoChange} className="hidden" />
+                                                     </label>
+                                                     <button 
+                                                         type="button" 
+                                                         onClick={() => setProductPhoto('')} 
+                                                         className="px-3 py-1 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded-lg text-xs font-bold transition-all"
+                                                     >
+                                                         Remove
+                                                     </button>
+                                                 </div>
+                                             </div>
+                                         ) : (
+                                             <label className="border-2 border-dashed border-slate-200 hover:border-teal-500 bg-slate-50/70 hover:bg-teal-50/30 rounded-2xl p-5 flex flex-col items-center justify-center cursor-pointer transition-all group text-center">
+                                                 <input type="file" accept="image/*" capture="environment" onChange={handlePhotoChange} className="hidden" />
+                                                 <div className="w-12 h-12 bg-white rounded-2xl border border-slate-200 shadow-xs flex items-center justify-center text-slate-400 group-hover:text-teal-600 group-hover:border-teal-300 transition-all mb-2">
+                                                     {uploadingPhoto ? (
+                                                         <div className="w-5 h-5 border-2 border-teal-600 border-t-transparent rounded-full animate-spin"></div>
+                                                     ) : (
+                                                         <MdPhotoCamera size={26} />
+                                                     )}
+                                                 </div>
+                                                 <span className="text-xs font-black text-slate-800 group-hover:text-teal-800">
+                                                     {uploadingPhoto ? 'Uploading Photo...' : 'Upload Photo'}
+                                                 </span>
+                                                 <span className="text-[10px] text-slate-400 font-semibold mt-0.5">
+                                                     Take photo of finished product
+                                                 </span>
+                                             </label>
+                                         )}
+                                     </div>
+
+                                     {/* Canvas Signature Pad */}
+                                     <div className="hidden">
+
                                         <canvas
-                                            ref={canvasRef}
+                                            ref={canvasRef} style={{ display: 'none' }}
                                             onMouseDown={startDrawing}
                                             onMouseMove={draw}
                                             onMouseUp={stopDrawing}
@@ -702,11 +870,18 @@ const ServiceVisits = () => {
 
                                     {selectedVisit.expenses && selectedVisit.expenses.length > 0 && (
                                         <div>
-                                            <span className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Expenses & Parts Logged</span>
+                                            <span className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Part Change & Expenses Logged</span>
                                             <div className="space-y-1.5 p-2 bg-slate-50 rounded-xl border border-slate-100 text-xs">
                                                 {selectedVisit.expenses.map((ex, idx) => (
                                                     <div key={idx} className="flex justify-between items-center font-bold text-slate-700">
-                                                        <span>{ex.description} ({ex.quantity || 1} x ₹{ex.rate || 0})</span>
+                                                        <div className="flex items-center gap-2">
+                                                            {ex.isPartChange && (
+                                                                <span className="px-1.5 py-0.5 bg-teal-100 text-teal-800 text-[9px] font-black uppercase rounded tracking-wider">
+                                                                    Part Changed
+                                                                </span>
+                                                            )}
+                                                            <span>{ex.description} ({ex.quantity || 1} x ₹{ex.rate || 0})</span>
+                                                        </div>
                                                         <span className="text-teal-700">₹{ex.amount}</span>
                                                     </div>
                                                 ))}
@@ -718,7 +893,16 @@ const ServiceVisits = () => {
                                         </div>
                                     )}
 
-                                    {selectedVisit.customerSignature && selectedVisit.customerSignature.startsWith('data:image') && (
+                                    {selectedVisit.productPhoto && (
+                                         <div>
+                                             <span className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Finished Product Picture</span>
+                                             <div className="p-2 bg-slate-50 rounded-xl border border-slate-200 flex justify-center">
+                                                 <img src={selectedVisit.productPhoto} alt="Product Picture" className="max-h-48 object-contain rounded-lg shadow-xs" />
+                                             </div>
+                                         </div>
+                                     )}
+
+                                     {selectedVisit.customerSignature && selectedVisit.customerSignature.startsWith('data:image') && (
                                         <div>
                                             <span className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Customer Sign Approval</span>
                                             <div className="p-2 bg-slate-50 rounded-xl border border-slate-200 flex justify-center">
@@ -837,6 +1021,16 @@ const ServiceVisits = () => {
                             <option value="">Select Engineer</option>
                             {engineers.map(u => <option key={u._id} value={u._id}>{u.name}</option>)}
                         </select>
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Type of Ticket (Manual Entry)</label>
+                        <input
+                            type="text"
+                            placeholder="e.g. Product Breakdown, Maintenance, Installation, Repair..."
+                            value={rescheduleTicketType}
+                            onChange={(e) => setRescheduleTicketType(e.target.value)}
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold outline-none focus:border-primary-600"
+                        />
                     </div>
                 </form>
             </Modal>

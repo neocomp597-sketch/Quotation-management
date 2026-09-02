@@ -35,6 +35,25 @@ exports.createTicket = async (req, res) => {
         const resolutionDue = new Date(now.getTime() + priority.resolutionSlaHours * 60 * 60 * 1000);
         const ticketBody = { ...req.body };
 
+        // ── Requirement 1: Prevent Duplicate Ticket Creation for Same Product Serial No. ──
+        const serialNo = (ticketBody.serialNumber || ticketBody.productSerialNo || '').trim();
+        if (serialNo) {
+            const activeTicket = await Ticket.findOne({
+                companyId,
+                $or: [
+                    { serialNumber: serialNo },
+                    { manualProductName: serialNo }
+                ],
+                status: { $in: ['Open', 'Assigned', 'In Progress', 'Pending Customer', 'Escalated', 'OPEN', 'ASSIGNED', 'IN-PROGRESS'] }
+            }).lean();
+
+            if (activeTicket) {
+                return res.status(400).json({
+                    message: `An active ticket (${activeTicket.ticketNo}) already exists for Product Serial No. "${serialNo}". A new ticket cannot be created until the existing ticket is closed.`
+                });
+            }
+        }
+
         // Clean empty string values for optional ObjectId fields to avoid Cast to ObjectId errors
         const optionalObjectIdFields = ['contactId', 'contactDesignationId', 'productId', 'assetId', 'invoiceId', 'assignedTeamId', 'assignedEngineerId', 'assignedSalespersonId'];
         for (const field of optionalObjectIdFields) {
@@ -288,6 +307,13 @@ exports.getTickets = async (req, res) => {
         if (req.query.customerId) filter.customerId = req.query.customerId;
         if (req.query.status) filter.status = req.query.status;
         if (req.query.priorityId) filter.priorityId = req.query.priorityId;
+        if (req.query.unassigned === 'true') filter.assignedEngineerId = null;
+        if (req.query.slaBreached === 'true') {
+            filter.slaResolutionDue = { $lt: new Date() };
+            if (!filter.status) {
+                filter.status = { $nin: ['Closed', 'Cancelled'] };
+            }
+        }
 
         const { getScopedBranchIds } = require('../utils/accessControl');
         const userBranchIds = getScopedBranchIds(req.user);
@@ -985,7 +1011,7 @@ exports.updateTicketLocation = async (req, res) => {
 
 exports.closeTicket = async (req, res) => {
     try {
-        const { resolutionNotes, isFirstCallResolved, rating, comment, latitude, longitude, address } = req.body;
+        const { resolutionNotes, isFirstCallResolved, rating, comment, latitude, longitude, address, productImage } = req.body;
         const companyId = req.user?.companyId;
 
         const ticket = await Ticket.findOne({ _id: req.params.id, companyId });
@@ -996,6 +1022,10 @@ exports.closeTicket = async (req, res) => {
         ticket.closedAt = now;
         if (!ticket.resolvedAt) {
             ticket.resolvedAt = now;
+        }
+
+        if (productImage) {
+            ticket.productImage = productImage;
         }
 
         if (typeof isFirstCallResolved !== 'undefined') {
@@ -1033,6 +1063,42 @@ exports.closeTicket = async (req, res) => {
     } catch (error) {
         console.error('Close ticket error:', error);
         res.status(500).json({ message: error.message || 'Error closing ticket' });
+    }
+};
+
+exports.updateRca = async (req, res) => {
+    try {
+        const companyId = req.user?.companyId;
+        const { problemDescription, rootCause, correctiveAction, preventiveAction, responsiblePerson, targetDate, rcaStatus, rcaImages } = req.body;
+
+        const ticket = await Ticket.findOne({ _id: req.params.id, companyId });
+        if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
+
+        ticket.rcaReport = {
+            problemDescription: problemDescription !== undefined ? problemDescription : (ticket.rcaReport?.problemDescription || ''),
+            rootCause: rootCause !== undefined ? rootCause : (ticket.rcaReport?.rootCause || ''),
+            correctiveAction: correctiveAction !== undefined ? correctiveAction : (ticket.rcaReport?.correctiveAction || ''),
+            preventiveAction: preventiveAction !== undefined ? preventiveAction : (ticket.rcaReport?.preventiveAction || ''),
+            responsiblePerson: responsiblePerson !== undefined ? responsiblePerson : (ticket.rcaReport?.responsiblePerson || ''),
+            targetDate: targetDate ? new Date(targetDate) : (ticket.rcaReport?.targetDate || null),
+            rcaStatus: rcaStatus || ticket.rcaReport?.rcaStatus || 'Draft',
+            rcaImages: Array.isArray(rcaImages) ? rcaImages : (ticket.rcaReport?.rcaImages || []),
+            updatedAt: new Date()
+        };
+
+        const validUserId = mongoose.Types.ObjectId.isValid(req.user?.id) ? req.user.id : null;
+        ticket.timeline.push({
+            activityType: 'RCAUpdated',
+            description: `Root Cause Analysis (RCA) updated (Status: ${ticket.rcaReport.rcaStatus})`,
+            performedBy: validUserId
+        });
+
+        await ticket.save();
+        broadcastCrmUpdate('TICKET', 'UPDATE', ticket);
+        res.json(ticket);
+    } catch (error) {
+        console.error('Update RCA error:', error);
+        res.status(500).json({ message: error.message || 'Error updating RCA report' });
     }
 };
 

@@ -287,10 +287,12 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                 { key: 'csm_tickets', name: 'My Tickets', icon: <MdPeople size={18} />, path: '/csm/tickets?tab=my' },
                 { key: 'csm_tickets', name: 'My Team Tickets', icon: <MdAccountTree size={18} />, path: '/csm/tickets?tab=team' },
                 { key: 'csm_visits', name: 'Service Visits', icon: <MdLocalShipping size={18} />, path: '/csm/visits' },
+                { key: 'csm_visits', name: 'Visit Planner', icon: <MdCalendarMonth size={18} />, path: '/csm/visit-planner' },
                 { key: 'csm_warranties_amc', name: 'Warranty & AMC', icon: <MdStorefront size={18} />, path: '/csm/warranties-amc' },
                 { key: 'csm_kb', name: 'Knowledge Base', icon: <MdDescription size={18} />, path: '/csm/kb' },
                 { key: 'csm_masters', name: 'CSM Config', icon: <MdSettings size={18} />, path: '/csm/masters' },
                 { key: 'csm_reports', name: 'Service Reports', icon: <MdAnalytics size={18} />, path: '/csm/reports' },
+                { key: 'csm_rca', name: 'RCA Report', icon: <MdAssessment size={18} />, path: '/csm/rca' },
             ]
         },
         {

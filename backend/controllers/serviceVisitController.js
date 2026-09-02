@@ -160,7 +160,7 @@ exports.checkIn = async (req, res) => {
 
 exports.checkOut = async (req, res) => {
     try {
-        const { latitude, longitude, address, visitReport, nextAction, customerSignature, billingStatus, expenses, actionType } = req.body;
+        const { latitude, longitude, address, visitReport, nextAction, customerSignature, productPhoto, billingStatus, expenses, actionType } = req.body;
         const companyId = req.user?.companyId;
 
         const visit = await ServiceVisit.findOne({ _id: req.params.id, companyId });
@@ -180,6 +180,7 @@ exports.checkOut = async (req, res) => {
             visit.nextAction = nextAction;
         }
         visit.customerSignature = customerSignature || '';
+        visit.productPhoto = productPhoto || '';
         visit.billingStatus = billingStatus || 'Paid';
         visit.expenses = expenses || [];
 
@@ -206,6 +207,16 @@ exports.checkOut = async (req, res) => {
 
         const ticket = await Ticket.findOne({ _id: visit.ticketId, companyId });
         if (ticket) {
+            const partChanges = (expenses || []).filter(ex => ex.isPartChange || ex.mgr5Id);
+            if (partChanges.length > 0) {
+                const partsSummary = partChanges.map(p => `${p.description} (Qty: ${p.quantity || 1})`).join(', ');
+                ticket.timeline.push({
+                    activityType: 'Part Change',
+                    description: `Spare Parts Changed during Visit (${visit.visitNo}): ${partsSummary}`,
+                    performedBy: req.user?.id
+                });
+            }
+
             if (actionType === 'close_visit') {
                 // Only current visit is closed, ticket remains OPEN
                 ticket.status = 'Open';
@@ -240,7 +251,7 @@ exports.checkOut = async (req, res) => {
 
 exports.rescheduleVisit = async (req, res) => {
     try {
-        const { scheduledDate, engineerId } = req.body;
+        const { scheduledDate, engineerId, ticketType } = req.body;
         const companyId = req.user?.companyId;
 
         const visit = await ServiceVisit.findOne({ _id: req.params.id, companyId });
@@ -254,11 +265,20 @@ exports.rescheduleVisit = async (req, res) => {
 
         if (scheduledDate) visit.scheduledDate = new Date(scheduledDate);
         if (engineerId) visit.engineerId = engineerId;
+        if (ticketType !== undefined) visit.ticketType = ticketType;
         
         // Reset status to Scheduled and clear any check-in logs so the visit can be started anew
         visit.status = 'Scheduled';
         visit.checkIn = null;
         visit.checkOut = null;
+
+        if (!visit.rescheduleHistory) visit.rescheduleHistory = [];
+        visit.rescheduleHistory.push({
+            rescheduledDate: visit.scheduledDate,
+            engineerId: visit.engineerId,
+            ticketType: visit.ticketType || '',
+            rescheduledAt: new Date()
+        });
 
         await visit.save();
 
@@ -272,9 +292,11 @@ exports.rescheduleVisit = async (req, res) => {
                 if (eng) engineerName = eng.name;
             }
             
+            const typeText = visit.ticketType ? ` [Type of Ticket: ${visit.ticketType}]` : '';
+
             ticket.timeline.push({
                 activityType: 'StatusChange',
-                description: `Field Service Visit rescheduled (${visit.visitNo}) to ${new Date(visit.scheduledDate).toLocaleString()} with engineer ${engineerName}`,
+                description: `Field Service Visit rescheduled (${visit.visitNo}) to ${new Date(visit.scheduledDate).toLocaleString()} with engineer ${engineerName}${typeText}`,
                 performedBy: req.user?.id
             });
             await ticket.save({ validateBeforeSave: false });

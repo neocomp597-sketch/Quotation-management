@@ -9,6 +9,7 @@ const warrantyAmcController = require('../controllers/warrantyAmcController');
 const kbController = require('../controllers/kbController');
 const csmMasterController = require('../controllers/csmMasterController');
 const customerContactController = require('../controllers/customerContactController');
+const rcaReportController = require('../controllers/rcaReportController');
 
 // ─── CSM DASHBOARD ──────────────────────────────────────────────────────────
 router.get('/dashboard', protect, csmDashboardController.getStats);
@@ -28,6 +29,7 @@ router.post('/tickets/:id/reassign', protect, ticketController.reassignTicket);
 router.patch('/tickets/:id/escalate', protect, ticketController.escalateTicket);
 router.post('/tickets/:id/feedback', protect, ticketController.submitFeedback);
 router.patch('/tickets/:id/location', protect, ticketController.updateTicketLocation);
+router.patch('/tickets/:id/rca', protect, ticketController.updateRca);
 router.patch('/tickets/:id/close', protect, ticketController.closeTicket);
 
 // Customer contacts for ticket auto-fill
@@ -114,5 +116,12 @@ router.post('/masters/engineers', protect, csmMasterController.engineers.create)
 router.get('/masters/engineers', protect, csmMasterController.engineers.getAll);
 router.put('/masters/engineers/:id', protect, csmMasterController.engineers.update);
 router.delete('/masters/engineers/:id', protect, csmMasterController.engineers.delete);
+
+// ─── RCA REPORTS ─────────────────────────────────────────────────────────────
+router.get('/rca-reports', protect, rcaReportController.getReports);
+router.get('/rca-reports/:id', protect, rcaReportController.getReportById);
+router.post('/rca-reports', protect, rcaReportController.createReport);
+router.put('/rca-reports/:id', protect, rcaReportController.updateReport);
+router.delete('/rca-reports/:id', protect, rcaReportController.deleteReport);
 
 module.exports = router;

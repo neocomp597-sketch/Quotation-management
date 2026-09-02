@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Root Cause Analysis</title>
+
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        background: #f4f6f8;
+        margin: 0;
+        padding: 20px;
+    }
+
+    .container {
+        max-width: 1100px;
+        margin: auto;
+        background: white;
+        padding: 25px;
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    h1 {
+        margin-top: 0;
+        color: #1f2937;
+        border-bottom: 2px solid #ddd;
+        padding-bottom: 12px;
+    }
+
+    .section {
+        margin-top: 25px;
+    }
+
+    .section-title {
+        background: #1f4e78;
+        color: white;
+        padding: 10px;
+        border-radius: 5px;
+        font-weight: bold;
+    }
+
+    .form-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
+        margin-top: 15px;
+    }
+
+    label {
+        font-weight: bold;
+        display: block;
+        margin-bottom: 6px;
+    }
+
+    input, select, textarea {
+        width: 100%;
+        padding: 9px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        box-sizing: border-box;
+    }
+
+    textarea {
+        min-height: 90px;
+        resize: vertical;
+    }
+
+    .full {
+        grid-column: 1 / 3;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 15px;
+    }
+
+    th, td {
+        border: 1px solid #ddd;
+        padding: 10px;
+        text-align: left;
+    }
+
+    th {
+        background: #e9eef3;
+    }
+
+    .btn {
+        padding: 10px 18px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        margin-right: 8px;
+    }
+
+    .save {
+        background: #198754;
+        color: white;
+    }
+
+    .reset {
+        background: #6c757d;
+        color: white;
+    }
+
+    .add {
+        background: #0d6efd;
+        color: white;
+    }
+
+    .status {
+        background: #fff3cd;
+        padding: 8px 15px;
+        border-radius: 20px;
+        display: inline-block;
+        font-weight: bold;
+    }
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <h1>Root Cause Analysis (RCA)</h1>
+
+    <div class="status">Status: Open</div>
+
+    <!-- Incident Details -->
+    <div class="section">
+        <div class="section-title">1. Incident Details</div>
+
+        <div class="form-grid">
+
+            <div>
+                <label>RCA Number</label>
+                <input type="text" value="RCA-2026-001">
+            </div>
+
+            <div>
+                <label>Date</label>
+                <input type="date">
+            </div>
+
+            <div>
+                <label>Department</label>
+                <select>
+                    <option>IT</option>
+                    <option>Purchase</option>
+                    <option>Production</option>
+                    <option>Quality</option>
+                    <option>Maintenance</option>
+                </select>
+            </div>
+
+            <div>
+                <label>Priority</label>
+                <select>
+                    <option>High</option>
+                    <option>Medium</option>
+                    <option>Low</option>
+                </select>
+            </div>
+
+            <div class="full">
+                <label>Problem Statement</label>
+                <textarea placeholder="Describe the problem clearly..."></textarea>
+            </div>
+
+            <div class="full">
+                <label>Impact</label>
+                <textarea placeholder="Describe business/production/customer impact..."></textarea>
+            </div>
+
+        </div>
+    </div>
+
+
+    <!-- Root Cause -->
+    <div class="section">
+        <div class="section-title">2. Root Cause Analysis – 5 Why</div>
+
+        <table>
+            <tr>
+                <th width="10%">Why</th>
+                <th>Analysis</th>
+            </tr>
+
+            <tr>
+                <td>1</td>
+                <td><input type="text" placeholder="Why did the problem occur?"></td>
+            </tr>
+
+            <tr>
+                <td>2</td>
+                <td><input type="text" placeholder="Why did this happen?"></td>
+            </tr>
+
+            <tr>
+                <td>3</td>
+                <td><input type="text" placeholder="Why?"></td>
+            </tr>
+
+            <tr>
+                <td>4</td>
+                <td><input type="text" placeholder="Why?"></td>
+            </tr>
+
+            <tr>
+                <td>5</td>
+                <td><input type="text" placeholder="Final root cause"></td>
+            </tr>
+        </table>
+    </div>
+
+
+    <!-- Cause Category -->
+    <div class="section">
+        <div class="section-title">3. Root Cause Category</div>
+
+        <div class="form-grid">
+
+            <div>
+                <label>Category</label>
+                <select>
+                    <option>Man / People</option>
+                    <option>Machine</option>
+                    <option>Method / Process</option>
+                    <option>Material</option>
+                    <option>Measurement</option>
+                    <option>Environment</option>
+                    <option>System / IT</option>
+                </select>
+            </div>
+
+            <div>
+                <label>Root Cause</label>
+                <input type="text" placeholder="Enter confirmed root cause">
+            </div>
+
+        </div>
+    </div>
+
+
+    <!-- Corrective Action -->
+    <div class="section">
+        <div class="section-title">4. Corrective & Preventive Action (CAPA)</div>
+
+        <table>
+            <tr>
+                <th>Action</th>
+                <th>Responsible Person</th>
+                <th>Target Date</th>
+                <th>Status</th>
+            </tr>
+
+            <tr>
+                <td><input type="text" placeholder="Corrective action"></td>
+                <td><input type="text" placeholder="Responsible"></td>
+                <td><input type="date"></td>
+                <td>
+                    <select>
+                        <option>Open</option>
+                        <option>In Progress</option>
+                        <option>Completed</option>
+                    </select>
+                </td>
+            </tr>
+
+            <tr>
+                <td><input type="text" placeholder="Preventive action"></td>
+                <td><input type="text" placeholder="Responsible"></td>
+                <td><input type="date"></td>
+                <td>
+                    <select>
+                        <option>Open</option>
+                        <option>In Progress</option>
+                        <option>Completed</option>
+                    </select>
+                </td>
+            </tr>
+        </table>
+    </div>
+
+
+    <!-- Verification -->
+    <div class="section">
+        <div class="section-title">5. Effectiveness Verification</div>
+
+        <div class="form-grid">
+
+            <div>
+                <label>Verification Date</label>
+                <input type="date">
+            </div>
+
+            <div>
+                <label>Effectiveness</label>
+                <select>
+                    <option>Effective</option>
+                    <option>Partially Effective</option>
+                    <option>Not Effective</option>
+                </select>
+            </div>
+
+            <div class="full">
+                <label>Verification Remarks</label>
+                <textarea placeholder="Enter verification details..."></textarea>
+            </div>
+
+        </div>
+    </div>
+
+
+    <!-- Buttons -->
+    <div class="section">
+        <button class="btn save">Save RCA</button>
+        <button class="btn reset">Reset</button>
+    </div>
+
+</div>
+
+</body>
+</html>
