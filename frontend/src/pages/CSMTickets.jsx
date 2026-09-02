@@ -1644,6 +1644,8 @@ const CSMTickets = () => {
                                         <th className="px-6 py-4">Ticket No</th>
                                         <th className="px-6 py-4">Customer & Contact</th>
                                         <th className="px-6 py-4">Subject</th>
+                                        <th className="px-6 py-4">Invoice No.</th>
+                                        <th className="px-6 py-4">Product Sr. No.</th>
                                         <th className="px-6 py-4">Priority</th>
                                         <th className="px-6 py-4">Status</th>
                                         <th className="px-6 py-4">Engineer</th>
@@ -1653,6 +1655,8 @@ const CSMTickets = () => {
                                 <tbody className="divide-y divide-slate-50 text-sm font-semibold text-slate-700">
                                     {tickets.map((t) => {
                                         const isManual = t.isManual || !!t.manualInvoiceNo || (t.description && t.description.includes('--- Uploaded Images ---'));
+                                        const invoiceNo = t.invoiceId?.voucherNumber || t.invoiceId?.invoiceNumber || t.manualInvoiceNo || 'N/A';
+                                        const productSrNo = t.assetId?.serialNumber || 'N/A';
                                         return (
                                             <tr key={t._id} className="hover:bg-slate-50/50 transition-colors">
                                                 <td className="px-6 py-4 font-black text-slate-900">
@@ -1678,6 +1682,16 @@ const CSMTickets = () => {
                                                     </p>
                                                 </td>
                                                 <td className="px-6 py-4 max-w-xs truncate">{t.issueTitle}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <span className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                                                        {invoiceNo}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <span className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-teal-50 text-teal-700 border border-teal-200">
+                                                        {productSrNo}
+                                                    </span>
+                                                </td>
                                                 <td className="px-6 py-4">
                                                     <span 
                                                         className="px-3 py-1 rounded-full text-xs font-bold text-white shadow-sm"

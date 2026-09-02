@@ -457,6 +457,7 @@ exports.getTickets = async (req, res) => {
                 .populate('assignedEngineerIds', 'name email mobile status')
                 .populate('productId', 'productName productCode')
                 .populate('assetId', 'serialNumber')
+                .populate('invoiceId', 'voucherNumber invoiceNumber')
                 .populate('assignedSalespersonId', 'name email mobile')
                 .populate('branchId', 'name code branchPrefix')
                 .sort({ createdAt: -1 })

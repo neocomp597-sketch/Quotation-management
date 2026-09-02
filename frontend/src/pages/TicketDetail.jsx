@@ -599,6 +599,21 @@ const TicketDetail = () => {
                                 </div>
                             </div>
 
+                            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
+                                <div>
+                                    <span className="block text-[10px] font-black uppercase tracking-widest text-slate-400">Invoice No</span>
+                                    <span className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-slate-100 text-slate-800 border border-slate-200 inline-block mt-0.5">
+                                        {ticket.invoiceId?.voucherNumber || ticket.invoiceId?.invoiceNumber || ticket.manualInvoiceNo || 'N/A'}
+                                    </span>
+                                </div>
+                                <div>
+                                    <span className="block text-[10px] font-black uppercase tracking-widest text-slate-400">Product Sr. No</span>
+                                    <span className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-teal-50 text-teal-800 border border-teal-200 inline-block mt-0.5">
+                                        {ticket.assetId?.serialNumber || 'N/A'}
+                                    </span>
+                                </div>
+                            </div>
+
                             {ticket.productId && (
                                 <div>
                                     <span className="block text-[10px] font-black uppercase tracking-widest text-slate-400">Product Linked</span>

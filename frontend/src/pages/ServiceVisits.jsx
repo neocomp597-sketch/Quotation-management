@@ -507,21 +507,17 @@ const ServiceVisits = () => {
                                     <table className="w-full text-left border-collapse text-sm">
                                         <thead>
                                             <tr className="bg-slate-50 text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100">
-                                                <th className="px-4 py-4">Visit No</th>
-                                                <th className="px-4 py-4">Ticket Details</th>
-                                                <th className="px-4 py-4">Engineer</th>
-                                                <th className="px-4 py-4">Invoice No.</th>
-                                                <th className="px-4 py-4">Product Sr. No.</th>
-                                                <th className="px-4 py-4">Scheduled Date</th>
-                                                <th className="px-4 py-4">Status</th>
-                                                <th className="px-4 py-4 text-center">Action</th>
+                                                <th className="px-6 py-4">Visit No</th>
+                                                <th className="px-6 py-4">Ticket Details</th>
+                                                <th className="px-6 py-4">Engineer</th>
+                                                <th className="px-6 py-4">Scheduled Date</th>
+                                                <th className="px-6 py-4">Status</th>
+                                                <th className="px-6 py-4 text-center">Action</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-50 font-semibold text-slate-700">
                                             {visits.map((v) => {
                                                 const isSelected = selectedVisit?._id === v._id;
-                                                const invoiceNo = v.ticketId?.invoiceId?.voucherNumber || v.ticketId?.invoiceId?.invoiceNumber || v.ticketId?.manualInvoiceNo || 'N/A';
-                                                const productSrNo = v.ticketId?.assetId?.serialNumber || 'N/A';
                                                 return (
                                                     <tr 
                                                         key={v._id} 
@@ -532,23 +528,13 @@ const ServiceVisits = () => {
                                                         }`}
                                                         onClick={() => setSelectedVisit(v)}
                                                     >
-                                                        <td className="px-4 py-4 font-black text-slate-900 whitespace-nowrap">{v.visitNo}</td>
-                                                        <td className="px-4 py-4">
+                                                        <td className="px-6 py-4 font-black text-slate-900">{v.visitNo}</td>
+                                                        <td className="px-6 py-4">
                                                             <p className="font-bold text-slate-900">{v.ticketId?.ticketNo || 'N/A'}</p>
                                                             <p className="text-[10px] text-slate-400 uppercase tracking-tight">{v.ticketId?.customerId?.customerName}</p>
                                                         </td>
-                                                        <td className="px-4 py-4 text-slate-500 whitespace-nowrap">{v.engineerId?.name || 'Unassigned'}</td>
-                                                        <td className="px-4 py-4 whitespace-nowrap">
-                                                            <span className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                                                                {invoiceNo}
-                                                            </span>
-                                                        </td>
-                                                        <td className="px-4 py-4 whitespace-nowrap">
-                                                            <span className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-teal-50 text-teal-700 border border-teal-200">
-                                                                {productSrNo}
-                                                            </span>
-                                                        </td>
-                                                        <td className="px-4 py-4 text-slate-500 whitespace-nowrap">{new Date(v.scheduledDate).toLocaleString()}</td>
+                                                        <td className="px-6 py-4 text-slate-500">{v.engineerId?.name || 'Unassigned'}</td>
+                                                        <td className="px-6 py-4 text-slate-500">{new Date(v.scheduledDate).toLocaleString()}</td>
                                                         <td className="px-4 py-4 whitespace-nowrap">
                                                             <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase border tracking-wider ${
                                                                 v.status === 'Completed' ? 'bg-teal-50 text-teal-600 border-teal-200' :
@@ -622,21 +608,6 @@ const ServiceVisits = () => {
                                     </div>
                                 </div>
 
-                                {/* Invoice No. and Product Sr. No. Header Badges */}
-                                <div className="flex flex-wrap items-center gap-3 mt-3 pt-3 border-t border-slate-100/80">
-                                    <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-600">
-                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Invoice No:</span>
-                                        <span className="px-2.5 py-0.5 rounded-lg text-xs font-mono font-bold bg-slate-100 text-slate-800 border border-slate-200">
-                                            {selectedVisit.ticketId?.invoiceId?.voucherNumber || selectedVisit.ticketId?.invoiceId?.invoiceNumber || selectedVisit.ticketId?.manualInvoiceNo || 'N/A'}
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-600">
-                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Product Sr. No:</span>
-                                        <span className="px-2.5 py-0.5 rounded-lg text-xs font-mono font-bold bg-teal-50 text-teal-800 border border-teal-200">
-                                            {selectedVisit.ticketId?.assetId?.serialNumber || 'N/A'}
-                                        </span>
-                                    </div>
-                                </div>
                             </div>
 
                             {/* Check-In Mode */}
@@ -929,14 +900,6 @@ const ServiceVisits = () => {
                                     </div>
 
                                     <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 space-y-2 text-xs font-semibold">
-                                        <div className="flex justify-between text-slate-500">
-                                            <span>Invoice No:</span>
-                                            <span className="font-mono font-bold text-slate-900">{selectedVisit.ticketId?.invoiceId?.voucherNumber || selectedVisit.ticketId?.invoiceId?.invoiceNumber || selectedVisit.ticketId?.manualInvoiceNo || 'N/A'}</span>
-                                        </div>
-                                        <div className="flex justify-between text-slate-500">
-                                            <span>Product Sr. No:</span>
-                                            <span className="font-mono font-bold text-teal-800">{selectedVisit.ticketId?.assetId?.serialNumber || 'N/A'}</span>
-                                        </div>
                                         <div className="flex justify-between text-slate-500">
                                             <span>Billing Coverage:</span>
                                             <span className="font-bold text-slate-900">{selectedVisit.billingStatus || 'Paid'}</span>
