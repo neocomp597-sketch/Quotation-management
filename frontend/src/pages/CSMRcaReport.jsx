@@ -323,11 +323,14 @@ const CSMRcaReport = () => {
                                                     <MdEdit size={16} />
                                                 </button>
                                                 <button
-                                                    onClick={() => handleDelete(report._id)}
-                                                    className="p-2 text-rose-600 dark:text-rose-400 hover:text-rose-800 bg-rose-50 dark:bg-rose-950/60 rounded-xl hover:bg-rose-100 transition-all border border-rose-200/50 dark:border-rose-800/50"
-                                                    title="Delete RCA"
+                                                    onClick={() => {
+                                                        handleEdit(report);
+                                                        setTimeout(() => window.print(), 300);
+                                                    }}
+                                                    className="p-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-all border border-slate-200/60 dark:border-slate-700/60"
+                                                    title="Print / Download RCA Report"
                                                 >
-                                                    <MdDelete size={16} />
+                                                    <MdPrint size={16} />
                                                 </button>
                                             </td>
                                         </tr>
