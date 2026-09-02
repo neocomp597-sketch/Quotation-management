@@ -1011,7 +1011,7 @@ exports.updateTicketLocation = async (req, res) => {
 
 exports.closeTicket = async (req, res) => {
     try {
-        const { resolutionNotes, isFirstCallResolved, rating, comment, latitude, longitude, address, productImage } = req.body;
+        const { resolutionNotes, isFirstCallResolved, rating, comment, latitude, longitude, address, productImage, customerSignature } = req.body;
         const companyId = req.user?.companyId;
 
         const ticket = await Ticket.findOne({ _id: req.params.id, companyId });
@@ -1026,6 +1026,9 @@ exports.closeTicket = async (req, res) => {
 
         if (productImage) {
             ticket.productImage = productImage;
+        }
+        if (customerSignature) {
+            ticket.customerSignature = customerSignature;
         }
 
         if (typeof isFirstCallResolved !== 'undefined') {

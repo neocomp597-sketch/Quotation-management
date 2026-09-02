@@ -92,6 +92,7 @@ const TicketSchema = new mongoose.Schema({
     },
     serialNumber: { type: String, default: '', index: true },
     productImage: { type: String, default: '' },
+    customerSignature: { type: String, default: '' },
     rcaReport: {
         problemDescription: { type: String, default: '' },
         rootCause: { type: String, default: '' },

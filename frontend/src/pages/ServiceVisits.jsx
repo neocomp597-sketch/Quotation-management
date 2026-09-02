@@ -3,7 +3,8 @@ import { csmService, mgrService, productService, uploadService } from '../servic
 import { toast } from 'react-toastify';
 import { 
     MdLocalShipping, MdMyLocation, MdCheckCircle, 
-    MdAssignment, MdEvent, MdAttachMoney, MdDelete, MdAdd, MdCalendarMonth, MdPhotoCamera
+    MdAssignment, MdEvent, MdAttachMoney, MdDelete, MdAdd, MdCalendarMonth, MdPhotoCamera,
+    MdMap, MdOpenInNew
 } from 'react-icons/md';
 import Modal from '../components/Modal';
 
@@ -180,23 +181,42 @@ const ServiceVisits = () => {
         }
     };
 
-    // Geolocation Check-in simulation
+    // Geolocation Check-in simulation with Reverse Geocoding
     const handleCheckIn = (visitId) => {
         if (!navigator.geolocation) {
             toast.error('Geolocation is not supported by your browser');
-            executeCheckIn(visitId, 18.5204, 73.8567, 'Shivajinagar, Pune (Fallback GPS)');
+            executeCheckIn(visitId, 18.5204, 73.8567, 'Shivajinagar, Pune (Lat: 18.5204, Lng: 73.8567)');
             return;
         }
 
-        toast.info('Fetching GPS coordinates...');
+        toast.info('Fetching GPS location & area address...');
         navigator.geolocation.getCurrentPosition(
-            (pos) => {
-                executeCheckIn(visitId, pos.coords.latitude, pos.coords.longitude, `GPS Coordinates Lat: ${pos.coords.latitude.toFixed(4)}, Lng: ${pos.coords.longitude.toFixed(4)}`);
+            async (pos) => {
+                const lat = pos.coords.latitude;
+                const lng = pos.coords.longitude;
+                let addressName = '';
+                try {
+                    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
+                    const data = await response.json();
+                    if (data && data.display_name) {
+                        const parts = data.display_name.split(',');
+                        addressName = parts.slice(0, 4).join(',').trim();
+                    }
+                } catch (e) {
+                    console.warn('Reverse geocoding error:', e);
+                }
+
+                const formattedAddress = addressName
+                    ? `${addressName} (Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)})`
+                    : `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`;
+
+                executeCheckIn(visitId, lat, lng, formattedAddress);
             },
             (err) => {
                 console.warn('Geolocation error, falling back:', err);
-                executeCheckIn(visitId, 18.5204, 73.8567, 'Pune Technical Service Hub (Default Fallback)');
-            }
+                executeCheckIn(visitId, 18.5204, 73.8567, 'Pune Technical Hub (Lat: 18.5204, Lng: 73.8567)');
+            },
+            { enableHighAccuracy: true, timeout: 10000 }
         );
     };
 
@@ -244,12 +264,13 @@ const ServiceVisits = () => {
         setIsDrawing(false);
     };
 
-    const clearCanvas = () => {
+    const clearSignature = () => {
         const canvas = canvasRef.current;
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
         ctx.clearRect(0, 0, canvas.width, canvas.height);
     };
+    const clearCanvas = clearSignature;
 
     const handleSelectMgr5Part = (e) => {
         const partId = e.target.value;
@@ -353,6 +374,11 @@ const ServiceVisits = () => {
     const handleCheckOut = async (actionType) => {
         if (!report.trim()) {
             toast.error('Visit Report / Actions Taken is required');
+            return;
+        }
+
+        if (!productPhoto) {
+            toast.error('Product photo is mandatory to close visit or close ticket');
             return;
         }
 
@@ -778,21 +804,36 @@ const ServiceVisits = () => {
                                          )}
                                      </div>
 
-                                     {/* Canvas Signature Pad */}
-                                     <div className="hidden">
-
-                                        <canvas
-                                            ref={canvasRef} style={{ display: 'none' }}
-                                            onMouseDown={startDrawing}
-                                            onMouseMove={draw}
-                                            onMouseUp={stopDrawing}
-                                            onMouseLeave={stopDrawing}
-                                            onTouchStart={startDrawing}
-                                            onTouchMove={draw}
-                                            onTouchEnd={stopDrawing}
-                                            className="border border-slate-200 rounded-xl bg-slate-50 cursor-crosshair max-w-full"
-                                        />
-                                    </div>
+                                     {/* CUSTOMER SIGNATURE */}
+                                     <div className="space-y-1.5 pt-1">
+                                         <div className="flex items-center justify-between">
+                                             <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                                                 CUSTOMER SIGNATURE
+                                             </label>
+                                             <button
+                                                 type="button"
+                                                 onClick={clearSignature}
+                                                 className="text-[10px] font-bold text-rose-600 hover:text-rose-700 underline"
+                                             >
+                                                 Clear Signature
+                                             </button>
+                                         </div>
+                                         <div className="bg-white border-2 border-dashed border-slate-200 rounded-2xl p-2 flex justify-center">
+                                             <canvas
+                                                 ref={canvasRef}
+                                                 width={380}
+                                                 height={130}
+                                                 onMouseDown={startDrawing}
+                                                 onMouseMove={draw}
+                                                 onMouseUp={stopDrawing}
+                                                 onMouseLeave={stopDrawing}
+                                                 onTouchStart={startDrawing}
+                                                 onTouchMove={draw}
+                                                 onTouchEnd={stopDrawing}
+                                                 className="border border-slate-200 rounded-xl bg-slate-50/80 cursor-crosshair w-full max-w-full touch-none"
+                                             />
+                                         </div>
+                                     </div>
 
                                     {/* Two Action Buttons */}
                                     <div className="pt-2 grid grid-cols-2 gap-3">
@@ -846,10 +887,25 @@ const ServiceVisits = () => {
                                                 <span className="font-bold text-slate-900">{new Date(selectedVisit.checkOut.time).toLocaleString()}</span>
                                             </div>
                                         )}
-                                        {selectedVisit.checkIn?.location?.address && (
-                                            <div className="pt-1 text-[11px] text-slate-600">
-                                                <span className="block text-[9px] font-black uppercase text-slate-400">GPS Location Stamp</span>
-                                                <p className="font-medium text-slate-700">{selectedVisit.checkIn.location.address}</p>
+                                        {selectedVisit.checkIn?.location && (
+                                            <div className="pt-1 text-[11px] text-slate-600 flex items-center justify-between gap-2">
+                                                <div>
+                                                    <span className="block text-[9px] font-black uppercase text-slate-400">GPS Location Stamp</span>
+                                                    <p className="font-medium text-slate-700">{selectedVisit.checkIn.location.address || `Lat: ${selectedVisit.checkIn.location.lat}, Lng: ${selectedVisit.checkIn.location.lng}`}</p>
+                                                </div>
+                                                {(selectedVisit.checkIn.location.lat || selectedVisit.checkIn.location.latitude) && (
+                                                    <a
+                                                        href={`https://www.google.com/maps?q=${selectedVisit.checkIn.location.lat || selectedVisit.checkIn.location.latitude},${selectedVisit.checkIn.location.lng || selectedVisit.checkIn.location.longitude}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 rounded-lg text-[10px] font-bold transition-all shrink-0 shadow-2xs group"
+                                                        title="Open in Google Maps"
+                                                    >
+                                                        <MdMap size={14} className="text-teal-600 group-hover:scale-110 transition-transform" />
+                                                        <span>Open Map</span>
+                                                        <MdOpenInNew size={11} />
+                                                    </a>
+                                                )}
                                             </div>
                                         )}
                                     </div>

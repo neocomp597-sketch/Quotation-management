@@ -6,7 +6,7 @@ import {
     MdAssignment, MdPerson, MdCalendarMonth, 
     MdFeedback, MdArrowBack, MdSave, 
     MdWarning, MdCheckCircleOutline, MdCheckCircle, MdChat,
-    MdMyLocation, MdLocationOn, MdStar, MdStarBorder, MdMap,
+    MdMyLocation, MdLocationOn, MdStar, MdStarBorder, MdMap, MdOpenInNew,
     MdPhotoCamera, MdCloudUpload, MdDelete, MdAssignmentTurnedIn
 } from 'react-icons/md';
 import Modal from '../components/Modal';
@@ -197,12 +197,136 @@ const TicketDetail = () => {
         );
     };
 
+    const handleStampCheckInForTicket = async () => {
+        if (!activeVisit) return;
+        const executeCheckIn = async (lat, lng, addr) => {
+            try {
+                await csmService.checkInVisit(activeVisit._id, { 
+                    latitude: lat, 
+                    longitude: lng, 
+                    address: addr 
+                });
+                toast.success('Engineer Check-In stamp recorded successfully!');
+                fetchTicketDetails();
+            } catch (err) {
+                toast.error('Check-in failed');
+            }
+        };
+
+        if (!navigator.geolocation) {
+            await executeCheckIn(18.5204, 73.8567, 'Shivajinagar, Pune (Lat: 18.5204, Lng: 73.8567)');
+            return;
+        }
+
+        toast.info('Fetching GPS location & area address...');
+        navigator.geolocation.getCurrentPosition(
+            async (pos) => {
+                const lat = pos.coords.latitude;
+                const lng = pos.coords.longitude;
+                let addressName = '';
+                try {
+                    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
+                    const data = await response.json();
+                    if (data && data.display_name) {
+                        const parts = data.display_name.split(',');
+                        addressName = parts.slice(0, 4).join(',').trim();
+                    }
+                } catch (e) {
+                    console.warn('Reverse geocoding error:', e);
+                }
+
+                const formattedAddress = addressName
+                    ? `${addressName} (Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)})`
+                    : `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`;
+
+                await executeCheckIn(lat, lng, formattedAddress);
+            },
+            async (err) => {
+                console.warn('Geolocation error, falling back:', err);
+                await executeCheckIn(18.5204, 73.8567, 'Pune Technical Hub (Lat: 18.5204, Lng: 73.8567)');
+            },
+            { enableHighAccuracy: true, timeout: 10000 }
+        );
+    };
+
+    const closeCanvasRef = React.useRef(null);
+    const [isDrawingCloseSig, setIsDrawingCloseSig] = useState(false);
+
+    const startDrawingCloseSig = (e) => {
+        setIsDrawingCloseSig(true);
+        drawCloseSig(e);
+    };
+
+    const stopDrawingCloseSig = () => {
+        setIsDrawingCloseSig(false);
+        const canvas = closeCanvasRef.current;
+        if (canvas) {
+            const ctx = canvas.getContext('2d');
+            ctx.beginPath();
+        }
+    };
+
+    const drawCloseSig = (e) => {
+        if (!isDrawingCloseSig) return;
+        const canvas = closeCanvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const rect = canvas.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        const x = clientX - rect.left;
+        const y = clientY - rect.top;
+
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineTo(x, y);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+    };
+
+    const clearCloseSignature = () => {
+        const canvas = closeCanvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    };
+
+    useEffect(() => {
+        if (showCloseModal) {
+            setTimeout(() => {
+                const canvas = closeCanvasRef.current;
+                if (canvas) {
+                    canvas.width = 380;
+                    canvas.height = 120;
+                    const ctx = canvas.getContext('2d');
+                    ctx.lineWidth = 2;
+                    ctx.lineCap = 'round';
+                    ctx.strokeStyle = '#0f172a';
+                }
+            }, 100);
+        }
+    }, [showCloseModal]);
+
     const handleCloseTicketSubmit = async (e) => {
         if (e) e.preventDefault();
         if (!closeResolutionNotes.trim()) {
             toast.error('Please enter resolution notes to close the ticket');
             return;
         }
+
+        if (!closeProductImage) {
+            toast.error('Product photo is mandatory to close ticket');
+            return;
+        }
+
+        let signatureData = '';
+        const canvas = closeCanvasRef.current;
+        if (canvas) {
+            signatureData = canvas.toDataURL('image/png');
+        }
+
         try {
             setIsClosingTicket(true);
             const locData = closeGps ? {
@@ -217,6 +341,7 @@ const TicketDetail = () => {
                 rating: closeRating,
                 comment: closeFeedbackComment,
                 productImage: closeProductImage,
+                customerSignature: signatureData,
                 ...locData
             });
 
@@ -937,16 +1062,38 @@ const TicketDetail = () => {
                                     <div className="border-t border-slate-50 pt-4 mt-4">
                                         <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-3">Audit Activity Log</span>
                                         <div className="space-y-3 border-l-2 border-slate-100 ml-2 pl-4">
-                                            {ticket.timeline?.map((t, idx) => (
-                                                <div key={idx} className="relative pb-2">
-                                                    <span className="absolute -left-[23px] top-1 w-2.5 h-2.5 bg-primary-600 border border-white rounded-full"></span>
-                                                    <div className="text-xs">
-                                                        <span className="font-bold text-slate-900">{t.activityType}: </span>
-                                                        <span className="text-slate-500 font-medium">{t.description}</span>
-                                                        <span className="text-[9px] text-slate-400 block mt-0.5">{new Date(t.createdAt).toLocaleString()}</span>
+                                            {ticket.timeline?.map((t, idx) => {
+                                                const coordMatch = t.description && t.description.match(/(?:Lat|latitude):\s*([0-9.-]+),\s*(?:Lng|longitude):\s*([0-9.-]+)/i);
+                                                const lat = coordMatch ? coordMatch[1] : null;
+                                                const lng = coordMatch ? coordMatch[2] : null;
+                                                const mapUrl = (lat && lng) ? `https://www.google.com/maps?q=${lat},${lng}` : null;
+
+                                                return (
+                                                    <div key={idx} className="relative pb-2.5">
+                                                        <span className="absolute -left-[23px] top-1 w-2.5 h-2.5 bg-teal-600 border border-white rounded-full"></span>
+                                                        <div className="text-xs flex items-start justify-between gap-3">
+                                                            <div className="flex-1">
+                                                                <span className="font-bold text-slate-900">{t.activityType}: </span>
+                                                                <span className="text-slate-600 font-medium">{t.description}</span>
+                                                                <span className="text-[9px] text-slate-400 block mt-0.5">{new Date(t.createdAt).toLocaleString()}</span>
+                                                            </div>
+                                                            {mapUrl && (
+                                                                <a
+                                                                    href={mapUrl}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-[10px] font-bold transition-all shrink-0 shadow-2xs group"
+                                                                    title="Open location in Google Maps"
+                                                                >
+                                                                    <MdMap size={14} className="text-emerald-600 group-hover:scale-110 transition-transform" />
+                                                                    <span>Open Map</span>
+                                                                    <MdOpenInNew size={11} />
+                                                                </a>
+                                                            )}
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            ))}
+                                                );
+                                            })}
                                         </div>
                                     </div>
                                 </div>
@@ -1023,19 +1170,7 @@ const TicketDetail = () => {
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2">
                                                 {['Scheduled', 'In Transit'].includes(activeVisit.status) && (
                                                     <button
-                                                        onClick={async () => {
-                                                            try {
-                                                                await csmService.checkInVisit(activeVisit._id, { 
-                                                                    latitude: 18.5204, 
-                                                                    longitude: 73.8567, 
-                                                                    address: 'Checked-in via Ticket Details Screen' 
-                                                                });
-                                                                toast.success('Engineer Check-In stamp recorded successfully!');
-                                                                fetchTicketDetails();
-                                                            } catch (err) {
-                                                                toast.error('Check-in failed');
-                                                            }
-                                                        }}
+                                                        onClick={handleStampCheckInForTicket}
                                                         className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md flex items-center justify-center gap-1.5"
                                                     >
                                                         <MdMyLocation size={16} />
@@ -1597,10 +1732,11 @@ const TicketDetail = () => {
                         />
                     </div>
 
-                    {/* Requirement 4: Product Image Attachment */}
+                    {/* Requirement: Mandatory Product Image Attachment */}
                     <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                            Product Image Attachment (Optional)
+                        <label className="block text-[10px] font-black text-rose-600 uppercase tracking-widest flex items-center justify-between">
+                            <span>Product Image Attachment * (Mandatory)</span>
+                            {!closeProductImage && <span className="text-rose-500 font-bold">Required</span>}
                         </label>
                         <div className="flex items-center gap-3">
                             <label className="cursor-pointer px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shrink-0">
@@ -1634,6 +1770,35 @@ const TicketDetail = () => {
                                 </button>
                             </div>
                         )}
+                    </div>
+
+                    {/* Requirement: Customer Signature Canvas */}
+                    <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5">
+                        <div className="flex items-center justify-between">
+                            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                                CUSTOMER SIGNATURE
+                            </label>
+                            <button
+                                type="button"
+                                onClick={clearCloseSignature}
+                                className="text-[10px] font-bold text-rose-600 hover:text-rose-700 underline"
+                            >
+                                Clear Signature
+                            </button>
+                        </div>
+                        <div className="bg-white border-2 border-dashed border-slate-200 rounded-xl p-2 flex justify-center">
+                            <canvas
+                                ref={closeCanvasRef}
+                                onMouseDown={startDrawingCloseSig}
+                                onMouseMove={drawCloseSig}
+                                onMouseUp={stopDrawingCloseSig}
+                                onMouseLeave={stopDrawingCloseSig}
+                                onTouchStart={startDrawingCloseSig}
+                                onTouchMove={drawCloseSig}
+                                onTouchEnd={stopDrawingCloseSig}
+                                className="border border-slate-200 rounded-lg bg-slate-50/80 cursor-crosshair w-full max-w-full touch-none"
+                            />
+                        </div>
                     </div>
 
                     <div className="p-3 bg-emerald-50/60 border border-emerald-100 rounded-xl space-y-2">

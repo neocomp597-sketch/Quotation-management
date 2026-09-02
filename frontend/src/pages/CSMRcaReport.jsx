@@ -9,6 +9,7 @@ import { toast } from 'react-toastify';
 
 const INITIAL_FORM = {
     rcaNumber: '',
+    ticketNo: '',
     date: new Date().toISOString().split('T')[0],
     department: 'Quality',
     priority: 'Medium',
@@ -72,6 +73,7 @@ const CSMRcaReport = () => {
         setSelectedReportId(report._id);
         setFormData({
             rcaNumber: report.rcaNumber || '',
+            ticketNo: report.ticketNo || '',
             date: report.date ? new Date(report.date).toISOString().split('T')[0] : '',
             department: report.department || 'Quality',
             priority: report.priority || 'Medium',
@@ -260,6 +262,7 @@ const CSMRcaReport = () => {
                                 <thead>
                                     <tr className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 border-b border-slate-100 dark:border-slate-800">
                                         <th className="pb-3 pl-4">RCA Number</th>
+                                        <th className="pb-3">Ticket No</th>
                                         <th className="pb-3">Date</th>
                                         <th className="pb-3">Department</th>
                                         <th className="pb-3">Priority</th>
@@ -272,6 +275,7 @@ const CSMRcaReport = () => {
                                     {reports.map((report) => (
                                         <tr key={report._id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
                                             <td className="py-4 pl-4 font-black text-slate-900 dark:text-slate-100">{report.rcaNumber}</td>
+                                            <td className="py-4 font-bold text-teal-700 dark:text-teal-400">{report.ticketNo || '-'}</td>
                                             <td className="py-4 text-xs text-slate-500 dark:text-slate-400 font-bold">
                                                 {new Date(report.date).toLocaleDateString()}
                                             </td>
@@ -337,22 +341,35 @@ const CSMRcaReport = () => {
                                 Customer Service & Technical Quality Root Cause Investigation
                             </p>
                         </div>
-                        <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/80 p-2 rounded-2xl border border-slate-200/60 dark:border-slate-700">
-                            <span className="font-extrabold text-xs text-slate-600 dark:text-slate-300 uppercase tracking-wider pl-1">Status:</span>
-                            <select
-                                value={formData.status}
-                                onChange={(e) => handleInputChange('status', e.target.value)}
-                                className={`px-3 py-1.5 rounded-xl font-black text-xs border focus:outline-none transition-all ${
-                                    formData.status === 'Closed' || formData.status === 'Resolved' ? 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800' :
-                                    formData.status === 'In Progress' ? 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800' :
-                                    'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800'
-                                }`}
-                            >
-                                <option value="Open">Open</option>
-                                <option value="In Progress">In Progress</option>
-                                <option value="Closed">Closed</option>
-                                <option value="Resolved">Resolved</option>
-                            </select>
+                        <div className="flex flex-wrap items-center gap-3">
+                            <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/80 p-2 rounded-2xl border border-slate-200/60 dark:border-slate-700">
+                                <span className="font-extrabold text-xs text-slate-600 dark:text-slate-300 uppercase tracking-wider pl-1">Ticket No:</span>
+                                <input
+                                    type="text"
+                                    value={formData.ticketNo}
+                                    onChange={(e) => handleInputChange('ticketNo', e.target.value)}
+                                    placeholder="e.g. TCK-2026-0001"
+                                    className="px-3 py-1.5 rounded-xl font-bold text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all w-36 sm:w-44"
+                                />
+                            </div>
+
+                            <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/80 p-2 rounded-2xl border border-slate-200/60 dark:border-slate-700">
+                                <span className="font-extrabold text-xs text-slate-600 dark:text-slate-300 uppercase tracking-wider pl-1">Status:</span>
+                                <select
+                                    value={formData.status}
+                                    onChange={(e) => handleInputChange('status', e.target.value)}
+                                    className={`px-3 py-1.5 rounded-xl font-black text-xs border focus:outline-none transition-all ${
+                                        formData.status === 'Closed' || formData.status === 'Resolved' ? 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800' :
+                                        formData.status === 'In Progress' ? 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800' :
+                                        'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800'
+                                    }`}
+                                >
+                                    <option value="Open">Open</option>
+                                    <option value="In Progress">In Progress</option>
+                                    <option value="Closed">Closed</option>
+                                    <option value="Resolved">Resolved</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
 
@@ -362,7 +379,7 @@ const CSMRcaReport = () => {
                             <MdFactCheck size={18} /> 1. Incident Details
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
                             <div>
                                 <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
                                     RCA Number
@@ -373,6 +390,19 @@ const CSMRcaReport = () => {
                                     onChange={(e) => handleInputChange('rcaNumber', e.target.value)}
                                     className="w-full p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-semibold text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all outline-none"
                                     placeholder="RCA-2026-001"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
+                                    Ticket No. (Manual)
+                                </label>
+                                <input
+                                    type="text"
+                                    value={formData.ticketNo}
+                                    onChange={(e) => handleInputChange('ticketNo', e.target.value)}
+                                    className="w-full p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-semibold text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all outline-none"
+                                    placeholder="e.g. TCK-2026-0001"
                                 />
                             </div>
 

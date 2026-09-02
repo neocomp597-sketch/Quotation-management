@@ -16,6 +16,7 @@ const CapaSchema = new mongoose.Schema({
 const CSMRcaReportSchema = new mongoose.Schema({
     companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company', required: false },
     rcaNumber: { type: String, required: true },
+    ticketNo: { type: String, default: '' },
     date: { type: Date, default: Date.now },
     department: { type: String, default: 'Quality' },
     priority: { type: String, enum: ['High', 'Medium', 'Low'], default: 'Medium' },
