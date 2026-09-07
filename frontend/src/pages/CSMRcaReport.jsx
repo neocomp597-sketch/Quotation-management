@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+import * as XLSX from 'xlsx';
 import { csmService } from '../services/api';
 import { 
     MdAssessment, MdAdd, MdPrint, MdRefresh, MdDelete, 
     MdEdit, MdArrowBack, MdSave, MdFormatListBulleted, MdCheckCircle,
     MdTune, MdFactCheck, MdAssignmentTurnedIn, MdHistory, MdVisibility,
-    MdPictureAsPdf, MdDownload
+    MdPictureAsPdf, MdDownload, MdFileDownload
 } from 'react-icons/md';
 import { toast } from 'react-toastify';
 
@@ -176,6 +177,64 @@ const CSMRcaReport = () => {
         }, 400);
     };
 
+    const handleDownloadExcel = (report) => {
+        const targetReport = report || (selectedReportId ? reports.find(r => r._id === selectedReportId) : null) || formData;
+        toast.info('Generating Excel file download...');
+        try {
+            const rows = [];
+            if (targetReport && targetReport.rcaNumber) {
+                rows.push({ Section: 'Document Header', Field: 'RCA Number', Detail: targetReport.rcaNumber });
+                rows.push({ Section: 'Document Header', Field: 'Ticket No', Detail: targetReport.ticketNo || '' });
+                rows.push({ Section: 'Document Header', Field: 'Date', Detail: targetReport.date || '' });
+                rows.push({ Section: 'Document Header', Field: 'Department', Detail: targetReport.department || '' });
+                rows.push({ Section: 'Document Header', Field: 'Priority', Detail: targetReport.priority || '' });
+                rows.push({ Section: 'Incident', Field: 'Problem Statement', Detail: targetReport.problemStatement || '' });
+                rows.push({ Section: 'Incident', Field: 'Impact', Detail: targetReport.impact || '' });
+
+                if (targetReport.fiveWhys && Array.isArray(targetReport.fiveWhys)) {
+                    targetReport.fiveWhys.forEach(w => {
+                        rows.push({ Section: '5-Why Breakdown', Field: `Why ${w.whyNo}`, Detail: w.analysis || '' });
+                    });
+                }
+                rows.push({ Section: 'Root Cause', Field: 'Category', Detail: targetReport.category || '' });
+                rows.push({ Section: 'Root Cause', Field: 'Confirmed Root Cause', Detail: targetReport.rootCause || '' });
+
+                if (targetReport.capaActions && Array.isArray(targetReport.capaActions)) {
+                    targetReport.capaActions.forEach((c, idx) => {
+                        rows.push({ Section: 'CAPA Action', Field: `CAPA #${idx + 1} (${c.actionType || 'Action'})`, Detail: `Action: ${c.action} | Resp: ${c.responsiblePerson} | Target: ${c.targetDate} | Status: ${c.status}` });
+                    });
+                }
+                rows.push({ Section: 'Verification', Field: 'Verification Date', Detail: targetReport.verificationDate || '' });
+                rows.push({ Section: 'Verification', Field: 'Effectiveness', Detail: targetReport.effectiveness || '' });
+                rows.push({ Section: 'Verification', Field: 'Remarks', Detail: targetReport.verificationRemarks || '' });
+            } else if (reports.length > 0) {
+                reports.forEach(r => {
+                    rows.push({
+                        'RCA Number': r.rcaNumber,
+                        'Ticket No': r.ticketNo,
+                        'Date': r.date ? new Date(r.date).toLocaleDateString() : '',
+                        'Department': r.department,
+                        'Priority': r.priority,
+                        'Category': r.category,
+                        'Confirmed Root Cause': r.rootCause,
+                        'Problem Statement': r.problemStatement
+                    });
+                });
+            }
+
+            const worksheet = XLSX.utils.json_to_sheet(rows);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, 'RCA Report');
+
+            const fileName = `${(targetReport?.rcaNumber || 'RCA-Report').replace(/\//g, '-')}.xlsx`;
+            XLSX.writeFile(workbook, fileName);
+            toast.success('RCA Report downloaded successfully as Excel!');
+        } catch (err) {
+            console.error('Excel Download Error:', err);
+            toast.error('Failed to download Excel file');
+        }
+    };
+
     const handlePrintReport = (report) => {
         if (report) {
             setSelectedReportId(report._id);
@@ -274,7 +333,7 @@ const CSMRcaReport = () => {
                             <MdAssessment size={22} />
                         </span>
                         <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 dark:text-slate-100 font-outfit uppercase">
-                            Root Cause Analysis (RCA)
+                            Root Cause Analysis
                         </h1>
                     </div>
                     <p className="text-slate-500 dark:text-slate-400 font-semibold text-xs sm:text-sm pl-11">
@@ -316,6 +375,14 @@ const CSMRcaReport = () => {
                                 title="Download / Save as PDF Document"
                             >
                                 <MdPictureAsPdf size={18} /> Download PDF
+                            </button>
+
+                            <button
+                                onClick={() => handleDownloadExcel()}
+                                className="flex items-center gap-1.5 px-4 py-2.5 bg-teal-700 hover:bg-teal-800 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md"
+                                title="Download / Save as Excel Document"
+                            >
+                                <MdFileDownload size={18} /> Download Excel
                             </button>
 
                             <button
@@ -427,6 +494,14 @@ const CSMRcaReport = () => {
                                                 >
                                                     <MdPictureAsPdf size={16} />
                                                 </button>
+                                                {/* Download Excel Button */}
+                                                <button
+                                                    onClick={() => handleDownloadExcel(report)}
+                                                    className="p-2 text-teal-600 dark:text-teal-400 hover:text-teal-800 bg-teal-50 dark:bg-teal-950/60 rounded-xl hover:bg-teal-100 transition-all border border-teal-200/50 dark:border-teal-800/50"
+                                                    title="Download Excel"
+                                                >
+                                                    <MdFileDownload size={16} />
+                                                </button>
                                                 {/* Print Button */}
                                                 <button
                                                     onClick={() => handlePrintReport(report)}
@@ -455,7 +530,7 @@ const CSMRcaReport = () => {
                                 Quality & Technical Audit Document
                             </span>
                             <h2 className="text-2xl font-black font-outfit uppercase tracking-tight text-slate-900">
-                                ROOT CAUSE ANALYSIS (RCA) REPORT
+                                ROOT CAUSE ANALYSIS REPORT
                             </h2>
                             <p className="text-xs text-slate-500 font-semibold">
                                 Customer Service & Technical Quality Root Cause Investigation

@@ -217,15 +217,18 @@ const CSMVisitPlanner = () => {
         }
     };
 
+    // Filter collapse state
+    const [isFilterCollapsed, setIsFilterCollapsed] = useState(false);
+
     return (
-        <div className="p-6 space-y-6 max-w-7xl mx-auto animate-fade-in-up">
+        <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto animate-fade-in-up">
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-black tracking-tight text-slate-900 font-outfit uppercase">
+                    <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 font-outfit uppercase">
                         Field Service Visit Planner
                     </h1>
-                    <p className="text-slate-500 font-semibold text-sm">
+                    <p className="text-slate-500 font-semibold text-xs sm:text-sm">
                         Visual schedule planner, engineer calendar allocations, and dispatch manager.
                     </p>
                 </div>
@@ -253,7 +256,7 @@ const CSMVisitPlanner = () => {
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                     
                     {/* Month / Date Navigation */}
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 flex-wrap">
                         <button
                             onClick={handleToday}
                             className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl transition-all border border-slate-200"
@@ -271,47 +274,61 @@ const CSMVisitPlanner = () => {
                         <h2 className="text-lg font-black text-slate-900 font-outfit uppercase min-w-[180px]">
                             {currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                         </h2>
+
+                        {/* Filter Collapsible Toggle */}
+                        <button
+                            type="button"
+                            onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
+                            className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all border border-slate-200"
+                        >
+                            <MdFilterList size={16} />
+                            {isFilterCollapsed ? 'Show Filters' : 'Hide Filters'}
+                        </button>
                     </div>
 
                     {/* Filters & View Modes */}
                     <div className="flex flex-wrap items-center gap-3">
-                        {/* Search input */}
-                        <div className="relative">
-                            <MdSearch className="absolute left-3 top-2.5 text-slate-400" size={18} />
-                            <input
-                                type="text"
-                                placeholder="Search visit, ticket..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 w-44"
-                            />
-                        </div>
+                        {!isFilterCollapsed && (
+                            <>
+                                {/* Search input */}
+                                <div className="relative">
+                                    <MdSearch className="absolute left-3 top-2.5 text-slate-400" size={18} />
+                                    <input
+                                        type="text"
+                                        placeholder="Search visit, ticket..."
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        className="pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 w-44"
+                                    />
+                                </div>
 
-                        {/* Engineer Filter */}
-                        <select
-                            value={selectedEngineer}
-                            onChange={(e) => setSelectedEngineer(e.target.value)}
-                            className="px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                        >
-                            <option value="all">All Engineers ({engineers.length})</option>
-                            {engineers.map(eng => (
-                                <option key={eng._id} value={eng._id}>{eng.name}</option>
-                            ))}
-                        </select>
+                                {/* Engineer Filter */}
+                                <select
+                                    value={selectedEngineer}
+                                    onChange={(e) => setSelectedEngineer(e.target.value)}
+                                    className="px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                >
+                                    <option value="all">All Engineers ({engineers.length})</option>
+                                    {engineers.map(eng => (
+                                        <option key={eng._id} value={eng._id}>{eng.name}</option>
+                                    ))}
+                                </select>
 
-                        {/* Status Filter */}
-                        <select
-                            value={selectedStatus}
-                            onChange={(e) => setSelectedStatus(e.target.value)}
-                            className="px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                        >
-                            <option value="all">All Statuses</option>
-                            <option value="Scheduled">Scheduled</option>
-                            <option value="In Transit">In Transit</option>
-                            <option value="Started">Started</option>
-                            <option value="Completed">Completed</option>
-                            <option value="Cancelled">Cancelled</option>
-                        </select>
+                                {/* Status Filter */}
+                                <select
+                                    value={selectedStatus}
+                                    onChange={(e) => setSelectedStatus(e.target.value)}
+                                    className="px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                >
+                                    <option value="all">All Statuses</option>
+                                    <option value="Scheduled">Scheduled</option>
+                                    <option value="In Transit">In Transit</option>
+                                    <option value="Started">Started</option>
+                                    <option value="Completed">Completed</option>
+                                    <option value="Cancelled">Cancelled</option>
+                                </select>
+                            </>
+                        )}
 
                         {/* View Mode Buttons */}
                         <div className="flex bg-slate-100 rounded-xl p-1 border border-slate-200">
@@ -385,7 +402,7 @@ const CSMVisitPlanner = () => {
                                                                 handleOpenScheduleModal(day);
                                                             }}
                                                             title={`Schedule visit for ${day.toLocaleDateString()}`}
-                                                            className="w-5 h-5 rounded-md bg-primary-50 hover:bg-primary-600 text-primary-600 hover:text-white flex items-center justify-center transition-all opacity-80 hover:opacity-100 active:scale-95 shadow-2xs"
+                                                            className="hidden text-primary-600 hover:text-white transition-all"
                                                         >
                                                             <MdAdd size={14} />
                                                         </button>
@@ -411,7 +428,7 @@ const CSMVisitPlanner = () => {
                                                     ))}
                                                     {dayVisits.length > 3 && (
                                                         <div className="text-[9px] font-black text-primary-600 text-center pt-0.5">
-                                                            +{dayVisits.length - 3} more visits
+                                                            {dayVisits.length - 3} more visits
                                                         </div>
                                                     )}
                                                 </div>
@@ -450,7 +467,7 @@ const CSMVisitPlanner = () => {
                                                             handleOpenScheduleModal(day);
                                                         }}
                                                         title={`Schedule visit for ${day.toLocaleDateString()}`}
-                                                        className="w-5 h-5 rounded-md bg-primary-50 hover:bg-primary-600 text-primary-600 hover:text-white flex items-center justify-center transition-all opacity-80 hover:opacity-100 active:scale-95 shadow-2xs"
+                                                        className="hidden text-primary-600 hover:text-white transition-all"
                                                     >
                                                         <MdAdd size={14} />
                                                     </button>

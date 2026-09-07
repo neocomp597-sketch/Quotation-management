@@ -1457,12 +1457,15 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                             <div className="grid grid-cols-2 gap-6">
                                 {[1, 2, 3, 4, 5].map(num => (
                                     <div key={`mgr${num}`} className="space-y-2">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">MGR {num}</label>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center justify-between">
+                                            <span>MGR {num} {num === 5 ? '(Spares Catalog)' : ''}</span>
+                                            {num === 5 && <span className="text-[9px] text-amber-600 font-bold bg-amber-50 px-1.5 py-0.5 rounded">Service Visit Parts</span>}
+                                        </label>
                                         <select
                                             name={`mgr${num}`}
                                             value={formData[`mgr${num}`]?._id || formData[`mgr${num}`] || ''}
                                             onChange={handleFormChange}
-                                            className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold appearance-none bg-white"
+                                            className={`w-full px-4 py-3.5 bg-slate-50 border rounded-2xl outline-none text-sm font-bold appearance-none bg-white ${num === 5 ? 'border-amber-300 focus:ring-2 focus:ring-amber-500/20' : 'border-slate-200'}`}
                                         >
                                             <option value="">Select MGR {num}</option>
                                             {mgrsData[`mgr${num}`].map(m => (

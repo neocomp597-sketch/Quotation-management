@@ -439,7 +439,7 @@ const CSMDashboard = () => {
                             </div>
                             <div className="flex items-center gap-6 flex-1 min-h-0">
                                 <div className="w-1/2 h-full relative">
-                                    <ResponsiveContainer width="100%" height="100%">
+                                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                                         <PieChart>
                                             <Pie
                                                 data={complianceData.some(d => d.value > 0) ? complianceData : [{ name: 'No Data', value: 1 }]}
@@ -514,7 +514,7 @@ const CSMDashboard = () => {
                         <div className="glass shadow-premium rounded-[2rem] p-6 bg-white dark:bg-slate-900/60 dark:border-slate-800 border border-slate-100 h-[340px] flex flex-col">
                             <h3 className="text-sm font-black text-slate-900 dark:text-slate-100 uppercase tracking-widest mb-4">Tickets by Status</h3>
                             <div className="flex-1 min-h-0">
-                                <ResponsiveContainer width="100%" height="100%">
+                                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                                     <PieChart>
                                         <Pie
                                             data={statusData}
@@ -539,7 +539,7 @@ const CSMDashboard = () => {
                         <div className="glass shadow-premium rounded-[2rem] p-6 bg-white dark:bg-slate-900/60 dark:border-slate-800 border border-slate-100 h-[340px] flex flex-col">
                             <h3 className="text-sm font-black text-slate-900 dark:text-slate-100 uppercase tracking-widest mb-4">Tickets by Category</h3>
                             <div className="flex-1 min-h-0">
-                                <ResponsiveContainer width="100%" height="100%">
+                                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                                     <BarChart data={categoryData} layout="vertical" margin={{ left: 10, right: 10, top: 10, bottom: 10 }}>
                                         <XAxis type="number" hide />
                                         <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 10, fontWeight: 'bold', fill: '#94a3b8' }} />

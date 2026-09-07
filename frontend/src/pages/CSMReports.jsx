@@ -42,6 +42,7 @@ const TABS = [
 const CSMReports = () => {
     const [loading, setLoading] = useState(true);
     const [reportData, setReportData] = useState(null);
+    const [isFilterCollapsed, setIsFilterCollapsed] = useState(false);
     
     // Dropdown list data
     const [priorities, setPriorities] = useState([]);
@@ -244,81 +245,92 @@ const CSMReports = () => {
 
             {/* Filters Bar */}
             <div className="glass shadow-premium rounded-[2rem] p-6 bg-white border border-slate-100/80 space-y-4">
-                <div className="flex items-center gap-2 pb-2 border-b border-slate-50">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-50">
                     <span className="text-xs font-black uppercase text-teal-600 tracking-wider">Report Parameters</span>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                    <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Start Date</label>
-                        <input
-                            type="date"
-                            name="startDate"
-                            value={filters.startDate}
-                            onChange={handleFilterChange}
-                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">End Date</label>
-                        <input
-                            type="date"
-                            name="endDate"
-                            value={filters.endDate}
-                            onChange={handleFilterChange}
-                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Category</label>
-                        <select
-                            name="categoryId"
-                            value={filters.categoryId}
-                            onChange={handleFilterChange}
-                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500"
-                        >
-                            <option value="">All Categories</option>
-                            {categories.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
-                        </select>
-                    </div>
-                    <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Priority</label>
-                        <select
-                            name="priorityId"
-                            value={filters.priorityId}
-                            onChange={handleFilterChange}
-                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500"
-                        >
-                            <option value="">All Priorities</option>
-                            {priorities.map(p => <option key={p._id} value={p._id}>{p.name}</option>)}
-                        </select>
-                    </div>
-                    <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Assigned Agent</label>
-                        <select
-                            name="assignedEngineerId"
-                            value={filters.assignedEngineerId}
-                            onChange={handleFilterChange}
-                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500"
-                        >
-                            <option value="">All Engineers</option>
-                            {engineers.map(e => <option key={e._id} value={e._id}>{e.name}</option>)}
-                        </select>
-                    </div>
-                </div>
-                <div className="flex justify-end gap-3 pt-2">
                     <button
-                        onClick={handleResetFilters}
-                        className="flex items-center gap-1.5 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold transition-all"
+                        type="button"
+                        onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
+                        className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all border border-slate-200"
                     >
-                        <MdClear size={16} /> Reset
-                    </button>
-                    <button
-                        onClick={handleApplyFilters}
-                        className="flex items-center gap-1.5 px-6 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md"
-                    >
-                        Apply Filters
+                        {isFilterCollapsed ? 'Show Filters' : 'Hide Filters'}
                     </button>
                 </div>
+                {!isFilterCollapsed && (
+                    <>
+                        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Start Date</label>
+                                <input
+                                    type="date"
+                                    name="startDate"
+                                    value={filters.startDate}
+                                    onChange={handleFilterChange}
+                                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">End Date</label>
+                                <input
+                                    type="date"
+                                    name="endDate"
+                                    value={filters.endDate}
+                                    onChange={handleFilterChange}
+                                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Category</label>
+                                <select
+                                    name="categoryId"
+                                    value={filters.categoryId}
+                                    onChange={handleFilterChange}
+                                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                >
+                                    <option value="">All Categories</option>
+                                    {categories.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Priority</label>
+                                <select
+                                    name="priorityId"
+                                    value={filters.priorityId}
+                                    onChange={handleFilterChange}
+                                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                >
+                                    <option value="">All Priorities</option>
+                                    {priorities.map(p => <option key={p._id} value={p._id}>{p.name}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Assigned Agent</label>
+                                <select
+                                    name="assignedEngineerId"
+                                    value={filters.assignedEngineerId}
+                                    onChange={handleFilterChange}
+                                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                >
+                                    <option value="">All Engineers</option>
+                                    {engineers.map(e => <option key={e._id} value={e._id}>{e.name}</option>)}
+                                </select>
+                            </div>
+                        </div>
+                        <div className="flex justify-end gap-3 pt-2">
+                            <button
+                                onClick={handleResetFilters}
+                                className="flex items-center gap-1.5 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold transition-all"
+                            >
+                                <MdClear size={16} /> Reset
+                            </button>
+                            <button
+                                onClick={handleApplyFilters}
+                                className="flex items-center gap-1.5 px-6 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md"
+                            >
+                                Apply Filters
+                            </button>
+                        </div>
+                    </>
+                )}
             </div>
 
             {/* HUD Analytics Metrics */}
@@ -420,7 +432,7 @@ const CSMReports = () => {
                                 <div className="p-6 border border-slate-100 rounded-3xl bg-white h-[320px] flex flex-col">
                                     <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-3">Ticket Status Distribution</h4>
                                     <div className="flex-1 min-h-0">
-                                        <ResponsiveContainer width="100%" height="100%">
+                                        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                                             <BarChart data={Object.entries(STATUS_COLORS).map(([status, color]) => ({
                                                 name: status,
                                                 count: tickets.filter(t => t.status === status).length,
@@ -443,7 +455,7 @@ const CSMReports = () => {
                                 <div className="p-6 border border-slate-100 rounded-3xl bg-white h-[320px] flex flex-col">
                                     <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-3">Ticket Priorities Breakdown</h4>
                                     <div className="flex-1 min-h-0">
-                                        <ResponsiveContainer width="100%" height="100%">
+                                        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                                             <PieChart>
                                                 <Pie
                                                     data={priorities.map(p => ({
@@ -596,7 +608,7 @@ const CSMReports = () => {
                                 <div className="md:col-span-2 p-6 border border-slate-100 rounded-3xl bg-white h-[260px] flex flex-col">
                                     <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-3">Compliance Pie</h4>
                                     <div className="flex-1 min-h-0">
-                                        <ResponsiveContainer width="100%" height="100%">
+                                        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                                             <PieChart>
                                                 <Pie
                                                     data={[
@@ -676,7 +688,7 @@ const CSMReports = () => {
                             <div className="p-6 border border-slate-100 rounded-3xl bg-white h-[350px] flex flex-col">
                                 <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4">Resolution Cycle Duration (Hours)</h4>
                                 <div className="flex-1 min-h-0">
-                                    <ResponsiveContainer width="100%" height="100%">
+                                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                                         <AreaChart data={resolutionTimeTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                                             <defs>
                                                 <linearGradient id="colorResolution" x1="0" y1="0" x2="0" y2="1">
@@ -869,7 +881,7 @@ const CSMReports = () => {
                                 <div className="p-6 border border-slate-100 rounded-3xl bg-white h-[320px] flex flex-col">
                                     <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-3">Requests by Category</h4>
                                     <div className="flex-1 min-h-0">
-                                        <ResponsiveContainer width="100%" height="100%">
+                                        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                                             <BarChart data={serviceRequestAnalysis} margin={{ left: 10, right: 10, top: 10, bottom: 10 }}>
                                                 <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                                                 <XAxis type="category" dataKey="name" tick={{ fontSize: 9, fontWeight: 'bold' }} />
@@ -928,7 +940,7 @@ const CSMReports = () => {
                                 <div className="md:col-span-2 p-6 border border-slate-100 rounded-3xl bg-white h-[260px] flex flex-col">
                                     <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-3">FCR Timeline Trend</h4>
                                     <div className="flex-1 min-h-0">
-                                        <ResponsiveContainer width="100%" height="100%">
+                                        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                                             <LineChart data={fcrStats.trend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                                                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                                                 <XAxis dataKey="date" tick={{ fontSize: 9 }} />
@@ -1059,7 +1071,7 @@ const CSMReports = () => {
                                 <div className="p-6 border border-slate-100 rounded-3xl bg-white h-[280px] flex flex-col md:col-span-1">
                                     <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-3">CSAT Stars Distribution</h4>
                                     <div className="flex-1 min-h-0">
-                                        <ResponsiveContainer width="100%" height="100%">
+                                        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                                             <BarChart data={csatBreakdown.distribution} margin={{ left: -30, right: 10, top: 10, bottom: 0 }}>
                                                 <XAxis dataKey="rating" tickFormatter={(t) => `${t} ★`} tick={{ fontSize: 9 }} />
                                                 <YAxis tick={{ fontSize: 9 }} />

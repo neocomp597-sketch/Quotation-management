@@ -16,5 +16,17 @@
     "customerName": "Rajesh",
     "companyName": "Rajesh",
     "gstin": ""
+  },
+  {
+    "_id": "6a985c8449b87d090e42e6b7",
+    "customerName": "manorath",
+    "companyName": "manorath",
+    "gstin": ""
+  },
+  {
+    "_id": "6a995352f88cee665163561e",
+    "customerName": "GETCO12",
+    "companyName": "GETCO12",
+    "gstin": ""
   }
 ]

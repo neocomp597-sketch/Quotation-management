@@ -36,37 +36,35 @@ const Mgr5SearchSelect = ({ mgr5Parts, selectedId, onSelect, isCustomDesc }) => 
 
     return (
         <div className="relative w-full" ref={wrapperRef}>
-            {/* Header Badge indicating MGR5 Fixated */}
+            {/* Header Badge indicating MGR5 Fixated Spares */}
             <div className="flex items-center justify-between mb-1">
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 text-[10px] font-black uppercase tracking-wider border border-amber-300/80 shadow-2xs">
                     <MdPushPin className="text-amber-600" size={12} />
-                    MGR5 FIXATED CATALOG
+                    MGR5 FIXATED CATALOG → SPARES (DEFAULT)
                 </span>
                 <span className="text-[10px] text-slate-400 font-bold">
-                    {spareParts.length + productParts.length} Items Available
+                    {mgr5Parts.length} Configured Products Available
                 </span>
             </div>
 
-            {/* Selection Trigger / Search Input */}
+            {/* Selection Trigger / Default Active Badge */}
             <div 
                 onClick={() => setIsOpen(!isOpen)}
                 className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl shadow-2xs flex items-center justify-between cursor-pointer hover:border-teal-500 transition-all group"
             >
                 <div className="flex items-center gap-2 truncate pr-2">
                     <MdSearch className="text-slate-400 group-hover:text-teal-600 transition-colors shrink-0" size={18} />
-                    {selectedItem ? (
-                        <div className="truncate text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                            <span className={`px-1.5 py-0.2 rounded text-[9px] font-black uppercase ${selectedItem.source === 'MGR5' ? 'bg-amber-100 text-amber-800' : 'bg-indigo-100 text-indigo-800'}`}>
-                                {selectedItem.source === 'MGR5' ? 'MGR5 Spare' : 'Product'}
+                    <div className="truncate text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                        <span className="px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-amber-100 text-amber-800 border border-amber-200">
+                            MGR5 SPARE
+                        </span>
+                        <span className="font-extrabold text-slate-900 truncate">SPARES (SPRS)</span>
+                        {selectedItem && (
+                            <span className="text-teal-700 font-bold ml-1 truncate">
+                                → {selectedItem.name} ({selectedItem.code})
                             </span>
-                            <span className="font-extrabold text-slate-900 truncate">{selectedItem.name}</span>
-                            <span className="text-slate-400 font-semibold shrink-0">({selectedItem.code})</span>
-                        </div>
-                    ) : isCustomDesc ? (
-                        <span className="text-xs font-bold text-amber-700">✍️ Custom Manual Entry Selected</span>
-                    ) : (
-                        <span className="text-xs font-semibold text-slate-400">Search & select MGR5 part or product...</span>
-                    )}
+                        )}
+                    </div>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
                     {(selectedItem || isCustomDesc) && (
@@ -229,48 +227,56 @@ const Mgr5SearchSelect = ({ mgr5Parts, selectedId, onSelect, isCustomDesc }) => 
 };
 
 const ServiceVisits = () => {
+    const canvasRef = useRef(null);
+
     const [loading, setLoading] = useState(false);
     const [visits, setVisits] = useState([]);
     const [selectedVisit, setSelectedVisit] = useState(null);
+    const [engineers, setEngineers] = useState([]);
+    const [tickets, setTickets] = useState([]);
     const [isQueueCollapsed, setIsQueueCollapsed] = useState(false);
     
-    // Check-out Form State
-    const [report, setReport] = useState('');
-    const [billing, setBilling] = useState('Paid');
-    const [expenses, setExpenses] = useState([]);
-    const [expDesc, setExpDesc] = useState('');
-    const [expQty, setExpQty] = useState(1);
-    const [expRate, setExpRate] = useState('');
-    const [nextAction, setNextAction] = useState('');
-    const [productPhoto, setProductPhoto] = useState('');
-    const [uploadingPhoto, setUploadingPhoto] = useState(false);
-    
-    // MGR5 Parts Catalog State
-    const [mgr5Parts, setMgr5Parts] = useState([]);
-    const [selectedMgr5PartId, setSelectedMgr5PartId] = useState('');
-    const [isPartChange, setIsPartChange] = useState(true);
-    const [isCustomExpDesc, setIsCustomExpDesc] = useState(false);
-    
-    // Signature drawing state
-    const canvasRef = useRef(null);
-    const [isDrawing, setIsDrawing] = useState(false);
+    // Collapsible filter state
+    const [isFilterCollapsed, setIsFilterCollapsed] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [statusFilter, setStatusFilter] = useState('all');
+    const [engineerFilter, setEngineerFilter] = useState('all');
 
-    // Reschedule State
+    // Create Modal State
+    const [showCreateModal, setShowCreateModal] = useState(false);
+    const [createTicketId, setCreateTicketId] = useState('');
+    const [createScheduledDate, setCreateScheduledDate] = useState('');
+    const [createEngineerId, setCreateEngineerId] = useState('');
+    const [createBillingStatus, setCreateBillingStatus] = useState('Paid');
+    const [creating, setCreating] = useState(false);
+
+    // Reschedule Modal State
     const [showRescheduleModal, setShowRescheduleModal] = useState(false);
     const [rescheduleDate, setRescheduleDate] = useState('');
     const [rescheduleEngineer, setRescheduleEngineer] = useState('');
     const [rescheduleTicketType, setRescheduleTicketType] = useState('');
-    const [engineers, setEngineers] = useState([]);
     const [rescheduling, setRescheduling] = useState(false);
 
-    // Create New Visit State
-    const [showCreateModal, setShowCreateModal] = useState(false);
-    const [tickets, setTickets] = useState([]);
-    const [createTicketId, setCreateTicketId] = useState('');
-    const [createEngineerId, setCreateEngineerId] = useState('');
-    const [createScheduledDate, setCreateScheduledDate] = useState('');
-    const [createBillingStatus, setCreateBillingStatus] = useState('Paid');
-    const [creating, setCreating] = useState(false);
+    // Completion / Check-out & Parts State
+    const [report, setReport] = useState('');
+    const [nextAction, setNextAction] = useState('');
+    const [billing, setBilling] = useState('Paid');
+    const [expenses, setExpenses] = useState([]);
+    const [productPhoto, setProductPhoto] = useState('');
+    const [uploadingPhoto, setUploadingPhoto] = useState(false);
+    const [mgr5Parts, setMgr5Parts] = useState([]);
+    const [selectedMgr5PartId, setSelectedMgr5PartId] = useState('');
+    const [expDesc, setExpDesc] = useState('');
+    const [expQty, setExpQty] = useState(1);
+    const [expRate, setExpRate] = useState('');
+    const [isPartChange, setIsPartChange] = useState(true);
+    const [isCustomExpDesc, setIsCustomExpDesc] = useState(false);
+    const [isDrawing, setIsDrawing] = useState(false);
+
+    const handleSelectVisit = (v) => {
+        setSelectedVisit(v);
+        setIsQueueCollapsed(true); // Open full-screen view on Select
+    };
 
     const fetchVisits = async () => {
         setLoading(true);
@@ -317,42 +323,63 @@ const ServiceVisits = () => {
                 productService.getAll({ limit: 1000 })
             ]);
             
-            let combined = [];
+            let sparesMgr5Id = null;
             if (mgrRes.status === 'fulfilled') {
                 const mgrData = Array.isArray(mgrRes.value.data) ? mgrRes.value.data : (mgrRes.value.data?.data || []);
-                mgrData.forEach(m => {
-                    combined.push({
-                        id: m._id,
-                        code: m.code,
-                        name: m.description,
-                        label: `[MGR5 Part] ${m.code} - ${m.description}`,
-                        rate: 0,
-                        source: 'MGR5'
-                    });
-                });
+                const sparesItem = mgrData.find(m => 
+                    (m.code || '').toLowerCase().includes('spr') || 
+                    (m.description || m.name || '').toLowerCase().includes('spare')
+                ) || mgrData[0];
+                if (sparesItem) sparesMgr5Id = sparesItem._id;
             }
+
+            let prodList = [];
             if (prodRes.status === 'fulfilled') {
                 const prodData = Array.isArray(prodRes.value.data) ? prodRes.value.data : (prodRes.value.data?.data || []);
-                // Prioritize products assigned to MGR5 category
-                const productsWithMgr5 = prodData.filter(p => p.mgr5 || p.mgr5Id);
-                const listToUse = productsWithMgr5.length > 0 ? productsWithMgr5 : prodData;
+                
+                // Filter products configured under Product Grouping -> MGR5 -> Spares
+                const productsUnderMgr5Spares = prodData.filter(p => {
+                    if (!p.mgr5 && !p.mgr5Id) return false;
+                    const mgr5Obj = p.mgr5 || p.mgr5Id;
+                    if (typeof mgr5Obj === 'object') {
+                        const code = (mgr5Obj.code || '').toLowerCase();
+                        const desc = (mgr5Obj.description || mgr5Obj.name || '').toLowerCase();
+                        if (sparesMgr5Id && (mgr5Obj._id === sparesMgr5Id || mgr5Obj.id === sparesMgr5Id)) return true;
+                        return code.includes('spr') || desc.includes('spare');
+                    }
+                    if (typeof mgr5Obj === 'string') {
+                        return (sparesMgr5Id && mgr5Obj === sparesMgr5Id) || mgr5Obj.toLowerCase().includes('spr') || mgr5Obj.toLowerCase().includes('spare');
+                    }
+                    return false;
+                });
+
+                // Use products under MGR5 -> Spares, fallback to prodData if empty
+                const listToUse = productsUnderMgr5Spares.length > 0 ? productsUnderMgr5Spares : prodData;
 
                 listToUse.forEach(p => {
-                    const mgr5Code = p.mgr5?.code || p.mgr5Id?.code || (typeof p.mgr5 === 'string' ? 'SP' : '');
-                    const mgr5Badge = mgr5Code ? ` [MGR5: ${mgr5Code}]` : '';
-                    combined.push({
+                    prodList.push({
                         id: p._id,
                         code: p.productCode,
                         name: p.productName,
-                        label: `[MGR5 Product] ${p.productName} (${p.productCode})${mgr5Badge}`,
+                        label: `${p.productName} (${p.productCode})`,
                         rate: p.mrp || p.basePrice || 0,
                         source: 'Product'
                     });
                 });
             }
-            setMgr5Parts(combined);
+
+            setMgr5Parts(prodList);
+
+            // Pre-select MGR5 Spares product by default when opening
+            if (prodList.length > 0 && !selectedMgr5PartId) {
+                const defaultProd = prodList[0];
+                setSelectedMgr5PartId(defaultProd.id);
+                setExpDesc(`${defaultProd.name}${defaultProd.code ? ` (${defaultProd.code})` : ''}`);
+                if (defaultProd.rate > 0) setExpRate(defaultProd.rate);
+                setIsPartChange(true);
+            }
         } catch (error) {
-            console.error('Failed to load MGR5 catalog', error);
+            console.error('Failed to load MGR5 catalog products', error);
         }
     };
 
@@ -703,18 +730,6 @@ const ServiceVisits = () => {
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
                     <button
-                        type="button"
-                        onClick={() => setIsQueueCollapsed(!isQueueCollapsed)}
-                        className={`px-4 py-3 rounded-2xl text-xs font-black uppercase tracking-wider transition-all border shadow-xs flex items-center justify-center gap-2 active:scale-95 ${
-                            isQueueCollapsed 
-                                ? 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100' 
-                                : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
-                        }`}
-                        title={isQueueCollapsed ? 'Expand Visit List Queue' : 'Collapse Visit List Queue'}
-                    >
-                        {isQueueCollapsed ? '▶ Show Visit List' : '◀ Collapse List (Full Screen Panel)'}
-                    </button>
-                    <button
                         onClick={() => handleOpenCreateModal()}
                         className="px-5 py-3 bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-xs tracking-wider rounded-2xl transition-all shadow-md flex items-center justify-center gap-2 active:scale-95 shrink-0"
                     >
@@ -748,68 +763,119 @@ const ServiceVisits = () => {
                                     </button>
                                 </div>
                             ) : (
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-left border-collapse text-sm">
-                                        <thead>
-                                            <tr className="bg-slate-50 text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100">
-                                                <th className="px-6 py-4">Visit No</th>
-                                                <th className="px-6 py-4">Ticket Details</th>
-                                                <th className="px-6 py-4">Engineer</th>
-                                                <th className="px-6 py-4">Scheduled Date</th>
-                                                <th className="px-6 py-4">Status</th>
-                                                <th className="px-6 py-4 text-center">Action</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-50 font-semibold text-slate-700">
-                                            {visits.map((v) => {
-                                                const isSelected = selectedVisit?._id === v._id;
-                                                return (
-                                                    <tr 
-                                                        key={v._id} 
-                                                        className={`transition-colors cursor-pointer ${
-                                                            isSelected 
-                                                                ? 'bg-primary-50/60 border-l-4 border-l-primary-600 font-bold' 
-                                                                : 'hover:bg-slate-50/50'
+                                <>
+                                    {/* Mobile Cards View (Phone Screens) */}
+                                    <div className="space-y-3 block sm:hidden">
+                                        {visits.map((v) => {
+                                            const isSelected = selectedVisit?._id === v._id;
+                                            return (
+                                                <div 
+                                                    key={v._id} 
+                                                    onClick={() => handleSelectVisit(v)}
+                                                    className={`csm-mobile-card border transition-all cursor-pointer ${
+                                                        isSelected 
+                                                            ? 'bg-primary-50/70 border-primary-500 shadow-md ring-2 ring-primary-500/20' 
+                                                            : 'bg-white border-slate-200 hover:border-slate-300'
+                                                    }`}
+                                                >
+                                                    <div className="flex items-center justify-between gap-2 mb-2">
+                                                        <span className="font-black text-slate-900 text-sm">{v.visitNo}</span>
+                                                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase border tracking-wider ${
+                                                            v.status === 'Completed' ? 'bg-teal-50 text-teal-600 border-teal-200' :
+                                                            v.status === 'Started' ? 'bg-indigo-50 text-indigo-600 border-indigo-200' :
+                                                            v.status === 'Cancelled' ? 'bg-rose-50 text-rose-600 border-rose-200' :
+                                                            'bg-slate-50 text-slate-500 border-slate-200'
+                                                        }`}>
+                                                            {v.status}
+                                                        </span>
+                                                    </div>
+                                                    <div className="space-y-1 mb-3 text-xs font-semibold">
+                                                        <p className="font-black text-slate-800">{v.ticketId?.ticketNo || 'N/A'} - {v.ticketId?.issueTitle}</p>
+                                                        <p className="text-slate-500">{v.ticketId?.customerId?.customerName}</p>
+                                                        <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-100 mt-2">
+                                                            <span>Eng: {v.engineerId?.name || 'Unassigned'}</span>
+                                                            <span>{new Date(v.scheduledDate).toLocaleDateString()}</span>
+                                                        </div>
+                                                    </div>
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); handleSelectVisit(v); }}
+                                                        className={`csm-mobile-btn-full font-black uppercase rounded-xl transition-all ${
+                                                            isSelected
+                                                                ? 'bg-primary-600 text-white shadow-sm'
+                                                                : 'bg-primary-50 text-primary-600 hover:bg-primary-100'
                                                         }`}
-                                                        onClick={() => setSelectedVisit(v)}
                                                     >
-                                                        <td className="px-6 py-4 font-black text-slate-900">{v.visitNo}</td>
-                                                        <td className="px-6 py-4">
-                                                            <p className="font-bold text-slate-900">{v.ticketId?.ticketNo || 'N/A'}</p>
-                                                            <p className="text-[10px] text-slate-400 uppercase tracking-tight">{v.ticketId?.customerId?.customerName}</p>
-                                                        </td>
-                                                        <td className="px-6 py-4 text-slate-500">{v.engineerId?.name || 'Unassigned'}</td>
-                                                        <td className="px-6 py-4 text-slate-500">{new Date(v.scheduledDate).toLocaleString()}</td>
-                                                        <td className="px-4 py-4 whitespace-nowrap">
-                                                            <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase border tracking-wider ${
-                                                                v.status === 'Completed' ? 'bg-teal-50 text-teal-600 border-teal-200' :
-                                                                v.status === 'Started' ? 'bg-indigo-50 text-indigo-600 border-indigo-200' :
-                                                                v.status === 'Cancelled' ? 'bg-rose-50 text-rose-600 border-rose-200' :
-                                                                'bg-slate-50 text-slate-500 border-slate-200'
-                                                            }`}>
-                                                                {v.status}
-                                                            </span>
-                                                        </td>
-                                                        <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
-                                                            <div className="flex justify-center">
-                                                                <button
-                                                                    onClick={() => setSelectedVisit(v)}
-                                                                    className={`px-3.5 py-1.5 rounded-xl text-xs font-black uppercase transition-all ${
-                                                                        isSelected
-                                                                            ? 'bg-primary-600 text-white shadow-sm'
-                                                                            : 'bg-primary-50 text-primary-600 hover:bg-primary-100'
-                                                                    }`}
-                                                                >
-                                                                    {isSelected ? 'Selected' : 'Select'}
-                                                                </button>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })}
-                                        </tbody>
-                                    </table>
-                                </div>
+                                                        {isSelected ? '✓ Selected (Viewing Details)' : 'Select & View Details'}
+                                                    </button>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+
+                                    {/* Desktop & Tablet Table View */}
+                                    <div className="overflow-x-auto hidden sm:block">
+                                        <table className="w-full text-left border-collapse text-sm">
+                                            <thead>
+                                                <tr className="bg-slate-50 text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100">
+                                                    <th className="px-6 py-4">Visit No</th>
+                                                    <th className="px-6 py-4">Ticket Details</th>
+                                                    <th className="px-6 py-4">Engineer</th>
+                                                    <th className="px-6 py-4">Scheduled Date</th>
+                                                    <th className="px-6 py-4">Status</th>
+                                                    <th className="px-6 py-4 text-center">Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-50 font-semibold text-slate-700">
+                                                {visits.map((v) => {
+                                                    const isSelected = selectedVisit?._id === v._id;
+                                                    return (
+                                                        <tr 
+                                                            key={v._id} 
+                                                            className={`transition-colors cursor-pointer ${
+                                                                isSelected 
+                                                                    ? 'bg-primary-50/60 border-l-4 border-l-primary-600 font-bold' 
+                                                                    : 'hover:bg-slate-50/50'
+                                                            }`}
+                                                            onClick={() => handleSelectVisit(v)}
+                                                        >
+                                                            <td className="px-6 py-4 font-black text-slate-900">{v.visitNo}</td>
+                                                            <td className="px-6 py-4">
+                                                                <p className="font-bold text-slate-900">{v.ticketId?.ticketNo || 'N/A'}</p>
+                                                                <p className="text-[10px] text-slate-400 uppercase tracking-tight">{v.ticketId?.customerId?.customerName}</p>
+                                                            </td>
+                                                            <td className="px-6 py-4 text-slate-500">{v.engineerId?.name || 'Unassigned'}</td>
+                                                            <td className="px-6 py-4 text-slate-500">{new Date(v.scheduledDate).toLocaleString()}</td>
+                                                            <td className="px-4 py-4 whitespace-nowrap">
+                                                                <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase border tracking-wider ${
+                                                                    v.status === 'Completed' ? 'bg-teal-50 text-teal-600 border-teal-200' :
+                                                                    v.status === 'Started' ? 'bg-indigo-50 text-indigo-600 border-indigo-200' :
+                                                                    v.status === 'Cancelled' ? 'bg-rose-50 text-rose-600 border-rose-200' :
+                                                                    'bg-slate-50 text-slate-500 border-slate-200'
+                                                                }`}>
+                                                                    {v.status}
+                                                                </span>
+                                                            </td>
+                                                            <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
+                                                                <div className="flex justify-center">
+                                                                    <button
+                                                                        onClick={() => handleSelectVisit(v)}
+                                                                        className={`px-3.5 py-1.5 rounded-xl text-xs font-black uppercase transition-all ${
+                                                                            isSelected
+                                                                                ? 'bg-primary-600 text-white shadow-sm'
+                                                                                : 'bg-primary-50 text-primary-600 hover:bg-primary-100'
+                                                                        }`}
+                                                                    >
+                                                                        {isSelected ? 'Selected' : 'Select'}
+                                                                    </button>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </>
                             )}
                         </div>
                     </div>
@@ -820,6 +886,15 @@ const ServiceVisits = () => {
                     {selectedVisit ? (
                         <div className="glass shadow-premium rounded-[2rem] p-6 bg-white border border-slate-100 space-y-6 animate-scale-in">
                             <div className="border-b border-slate-100 pb-4">
+                                {isQueueCollapsed && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsQueueCollapsed(false)}
+                                        className="mb-3 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-black uppercase tracking-wider transition-all border border-slate-200 inline-flex items-center gap-1.5 active:scale-95 shadow-2xs"
+                                    >
+                                        ← Back to Visit Queue List
+                                    </button>
+                                )}
                                 <div className="flex justify-between items-start gap-4">
                                     <div>
                                         <span className="text-[10px] font-black uppercase tracking-widest text-teal-600">Active Service Dispatch</span>
@@ -830,13 +905,6 @@ const ServiceVisits = () => {
                                         )}
                                     </div>
                                     <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2">
-                                        <button
-                                            type="button"
-                                            onClick={() => setIsQueueCollapsed(!isQueueCollapsed)}
-                                            className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all border border-amber-200 shrink-0"
-                                        >
-                                            {isQueueCollapsed ? '← Show Visit Queue' : 'Expand Panel (Collapse Queue) ◀'}
-                                        </button>
                                         {['Scheduled', 'In Transit', 'Started'].includes(selectedVisit.status) && (
                                             <button
                                                 onClick={() => {
@@ -936,16 +1004,58 @@ const ServiceVisits = () => {
                                         {/* Line Input Row (Part Description, Qty, Rate, Add Button) */}
                                         <div className="grid grid-cols-12 gap-2 items-center pt-1">
                                             <div className="col-span-5">
-                                                <input 
-                                                    type="text" 
-                                                    placeholder="Part / Charge Name" 
-                                                    value={expDesc} 
-                                                    onChange={e => {
-                                                        setExpDesc(e.target.value);
-                                                        if (!e.target.value) setSelectedMgr5PartId('');
-                                                    }} 
-                                                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 bg-white focus:ring-2 focus:ring-teal-500 outline-none"
-                                                />
+                                                {isCustomExpDesc ? (
+                                                    <div className="relative flex items-center">
+                                                        <input 
+                                                            type="text" 
+                                                            placeholder="Custom Part / Charge Name" 
+                                                            value={expDesc} 
+                                                            onChange={e => setExpDesc(e.target.value)} 
+                                                            className="w-full px-3 py-2 pr-7 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 bg-white focus:ring-2 focus:ring-teal-500 outline-none"
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setIsCustomExpDesc(false)}
+                                                            className="absolute right-2 text-slate-400 hover:text-slate-600"
+                                                            title="Switch to MGR5 Dropdown"
+                                                        >
+                                                            <MdExpandMore size={16} />
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <select 
+                                                        value={selectedMgr5PartId || ''} 
+                                                        onChange={e => {
+                                                            const val = e.target.value;
+                                                            if (val === '__custom__') {
+                                                                setIsCustomExpDesc(true);
+                                                                setSelectedMgr5PartId('');
+                                                                setExpDesc('');
+                                                                return;
+                                                            }
+                                                            if (!val) {
+                                                                setSelectedMgr5PartId('');
+                                                                setExpDesc('');
+                                                                setExpRate('');
+                                                                return;
+                                                            }
+                                                            const found = mgr5Parts.find(p => p.id === val);
+                                                            if (found) {
+                                                                handleSelectMgr5Part(found);
+                                                            }
+                                                        }} 
+                                                        className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 bg-white focus:ring-2 focus:ring-teal-500 outline-none cursor-pointer truncate"
+                                                    >
+                                                        <option value="">-- Select Spare / Product (MGR5 → Spares) --</option>
+                                                        {mgr5Parts.map(item => (
+                                                            <option key={item.id} value={item.id}>
+                                                                {item.source === 'Product' ? '📦 ' : '🔧 '}
+                                                                {item.name} {item.code ? `(${item.code})` : ''} {item.rate > 0 ? `- ₹${item.rate}` : ''}
+                                                            </option>
+                                                        ))}
+                                                        <option value="__custom__">✍️ Custom Manual Entry...</option>
+                                                    </select>
+                                                )}
                                             </div>
                                             <div className="col-span-2">
                                                 <input 

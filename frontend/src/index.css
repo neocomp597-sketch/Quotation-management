@@ -760,5 +760,32 @@ html, body {
   }
 }
 
+/* ==========================================================================
+   CSM Mobile View & Media Query Enhancements
+   ========================================================================== */
+@media (max-width: 640px) {
+  .csm-mobile-page {
+    padding: 0.75rem !important;
+  }
+  .csm-mobile-card {
+    border-radius: 1.25rem !important;
+    padding: 1rem !important;
+    margin-bottom: 0.75rem !important;
+  }
+  .csm-mobile-btn-full {
+    width: 100% !important;
+    min-height: 48px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 0.8125rem !important;
+  }
+  .csm-mobile-signature-canvas {
+    width: 100% !important;
+    max-width: 100% !important;
+    touch-action: none !important;
+  }
+}
+
 
 

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { csmService, userService, uploadService } from '../services/api';
+import { csmService, userService, uploadService, mgrService, productService } from '../services/api';
 import { toast } from 'react-toastify';
 import { 
     MdAssignment, MdPerson, MdCalendarMonth, 
@@ -57,7 +57,7 @@ const TicketDetail = () => {
     const [isCapturingGps, setIsCapturingGps] = useState(false);
     const [manualAddress, setManualAddress] = useState('');
 
-    // Ticket Closing Modal State
+    // Ticket Closing Modal & Parts State
     const [showCloseModal, setShowCloseModal] = useState(false);
     const [closeResolutionNotes, setCloseResolutionNotes] = useState('');
     const [closeIsFcr, setCloseIsFcr] = useState(true);
@@ -67,6 +67,134 @@ const TicketDetail = () => {
     const [closeProductImage, setCloseProductImage] = useState('');
     const [uploadingCloseImage, setUploadingCloseImage] = useState(false);
     const [isClosingTicket, setIsClosingTicket] = useState(false);
+
+    // MGR5 Spares Parts State
+    const [mgr5Parts, setMgr5Parts] = useState([]);
+    const [selectedMgr5PartId, setSelectedMgr5PartId] = useState('');
+    const [expDesc, setExpDesc] = useState('');
+    const [expQty, setExpQty] = useState(1);
+    const [expRate, setExpRate] = useState('');
+    const [isPartChange, setIsPartChange] = useState(true);
+    const [isCustomExpDesc, setIsCustomExpDesc] = useState(false);
+    const [closeExpenses, setCloseExpenses] = useState([]);
+
+    const fetchMgr5PartsForTicket = async () => {
+        try {
+            const [mgrRes, prodRes] = await Promise.allSettled([
+                mgrService.getAll('MGR5'),
+                productService.getAll({ limit: 1000 })
+            ]);
+            
+            let sparesMgr5Id = null;
+            if (mgrRes.status === 'fulfilled') {
+                const mgrData = Array.isArray(mgrRes.value.data) ? mgrRes.value.data : (mgrRes.value.data?.data || []);
+                const sparesItem = mgrData.find(m => 
+                    (m.code || '').toLowerCase().includes('spr') || 
+                    (m.description || m.name || '').toLowerCase().includes('spare')
+                ) || mgrData[0];
+                if (sparesItem) sparesMgr5Id = sparesItem._id;
+            }
+
+            let prodList = [];
+            if (prodRes.status === 'fulfilled') {
+                const prodData = Array.isArray(prodRes.value.data) ? prodRes.value.data : (prodRes.value.data?.data || []);
+                const productsUnderMgr5Spares = prodData.filter(p => {
+                    if (!p.mgr5 && !p.mgr5Id) return false;
+                    const mgr5Obj = p.mgr5 || p.mgr5Id;
+                    if (typeof mgr5Obj === 'object') {
+                        const code = (mgr5Obj.code || '').toLowerCase();
+                        const desc = (mgr5Obj.description || mgr5Obj.name || '').toLowerCase();
+                        if (sparesMgr5Id && (mgr5Obj._id === sparesMgr5Id || mgr5Obj.id === sparesMgr5Id)) return true;
+                        return code.includes('spr') || desc.includes('spare');
+                    }
+                    if (typeof mgr5Obj === 'string') {
+                        return (sparesMgr5Id && mgr5Obj === sparesMgr5Id) || mgr5Obj.toLowerCase().includes('spr') || mgr5Obj.toLowerCase().includes('spare');
+                    }
+                    return false;
+                });
+
+                const listToUse = productsUnderMgr5Spares.length > 0 ? productsUnderMgr5Spares : prodData;
+                listToUse.forEach(p => {
+                    prodList.push({
+                        id: p._id,
+                        code: p.productCode,
+                        name: p.productName,
+                        label: `${p.productName} (${p.productCode})`,
+                        rate: p.mrp || p.basePrice || 0,
+                        source: 'Product'
+                    });
+                });
+            }
+
+            setMgr5Parts(prodList);
+
+            if (prodList.length > 0 && !selectedMgr5PartId) {
+                const defaultProd = prodList[0];
+                setSelectedMgr5PartId(defaultProd.id);
+                setExpDesc(`${defaultProd.name}${defaultProd.code ? ` (${defaultProd.code})` : ''}`);
+                if (defaultProd.rate > 0) setExpRate(defaultProd.rate);
+                setIsPartChange(true);
+            }
+        } catch (error) {
+            console.error('Failed to load MGR5 catalog for ticket close', error);
+        }
+    };
+
+    useEffect(() => {
+        if (showCloseModal) {
+            fetchMgr5PartsForTicket();
+        }
+    }, [showCloseModal]);
+
+    const handleSelectMgr5PartForTicket = (itemOrId) => {
+        if (typeof itemOrId === 'string') {
+            if (itemOrId === '__custom__') {
+                setIsCustomExpDesc(true);
+                setSelectedMgr5PartId('');
+                setExpDesc('');
+                return;
+            }
+            setSelectedMgr5PartId(itemOrId);
+            const found = mgr5Parts.find(p => p.id === itemOrId);
+            if (found) {
+                setExpDesc(`${found.name} (${found.code})`);
+                if (found.rate > 0) setExpRate(found.rate);
+                setIsPartChange(true);
+                setIsCustomExpDesc(false);
+            }
+        } else if (itemOrId && typeof itemOrId === 'object') {
+            setSelectedMgr5PartId(itemOrId.id);
+            setExpDesc(`${itemOrId.name}${itemOrId.code ? ` (${itemOrId.code})` : ''}`);
+            if (itemOrId.rate > 0) setExpRate(itemOrId.rate);
+            setIsPartChange(true);
+            setIsCustomExpDesc(false);
+        }
+    };
+
+    const handleAddCloseExpense = (e) => {
+        if (e) e.preventDefault();
+        if (!expDesc.trim()) {
+            toast.error('Please select an MGR5 Part or enter Part/Charge name');
+            return;
+        }
+        const qtyNum = Number(expQty) || 1;
+        const rateNum = Number(expRate) || 0;
+        const newExpense = {
+            mgr5Id: selectedMgr5PartId || null,
+            description: expDesc.trim(),
+            quantity: qtyNum,
+            rate: rateNum,
+            amount: qtyNum * rateNum,
+            isPartChange
+        };
+        setCloseExpenses(prev => [...prev, newExpense]);
+        setExpQty(1);
+        toast.success(`Recorded expense/part: ${expDesc}`);
+    };
+
+    const handleRemoveCloseExpense = (idx) => {
+        setCloseExpenses(prev => prev.filter((_, i) => i !== idx));
+    };
 
     // RCA Report Form State
     const [rcaForm, setRcaForm] = useState({
@@ -1593,6 +1721,135 @@ const TicketDetail = () => {
                         />
                     </div>
 
+                    {/* Expenses & Part Change Log for Ticket Close */}
+                    <div className="space-y-3 p-4 bg-slate-50/80 rounded-2xl border border-slate-200/60">
+                        <div className="flex justify-between items-center pb-1">
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-600 uppercase tracking-widest">
+                                    PART CHANGE & EXPENSE LOG
+                                </label>
+                                <p className="text-[10px] text-slate-400 font-semibold">Select MGR5 parts or products to log field expenses</p>
+                            </div>
+                            <label className="flex items-center gap-1.5 cursor-pointer bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs">
+                                <input 
+                                    type="checkbox" 
+                                    checked={isPartChange} 
+                                    onChange={(e) => setIsPartChange(e.target.checked)} 
+                                    className="h-3.5 w-3.5 text-emerald-600 rounded border-slate-300 cursor-pointer"
+                                />
+                                <span className="text-[10px] font-black text-emerald-800 uppercase">Replaced Spare Part</span>
+                            </label>
+                        </div>
+
+                        {/* MGR5 Spares Default Active Badge */}
+                        <div className="w-full px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between">
+                            <div className="flex items-center gap-2 truncate">
+                                <span className="px-1.5 py-0.5 bg-amber-200/80 text-amber-900 font-black text-[9px] rounded uppercase">
+                                    MGR5 SPARE
+                                </span>
+                                <span className="text-xs font-black text-amber-950">SPARES (SPRS) — Selected by Default</span>
+                            </div>
+                            <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-md shrink-0">
+                                {mgr5Parts.length} Products Configured
+                            </span>
+                        </div>
+
+                        {/* Part / Change Name Dropdown populated from Product Grouping -> MGR5 -> Spares */}
+                        <div className="grid grid-cols-12 gap-2 items-center pt-1">
+                            <div className="col-span-5">
+                                {isCustomExpDesc ? (
+                                    <input 
+                                        type="text" 
+                                        placeholder="Custom Part / Charge Name" 
+                                        value={expDesc} 
+                                        onChange={e => setExpDesc(e.target.value)} 
+                                        className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 bg-white focus:ring-2 focus:ring-emerald-500 outline-none"
+                                    />
+                                ) : (
+                                    <select 
+                                        value={selectedMgr5PartId || ''} 
+                                        onChange={e => {
+                                            const val = e.target.value;
+                                            if (val === '__custom__') {
+                                                setIsCustomExpDesc(true);
+                                                setSelectedMgr5PartId('');
+                                                setExpDesc('');
+                                                return;
+                                            }
+                                            if (!val) {
+                                                setSelectedMgr5PartId('');
+                                                setExpDesc('');
+                                                setExpRate('');
+                                                return;
+                                            }
+                                            handleSelectMgr5PartForTicket(val);
+                                        }} 
+                                        className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 bg-white focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer truncate"
+                                    >
+                                        <option value="">-- Select Spare / Product (MGR5 → Spares) --</option>
+                                        {mgr5Parts.map(item => (
+                                            <option key={item.id} value={item.id}>
+                                                📦 {item.name} {item.code ? `(${item.code})` : ''} {item.rate > 0 ? `- ₹${item.rate}` : ''}
+                                            </option>
+                                        ))}
+                                        <option value="__custom__">✍️ Custom Manual Entry...</option>
+                                    </select>
+                                )}
+                            </div>
+                            <div className="col-span-2">
+                                <input 
+                                    type="number" 
+                                    min="1"
+                                    placeholder="Qty" 
+                                    value={expQty} 
+                                    onChange={e => setExpQty(e.target.value)} 
+                                    className="w-full px-2 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 text-center bg-white focus:ring-2 focus:ring-emerald-500 outline-none"
+                                />
+                            </div>
+                            <div className="col-span-2">
+                                <input 
+                                    type="number" 
+                                    min="0"
+                                    placeholder="Rate ₹" 
+                                    value={expRate} 
+                                    onChange={e => setExpRate(e.target.value)} 
+                                    className="w-full px-2 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 text-center bg-white focus:ring-2 focus:ring-emerald-500 outline-none"
+                                />
+                            </div>
+                            <div className="col-span-3">
+                                <button 
+                                    type="button"
+                                    onClick={handleAddCloseExpense}
+                                    className="w-full py-2 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-sm active:scale-95"
+                                >
+                                    + Add Item
+                                </button>
+                            </div>
+                        </div>
+
+                        {closeExpenses.length > 0 && (
+                            <div className="space-y-1.5 pt-2">
+                                {closeExpenses.map((ex, idx) => (
+                                    <div key={idx} className="flex justify-between items-center text-xs font-bold text-slate-600 bg-white p-2 rounded-lg border border-slate-100 shadow-sm">
+                                        <div className="flex items-center gap-2">
+                                            {ex.isPartChange && (
+                                                <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 text-[9px] font-black uppercase rounded tracking-wider">
+                                                    Part Changed
+                                                </span>
+                                            )}
+                                            <span className="text-slate-900 font-extrabold">{ex.description}</span>
+                                            <span className="text-[10px] text-slate-400 font-semibold ml-2">({ex.quantity || 1} x ₹{ex.rate || 0})</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-emerald-700 font-black">₹{ex.amount}</span>
+                                            <button type="button" onClick={() => handleRemoveCloseExpense(idx)} className="text-rose-500 hover:text-rose-700"><MdDelete /></button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
                     <div className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-xl">
                         <div>
                             <span className="text-xs font-bold text-slate-900 block">First Call Resolved (FCR)</span>
@@ -1647,6 +1904,7 @@ const TicketDetail = () => {
                                 <input
                                     type="file"
                                     accept="image/*"
+                                    capture="environment"
                                     className="hidden"
                                     disabled={uploadingCloseImage}
                                     onChange={(e) => e.target.files?.[0] && handleUploadCloseImage(e.target.files[0])}

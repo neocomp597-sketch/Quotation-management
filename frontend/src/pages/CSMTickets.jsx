@@ -92,6 +92,7 @@ const CSMTickets = () => {
     const [filterInvoiceType, setFilterInvoiceType] = useState('');
     const [filterCustomer, setFilterCustomer] = useState('');
     const [filterBranch, setFilterBranch] = useState('');
+    const [isFilterCollapsed, setIsFilterCollapsed] = useState(false);
     const [ticketCustomers, setTicketCustomers] = useState([]);
     const [branches, setBranches] = useState([]);
 
@@ -1578,88 +1579,101 @@ const CSMTickets = () => {
 
             {/* Filters Toolbar */}
             <div className="glass shadow-premium rounded-[2rem] p-6 bg-white border border-slate-100 flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between relative z-20">
-                <form onSubmit={handleSearchSubmit} className="flex-1 max-w-md relative">
-                    <input
-                        type="text"
-                        placeholder="Search ticket no, title, contact..."
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        className="w-full pl-12 pr-4 py-3 rounded-2xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-semibold"
-                    />
-                    <MdSearch className="absolute left-4 top-3.5 text-slate-400" size={20} />
-                </form>
-                <div className="flex flex-wrap items-center gap-3">
-                    {/* Customer Filter */}
-                    <div className="flex items-center gap-2 bg-slate-50 border border-slate-100 rounded-2xl px-4 py-1">
-                        <MdFilterList className="text-slate-400" />
-                        <span className="text-xs font-black uppercase tracking-wider text-slate-400">Customer</span>
-                        <SearchableSelect
-                            options={ticketCustomers.map(c => ({
-                                value: c._id,
-                                label: c.companyName || c.customerName
-                            }))}
-                            value={filterCustomer}
-                            onChange={(val) => { setFilterCustomer(val); setPage(1); }}
-                            placeholder="All Customers"
-                            inputClass="bg-transparent border-none outline-none text-xs font-bold text-slate-700 cursor-pointer flex items-center gap-1 max-w-[180px] truncate"
-                            menuClass="w-64"
+                <div className="flex-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                    <form onSubmit={handleSearchSubmit} className="flex-1 max-w-md relative">
+                        <input
+                            type="text"
+                            placeholder="Search ticket no, title, contact..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            className="w-full pl-12 pr-4 py-3 rounded-2xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-semibold"
                         />
-                    </div>
+                        <MdSearch className="absolute left-4 top-3.5 text-slate-400" size={20} />
+                    </form>
+                    <button
+                        type="button"
+                        onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
+                        className="px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-black uppercase text-xs tracking-wider rounded-2xl transition-all flex items-center justify-center gap-2 shrink-0 active:scale-95"
+                    >
+                        <MdFilterList size={18} />
+                        {isFilterCollapsed ? 'Show Filters' : 'Hide Filters'}
+                    </button>
+                </div>
 
-                    {/* Branch Filter */}
-                    {branches.length > 0 && (
+                {!isFilterCollapsed && (
+                    <div className="flex flex-wrap items-center gap-3 animate-fade-in">
+                        {/* Customer Filter */}
+                        <div className="flex items-center gap-2 bg-slate-50 border border-slate-100 rounded-2xl px-4 py-1">
+                            <MdFilterList className="text-slate-400" />
+                            <span className="text-xs font-black uppercase tracking-wider text-slate-400">Customer</span>
+                            <SearchableSelect
+                                options={ticketCustomers.map(c => ({
+                                    value: c._id,
+                                    label: c.companyName || c.customerName
+                                }))}
+                                value={filterCustomer}
+                                onChange={(val) => { setFilterCustomer(val); setPage(1); }}
+                                placeholder="All Customers"
+                                inputClass="bg-transparent border-none outline-none text-xs font-bold text-slate-700 cursor-pointer flex items-center gap-1 max-w-[180px] truncate"
+                                menuClass="w-64"
+                            />
+                        </div>
+
+                        {/* Branch Filter */}
+                        {branches.length > 0 && (
+                            <div className="flex items-center gap-2 bg-slate-50 border border-slate-100 rounded-2xl px-4 py-1.5">
+                                <MdFilterList className="text-slate-400" />
+                                <span className="text-xs font-black uppercase tracking-wider text-slate-400">Branch</span>
+                                <select
+                                    value={filterBranch}
+                                    onChange={(e) => { setFilterBranch(e.target.value); setPage(1); }}
+                                    className="bg-transparent border-none focus:outline-none text-xs font-bold text-slate-700 cursor-pointer"
+                                >
+                                    <option value="">All Branches</option>
+                                    {branches.map(b => (
+                                        <option key={b._id} value={b._id}>{b.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+
+                        {/* Invoice Type Filter */}
                         <div className="flex items-center gap-2 bg-slate-50 border border-slate-100 rounded-2xl px-4 py-1.5">
                             <MdFilterList className="text-slate-400" />
-                            <span className="text-xs font-black uppercase tracking-wider text-slate-400">Branch</span>
+                            <span className="text-xs font-black uppercase tracking-wider text-slate-400">Ticket Type</span>
                             <select
-                                value={filterBranch}
-                                onChange={(e) => { setFilterBranch(e.target.value); setPage(1); }}
+                                value={filterInvoiceType}
+                                onChange={(e) => { setFilterInvoiceType(e.target.value); setPage(1); }}
                                 className="bg-transparent border-none focus:outline-none text-xs font-bold text-slate-700 cursor-pointer"
                             >
-                                <option value="">All Branches</option>
-                                {branches.map(b => (
-                                    <option key={b._id} value={b._id}>{b.name}</option>
-                                ))}
+                                <option value="">All Tickets</option>
+                                <option value="standard">System Tickets</option>
+                                <option value="manual">Manual Tickets</option>
                             </select>
                         </div>
-                    )}
 
-                    {/* Invoice Type Filter */}
-                    <div className="flex items-center gap-2 bg-slate-50 border border-slate-100 rounded-2xl px-4 py-1.5">
-                        <MdFilterList className="text-slate-400" />
-                        <span className="text-xs font-black uppercase tracking-wider text-slate-400">Ticket Type</span>
-                        <select
-                            value={filterInvoiceType}
-                            onChange={(e) => { setFilterInvoiceType(e.target.value); setPage(1); }}
-                            className="bg-transparent border-none focus:outline-none text-xs font-bold text-slate-700 cursor-pointer"
-                        >
-                            <option value="">All Tickets</option>
-                            <option value="standard">System Tickets</option>
-                            <option value="manual">Manual Tickets</option>
-                        </select>
+                        {/* Status Filter */}
+                        <div className="flex items-center gap-2 bg-slate-50 border border-slate-100 rounded-2xl px-4 py-1.5">
+                            <MdFilterList className="text-slate-400" />
+                            <span className="text-xs font-black uppercase tracking-wider text-slate-400">Status</span>
+                            <select
+                                value={filterStatus}
+                                onChange={(e) => { setFilterStatus(e.target.value); setPage(1); }}
+                                className="bg-transparent border-none focus:outline-none text-xs font-bold text-slate-700 cursor-pointer"
+                            >
+                                <option value="">All Statuses</option>
+                                <option value="open_tickets">Open Tickets (In Process)</option>
+                                <option value="Open">Open</option>
+                                <option value="Assigned">Assigned</option>
+                                <option value="In Progress">In Progress</option>
+                                <option value="Pending Customer">Pending Customer</option>
+                                <option value="Resolved">Resolved</option>
+                                <option value="Closed">Closed</option>
+                                <option value="Escalated">Escalated</option>
+                            </select>
+                        </div>
                     </div>
-
-                    {/* Status Filter */}
-                    <div className="flex items-center gap-2 bg-slate-50 border border-slate-100 rounded-2xl px-4 py-1.5">
-                        <MdFilterList className="text-slate-400" />
-                        <span className="text-xs font-black uppercase tracking-wider text-slate-400">Status</span>
-                        <select
-                            value={filterStatus}
-                            onChange={(e) => { setFilterStatus(e.target.value); setPage(1); }}
-                            className="bg-transparent border-none focus:outline-none text-xs font-bold text-slate-700 cursor-pointer"
-                        >
-                            <option value="">All Statuses</option>
-                            <option value="open_tickets">Open Tickets (In Process)</option>
-                            <option value="Open">Open</option>
-                            <option value="Assigned">Assigned</option>
-                            <option value="In Progress">In Progress</option>
-                            <option value="Pending Customer">Pending Customer</option>
-                            <option value="Resolved">Resolved</option>
-                            <option value="Closed">Closed</option>
-                            <option value="Escalated">Escalated</option>
-                        </select>
-                    </div>
-                </div>
+                )}
             </div>
 
             {/* Table Card */}
