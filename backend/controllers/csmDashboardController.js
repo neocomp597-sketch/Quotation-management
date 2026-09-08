@@ -76,8 +76,8 @@ exports.getStats = async (req, res) => {
                     as: 'catInfo'
                 }
             },
-            { $unwind: '$catInfo' },
-            { $group: { _id: '$catInfo.name', count: { $sum: 1 } } }
+            { $unwind: { path: '$catInfo', preserveNullAndEmptyArrays: true } },
+            { $group: { _id: { $ifNull: ['$catInfo.name', 'General Service'] }, count: { $sum: 1 } } }
         ]);
 
         // SLA compliance breach ratios

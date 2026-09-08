@@ -45,6 +45,19 @@ const getScopedBranchIds = (user) => {
     return branches;
 };
 
+const mongoose = require('mongoose');
+
+const toObjectId = (val) => {
+    if (!val) return val;
+    if (Array.isArray(val)) {
+        return val.map(v => toObjectId(v));
+    }
+    if (typeof val === 'string' && mongoose.Types.ObjectId.isValid(val)) {
+        return new mongoose.Types.ObjectId(val);
+    }
+    return val;
+};
+
 /**
  * Builds MongoDB filter query incorporating strict access control hierarchy:
  * User -> Org Chart -> Branch -> Company
@@ -58,7 +71,8 @@ const buildAccessScopeQuery = async (req, {
     const user = req.user;
     if (!user) return {};
 
-    const companyId = customCompanyId || req.query?.companyId || req.headers?.['x-company-id'] || user.companyId;
+    const rawCompanyId = customCompanyId || req.query?.companyId || req.headers?.['x-company-id'] || user.companyId;
+    const companyId = toObjectId(rawCompanyId);
     const query = {};
 
     if (companyId) {
@@ -75,24 +89,25 @@ const buildAccessScopeQuery = async (req, {
     if (requestedBranch) {
         if (!isAdmin && userBranchIds.length > 0 && !userBranchIds.includes(requestedBranch.toString())) {
             // User requested branch outside their authorized branches -> constrain to authorized
-            query[branchField] = { $in: userBranchIds };
+            query[branchField] = { $in: userBranchIds.map(toObjectId) };
         } else {
-            query[branchField] = requestedBranch;
+            query[branchField] = toObjectId(requestedBranch);
         }
     } else if (!isAdmin && userBranchIds.length > 0) {
-        query[branchField] = { $in: userBranchIds };
+        query[branchField] = { $in: userBranchIds.map(toObjectId) };
     }
 
     // Role / Org-chart hierarchy scoping for non-admin users
     if (!isAdmin) {
-        const scopedUserIds = await getScopedUserIds(user.id || user._id, companyId);
+        const scopedUserIds = await getScopedUserIds(user.id || user._id, rawCompanyId);
+        const scopedObjectIds = scopedUserIds.map(toObjectId);
         
         const userOrEngineerConditions = [];
         if (userField) {
-            userOrEngineerConditions.push({ [userField]: { $in: scopedUserIds } });
+            userOrEngineerConditions.push({ [userField]: { $in: scopedObjectIds } });
         }
         if (engineerField) {
-            userOrEngineerConditions.push({ [engineerField]: { $in: scopedUserIds } });
+            userOrEngineerConditions.push({ [engineerField]: { $in: scopedObjectIds } });
         }
 
         if (userOrEngineerConditions.length > 1) {

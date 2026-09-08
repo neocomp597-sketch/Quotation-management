@@ -9,7 +9,8 @@ import {
     MdAssignment, MdHourglassEmpty, MdWarning, 
     MdCheckCircle, MdTimer, MdTrendingUp, MdRefresh,
     MdFlashOn, MdLocationOn, MdPerson, MdFilterList,
-    MdAssignmentInd, MdCalendarToday, MdBusiness
+    MdAssignmentInd, MdCalendarToday, MdBusiness,
+    MdExpandMore, MdExpandLess, MdRestartAlt, MdTune
 } from 'react-icons/md';
 import { toast } from 'react-toastify';
 
@@ -40,7 +41,41 @@ const CSMDashboard = () => {
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
     const [startDay, setStartDay] = useState('');
     const [endDay, setEndDay] = useState('');
-    const [customMode, setCustomMode] = useState(true);
+    const [customMode, setCustomMode] = useState(false);
+    const [isFilterCollapsed, setIsFilterCollapsed] = useState(true);
+
+    const getSelectedBranchName = () => {
+        if (!selectedBranch) return 'All Branches';
+        const found = branches.find(b => b._id === selectedBranch);
+        return found ? (found.name || found.code) : 'Branch';
+    };
+
+    const getActiveDateSummary = () => {
+        if (quickRange === 'today') return 'Today';
+        if (quickRange === 'yesterday') return 'Yesterday';
+        if (quickRange === 'thisMonth') return 'This Month';
+        if (quickRange === 'lastMonth') return 'Previous Month';
+        if (customMode) {
+            const monthNamesShort = [
+                'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+            ];
+            const mName = monthNamesShort[selectedMonth - 1] || '';
+            const rangeStr = (startDay || endDay) ? ` (${startDay || 1}-${endDay || daysInSelectedMonth})` : '';
+            return `${mName} ${selectedYear}${rangeStr}`;
+        }
+        return 'All Time';
+    };
+
+    const resetFilters = () => {
+        setSelectedBranch('');
+        setQuickRange('');
+        setCustomMode(false);
+        setStartDay('');
+        setEndDay('');
+        setSelectedMonth(new Date().getMonth() + 1);
+        setSelectedYear(new Date().getFullYear());
+    };
 
     const loadBranches = async () => {
         try {
@@ -220,146 +255,208 @@ const CSMDashboard = () => {
                 </div>
             </div>
 
-            {/* Filter Toolbar (Requirements 6, 7 & 8) */}
-            <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 font-black text-xs uppercase text-slate-500 tracking-wider">
-                        <MdFilterList size={18} className="text-teal-600" /> Filter View:
-                    </div>
-
-                    {/* Quick Range Selector */}
-                    <div className="flex flex-wrap items-center gap-1.5">
-                        <button
-                            onClick={() => { setQuickRange(''); setCustomMode(false); }}
-                            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all ${
-                                !quickRange && !customMode
-                                    ? 'bg-teal-600 text-white shadow-md'
-                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                            }`}
-                        >
-                            All Time
-                        </button>
-                        <button
-                            onClick={() => { setQuickRange('today'); setCustomMode(false); }}
-                            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all ${
-                                quickRange === 'today'
-                                    ? 'bg-teal-600 text-white shadow-md'
-                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                            }`}
-                        >
-                            Today
-                        </button>
-                        <button
-                            onClick={() => { setQuickRange('yesterday'); setCustomMode(false); }}
-                            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all ${
-                                quickRange === 'yesterday'
-                                    ? 'bg-teal-600 text-white shadow-md'
-                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                            }`}
-                        >
-                            Yesterday
-                        </button>
-                        <button
-                            onClick={() => { setQuickRange('thisMonth'); setCustomMode(false); }}
-                            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all ${
-                                quickRange === 'thisMonth'
-                                    ? 'bg-teal-600 text-white shadow-md'
-                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                            }`}
-                        >
-                            This Month
-                        </button>
-                        <button
-                            onClick={() => { setQuickRange('lastMonth'); setCustomMode(false); }}
-                            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all ${
-                                quickRange === 'lastMonth'
-                                    ? 'bg-teal-600 text-white shadow-md'
-                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                            }`}
-                        >
-                            Previous Month
-                        </button>
-                        <button
-                            onClick={() => { setQuickRange(''); setCustomMode(true); }}
-                            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center gap-1 ${
-                                customMode
-                                    ? 'bg-teal-600 text-white shadow-md'
-                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                            }`}
-                        >
-                            <MdCalendarToday size={14} /> Month / Day Range
-                        </button>
-                    </div>
-
-                    {/* Branch Filter Dropdown */}
-                    {branches.length > 0 && (
-                        <div className="flex items-center gap-2">
-                            <MdBusiness className="text-slate-400" size={16} />
-                            <select
-                                value={selectedBranch}
-                                onChange={(e) => setSelectedBranch(e.target.value)}
-                                className="bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 font-bold text-xs rounded-xl px-3 py-1.5 outline-none focus:ring-2 focus:ring-teal-500"
-                            >
-                                <option value="">All Branches</option>
-                                {branches.map((b) => (
-                                    <option key={b._id} value={b._id}>
-                                        {b.name || b.code}
-                                    </option>
-                                ))}
-                            </select>
+            {/* Filter Toolbar (Collapsible & Premium UI) */}
+            <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm transition-all overflow-hidden">
+                {/* Filter Header / Collapse Toggle Bar */}
+                <div 
+                    onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
+                    className="p-4 flex items-center justify-between gap-4 cursor-pointer select-none hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
+                >
+                    <div className="flex items-center gap-3">
+                        <div className="p-2.5 bg-teal-50 dark:bg-teal-950/60 text-teal-600 dark:text-teal-400 rounded-2xl border border-teal-100 dark:border-teal-900/50">
+                            <MdFilterList size={20} />
                         </div>
-                    )}
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 dark:text-slate-200">
+                                    Filter View
+                                </h3>
+                                {(selectedBranch || quickRange || customMode) && (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black bg-teal-100 dark:bg-teal-900/60 text-teal-700 dark:text-teal-300">
+                                        Active
+                                    </span>
+                                )}
+                            </div>
+                            <p className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 mt-0.5">
+                                {getSelectedBranchName()} • {getActiveDateSummary()}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                        {/* Quick Branch & Date Badges when collapsed */}
+                        {isFilterCollapsed && (
+                            <div className="hidden sm:flex items-center gap-2">
+                                <span className="px-3 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl text-[11px] font-bold border border-slate-200/60 dark:border-slate-700">
+                                    {getSelectedBranchName()}
+                                </span>
+                                <span className="px-3 py-1 bg-teal-50 dark:bg-teal-950/50 text-teal-600 dark:text-teal-300 rounded-xl text-[11px] font-bold border border-teal-200/60 dark:border-teal-900/50">
+                                    {getActiveDateSummary()}
+                                </span>
+                            </div>
+                        )}
+
+                        <button
+                            type="button"
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition-all"
+                            aria-label={isFilterCollapsed ? "Expand filters" : "Collapse filters"}
+                        >
+                            <span>{isFilterCollapsed ? "Expand Filters" : "Collapse"}</span>
+                            {isFilterCollapsed ? <MdExpandMore size={18} /> : <MdExpandLess size={18} />}
+                        </button>
+                    </div>
                 </div>
 
-                {/* Custom Month-wise & Day Range Selection (Requirement 7) */}
-                {customMode && (
-                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center gap-3 text-xs">
-                        <div className="flex items-center gap-2">
-                            <span className="font-bold text-slate-600">Month:</span>
-                            <select
-                                value={selectedMonth}
-                                onChange={(e) => setSelectedMonth(Number(e.target.value))}
-                                className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 font-semibold outline-none"
-                            >
-                                {monthNames.map((m, idx) => (
-                                    <option key={idx} value={idx + 1}>{m}</option>
-                                ))}
-                            </select>
+                {/* Expanded Filter Panel */}
+                {!isFilterCollapsed && (
+                    <div className="p-4 pt-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 space-y-4 animate-in fade-in slide-in-from-top-1 duration-200">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            {/* Preset Buttons */}
+                            <div className="flex flex-wrap items-center gap-1.5">
+                                <button
+                                    onClick={() => { setQuickRange(''); setCustomMode(false); }}
+                                    className={`px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all ${
+                                        !quickRange && !customMode
+                                            ? 'bg-teal-600 text-white shadow-md shadow-teal-600/20'
+                                            : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
+                                    }`}
+                                >
+                                    All Time
+                                </button>
+                                <button
+                                    onClick={() => { setQuickRange('today'); setCustomMode(false); }}
+                                    className={`px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all ${
+                                        quickRange === 'today'
+                                            ? 'bg-teal-600 text-white shadow-md shadow-teal-600/20'
+                                            : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
+                                    }`}
+                                >
+                                    Today
+                                </button>
+                                <button
+                                    onClick={() => { setQuickRange('yesterday'); setCustomMode(false); }}
+                                    className={`px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all ${
+                                        quickRange === 'yesterday'
+                                            ? 'bg-teal-600 text-white shadow-md shadow-teal-600/20'
+                                            : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
+                                    }`}
+                                >
+                                    Yesterday
+                                </button>
+                                <button
+                                    onClick={() => { setQuickRange('thisMonth'); setCustomMode(false); }}
+                                    className={`px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all ${
+                                        quickRange === 'thisMonth'
+                                            ? 'bg-teal-600 text-white shadow-md shadow-teal-600/20'
+                                            : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
+                                    }`}
+                                >
+                                    This Month
+                                </button>
+                                <button
+                                    onClick={() => { setQuickRange('lastMonth'); setCustomMode(false); }}
+                                    className={`px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all ${
+                                        quickRange === 'lastMonth'
+                                            ? 'bg-teal-600 text-white shadow-md shadow-teal-600/20'
+                                            : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
+                                    }`}
+                                >
+                                    Previous Month
+                                </button>
+                                <button
+                                    onClick={() => { setQuickRange(''); setCustomMode(true); }}
+                                    className={`px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 ${
+                                        customMode
+                                            ? 'bg-teal-600 text-white shadow-md shadow-teal-600/20'
+                                            : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
+                                    }`}
+                                >
+                                    <MdCalendarToday size={14} /> Month / Day Range
+                                </button>
+                            </div>
+
+                            {/* Branch Filter & Reset */}
+                            <div className="flex items-center gap-3">
+                                {branches.length > 0 && (
+                                    <div className="flex items-center gap-2">
+                                        <MdBusiness className="text-teal-600" size={16} />
+                                        <select
+                                            value={selectedBranch}
+                                            onChange={(e) => setSelectedBranch(e.target.value)}
+                                            className="bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 font-bold text-xs rounded-xl px-3 py-1.5 outline-none focus:ring-2 focus:ring-teal-500 shadow-sm"
+                                        >
+                                            <option value="">All Branches</option>
+                                            {branches.map((b) => (
+                                                <option key={b._id} value={b._id}>
+                                                    {b.name || b.code}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
+
+                                {(selectedBranch || quickRange || customMode || startDay || endDay) && (
+                                    <button
+                                        onClick={resetFilters}
+                                        className="flex items-center gap-1 text-xs font-bold text-rose-600 hover:text-rose-700 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 px-2.5 py-1.5 rounded-xl transition-colors"
+                                    >
+                                        <MdRestartAlt size={16} /> Reset
+                                    </button>
+                                )}
+                            </div>
                         </div>
 
-                        <div className="flex items-center gap-2">
-                            <span className="font-bold text-slate-600">Year:</span>
-                            <select
-                                value={selectedYear}
-                                onChange={(e) => setSelectedYear(Number(e.target.value))}
-                                className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 font-semibold outline-none"
-                            >
-                                {[2024, 2025, 2026, 2027].map((y) => (
-                                    <option key={y} value={y}>{y}</option>
-                                ))}
-                            </select>
-                        </div>
+                        {/* Custom Month-wise & Day Range Selection */}
+                        {customMode && (
+                            <div className="pt-3 border-t border-slate-200/60 dark:border-slate-800 flex flex-wrap items-center gap-4 text-xs">
+                                <div className="flex items-center gap-2">
+                                    <span className="font-bold text-slate-500 dark:text-slate-400 uppercase text-[10px] tracking-wider">Month:</span>
+                                    <select
+                                        value={selectedMonth}
+                                        onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                                        className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 rounded-xl px-3 py-1.5 font-bold outline-none focus:ring-2 focus:ring-teal-500 shadow-sm"
+                                    >
+                                        {monthNames.map((m, idx) => (
+                                            <option key={idx} value={idx + 1}>{m}</option>
+                                        ))}
+                                    </select>
+                                </div>
 
-                        <div className="flex items-center gap-2">
-                            <span className="font-bold text-slate-600">Day Range:</span>
-                            <select
-                                value={startDay}
-                                onChange={(e) => setStartDay(e.target.value)}
-                                className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 font-semibold outline-none"
-                            >
-                                <option value="">1</option>
-                                {dayOptions.map(day => <option key={day} value={day}>{day}</option>)}
-                            </select>
-                            <span>to</span>
-                            <select
-                                value={endDay}
-                                onChange={(e) => setEndDay(e.target.value)}
-                                className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 font-semibold outline-none"
-                            >
-                                <option value="">{daysInSelectedMonth}</option>
-                                {dayOptions.map(day => <option key={day} value={day}>{day}</option>)}
-                            </select>
-                        </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="font-bold text-slate-500 dark:text-slate-400 uppercase text-[10px] tracking-wider">Year:</span>
+                                    <select
+                                        value={selectedYear}
+                                        onChange={(e) => setSelectedYear(Number(e.target.value))}
+                                        className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 rounded-xl px-3 py-1.5 font-bold outline-none focus:ring-2 focus:ring-teal-500 shadow-sm"
+                                    >
+                                        {[2024, 2025, 2026, 2027].map((y) => (
+                                            <option key={y} value={y}>{y}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                    <span className="font-bold text-slate-500 dark:text-slate-400 uppercase text-[10px] tracking-wider">Day Range:</span>
+                                    <select
+                                        value={startDay}
+                                        onChange={(e) => setStartDay(e.target.value)}
+                                        className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 rounded-xl px-2.5 py-1.5 font-bold outline-none focus:ring-2 focus:ring-teal-500 shadow-sm"
+                                    >
+                                        <option value="">1</option>
+                                        {dayOptions.map(day => <option key={day} value={day}>{day}</option>)}
+                                    </select>
+                                    <span className="font-bold text-slate-400">to</span>
+                                    <select
+                                        value={endDay}
+                                        onChange={(e) => setEndDay(e.target.value)}
+                                        className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 rounded-xl px-2.5 py-1.5 font-bold outline-none focus:ring-2 focus:ring-teal-500 shadow-sm"
+                                    >
+                                        <option value="">{daysInSelectedMonth}</option>
+                                        {dayOptions.map(day => <option key={day} value={day}>{day}</option>)}
+                                    </select>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
@@ -399,10 +496,10 @@ const CSMDashboard = () => {
                             <div 
                                 key={i}
                                 onClick={() => card.link && navigate(card.link)}
-                                className="glass shadow-sm rounded-2xl p-4 border border-slate-100/80 bg-white dark:bg-slate-900/60 dark:border-slate-800 flex items-center justify-between cursor-pointer hover:scale-[1.02] hover:shadow-md transition-all active:scale-95 group"
+                                className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 shadow-sm flex items-center justify-between cursor-pointer hover:scale-[1.02] hover:shadow-md transition-all active:scale-95 group"
                             >
                                 <div className="space-y-0.5">
-                                    <span className="text-[11px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-wider group-hover:text-primary-600 transition-colors">{card.label}</span>
+                                    <span className="text-[11px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-wider group-hover:text-teal-600 transition-colors">{card.label}</span>
                                     <h2 className="text-3xl font-black text-slate-900 dark:text-slate-100 font-outfit">{card.value}</h2>
                                 </div>
                                 <div className={`w-12 h-12 bg-gradient-to-br ${card.color} rounded-xl flex items-center justify-center text-white shadow-sm group-hover:rotate-6 transition-transform`}>
@@ -415,38 +512,40 @@ const CSMDashboard = () => {
                     {/* SLA & Time Metrics Section */}
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         {/* Avg Resolution Card */}
-                        <div className="glass shadow-premium rounded-[2rem] p-6 bg-gradient-to-br from-teal-900 to-slate-900 text-white flex flex-col justify-between border border-teal-950 h-[300px]">
+                        <div className="shadow-premium rounded-[2rem] p-6 bg-gradient-to-br from-teal-800 via-teal-900 to-slate-950 text-white flex flex-col justify-between border border-teal-900 h-[300px]">
                             <div className="flex items-center justify-between">
                                 <span className="text-[10px] font-black uppercase tracking-widest text-teal-400">Resolution Speed</span>
-                                <MdTimer size={24} className="text-teal-400" />
+                                <div className="p-2 bg-teal-500/20 rounded-xl text-teal-300">
+                                    <MdTimer size={22} />
+                                </div>
                             </div>
-                            <div className="py-4">
-                                <h2 className="text-5xl font-black font-outfit leading-none mb-2">
+                            <div className="py-2">
+                                <h2 className="text-5xl font-black font-outfit leading-none mb-2 text-white drop-shadow-sm">
                                     {stats?.avgResolutionHours || 0} hrs
                                 </h2>
-                                <p className="text-xs font-bold text-teal-200">Average resolution cycle time per ticket</p>
+                                <p className="text-xs font-bold text-teal-200/90">Average resolution cycle time per ticket</p>
                             </div>
-                            <div className="border-t border-teal-850 pt-4 flex items-center gap-2 text-xs font-bold text-teal-300">
-                                <MdTrendingUp size={16} />
+                            <div className="border-t border-teal-800/60 pt-4 flex items-center gap-2 text-xs font-bold text-teal-300/90">
+                                <MdTrendingUp size={16} className="text-teal-400" />
                                 Calculated from all closed cases this period
                             </div>
                         </div>
 
                         {/* SLA Compliance Donut */}
-                        <div className="glass shadow-premium rounded-[2rem] p-6 bg-white dark:bg-slate-900/60 dark:border-slate-800 border border-slate-100 flex flex-col justify-between h-[300px]">
+                        <div className="shadow-premium rounded-[2rem] p-6 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 flex flex-col justify-between h-[300px]">
                             <div>
                                 <h3 className="text-sm font-black text-slate-900 dark:text-slate-100 uppercase tracking-widest">SLA Resolution Compliance</h3>
                             </div>
-                            <div className="flex items-center gap-6 flex-1 min-h-0">
-                                <div className="w-1/2 h-full relative">
-                                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                            <div className="flex items-center gap-4 flex-1 min-h-0 relative">
+                                <div className="w-1/2 h-[180px] relative">
+                                    <ResponsiveContainer width="100%" height="100%">
                                         <PieChart>
                                             <Pie
                                                 data={complianceData.some(d => d.value > 0) ? complianceData : [{ name: 'No Data', value: 1 }]}
                                                 cx="50%"
                                                 cy="50%"
-                                                innerRadius={55}
-                                                outerRadius={75}
+                                                innerRadius={50}
+                                                outerRadius={70}
                                                 paddingAngle={4}
                                                 dataKey="value"
                                             >
@@ -468,31 +567,33 @@ const CSMDashboard = () => {
                                         <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1">SLA Met</span>
                                     </div>
                                 </div>
-                                <div className="w-1/2 space-y-2.5 font-semibold text-xs text-slate-500 dark:text-slate-400">
+                                <div className="w-1/2 space-y-2 font-semibold text-xs text-slate-500 dark:text-slate-400">
                                     <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Milestone Review</p>
-                                    <p className="leading-relaxed">SLA breaches represent tickets where engineers exceeded priority-defined fix durations.</p>
-                                    <p className="font-bold text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/40 border border-teal-100 dark:border-teal-900/50 rounded-xl px-3 py-1.5 inline-block">Target: 95.0%</p>
+                                    <p className="leading-relaxed text-[11px]">SLA breaches represent tickets where engineers exceeded priority-defined fix durations.</p>
+                                    <div className="pt-1">
+                                        <span className="font-bold text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/40 border border-teal-100 dark:border-teal-900/50 rounded-xl px-3 py-1.5 inline-block text-[11px]">Target: 95.0%</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
                         {/* Recent Service Visits Timeline */}
-                        <div className="glass shadow-premium rounded-[2rem] p-6 bg-white dark:bg-slate-900/60 dark:border-slate-800 border border-slate-100 flex flex-col h-[300px]">
+                        <div className="shadow-premium rounded-[2rem] p-6 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 flex flex-col h-[300px]">
                             <h3 className="text-sm font-black text-slate-900 dark:text-slate-100 uppercase tracking-widest mb-3">Field Service Log</h3>
-                            <div className="flex-1 overflow-y-auto space-y-3 pr-1 custom-scrollbar">
+                            <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 custom-scrollbar">
                                 {visits.length === 0 ? (
                                     <div className="flex flex-col items-center justify-center h-full text-slate-400 text-xs font-bold py-8">
                                         No service visits recorded.
                                     </div>
                                 ) : (
                                     visits.slice(0, 5).map((visit, idx) => (
-                                        <div key={visit._id || idx} className="p-3 rounded-2xl bg-slate-50/50 dark:bg-slate-800/40 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors border border-slate-100/50 dark:border-slate-700/50 flex flex-col space-y-1.5">
+                                        <div key={visit._id || idx} className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors border border-slate-100 dark:border-slate-700/60 flex flex-col space-y-1.5">
                                             <div className="flex items-center justify-between">
                                                 <span className="font-black text-slate-800 dark:text-slate-100 text-xs tracking-tight">{visit.visitNo}</span>
                                                 {getVisitStatusBadge(visit.status)}
                                             </div>
-                                            <div className="text-xs text-slate-500 dark:text-slate-400 font-bold flex items-center gap-1">
-                                                <MdLocationOn className="text-slate-400 shrink-0" size={13} />
+                                            <div className="text-xs text-slate-600 dark:text-slate-300 font-bold flex items-center gap-1">
+                                                <MdLocationOn className="text-teal-600 dark:text-teal-400 shrink-0" size={13} />
                                                 <span className="truncate">{visit.ticketId?.customerId?.customerName || 'Unknown Location'}</span>
                                             </div>
                                             <div className="flex items-center justify-between text-[11px] text-slate-400 dark:text-slate-500 font-semibold">
@@ -511,48 +612,72 @@ const CSMDashboard = () => {
                     {/* Charts Grid */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {/* Tickets by Status */}
-                        <div className="glass shadow-premium rounded-[2rem] p-6 bg-white dark:bg-slate-900/60 dark:border-slate-800 border border-slate-100 h-[340px] flex flex-col">
-                            <h3 className="text-sm font-black text-slate-900 dark:text-slate-100 uppercase tracking-widest mb-4">Tickets by Status</h3>
-                            <div className="flex-1 min-h-0">
-                                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-                                    <PieChart>
-                                        <Pie
-                                            data={statusData}
-                                            cx="50%"
-                                            cy="50%"
-                                            outerRadius={90}
-                                            label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
-                                            dataKey="value"
-                                            tick={{ fontSize: 11, fontWeight: 'bold' }}
-                                        >
-                                            {statusData.map((entry, index) => (
-                                                <Cell key={`cell-${index}`} fill={STATUS_COLORS[entry.name] || COLORS[index % COLORS.length]} />
-                                            ))}
-                                        </Pie>
-                                        <Tooltip />
-                                    </PieChart>
-                                </ResponsiveContainer>
+                        <div className="shadow-premium rounded-[2rem] p-6 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 h-[360px] flex flex-col">
+                            <div className="flex items-center justify-between mb-2">
+                                <h3 className="text-sm font-black text-slate-900 dark:text-slate-100 uppercase tracking-widest">Tickets by Status</h3>
+                                <span className="text-xs font-bold text-slate-400">{statusData.reduce((acc, curr) => acc + curr.value, 0)} Total</span>
+                            </div>
+                            <div className="flex-1 w-full min-h-[260px] relative flex items-center justify-center">
+                                {statusData.length === 0 || !statusData.some(d => d.value > 0) ? (
+                                    <div className="flex flex-col items-center justify-center text-slate-400 text-xs font-semibold space-y-2">
+                                        <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400">
+                                            <MdAssignment size={24} />
+                                        </div>
+                                        <p>No status data for selected period</p>
+                                    </div>
+                                ) : (
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <PieChart>
+                                            <Pie
+                                                data={statusData}
+                                                cx="50%"
+                                                cy="50%"
+                                                outerRadius={90}
+                                                label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                                                dataKey="value"
+                                                tick={{ fontSize: 11, fontWeight: 'bold' }}
+                                            >
+                                                {statusData.map((entry, index) => (
+                                                    <Cell key={`cell-${index}`} fill={STATUS_COLORS[entry.name] || COLORS[index % COLORS.length]} />
+                                                ))}
+                                            </Pie>
+                                            <Tooltip />
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                )}
                             </div>
                         </div>
 
                         {/* Tickets by Category */}
-                        <div className="glass shadow-premium rounded-[2rem] p-6 bg-white dark:bg-slate-900/60 dark:border-slate-800 border border-slate-100 h-[340px] flex flex-col">
-                            <h3 className="text-sm font-black text-slate-900 dark:text-slate-100 uppercase tracking-widest mb-4">Tickets by Category</h3>
-                            <div className="flex-1 min-h-0">
-                                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-                                    <BarChart data={categoryData} layout="vertical" margin={{ left: 10, right: 10, top: 10, bottom: 10 }}>
-                                        <XAxis type="number" hide />
-                                        <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 10, fontWeight: 'bold', fill: '#94a3b8' }} />
-                                        <Tooltip />
-                                        <Bar dataKey="value" fill="#0d9488" radius={[0, 8, 8, 0]} barSize={16} />
-                                    </BarChart>
-                                </ResponsiveContainer>
+                        <div className="shadow-premium rounded-[2rem] p-6 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 h-[360px] flex flex-col">
+                            <div className="flex items-center justify-between mb-2">
+                                <h3 className="text-sm font-black text-slate-900 dark:text-slate-100 uppercase tracking-widest">Tickets by Category</h3>
+                                <span className="text-xs font-bold text-slate-400">{categoryData.reduce((acc, curr) => acc + curr.value, 0)} Categorized</span>
+                            </div>
+                            <div className="flex-1 w-full min-h-[260px] relative flex items-center justify-center">
+                                {categoryData.length === 0 || !categoryData.some(d => d.value > 0) ? (
+                                    <div className="flex flex-col items-center justify-center text-slate-400 text-xs font-semibold space-y-2">
+                                        <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400">
+                                            <MdTune size={24} />
+                                        </div>
+                                        <p>No category breakdown for selected period</p>
+                                    </div>
+                                ) : (
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart data={categoryData} layout="vertical" margin={{ left: 20, right: 20, top: 10, bottom: 10 }}>
+                                            <XAxis type="number" hide />
+                                            <YAxis dataKey="name" type="category" width={110} tick={{ fontSize: 11, fontWeight: '600', fill: '#64748b' }} />
+                                            <Tooltip />
+                                            <Bar dataKey="value" fill="#0d9488" radius={[0, 8, 8, 0]} barSize={18} />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                )}
                             </div>
                         </div>
                     </div>
 
                     {/* Engineer Performance Leaderboard */}
-                    <div className="glass shadow-premium rounded-[2rem] p-6 bg-white dark:bg-slate-900/60 dark:border-slate-800 border border-slate-100">
+                    <div className="shadow-premium rounded-[2rem] p-6 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800">
                         <h3 className="text-sm font-black text-slate-900 dark:text-slate-100 uppercase tracking-widest mb-4">Top Performing Engineers</h3>
                         {engineers.length === 0 ? (
                             <div className="text-center py-8 text-slate-400 text-sm font-bold">
