@@ -511,6 +511,17 @@ export const importService = {
   },
   getTenderTemplate: () =>
     api.get("/import/template/tenders", { responseType: "blob" }),
+  importAssets: (file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return api.post("/import/assets", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+  },
+  getAssetTemplate: () =>
+    api.get("/import/template/assets", { responseType: "blob" }),
 };
 
 export const attributeService = {

@@ -34,7 +34,9 @@ const {
     importContracts,
     getContractTemplate,
     importTenders,
-    getTenderTemplate
+    getTenderTemplate,
+    importAssets,
+    getAssetTemplate
 } = require('../controllers/importController');
 
 // Multer memory storage for Excel/CSV files
@@ -75,6 +77,7 @@ router.post('/employees', protect, upload.single('file'), importEmployees);
 router.post('/contacts', protect, upload.single('file'), importContacts);
 router.post('/contracts', protect, upload.single('file'), importContracts);
 router.post('/tenders', protect, upload.single('file'), importTenders);
+router.post('/assets', protect, upload.single('file'), importAssets);
 
 router.get('/cleanup-rr-techgrove', async (req, res) => {
     const { cleanupRRTechgroveEmployees } = require('../services/cleanupRRTechgroveEmployees');
@@ -269,6 +272,7 @@ router.get('/template/planning', protect, getPlanningTemplate);
 router.get('/template/warranties', protect, getWarrantyTemplate);
 router.get('/template/amcs', protect, getAmcTemplate);
 router.get('/template/tickets', protect, getTicketTemplate);
+router.get('/template/assets', protect, getAssetTemplate);
 router.get('/template/vendors', getVendorTemplate);
 router.get('/template/price-books', getPriceBookTemplate);
 router.get('/template/employees', async (req, res) => {

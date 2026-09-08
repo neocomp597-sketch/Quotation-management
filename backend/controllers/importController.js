@@ -68,6 +68,7 @@ const PriceBookItem = require('../models/PriceBookItem');
 const EmployeeProfile = require('../models/EmployeeProfile');
 const Contact = require('../models/Contact');
 const Contract = require('../models/Contract');
+const Asset = require('../models/Asset');
 const { deriveBasePriceFromVendors } = require('../utils/vendorSelection');
 const { invalidateCustomerCaches, invalidateProductCaches } = require('../utils/cacheInvalidation');
 
@@ -3142,6 +3143,238 @@ const getTenderTemplate = async (req, res) => {
     }
 };
 
+const importAssets = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ message: 'No file uploaded' });
+        }
+
+        const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const data = XLSX.utils.sheet_to_json(worksheet);
+
+        const headers = XLSX.utils.sheet_to_json(worksheet, { header: 1 })[0] || [];
+        const cleanHeaders = headers.map(h => String(h || '').trim().toLowerCase());
+        
+        const hasSerial = cleanHeaders.some(h => ['serial number', 'serialnumber', 'serial', 'serial no', 'serialno', 'sn'].includes(h));
+        
+        if (!hasSerial) {
+            return res.status(400).json({
+                message: `Missing required column headers: The sheet must contain a 'Serial Number' column.`,
+                errors: [`The sheet must contain a 'Serial Number' column.`]
+            });
+        }
+
+        if (data.length === 0) {
+            return res.status(400).json({ message: 'No data found in file' });
+        }
+
+        const results = {
+            created: 0,
+            updated: 0,
+            skipped: 0,
+            failed: 0,
+            errors: []
+        };
+
+        const companyId = req.user?.companyId;
+        const companyFilter = companyId ? { companyId } : {};
+
+        for (let i = 0; i < data.length; i++) {
+            const row = data[i];
+            try {
+                const serialNumber = pickFirstNonEmpty(
+                    row['Serial Number'], row.serialNumber, row['Serial No'], row.serialNo, row.Serial, row.serial, row.SN, row.sn
+                );
+
+                if (!serialNumber) {
+                    results.skipped++;
+                    continue;
+                }
+
+                let productCode = pickFirstNonEmpty(row['Product Code'], row.productCode, row.code, row.Code);
+                let productName = pickFirstNonEmpty(row['Product Name'], row.productName, row.name, row.Name);
+                const rawStatus = pickFirstNonEmpty(row.Status, row.status, 'IN_STOCK');
+                const customerLookup = pickFirstNonEmpty(
+                    row['Customer Code'], row.customerCode, row['Customer Name'], row.customerName, row['Company Name'], row.companyName, row['Customer']
+                );
+                const invoiceNumber = pickFirstNonEmpty(row['Invoice Number'], row.invoiceNumber, row['Invoice Ref'], row.invoiceRef, row['Invoice']);
+                const rawSaleDate = row['Sale Date'] || row.saleDate || row['Invoice Date'] || row.invoiceDate;
+                const location = pickFirstNonEmpty(row.Location, row.location, '');
+
+                // Map status to schema enum: ['IN_STOCK', 'ALLOCATED', 'SOLD', 'RETURNED', 'SCRAPPED']
+                let status = 'IN_STOCK';
+                const normStatus = rawStatus.toUpperCase().replace(/[\s\-_]+/g, '');
+                if (normStatus.includes('STOCK')) status = 'IN_STOCK';
+                else if (normStatus.includes('ALLOCAT')) status = 'ALLOCATED';
+                else if (normStatus.includes('SOLD')) status = 'SOLD';
+                else if (normStatus.includes('RETURN')) status = 'RETURNED';
+                else if (normStatus.includes('SCRAP')) status = 'SCRAPPED';
+
+                // Resolve product
+                let product = null;
+                if (productCode) {
+                    product = await Product.findOne({ ...companyFilter, productCode: buildExactRegex(productCode) });
+                }
+                if (!product && productName) {
+                    product = await Product.findOne({ ...companyFilter, productName: buildExactRegex(productName) });
+                }
+
+                if (!product) {
+                    const firstProd = await Product.findOne(companyFilter);
+                    if (firstProd) {
+                        product = firstProd;
+                    } else {
+                        product = await Product.create({
+                            ...companyFilter,
+                            productCode: productCode || 'GEN-PROD',
+                            productName: productName || 'General Asset Product',
+                            hsnCode: 'N/A',
+                            gstPercentage: 18,
+                            basePrice: 0,
+                            mrp: 0,
+                            uom: 'Nos',
+                            status: 'Active'
+                        });
+                    }
+                }
+
+                // Resolve customer if lookup provided
+                let customer = null;
+                if (customerLookup) {
+                    customer = await Customer.findOne({
+                        ...companyFilter,
+                        $or: [
+                            { externalCode: buildExactRegex(customerLookup) },
+                            { customerName: buildExactRegex(customerLookup) },
+                            { companyName: buildExactRegex(customerLookup) }
+                        ]
+                    });
+
+                    if (!customer) {
+                        customer = await Customer.create({
+                            ...companyFilter,
+                            externalCode: customerLookup,
+                            customerName: customerLookup,
+                            companyName: customerLookup,
+                            createdBy: req.user?.id || null
+                        });
+                    }
+                }
+
+                // Parse saleDate if present
+                let saleDate = null;
+                if (rawSaleDate) {
+                    if (typeof rawSaleDate === 'number' && Number.isFinite(rawSaleDate)) {
+                        saleDate = excelSerialDateToDate(rawSaleDate);
+                    } else {
+                        const parsed = new Date(rawSaleDate);
+                        if (!isNaN(parsed.getTime())) saleDate = parsed;
+                    }
+                }
+
+                // Upsert Asset
+                let existingAsset = await Asset.findOne({ ...companyFilter, serialNumber: buildExactRegex(serialNumber) });
+
+                const assetPayload = {
+                    ...(companyId ? { companyId } : {}),
+                    productId: product._id,
+                    serialNumber,
+                    status,
+                    customerId: customer ? customer._id : (existingAsset ? existingAsset.customerId : null),
+                    invoiceNumber: invoiceNumber || (existingAsset ? existingAsset.invoiceNumber : ''),
+                    saleDate: saleDate || (existingAsset ? existingAsset.saleDate : null),
+                    location: location || (existingAsset ? existingAsset.location : ''),
+                    createdBy: req.user?.id || (existingAsset ? existingAsset.createdBy : null)
+                };
+
+                if (existingAsset) {
+                    await Asset.findByIdAndUpdate(existingAsset._id, assetPayload);
+                    results.updated++;
+                } else {
+                    await Asset.create(assetPayload);
+                    results.created++;
+                }
+            } catch (err) {
+                results.failed++;
+                results.errors.push(`Row ${i + 2}: ${err.message}`);
+            }
+        }
+
+        const successCount = results.created + results.updated;
+
+        if (successCount > 0) {
+            const { createCompanyNotifications } = require('../utils/notificationHelper');
+            await createCompanyNotifications({
+                companyId: req.user?.companyId,
+                title: 'Serial Numbers / Assets Imported',
+                message: `Successfully imported/updated ${successCount} asset serial numbers (created: ${results.created}, updated: ${results.updated}, skipped: ${results.skipped}, failed: ${results.failed}).`,
+                type: 'Reminder',
+                excludeUserId: req.user?.id
+            });
+        }
+
+        if (successCount === 0 && results.failed > 0) {
+            return res.status(400).json({
+                message: 'All rows failed to import',
+                errors: results.errors,
+                success: 0,
+                ...results
+            });
+        }
+
+        res.status(200).json({
+            message: `Import completed. Created: ${results.created}, Updated: ${results.updated}, Skipped: ${results.skipped}, Failed: ${results.failed}.`,
+            success: successCount,
+            ...results
+        });
+    } catch (error) {
+        console.error('Import assets error:', error);
+        res.status(500).json({ message: error.message || 'Error importing serial numbers', errors: [error.message] });
+    }
+};
+
+const getAssetTemplate = async (req, res) => {
+    try {
+        const templateData = [
+            {
+                'Serial Number': 'SN-100201',
+                'Product Code': 'PROD-001',
+                'Product Name': '10KVA Transformer',
+                'Status': 'IN_STOCK',
+                'Customer Code': '',
+                'Customer Name': '',
+                'Invoice Number': '',
+                'Sale Date': '',
+                'Location': 'Bay-4 Outgoing Yard'
+            },
+            {
+                'Serial Number': 'SN-100202',
+                'Product Code': 'PROD-001',
+                'Product Name': '10KVA Transformer',
+                'Status': 'SOLD',
+                'Customer Code': 'CUST-001',
+                'Customer Name': 'Apex Industrial Solutions',
+                'Invoice Number': 'INV-2026-001',
+                'Sale Date': '2026-03-15',
+                'Location': 'Client Site Alpha'
+            }
+        ];
+
+        const ws = XLSX.utils.json_to_sheet(templateData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Asset Serials Template');
+
+        const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename=Asset_Serials_Import_Template.xlsx');
+        res.send(buffer);
+    } catch (err) {
+        res.status(500).json({ message: 'Error generating asset serials import template' });
+    }
+};
+
 module.exports = {
     importProducts,
     importCustomers,
@@ -3172,5 +3405,7 @@ module.exports = {
     importContracts,
     getContractTemplate,
     importTenders,
-    getTenderTemplate
+    getTenderTemplate,
+    importAssets,
+    getAssetTemplate
 };

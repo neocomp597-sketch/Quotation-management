@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { csmService, productService } from '../services/api';
+import { csmService, productService, importService } from '../services/api';
 import { toast } from 'react-toastify';
+import * as XLSX from 'xlsx';
 import { 
     MdSearch, MdTag, MdInfoOutline, MdSync, 
-    MdLocalOffer, MdPeople, MdReceipt, MdAssignmentTurnedIn 
+    MdLocalOffer, MdPeople, MdReceipt, MdAssignmentTurnedIn,
+    MdFileUpload, MdFileDownload
 } from 'react-icons/md';
 import Modal from '../components/Modal';
+import ImportModal from '../components/ImportModal';
 import PaginationControls from '../components/PaginationControls';
 
 const PAGE_SIZE = 15;
@@ -18,6 +21,7 @@ const SerialNoMaster = () => {
     const [selectedStatus, setSelectedStatus] = useState('ALL');
     const [selectedProduct, setSelectedProduct] = useState('ALL');
     const [currentPage, setCurrentPage] = useState(1);
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     
     // Detailed modal view
     const [selectedAssetSerial, setSelectedAssetSerial] = useState(null);
@@ -44,6 +48,32 @@ const SerialNoMaster = () => {
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleExport = () => {
+        if (!filteredAssets || filteredAssets.length === 0) {
+            toast.error('No serial number assets to export');
+            return;
+        }
+
+        const exportData = filteredAssets.map(asset => ({
+            'Serial Number': asset.serialNumber || '',
+            'Product Name': asset.productId?.productName || '',
+            'Product Code': asset.productId?.productCode || '',
+            'Status': asset.status || 'IN_STOCK',
+            'Customer': asset.customerId?.companyName || asset.customerId?.customerName || 'Stock (Unsold)',
+            'Invoice Ref': asset.invoiceNumber || '',
+            'Sale Date': asset.saleDate || asset.invoiceDate 
+                ? new Date(asset.saleDate || asset.invoiceDate).toLocaleDateString('en-IN')
+                : '',
+            'Location': asset.location || ''
+        }));
+
+        const ws = XLSX.utils.json_to_sheet(exportData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Serial No Master');
+        XLSX.writeFile(wb, `Serial_No_Master_${new Date().toISOString().slice(0, 10)}.xlsx`);
+        toast.success(`Exported ${exportData.length} serial number assets`);
     };
 
     const handleViewDetail = async (serialNumber) => {
@@ -110,10 +140,27 @@ const SerialNoMaster = () => {
                     </h1>
                     <p className="text-slate-500 font-medium">Track unique physical asset serial numbers, their current inventory statuses, invoices, and customer assignments.</p>
                 </div>
-                <div>
+                <div className="flex flex-wrap gap-3 items-center">
+                    <button
+                        onClick={() => setIsImportModalOpen(true)}
+                        className="flex items-center justify-center gap-2 bg-slate-900 hover:bg-black text-white px-5 py-3 rounded-2xl font-bold transition-all uppercase text-xs tracking-widest active:scale-95 shadow-sm"
+                        title="Import Assets / Serials"
+                    >
+                        <MdFileUpload size={18} />
+                        <span>Import</span>
+                    </button>
+                    <button
+                        onClick={handleExport}
+                        className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-5 py-3 rounded-2xl font-bold transition-all uppercase text-xs tracking-widest active:scale-95 shadow-sm"
+                        title="Export Assets / Serials"
+                    >
+                        <MdFileDownload size={18} />
+                        <span>Export</span>
+                    </button>
                     <button
                         onClick={fetchData}
-                        className="flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-6 py-3 rounded-2xl font-bold transition-all uppercase text-xs tracking-widest active:scale-95 border border-slate-200"
+                        className="flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-5 py-3 rounded-2xl font-bold transition-all uppercase text-xs tracking-widest active:scale-95 border border-slate-200"
+                        title="Refresh"
                     >
                         <MdSync size={18} />
                         <span>Refresh</span>
@@ -428,6 +475,19 @@ const SerialNoMaster = () => {
                     <div className="py-8 text-center text-slate-400 text-sm">Failed to load detailed asset information.</div>
                 )}
             </Modal>
+
+            {/* Import Modal */}
+            <ImportModal
+                isOpen={isImportModalOpen}
+                onClose={() => {
+                    setIsImportModalOpen(false);
+                    fetchData();
+                }}
+                title="Import Serial Numbers / Assets"
+                type="assets"
+                onImport={importService.importAssets}
+                onDownloadTemplate={importService.getAssetTemplate}
+            />
         </div>
     );
 };
