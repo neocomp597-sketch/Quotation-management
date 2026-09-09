@@ -799,6 +799,10 @@ export const csmService = {
   createAmc: (data) => api.post("/csm/amcs", data),
   getAssets: (params = {}) => api.get("/csm/assets", { params }),
   createAsset: (data) => api.post("/csm/assets", data),
+  createSingleAsset: (data) => api.post("/csm/assets/single", data),
+  returnAsset: (id, returnReason) => api.post(`/csm/assets/${id}/return`, { returnReason }),
+  getReturnHistory: () => api.get("/csm/assets/return-history"),
+  deleteAsset: (id) => api.delete(`/csm/assets/${id}`),
   getAssetSummary: (params = {}) => api.get("/csm/assets/summary", { params }),
   searchSerialNumbers: (q) => api.get("/csm/assets/search-serials", { params: { q } }),
 

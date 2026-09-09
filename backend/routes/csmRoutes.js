@@ -50,10 +50,14 @@ router.patch('/visits/:id/reschedule', protect, serviceVisitController.reschedul
 router.get('/entitlements/verify', protect, warrantyAmcController.verifyEntitlements);
 router.get('/assets/summary', protect, warrantyAmcController.getAssetSummary);
 router.get('/assets/search-serials', protect, warrantyAmcController.searchSerialNumbers);
+router.get('/assets/return-history', protect, warrantyAmcController.getReturnHistory);
 router.post('/warranties', protect, warrantyAmcController.createWarranty);
 router.get('/warranties', protect, warrantyAmcController.getWarranties);
 router.post('/amcs', protect, warrantyAmcController.createAmc);
 router.get('/amcs', protect, warrantyAmcController.getAmcs);
+router.post('/assets/single', protect, warrantyAmcController.createSingleAsset);
+router.post('/assets/:id/return', protect, warrantyAmcController.returnAsset);
+router.delete('/assets/:id', protect, warrantyAmcController.deleteAsset);
 router.post('/assets', protect, warrantyAmcController.createAsset);
 router.get('/assets', protect, warrantyAmcController.getAssets);
 

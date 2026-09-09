@@ -25,7 +25,8 @@ const MENU_GROUPS = [
             { key: 'master_terms', label: 'Terms & Conditions', description: 'Terms and conditions master' },
             { key: 'master_territories', label: 'Territory Master', description: 'Territory master management' },
             { key: 'master_branches', label: 'Branch Master', description: 'Branch master management' },
-            { key: 'master_serials', label: 'Serial No. Master', description: 'Serial number and asset master record management' },
+            { key: 'master_serials', label: 'Invoice Bulk Upload', description: 'Invoice bulk upload and serial asset management' },
+            { key: 'invoice_bulk_upload_delete', label: 'Delete Invoice Bulk Upload Entry', description: 'Permission to delete invoice bulk upload entries' },
             { key: 'state_master_create', label: 'State Master', description: 'State master management' },
             { key: 'city_master', label: 'City Master', description: 'City master management' }
         ]

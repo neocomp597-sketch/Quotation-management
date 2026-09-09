@@ -47,7 +47,7 @@ const searchablePages = [
     { label: 'Terms & Conditions', path: '/terms', permissionKey: 'master_terms', keywords: ['terms', 'conditions'] },
     { label: 'Territory Master', path: '/territory-master', permissionKey: 'master_territories', keywords: ['territory'] },
     { label: 'Branch Master', path: '/branches', keywords: ['branch', 'office', 'branches', 'branch master'] },
-    { label: 'Serial No. Master', path: '/serial-no-master', permissionKey: 'master_serials', keywords: ['serial number', 'assets', 'stock serials'] },
+    { label: 'Invoice Bulk Upload', path: '/serial-no-master', permissionKey: 'master_serials', keywords: ['invoice bulk upload', 'serial number', 'assets', 'stock serials'] },
     { label: 'Settings', path: '/settings', permissionKey: 'settings_profile', keywords: ['profile'] },
     { label: 'Org Chart & My Team', path: '/settings?tab=org-chart', permissionKey: 'payroll_org_chart', keywords: ['org chart', 'my team', 'team', 'hierarchy', 'tree'] },
     { label: 'Authorization', path: '/admin/authorization', permissionKey: 'admin_authorization', keywords: ['permissions', 'roles'] },
@@ -380,7 +380,7 @@ const moduleSubmodulesMap = {
         { label: 'Geographical Regions', path: '/territory-master' }
     ],
     '/serial-no-master': [
-        { label: 'Serial No. Master', path: '/serial-no-master' },
+        { label: 'Invoice Bulk Upload', path: '/serial-no-master' },
         { label: 'Barcode & Asset Tracker', path: '/serial-no-master' }
     ],
     '/settings': [

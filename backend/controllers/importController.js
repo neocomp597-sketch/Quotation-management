@@ -3143,6 +3143,8 @@ const getTenderTemplate = async (req, res) => {
     }
 };
 
+const AssetHistory = require('../models/AssetHistory');
+
 const importAssets = async (req, res) => {
     try {
         if (!req.file) {
@@ -3199,17 +3201,31 @@ const importAssets = async (req, res) => {
                 const customerLookup = pickFirstNonEmpty(
                     row['Customer Code'], row.customerCode, row['Customer Name'], row.customerName, row['Company Name'], row.companyName, row['Customer']
                 );
-                const invoiceNumber = pickFirstNonEmpty(row['Invoice Number'], row.invoiceNumber, row['Invoice Ref'], row.invoiceRef, row['Invoice']);
+                const customerPostalCode = pickFirstNonEmpty(
+                    row['Customer Postal Code'], row.customerPostalCode, row['Postal Code'], row.postalCode, row.pincode, row.Pincode, ''
+                );
+                const invoiceNumber = pickFirstNonEmpty(
+                    row['Invoice Ref'], row.invoiceRef, row['Invoice Number'], row.invoiceNumber, row['Invoice'], row.invoice
+                );
                 const rawSaleDate = row['Sale Date'] || row.saleDate || row['Invoice Date'] || row.invoiceDate;
                 const location = pickFirstNonEmpty(row.Location, row.location, '');
+                const mgr1 = pickFirstNonEmpty(row['Mgr 1'], row.mgr1, '');
+                const mgr2 = pickFirstNonEmpty(row['Mgr 2'], row.mgr2, '');
+                const mgr3 = pickFirstNonEmpty(row['Mgr 3'], row.mgr3, '');
+                const mgr4 = pickFirstNonEmpty(row['Mgr 4'], row.mgr4, '');
+                const mgr5 = pickFirstNonEmpty(row['Mgr 5'], row.mgr5, '');
+                const rawIndicator = pickFirstNonEmpty(
+                    row['Indicator_Field'], row.indicator_field, row.indicatorField, row.Indicator, row.indicator, ''
+                );
+                const indicatorField = String(rawIndicator).trim().slice(0, 20);
 
-                // Map status to schema enum: ['IN_STOCK', 'ALLOCATED', 'SOLD', 'RETURNED', 'SCRAPPED']
+                // Map status
                 let status = 'IN_STOCK';
-                const normStatus = rawStatus.toUpperCase().replace(/[\s\-_]+/g, '');
+                const normStatus = String(rawStatus).toUpperCase().replace(/[\s\-_]+/g, '');
                 if (normStatus.includes('STOCK')) status = 'IN_STOCK';
                 else if (normStatus.includes('ALLOCAT')) status = 'ALLOCATED';
                 else if (normStatus.includes('SOLD')) status = 'SOLD';
-                else if (normStatus.includes('RETURN')) status = 'RETURNED';
+                else if (normStatus.includes('RETURN')) status = 'RETURN';
                 else if (normStatus.includes('SCRAP')) status = 'SCRAPPED';
 
                 // Resolve product
@@ -3222,23 +3238,21 @@ const importAssets = async (req, res) => {
                 }
 
                 if (!product) {
-                    const firstProd = await Product.findOne(companyFilter);
-                    if (firstProd) {
-                        product = firstProd;
-                    } else {
-                        product = await Product.create({
-                            ...companyFilter,
-                            productCode: productCode || 'GEN-PROD',
-                            productName: productName || 'General Asset Product',
-                            hsnCode: 'N/A',
-                            gstPercentage: 18,
-                            basePrice: 0,
-                            mrp: 0,
-                            uom: 'Nos',
-                            status: 'Active'
-                        });
-                    }
+                    product = await Product.create({
+                        ...companyFilter,
+                        productCode: productCode || 'PROD-001',
+                        productName: productName || 'General Product',
+                        hsnCode: 'N/A',
+                        gstPercentage: 18,
+                        basePrice: 0,
+                        mrp: 0,
+                        uom: 'Nos',
+                        status: 'Active'
+                    });
                 }
+
+                productCode = product.productCode;
+                productName = product.productName;
 
                 // Resolve customer if lookup provided
                 let customer = null;
@@ -3263,7 +3277,7 @@ const importAssets = async (req, res) => {
                     }
                 }
 
-                // Parse saleDate if present
+                // Parse saleDate
                 let saleDate = null;
                 if (rawSaleDate) {
                     if (typeof rawSaleDate === 'number' && Number.isFinite(rawSaleDate)) {
@@ -3274,27 +3288,102 @@ const importAssets = async (req, res) => {
                     }
                 }
 
-                // Upsert Asset
-                let existingAsset = await Asset.findOne({ ...companyFilter, serialNumber: buildExactRegex(serialNumber) });
+                // --- Unique Identifier Check: Product_Code + Serial No + Indicator_Field ---
+                const existingAssets = await Asset.find({
+                    ...companyFilter,
+                    serialNumber: buildExactRegex(serialNumber)
+                }).populate('productId');
 
-                const assetPayload = {
-                    ...(companyId ? { companyId } : {}),
-                    productId: product._id,
-                    serialNumber,
-                    status,
-                    customerId: customer ? customer._id : (existingAsset ? existingAsset.customerId : null),
-                    invoiceNumber: invoiceNumber || (existingAsset ? existingAsset.invoiceNumber : ''),
-                    saleDate: saleDate || (existingAsset ? existingAsset.saleDate : null),
-                    location: location || (existingAsset ? existingAsset.location : ''),
-                    createdBy: req.user?.id || (existingAsset ? existingAsset.createdBy : null)
-                };
+                let matchedAsset = existingAssets.find(a => {
+                    const codeMatches = a.productId?.productCode &&
+                        a.productId.productCode.trim().toLowerCase() === productCode.trim().toLowerCase();
+                    const indicatorMatches = (a.indicatorField || '').trim().toLowerCase() === indicatorField.toLowerCase();
+                    return codeMatches && indicatorMatches;
+                });
 
-                if (existingAsset) {
-                    await Asset.findByIdAndUpdate(existingAsset._id, assetPayload);
+                if (matchedAsset) {
+                    // Check if active (Case 2: duplicate upload) vs returned (Case 4: re-use serial number)
+                    if (matchedAsset.status !== 'RETURN' && matchedAsset.status !== 'RETURNED') {
+                        throw new Error(`Duplicate record: Combination of Product Code (${productCode}), Serial No (${serialNumber}), and Indicator (${indicatorField || 'blank'}) already exists.`);
+                    }
+
+                    // Returned serial number being resold/re-used: update asset to new active transaction
+                    const updatePayload = {
+                        productId: product._id,
+                        status: status === 'RETURN' ? 'SOLD' : status,
+                        customerId: customer ? customer._id : null,
+                        customerNameStr: customerLookup || '',
+                        customerPostalCode,
+                        invoiceNumber: invoiceNumber || '',
+                        saleDate: saleDate || new Date(),
+                        location: location || '',
+                        mgr1, mgr2, mgr3, mgr4, mgr5,
+                        indicatorField,
+                        returnReason: '',
+                        returnedAt: null
+                    };
+
+                    await Asset.findByIdAndUpdate(matchedAsset._id, updatePayload);
                     results.updated++;
+
+                    // Add history record for the new sale
+                    await AssetHistory.create({
+                        ...(companyId ? { companyId } : {}),
+                        assetId: matchedAsset._id,
+                        serialNumber,
+                        productCode,
+                        productName,
+                        productId: product._id,
+                        customerId: customer ? customer._id : null,
+                        customerName: customer ? (customer.companyName || customer.customerName) : customerLookup,
+                        customerPostalCode,
+                        invoiceNumber: invoiceNumber || '',
+                        saleDate: saleDate || new Date(),
+                        location: location || '',
+                        mgr1, mgr2, mgr3, mgr4, mgr5,
+                        indicatorField,
+                        transactionType: 'SALE',
+                        status: status === 'RETURN' ? 'SOLD' : status,
+                        createdBy: req.user?.id || null
+                    });
                 } else {
-                    await Asset.create(assetPayload);
+                    // Case 1 / Case 3: Completely new combination or different product
+                    const newAsset = await Asset.create({
+                        ...(companyId ? { companyId } : {}),
+                        productId: product._id,
+                        serialNumber,
+                        status,
+                        customerId: customer ? customer._id : null,
+                        customerNameStr: customerLookup || '',
+                        customerPostalCode,
+                        invoiceNumber: invoiceNumber || '',
+                        saleDate: saleDate || (status === 'SOLD' ? new Date() : null),
+                        location: location || '',
+                        mgr1, mgr2, mgr3, mgr4, mgr5,
+                        indicatorField,
+                        createdBy: req.user?.id || null
+                    });
                     results.created++;
+
+                    await AssetHistory.create({
+                        ...(companyId ? { companyId } : {}),
+                        assetId: newAsset._id,
+                        serialNumber,
+                        productCode,
+                        productName,
+                        productId: product._id,
+                        customerId: customer ? customer._id : null,
+                        customerName: customer ? (customer.companyName || customer.customerName) : customerLookup,
+                        customerPostalCode,
+                        invoiceNumber: invoiceNumber || '',
+                        saleDate: saleDate || (status === 'SOLD' ? new Date() : null),
+                        location: location || '',
+                        mgr1, mgr2, mgr3, mgr4, mgr5,
+                        indicatorField,
+                        transactionType: 'IMPORT',
+                        status,
+                        createdBy: req.user?.id || null
+                    });
                 }
             } catch (err) {
                 results.failed++;
@@ -3308,8 +3397,8 @@ const importAssets = async (req, res) => {
             const { createCompanyNotifications } = require('../utils/notificationHelper');
             await createCompanyNotifications({
                 companyId: req.user?.companyId,
-                title: 'Serial Numbers / Assets Imported',
-                message: `Successfully imported/updated ${successCount} asset serial numbers (created: ${results.created}, updated: ${results.updated}, skipped: ${results.skipped}, failed: ${results.failed}).`,
+                title: 'Invoice Bulk Upload Complete',
+                message: `Successfully imported ${successCount} serial asset records (created: ${results.created}, updated: ${results.updated}, skipped: ${results.skipped}, failed: ${results.failed}).`,
                 type: 'Reminder',
                 excludeUserId: req.user?.id
             });
@@ -3331,7 +3420,7 @@ const importAssets = async (req, res) => {
         });
     } catch (error) {
         console.error('Import assets error:', error);
-        res.status(500).json({ message: error.message || 'Error importing serial numbers', errors: [error.message] });
+        res.status(500).json({ message: error.message || 'Error importing invoice bulk assets', errors: [error.message] });
     }
 };
 
@@ -3340,38 +3429,50 @@ const getAssetTemplate = async (req, res) => {
         const templateData = [
             {
                 'Serial Number': 'SN-100201',
-                'Product Code': 'PROD-001',
                 'Product Name': '10KVA Transformer',
+                'Product Code': 'PROD-001',
                 'Status': 'IN_STOCK',
-                'Customer Code': '',
-                'Customer Name': '',
-                'Invoice Number': '',
+                'Customer': '',
+                'Customer Postal Code': '',
+                'Invoice Ref': '',
                 'Sale Date': '',
-                'Location': 'Bay-4 Outgoing Yard'
+                'Location': 'Bay-4 Outgoing Yard',
+                'Mgr 1': 'Manager A',
+                'Mgr 2': '',
+                'Mgr 3': '',
+                'Mgr 4': '',
+                'Mgr 5': '',
+                'Indicator_Field': 'SALE'
             },
             {
                 'Serial Number': 'SN-100202',
-                'Product Code': 'PROD-001',
                 'Product Name': '10KVA Transformer',
+                'Product Code': 'PROD-001',
                 'Status': 'SOLD',
-                'Customer Code': 'CUST-001',
-                'Customer Name': 'Apex Industrial Solutions',
-                'Invoice Number': 'INV-2026-001',
+                'Customer': 'Apex Industrial Solutions',
+                'Customer Postal Code': '400001',
+                'Invoice Ref': 'INV-2026-001',
                 'Sale Date': '2026-03-15',
-                'Location': 'Client Site Alpha'
+                'Location': 'Client Site Alpha',
+                'Mgr 1': 'Manager A',
+                'Mgr 2': 'Manager B',
+                'Mgr 3': '',
+                'Mgr 4': '',
+                'Mgr 5': '',
+                'Indicator_Field': 'SALE'
             }
         ];
 
         const ws = XLSX.utils.json_to_sheet(templateData);
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Asset Serials Template');
+        XLSX.utils.book_append_sheet(wb, ws, 'Invoice Bulk Upload Template');
 
         const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        res.setHeader('Content-Disposition', 'attachment; filename=Asset_Serials_Import_Template.xlsx');
+        res.setHeader('Content-Disposition', 'attachment; filename=Invoice_Bulk_Upload_Template.xlsx');
         res.send(buffer);
     } catch (err) {
-        res.status(500).json({ message: 'Error generating asset serials import template' });
+        res.status(500).json({ message: 'Error generating invoice bulk upload template' });
     }
 };
 

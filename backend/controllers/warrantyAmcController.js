@@ -1,6 +1,18 @@
 const Warranty = require('../models/Warranty');
 const AMC = require('../models/AMC');
 const Asset = require('../models/Asset');
+const AssetHistory = require('../models/AssetHistory');
+const Product = require('../models/Product');
+const Customer = require('../models/Customer');
+const RolePermission = require('../models/RolePermission');
+
+// Utility for regex matching
+const buildExactRegex = (str) => {
+    if (!str) return null;
+    const clean = String(str).trim();
+    const escaped = clean.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    return new RegExp(`^${escaped}$`, 'i');
+};
 
 // Warranty CRUD
 exports.createWarranty = async (req, res) => {
@@ -65,7 +77,6 @@ exports.verifyEntitlements = async (req, res) => {
             recommendedBillingType: 'Paid'
         };
 
-        // 1. Check active warranties
         const warrantyFilter = { customerId, status: 'Active', companyId };
         if (productId) warrantyFilter.productId = productId;
         if (assetId) warrantyFilter.assetId = assetId;
@@ -80,12 +91,10 @@ exports.verifyEntitlements = async (req, res) => {
                 verification.warranty.expiryDate = activeWarranty.expiryDate;
                 verification.recommendedBillingType = 'Under Warranty';
             } else {
-                // Auto expire if past expiry date
                 await Warranty.findByIdAndUpdate(activeWarranty._id, { status: 'Expired' });
             }
         }
 
-        // 2. Check active AMC (if warranty is not active)
         if (!verification.warranty.isActive) {
             const activeAmc = await AMC.findOne({
                 customerId,
@@ -103,7 +112,6 @@ exports.verifyEntitlements = async (req, res) => {
                     verification.amc.remainingVisits = remainingVisits;
                     verification.recommendedBillingType = 'Under AMC';
                 } else {
-                    // Auto expire if visits depleted
                     await AMC.findByIdAndUpdate(activeAmc._id, { status: 'Expired' });
                 }
             }
@@ -126,16 +134,328 @@ exports.createAsset = async (req, res) => {
     }
 };
 
+// Single Entry Creation (Requirement #15, #3, #4, #8, #17)
+exports.createSingleAsset = async (req, res) => {
+    try {
+        const companyId = req.user?.companyId;
+        const {
+            serialNumber,
+            productCode,
+            productName,
+            status = 'IN_STOCK',
+            customer: customerInput,
+            customerPostalCode = '',
+            invoiceNumber = '',
+            saleDate,
+            location = '',
+            mgr1 = '',
+            mgr2 = '',
+            mgr3 = '',
+            mgr4 = '',
+            mgr5 = '',
+            indicatorField = ''
+        } = req.body;
+
+        if (!serialNumber || !String(serialNumber).trim()) {
+            return res.status(400).json({ message: 'Serial Number is required' });
+        }
+        if (!productCode || !String(productCode).trim()) {
+            return res.status(400).json({ message: 'Product Code is required' });
+        }
+
+        const cleanSN = String(serialNumber).trim();
+        const cleanProductCode = String(productCode).trim();
+        const cleanIndicator = String(indicatorField || '').trim().slice(0, 20);
+
+        // Resolve product
+        let product = await Product.findOne({
+            companyId,
+            productCode: buildExactRegex(cleanProductCode)
+        });
+
+        if (!product && productName) {
+            product = await Product.findOne({
+                companyId,
+                productName: buildExactRegex(productName)
+            });
+        }
+
+        if (!product) {
+            product = await Product.create({
+                companyId,
+                productCode: cleanProductCode,
+                productName: productName || cleanProductCode,
+                hsnCode: 'N/A',
+                gstPercentage: 18,
+                basePrice: 0,
+                mrp: 0,
+                uom: 'Nos',
+                status: 'Active'
+            });
+        }
+
+        // Resolve customer
+        let customer = null;
+        if (customerInput && String(customerInput).trim()) {
+            const cleanCust = String(customerInput).trim();
+            customer = await Customer.findOne({
+                companyId,
+                $or: [
+                    { externalCode: buildExactRegex(cleanCust) },
+                    { customerName: buildExactRegex(cleanCust) },
+                    { companyName: buildExactRegex(cleanCust) }
+                ]
+            });
+
+            if (!customer) {
+                customer = await Customer.create({
+                    companyId,
+                    externalCode: cleanCust,
+                    customerName: cleanCust,
+                    companyName: cleanCust,
+                    createdBy: req.user?.id || null
+                });
+            }
+        }
+
+        // Unique Identifier Check: Product Code + Serial No + Indicator_Field
+        const existingAssets = await Asset.find({
+            companyId,
+            serialNumber: buildExactRegex(cleanSN)
+        }).populate('productId');
+
+        const matchedAsset = existingAssets.find(a => {
+            const codeMatches = a.productId?.productCode &&
+                a.productId.productCode.trim().toLowerCase() === cleanProductCode.toLowerCase();
+            const indicatorMatches = (a.indicatorField || '').trim().toLowerCase() === cleanIndicator.toLowerCase();
+            return codeMatches && indicatorMatches;
+        });
+
+        if (matchedAsset) {
+            // Case 2: Duplicate upload error if not in RETURN status
+            if (matchedAsset.status !== 'RETURN' && matchedAsset.status !== 'RETURNED') {
+                return res.status(400).json({
+                    message: `Duplicate record: Combination of Product Code (${cleanProductCode}), Serial No (${cleanSN}), and Indicator (${cleanIndicator || 'blank'}) already exists.`
+                });
+            }
+
+            // Case 4: Serial number was returned and is now being re-sold / re-entered
+            const updatePayload = {
+                productId: product._id,
+                status: status === 'RETURN' ? 'SOLD' : status,
+                customerId: customer ? customer._id : null,
+                customerNameStr: customerInput || '',
+                customerPostalCode,
+                invoiceNumber,
+                saleDate: saleDate ? new Date(saleDate) : new Date(),
+                location,
+                mgr1, mgr2, mgr3, mgr4, mgr5,
+                indicatorField: cleanIndicator,
+                returnReason: '',
+                returnedAt: null
+            };
+
+            await Asset.findByIdAndUpdate(matchedAsset._id, updatePayload);
+
+            // Log new sale transaction history
+            await AssetHistory.create({
+                companyId,
+                assetId: matchedAsset._id,
+                serialNumber: cleanSN,
+                productCode: product.productCode,
+                productName: product.productName,
+                productId: product._id,
+                customerId: customer ? customer._id : null,
+                customerName: customer ? (customer.companyName || customer.customerName) : (customerInput || ''),
+                customerPostalCode,
+                invoiceNumber,
+                saleDate: saleDate ? new Date(saleDate) : new Date(),
+                location,
+                mgr1, mgr2, mgr3, mgr4, mgr5,
+                indicatorField: cleanIndicator,
+                transactionType: 'SINGLE_ENTRY',
+                status: status === 'RETURN' ? 'SOLD' : status,
+                createdBy: req.user?.id || null
+            });
+
+            const updatedDoc = await Asset.findById(matchedAsset._id).populate('customerId').populate('productId');
+            return res.status(200).json({ message: 'Serial asset entry updated successfully (Re-use of returned serial)', data: updatedDoc });
+        }
+
+        // Case 1 / Case 3: Create new asset entry
+        const newAsset = await Asset.create({
+            companyId,
+            productId: product._id,
+            serialNumber: cleanSN,
+            status,
+            customerId: customer ? customer._id : null,
+            customerNameStr: customerInput || '',
+            customerPostalCode,
+            invoiceNumber,
+            saleDate: saleDate ? new Date(saleDate) : (status === 'SOLD' ? new Date() : null),
+            location,
+            mgr1, mgr2, mgr3, mgr4, mgr5,
+            indicatorField: cleanIndicator,
+            createdBy: req.user?.id || null
+        });
+
+        await AssetHistory.create({
+            companyId,
+            assetId: newAsset._id,
+            serialNumber: cleanSN,
+            productCode: product.productCode,
+            productName: product.productName,
+            productId: product._id,
+            customerId: customer ? customer._id : null,
+            customerName: customer ? (customer.companyName || customer.customerName) : (customerInput || ''),
+            customerPostalCode,
+            invoiceNumber,
+            saleDate: saleDate ? new Date(saleDate) : (status === 'SOLD' ? new Date() : null),
+            location,
+            mgr1, mgr2, mgr3, mgr4, mgr5,
+            indicatorField: cleanIndicator,
+            transactionType: 'SINGLE_ENTRY',
+            status,
+            createdBy: req.user?.id || null
+        });
+
+        const createdDoc = await Asset.findById(newAsset._id).populate('customerId').populate('productId');
+        res.status(201).json({ message: 'Single entry added successfully', data: createdDoc });
+    } catch (error) {
+        console.error('createSingleAsset error:', error);
+        res.status(500).json({ message: error.message || 'Error creating single entry' });
+    }
+};
+
+// Process Sales Return (Requirement #6, #7, #8)
+exports.returnAsset = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { returnReason } = req.body;
+        const companyId = req.user?.companyId;
+
+        if (!returnReason || !String(returnReason).trim()) {
+            return res.status(400).json({ message: 'Return reason is required' });
+        }
+
+        const asset = await Asset.findOne({ _id: id, companyId }).populate('productId').populate('customerId');
+        if (!asset) {
+            return res.status(404).json({ message: 'Asset entry not found' });
+        }
+
+        const now = new Date();
+        const cleanReason = String(returnReason).trim();
+
+        // Update active asset status to RETURN
+        asset.status = 'RETURN';
+        asset.returnReason = cleanReason;
+        asset.returnedAt = now;
+        await asset.save();
+
+        // Create transaction history record for RETURN
+        await AssetHistory.create({
+            companyId,
+            assetId: asset._id,
+            serialNumber: asset.serialNumber,
+            productCode: asset.productId?.productCode || '',
+            productName: asset.productId?.productName || '',
+            productId: asset.productId?._id,
+            customerId: asset.customerId?._id,
+            customerName: asset.customerId?.companyName || asset.customerId?.customerName || asset.customerNameStr || '',
+            customerPostalCode: asset.customerPostalCode || '',
+            invoiceNumber: asset.invoiceNumber || '',
+            saleDate: asset.saleDate || asset.invoiceDate || null,
+            returnDate: now,
+            returnReason: cleanReason,
+            location: asset.location || '',
+            mgr1: asset.mgr1 || '',
+            mgr2: asset.mgr2 || '',
+            mgr3: asset.mgr3 || '',
+            mgr4: asset.mgr4 || '',
+            mgr5: asset.mgr5 || '',
+            indicatorField: asset.indicatorField || '',
+            transactionType: 'RETURN',
+            status: 'RETURN',
+            createdBy: req.user?.id || null
+        });
+
+        res.json({ message: 'Sales return processed successfully', data: asset });
+    } catch (error) {
+        console.error('returnAsset error:', error);
+        res.status(500).json({ message: error.message || 'Error processing sales return' });
+    }
+};
+
+// Return History List (Requirement #9)
+exports.getReturnHistory = async (req, res) => {
+    try {
+        const companyId = req.user?.companyId;
+        const historyDocs = await AssetHistory.find({
+            companyId,
+            $or: [
+                { transactionType: 'RETURN' },
+                { status: 'RETURN' },
+                { status: 'RETURNED' }
+            ]
+        })
+        .populate('customerId', 'customerName companyName')
+        .populate('productId', 'productName productCode')
+        .sort({ returnDate: -1, createdAt: -1 })
+        .lean();
+
+        res.json(historyDocs);
+    } catch (error) {
+        console.error('getReturnHistory error:', error);
+        res.status(500).json({ message: error.message || 'Error fetching return history' });
+    }
+};
+
+// Delete Entry (Requirement #11, #12)
+exports.deleteAsset = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const companyId = req.user?.companyId;
+        const user = req.user;
+
+        let isAuthorized = false;
+        if (user.role === 'admin' || user.role === 'superadmin' || user.isSuperAdmin) {
+            isAuthorized = true;
+        } else {
+            const rolePerm = await RolePermission.findOne({ role: user.role, companyId }).lean();
+            if (rolePerm && (rolePerm.menuVisibility?.invoice_bulk_upload_delete || rolePerm.menuVisibility?.master_serials_delete)) {
+                isAuthorized = true;
+            }
+        }
+
+        if (!isAuthorized) {
+            return res.status(403).json({ message: 'Permission denied: Only Company Admin or users with Delete Invoice Bulk Upload Entry permission can delete entries.' });
+        }
+
+        const asset = await Asset.findOneAndDelete({ _id: id, companyId });
+        if (!asset) {
+            return res.status(404).json({ message: 'Entry not found' });
+        }
+
+        res.json({ message: 'Invoice Bulk Upload entry deleted successfully' });
+    } catch (error) {
+        console.error('deleteAsset error:', error);
+        res.status(500).json({ message: error.message || 'Error deleting entry' });
+    }
+};
+
+// List Assets with Customer Name search support (Requirement #10)
 exports.getAssets = async (req, res) => {
     try {
         const filter = { companyId: req.user?.companyId };
         if (req.query.customerId) filter.customerId = req.query.customerId;
         if (req.query.productId) filter.productId = req.query.productId;
+
         const docs = await Asset.find(filter)
-            .populate('customerId', 'customerName companyName')
+            .populate('customerId', 'customerName companyName externalCode')
             .populate('productId', 'productName productCode')
             .sort({ createdAt: -1 })
             .lean();
+
         res.json(docs);
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -170,7 +490,7 @@ exports.getAssetSummary = async (req, res) => {
             .lean();
 
             if (matches.length > 0) {
-                const statusPriority = { 'SOLD': 1, 'ALLOCATED': 2, 'RETURNED': 3, 'IN_STOCK': 4, 'SCRAPPED': 5 };
+                const statusPriority = { 'SOLD': 1, 'ALLOCATED': 2, 'RETURNED': 3, 'RETURN': 3, 'IN_STOCK': 4, 'SCRAPPED': 5 };
                 matches.sort((a, b) => {
                     const pA = statusPriority[a.status] || (a.customerId ? 1 : 4);
                     const pB = statusPriority[b.status] || (b.customerId ? 1 : 4);
@@ -191,7 +511,6 @@ exports.getAssetSummary = async (req, res) => {
 
         const now = new Date();
         
-        // 1. Warranty Coverage
         let warranty = null;
         if (asset.customerId) {
             warranty = await Warranty.findOne({
@@ -210,7 +529,6 @@ exports.getAssetSummary = async (req, res) => {
             };
         }
 
-        // 2. AMC Coverage
         let amc = null;
         if (asset.customerId) {
             amc = await AMC.findOne({
@@ -222,7 +540,6 @@ exports.getAssetSummary = async (req, res) => {
             }).lean();
         }
 
-        // 3. Ticket counts for this asset
         const openTicketsCount = await Ticket.countDocuments({
             assetId: asset._id,
             status: { $in: ['Open', 'Assigned', 'In Progress', 'Pending Customer', 'Escalated'] },
@@ -235,7 +552,6 @@ exports.getAssetSummary = async (req, res) => {
             companyId
         });
 
-        // 4. Last Service Date (derived from recent completed visit)
         const tickets = await Ticket.find({ assetId: asset._id, companyId }).select('_id').lean();
         const ticketIds = tickets.map(t => t._id);
         
@@ -254,11 +570,18 @@ exports.getAssetSummary = async (req, res) => {
             }
         }
 
+        // Fetch transaction history
+        const history = await AssetHistory.find({
+            companyId,
+            serialNumber: buildExactRegex(asset.serialNumber)
+        }).sort({ createdAt: -1 }).lean();
+
         res.json({
             asset,
             warranty,
             amc,
             lastServiceDate,
+            history,
             ticketCounts: {
                 open: openTicketsCount,
                 closed: closedTicketsCount
@@ -270,6 +593,7 @@ exports.getAssetSummary = async (req, res) => {
     }
 };
 
+// Search Serial Numbers for Complaint Registration (Requirement #13, #14)
 exports.searchSerialNumbers = async (req, res) => {
     try {
         const { q } = req.query;
@@ -282,55 +606,77 @@ exports.searchSerialNumbers = async (req, res) => {
         const queryStr = String(q).trim();
         const escapedQuery = queryStr.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
 
-        // Only search for SOLD products (or assets with a customer assigned) when raising complaints/tickets
-        const filter = {
+        // Search active assets
+        const assets = await Asset.find({
             companyId,
-            $or: [
-                { status: 'SOLD' },
-                { customerId: { $ne: null } }
-            ],
             serialNumber: { $regex: escapedQuery, $options: 'i' }
-        };
+        })
+        .sort({ customerId: -1, status: -1, serialNumber: 1 })
+        .limit(100)
+        .populate('customerId', 'customerName companyName billingAddress mobile email gstin')
+        .populate('productId', 'productName productCode basePrice mrp')
+        .populate('invoiceId', 'voucherNumber date')
+        .lean();
 
-        const assets = await Asset.find(filter)
-            .sort({ customerId: -1, status: -1, serialNumber: 1 })
-            .limit(200)
-            .populate('customerId', 'customerName companyName billingAddress mobile email gstin')
-            .populate('productId', 'productName productCode basePrice mrp')
-            .populate('invoiceId', 'voucherNumber date')
-            .lean();
+        // Also search transaction history for historical serials
+        const historyDocs = await AssetHistory.find({
+            companyId,
+            serialNumber: { $regex: escapedQuery, $options: 'i' }
+        })
+        .sort({ createdAt: -1 })
+        .limit(100)
+        .populate('customerId', 'customerName companyName billingAddress mobile email gstin')
+        .populate('productId', 'productName productCode basePrice mrp')
+        .lean();
 
-        // Sort priority: SOLD > ALLOCATED > RETURNED > IN_STOCK > SCRAPPED
-        const statusPriority = { 'SOLD': 1, 'ALLOCATED': 2, 'RETURNED': 3, 'IN_STOCK': 4, 'SCRAPPED': 5 };
-
-        assets.sort((a, b) => {
-            const pA = statusPriority[a.status] || (a.customerId ? 1 : 4);
-            const pB = statusPriority[b.status] || (b.customerId ? 1 : 4);
-            if (pA !== pB) return pA - pB;
-
-            if (a.customerId && !b.customerId) return -1;
-            if (!a.customerId && b.customerId) return 1;
-
-            return (a.serialNumber || '').localeCompare(b.serialNumber || '');
-        });
-
-        // Deduplicate by serialNumber so each Serial No. appears only once
-        const uniqueAssets = [];
+        const combinedResults = [];
         const seenSerials = new Set();
 
-        for (const asset of assets) {
-            const sn = (asset.serialNumber || '').trim().toLowerCase();
-            if (sn && !seenSerials.has(sn)) {
-                seenSerials.add(sn);
-                uniqueAssets.push(asset);
+        // Add active assets first
+        for (const a of assets) {
+            const snKey = `${(a.serialNumber || '').trim().toLowerCase()}-${a.productId?.productCode || ''}`;
+            seenSerials.add(snKey);
+            combinedResults.push({
+                _id: a._id,
+                serialNumber: a.serialNumber,
+                productId: a.productId,
+                productCode: a.productId?.productCode || '',
+                productName: a.productId?.productName || '',
+                customerId: a.customerId,
+                customerName: a.customerId?.companyName || a.customerId?.customerName || a.customerNameStr || '',
+                customerPostalCode: a.customerPostalCode || '',
+                invoiceNumber: a.invoiceNumber || (a.invoiceId?.voucherNumber || ''),
+                saleDate: a.saleDate || a.invoiceDate || null,
+                status: a.status || 'IN_STOCK',
+                location: a.location || ''
+            });
+        }
+
+        // Add historical records if not already in active list
+        for (const h of historyDocs) {
+            const snKey = `${(h.serialNumber || '').trim().toLowerCase()}-${h.productCode || ''}`;
+            if (!seenSerials.has(snKey)) {
+                seenSerials.add(snKey);
+                combinedResults.push({
+                    _id: h.assetId || h._id,
+                    serialNumber: h.serialNumber,
+                    productId: h.productId || { productName: h.productName, productCode: h.productCode },
+                    productCode: h.productCode || '',
+                    productName: h.productName || '',
+                    customerId: h.customerId || (h.customerName ? { customerName: h.customerName, companyName: h.customerName } : null),
+                    customerName: h.customerName || '',
+                    customerPostalCode: h.customerPostalCode || '',
+                    invoiceNumber: h.invoiceNumber || '',
+                    saleDate: h.saleDate || null,
+                    status: h.status || 'SOLD',
+                    location: h.location || ''
+                });
             }
         }
 
-        res.json(uniqueAssets.slice(0, 30));
+        res.json(combinedResults.slice(0, 30));
     } catch (error) {
         console.error('searchSerialNumbers error:', error);
         res.status(500).json({ message: error.message || 'Error searching serial numbers' });
     }
 };
-
-

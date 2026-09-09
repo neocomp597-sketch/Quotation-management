@@ -30,7 +30,7 @@ export const MENU_PERMISSION_GROUPS = [
             { key: 'master_attributes', label: 'Attributes', description: 'Attribute master definitions', defaultRoute: '/attributes' },
             { key: 'master_terms', label: 'Terms & Conditions', description: 'Terms and conditions master', defaultRoute: '/terms' },
             { key: 'master_statuses', label: 'Status Master', description: 'Status master definitions for planning', defaultRoute: '/status-master' },
-            { key: 'master_serials', label: 'Serial No. Master', description: 'Serial number and asset master records', defaultRoute: '/serial-no-master' },
+            { key: 'master_serials', label: 'Invoice Bulk Upload', description: 'Serial number and asset master records', defaultRoute: '/serial-no-master' },
             { key: 'flowchart_view', label: 'Flowchart Builder', description: 'Visual process flowchart builder', defaultRoute: '/flowcharts' }
         ]
     },

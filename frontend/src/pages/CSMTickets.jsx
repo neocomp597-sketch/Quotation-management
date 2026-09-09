@@ -210,6 +210,10 @@ const CSMTickets = () => {
     const [isSearchingSerials, setIsSearchingSerials] = useState(false);
     const [showSerialDropdown, setShowSerialDropdown] = useState(false);
 
+    const [manualSerialSuggestions, setManualSerialSuggestions] = useState([]);
+    const [isSearchingManualSerials, setIsSearchingManualSerials] = useState(false);
+    const [showManualSerialDropdown, setShowManualSerialDropdown] = useState(false);
+
     const handleSerialInputChange = async (val) => {
         setFormData(prev => ({ ...prev, serialNumber: val }));
         const query = val ? String(val).trim() : '';
@@ -218,17 +222,7 @@ const CSMTickets = () => {
             setShowSerialDropdown(true);
             try {
                 const res = await csmService.searchSerialNumbers(query);
-                const rawList = res.data || [];
-                // Only include SOLD products and deduplicate by serialNumber
-                const soldList = rawList.filter(a => a.status === 'SOLD' || a.customerId);
-                const uniqueMap = new Map();
-                soldList.forEach(item => {
-                    const key = (item.serialNumber || '').trim().toLowerCase();
-                    if (key && !uniqueMap.has(key)) {
-                        uniqueMap.set(key, item);
-                    }
-                });
-                setSerialSuggestions(Array.from(uniqueMap.values()));
+                setSerialSuggestions(res.data || []);
             } catch (err) {
                 console.error('Serial search error:', err);
                 setSerialSuggestions([]);
@@ -247,6 +241,88 @@ const CSMTickets = () => {
         if (asset?.serialNumber) {
             setFormData(prev => ({ ...prev, serialNumber: asset.serialNumber }));
             handleSerialNoLookup(asset.serialNumber, asset);
+        }
+    };
+
+    const handleManualSerialInputChange = async (val) => {
+        setManualFormData(prev => ({ ...prev, serialNumber: val }));
+        const query = val ? String(val).trim() : '';
+        if (query.length >= 1) {
+            setIsSearchingManualSerials(true);
+            setShowManualSerialDropdown(true);
+            try {
+                const res = await csmService.searchSerialNumbers(query);
+                setManualSerialSuggestions(res.data || []);
+            } catch (err) {
+                console.error('Manual serial search error:', err);
+                setManualSerialSuggestions([]);
+            } finally {
+                setIsSearchingManualSerials(false);
+            }
+        } else {
+            setManualSerialSuggestions([]);
+            setShowManualSerialDropdown(false);
+        }
+    };
+
+    const handleManualSelectSerialSuggestion = (asset) => {
+        setShowManualSerialDropdown(false);
+        setManualSerialSuggestions([]);
+        if (asset?.serialNumber) {
+            setManualFormData(prev => ({ ...prev, serialNumber: asset.serialNumber }));
+            handleManualSerialLookup(asset.serialNumber, asset);
+        }
+    };
+
+    const handleManualSerialLookup = async (serialNo, preloadedAsset = null) => {
+        const cleanSN = String(serialNo || '').trim();
+        if (!cleanSN && !preloadedAsset) return;
+        try {
+            const summaryParams = preloadedAsset?._id ? { assetId: preloadedAsset._id } : { serialNumber: cleanSN };
+            const res = await csmService.getAssetSummary(summaryParams);
+            const asset = res.data?.asset || preloadedAsset;
+            if (asset) {
+                const custName = asset.customerName || asset.customerId?.companyName || asset.customerId?.customerName || asset.customerNameStr || '';
+                const custId = asset.customerId?._id || asset.customerId || '';
+                const prodName = asset.productName || asset.productId?.productName || '';
+                const prodId = asset.productId?._id || asset.productId || '';
+                const invNo = asset.invoiceNumber || (asset.invoiceId?.voucherNumber || '');
+                const invDate = asset.saleDate || asset.invoiceDate ? new Date(asset.saleDate || asset.invoiceDate).toISOString().slice(0, 10) : '';
+                const pincode = asset.customerPostalCode || asset.customerId?.billingAddress?.pincode || asset.locationPincode || '';
+
+                setManualFormData(prev => ({
+                    ...prev,
+                    serialNumber: asset.serialNumber || cleanSN,
+                    customerId: custId || prev.customerId,
+                    customerName: custName || prev.customerName,
+                    productId: prodId || prev.productId,
+                    customProductName: prodName || prev.customProductName,
+                    invoiceNo: invNo || prev.invoiceNo,
+                    invoiceDate: invDate || prev.invoiceDate,
+                    pincode: pincode || prev.pincode
+                }));
+
+                if (custId) {
+                    try {
+                        const contactsRes = await csmService.getCustomerContacts({ customerId: custId });
+                        const contacts = contactsRes.data || [];
+                        const primaryContact = contacts.find(c => c.isPrimary) || contacts[0];
+                        if (primaryContact) {
+                            setManualFormData(prev => ({
+                                ...prev,
+                                contactName: primaryContact.contactName || prev.contactName,
+                                contactPhone: primaryContact.mobileNo || prev.contactPhone,
+                                contactEmail: primaryContact.email || prev.contactEmail
+                            }));
+                        }
+                    } catch (e) {}
+                }
+                toast.success(`Asset details auto-filled for Serial No: ${asset.serialNumber || cleanSN}`);
+            } else {
+                toast.info('No matching serial number found in master/history data.');
+            }
+        } catch (err) {
+            console.error('Error looking up manual serial number:', err);
         }
     };
 
@@ -1842,6 +1918,78 @@ const CSMTickets = () => {
                     <div className="glass shadow-premium rounded-[2rem] p-6 md:p-8 bg-white border border-slate-100">
                     <form id="create-ticket-form" onSubmit={handleCreateTicket} className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                        {/* 1. Product Serial No. - FIRST FIELD */}
+                        <div className="md:col-span-2 lg:col-span-3 p-4 bg-primary-50/40 border border-primary-200/80 rounded-2xl">
+                            <label className="block text-xs font-black text-primary-900 uppercase tracking-widest mb-1.5">
+                                Product Serial No. * <span className="text-[10px] text-primary-600 font-bold lowercase">(Primary Field – enter or search serial no. to auto-fill product & customer details)</span>
+                            </label>
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    value={formData.serialNumber || ''}
+                                    onChange={(e) => handleSerialInputChange(e.target.value)}
+                                    onFocus={() => {
+                                        if (formData.serialNumber && formData.serialNumber.trim().length >= 1) {
+                                            handleSerialInputChange(formData.serialNumber);
+                                        }
+                                    }}
+                                    onBlur={() => {
+                                        setTimeout(() => setShowSerialDropdown(false), 200);
+                                    }}
+                                    className="w-full pl-4 pr-12 py-3 rounded-xl border border-primary-200 bg-white text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all shadow-sm"
+                                    placeholder="Enter or scan Serial No (e.g. SN-100202 or 2001)..."
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => handleSerialNoLookup(formData.serialNumber)}
+                                    className="absolute right-2 top-1.5 p-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-all shadow-sm flex items-center justify-center"
+                                    title="Lookup Serial Number & Auto-fill Details"
+                                >
+                                    <MdSearch size={18} />
+                                </button>
+
+                                {/* Dropdown Suggestions List */}
+                                {showSerialDropdown && (
+                                    <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-2xl shadow-xl max-h-60 overflow-y-auto divide-y divide-slate-100 animate-in fade-in slide-in-from-top-1">
+                                        {isSearchingSerials ? (
+                                            <div className="p-3 text-xs text-slate-400 font-bold text-center">Searching Master & History Data...</div>
+                                        ) : serialSuggestions.length === 0 ? (
+                                            <div className="p-3 text-xs text-slate-400 font-bold text-center">No matching Serial Numbers found</div>
+                                        ) : (
+                                            serialSuggestions.map((asset, idx) => {
+                                                const custName = asset.customerName || asset.customerId?.companyName || asset.customerId?.customerName;
+                                                const prodName = asset.productName || asset.productId?.productName;
+                                                return (
+                                                    <div
+                                                        key={asset._id || idx}
+                                                        onMouseDown={() => handleSelectSerialSuggestion(asset)}
+                                                        className="p-3 hover:bg-primary-50/80 cursor-pointer transition-colors"
+                                                    >
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="font-mono font-bold text-slate-900 text-sm">{asset.serialNumber}</span>
+                                                            <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded border ${
+                                                                asset.status === 'SOLD' ? 'bg-blue-100 text-blue-700 border-blue-200' :
+                                                                asset.status === 'RETURN' ? 'bg-amber-100 text-amber-700 border-amber-200' :
+                                                                'bg-emerald-100 text-emerald-700 border-emerald-200'
+                                                            }`}>
+                                                                {asset.status || 'IN_STOCK'}
+                                                            </span>
+                                                        </div>
+                                                        <div className="text-xs text-slate-600 font-medium truncate mt-1 flex items-center justify-between">
+                                                            <span className="truncate max-w-[55%]">{prodName || 'Product'}</span>
+                                                            <span className="font-bold text-slate-800 truncate max-w-[42%] text-right">
+                                                                {custName ? `👤 ${custName}` : 'Asset'}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
                         <div>
                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Customer *</label>
                             <SearchableSelect
@@ -1875,45 +2023,6 @@ const CSMTickets = () => {
                                     </div>
                                 );
                             })()}
-                        </div>
-                        <div>
-                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
-                                Link Invoice {formData.customerId ? `(${invoices.length})` : ''}
-                            </label>
-                            <select
-                                value={formData.invoiceId}
-                                disabled={!formData.customerId}
-                                onChange={(e) => {
-                                    const nextInvoiceId = e.target.value;
-                                    setFormData(prev => {
-                                        const nextData = { ...prev, invoiceId: nextInvoiceId };
-                                        if (nextInvoiceId) {
-                                            const selectedInvoice = invoices.find(i => i._id === nextInvoiceId);
-                                            const invoiceProductIds = selectedInvoice ? selectedInvoice.items.map(item => item.productId?.toString()).filter(Boolean) : [];
-                                            if (prev.productId && !invoiceProductIds.includes(prev.productId.toString())) {
-                                                nextData.productId = '';
-                                                nextData.assetId = '';
-                                            }
-                                        }
-                                        return nextData;
-                                    });
-                                }}
-                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold disabled:bg-slate-50 disabled:text-slate-400"
-                            >
-                                <option value="">{formData.customerId ? `Select Invoice (${invoices.length} available)` : 'Select Customer First'}</option>
-                                {invoices.map(i => <option key={i._id} value={i._id}>{i.voucherNumber} ({new Date(i.date).toLocaleDateString()})</option>)}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Pincode *</label>
-                            <input
-                                type="text"
-                                required
-                                value={formData.pincode || ''}
-                                onChange={(e) => setFormData({ ...formData, pincode: e.target.value })}
-                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
-                                placeholder="Enter Pincode"
-                            />
                         </div>
                         <div>
                             <div className="flex justify-between items-center mb-1">
@@ -1961,68 +2070,42 @@ const CSMTickets = () => {
                         </div>
                         <div>
                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
-                                Product Serial No. <span className="text-[9px] text-teal-600 font-bold lowercase">(type partial e.g. 1002)</span>
+                                Link Invoice {formData.customerId ? `(${invoices.length})` : ''}
                             </label>
-                            <div className="relative">
-                                <input
-                                    type="text"
-                                    value={formData.serialNumber || ''}
-                                    onChange={(e) => handleSerialInputChange(e.target.value)}
-                                    onFocus={() => {
-                                        if (formData.serialNumber && formData.serialNumber.trim().length >= 1) {
-                                            handleSerialInputChange(formData.serialNumber);
+                            <select
+                                value={formData.invoiceId}
+                                disabled={!formData.customerId}
+                                onChange={(e) => {
+                                    const nextInvoiceId = e.target.value;
+                                    setFormData(prev => {
+                                        const nextData = { ...prev, invoiceId: nextInvoiceId };
+                                        if (nextInvoiceId) {
+                                            const selectedInvoice = invoices.find(i => i._id === nextInvoiceId);
+                                            const invoiceProductIds = selectedInvoice ? selectedInvoice.items.map(item => item.productId?.toString()).filter(Boolean) : [];
+                                            if (prev.productId && !invoiceProductIds.includes(prev.productId.toString())) {
+                                                nextData.productId = '';
+                                                nextData.assetId = '';
+                                            }
                                         }
-                                    }}
-                                    onBlur={() => {
-                                        setTimeout(() => setShowSerialDropdown(false), 200);
-                                    }}
-                                    className="w-full pl-4 pr-12 py-3 rounded-xl border border-slate-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all"
-                                    placeholder="Enter or scan Serial No (e.g. 1002 or CE1002)..."
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => handleSerialNoLookup(formData.serialNumber)}
-                                    className="absolute right-2 top-1.5 p-1.5 hover:bg-slate-100 text-slate-500 rounded-lg transition-all"
-                                    title="Lookup Serial Number"
-                                >
-                                    <MdSearch size={20} />
-                                </button>
-
-                                {/* Dropdown Suggestions List */}
-                                {showSerialDropdown && (
-                                    <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-2xl shadow-xl max-h-60 overflow-y-auto divide-y divide-slate-100 animate-in fade-in slide-in-from-top-1">
-                                        {isSearchingSerials ? (
-                                            <div className="p-3 text-xs text-slate-400 font-bold text-center">Searching Serial Numbers...</div>
-                                        ) : serialSuggestions.length === 0 ? (
-                                            <div className="p-3 text-xs text-slate-400 font-bold text-center">No matching SOLD Serial Numbers found</div>
-                                        ) : (
-                                            serialSuggestions.map(asset => {
-                                                const custName = asset.customerId?.companyName || asset.customerId?.customerName;
-                                                return (
-                                                    <div
-                                                        key={asset._id}
-                                                        onMouseDown={() => handleSelectSerialSuggestion(asset)}
-                                                        className="p-3 hover:bg-teal-50/70 cursor-pointer transition-colors"
-                                                    >
-                                                        <div className="flex items-center justify-between">
-                                                            <span className="font-mono font-bold text-slate-900 text-sm">{asset.serialNumber}</span>
-                                                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-blue-100 text-blue-700 border border-blue-200">
-                                                                🛒 SOLD
-                                                            </span>
-                                                        </div>
-                                                        <div className="text-xs text-slate-600 font-medium truncate mt-1 flex items-center justify-between">
-                                                            <span className="truncate max-w-[55%]">{asset.productId?.productName || 'Product'}</span>
-                                                            <span className="font-bold text-slate-800 truncate max-w-[42%] text-right">
-                                                                {custName ? `👤 ${custName}` : 'Customer Asset'}
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })
-                                        )}
-                                    </div>
-                                )}
-                            </div>
+                                        return nextData;
+                                    });
+                                }}
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold disabled:bg-slate-50 disabled:text-slate-400"
+                            >
+                                <option value="">{formData.customerId ? `Select Invoice (${invoices.length} available)` : 'Select Customer First'}</option>
+                                {invoices.map(i => <option key={i._id} value={i._id}>{i.voucherNumber} ({new Date(i.date).toLocaleDateString()})</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Pincode *</label>
+                            <input
+                                type="text"
+                                required
+                                value={formData.pincode || ''}
+                                onChange={(e) => setFormData({ ...formData, pincode: e.target.value })}
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
+                                placeholder="Enter Pincode"
+                            />
                         </div>
 
                         {/* Asset Lookup Card */}
@@ -2649,6 +2732,78 @@ const CSMTickets = () => {
                 <form id="manual-ticket-form" onSubmit={handleCreateManualTicket} className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                         
+                        {/* 1. Product Serial No. - FIRST FIELD */}
+                        <div className="md:col-span-2 lg:col-span-3 p-4 bg-primary-50/40 border border-primary-200/80 rounded-2xl">
+                            <label className="block text-xs font-black text-primary-900 uppercase tracking-widest mb-1.5">
+                                Product Serial No. <span className="text-[10px] text-primary-600 font-bold lowercase">(Primary Field – enter serial no. to auto-fill customer & product details)</span>
+                            </label>
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    placeholder="Enter or scan Serial No (e.g. SN-100202 or 2001)..."
+                                    value={manualFormData.serialNumber || ''}
+                                    onChange={(e) => handleManualSerialInputChange(e.target.value)}
+                                    onFocus={() => {
+                                        if (manualFormData.serialNumber && manualFormData.serialNumber.trim().length >= 1) {
+                                            handleManualSerialInputChange(manualFormData.serialNumber);
+                                        }
+                                    }}
+                                    onBlur={() => {
+                                        setTimeout(() => setShowManualSerialDropdown(false), 200);
+                                    }}
+                                    className="w-full pl-4 pr-12 py-3 rounded-xl border border-primary-200 bg-white text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all shadow-sm"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => handleManualSerialLookup(manualFormData.serialNumber)}
+                                    className="absolute right-2 top-1.5 p-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-all shadow-sm flex items-center justify-center"
+                                    title="Lookup Serial Number & Auto-fill Details"
+                                >
+                                    <MdSearch size={18} />
+                                </button>
+
+                                {/* Dropdown Suggestions List */}
+                                {showManualSerialDropdown && (
+                                    <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-2xl shadow-xl max-h-60 overflow-y-auto divide-y divide-slate-100 animate-in fade-in slide-in-from-top-1">
+                                        {isSearchingManualSerials ? (
+                                            <div className="p-3 text-xs text-slate-400 font-bold text-center">Searching Master & History Data...</div>
+                                        ) : manualSerialSuggestions.length === 0 ? (
+                                            <div className="p-3 text-xs text-slate-400 font-bold text-center">No matching Serial Numbers found</div>
+                                        ) : (
+                                            manualSerialSuggestions.map((asset, idx) => {
+                                                const custName = asset.customerName || asset.customerId?.companyName || asset.customerId?.customerName;
+                                                const prodName = asset.productName || asset.productId?.productName;
+                                                return (
+                                                    <div
+                                                        key={asset._id || idx}
+                                                        onMouseDown={() => handleManualSelectSerialSuggestion(asset)}
+                                                        className="p-3 hover:bg-primary-50/80 cursor-pointer transition-colors"
+                                                    >
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="font-mono font-bold text-slate-900 text-sm">{asset.serialNumber}</span>
+                                                            <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded border ${
+                                                                asset.status === 'SOLD' ? 'bg-blue-100 text-blue-700 border-blue-200' :
+                                                                asset.status === 'RETURN' ? 'bg-amber-100 text-amber-700 border-amber-200' :
+                                                                'bg-emerald-100 text-emerald-700 border-emerald-200'
+                                                            }`}>
+                                                                {asset.status || 'IN_STOCK'}
+                                                            </span>
+                                                        </div>
+                                                        <div className="text-xs text-slate-600 font-medium truncate mt-1 flex items-center justify-between">
+                                                            <span className="truncate max-w-[55%]">{prodName || 'Product'}</span>
+                                                            <span className="font-bold text-slate-800 truncate max-w-[42%] text-right">
+                                                                {custName ? `👤 ${custName}` : 'Asset'}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
                         {/* Customer Name */}
                         <div>
                             <div className="flex justify-between items-center mb-1.5">
@@ -2720,18 +2875,6 @@ const CSMTickets = () => {
                                 type="date"
                                 value={manualFormData.invoiceDate}
                                 onChange={(e) => setManualFormData({ ...manualFormData, invoiceDate: e.target.value })}
-                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500"
-                            />
-                        </div>
-
-                        {/* Product Serial No. */}
-                        <div>
-                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Product Serial No.</label>
-                            <input
-                                type="text"
-                                placeholder="Serial Number"
-                                value={manualFormData.serialNumber}
-                                onChange={(e) => setManualFormData({ ...manualFormData, serialNumber: e.target.value })}
                                 className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500"
                             />
                         </div>
