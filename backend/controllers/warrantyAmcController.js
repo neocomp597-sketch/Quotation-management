@@ -633,9 +633,13 @@ exports.searchSerialNumbers = async (req, res) => {
         const queryStr = String(q).trim();
         const escapedQuery = queryStr.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
 
-        // Search active assets
+        // Search active assets - ONLY SOLD products / customer-assigned assets
         const assets = await Asset.find({
             companyId,
+            $or: [
+                { status: 'SOLD' },
+                { customerId: { $ne: null } }
+            ],
             serialNumber: { $regex: escapedQuery, $options: 'i' }
         })
         .sort({ customerId: -1, status: -1, serialNumber: 1 })
@@ -645,9 +649,14 @@ exports.searchSerialNumbers = async (req, res) => {
         .populate('invoiceId', 'voucherNumber date')
         .lean();
 
-        // Also search transaction history for historical serials
+        // Also search transaction history for historical SOLD serials
         const historyDocs = await AssetHistory.find({
             companyId,
+            $or: [
+                { status: 'SOLD' },
+                { transactionType: 'SOLD' },
+                { customerId: { $ne: null } }
+            ],
             serialNumber: { $regex: escapedQuery, $options: 'i' }
         })
         .sort({ createdAt: -1 })
@@ -659,8 +668,9 @@ exports.searchSerialNumbers = async (req, res) => {
         const combinedResults = [];
         const seenSerials = new Set();
 
-        // Add active assets first
+        // Add active SOLD assets first
         for (const a of assets) {
+            if (a.status === 'IN_STOCK' && !a.customerId) continue; // Exclude unsold stock
             const snKey = `${(a.serialNumber || '').trim().toLowerCase()}-${a.productId?.productCode || ''}`;
             seenSerials.add(snKey);
             combinedResults.push({
@@ -674,13 +684,14 @@ exports.searchSerialNumbers = async (req, res) => {
                 customerPostalCode: a.customerPostalCode || '',
                 invoiceNumber: a.invoiceNumber || (a.invoiceId?.voucherNumber || ''),
                 saleDate: a.saleDate || a.invoiceDate || null,
-                status: a.status || 'IN_STOCK',
+                status: a.status || 'SOLD',
                 location: a.location || ''
             });
         }
 
-        // Add historical records if not already in active list
+        // Add historical records if not already in active list (only SOLD status)
         for (const h of historyDocs) {
+            if (h.status === 'IN_STOCK' && !h.customerId) continue;
             const snKey = `${(h.serialNumber || '').trim().toLowerCase()}-${h.productCode || ''}`;
             if (!seenSerials.has(snKey)) {
                 seenSerials.add(snKey);

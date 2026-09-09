@@ -53,6 +53,32 @@ exports.createTicket = async (req, res) => {
             }
         }
 
+        // ── Requirement: Complaints / Tickets can ONLY be generated for SOLD products ──
+        try {
+            const Asset = require('../models/Asset');
+            let linkedAsset = null;
+            if (targetAssetId) {
+                linkedAsset = await Asset.findById(targetAssetId).lean();
+            } else if (targetSerialNo) {
+                const cleanSN = targetSerialNo.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+                linkedAsset = await Asset.findOne({
+                    companyId,
+                    serialNumber: { $regex: new RegExp("^" + cleanSN + "$", "i") }
+                }).lean();
+            }
+
+            if (linkedAsset) {
+                const isSoldStatus = linkedAsset.status === 'SOLD' || Boolean(linkedAsset.customerId);
+                if (!isSoldStatus || linkedAsset.status === 'IN_STOCK') {
+                    return res.status(400).json({
+                        message: `Complaints or tickets can only be generated for SOLD products. The selected item (Serial No: "${linkedAsset.serialNumber}") is in status '${linkedAsset.status || 'IN_STOCK'}'.`
+                    });
+                }
+            }
+        } catch (err) {
+            console.error('Error validating sold status for ticket creation:', err);
+        }
+
         if (targetSerialNo || targetAssetId) {
             const queryConditions = [];
             if (targetAssetId) {

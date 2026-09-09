@@ -238,9 +238,15 @@ const CSMTickets = () => {
     const handleSelectSerialSuggestion = (asset) => {
         setShowSerialDropdown(false);
         setSerialSuggestions([]);
-        if (asset?.serialNumber) {
-            setFormData(prev => ({ ...prev, serialNumber: asset.serialNumber }));
-            handleSerialNoLookup(asset.serialNumber, asset);
+        if (asset) {
+            if (asset.status === 'IN_STOCK' || (asset.status !== 'SOLD' && !asset.customerId)) {
+                toast.error('Complaints or tickets can only be generated for SOLD products.');
+                return;
+            }
+            if (asset.serialNumber) {
+                setFormData(prev => ({ ...prev, serialNumber: asset.serialNumber }));
+                handleSerialNoLookup(asset.serialNumber, asset);
+            }
         }
     };
 
@@ -252,7 +258,9 @@ const CSMTickets = () => {
             setShowManualSerialDropdown(true);
             try {
                 const res = await csmService.searchSerialNumbers(query);
-                setManualSerialSuggestions(res.data || []);
+                // Filter to ONLY SOLD assets
+                const soldOnly = (res.data || []).filter(a => a.status === 'SOLD' || Boolean(a.customerId));
+                setManualSerialSuggestions(soldOnly);
             } catch (err) {
                 console.error('Manual serial search error:', err);
                 setManualSerialSuggestions([]);
@@ -268,9 +276,15 @@ const CSMTickets = () => {
     const handleManualSelectSerialSuggestion = (asset) => {
         setShowManualSerialDropdown(false);
         setManualSerialSuggestions([]);
-        if (asset?.serialNumber) {
-            setManualFormData(prev => ({ ...prev, serialNumber: asset.serialNumber }));
-            handleManualSerialLookup(asset.serialNumber, asset);
+        if (asset) {
+            if (asset.status === 'IN_STOCK' || (asset.status !== 'SOLD' && !asset.customerId)) {
+                toast.error('Complaints or tickets can only be generated for SOLD products.');
+                return;
+            }
+            if (asset.serialNumber) {
+                setManualFormData(prev => ({ ...prev, serialNumber: asset.serialNumber }));
+                handleManualSerialLookup(asset.serialNumber, asset);
+            }
         }
     };
 
@@ -282,6 +296,10 @@ const CSMTickets = () => {
             const res = await csmService.getAssetSummary(summaryParams);
             const asset = res.data?.asset || preloadedAsset;
             if (asset) {
+                if (asset.status === 'IN_STOCK' || (asset.status !== 'SOLD' && !asset.customerId)) {
+                    toast.error(`Complaints or tickets can only be generated for SOLD products. Serial No. "${asset.serialNumber || cleanSN}" is currently in stock (unsold).`);
+                    return;
+                }
                 let custName = asset.customerName || asset.customerId?.companyName || asset.customerId?.customerName || asset.customerNameStr || '';
                 let custId = asset.customerId?._id || (typeof asset.customerId === 'string' ? asset.customerId : '');
                 
@@ -1112,6 +1130,11 @@ const CSMTickets = () => {
             setGeneratedSerial('');
 
             if (asset) {
+                if (asset.status === 'IN_STOCK' || (asset.status !== 'SOLD' && !asset.customerId)) {
+                    toast.error(`Complaints or tickets can only be generated for SOLD products. Serial No. "${asset.serialNumber || cleanSN}" is currently in stock (unsold).`);
+                    setAssetSummary(null);
+                    return;
+                }
                 let targetCustId = asset.customerId?._id || (typeof asset.customerId === 'string' ? asset.customerId : null);
                 let targetCustName = asset.customerName || asset.customerId?.companyName || asset.customerId?.customerName || asset.customerNameStr || '';
 
