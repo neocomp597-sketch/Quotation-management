@@ -31,6 +31,7 @@ export const MENU_PERMISSION_GROUPS = [
             { key: 'master_terms', label: 'Terms & Conditions', description: 'Terms and conditions master', defaultRoute: '/terms' },
             { key: 'master_statuses', label: 'Status Master', description: 'Status master definitions for planning', defaultRoute: '/status-master' },
             { key: 'master_serials', label: 'Invoice Bulk Upload', description: 'Serial number and asset master records', defaultRoute: '/serial-no-master' },
+            { key: 'invoice_bulk_upload_delete', label: 'Delete Invoice Bulk Upload Entry', description: 'Permission to delete invoice bulk upload entries', defaultRoute: '/serial-no-master' },
             { key: 'flowchart_view', label: 'Flowchart Builder', description: 'Visual process flowchart builder', defaultRoute: '/flowcharts' }
         ]
     },

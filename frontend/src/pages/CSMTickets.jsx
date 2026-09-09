@@ -282,10 +282,41 @@ const CSMTickets = () => {
             const res = await csmService.getAssetSummary(summaryParams);
             const asset = res.data?.asset || preloadedAsset;
             if (asset) {
-                const custName = asset.customerName || asset.customerId?.companyName || asset.customerId?.customerName || asset.customerNameStr || '';
-                const custId = asset.customerId?._id || asset.customerId || '';
-                const prodName = asset.productName || asset.productId?.productName || '';
-                const prodId = asset.productId?._id || asset.productId || '';
+                let custName = asset.customerName || asset.customerId?.companyName || asset.customerId?.customerName || asset.customerNameStr || '';
+                let custId = asset.customerId?._id || (typeof asset.customerId === 'string' ? asset.customerId : '');
+                
+                // Attempt to match customer in customers master array by ID or Name
+                if (customers && customers.length > 0) {
+                    if (custId) {
+                        const match = customers.find(c => String(c._id) === String(custId));
+                        if (match) custName = match.companyName || match.customerName;
+                    }
+                    if (!custId && custName) {
+                        const match = customers.find(c => (c.companyName || c.customerName || '').toLowerCase() === custName.toLowerCase());
+                        if (match) custId = match._id;
+                    }
+                }
+
+                let prodName = asset.productName || asset.productId?.productName || '';
+                let prodId = asset.productId?._id || (typeof asset.productId === 'string' ? asset.productId : '');
+
+                // Attempt to match product in products master array by ID, Code, or Name
+                if (products && products.length > 0) {
+                    const pCode = (asset.productCode || asset.productId?.productCode || '').toLowerCase();
+                    const pName = (prodName || '').toLowerCase();
+                    if (prodId) {
+                        const match = products.find(p => String(p._id) === String(prodId));
+                        if (match) prodName = match.productName;
+                    }
+                    if (!prodId && (pCode || pName)) {
+                        const match = products.find(p => (p.productCode || '').toLowerCase() === pCode || (p.productName || '').toLowerCase() === pName);
+                        if (match) {
+                            prodId = match._id;
+                            prodName = match.productName;
+                        }
+                    }
+                }
+
                 const invNo = asset.invoiceNumber || (asset.invoiceId?.voucherNumber || '');
                 const invDate = asset.saleDate || asset.invoiceDate ? new Date(asset.saleDate || asset.invoiceDate).toISOString().slice(0, 10) : '';
                 const pincode = asset.customerPostalCode || asset.customerId?.billingAddress?.pincode || asset.locationPincode || '';
@@ -302,6 +333,7 @@ const CSMTickets = () => {
                     pincode: pincode || prev.pincode
                 }));
 
+                // Auto-fetch contacts for matched customer
                 if (custId) {
                     try {
                         const contactsRes = await csmService.getCustomerContacts({ customerId: custId });
@@ -314,12 +346,19 @@ const CSMTickets = () => {
                                 contactPhone: primaryContact.mobileNo || prev.contactPhone,
                                 contactEmail: primaryContact.email || prev.contactEmail
                             }));
+                        } else if (asset.customerId && typeof asset.customerId === 'object') {
+                            if (asset.customerId.mobile) {
+                                setManualFormData(prev => ({ ...prev, contactPhone: asset.customerId.mobile }));
+                            }
+                            if (asset.customerId.email) {
+                                setManualFormData(prev => ({ ...prev, contactEmail: asset.customerId.email }));
+                            }
                         }
                     } catch (e) {}
                 }
-                toast.success(`Asset details auto-filled for Serial No: ${asset.serialNumber || cleanSN}`);
+                toast.success(`Asset found! Auto-filled details for Serial No: ${asset.serialNumber || cleanSN}`);
             } else {
-                toast.info('No matching serial number found in master/history data.');
+                toast.info('No matching serial number found in Master or Transaction data. Continuing with manual entry.');
             }
         } catch (err) {
             console.error('Error looking up manual serial number:', err);
@@ -1073,7 +1112,35 @@ const CSMTickets = () => {
             setGeneratedSerial('');
 
             if (asset) {
-                const targetCustId = asset.customerId?._id || asset.customerId || null;
+                let targetCustId = asset.customerId?._id || (typeof asset.customerId === 'string' ? asset.customerId : null);
+                let targetCustName = asset.customerName || asset.customerId?.companyName || asset.customerId?.customerName || asset.customerNameStr || '';
+
+                if (customers && customers.length > 0) {
+                    if (targetCustId) {
+                        const match = customers.find(c => String(c._id) === String(targetCustId));
+                        if (match) targetCustId = match._id;
+                    }
+                    if (!targetCustId && targetCustName) {
+                        const match = customers.find(c => (c.companyName || c.customerName || '').toLowerCase() === targetCustName.toLowerCase());
+                        if (match) targetCustId = match._id;
+                    }
+                }
+
+                let targetProdId = asset.productId?._id || (typeof asset.productId === 'string' ? asset.productId : null);
+                let targetProdName = asset.productName || asset.productId?.productName || '';
+
+                if (products && products.length > 0) {
+                    const pCode = (asset.productCode || asset.productId?.productCode || '').toLowerCase();
+                    const pName = (targetProdName || '').toLowerCase();
+                    if (targetProdId) {
+                        const match = products.find(p => String(p._id) === String(targetProdId));
+                        if (match) targetProdId = match._id;
+                    }
+                    if (!targetProdId && (pCode || pName)) {
+                        const match = products.find(p => (p.productCode || '').toLowerCase() === pCode || (p.productName || '').toLowerCase() === pName);
+                        if (match) targetProdId = match._id;
+                    }
+                }
                 
                 let invList = [];
                 let contactsList = [];
@@ -1098,13 +1165,13 @@ const CSMTickets = () => {
                 
                 // Autofill
                 setFormData(prev => {
-                    const custPincode = asset.customerId?.billingAddress?.pincode || asset.pincode || asset.locationPincode || prev.pincode || '';
+                    const custPincode = asset.customerPostalCode || asset.customerId?.billingAddress?.pincode || asset.pincode || asset.locationPincode || prev.pincode || '';
                     const matchedInvoice = asset.invoiceId?._id || asset.invoiceId || (invList.length > 0 ? invList[0]._id : '');
 
                     const nextData = {
                         ...prev,
                         customerId: targetCustId || prev.customerId || '',
-                        productId: asset.productId?._id || asset.productId || prev.productId || '',
+                        productId: targetProdId || prev.productId || '',
                         assetId: asset._id || '',
                         serialNumber: asset.serialNumber || cleanSN,
                         pincode: custPincode,
@@ -1145,7 +1212,7 @@ const CSMTickets = () => {
                     }
                 }
             } else {
-                toast.info('No matching registered asset/serial number found. You can enter details manually.');
+                toast.info('No matching serial number found in Master or Transaction data. Continuing with manual entry.');
             }
         } catch (err) {
             console.error('Error looking up serial number:', err);
@@ -1928,6 +1995,12 @@ const CSMTickets = () => {
                                     type="text"
                                     value={formData.serialNumber || ''}
                                     onChange={(e) => handleSerialInputChange(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            handleSerialNoLookup(formData.serialNumber);
+                                        }
+                                    }}
                                     onFocus={() => {
                                         if (formData.serialNumber && formData.serialNumber.trim().length >= 1) {
                                             handleSerialInputChange(formData.serialNumber);
@@ -1935,6 +2008,9 @@ const CSMTickets = () => {
                                     }}
                                     onBlur={() => {
                                         setTimeout(() => setShowSerialDropdown(false), 200);
+                                        if (formData.serialNumber && formData.serialNumber.trim().length >= 2) {
+                                            handleSerialNoLookup(formData.serialNumber);
+                                        }
                                     }}
                                     className="w-full pl-4 pr-12 py-3 rounded-xl border border-primary-200 bg-white text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all shadow-sm"
                                     placeholder="Enter or scan Serial No (e.g. SN-100202 or 2001)..."
@@ -2743,6 +2819,12 @@ const CSMTickets = () => {
                                     placeholder="Enter or scan Serial No (e.g. SN-100202 or 2001)..."
                                     value={manualFormData.serialNumber || ''}
                                     onChange={(e) => handleManualSerialInputChange(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            handleManualSerialLookup(manualFormData.serialNumber);
+                                        }
+                                    }}
                                     onFocus={() => {
                                         if (manualFormData.serialNumber && manualFormData.serialNumber.trim().length >= 1) {
                                             handleManualSerialInputChange(manualFormData.serialNumber);
@@ -2750,6 +2832,9 @@ const CSMTickets = () => {
                                     }}
                                     onBlur={() => {
                                         setTimeout(() => setShowManualSerialDropdown(false), 200);
+                                        if (manualFormData.serialNumber && manualFormData.serialNumber.trim().length >= 2) {
+                                            handleManualSerialLookup(manualFormData.serialNumber);
+                                        }
                                     }}
                                     className="w-full pl-4 pr-12 py-3 rounded-xl border border-primary-200 bg-white text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all shadow-sm"
                                 />

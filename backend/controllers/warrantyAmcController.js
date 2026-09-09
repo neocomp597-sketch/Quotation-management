@@ -500,6 +500,33 @@ exports.getAssetSummary = async (req, res) => {
                     return 0;
                 });
                 asset = matches[0];
+            } else {
+                // FALLBACK: Search AssetHistory (Transaction Data) if not found in Asset Master
+                const historyDoc = await AssetHistory.findOne({
+                    companyId,
+                    serialNumber: { $regex: new RegExp("^" + escapedSN + "$", "i") }
+                })
+                .sort({ createdAt: -1 })
+                .populate('customerId', 'customerName companyName gstin billingAddress mobile email')
+                .populate('productId', 'productName productCode basePrice mrp catalogType')
+                .lean();
+
+                if (historyDoc) {
+                    asset = {
+                        _id: historyDoc.assetId || historyDoc._id,
+                        serialNumber: historyDoc.serialNumber,
+                        productId: historyDoc.productId || { productName: historyDoc.productName, productCode: historyDoc.productCode },
+                        productName: historyDoc.productName || historyDoc.productId?.productName || '',
+                        productCode: historyDoc.productCode || historyDoc.productId?.productCode || '',
+                        customerId: historyDoc.customerId || (historyDoc.customerName ? { customerName: historyDoc.customerName, companyName: historyDoc.customerName } : null),
+                        customerNameStr: historyDoc.customerName || '',
+                        customerPostalCode: historyDoc.customerPostalCode || '',
+                        invoiceNumber: historyDoc.invoiceNumber || '',
+                        saleDate: historyDoc.saleDate || historyDoc.createdAt,
+                        status: historyDoc.transactionType || 'HISTORICAL',
+                        location: historyDoc.location || ''
+                    };
+                }
             }
         } else {
             return res.status(400).json({ message: 'assetId or serialNumber is required' });
