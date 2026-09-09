@@ -42,8 +42,8 @@ const SerialNoMaster = () => {
     const [loadingSummary, setLoadingSummary] = useState(false);
     const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
-    // --- SINGLE ENTRY MODAL ---
-    const [isSingleModalOpen, setIsSingleModalOpen] = useState(false);
+    // Page View State: 'list' | 'single'
+    const [pageView, setPageView] = useState('list');
     const [singleSaving, setSingleSaving] = useState(false);
     const [singleForm, setSingleForm] = useState({
         serialNumber: '',
@@ -225,7 +225,7 @@ const SerialNoMaster = () => {
         try {
             await csmService.createSingleAsset(singleForm);
             toast.success('Single entry created successfully!');
-            setIsSingleModalOpen(false);
+            setPageView('list');
             setSingleForm({
                 serialNumber: '',
                 productCode: '',
@@ -322,8 +322,214 @@ const SerialNoMaster = () => {
 
     return (
         <div className="space-y-6">
-            {/* Header (Requirement #1, #16) */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            {pageView === 'single' && (
+                /* --- FULL PAGE SINGLE ENTRY FORM (Requirement #15) --- */
+                <div className="space-y-6 animate-fade-in-up">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div>
+                            <button
+                                type="button"
+                                onClick={() => setPageView('list')}
+                                className="text-xs font-black uppercase tracking-widest text-primary-600 hover:text-primary-700 mb-2 flex items-center gap-1 transition-all cursor-pointer"
+                            >
+                                ← Back to Invoice Bulk Upload
+                            </button>
+                            <h1 className="text-3xl font-black tracking-tight text-slate-900 font-outfit uppercase">
+                                Add Single Entry
+                            </h1>
+                            <p className="text-slate-500 font-semibold text-sm">
+                                Manually enter one invoice, product, or serial record into the system without uploading an Excel file.
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setPageView('list')}
+                                className="px-6 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                form="single-entry-form"
+                                disabled={singleSaving}
+                                className="px-6 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-emerald-600/20 active:scale-95 disabled:opacity-50 cursor-pointer"
+                            >
+                                {singleSaving ? 'Saving Entry...' : 'Save Single Entry'}
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="glass shadow-premium rounded-[2rem] p-6 md:p-8 bg-white border border-slate-100">
+                        <form id="single-entry-form" onSubmit={handleSingleEntrySubmit} className="space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 text-xs font-bold text-slate-700">
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Serial Number *</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        placeholder="e.g. SN-100202"
+                                        value={singleForm.serialNumber}
+                                        onChange={(e) => setSingleForm({ ...singleForm, serialNumber: e.target.value })}
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Product Code *</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        placeholder="e.g. PROD-001"
+                                        value={singleForm.productCode}
+                                        onChange={(e) => setSingleForm({ ...singleForm, productCode: e.target.value })}
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Product Name *</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        placeholder="e.g. 10KVA Transformer"
+                                        value={singleForm.productName}
+                                        onChange={(e) => setSingleForm({ ...singleForm, productName: e.target.value })}
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Status</label>
+                                    <select
+                                        value={singleForm.status}
+                                        onChange={(e) => setSingleForm({ ...singleForm, status: e.target.value })}
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
+                                    >
+                                        <option value="IN_STOCK">IN_STOCK</option>
+                                        <option value="SOLD">SOLD</option>
+                                        <option value="ALLOCATED">ALLOCATED</option>
+                                        <option value="RETURN">RETURN</option>
+                                        <option value="SCRAPPED">SCRAPPED</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Customer Name / Code</label>
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. Apex Industrial"
+                                        value={singleForm.customer}
+                                        onChange={(e) => setSingleForm({ ...singleForm, customer: e.target.value })}
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Customer Postal Code</label>
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. 400001"
+                                        value={singleForm.customerPostalCode}
+                                        onChange={(e) => setSingleForm({ ...singleForm, customerPostalCode: e.target.value })}
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Invoice Number</label>
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. INV-2026-001"
+                                        value={singleForm.invoiceNumber}
+                                        onChange={(e) => setSingleForm({ ...singleForm, invoiceNumber: e.target.value })}
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Sale Date</label>
+                                    <input
+                                        type="date"
+                                        value={singleForm.saleDate}
+                                        onChange={(e) => setSingleForm({ ...singleForm, saleDate: e.target.value })}
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Location</label>
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. Client Site Alpha"
+                                        value={singleForm.location}
+                                        onChange={(e) => setSingleForm({ ...singleForm, location: e.target.value })}
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Mgr 1</label>
+                                    <input
+                                        type="text"
+                                        placeholder="Mgr 1"
+                                        value={singleForm.mgr1}
+                                        onChange={(e) => setSingleForm({ ...singleForm, mgr1: e.target.value })}
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Mgr 2</label>
+                                    <input
+                                        type="text"
+                                        placeholder="Mgr 2"
+                                        value={singleForm.mgr2}
+                                        onChange={(e) => setSingleForm({ ...singleForm, mgr2: e.target.value })}
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Mgr 3</label>
+                                    <input
+                                        type="text"
+                                        placeholder="Mgr 3"
+                                        value={singleForm.mgr3}
+                                        onChange={(e) => setSingleForm({ ...singleForm, mgr3: e.target.value })}
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Mgr 4</label>
+                                    <input
+                                        type="text"
+                                        placeholder="Mgr 4"
+                                        value={singleForm.mgr4}
+                                        onChange={(e) => setSingleForm({ ...singleForm, mgr4: e.target.value })}
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Mgr 5</label>
+                                    <input
+                                        type="text"
+                                        placeholder="Mgr 5"
+                                        value={singleForm.mgr5}
+                                        onChange={(e) => setSingleForm({ ...singleForm, mgr5: e.target.value })}
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Indicator Field (Max 20 chars)</label>
+                                    <input
+                                        type="text"
+                                        maxLength={20}
+                                        placeholder="e.g. SALE or RETURN"
+                                        value={singleForm.indicatorField}
+                                        onChange={(e) => setSingleForm({ ...singleForm, indicatorField: e.target.value })}
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
+                                    />
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {pageView === 'list' && (
+                <>
+                {/* Header (Requirement #1, #16) */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2 font-outfit uppercase">
                         <MdTag className="text-primary-600" />
@@ -333,8 +539,8 @@ const SerialNoMaster = () => {
                 </div>
                 <div className="flex flex-wrap gap-3 items-center justify-start md:justify-end">
                     <button
-                        onClick={() => setIsSingleModalOpen(true)}
-                        className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-2xl font-black transition-all uppercase text-[10px] tracking-widest active:scale-95 shadow-md shadow-emerald-600/10"
+                        onClick={() => setPageView('single')}
+                        className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-2xl font-black transition-all uppercase text-[10px] tracking-widest active:scale-95 shadow-md shadow-emerald-600/10 cursor-pointer"
                         title="Add Single Invoice/Serial Record"
                     >
                         <MdAdd size={18} />
@@ -647,6 +853,8 @@ const SerialNoMaster = () => {
                     )}
                 </div>
             </div>
+            </>
+            )}
 
             {/* Asset Detail Modal */}
             <Modal isOpen={isDetailModalOpen} onClose={() => setIsDetailModalOpen(false)} title="Asset Lifecycle Detail" maxWidth="max-w-xl" footer={<button onClick={() => setIsDetailModalOpen(false)} className="bg-slate-900 hover:bg-black text-white px-8 py-3 rounded-2xl font-black transition-all shadow-xl uppercase text-[10px] tracking-widest active:scale-95">Close</button>}>
@@ -694,194 +902,7 @@ const SerialNoMaster = () => {
                 ) : (<div className="py-8 text-center text-slate-400 text-sm">Failed to load detailed asset information.</div>)}
             </Modal>
 
-            {/* --- SINGLE ENTRY MODAL (Requirement #15) --- */}
-            <Modal
-                isOpen={isSingleModalOpen}
-                onClose={() => setIsSingleModalOpen(false)}
-                title="+ Add Single Entry"
-                maxWidth="max-w-3xl"
-            >
-                <form onSubmit={handleSingleEntrySubmit} className="space-y-4">
-                    <p className="text-xs font-semibold text-slate-500">
-                        Manually enter one invoice/product/serial record into the system without uploading an Excel file.
-                    </p>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-bold text-slate-700">
-                        <div>
-                            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Serial Number *</label>
-                            <input
-                                type="text"
-                                required
-                                placeholder="e.g. SN-100202"
-                                value={singleForm.serialNumber}
-                                onChange={(e) => setSingleForm({ ...singleForm, serialNumber: e.target.value })}
-                                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Product Code *</label>
-                            <input
-                                type="text"
-                                required
-                                placeholder="e.g. PROD-001"
-                                value={singleForm.productCode}
-                                onChange={(e) => setSingleForm({ ...singleForm, productCode: e.target.value })}
-                                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Product Name *</label>
-                            <input
-                                type="text"
-                                required
-                                placeholder="e.g. 10KVA Transformer"
-                                value={singleForm.productName}
-                                onChange={(e) => setSingleForm({ ...singleForm, productName: e.target.value })}
-                                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Status</label>
-                            <select
-                                value={singleForm.status}
-                                onChange={(e) => setSingleForm({ ...singleForm, status: e.target.value })}
-                                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none"
-                            >
-                                <option value="IN_STOCK">IN_STOCK</option>
-                                <option value="SOLD">SOLD</option>
-                                <option value="ALLOCATED">ALLOCATED</option>
-                                <option value="RETURN">RETURN</option>
-                                <option value="SCRAPPED">SCRAPPED</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Customer Name / Code</label>
-                            <input
-                                type="text"
-                                placeholder="e.g. Apex Industrial"
-                                value={singleForm.customer}
-                                onChange={(e) => setSingleForm({ ...singleForm, customer: e.target.value })}
-                                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Customer Postal Code</label>
-                            <input
-                                type="text"
-                                placeholder="e.g. 400001"
-                                value={singleForm.customerPostalCode}
-                                onChange={(e) => setSingleForm({ ...singleForm, customerPostalCode: e.target.value })}
-                                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Invoice Number</label>
-                            <input
-                                type="text"
-                                placeholder="e.g. INV-2026-001"
-                                value={singleForm.invoiceNumber}
-                                onChange={(e) => setSingleForm({ ...singleForm, invoiceNumber: e.target.value })}
-                                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Sale Date</label>
-                            <input
-                                type="date"
-                                value={singleForm.saleDate}
-                                onChange={(e) => setSingleForm({ ...singleForm, saleDate: e.target.value })}
-                                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Location</label>
-                            <input
-                                type="text"
-                                placeholder="e.g. Client Site Alpha"
-                                value={singleForm.location}
-                                onChange={(e) => setSingleForm({ ...singleForm, location: e.target.value })}
-                                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Mgr 1</label>
-                            <input
-                                type="text"
-                                placeholder="Mgr 1"
-                                value={singleForm.mgr1}
-                                onChange={(e) => setSingleForm({ ...singleForm, mgr1: e.target.value })}
-                                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Mgr 2</label>
-                            <input
-                                type="text"
-                                placeholder="Mgr 2"
-                                value={singleForm.mgr2}
-                                onChange={(e) => setSingleForm({ ...singleForm, mgr2: e.target.value })}
-                                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Mgr 3</label>
-                            <input
-                                type="text"
-                                placeholder="Mgr 3"
-                                value={singleForm.mgr3}
-                                onChange={(e) => setSingleForm({ ...singleForm, mgr3: e.target.value })}
-                                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Mgr 4</label>
-                            <input
-                                type="text"
-                                placeholder="Mgr 4"
-                                value={singleForm.mgr4}
-                                onChange={(e) => setSingleForm({ ...singleForm, mgr4: e.target.value })}
-                                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Mgr 5</label>
-                            <input
-                                type="text"
-                                placeholder="Mgr 5"
-                                value={singleForm.mgr5}
-                                onChange={(e) => setSingleForm({ ...singleForm, mgr5: e.target.value })}
-                                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Indicator Field (Max 20 chars)</label>
-                            <input
-                                type="text"
-                                maxLength={20}
-                                placeholder="e.g. SALE or RETURN"
-                                value={singleForm.indicatorField}
-                                onChange={(e) => setSingleForm({ ...singleForm, indicatorField: e.target.value })}
-                                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none"
-                            />
-                        </div>
-                    </div>
-                    <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
-                        <button
-                            type="button"
-                            onClick={() => setIsSingleModalOpen(false)}
-                            className="px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-bold uppercase text-xs"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            disabled={singleSaving}
-                            className="px-8 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-2xl font-black uppercase text-xs tracking-wider shadow-lg shadow-emerald-600/20 active:scale-95"
-                        >
-                            {singleSaving ? 'Saving...' : 'Save Single Entry'}
-                        </button>
-                    </div>
-                </form>
-            </Modal>
+
 
             {/* --- SALES RETURN FORM MODAL (Requirement #6) --- */}
             <Modal
