@@ -3322,20 +3322,33 @@ const importAssets = async (req, res) => {
                     serialNumber: buildExactRegex(serialNumber)
                 }).populate('productId');
 
-                let matchedAsset = existingAssets.find(a => {
-                    const codeMatches = a.productId?.productCode &&
-                        a.productId.productCode.trim().toLowerCase() === productCode.trim().toLowerCase();
-                    const indicatorMatches = (a.indicatorField || '').trim().toLowerCase() === indicatorField.toLowerCase();
-                    return codeMatches && indicatorMatches;
+                const isProductMatch = (a) => {
+                    if (!a.productId) return false;
+                    const sameId = a.productId._id && product._id && a.productId._id.toString() === product._id.toString();
+                    const prodCodeA = (a.productId.productCode || '').trim().toLowerCase();
+                    const prodCodeTarget = (product.productCode || productCode).trim().toLowerCase();
+                    return sameId || prodCodeA === prodCodeTarget || prodCodeA === productCode.trim().toLowerCase();
+                };
+
+                const isIndicatorMatch = (a) => {
+                    return (a.indicatorField || '').trim().toLowerCase() === indicatorField.toLowerCase();
+                };
+
+                let matchedActiveAsset = existingAssets.find(a => {
+                    const isReturn = a.status === 'RETURN' || a.status === 'RETURNED';
+                    return !isReturn && isProductMatch(a) && isIndicatorMatch(a);
                 });
 
-                if (matchedAsset) {
-                    // Check if active (Case 2: duplicate upload) vs returned (Case 4: re-use serial number)
-                    if (matchedAsset.status !== 'RETURN' && matchedAsset.status !== 'RETURNED') {
-                        throw new Error(`Duplicate record: Combination of Product Code (${productCode}), Serial No (${serialNumber}), and Indicator (${indicatorField || 'blank'}) already exists.`);
-                    }
+                if (matchedActiveAsset) {
+                    throw new Error(`Duplicate entry: Serial Number (${serialNumber}) already exists in active inventory. Duplicate entry cannot be created.`);
+                }
 
-                    // Returned serial number being resold/re-used: update asset to new active transaction
+                const matchedReturnedAsset = existingAssets.find(a => {
+                    const isReturn = a.status === 'RETURN' || a.status === 'RETURNED';
+                    return isReturn && isProductMatch(a) && isIndicatorMatch(a);
+                });
+
+                if (matchedReturnedAsset) {
                     const updatePayload = {
                         productId: product._id,
                         status: status === 'RETURN' ? 'SOLD' : status,
@@ -3351,16 +3364,16 @@ const importAssets = async (req, res) => {
                         returnedAt: null
                     };
 
-                    await Asset.findByIdAndUpdate(matchedAsset._id, updatePayload);
+                    await Asset.findByIdAndUpdate(matchedReturnedAsset._id, updatePayload);
                     results.updated++;
 
-                    // Add history record for the new sale
+                    // Add history record for the resold asset
                     await AssetHistory.create({
                         ...(companyId ? { companyId } : {}),
-                        assetId: matchedAsset._id,
+                        assetId: matchedReturnedAsset._id,
                         serialNumber,
-                        productCode,
-                        productName,
+                        productCode: product.productCode,
+                        productName: product.productName,
                         productId: product._id,
                         customerId: customer ? customer._id : null,
                         customerName: customer ? (customer.companyName || customer.customerName) : customerLookup,
@@ -3370,7 +3383,7 @@ const importAssets = async (req, res) => {
                         location: location || '',
                         mgr1, mgr2, mgr3, mgr4, mgr5,
                         indicatorField,
-                        transactionType: 'SALE',
+                        transactionType: 'IMPORT_RESELL',
                         status: status === 'RETURN' ? 'SOLD' : status,
                         createdBy: req.user?.id || null
                     });

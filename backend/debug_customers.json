@@ -28,5 +28,17 @@
     "customerName": "GETCO12",
     "companyName": "GETCO12",
     "gstin": ""
+  },
+  {
+    "_id": "6aa0f87e70b0ad51e79f11c8",
+    "customerName": "CUST-001",
+    "companyName": "CUST-001",
+    "gstin": ""
+  },
+  {
+    "_id": "6aa194a4b90d621eeb2ae383",
+    "customerName": "rohit shirsagar",
+    "companyName": "rohit shirsagar",
+    "gstin": ""
   }
 ]

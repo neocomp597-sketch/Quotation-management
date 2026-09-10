@@ -250,22 +250,44 @@ exports.createSingleAsset = async (req, res) => {
             serialNumber: buildExactRegex(cleanSN)
         }).populate('productId');
 
-        const matchedAsset = existingAssets.find(a => {
-            const codeMatches = a.productId?.productCode &&
-                a.productId.productCode.trim().toLowerCase() === cleanProductCode.toLowerCase();
-            const indicatorMatches = (a.indicatorField || '').trim().toLowerCase() === cleanIndicator.toLowerCase();
-            return codeMatches && indicatorMatches;
+        const isProductMatch = (a) => {
+            if (!a.productId) return false;
+            const sameId = a.productId._id && product._id && a.productId._id.toString() === product._id.toString();
+            const prodCodeA = (a.productId.productCode || '').trim().toLowerCase();
+            const prodCodeTarget = (product.productCode || cleanProductCode).trim().toLowerCase();
+            return sameId || prodCodeA === prodCodeTarget || prodCodeA === cleanProductCode.toLowerCase();
+        };
+
+        const isIndicatorMatch = (a) => {
+            return (a.indicatorField || '').trim().toLowerCase() === cleanIndicator.toLowerCase();
+        };
+
+        // 1. Search for active asset match
+        let matchedActiveAsset = existingAssets.find(a => {
+            const isReturn = a.status === 'RETURN' || a.status === 'RETURNED';
+            return !isReturn && isProductMatch(a) && isIndicatorMatch(a);
         });
 
-        if (matchedAsset) {
-            // Case 2: Duplicate upload error if not in RETURN status
-            if (matchedAsset.status !== 'RETURN' && matchedAsset.status !== 'RETURNED') {
-                return res.status(400).json({
-                    message: `Duplicate record: Combination of Product Code (${cleanProductCode}), Serial No (${cleanSN}), and Indicator (${cleanIndicator || 'blank'}) already exists.`
-                });
-            }
+        if (!matchedActiveAsset) {
+            matchedActiveAsset = existingAssets.find(a => {
+                const isReturn = a.status === 'RETURN' || a.status === 'RETURNED';
+                return !isReturn && isIndicatorMatch(a);
+            });
+        }
 
-            // Case 4: Serial number was returned and is now being re-sold / re-entered
+        if (matchedActiveAsset) {
+            return res.status(400).json({
+                message: `Duplicate entry: Serial Number (${cleanSN}) already exists in active inventory. Duplicate entry cannot be created.`
+            });
+        }
+
+        // 2. Search for returned asset match (to re-activate)
+        const matchedReturnedAsset = existingAssets.find(a => {
+            const isReturn = a.status === 'RETURN' || a.status === 'RETURNED';
+            return isReturn && isProductMatch(a) && isIndicatorMatch(a);
+        });
+
+        if (matchedReturnedAsset) {
             const updatePayload = {
                 productId: product._id,
                 status: status === 'RETURN' ? 'SOLD' : status,
@@ -273,7 +295,7 @@ exports.createSingleAsset = async (req, res) => {
                 customerNameStr: customerInput || '',
                 customerPostalCode,
                 invoiceNumber,
-                saleDate: saleDate ? new Date(saleDate) : new Date(),
+                saleDate: saleDate ? new Date(saleDate) : (status === 'SOLD' ? new Date() : null),
                 location,
                 mgr1: finalMgr1,
                 mgr2: finalMgr2,
@@ -285,12 +307,11 @@ exports.createSingleAsset = async (req, res) => {
                 returnedAt: null
             };
 
-            await Asset.findByIdAndUpdate(matchedAsset._id, updatePayload);
+            await Asset.findByIdAndUpdate(matchedReturnedAsset._id, updatePayload);
 
-            // Log new sale transaction history
             await AssetHistory.create({
                 companyId,
-                assetId: matchedAsset._id,
+                assetId: matchedReturnedAsset._id,
                 serialNumber: cleanSN,
                 productCode: product.productCode,
                 productName: product.productName,
@@ -299,7 +320,7 @@ exports.createSingleAsset = async (req, res) => {
                 customerName: customer ? (customer.companyName || customer.customerName) : (customerInput || ''),
                 customerPostalCode,
                 invoiceNumber,
-                saleDate: saleDate ? new Date(saleDate) : new Date(),
+                saleDate: saleDate ? new Date(saleDate) : (status === 'SOLD' ? new Date() : null),
                 location,
                 mgr1: finalMgr1,
                 mgr2: finalMgr2,
@@ -307,13 +328,16 @@ exports.createSingleAsset = async (req, res) => {
                 mgr4: finalMgr4,
                 mgr5: finalMgr5,
                 indicatorField: cleanIndicator,
-                transactionType: 'SINGLE_ENTRY',
+                transactionType: 'SINGLE_ENTRY_RESELL',
                 status: status === 'RETURN' ? 'SOLD' : status,
                 createdBy: req.user?.id || null
             });
 
-            const updatedDoc = await Asset.findById(matchedAsset._id).populate('customerId').populate('productId');
-            return res.status(200).json({ message: 'Serial asset entry updated successfully (Re-use of returned serial)', data: updatedDoc });
+            const updatedDoc = await Asset.findById(matchedReturnedAsset._id).populate('customerId').populate('productId');
+            return res.status(200).json({
+                message: 'Serial asset entry updated successfully (Re-use of returned serial)',
+                data: updatedDoc
+            });
         }
 
         // Case 1 / Case 3: Create new asset entry
@@ -662,7 +686,7 @@ exports.getAssetSummary = async (req, res) => {
     }
 };
 
-// Search Serial Numbers for Complaint Registration (Requirement #13, #14)
+// Search Serial Numbers for Complaint Registration & Customer Service (Requirement: Invoice Bulk Upload source of truth)
 exports.searchSerialNumbers = async (req, res) => {
     try {
         const { q } = req.query;
@@ -675,30 +699,21 @@ exports.searchSerialNumbers = async (req, res) => {
         const queryStr = String(q).trim();
         const escapedQuery = queryStr.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
 
-        // Search active assets - ONLY SOLD products / customer-assigned assets
+        // Search ALL registered assets in Invoice Bulk Upload for this company
         const assets = await Asset.find({
             companyId,
-            $or: [
-                { status: 'SOLD' },
-                { customerId: { $ne: null } }
-            ],
             serialNumber: { $regex: escapedQuery, $options: 'i' }
         })
-        .sort({ customerId: -1, status: -1, serialNumber: 1 })
+        .sort({ createdAt: -1, serialNumber: 1 })
         .limit(100)
         .populate('customerId', 'customerName companyName billingAddress mobile email gstin')
         .populate('productId', 'productName productCode basePrice mrp')
         .populate('invoiceId', 'voucherNumber date')
         .lean();
 
-        // Also search transaction history for historical SOLD serials
+        // Also search transaction history for historical serials registered in Invoice Bulk Upload
         const historyDocs = await AssetHistory.find({
             companyId,
-            $or: [
-                { status: 'SOLD' },
-                { transactionType: 'SOLD' },
-                { customerId: { $ne: null } }
-            ],
             serialNumber: { $regex: escapedQuery, $options: 'i' }
         })
         .sort({ createdAt: -1 })
@@ -710,30 +725,34 @@ exports.searchSerialNumbers = async (req, res) => {
         const combinedResults = [];
         const seenSerials = new Set();
 
-        // Add active SOLD assets first
+        // Add active assets from Invoice Bulk Upload
         for (const a of assets) {
-            if (a.status === 'IN_STOCK' && !a.customerId) continue; // Exclude unsold stock
             const snKey = `${(a.serialNumber || '').trim().toLowerCase()}-${a.productId?.productCode || ''}`;
             seenSerials.add(snKey);
             combinedResults.push({
                 _id: a._id,
                 serialNumber: a.serialNumber,
                 productId: a.productId,
-                productCode: a.productId?.productCode || '',
-                productName: a.productId?.productName || '',
+                productCode: a.productId?.productCode || a.productCode || '',
+                productName: a.productId?.productName || a.productName || '',
                 customerId: a.customerId,
                 customerName: a.customerId?.companyName || a.customerId?.customerName || a.customerNameStr || '',
                 customerPostalCode: a.customerPostalCode || '',
                 invoiceNumber: a.invoiceNumber || (a.invoiceId?.voucherNumber || ''),
                 saleDate: a.saleDate || a.invoiceDate || null,
-                status: a.status || 'SOLD',
-                location: a.location || ''
+                status: a.status || 'IN_STOCK',
+                location: a.location || '',
+                mgr1: a.mgr1 || '',
+                mgr2: a.mgr2 || '',
+                mgr3: a.mgr3 || '',
+                mgr4: a.mgr4 || '',
+                mgr5: a.mgr5 || '',
+                indicatorField: a.indicatorField || ''
             });
         }
 
-        // Add historical records if not already in active list (only SOLD status)
+        // Add historical records if not already in active list
         for (const h of historyDocs) {
-            if (h.status === 'IN_STOCK' && !h.customerId) continue;
             const snKey = `${(h.serialNumber || '').trim().toLowerCase()}-${h.productCode || ''}`;
             if (!seenSerials.has(snKey)) {
                 seenSerials.add(snKey);
@@ -748,8 +767,14 @@ exports.searchSerialNumbers = async (req, res) => {
                     customerPostalCode: h.customerPostalCode || '',
                     invoiceNumber: h.invoiceNumber || '',
                     saleDate: h.saleDate || null,
-                    status: h.status || 'SOLD',
-                    location: h.location || ''
+                    status: h.status || 'HISTORICAL',
+                    location: h.location || '',
+                    mgr1: h.mgr1 || '',
+                    mgr2: h.mgr2 || '',
+                    mgr3: h.mgr3 || '',
+                    mgr4: h.mgr4 || '',
+                    mgr5: h.mgr5 || '',
+                    indicatorField: h.indicatorField || ''
                 });
             }
         }
