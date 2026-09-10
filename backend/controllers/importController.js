@@ -3231,10 +3231,20 @@ const importAssets = async (req, res) => {
                 // Resolve product
                 let product = null;
                 if (productCode) {
-                    product = await Product.findOne({ ...companyFilter, productCode: buildExactRegex(productCode) });
+                    product = await Product.findOne({ ...companyFilter, productCode: buildExactRegex(productCode) })
+                        .populate('mgr1', 'code description')
+                        .populate('mgr2', 'code description')
+                        .populate('mgr3', 'code description')
+                        .populate('mgr4', 'code description')
+                        .populate('mgr5', 'code description');
                 }
                 if (!product && productName) {
-                    product = await Product.findOne({ ...companyFilter, productName: buildExactRegex(productName) });
+                    product = await Product.findOne({ ...companyFilter, productName: buildExactRegex(productName) })
+                        .populate('mgr1', 'code description')
+                        .populate('mgr2', 'code description')
+                        .populate('mgr3', 'code description')
+                        .populate('mgr4', 'code description')
+                        .populate('mgr5', 'code description');
                 }
 
                 if (!product) {
@@ -3253,6 +3263,24 @@ const importAssets = async (req, res) => {
 
                 productCode = product.productCode;
                 productName = product.productName;
+
+                const formatMgrVal = (mgr) => {
+                    if (!mgr) return '';
+                    if (typeof mgr === 'string') return mgr;
+                    if (mgr.code && mgr.description && mgr.code.toLowerCase() !== mgr.description.toLowerCase()) {
+                        return `${mgr.code} - ${mgr.description}`;
+                    }
+                    return mgr.description || mgr.code || '';
+                };
+
+                // Auto-pick Mgr 1 to Mgr 5 from Product Master if not explicitly provided in Excel row
+                if (product) {
+                    if (!mgr1 && product.mgr1) mgr1 = formatMgrVal(product.mgr1);
+                    if (!mgr2 && product.mgr2) mgr2 = formatMgrVal(product.mgr2);
+                    if (!mgr3 && product.mgr3) mgr3 = formatMgrVal(product.mgr3);
+                    if (!mgr4 && product.mgr4) mgr4 = formatMgrVal(product.mgr4);
+                    if (!mgr5 && product.mgr5) mgr5 = formatMgrVal(product.mgr5);
+                }
 
                 // Resolve customer if lookup provided
                 let customer = null;

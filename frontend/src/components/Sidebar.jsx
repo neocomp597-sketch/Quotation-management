@@ -143,7 +143,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                 { key: 'master_attributes', name: 'Attributes', icon: <MdAssignment size={18} />, path: '/attributes' },
                 { key: 'master_terms', name: 'Terms & Conditions', icon: <MdDescription size={18} />, path: '/terms' },
                 { key: 'master_statuses', name: 'Status Master', icon: <MdBarChart size={18} />, path: '/status-master', adminOnly: true },
-                { key: 'master_serials', name: 'Invoice Bulk Upload', icon: <MdTag size={18} />, path: '/serial-no-master' },
+
                 { key: 'flowchart_view', name: 'Flowchart Builder', icon: <MdAccountTree size={18} />, path: '/flowcharts' },
             ]
         },
@@ -469,7 +469,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                                         return `flex items-center gap-4 px-4 py-3 rounded-2xl transition-all duration-200 group relative ${active
                                             ? 'bg-primary-600 text-white shadow-xl shadow-primary-600/25 ring-1 ring-white/10'
                                             : 'text-slate-500 hover:bg-slate-50 hover:text-primary-600 font-semibold'
-                                        }`;
+                                            }`;
                                     }}
                                 >
                                     <div className="transition-transform duration-300 group-hover:scale-110 shrink-0">
@@ -533,7 +533,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                                                     return `flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group ${active
                                                         ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/20'
                                                         : 'text-slate-500 hover:bg-slate-50 hover:text-primary-600'
-                                                    }`;
+                                                        }`;
                                                 }}
                                             >
                                                 <div className="shrink-0">{child.icon}</div>

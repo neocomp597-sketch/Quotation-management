@@ -7,6 +7,7 @@ const SearchableSelect = ({
     onChange, 
     placeholder = 'Select option', 
     noResultsText = 'No options found',
+    allowCustom = false,
     className = '',
     inputClass = '',
     menuClass = '',
@@ -56,8 +57,10 @@ const SearchableSelect = ({
     });
 
     const handleSelect = (option) => {
-        const val = typeof option === 'string' ? option : option.value;
-        onChange(val);
+        const val = typeof option === 'string' ? option : option?.value;
+        if (onChange) {
+            onChange(val, option);
+        }
         setIsOpen(false);
     };
 
@@ -127,6 +130,17 @@ const SearchableSelect = ({
                                 >
                                     {placeholder}
                                 </button>
+
+                                {allowCustom && search.trim() && (
+                                    <button
+                                        type="button"
+                                        onClick={() => handleSelect({ value: search.trim(), label: search.trim() })}
+                                        className="w-full text-left px-3 py-2 rounded-xl text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 transition-all mb-1 flex items-center gap-1.5"
+                                    >
+                                        <MdAdd size={15} />
+                                        <span>Use custom: "{search.trim()}"</span>
+                                    </button>
+                                )}
 
                                 {filteredOptions.length === 0 ? (
                                     <div className="text-center py-4 text-xs font-bold text-slate-400">

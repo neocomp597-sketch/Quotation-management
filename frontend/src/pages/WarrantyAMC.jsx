@@ -145,6 +145,13 @@ const WarrantyAMC = () => {
         })
     ), [customers]);
 
+    const productOptions = useMemo(() => (
+        products.map(product => ({
+            value: product._id,
+            label: product.productCode ? `${product.productCode} - ${product.productName}` : product.productName || 'Unnamed Product'
+        }))
+    ), [products]);
+
     const invoiceOptions = useMemo(() => (
         customerInvoices.map(invoice => ({
             value: invoice._id,
@@ -699,30 +706,30 @@ const WarrantyAMC = () => {
                 <form id="warranty-amc-form" onSubmit={handleCreate} className="space-y-4">
                     <div>
                         <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Customer *</label>
-                        <select
-                            required
+                        <SearchableSelect
                             value={formData.customerId}
-                            onChange={e => setFormData({ ...formData, customerId: e.target.value })}
-                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
-                        >
-                            <option value="">Select Customer</option>
-                            {customers.map(c => <option key={c._id} value={c._id}>{c.companyName || c.customerName}</option>)}
-                        </select>
+                            onChange={val => setFormData({ ...formData, customerId: val })}
+                            options={customerOptions}
+                            placeholder="Select Customer"
+                            noResultsText="No customers found"
+                            inputClass="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold bg-white text-left cursor-pointer"
+                            menuClass="max-h-56"
+                        />
                     </div>
 
                     {activeSection === 'warranties' ? (
                         <>
                             <div>
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Product *</label>
-                                <select
-                                    required
+                                <SearchableSelect
                                     value={formData.productId}
-                                    onChange={e => setFormData({ ...formData, productId: e.target.value })}
-                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
-                                >
-                                    <option value="">Select Product</option>
-                                    {products.map(p => <option key={p._id} value={p._id}>{p.productName}</option>)}
-                                </select>
+                                    onChange={val => setFormData({ ...formData, productId: val })}
+                                    options={productOptions}
+                                    placeholder="Select Product"
+                                    noResultsText="No products found"
+                                    inputClass="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold bg-white text-left cursor-pointer"
+                                    menuClass="max-h-56"
+                                />
                             </div>
                             <div>
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Serial Number *</label>

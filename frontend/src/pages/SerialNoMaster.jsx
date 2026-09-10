@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { csmService, productService, importService } from '../services/api';
+import { csmService, productService, customerService, importService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
@@ -11,6 +11,7 @@ import {
 import Modal from '../components/Modal';
 import ImportModal from '../components/ImportModal';
 import PaginationControls from '../components/PaginationControls';
+import SearchableSelect from '../components/SearchableSelect';
 
 const PAGE_SIZE = 15;
 
@@ -19,6 +20,7 @@ const SerialNoMaster = () => {
     const [assets, setAssets] = useState([]);
     const [returnHistory, setReturnHistory] = useState([]);
     const [products, setProducts] = useState([]);
+    const [customers, setCustomers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [loadingHistory, setLoadingHistory] = useState(false);
     const [activeTab, setActiveTab] = useState('active'); // 'active' | 'returns'
@@ -76,18 +78,124 @@ const SerialNoMaster = () => {
     const fetchData = async () => {
         setLoading(true);
         try {
-            const [assetsRes, productsRes] = await Promise.all([
+            const [assetsRes, productsRes, customersRes] = await Promise.all([
                 csmService.getAssets(),
-                productService.getAll()
+                productService.getAll({ limit: 1000 }),
+                customerService.getAll({ limit: 1000 })
             ]);
             setAssets(assetsRes.data || []);
-            setProducts(productsRes.data || []);
+            setProducts(productsRes.data?.data || productsRes.data || []);
+            setCustomers(customersRes.data?.data || customersRes.data || []);
         } catch (err) {
             console.error('Error fetching Invoice Bulk Upload data:', err);
             toast.error('Failed to load invoice bulk upload data');
         } finally {
             setLoading(false);
         }
+    };
+
+    const customerOptions = useMemo(() => {
+        return customers.map(c => {
+            const nameStr = c.companyName && c.customerName && c.companyName !== c.customerName
+                ? `${c.companyName} (${c.customerName})`
+                : c.companyName || c.customerName || 'Unnamed Customer';
+            const codeStr = c.externalCode ? ` [${c.externalCode}]` : '';
+            return {
+                id: c._id,
+                value: c.externalCode || c.companyName || c.customerName || '',
+                label: `${nameStr}${codeStr}`,
+                customerName: c.companyName || c.customerName || '',
+                pincode: c.billingAddress?.pincode || c.pincode || '',
+                customerObj: c
+            };
+        });
+    }, [customers]);
+
+    const productOptions = useMemo(() => {
+        return products.map(p => {
+            const code = p.productCode || '';
+            const name = p.productName || '';
+            return {
+                id: p._id,
+                value: code || p._id,
+                label: code && name ? `${code} - ${name}` : (code || name),
+                productCode: code,
+                productName: name,
+                productObj: p
+            };
+        });
+    }, [products]);
+
+    const productFilterOptions = useMemo(() => {
+        return [
+            { value: 'ALL', label: 'All Products' },
+            ...products.map(p => ({
+                value: p._id,
+                label: p.productCode ? `${p.productCode} - ${p.productName}` : p.productName
+            }))
+        ];
+    }, [products]);
+
+    const handleSelectCustomer = (val, option) => {
+        const custObj = option?.customerObj;
+        const custName = custObj?.companyName || custObj?.customerName || option?.label || val;
+        const pincode = custObj?.billingAddress?.pincode || custObj?.pincode || '';
+        setSingleForm(prev => ({
+            ...prev,
+            customer: val || custName || '',
+            customerPostalCode: prev.customerPostalCode || pincode
+        }));
+    };
+
+    const formatMgrVal = (mgr) => {
+        if (!mgr) return '';
+        if (typeof mgr === 'string') return mgr;
+        if (mgr.code && mgr.description && mgr.code.toLowerCase() !== mgr.description.toLowerCase()) {
+            return `${mgr.code} - ${mgr.description}`;
+        }
+        return mgr.description || mgr.code || '';
+    };
+
+    const handleSelectProduct = (val, option) => {
+        const prodObj = option?.productObj || products.find(p => p.productCode === val || p.productName === val || p._id === val);
+        const prodCode = prodObj?.productCode || option?.productCode || val;
+        const prodName = prodObj?.productName || option?.productName || '';
+
+        setSingleForm(prev => ({
+            ...prev,
+            productCode: prodCode || '',
+            productName: prodName || prev.productName || '',
+            mgr1: prodObj ? formatMgrVal(prodObj.mgr1) : prev.mgr1,
+            mgr2: prodObj ? formatMgrVal(prodObj.mgr2) : prev.mgr2,
+            mgr3: prodObj ? formatMgrVal(prodObj.mgr3) : prev.mgr3,
+            mgr4: prodObj ? formatMgrVal(prodObj.mgr4) : prev.mgr4,
+            mgr5: prodObj ? formatMgrVal(prodObj.mgr5) : prev.mgr5,
+        }));
+    };
+
+    const handleProductInputChange = (field, value) => {
+        const updatedForm = { ...singleForm, [field]: value };
+        const cleanVal = String(value || '').trim().toLowerCase();
+        if (cleanVal) {
+            const matchedProduct = products.find(p =>
+                (p.productName && p.productName.trim().toLowerCase() === cleanVal) ||
+                (p.productCode && p.productCode.trim().toLowerCase() === cleanVal)
+            );
+            if (matchedProduct) {
+                if (field === 'productName' && matchedProduct.productCode) {
+                    updatedForm.productCode = matchedProduct.productCode;
+                }
+                if (field === 'productCode' && matchedProduct.productName) {
+                    updatedForm.productName = matchedProduct.productName;
+                }
+                if (matchedProduct.mgr1) updatedForm.mgr1 = formatMgrVal(matchedProduct.mgr1);
+                if (matchedProduct.mgr2) updatedForm.mgr2 = formatMgrVal(matchedProduct.mgr2);
+                if (matchedProduct.mgr3) updatedForm.mgr3 = formatMgrVal(matchedProduct.mgr3);
+                if (matchedProduct.mgr4) updatedForm.mgr4 = formatMgrVal(matchedProduct.mgr4);
+                if (matchedProduct.mgr5) updatedForm.mgr5 = formatMgrVal(matchedProduct.mgr5);
+            }
+        }
+        setSingleForm(updatedForm);
     };
 
     const fetchReturnHistory = async () => {
@@ -375,13 +483,26 @@ const SerialNoMaster = () => {
                                     />
                                 </div>
                                 <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-emerald-600 mb-1.5">Search & Select Product</label>
+                                    <SearchableSelect
+                                        options={productOptions}
+                                        value={singleForm.productCode}
+                                        onChange={handleSelectProduct}
+                                        placeholder="Type or select product..."
+                                        noResultsText="No matching products found"
+                                        allowCustom={true}
+                                        inputClass="w-full flex items-center justify-between px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900 text-xs text-left cursor-pointer"
+                                        menuClass="max-h-60"
+                                    />
+                                </div>
+                                <div>
                                     <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Product Code *</label>
                                     <input
                                         type="text"
                                         required
                                         placeholder="e.g. PROD-001"
                                         value={singleForm.productCode}
-                                        onChange={(e) => setSingleForm({ ...singleForm, productCode: e.target.value })}
+                                        onChange={(e) => handleProductInputChange('productCode', e.target.value)}
                                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
                                     />
                                 </div>
@@ -392,7 +513,7 @@ const SerialNoMaster = () => {
                                         required
                                         placeholder="e.g. 10KVA Transformer"
                                         value={singleForm.productName}
-                                        onChange={(e) => setSingleForm({ ...singleForm, productName: e.target.value })}
+                                        onChange={(e) => handleProductInputChange('productName', e.target.value)}
                                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
                                     />
                                 </div>
@@ -409,6 +530,19 @@ const SerialNoMaster = () => {
                                         <option value="RETURN">RETURN</option>
                                         <option value="SCRAPPED">SCRAPPED</option>
                                     </select>
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-emerald-600 mb-1.5">Search & Select Customer</label>
+                                    <SearchableSelect
+                                        options={customerOptions}
+                                        value={singleForm.customer}
+                                        onChange={handleSelectCustomer}
+                                        placeholder="Type or select customer..."
+                                        noResultsText="No matching customers found"
+                                        allowCustom={true}
+                                        inputClass="w-full flex items-center justify-between px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900 text-xs text-left cursor-pointer"
+                                        menuClass="max-h-60"
+                                    />
                                 </div>
                                 <div>
                                     <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Customer Name / Code</label>
@@ -458,6 +592,12 @@ const SerialNoMaster = () => {
                                         onChange={(e) => setSingleForm({ ...singleForm, location: e.target.value })}
                                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
                                     />
+                                </div>
+                                <div className="col-span-full pt-2">
+                                    <div className="flex items-center gap-2 p-3 bg-amber-50/90 border border-amber-200/90 rounded-2xl text-amber-900 text-xs font-bold">
+                                        <MdInfoOutline size={20} className="text-amber-600 flex-shrink-0" />
+                                        <span>Product Grouping (Mgr 1 to Mgr 5): Automatically populated from Product Master when Product Name or Product Code matches.</span>
+                                    </div>
                                 </div>
                                 <div>
                                     <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Mgr 1</label>
@@ -645,16 +785,15 @@ const SerialNoMaster = () => {
                                 <option value="RETURN">Returned</option>
                                 <option value="SCRAPPED">Scrapped</option>
                             </select>
-                            <select
+                            <SearchableSelect
+                                options={productFilterOptions}
                                 value={selectedProduct}
-                                onChange={(e) => setSelectedProduct(e.target.value)}
-                                className="px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-xs font-bold text-slate-700 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all max-w-[200px] truncate"
-                            >
-                                <option value="ALL">All Products</option>
-                                {products.map(p => (
-                                    <option key={p._id} value={p._id}>{p.productName}</option>
-                                ))}
-                            </select>
+                                onChange={(val) => setSelectedProduct(val || 'ALL')}
+                                placeholder="All Products"
+                                noResultsText="No matching product"
+                                inputClass="px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-xs font-bold text-slate-700 flex items-center justify-between gap-2 cursor-pointer min-w-[180px]"
+                                menuClass="max-h-60"
+                            />
                         </div>
                     )}
                 </div>

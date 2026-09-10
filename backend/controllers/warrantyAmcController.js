@@ -171,13 +171,23 @@ exports.createSingleAsset = async (req, res) => {
         let product = await Product.findOne({
             companyId,
             productCode: buildExactRegex(cleanProductCode)
-        });
+        })
+        .populate('mgr1', 'code description')
+        .populate('mgr2', 'code description')
+        .populate('mgr3', 'code description')
+        .populate('mgr4', 'code description')
+        .populate('mgr5', 'code description');
 
         if (!product && productName) {
             product = await Product.findOne({
                 companyId,
                 productName: buildExactRegex(productName)
-            });
+            })
+            .populate('mgr1', 'code description')
+            .populate('mgr2', 'code description')
+            .populate('mgr3', 'code description')
+            .populate('mgr4', 'code description')
+            .populate('mgr5', 'code description');
         }
 
         if (!product) {
@@ -193,6 +203,22 @@ exports.createSingleAsset = async (req, res) => {
                 status: 'Active'
             });
         }
+
+        const formatMgrVal = (mgr) => {
+            if (!mgr) return '';
+            if (typeof mgr === 'string') return mgr;
+            if (mgr.code && mgr.description && mgr.code.toLowerCase() !== mgr.description.toLowerCase()) {
+                return `${mgr.code} - ${mgr.description}`;
+            }
+            return mgr.description || mgr.code || '';
+        };
+
+        // Auto-fill Mgr 1 to Mgr 5 from Product Master if not explicitly provided
+        const finalMgr1 = mgr1 || (product ? formatMgrVal(product.mgr1) : '');
+        const finalMgr2 = mgr2 || (product ? formatMgrVal(product.mgr2) : '');
+        const finalMgr3 = mgr3 || (product ? formatMgrVal(product.mgr3) : '');
+        const finalMgr4 = mgr4 || (product ? formatMgrVal(product.mgr4) : '');
+        const finalMgr5 = mgr5 || (product ? formatMgrVal(product.mgr5) : '');
 
         // Resolve customer
         let customer = null;
@@ -249,7 +275,11 @@ exports.createSingleAsset = async (req, res) => {
                 invoiceNumber,
                 saleDate: saleDate ? new Date(saleDate) : new Date(),
                 location,
-                mgr1, mgr2, mgr3, mgr4, mgr5,
+                mgr1: finalMgr1,
+                mgr2: finalMgr2,
+                mgr3: finalMgr3,
+                mgr4: finalMgr4,
+                mgr5: finalMgr5,
                 indicatorField: cleanIndicator,
                 returnReason: '',
                 returnedAt: null
@@ -271,7 +301,11 @@ exports.createSingleAsset = async (req, res) => {
                 invoiceNumber,
                 saleDate: saleDate ? new Date(saleDate) : new Date(),
                 location,
-                mgr1, mgr2, mgr3, mgr4, mgr5,
+                mgr1: finalMgr1,
+                mgr2: finalMgr2,
+                mgr3: finalMgr3,
+                mgr4: finalMgr4,
+                mgr5: finalMgr5,
                 indicatorField: cleanIndicator,
                 transactionType: 'SINGLE_ENTRY',
                 status: status === 'RETURN' ? 'SOLD' : status,
@@ -294,7 +328,11 @@ exports.createSingleAsset = async (req, res) => {
             invoiceNumber,
             saleDate: saleDate ? new Date(saleDate) : (status === 'SOLD' ? new Date() : null),
             location,
-            mgr1, mgr2, mgr3, mgr4, mgr5,
+            mgr1: finalMgr1,
+            mgr2: finalMgr2,
+            mgr3: finalMgr3,
+            mgr4: finalMgr4,
+            mgr5: finalMgr5,
             indicatorField: cleanIndicator,
             createdBy: req.user?.id || null
         });
@@ -312,7 +350,11 @@ exports.createSingleAsset = async (req, res) => {
             invoiceNumber,
             saleDate: saleDate ? new Date(saleDate) : (status === 'SOLD' ? new Date() : null),
             location,
-            mgr1, mgr2, mgr3, mgr4, mgr5,
+            mgr1: finalMgr1,
+            mgr2: finalMgr2,
+            mgr3: finalMgr3,
+            mgr4: finalMgr4,
+            mgr5: finalMgr5,
             indicatorField: cleanIndicator,
             transactionType: 'SINGLE_ENTRY',
             status,
