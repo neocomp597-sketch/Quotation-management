@@ -10,6 +10,7 @@ const AssetHistorySchema = new mongoose.Schema({
     customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer' },
     customerName: { type: String, default: '' },
     customerPostalCode: { type: String, default: '' },
+    customerMobile: { type: String, default: '' },
     invoiceNumber: { type: String, default: '' },
     saleDate: { type: Date },
     returnDate: { type: Date },

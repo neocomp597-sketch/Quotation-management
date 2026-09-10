@@ -3204,6 +3204,9 @@ const importAssets = async (req, res) => {
                 const customerPostalCode = pickFirstNonEmpty(
                     row['Customer Postal Code'], row.customerPostalCode, row['Postal Code'], row.postalCode, row.pincode, row.Pincode, ''
                 );
+                const customerMobile = pickFirstNonEmpty(
+                    row['Mobile Number'], row.mobileNumber, row['Mobile No'], row.mobileNo, row['Phone Number'], row.phoneNumber, row['Mobile'], row.mobile, row['Phone'], row.phone, ''
+                );
                 const invoiceNumber = pickFirstNonEmpty(
                     row['Invoice Ref'], row.invoiceRef, row['Invoice Number'], row.invoiceNumber, row['Invoice'], row.invoice
                 );
@@ -3300,8 +3303,12 @@ const importAssets = async (req, res) => {
                             externalCode: customerLookup,
                             customerName: customerLookup,
                             companyName: customerLookup,
+                            mobile: customerMobile || '',
                             createdBy: req.user?.id || null
                         });
+                    } else if (customerMobile && !customer.mobile) {
+                        customer.mobile = customerMobile;
+                        await customer.save();
                     }
                 }
 
@@ -3355,6 +3362,7 @@ const importAssets = async (req, res) => {
                         customerId: customer ? customer._id : null,
                         customerNameStr: customerLookup || '',
                         customerPostalCode,
+                        customerMobile: customerMobile || '',
                         invoiceNumber: invoiceNumber || '',
                         saleDate: saleDate || new Date(),
                         location: location || '',
@@ -3378,6 +3386,7 @@ const importAssets = async (req, res) => {
                         customerId: customer ? customer._id : null,
                         customerName: customer ? (customer.companyName || customer.customerName) : customerLookup,
                         customerPostalCode,
+                        customerMobile: customerMobile || '',
                         invoiceNumber: invoiceNumber || '',
                         saleDate: saleDate || new Date(),
                         location: location || '',
@@ -3397,6 +3406,7 @@ const importAssets = async (req, res) => {
                         customerId: customer ? customer._id : null,
                         customerNameStr: customerLookup || '',
                         customerPostalCode,
+                        customerMobile: customerMobile || '',
                         invoiceNumber: invoiceNumber || '',
                         saleDate: saleDate || (status === 'SOLD' ? new Date() : null),
                         location: location || '',
@@ -3416,9 +3426,10 @@ const importAssets = async (req, res) => {
                         customerId: customer ? customer._id : null,
                         customerName: customer ? (customer.companyName || customer.customerName) : customerLookup,
                         customerPostalCode,
+                        customerMobile: customerMobile || '',
                         invoiceNumber: invoiceNumber || '',
                         saleDate: saleDate || (status === 'SOLD' ? new Date() : null),
-                        location: location || '',
+                        location,
                         mgr1, mgr2, mgr3, mgr4, mgr5,
                         indicatorField,
                         transactionType: 'IMPORT',

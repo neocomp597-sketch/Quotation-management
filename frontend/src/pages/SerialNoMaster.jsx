@@ -26,7 +26,7 @@ const SerialNoMaster = () => {
     const [activeTab, setActiveTab] = useState('active'); // 'active' | 'returns'
 
     const [searchQuery, setSearchQuery] = useState('');
-    const [selectedStatus, setSelectedStatus] = useState('ALL');
+    const [selectedStatus, setSelectedStatus] = useState('SOLD');
     const [selectedProduct, setSelectedProduct] = useState('ALL');
     const [currentPage, setCurrentPage] = useState(1);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -50,9 +50,10 @@ const SerialNoMaster = () => {
         serialNumber: '',
         productCode: '',
         productName: '',
-        status: 'IN_STOCK',
+        status: 'SOLD',
         customer: '',
         customerPostalCode: '',
+        customerMobile: '',
         invoiceNumber: '',
         saleDate: '',
         location: '',
@@ -137,10 +138,12 @@ const SerialNoMaster = () => {
         const custObj = option?.customerObj;
         const custName = custObj?.companyName || custObj?.customerName || option?.label || val;
         const pincode = custObj?.billingAddress?.pincode || custObj?.pincode || '';
+        const mobile = custObj?.mobile || '';
         setSingleForm(prev => ({
             ...prev,
             customer: val || custName || '',
-            customerPostalCode: prev.customerPostalCode || pincode
+            customerPostalCode: prev.customerPostalCode || pincode,
+            customerMobile: prev.customerMobile || mobile
         }));
     };
 
@@ -289,11 +292,18 @@ const SerialNoMaster = () => {
         }
     };
 
-    // Single Entry Submit (Requirement #15)
+    // Single Entry Submit (Requirement #15, #3 Mobile Mandatory)
     const handleSingleEntrySubmit = async (e) => {
         e.preventDefault();
         if (!singleForm.serialNumber.trim() || !singleForm.productCode.trim()) {
             return toast.error('Serial Number and Product Code are required');
+        }
+        if (!singleForm.customerMobile || !singleForm.customerMobile.trim()) {
+            return toast.error('Mobile Number is mandatory. Please enter a valid mobile number.');
+        }
+        const cleanMobile = singleForm.customerMobile.trim().replace(/\D/g, '');
+        if (cleanMobile.length !== 10) {
+            return toast.error('Please enter a valid 10-digit mobile number');
         }
 
         setSingleSaving(true);
@@ -305,9 +315,10 @@ const SerialNoMaster = () => {
                 serialNumber: '',
                 productCode: '',
                 productName: '',
-                status: 'IN_STOCK',
+                status: 'SOLD',
                 customer: '',
                 customerPostalCode: '',
+                customerMobile: '',
                 invoiceNumber: '',
                 saleDate: '',
                 location: '',
@@ -327,9 +338,14 @@ const SerialNoMaster = () => {
         }
     };
 
-    // Customer Name Search + Product Code + Product Name + Serial No + Invoice Ref (Requirement #10)
+    // Customer Name Search + Product Code + Product Name + Serial No + Invoice Ref (Requirement #10, #1 Sold Only)
     const filteredAssets = useMemo(() => {
         return assets.filter(asset => {
+            // Requirement #1: Show only products/entries from the Sold List (exclude unsold stock entries)
+            if (asset.status === 'IN_STOCK' && selectedStatus !== 'IN_STOCK') {
+                return false;
+            }
+
             const custName = (
                 asset.customerId?.companyName ||
                 asset.customerId?.customerName ||
@@ -528,6 +544,18 @@ const SerialNoMaster = () => {
                                         placeholder="e.g. 400001"
                                         value={singleForm.customerPostalCode}
                                         onChange={(e) => setSingleForm({ ...singleForm, customerPostalCode: e.target.value })}
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-emerald-600 mb-1.5">Mobile Number *</label>
+                                    <input
+                                        type="tel"
+                                        required
+                                        maxLength={10}
+                                        placeholder="e.g. 9823012345"
+                                        value={singleForm.customerMobile}
+                                        onChange={(e) => setSingleForm({ ...singleForm, customerMobile: e.target.value.replace(/\D/g, '').slice(0, 10) })}
                                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
                                     />
                                 </div>

@@ -103,6 +103,12 @@ router.get('/masters/designations', protect, csmMasterController.designations.ge
 router.put('/masters/designations/:id', protect, csmMasterController.designations.update);
 router.delete('/masters/designations/:id', protect, csmMasterController.designations.delete);
 
+// Problems
+router.post('/masters/problems', protect, csmMasterController.problems.create);
+router.get('/masters/problems', protect, csmMasterController.problems.getAll);
+router.put('/masters/problems/:id', protect, csmMasterController.problems.update);
+router.delete('/masters/problems/:id', protect, csmMasterController.problems.delete);
+
 // SLA Policies
 router.post('/masters/sla-policies', protect, csmMasterController.slaPolicies.create);
 router.get('/masters/sla-policies', protect, csmMasterController.slaPolicies.getAll);

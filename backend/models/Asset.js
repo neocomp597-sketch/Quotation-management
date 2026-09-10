@@ -5,6 +5,7 @@ const AssetSchema = new mongoose.Schema({
     customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer' },
     customerNameStr: { type: String, default: '' },
     customerPostalCode: { type: String, default: '' },
+    customerMobile: { type: String, default: '' },
     productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
     serialNumber: { type: String, required: true },
     status: {

@@ -145,6 +145,9 @@ exports.createSingleAsset = async (req, res) => {
             status = 'IN_STOCK',
             customer: customerInput,
             customerPostalCode = '',
+            customerMobile = '',
+            customerPhone = '',
+            mobileNumber = '',
             invoiceNumber = '',
             saleDate,
             location = '',
@@ -161,6 +164,11 @@ exports.createSingleAsset = async (req, res) => {
         }
         if (!productCode || !String(productCode).trim()) {
             return res.status(400).json({ message: 'Product Code is required' });
+        }
+        const rawMobile = customerMobile || customerPhone || mobileNumber || '';
+        const cleanMobile = String(rawMobile).trim();
+        if (!cleanMobile) {
+            return res.status(400).json({ message: 'Mobile Number is mandatory' });
         }
 
         const cleanSN = String(serialNumber).trim();
@@ -239,8 +247,12 @@ exports.createSingleAsset = async (req, res) => {
                     externalCode: cleanCust,
                     customerName: cleanCust,
                     companyName: cleanCust,
+                    mobile: cleanMobile,
                     createdBy: req.user?.id || null
                 });
+            } else if (cleanMobile && !customer.mobile) {
+                customer.mobile = cleanMobile;
+                await customer.save();
             }
         }
 
@@ -294,6 +306,7 @@ exports.createSingleAsset = async (req, res) => {
                 customerId: customer ? customer._id : null,
                 customerNameStr: customerInput || '',
                 customerPostalCode,
+                customerMobile: cleanMobile,
                 invoiceNumber,
                 saleDate: saleDate ? new Date(saleDate) : (status === 'SOLD' ? new Date() : null),
                 location,
@@ -319,6 +332,7 @@ exports.createSingleAsset = async (req, res) => {
                 customerId: customer ? customer._id : null,
                 customerName: customer ? (customer.companyName || customer.customerName) : (customerInput || ''),
                 customerPostalCode,
+                customerMobile: cleanMobile,
                 invoiceNumber,
                 saleDate: saleDate ? new Date(saleDate) : (status === 'SOLD' ? new Date() : null),
                 location,
@@ -349,6 +363,7 @@ exports.createSingleAsset = async (req, res) => {
             customerId: customer ? customer._id : null,
             customerNameStr: customerInput || '',
             customerPostalCode,
+            customerMobile: cleanMobile,
             invoiceNumber,
             saleDate: saleDate ? new Date(saleDate) : (status === 'SOLD' ? new Date() : null),
             location,
@@ -371,6 +386,7 @@ exports.createSingleAsset = async (req, res) => {
             customerId: customer ? customer._id : null,
             customerName: customer ? (customer.companyName || customer.customerName) : (customerInput || ''),
             customerPostalCode,
+            customerMobile: cleanMobile,
             invoiceNumber,
             saleDate: saleDate ? new Date(saleDate) : (status === 'SOLD' ? new Date() : null),
             location,
@@ -738,6 +754,7 @@ exports.searchSerialNumbers = async (req, res) => {
                 customerId: a.customerId,
                 customerName: a.customerId?.companyName || a.customerId?.customerName || a.customerNameStr || '',
                 customerPostalCode: a.customerPostalCode || '',
+                customerMobile: a.customerMobile || a.customerId?.mobile || '',
                 invoiceNumber: a.invoiceNumber || (a.invoiceId?.voucherNumber || ''),
                 saleDate: a.saleDate || a.invoiceDate || null,
                 status: a.status || 'IN_STOCK',
@@ -765,6 +782,7 @@ exports.searchSerialNumbers = async (req, res) => {
                     customerId: h.customerId || (h.customerName ? { customerName: h.customerName, companyName: h.customerName } : null),
                     customerName: h.customerName || '',
                     customerPostalCode: h.customerPostalCode || '',
+                    customerMobile: h.customerMobile || h.customerId?.mobile || '',
                     invoiceNumber: h.invoiceNumber || '',
                     saleDate: h.saleDate || null,
                     status: h.status || 'HISTORICAL',

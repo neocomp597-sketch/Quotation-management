@@ -185,6 +185,13 @@ const CSMTickets = () => {
         resolutionSlaHours: '4',
         color: '#3b82f6'
     });
+    // Problem Master & Quick Add State
+    const [problems, setProblems] = useState([]);
+    const [loadingProblems, setLoadingProblems] = useState(false);
+    const [showQuickAddProblemModal, setShowQuickAddProblemModal] = useState(false);
+    const [quickProblemName, setQuickProblemName] = useState('');
+    const [savingQuickProblem, setSavingQuickProblem] = useState(false);
+
     const [formData, setFormData] = useState({
         customerId: '',
         contactId: '',
@@ -192,10 +199,14 @@ const CSMTickets = () => {
         contactDesignationId: '',
         contactDesignation: '',
         contactPhone: '',
+        contactAlternatePhone: '',
         contactEmail: '',
         pincode: '',
         priorityId: '',
         categoryId: '',
+        mgr4Category: '',
+        problemId: '',
+        problemName: '',
         typeId: '',
         productId: '',
         assetId: '',
@@ -407,6 +418,48 @@ const CSMTickets = () => {
         }
     };
 
+    const fetchProblems = async (mgr4Val = '') => {
+        setLoadingProblems(true);
+        try {
+            const res = await csmService.getProblems({ mgr4Category: mgr4Val });
+            setProblems(res.data || []);
+        } catch (err) {
+            console.error('Error fetching problems:', err);
+        } finally {
+            setLoadingProblems(false);
+        }
+    };
+
+    const handleSaveQuickProblem = async (e) => {
+        e?.preventDefault();
+        if (!quickProblemName.trim()) {
+            return toast.error('Problem title is required');
+        }
+        setSavingQuickProblem(true);
+        try {
+            const res = await csmService.createProblem({
+                name: quickProblemName.trim(),
+                mgr4Category: formData.mgr4Category || ''
+            });
+            toast.success('New problem added successfully!');
+            const newProb = res.data;
+            setProblems(prev => [newProb, ...prev]);
+            setFormData(prev => ({
+                ...prev,
+                problemId: newProb._id,
+                problemName: newProb.name,
+                issueTitle: prev.issueTitle || newProb.name
+            }));
+            setQuickProblemName('');
+            setShowQuickAddProblemModal(false);
+        } catch (err) {
+            console.error('Error adding quick problem:', err);
+            toast.error(err.response?.data?.message || 'Failed to add quick problem');
+        } finally {
+            setSavingQuickProblem(false);
+        }
+    };
+
     const fetchTicketCustomers = async () => {
         try {
             const res = await csmService.getTicketCustomers();
@@ -418,7 +471,7 @@ const CSMTickets = () => {
 
     const loadCreationData = async () => {
         try {
-            const [custRes, priRes, catRes, typRes, prodRes, srcRes, desRes, assetRes, branchRes] = await Promise.allSettled([
+            const [custRes, priRes, catRes, typRes, prodRes, srcRes, desRes, assetRes, branchRes, probRes] = await Promise.allSettled([
                 customerService.getAll({ limit: 500 }),
                 csmService.getPriorities(),
                 csmService.getCategories(),
@@ -427,7 +480,8 @@ const CSMTickets = () => {
                 csmService.getSources(),
                 csmService.getDesignations(),
                 csmService.getAssets(),
-                branchService.getAll()
+                branchService.getAll(),
+                csmService.getProblems({ mgr4Category: formData.mgr4Category || '' })
             ]);
 
             const valueOf = (result) => result.status === 'fulfilled' ? result.value : null;
@@ -441,6 +495,7 @@ const CSMTickets = () => {
             if (branchesRes?.data) setBranches(branchesRes.data);
             const designationsRes = valueOf(desRes);
             const assetsRes = valueOf(assetRes);
+            const problemsRes = valueOf(probRes);
 
             setCustomers(customersRes?.data?.data || customersRes?.data || []);
             setPriorities(prioritiesRes?.data || []);
@@ -450,6 +505,7 @@ const CSMTickets = () => {
             setSources(sourcesRes?.data || []);
             setDesignations(designationsRes?.data || []);
             setAssets(assetsRes?.data || []);
+            setProblems(problemsRes?.data || []);
 
             const failed = [custRes, priRes, catRes, typRes, prodRes, srcRes, desRes, assetRes].some(result => result.status === 'rejected');
             if (failed) {
@@ -672,11 +728,22 @@ const CSMTickets = () => {
                 ...prev,
                 productId: '',
                 assetId: '',
-                serialNumber: ''
+                serialNumber: '',
+                mgr4Category: '',
+                problemId: '',
+                problemName: ''
             }));
             setAssetSummary(null);
             setGeneratedSerial('');
             return;
+        }
+
+        const selectedProd = products.find(p => p._id === productId);
+        let mgr4Val = '';
+        if (selectedProd && selectedProd.mgr4) {
+            mgr4Val = typeof selectedProd.mgr4 === 'object'
+                ? (selectedProd.mgr4.code || selectedProd.mgr4.description || '')
+                : selectedProd.mgr4;
         }
 
         // Find if there is any matching asset for this product & customer
@@ -690,9 +757,14 @@ const CSMTickets = () => {
         setFormData(prev => ({
             ...prev,
             productId,
+            mgr4Category: mgr4Val || prev.mgr4Category || '',
             assetId: autoAsset ? autoAsset._id : '',
             serialNumber: autoAsset ? autoAsset.serialNumber : ''
         }));
+
+        if (mgr4Val) {
+            fetchProblems(mgr4Val);
+        }
         
         if (autoAsset) {
             setGeneratedSerial('');
@@ -714,13 +786,22 @@ const CSMTickets = () => {
                 });
         } else {
             setAssetSummary(null);
-            const selectedProd = products.find(p => p._id === productId);
             const prodCode = selectedProd?.productCode || 'PROD';
             const randomNum = Math.floor(1000 + Math.random() * 9000);
             const tempSN = `SN-${prodCode.replace(/\s+/g, '')}-${randomNum}`;
             setGeneratedSerial(tempSN);
             setFormData(prev => ({ ...prev, serialNumber: tempSN }));
         }
+    };
+
+    const handleProblemChange = (problemId) => {
+        const selectedProb = problems.find(p => p._id === problemId);
+        setFormData(prev => ({
+            ...prev,
+            problemId,
+            problemName: selectedProb ? selectedProb.name : '',
+            issueTitle: prev.issueTitle ? prev.issueTitle : (selectedProb ? selectedProb.name : '')
+        }));
     };
 
     const handleSubjectChange = (subjectVal) => {
@@ -1167,6 +1248,24 @@ const CSMTickets = () => {
                     }
                 }
                 
+                // Derive MGR4 category from asset or product
+                let mgr4Val = asset.mgr4 || '';
+                if (!mgr4Val && asset.productId) {
+                    if (typeof asset.productId === 'object' && asset.productId.mgr4) {
+                        mgr4Val = typeof asset.productId.mgr4 === 'object' 
+                            ? (asset.productId.mgr4.code || asset.productId.mgr4.description || '') 
+                            : asset.productId.mgr4;
+                    }
+                }
+                if (!mgr4Val && targetProdId) {
+                    const pMatch = products.find(p => String(p._id) === String(targetProdId));
+                    if (pMatch && pMatch.mgr4) {
+                        mgr4Val = typeof pMatch.mgr4 === 'object' 
+                            ? (pMatch.mgr4.code || pMatch.mgr4.description || '') 
+                            : pMatch.mgr4;
+                    }
+                }
+
                 // Autofill
                 setFormData(prev => {
                     const custPincode = asset.customerPostalCode || asset.customerId?.billingAddress?.pincode || asset.pincode || asset.locationPincode || prev.pincode || '';
@@ -1179,7 +1278,8 @@ const CSMTickets = () => {
                         assetId: asset._id || '',
                         serialNumber: asset.serialNumber || cleanSN,
                         pincode: custPincode,
-                        invoiceId: matchedInvoice || prev.invoiceId || ''
+                        invoiceId: matchedInvoice || prev.invoiceId || '',
+                        mgr4Category: mgr4Val || prev.mgr4Category || ''
                     };
                     
                     if (contactsList.length > 0) {
@@ -1189,20 +1289,24 @@ const CSMTickets = () => {
                             nextData.contactName = primaryContact.contactName || '';
                             nextData.contactDesignationId = primaryContact.designationId?._id || '';
                             nextData.contactDesignation = primaryContact.designationId?.name || '';
-                            nextData.contactPhone = primaryContact.mobileNo || '';
+                            nextData.contactPhone = primaryContact.mobileNo || asset.customerMobile || '';
                             nextData.contactEmail = primaryContact.email || '';
                         }
-                    } else if (asset.customerId) {
-                        if (asset.customerId.mobile && !nextData.contactPhone) {
-                            nextData.contactPhone = asset.customerId.mobile;
+                    } else {
+                        if ((asset.customerMobile || asset.customerId?.mobile) && !nextData.contactPhone) {
+                            nextData.contactPhone = asset.customerMobile || asset.customerId?.mobile;
                         }
-                        if (asset.customerId.email && !nextData.contactEmail) {
+                        if (asset.customerId?.email && !nextData.contactEmail) {
                             nextData.contactEmail = asset.customerId.email;
                         }
                     }
                     
                     return nextData;
                 });
+
+                if (mgr4Val) {
+                    fetchProblems(mgr4Val);
+                }
                 
                 toast.success(`Asset found! Auto-filled details for Serial No: ${asset.serialNumber || cleanSN}`);
                 
@@ -2345,21 +2449,65 @@ const CSMTickets = () => {
                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Contact Phone</label>
                             <input
                                 type="text"
-                                value={formData.contactPhone}
+                                value={formData.contactPhone || ''}
                                 onChange={(e) => setFormData({ ...formData, contactPhone: e.target.value })}
                                 className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold bg-slate-50 disabled:opacity-75"
                                 disabled={Boolean(formData.contactId)}
                             />
                         </div>
                         <div>
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Alternate Mobile Number</label>
+                            <input
+                                type="text"
+                                value={formData.contactAlternatePhone || ''}
+                                onChange={(e) => setFormData({ ...formData, contactAlternatePhone: e.target.value })}
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                placeholder="Enter alternate mobile number"
+                            />
+                        </div>
+                        <div>
                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Contact Email</label>
                             <input
                                 type="email"
-                                value={formData.contactEmail}
+                                value={formData.contactEmail || ''}
                                 onChange={(e) => setFormData({ ...formData, contactEmail: e.target.value })}
-                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold bg-slate-50 disabled:opacity-75"
-                                disabled={Boolean(formData.contactId)}
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                placeholder="Enter contact email"
                             />
+                        </div>
+                        <div>
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">MGR4 Category</label>
+                            <input
+                                type="text"
+                                value={formData.mgr4Category || ''}
+                                onChange={(e) => {
+                                    const val = e.target.value;
+                                    setFormData(prev => ({ ...prev, mgr4Category: val }));
+                                    fetchProblems(val);
+                                }}
+                                placeholder="Auto-selected MGR4 Category"
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold bg-slate-50 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                            />
+                        </div>
+                        <div>
+                            <div className="flex justify-between items-center mb-1">
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Problem List</label>
+                                <button 
+                                    type="button" 
+                                    onClick={() => setShowQuickAddProblemModal(true)}
+                                    className="text-[10px] font-black uppercase text-primary-600 hover:text-primary-700 tracking-wider flex items-center gap-0.5"
+                                >
+                                    + Quick Add
+                                </button>
+                            </div>
+                            <select
+                                value={formData.problemId || ''}
+                                onChange={(e) => handleProblemChange(e.target.value)}
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
+                            >
+                                <option value="">Select Problem</option>
+                                {problems.map(p => <option key={p._id} value={p._id}>{p.name}</option>)}
+                            </select>
                         </div>
                         <div>
                             <div className="flex justify-between items-center mb-1">
@@ -2403,7 +2551,7 @@ const CSMTickets = () => {
                                 {categories.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
                             </select>
                         </div>
-                        <div className="md:col-span-2">
+                        <div>
                             <div className="flex justify-between items-center mb-1">
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Ticket Type *</label>
                                 <button 
@@ -2531,6 +2679,56 @@ const CSMTickets = () => {
                         />
                         Mark as primary contact
                     </label>
+                </form>
+            </Modal>
+
+            {/* Quick Add Problem Modal */}
+            <Modal
+                isOpen={showQuickAddProblemModal}
+                onClose={() => setShowQuickAddProblemModal(false)}
+                title="Quick Add Problem"
+                maxWidth="max-w-md"
+                footer={
+                    <>
+                        <button
+                            type="button"
+                            onClick={() => setShowQuickAddProblemModal(false)}
+                            className="w-full md:w-auto px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            form="quick-add-problem-form"
+                            disabled={savingQuickProblem}
+                            className="w-full md:w-auto px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-primary-600/20 disabled:opacity-50"
+                        >
+                            {savingQuickProblem ? 'Saving...' : 'Save Problem'}
+                        </button>
+                    </>
+                }
+            >
+                <form id="quick-add-problem-form" onSubmit={handleSaveQuickProblem} className="space-y-4">
+                    <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">MGR4 Category</label>
+                        <input
+                            type="text"
+                            disabled
+                            value={formData.mgr4Category || 'General / All'}
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold bg-slate-50 text-slate-600"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Problem Title *</label>
+                        <input
+                            type="text"
+                            required
+                            value={quickProblemName}
+                            onChange={(e) => setQuickProblemName(e.target.value)}
+                            placeholder="Enter problem title / issue"
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        />
+                    </div>
                 </form>
             </Modal>
 

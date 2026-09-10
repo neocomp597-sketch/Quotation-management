@@ -6,6 +6,7 @@ const ServiceTeam = require('../models/ServiceTeam');
 const TicketSource = require('../models/TicketSource');
 const Designation = require('../models/Designation');
 const Engineer = require('../models/Engineer');
+const Problem = require('../models/Problem');
 
 // Seed default master configurations
 exports.seedDefaults = async (req, res) => {
@@ -744,6 +745,24 @@ exports.slaPolicies = createCrudEndpoints(SlaPolicy, 'SlaPolicy');
 exports.serviceTeams = createCrudEndpoints(ServiceTeam, 'ServiceTeam');
 exports.sources = createCrudEndpoints(TicketSource, 'TicketSource');
 exports.designations = createCrudEndpoints(Designation, 'Designation');
+exports.problems = {
+    ...createCrudEndpoints(Problem, 'Problem'),
+    getAll: async (req, res) => {
+        try {
+            const filter = { companyId: req.user?.companyId };
+            if (req.query.mgr4Category) {
+                filter.mgr4Category = buildExactRegex(req.query.mgr4Category) || req.query.mgr4Category;
+            }
+            if (req.query.categoryId) {
+                filter.categoryId = req.query.categoryId;
+            }
+            const docs = await Problem.find(filter).sort({ createdAt: -1 }).lean();
+            res.json(docs);
+        } catch (error) {
+            res.status(500).json({ message: 'Error fetching Problems: ' + error.message });
+        }
+    }
+};
 
 exports.engineers = {
     create: async (req, res) => {
