@@ -1350,16 +1350,17 @@ const CSMTickets = () => {
                 'Customer Email': t.customerId?.email || '',
                 'Customer Phone': t.customerId?.mobile || '',
                 'Contact Person': t.contactName || '',
-                'Contact Phone': t.contactPhone || '',
+                'Contact Phone *': t.contactPhone || '',
+                'Alternate Mobile Number': t.contactAlternatePhone || '',
                 'Contact Email': t.contactEmail || '',
                 'Product Name': t.productId?.productName || '',
                 'Product Code': t.productId?.productCode || '',
                 'Serial No': t.assetId?.serialNumber || '',
+                'MGR4 Category': t.mgr4Category || '',
+                'Problem Name': t.problemName || '',
                 'Subject': t.issueTitle || '',
                 'Description': t.description || '',
                 'Priority': t.priorityId?.name || '',
-                'Category': t.categoryId?.name || '',
-                'Type': t.typeId?.name || '',
                 'Status': t.status || '',
                 'Source': t.source || '',
                 'Issue Date': t.createdAt ? new Date(t.createdAt).toLocaleDateString('en-IN') : '',
@@ -2530,47 +2531,6 @@ const CSMTickets = () => {
                                 {priorities.map(p => <option key={p._id} value={p._id}>{p.name}</option>)}
                             </select>
                         </div>
-                        <div>
-                            <div className="flex justify-between items-center mb-1">
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Category *</label>
-                                <button 
-                                    type="button" 
-                                    onClick={() => handleOpenMiniMaster('category')}
-                                    className="text-[10px] font-black uppercase text-primary-600 hover:text-primary-700 tracking-wider flex items-center gap-0.5"
-                                >
-                                    + Quick Add
-                                </button>
-                            </div>
-                            <select
-                                required
-                                value={formData.categoryId}
-                                onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
-                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
-                            >
-                                <option value="">Select Category</option>
-                                {categories.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
-                            </select>
-                        </div>
-                        <div>
-                            <div className="flex justify-between items-center mb-1">
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Ticket Type *</label>
-                                <button 
-                                    type="button" 
-                                    onClick={() => handleOpenMiniMaster('type')}
-                                    className="text-[10px] font-black uppercase text-primary-600 hover:text-primary-700 tracking-wider flex items-center gap-0.5"
-                                >
-                                    + Quick Add
-                                </button>
-                            </div>
-                            <select
-                                required
-                                value={formData.typeId}
-                                onChange={(e) => setFormData({ ...formData, typeId: e.target.value })}
-                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
-                            >
-                                <option value="">Select Type</option>
-                                {types.map(t => <option key={t._id} value={t._id}>{t.name}</option>)}
-                            </select>
                         </div>
                         
                         {/* SLA Preview box */}
@@ -3276,50 +3236,6 @@ const CSMTickets = () => {
                             >
                                 <option value="">Select Priority</option>
                                 {priorities.map(p => <option key={p._id} value={p.name}>{p.name}</option>)}
-                            </select>
-                        </div>
-
-                        {/* Category */}
-                        <div>
-                            <div className="flex justify-between items-center mb-1.5">
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Category</label>
-                                <button 
-                                    type="button" 
-                                    onClick={() => handleOpenMiniMaster('category')}
-                                    className="text-[10px] font-black uppercase text-primary-600 hover:text-primary-700 tracking-wider flex items-center gap-0.5"
-                                >
-                                    + Quick Add
-                                </button>
-                            </div>
-                            <select
-                                value={manualFormData.category}
-                                onChange={(e) => setManualFormData({ ...manualFormData, category: e.target.value })}
-                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500"
-                            >
-                                <option value="">Select Category</option>
-                                {categories.map(c => <option key={c._id} value={c.name}>{c.name}</option>)}
-                            </select>
-                        </div>
-
-                        {/* Ticket Type */}
-                        <div>
-                            <div className="flex justify-between items-center mb-1.5">
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Ticket Type</label>
-                                <button 
-                                    type="button" 
-                                    onClick={() => handleOpenMiniMaster('type')}
-                                    className="text-[10px] font-black uppercase text-primary-600 hover:text-primary-700 tracking-wider flex items-center gap-0.5"
-                                >
-                                    + Quick Add
-                                </button>
-                            </div>
-                            <select
-                                value={manualFormData.type}
-                                onChange={(e) => setManualFormData({ ...manualFormData, type: e.target.value })}
-                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500"
-                            >
-                                <option value="">Select Type</option>
-                                {types.map(t => <option key={t._id} value={t.name}>{t.name}</option>)}
                             </select>
                         </div>
 

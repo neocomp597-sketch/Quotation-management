@@ -1774,17 +1774,26 @@ const importTickets = async (req, res) => {
                     }
                 }
 
+                const contactPhone = cleanCellValue(row['Contact Phone *'] || row['Contact Phone'] || row['Mobile Number'] || row['Mobile No'] || row.contactPhone || row.mobileNumber || row.mobile || customer?.mobile || '');
+                const contactAlternatePhone = cleanCellValue(row['Alternate Mobile Number'] || row['Alternate Phone'] || row.contactAlternatePhone || row.alternateMobile || '');
+
+                if (!contactPhone || !/^\d{10}$/.test(String(contactPhone).trim())) {
+                    throw new Error(`Contact Phone / Mobile Number is mandatory and must be a valid 10-digit number. (Got: "${contactPhone || 'blank'}")`);
+                }
+
                 // Create the ticket
                 const ticketData = {
                     companyId,
                     ticketNo,
                     customerId: customer._id,
+                    contactPhone,
+                    contactAlternatePhone,
                     productId: product ? product._id : null,
                     assetId: asset ? asset._id : null,
                     issueTitle,
                     description,
-                    categoryId: categoryObj._id,
-                    typeId: typeObj._id,
+                    categoryId: categoryObj ? categoryObj._id : null,
+                    typeId: typeObj ? typeObj._id : null,
                     priorityId: priorityObj._id,
                     status,
                     source: 'Excel Import',
@@ -1831,13 +1840,13 @@ const getTicketTemplate = async (req, res) => {
             {
                 'Ticket No': 'CSM-2026-0001',
                 'Customer Code': customer?.externalCode || customer?.customerName || 'CUST001',
+                'Contact Phone *': customer?.mobile || '9876543210',
+                'Alternate Mobile Number': '9876543211',
                 'Product Code': product?.productCode || 'PROD001',
                 'Product Serial No.': 'SN-GEN-908123',
                 'Issue Title': 'Hose leakage at joint',
                 'Description': 'Customer reported heavy leakage in the Brass Hose Connector after 10 days of use.',
                 'Priority': 'Medium',
-                'Category': 'Hardware',
-                'Ticket Type': 'Complaint',
                 'Status': 'Open',
                 'Issue Date': '2026-06-30'
             }
@@ -3205,8 +3214,11 @@ const importAssets = async (req, res) => {
                     row['Customer Postal Code'], row.customerPostalCode, row['Postal Code'], row.postalCode, row.pincode, row.Pincode, ''
                 );
                 const customerMobile = pickFirstNonEmpty(
-                    row['Mobile Number'], row.mobileNumber, row['Mobile No'], row.mobileNo, row['Phone Number'], row.phoneNumber, row['Mobile'], row.mobile, row['Phone'], row.phone, ''
+                    row['Mobile Number *'], row['Mobile Number'], row.mobileNumber, row['Mobile No'], row.mobileNo, row['Phone Number'], row.phoneNumber, row['Mobile'], row.mobile, row['Phone'], row.phone, ''
                 );
+                if (!customerMobile || !/^\d{10}$/.test(String(customerMobile).trim())) {
+                    throw new Error(`Mobile Number is mandatory and must be a valid 10-digit number. (Got: "${customerMobile || 'blank'}")`);
+                }
                 const invoiceNumber = pickFirstNonEmpty(
                     row['Invoice Ref'], row.invoiceRef, row['Invoice Number'], row.invoiceNumber, row['Invoice'], row.invoice
                 );

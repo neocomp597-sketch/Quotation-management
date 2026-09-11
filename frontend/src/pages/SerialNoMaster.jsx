@@ -240,6 +240,7 @@ const SerialNoMaster = () => {
                 'Status': asset.status || 'IN_STOCK',
                 'Customer': custName,
                 'Customer Postal Code': asset.customerPostalCode || '',
+                'Mobile Number': asset.customerMobile || asset.customerId?.mobile || '',
                 'Invoice Ref': asset.invoiceNumber || '',
                 'Sale Date': sDate ? new Date(sDate).toLocaleDateString('en-IN') : '',
                 'Location': asset.location || '',
