@@ -3535,12 +3535,6 @@ const getAssetTemplate = async (req, res) => {
                 'Mobile Number': '',
                 'Invoice Ref': '',
                 'Sale Date': '',
-                'Location': 'Bay-4 Outgoing Yard',
-                'Mgr 1': 'Manager A',
-                'Mgr 2': '',
-                'Mgr 3': '',
-                'Mgr 4': '',
-                'Mgr 5': '',
                 'Indicator_Field': 'SALE'
             },
             {
@@ -3553,12 +3547,6 @@ const getAssetTemplate = async (req, res) => {
                 'Mobile Number': '9823012345',
                 'Invoice Ref': 'INV-2026-001',
                 'Sale Date': '2026-03-15',
-                'Location': 'Client Site Alpha',
-                'Mgr 1': 'Manager A',
-                'Mgr 2': 'Manager B',
-                'Mgr 3': '',
-                'Mgr 4': '',
-                'Mgr 5': '',
                 'Indicator_Field': 'SALE'
             }
         ];
