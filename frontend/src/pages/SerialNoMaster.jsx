@@ -538,12 +538,12 @@ const SerialNoMaster = () => {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Customer Postal Code</label>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Customer  Code</label>
                                     <input
                                         type="text"
-                                        placeholder="e.g. 400001"
-                                        value={singleForm.customerPostalCode}
-                                        onChange={(e) => setSingleForm({ ...singleForm, customerPostalCode: e.target.value })}
+                                        placeholder="e.g. CUST-001"
+                                        value={singleForm.customerCode}
+                                        onChange={(e) => setSingleForm({ ...singleForm, customerCode: e.target.value })}
                                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
                                     />
                                 </div>
