@@ -873,7 +873,7 @@ const SerialNoMaster = () => {
                                                     assetSummary.asset[mgrKey] ? (
                                                         <div key={mgrKey} className="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
                                                             <span className="block text-[8px] font-black uppercase tracking-widest text-slate-400">Mgr {i + 1}</span>
-                                                            <span className="font-semibold text-slate-800 text-xs">{formatMgrVal(assetSummary.asset[mgrKey])}</span>
+                                                            <span className="font-semibold text-slate-800 text-xs">{typeof assetSummary.asset[mgrKey] === 'object' ? (assetSummary.asset[mgrKey]?.name || assetSummary.asset[mgrKey]?.title || JSON.stringify(assetSummary.asset[mgrKey])) : assetSummary.asset[mgrKey]}</span>
                                                         </div>
                                                     ) : null
                                                 ))}
