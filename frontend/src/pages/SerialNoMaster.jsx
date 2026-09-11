@@ -46,6 +46,7 @@ const SerialNoMaster = () => {
     // Page View State: 'list' | 'single'
     const [pageView, setPageView] = useState('list');
     const [singleSaving, setSingleSaving] = useState(false);
+    const [showMgrFields, setShowMgrFields] = useState(false);
     const [singleForm, setSingleForm] = useState({
         serialNumber: '',
         productCode: '',
@@ -692,62 +693,80 @@ const SerialNoMaster = () => {
                                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
                                     />
                                 </div>
-                                <div className="col-span-full pt-2">
-                                    <div className="flex items-center gap-2 p-3 bg-amber-50/90 border border-amber-200/90 rounded-2xl text-amber-900 text-xs font-bold">
-                                        <MdInfoOutline size={20} className="text-amber-600 flex-shrink-0" />
-                                        <span>Product Grouping (Mgr 1 to Mgr 5): Automatically populated from Product Master when Product Name or Product Code matches.</span>
-                                    </div>
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Mgr 1</label>
-                                    <input
-                                        type="text"
-                                        placeholder="Mgr 1"
-                                        value={singleForm.mgr1}
-                                        onChange={(e) => setSingleForm({ ...singleForm, mgr1: e.target.value })}
-                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Mgr 2</label>
-                                    <input
-                                        type="text"
-                                        placeholder="Mgr 2"
-                                        value={singleForm.mgr2}
-                                        onChange={(e) => setSingleForm({ ...singleForm, mgr2: e.target.value })}
-                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Mgr 3</label>
-                                    <input
-                                        type="text"
-                                        placeholder="Mgr 3"
-                                        value={singleForm.mgr3}
-                                        onChange={(e) => setSingleForm({ ...singleForm, mgr3: e.target.value })}
-                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Mgr 4</label>
-                                    <input
-                                        type="text"
-                                        placeholder="Mgr 4"
-                                        value={singleForm.mgr4}
-                                        onChange={(e) => setSingleForm({ ...singleForm, mgr4: e.target.value })}
-                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Mgr 5</label>
-                                    <input
-                                        type="text"
-                                        placeholder="Mgr 5"
-                                        value={singleForm.mgr5}
-                                        onChange={(e) => setSingleForm({ ...singleForm, mgr5: e.target.value })}
-                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
-                                    />
-                                </div>
+                                 <div className="col-span-full pt-2 border-t border-slate-100 flex items-center justify-between">
+                                     <div className="flex items-center gap-2">
+                                         <span className="text-xs font-bold text-slate-700">Product Grouping (Mgr 1 to Mgr 5)</span>
+                                         <span className="text-[10px] text-slate-400 font-semibold">(Auto-populated from Product Master)</span>
+                                     </div>
+                                     <button
+                                         type="button"
+                                         onClick={() => setShowMgrFields(prev => !prev)}
+                                         className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                                     >
+                                         {showMgrFields ? '👁 Hide Mgr 1 - Mgr 5 Fields' : '👁 Show Mgr 1 - Mgr 5 Fields'}
+                                     </button>
+                                 </div>
+
+                                 {showMgrFields && (
+                                     <>
+                                         <div className="col-span-full">
+                                             <div className="flex items-center gap-2 p-3 bg-amber-50/90 border border-amber-200/90 rounded-2xl text-amber-900 text-xs font-bold">
+                                                 <MdInfoOutline size={20} className="text-amber-600 flex-shrink-0" />
+                                                 <span>Product Grouping (Mgr 1 to Mgr 5): Automatically populated from Product Master when Product Name or Product Code matches.</span>
+                                             </div>
+                                         </div>
+                                         <div>
+                                             <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Mgr 1</label>
+                                             <input
+                                                 type="text"
+                                                 placeholder="Mgr 1"
+                                                 value={singleForm.mgr1}
+                                                 onChange={(e) => setSingleForm({ ...singleForm, mgr1: e.target.value })}
+                                                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
+                                             />
+                                         </div>
+                                         <div>
+                                             <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Mgr 2</label>
+                                             <input
+                                                 type="text"
+                                                 placeholder="Mgr 2"
+                                                 value={singleForm.mgr2}
+                                                 onChange={(e) => setSingleForm({ ...singleForm, mgr2: e.target.value })}
+                                                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
+                                             />
+                                         </div>
+                                         <div>
+                                             <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Mgr 3</label>
+                                             <input
+                                                 type="text"
+                                                 placeholder="Mgr 3"
+                                                 value={singleForm.mgr3}
+                                                 onChange={(e) => setSingleForm({ ...singleForm, mgr3: e.target.value })}
+                                                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
+                                             />
+                                         </div>
+                                         <div>
+                                             <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Mgr 4</label>
+                                             <input
+                                                 type="text"
+                                                 placeholder="Mgr 4"
+                                                 value={singleForm.mgr4}
+                                                 onChange={(e) => setSingleForm({ ...singleForm, mgr4: e.target.value })}
+                                                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
+                                             />
+                                         </div>
+                                         <div>
+                                             <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Mgr 5</label>
+                                             <input
+                                                 type="text"
+                                                 placeholder="Mgr 5"
+                                                 value={singleForm.mgr5}
+                                                 onChange={(e) => setSingleForm({ ...singleForm, mgr5: e.target.value })}
+                                                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
+                                             />
+                                         </div>
+                                     </>
+                                 )}
                                 <div>
                                     <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Indicator Field (Max 20 chars)</label>
                                     <input
