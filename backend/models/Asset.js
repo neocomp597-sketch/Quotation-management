@@ -3,6 +3,7 @@ const tenantPlugin = require('./plugins/tenantPlugin');
 
 const AssetSchema = new mongoose.Schema({
     customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer' },
+    customerCode: { type: String, default: '' },
     customerNameStr: { type: String, default: '' },
     customerPostalCode: { type: String, default: '' },
     customerMobile: { type: String, default: '' },

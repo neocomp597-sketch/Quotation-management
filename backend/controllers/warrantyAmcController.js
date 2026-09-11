@@ -143,8 +143,8 @@ exports.createSingleAsset = async (req, res) => {
             productCode,
             productName,
             status = 'IN_STOCK',
+            customerCode = '',
             customer: customerInput,
-            customerPostalCode = '',
             customerMobile = '',
             customerPhone = '',
             mobileNumber = '',
@@ -228,31 +228,40 @@ exports.createSingleAsset = async (req, res) => {
         const finalMgr4 = mgr4 || (product ? formatMgrVal(product.mgr4) : '');
         const finalMgr5 = mgr5 || (product ? formatMgrVal(product.mgr5) : '');
 
-        // Resolve customer
+        // Resolve customer from Customer Master using Customer Code or Customer Name
         let customer = null;
-        if (customerInput && String(customerInput).trim()) {
-            const cleanCust = String(customerInput).trim();
+        let finalCustomerCode = String(customerCode || '').trim();
+        let finalCustomerPostalCode = '';
+        const searchTarget = finalCustomerCode || (customerInput ? String(customerInput).trim() : '');
+
+        if (searchTarget) {
             customer = await Customer.findOne({
                 companyId,
                 $or: [
-                    { externalCode: buildExactRegex(cleanCust) },
-                    { customerName: buildExactRegex(cleanCust) },
-                    { companyName: buildExactRegex(cleanCust) }
+                    { externalCode: buildExactRegex(searchTarget) },
+                    { customerName: buildExactRegex(searchTarget) },
+                    { companyName: buildExactRegex(searchTarget) }
                 ]
             });
 
             if (!customer) {
                 customer = await Customer.create({
                     companyId,
-                    externalCode: cleanCust,
-                    customerName: cleanCust,
-                    companyName: cleanCust,
+                    externalCode: searchTarget,
+                    customerName: customerInput || searchTarget,
+                    companyName: customerInput || searchTarget,
                     mobile: cleanMobile,
                     createdBy: req.user?.id || null
                 });
             } else if (cleanMobile && !customer.mobile) {
                 customer.mobile = cleanMobile;
                 await customer.save();
+            }
+
+            if (customer) {
+                finalCustomerCode = customer.externalCode || searchTarget;
+                // Postal Code is strictly derived from Customer Master
+                finalCustomerPostalCode = customer.billingAddress?.pincode || customer.pincode || '';
             }
         }
 
@@ -304,8 +313,9 @@ exports.createSingleAsset = async (req, res) => {
                 productId: product._id,
                 status: status === 'RETURN' ? 'SOLD' : status,
                 customerId: customer ? customer._id : null,
-                customerNameStr: customerInput || '',
-                customerPostalCode,
+                customerCode: finalCustomerCode,
+                customerNameStr: customer ? (customer.companyName || customer.customerName) : (customerInput || ''),
+                customerPostalCode: finalCustomerPostalCode,
                 customerMobile: cleanMobile,
                 invoiceNumber,
                 saleDate: saleDate ? new Date(saleDate) : (status === 'SOLD' ? new Date() : null),
@@ -330,8 +340,9 @@ exports.createSingleAsset = async (req, res) => {
                 productName: product.productName,
                 productId: product._id,
                 customerId: customer ? customer._id : null,
+                customerCode: finalCustomerCode,
                 customerName: customer ? (customer.companyName || customer.customerName) : (customerInput || ''),
-                customerPostalCode,
+                customerPostalCode: finalCustomerPostalCode,
                 customerMobile: cleanMobile,
                 invoiceNumber,
                 saleDate: saleDate ? new Date(saleDate) : (status === 'SOLD' ? new Date() : null),
@@ -361,8 +372,9 @@ exports.createSingleAsset = async (req, res) => {
             serialNumber: cleanSN,
             status,
             customerId: customer ? customer._id : null,
-            customerNameStr: customerInput || '',
-            customerPostalCode,
+            customerCode: finalCustomerCode,
+            customerNameStr: customer ? (customer.companyName || customer.customerName) : (customerInput || ''),
+            customerPostalCode: finalCustomerPostalCode,
             customerMobile: cleanMobile,
             invoiceNumber,
             saleDate: saleDate ? new Date(saleDate) : (status === 'SOLD' ? new Date() : null),
@@ -384,8 +396,9 @@ exports.createSingleAsset = async (req, res) => {
             productName: product.productName,
             productId: product._id,
             customerId: customer ? customer._id : null,
+            customerCode: finalCustomerCode,
             customerName: customer ? (customer.companyName || customer.customerName) : (customerInput || ''),
-            customerPostalCode,
+            customerPostalCode: finalCustomerPostalCode,
             customerMobile: cleanMobile,
             invoiceNumber,
             saleDate: saleDate ? new Date(saleDate) : (status === 'SOLD' ? new Date() : null),
@@ -533,7 +546,7 @@ exports.getAssets = async (req, res) => {
         if (req.query.productId) filter.productId = req.query.productId;
 
         const docs = await Asset.find(filter)
-            .populate('customerId', 'customerName companyName externalCode')
+            .populate('customerId', 'customerName companyName externalCode billingAddress pincode mobile')
             .populate('productId', 'productName productCode')
             .sort({ createdAt: -1 })
             .lean();

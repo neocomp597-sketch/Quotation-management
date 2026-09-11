@@ -3207,11 +3207,11 @@ const importAssets = async (req, res) => {
                 let productCode = pickFirstNonEmpty(row['Product Code'], row.productCode, row.code, row.Code);
                 let productName = pickFirstNonEmpty(row['Product Name'], row.productName, row.name, row.Name);
                 const rawStatus = pickFirstNonEmpty(row.Status, row.status, 'IN_STOCK');
+                const customerCodeInput = pickFirstNonEmpty(
+                    row['Customer Code'], row.customerCode, row['Customer External Code'], row.externalCode
+                );
                 const customerLookup = pickFirstNonEmpty(
                     row['Customer Code'], row.customerCode, row['Customer Name'], row.customerName, row['Company Name'], row.companyName, row['Customer']
-                );
-                const customerPostalCode = pickFirstNonEmpty(
-                    row['Customer Postal Code'], row.customerPostalCode, row['Postal Code'], row.postalCode, row.pincode, row.Pincode, ''
                 );
                 const customerMobile = pickFirstNonEmpty(
                     row['Mobile Number *'], row['Mobile Number'], row.mobileNumber, row['Mobile No'], row.mobileNo, row['Phone Number'], row.phoneNumber, row['Mobile'], row.mobile, row['Phone'], row.phone, ''
@@ -3297,30 +3297,40 @@ const importAssets = async (req, res) => {
                     if (!mgr5 && product.mgr5) mgr5 = formatMgrVal(product.mgr5);
                 }
 
-                // Resolve customer if lookup provided
+                // Resolve customer from Customer Master using Customer Code or Customer Name
                 let customer = null;
-                if (customerLookup) {
+                let customerCodeVal = customerCodeInput || '';
+                let customerPostalCode = '';
+
+                if (customerCodeInput || customerLookup) {
+                    const searchTarget = customerCodeInput || customerLookup;
                     customer = await Customer.findOne({
                         ...companyFilter,
                         $or: [
-                            { externalCode: buildExactRegex(customerLookup) },
-                            { customerName: buildExactRegex(customerLookup) },
-                            { companyName: buildExactRegex(customerLookup) }
+                            { externalCode: buildExactRegex(searchTarget) },
+                            { customerName: buildExactRegex(searchTarget) },
+                            { companyName: buildExactRegex(searchTarget) }
                         ]
                     });
 
                     if (!customer) {
                         customer = await Customer.create({
                             ...companyFilter,
-                            externalCode: customerLookup,
-                            customerName: customerLookup,
-                            companyName: customerLookup,
+                            externalCode: searchTarget,
+                            customerName: customerLookup || searchTarget,
+                            companyName: customerLookup || searchTarget,
                             mobile: customerMobile || '',
                             createdBy: req.user?.id || null
                         });
                     } else if (customerMobile && !customer.mobile) {
                         customer.mobile = customerMobile;
                         await customer.save();
+                    }
+
+                    if (customer) {
+                        customerCodeVal = customer.externalCode || searchTarget;
+                        // Postal Code is strictly derived/fetched from Customer Master
+                        customerPostalCode = customer.billingAddress?.pincode || customer.pincode || '';
                     }
                 }
 
@@ -3372,7 +3382,8 @@ const importAssets = async (req, res) => {
                         productId: product._id,
                         status: status === 'RETURN' ? 'SOLD' : status,
                         customerId: customer ? customer._id : null,
-                        customerNameStr: customerLookup || '',
+                        customerCode: customerCodeVal,
+                        customerNameStr: customer ? (customer.companyName || customer.customerName) : (customerLookup || ''),
                         customerPostalCode,
                         customerMobile: customerMobile || '',
                         invoiceNumber: invoiceNumber || '',
@@ -3396,6 +3407,7 @@ const importAssets = async (req, res) => {
                         productName: product.productName,
                         productId: product._id,
                         customerId: customer ? customer._id : null,
+                        customerCode: customerCodeVal,
                         customerName: customer ? (customer.companyName || customer.customerName) : customerLookup,
                         customerPostalCode,
                         customerMobile: customerMobile || '',
@@ -3416,7 +3428,8 @@ const importAssets = async (req, res) => {
                         serialNumber,
                         status,
                         customerId: customer ? customer._id : null,
-                        customerNameStr: customerLookup || '',
+                        customerCode: customerCodeVal,
+                        customerNameStr: customer ? (customer.companyName || customer.customerName) : (customerLookup || ''),
                         customerPostalCode,
                         customerMobile: customerMobile || '',
                         invoiceNumber: invoiceNumber || '',
@@ -3436,6 +3449,7 @@ const importAssets = async (req, res) => {
                         productName,
                         productId: product._id,
                         customerId: customer ? customer._id : null,
+                        customerCode: customerCodeVal,
                         customerName: customer ? (customer.companyName || customer.customerName) : customerLookup,
                         customerPostalCode,
                         customerMobile: customerMobile || '',
@@ -3496,8 +3510,9 @@ const getAssetTemplate = async (req, res) => {
                 'Product Name': '10KVA Transformer',
                 'Product Code': 'PROD-001',
                 'Status': 'IN_STOCK',
-                'Customer': '',
-                'Customer Postal Code': '',
+                'Customer Code': '',
+                'Customer Name': '',
+                'Mobile Number': '',
                 'Invoice Ref': '',
                 'Sale Date': '',
                 'Location': 'Bay-4 Outgoing Yard',
@@ -3513,8 +3528,9 @@ const getAssetTemplate = async (req, res) => {
                 'Product Name': '10KVA Transformer',
                 'Product Code': 'PROD-001',
                 'Status': 'SOLD',
-                'Customer': 'Apex Industrial Solutions',
-                'Customer Postal Code': '400001',
+                'Customer Code': 'CUST-101',
+                'Customer Name': 'Apex Industrial Solutions',
+                'Mobile Number': '9823012345',
                 'Invoice Ref': 'INV-2026-001',
                 'Sale Date': '2026-03-15',
                 'Location': 'Client Site Alpha',

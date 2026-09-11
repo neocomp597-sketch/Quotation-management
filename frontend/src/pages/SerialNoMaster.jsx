@@ -51,6 +51,7 @@ const SerialNoMaster = () => {
         productCode: '',
         productName: '',
         status: 'SOLD',
+        customerCode: '',
         customer: '',
         customerPostalCode: '',
         customerMobile: '',
@@ -101,7 +102,8 @@ const SerialNoMaster = () => {
             return {
                 id: c._id,
                 value: c.externalCode || c.companyName || c.customerName || '',
-                label: `${nameStr}${codeStr}`,
+                label: c.externalCode ? `[${c.externalCode}] ${nameStr}` : nameStr,
+                customerCode: c.externalCode || '',
                 customerName: c.companyName || c.customerName || '',
                 pincode: c.billingAddress?.pincode || c.pincode || '',
                 customerObj: c
@@ -136,14 +138,16 @@ const SerialNoMaster = () => {
 
     const handleSelectCustomer = (val, option) => {
         const custObj = option?.customerObj;
-        const custName = custObj?.companyName || custObj?.customerName || option?.label || val;
+        const custCode = custObj?.externalCode || option?.customerCode || (customers.find(c => c.externalCode === val)?.externalCode || '');
+        const custName = custObj?.companyName || custObj?.customerName || option?.customerName || option?.label || val;
         const pincode = custObj?.billingAddress?.pincode || custObj?.pincode || '';
         const mobile = custObj?.mobile || '';
         setSingleForm(prev => ({
             ...prev,
+            customerCode: custCode || prev.customerCode || '',
             customer: val || custName || '',
-            customerPostalCode: prev.customerPostalCode || pincode,
-            customerMobile: prev.customerMobile || mobile
+            customerPostalCode: pincode,
+            customerMobile: mobile || prev.customerMobile || ''
         }));
     };
 
@@ -219,7 +223,7 @@ const SerialNoMaster = () => {
         }
     };
 
-    // Standardized 15-Column Export (Requirement #2)
+    // Standardized 16-Column Export (Requirement #3)
     const handleExport = () => {
         const dataToExport = activeTab === 'returns' ? returnHistory : filteredAssets;
         if (!dataToExport || dataToExport.length === 0) {
@@ -230,17 +234,20 @@ const SerialNoMaster = () => {
         const exportData = dataToExport.map(asset => {
             const prodName = asset.productId?.productName || asset.productName || '';
             const prodCode = asset.productId?.productCode || asset.productCode || '';
+            const custCode = asset.customerId?.externalCode || asset.customerCode || '';
             const custName = asset.customerId?.companyName || asset.customerId?.customerName || asset.customerNameStr || asset.customerName || (asset.customerId ? 'Customer' : 'Stock (Unsold)');
+            const postalCode = asset.customerId?.billingAddress?.pincode || asset.customerId?.pincode || asset.customerPostalCode || '';
             const sDate = asset.saleDate || asset.invoiceDate;
 
             return {
-                'Serial Number': asset.serialNumber || '',
+                'Serial Num': asset.serialNumber || '',
                 'Product Name': prodName,
                 'Product Code': prodCode,
                 'Status': asset.status || 'IN_STOCK',
-                'Customer': custName,
-                'Customer Postal Code': asset.customerPostalCode || '',
+                'Customer Code': custCode,
+                'Customer Name': custName,
                 'Mobile Number': asset.customerMobile || asset.customerId?.mobile || '',
+                'Postal Code (From Master)': postalCode,
                 'Invoice Ref': asset.invoiceNumber || '',
                 'Sale Date': sDate ? new Date(sDate).toLocaleDateString('en-IN') : '',
                 'Location': asset.location || '',
@@ -248,8 +255,7 @@ const SerialNoMaster = () => {
                 'Mgr 2': asset.mgr2 || '',
                 'Mgr 3': asset.mgr3 || '',
                 'Mgr 4': asset.mgr4 || '',
-                'Mgr 5': asset.mgr5 || '',
-                'Indicator_Field': asset.indicatorField || ''
+                'Mgr 5': asset.mgr5 || ''
             };
         });
 
@@ -317,6 +323,7 @@ const SerialNoMaster = () => {
                 productCode: '',
                 productName: '',
                 status: 'SOLD',
+                customerCode: '',
                 customer: '',
                 customerPostalCode: '',
                 customerMobile: '',
@@ -347,6 +354,12 @@ const SerialNoMaster = () => {
                 return false;
             }
 
+            const custCode = (
+                asset.customerId?.externalCode ||
+                asset.customerCode ||
+                ''
+            ).toLowerCase();
+
             const custName = (
                 asset.customerId?.companyName ||
                 asset.customerId?.customerName ||
@@ -365,6 +378,7 @@ const SerialNoMaster = () => {
                 prodName.includes(query) ||
                 prodCode.includes(query) ||
                 invNo.includes(query) ||
+                custCode.includes(query) ||
                 custName.includes(query);
 
             const matchesStatus = selectedStatus === 'ALL' || asset.status === selectedStatus;
@@ -529,7 +543,27 @@ const SerialNoMaster = () => {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Customer Name / Code</label>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Customer Code</label>
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. CUST-101"
+                                        value={singleForm.customerCode}
+                                        onChange={(e) => {
+                                            const code = e.target.value;
+                                            const matchedCust = customers.find(c => c.externalCode && c.externalCode.toLowerCase() === code.trim().toLowerCase());
+                                            setSingleForm(prev => ({
+                                                ...prev,
+                                                customerCode: code,
+                                                customer: matchedCust ? (matchedCust.companyName || matchedCust.customerName) : prev.customer,
+                                                customerPostalCode: matchedCust ? (matchedCust.billingAddress?.pincode || matchedCust.pincode || '') : prev.customerPostalCode,
+                                                customerMobile: matchedCust ? (matchedCust.mobile || prev.customerMobile) : prev.customerMobile
+                                            }));
+                                        }}
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Customer Name</label>
                                     <input
                                         type="text"
                                         placeholder="e.g. Apex Industrial"
@@ -539,13 +573,16 @@ const SerialNoMaster = () => {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Customer Postal Code</label>
+                                    <div className="flex items-center justify-between mb-1.5">
+                                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400">Postal Code</label>
+                                        <span className="text-[9px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">From Customer Master</span>
+                                    </div>
                                     <input
                                         type="text"
-                                        placeholder="e.g. 400001"
+                                        readOnly={true}
+                                        placeholder="Auto-fetched from Customer Master"
                                         value={singleForm.customerPostalCode}
-                                        onChange={(e) => setSingleForm({ ...singleForm, customerPostalCode: e.target.value })}
-                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
+                                        className="w-full px-4 py-3 bg-slate-100 border border-slate-200 rounded-xl outline-none font-semibold text-slate-600 cursor-not-allowed"
                                     />
                                 </div>
                                 <div>
@@ -733,7 +770,11 @@ const SerialNoMaster = () => {
                                             <span className="text-slate-900 font-mono text-sm font-bold">{assetSummary.asset?.productId?.productCode || assetSummary.asset?.productCode || 'N/A'}</span>
                                         </div>
                                         <div className="p-3.5 bg-slate-50 border border-slate-100 rounded-2xl">
-                                            <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">Customer</span>
+                                            <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">Customer Code</span>
+                                            <span className="text-slate-900 font-mono text-sm font-bold">{assetSummary.asset?.customerId?.externalCode || assetSummary.asset?.customerCode || 'N/A'}</span>
+                                        </div>
+                                        <div className="p-3.5 bg-slate-50 border border-slate-100 rounded-2xl">
+                                            <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">Customer Name</span>
                                             <span className="text-slate-900 text-sm font-bold">{assetSummary.asset?.customerId?.companyName || assetSummary.asset?.customerId?.customerName || assetSummary.asset?.customerNameStr || 'Stock (Unsold)'}</span>
                                         </div>
                                         <div className="p-3.5 bg-slate-50 border border-slate-100 rounded-2xl">
@@ -745,8 +786,8 @@ const SerialNoMaster = () => {
                                             <span className="text-slate-900 text-sm font-bold">{assetSummary.asset?.saleDate || assetSummary.asset?.invoiceDate ? new Date(assetSummary.asset.saleDate || assetSummary.asset.invoiceDate).toLocaleDateString('en-IN') : 'N/A'}</span>
                                         </div>
                                         <div className="p-3.5 bg-slate-50 border border-slate-100 rounded-2xl">
-                                            <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">Postal Code</span>
-                                            <span className="text-slate-900 text-sm font-bold">{assetSummary.asset?.customerPostalCode || 'N/A'}</span>
+                                            <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">Postal Code (Customer Master)</span>
+                                            <span className="text-slate-900 text-sm font-bold">{assetSummary.asset?.customerId?.billingAddress?.pincode || assetSummary.asset?.customerId?.pincode || assetSummary.asset?.customerPostalCode || 'N/A'}</span>
                                         </div>
                                         <div className="p-3.5 bg-slate-50 border border-slate-100 rounded-2xl">
                                             <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">Location</span>
@@ -1123,12 +1164,17 @@ const SerialNoMaster = () => {
                                                     </td>
                                                     <td className="p-4 text-sm font-semibold text-slate-700">
                                                         {custDisplay ? (
-                                                            <span>{custDisplay}</span>
+                                                            <div>
+                                                                <span>{custDisplay}</span>
+                                                                {(asset.customerId?.externalCode || asset.customerCode) && (
+                                                                    <span className="block text-[10px] text-primary-600 font-mono font-bold">Code: {asset.customerId?.externalCode || asset.customerCode}</span>
+                                                                )}
+                                                            </div>
                                                         ) : (
                                                             <span className="text-slate-400 font-normal italic">Stock (Unsold)</span>
                                                         )}
-                                                        {asset.customerPostalCode && (
-                                                            <span className="block text-[10px] text-slate-400 font-bold">Pin: {asset.customerPostalCode}</span>
+                                                        {(asset.customerId?.billingAddress?.pincode || asset.customerId?.pincode || asset.customerPostalCode) && (
+                                                            <span className="block text-[10px] text-slate-400 font-bold">Pin: {asset.customerId?.billingAddress?.pincode || asset.customerId?.pincode || asset.customerPostalCode}</span>
                                                         )}
                                                     </td>
                                                     <td className="p-4 text-sm font-bold text-slate-800">
