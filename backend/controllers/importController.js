@@ -537,6 +537,22 @@ const importCustomers = async (req, res) => {
                     throw new Error('Missing required fields: Customer Name or Company Name');
                 }
 
+                if (customerData.billingAddress.pincode) {
+                    const cleanPin = String(customerData.billingAddress.pincode).trim().replace(/\D/g, '');
+                    if (cleanPin.length !== 6) {
+                        throw new Error(`Billing Pincode must be exactly 6 numeric digits (Got: "${customerData.billingAddress.pincode}")`);
+                    }
+                    customerData.billingAddress.pincode = cleanPin;
+                }
+
+                if (customerData.shippingAddress.pincode) {
+                    const cleanPin = String(customerData.shippingAddress.pincode).trim().replace(/\D/g, '');
+                    if (cleanPin.length !== 6) {
+                        throw new Error(`Shipping Pincode must be exactly 6 numeric digits (Got: "${customerData.shippingAddress.pincode}")`);
+                    }
+                    customerData.shippingAddress.pincode = cleanPin;
+                }
+
                 // Check for matches in memory
                 let existing = null;
                 if (customerData.externalCode) {

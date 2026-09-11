@@ -10,7 +10,7 @@ import PortalDropdown from '../components/PortalDropdown';
 import Modal from '../components/Modal';
 import SearchableSelect from '../components/SearchableSelect';
 import { useSubmitGuard } from '../hooks/useSubmitGuard';
-import { isValidMobile } from '../utils/validation';
+import { isValidMobile, isValidPincode } from '../utils/validation';
 
 const statusStyles = {
     'Open': 'bg-emerald-50 text-emerald-600 border-emerald-200',
@@ -878,6 +878,10 @@ const CSMTickets = () => {
             toast.error('Pincode is required');
             return;
         }
+        if (!isValidPincode(formData.pincode)) {
+            toast.error('Pincode must be exactly 6 numeric digits');
+            return;
+        }
 
         let assetIdToSubmit = formData.assetId;
 
@@ -968,6 +972,10 @@ const CSMTickets = () => {
         }
         if (!manualFormData.pincode || !manualFormData.pincode.trim()) {
             toast.error('Pincode is required');
+            return;
+        }
+        if (!isValidPincode(manualFormData.pincode)) {
+            toast.error('Pincode must be exactly 6 numeric digits');
             return;
         }
         try {
@@ -2286,10 +2294,11 @@ const CSMTickets = () => {
                             <input
                                 type="text"
                                 required
+                                maxLength={6}
                                 value={formData.pincode || ''}
-                                onChange={(e) => setFormData({ ...formData, pincode: e.target.value })}
+                                onChange={(e) => setFormData({ ...formData, pincode: e.target.value.replace(/\D/g, '').slice(0, 6) })}
                                 className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
-                                placeholder="Enter Pincode"
+                                placeholder="Enter 6-digit Pincode"
                             />
                         </div>
 
@@ -3095,9 +3104,10 @@ const CSMTickets = () => {
                             <input
                                 type="text"
                                 required
-                                placeholder="Enter Pincode"
+                                maxLength={6}
+                                placeholder="Enter 6-digit Pincode"
                                 value={manualFormData.pincode || ''}
-                                onChange={(e) => setManualFormData({ ...manualFormData, pincode: e.target.value })}
+                                onChange={(e) => setManualFormData({ ...manualFormData, pincode: e.target.value.replace(/\D/g, '').slice(0, 6) })}
                                 className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500"
                             />
                         </div>

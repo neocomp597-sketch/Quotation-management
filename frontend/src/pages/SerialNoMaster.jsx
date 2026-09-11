@@ -312,6 +312,9 @@ const SerialNoMaster = () => {
         if (cleanMobile.length !== 10) {
             return toast.error('Please enter a valid 10-digit mobile number');
         }
+        if (singleForm.customerPostalCode && !/^\d{6}$/.test(String(singleForm.customerPostalCode).trim())) {
+            return toast.error(`Postal Code in Customer Master is invalid. Pincode must be exactly 6 numeric digits. (Got: "${singleForm.customerPostalCode}")`);
+        }
 
         setSingleSaving(true);
         try {
@@ -575,14 +578,26 @@ const SerialNoMaster = () => {
                                 <div>
                                     <div className="flex items-center justify-between mb-1.5">
                                         <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400">Postal Code</label>
-                                        <span className="text-[9px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">From Customer Master</span>
+                                        {/^\d{6}$/.test(String(singleForm.customerPostalCode || '').trim()) ? (
+                                            <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">✓ Valid 6-Digit Code (From Master)</span>
+                                        ) : singleForm.customerPostalCode ? (
+                                            <span className="text-[9px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">⚠ Invalid Pincode (Must be 6 digits)</span>
+                                        ) : (
+                                            <span className="text-[9px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">From Customer Master</span>
+                                        )}
                                     </div>
                                     <input
                                         type="text"
                                         readOnly={true}
                                         placeholder="Auto-fetched from Customer Master"
                                         value={singleForm.customerPostalCode}
-                                        className="w-full px-4 py-3 bg-slate-100 border border-slate-200 rounded-xl outline-none font-semibold text-slate-600 cursor-not-allowed"
+                                        className={`w-full px-4 py-3 border rounded-xl outline-none font-semibold cursor-not-allowed transition-all ${
+                                            /^\d{6}$/.test(String(singleForm.customerPostalCode || '').trim())
+                                                ? 'bg-slate-50 border-slate-200 text-slate-900'
+                                                : singleForm.customerPostalCode
+                                                ? 'bg-rose-50/50 border-rose-200 text-rose-800'
+                                                : 'bg-slate-100 border-slate-200 text-slate-500'
+                                        }`}
                                     />
                                 </div>
                                 <div>

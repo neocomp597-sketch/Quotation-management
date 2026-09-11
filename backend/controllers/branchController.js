@@ -64,6 +64,14 @@ exports.createBranch = async (req, res) => {
             return res.status(400).json({ message: 'Branch Prefix should be 2 to 5 characters (e.g., NSK, PN, MUM)' });
         }
 
+        let cleanPincode = '';
+        if (pincode) {
+            cleanPincode = String(pincode).trim().replace(/\D/g, '');
+            if (cleanPincode.length !== 6) {
+                return res.status(400).json({ message: 'Pincode must be exactly 6 numeric digits' });
+            }
+        }
+
         const existingCode = await Branch.findOne({ companyId, code: cleanCode }).lean();
         if (existingCode) {
             return res.status(400).json({ message: 'Branch Code already exists' });
@@ -84,7 +92,7 @@ exports.createBranch = async (req, res) => {
             state: state || '',
             stateShortCode: stateShortCode || '',
             countryDialCode: countryDialCode || '+91',
-            pincode: pincode || '',
+            pincode: cleanPincode,
             contactNo: contactNo || '',
             email: email || '',
             gstNo: gstNo || '',
@@ -162,7 +170,13 @@ exports.updateBranch = async (req, res) => {
         if (state !== undefined) branch.state = state;
         if (stateShortCode !== undefined) branch.stateShortCode = stateShortCode;
         if (countryDialCode !== undefined) branch.countryDialCode = countryDialCode || '+91';
-        if (pincode !== undefined) branch.pincode = pincode;
+        if (pincode !== undefined) {
+            const cleanPin = String(pincode).trim().replace(/\D/g, '');
+            if (cleanPin && cleanPin.length !== 6) {
+                return res.status(400).json({ message: 'Pincode must be exactly 6 numeric digits' });
+            }
+            branch.pincode = cleanPin;
+        }
         if (contactNo !== undefined) branch.contactNo = contactNo;
         if (email !== undefined) branch.email = email;
         if (gstNo !== undefined) branch.gstNo = gstNo;

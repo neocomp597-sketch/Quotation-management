@@ -201,6 +201,8 @@ const Customers = ({ isCreatePage, isEditPage }) => {
             val = value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10);
         } else if (name === 'mobile') {
             val = value.replace(/[^\d]/g, '').slice(0, 10);
+        } else if (name === 'billingAddress.pincode') {
+            val = value.replace(/[^\d]/g, '').slice(0, 6);
         } else if (name === 'email') {
             val = value.toLowerCase().trim();
         }
@@ -257,6 +259,10 @@ const Customers = ({ isCreatePage, isEditPage }) => {
         }
         if (formData.pan && !isValidPAN(formData.pan)) {
             toast.error('Invalid PAN format (must be 10 characters, e.g. ABCDE1234F)');
+            return;
+        }
+        if (formData.billingAddress?.pincode && formData.billingAddress.pincode.trim().length !== 6) {
+            toast.error('Billing Pincode must be exactly 6 numeric digits (e.g. 400001)');
             return;
         }
 

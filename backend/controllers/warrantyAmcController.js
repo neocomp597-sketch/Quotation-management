@@ -260,8 +260,10 @@ exports.createSingleAsset = async (req, res) => {
 
             if (customer) {
                 finalCustomerCode = customer.externalCode || searchTarget;
-                // Postal Code is strictly derived from Customer Master
-                finalCustomerPostalCode = customer.billingAddress?.pincode || customer.pincode || '';
+                // Postal Code is strictly derived from Customer Master with 6-digit validation
+                const rawPin = customer.billingAddress?.pincode || customer.pincode || '';
+                const cleanPin = String(rawPin).trim().replace(/\D/g, '');
+                finalCustomerPostalCode = cleanPin.length === 6 ? cleanPin : String(rawPin).trim();
             }
         }
 

@@ -203,11 +203,19 @@ const CSMMasters = ({ isCreatePage, isEditPage }) => {
                     toast.error('Manual creation of engineers is disabled. Create a Service Engineer in Employee Master.');
                     return;
                 }
+                const parsedPincodes = typeof formData.pincodes === 'string'
+                    ? formData.pincodes.split(',').map(p => p.trim()).filter(Boolean)
+                    : (formData.pincodes || []);
+
+                const invalidPin = parsedPincodes.find(p => !/^\d{6}$/.test(p));
+                if (invalidPin) {
+                    toast.error(`Invalid Pincode "${invalidPin}". Each pincode must be exactly 6 numeric digits.`);
+                    return;
+                }
+
                 const payload = {
                     territoryId: formData.territoryId || null,
-                    pincodes: typeof formData.pincodes === 'string'
-                        ? formData.pincodes.split(',').map(p => p.trim()).filter(Boolean)
-                        : (formData.pincodes || []),
+                    pincodes: parsedPincodes,
                     status: formData.status
                 };
                 await csmService.updateEngineer(editId, payload);

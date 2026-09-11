@@ -827,9 +827,19 @@ exports.engineers = {
                 updateData.territoryId = req.body.territoryId || null;
             }
             if (req.body.pincodes !== undefined) {
-                updateData.pincodes = Array.isArray(req.body.pincodes)
+                const rawPins = Array.isArray(req.body.pincodes)
                     ? req.body.pincodes
                     : (typeof req.body.pincodes === 'string' ? req.body.pincodes.split(',').map(p => p.trim()).filter(Boolean) : []);
+                
+                const cleanedPins = [];
+                for (const pin of rawPins) {
+                    const cleanPin = String(pin).trim().replace(/\D/g, '');
+                    if (cleanPin.length !== 6) {
+                        return res.status(400).json({ message: `Pincode "${pin}" must be exactly 6 numeric digits` });
+                    }
+                    cleanedPins.push(cleanPin);
+                }
+                updateData.pincodes = cleanedPins;
             }
             if (req.body.status) {
                 updateData.status = req.body.status;

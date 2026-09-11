@@ -66,6 +66,13 @@ exports.updateCompanySettings = async (req, res) => {
             return res.status(400).json({ message: 'Company name is required' });
         }
 
+        if (address?.pincode) {
+            const cleanPin = String(address.pincode).trim().replace(/\D/g, '');
+            if (cleanPin && cleanPin.length !== 6) {
+                return res.status(400).json({ message: 'Pincode must be exactly 6 numeric digits' });
+            }
+        }
+
         let settings = await CompanySettings.findOne({
             $or: [
                 { companyId: req.user.companyId },

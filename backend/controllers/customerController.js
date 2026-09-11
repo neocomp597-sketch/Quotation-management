@@ -111,6 +111,24 @@ const findDuplicateCustomer = async (payload, excludeId) => {
 const createCustomer = async (req, res) => {
     try {
         const { customerName, companyName, gstin, billingAddress, shippingAddress, mobile, email, logoUrl, defaultDiscount, territory } = req.body;
+        
+        // Pincode validation helper
+        const validatePincode = (addressObj, typeName) => {
+            const raw = addressObj?.pincode;
+            if (raw && String(raw).trim()) {
+                const clean = String(raw).trim().replace(/\D/g, '');
+                if (clean.length !== 6) {
+                    return `${typeName} Pincode must be exactly 6 numeric digits (e.g. 400001). Got: "${raw}"`;
+                }
+            }
+            return null;
+        };
+
+        const billPinErr = validatePincode(billingAddress, 'Billing');
+        if (billPinErr) return res.status(400).json({ message: billPinErr });
+        const shipPinErr = validatePincode(shippingAddress, 'Shipping');
+        if (shipPinErr) return res.status(400).json({ message: shipPinErr });
+
         const duplicate = await findDuplicateCustomer({ gstin, mobile, email });
         if (duplicate) {
             return res.status(409).json({
@@ -243,6 +261,23 @@ const getCustomerById = async (req, res) => {
 const updateCustomer = async (req, res) => {
     try {
         const { customerName, companyName, gstin, billingAddress, shippingAddress, mobile, email, logoUrl, defaultDiscount, territory } = req.body;
+        
+        const validatePincode = (addressObj, typeName) => {
+            const raw = addressObj?.pincode;
+            if (raw && String(raw).trim()) {
+                const clean = String(raw).trim().replace(/\D/g, '');
+                if (clean.length !== 6) {
+                    return `${typeName} Pincode must be exactly 6 numeric digits (e.g. 400001). Got: "${raw}"`;
+                }
+            }
+            return null;
+        };
+
+        const billPinErr = validatePincode(billingAddress, 'Billing');
+        if (billPinErr) return res.status(400).json({ message: billPinErr });
+        const shipPinErr = validatePincode(shippingAddress, 'Shipping');
+        if (shipPinErr) return res.status(400).json({ message: shipPinErr });
+
         const duplicate = await findDuplicateCustomer({ gstin, mobile, email }, req.params.id);
         if (duplicate) {
             return res.status(409).json({
