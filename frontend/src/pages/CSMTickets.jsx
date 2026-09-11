@@ -2531,7 +2531,6 @@ const CSMTickets = () => {
                                 {priorities.map(p => <option key={p._id} value={p._id}>{p.name}</option>)}
                             </select>
                         </div>
-                        </div>
                         
                         {/* SLA Preview box */}
                         {selectedPriorityInfo && (
