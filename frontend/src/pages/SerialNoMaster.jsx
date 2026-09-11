@@ -247,6 +247,7 @@ const SerialNoMaster = () => {
 
         const exportData = dataToExport.map(asset => {
             const prodName = asset.productId?.productName || asset.productName || '';
+            const prodCode = asset.productId?.productCode || asset.productCode || '';
             let custCode = asset.customerId?.externalCode || asset.customerCode || '';
             const custName = asset.customerId?.companyName || asset.customerId?.customerName || asset.customerNameStr || asset.customerName || (asset.customerId ? 'Customer' : 'Stock (Unsold)');
             if (custCode && custName && custCode.trim().toLowerCase() === custName.trim().toLowerCase()) {
