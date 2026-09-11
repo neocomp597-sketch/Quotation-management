@@ -256,6 +256,13 @@ const SerialNoMaster = () => {
             const postalCode = asset.customerId?.billingAddress?.pincode || asset.customerId?.pincode || asset.customerPostalCode || '';
             const sDate = asset.saleDate || asset.invoiceDate;
 
+            // MGR information determined dynamically from the current Product / MGR Master mapping
+            const mgr1Val = asset.productId?.mgr1 ? formatMgrVal(asset.productId.mgr1) : (asset.mgr1 || '');
+            const mgr2Val = asset.productId?.mgr2 ? formatMgrVal(asset.productId.mgr2) : (asset.mgr2 || '');
+            const mgr3Val = asset.productId?.mgr3 ? formatMgrVal(asset.productId.mgr3) : (asset.mgr3 || '');
+            const mgr4Val = asset.productId?.mgr4 ? formatMgrVal(asset.productId.mgr4) : (asset.mgr4 || '');
+            const mgr5Val = asset.productId?.mgr5 ? formatMgrVal(asset.productId.mgr5) : (asset.mgr5 || '');
+
             return {
                 'Serial Num': asset.serialNumber || '',
                 'Product Name': prodName,
@@ -268,11 +275,11 @@ const SerialNoMaster = () => {
                 'Invoice Ref': asset.invoiceNumber || '',
                 'Sale Date': sDate ? new Date(sDate).toLocaleDateString('en-IN') : '',
                 'Location': asset.location || '',
-                'Mgr 1': asset.mgr1 || '',
-                'Mgr 2': asset.mgr2 || '',
-                'Mgr 3': asset.mgr3 || '',
-                'Mgr 4': asset.mgr4 || '',
-                'Mgr 5': asset.mgr5 || ''
+                'Mgr 1': mgr1Val,
+                'Mgr 2': mgr2Val,
+                'Mgr 3': mgr3Val,
+                'Mgr 4': mgr4Val,
+                'Mgr 5': mgr5Val
             };
         });
 

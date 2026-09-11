@@ -499,8 +499,18 @@ exports.getReturnHistory = async (req, res) => {
                 { status: 'RETURNED' }
             ]
         })
-        .populate('customerId', 'customerName companyName')
-        .populate('productId', 'productName productCode')
+        .populate('customerId', 'customerName companyName externalCode pincode mobile')
+        .populate({
+            path: 'productId',
+            select: 'productName productCode mgr1 mgr2 mgr3 mgr4 mgr5',
+            populate: [
+                { path: 'mgr1', select: 'code description' },
+                { path: 'mgr2', select: 'code description' },
+                { path: 'mgr3', select: 'code description' },
+                { path: 'mgr4', select: 'code description' },
+                { path: 'mgr5', select: 'code description' }
+            ]
+        })
         .sort({ returnDate: -1, createdAt: -1 })
         .lean();
 
@@ -553,7 +563,17 @@ exports.getAssets = async (req, res) => {
 
         const docs = await Asset.find(filter)
             .populate('customerId', 'customerName companyName externalCode billingAddress pincode mobile')
-            .populate('productId', 'productName productCode')
+            .populate({
+                path: 'productId',
+                select: 'productName productCode mgr1 mgr2 mgr3 mgr4 mgr5',
+                populate: [
+                    { path: 'mgr1', select: 'code description' },
+                    { path: 'mgr2', select: 'code description' },
+                    { path: 'mgr3', select: 'code description' },
+                    { path: 'mgr4', select: 'code description' },
+                    { path: 'mgr5', select: 'code description' }
+                ]
+            })
             .sort({ createdAt: -1 })
             .lean();
 
@@ -575,7 +595,17 @@ exports.getAssetSummary = async (req, res) => {
         if (assetId) {
             asset = await Asset.findOne({ _id: assetId, companyId })
                 .populate('customerId', 'customerName companyName gstin billingAddress mobile email')
-                .populate('productId', 'productName productCode basePrice mrp catalogType')
+                .populate({
+                    path: 'productId',
+                    select: 'productName productCode basePrice mrp catalogType mgr1 mgr2 mgr3 mgr4 mgr5',
+                    populate: [
+                        { path: 'mgr1', select: 'code description' },
+                        { path: 'mgr2', select: 'code description' },
+                        { path: 'mgr3', select: 'code description' },
+                        { path: 'mgr4', select: 'code description' },
+                        { path: 'mgr5', select: 'code description' }
+                    ]
+                })
                 .populate('invoiceId', 'voucherNumber date')
                 .lean();
         } else if (serialNumber) {
@@ -586,7 +616,17 @@ exports.getAssetSummary = async (req, res) => {
                 serialNumber: { $regex: new RegExp("^" + escapedSN + "$", "i") }
             })
             .populate('customerId', 'customerName companyName gstin billingAddress mobile email')
-            .populate('productId', 'productName productCode basePrice mrp catalogType')
+            .populate({
+                path: 'productId',
+                select: 'productName productCode basePrice mrp catalogType mgr1 mgr2 mgr3 mgr4 mgr5',
+                populate: [
+                    { path: 'mgr1', select: 'code description' },
+                    { path: 'mgr2', select: 'code description' },
+                    { path: 'mgr3', select: 'code description' },
+                    { path: 'mgr4', select: 'code description' },
+                    { path: 'mgr5', select: 'code description' }
+                ]
+            })
             .populate('invoiceId', 'voucherNumber date')
             .lean();
 

@@ -3240,11 +3240,11 @@ const importAssets = async (req, res) => {
                 );
                 const rawSaleDate = row['Sale Date'] || row.saleDate || row['Invoice Date'] || row.invoiceDate;
                 const location = pickFirstNonEmpty(row.Location, row.location, '');
-                const mgr1 = pickFirstNonEmpty(row['Mgr 1'], row.mgr1, '');
-                const mgr2 = pickFirstNonEmpty(row['Mgr 2'], row.mgr2, '');
-                const mgr3 = pickFirstNonEmpty(row['Mgr 3'], row.mgr3, '');
-                const mgr4 = pickFirstNonEmpty(row['Mgr 4'], row.mgr4, '');
-                const mgr5 = pickFirstNonEmpty(row['Mgr 5'], row.mgr5, '');
+                let mgr1 = '';
+                let mgr2 = '';
+                let mgr3 = '';
+                let mgr4 = '';
+                let mgr5 = '';
                 const rawIndicator = pickFirstNonEmpty(
                     row['Indicator_Field'], row.indicator_field, row.indicatorField, row.Indicator, row.indicator, ''
                 );
@@ -3304,13 +3304,13 @@ const importAssets = async (req, res) => {
                     return mgr.description || mgr.code || '';
                 };
 
-                // Auto-pick Mgr 1 to Mgr 5 from Product Master if not explicitly provided in Excel row
+                // Automatically assign MGR 1 to MGR 5 from Product Master mapping
                 if (product) {
-                    if (!mgr1 && product.mgr1) mgr1 = formatMgrVal(product.mgr1);
-                    if (!mgr2 && product.mgr2) mgr2 = formatMgrVal(product.mgr2);
-                    if (!mgr3 && product.mgr3) mgr3 = formatMgrVal(product.mgr3);
-                    if (!mgr4 && product.mgr4) mgr4 = formatMgrVal(product.mgr4);
-                    if (!mgr5 && product.mgr5) mgr5 = formatMgrVal(product.mgr5);
+                    if (product.mgr1) mgr1 = formatMgrVal(product.mgr1);
+                    if (product.mgr2) mgr2 = formatMgrVal(product.mgr2);
+                    if (product.mgr3) mgr3 = formatMgrVal(product.mgr3);
+                    if (product.mgr4) mgr4 = formatMgrVal(product.mgr4);
+                    if (product.mgr5) mgr5 = formatMgrVal(product.mgr5);
                 }
 
                 // Resolve customer from Customer Master using Customer Code or Customer Name
