@@ -110,8 +110,10 @@ const findDuplicateCustomer = async (payload, excludeId) => {
 // Create Customer
 const createCustomer = async (req, res) => {
     try {
-        const { customerName, companyName, gstin, billingAddress, shippingAddress, mobile, email, logoUrl, defaultDiscount, territory } = req.body;
+        const { externalCode, customerCode, code, customerName, companyName, gstin, billingAddress, shippingAddress, mobile, email, logoUrl, defaultDiscount, territory } = req.body;
         
+        const cleanExternalCode = String(externalCode || customerCode || code || '').trim();
+
         // Pincode validation helper
         const validatePincode = (addressObj, typeName) => {
             const raw = addressObj?.pincode;
@@ -136,7 +138,8 @@ const createCustomer = async (req, res) => {
                 duplicate
             });
         }
-        const uniqueCustomerName = await getUniqueCustomerName(customerName);
+        const targetCustName = customerName?.trim() || companyName?.trim() || cleanExternalCode;
+        const uniqueCustomerName = await getUniqueCustomerName(targetCustName);
 
         const companyId = req.user?.companyId || req.headers['x-company-id'] || req.body.companyId;
 
@@ -148,8 +151,9 @@ const createCustomer = async (req, res) => {
 
         const newCustomer = new Customer({
             companyId,
+            externalCode: cleanExternalCode,
             customerName: uniqueCustomerName,
-            companyName: companyName?.trim(),
+            companyName: companyName?.trim() || uniqueCustomerName,
             gstin: gstin?.trim().toUpperCase(),
             billingAddress,
             shippingAddress,
@@ -196,7 +200,7 @@ const getAllCustomers = async (req, res) => {
 
         if (!hasListParams(req.query) && req.query.all !== 'false') {
             const customers = await Customer.find(query)
-                .select('customerName companyName gstin billingAddress mobile email logoUrl defaultDiscount territory createdAt')
+                .select('externalCode customerName companyName gstin billingAddress mobile email logoUrl defaultDiscount territory createdAt')
                 .populate('territory', 'name type')
                 .sort({ createdAt: -1 })
                 .lean();
@@ -207,7 +211,7 @@ const getAllCustomers = async (req, res) => {
         const { page, limit, skip } = getPagination(req.query);
         const [customers, total] = await Promise.all([
             Customer.find(query)
-                .select('customerName companyName gstin billingAddress mobile email logoUrl defaultDiscount territory createdAt')
+                .select('externalCode customerName companyName gstin billingAddress mobile email logoUrl defaultDiscount territory createdAt')
                 .populate('territory', 'name type')
                 .sort({ createdAt: -1 })
                 .skip(skip)
@@ -243,7 +247,7 @@ const getCustomerById = async (req, res) => {
         }
 
         const customer = await Customer.findById(req.params.id)
-            .select('customerName companyName gstin billingAddress shippingAddress mobile email logoUrl defaultDiscount territory createdAt')
+            .select('externalCode customerName companyName gstin billingAddress shippingAddress mobile email logoUrl defaultDiscount territory createdAt')
             .populate('territory', 'name type')
             .lean();
         if (!customer) {
@@ -260,8 +264,12 @@ const getCustomerById = async (req, res) => {
 // Update Customer
 const updateCustomer = async (req, res) => {
     try {
-        const { customerName, companyName, gstin, billingAddress, shippingAddress, mobile, email, logoUrl, defaultDiscount, territory } = req.body;
+        const { externalCode, customerCode, code, customerName, companyName, gstin, billingAddress, shippingAddress, mobile, email, logoUrl, defaultDiscount, territory } = req.body;
         
+        const cleanExternalCode = externalCode !== undefined || customerCode !== undefined || code !== undefined
+            ? String(externalCode || customerCode || code || '').trim()
+            : undefined;
+
         const validatePincode = (addressObj, typeName) => {
             const raw = addressObj?.pincode;
             if (raw && String(raw).trim()) {
@@ -285,7 +293,8 @@ const updateCustomer = async (req, res) => {
                 duplicate
             });
         }
-        const uniqueCustomerName = await getUniqueCustomerName(customerName, req.params.id);
+        const targetCustName = customerName?.trim() || companyName?.trim() || cleanExternalCode || 'Customer';
+        const uniqueCustomerName = await getUniqueCustomerName(targetCustName, req.params.id);
 
         let assignedTerritory = territory;
         if (assignedTerritory === undefined) {
@@ -294,9 +303,9 @@ const updateCustomer = async (req, res) => {
             assignedTerritory = await getAutoAssignedTerritory(billingAddress, shippingAddress, companyId);
         }
 
-        const updatedCustomer = await Customer.findByIdAndUpdate(req.params.id, {
+        const updatePayload = {
             customerName: uniqueCustomerName,
-            companyName: companyName?.trim(),
+            companyName: companyName?.trim() || uniqueCustomerName,
             gstin: gstin?.trim().toUpperCase(),
             billingAddress,
             shippingAddress,
@@ -305,7 +314,12 @@ const updateCustomer = async (req, res) => {
             logoUrl,
             defaultDiscount,
             territory: assignedTerritory !== undefined ? (assignedTerritory || null) : undefined,
-        }, { new: true }).populate('territory', 'name type').lean();
+        };
+        if (cleanExternalCode !== undefined) {
+            updatePayload.externalCode = cleanExternalCode;
+        }
+
+        const updatedCustomer = await Customer.findByIdAndUpdate(req.params.id, updatePayload, { new: true }).populate('territory', 'name type').lean();
 
         if (!updatedCustomer) {
             return res.status(404).json({ message: 'Customer not found' });

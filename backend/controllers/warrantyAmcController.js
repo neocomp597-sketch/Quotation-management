@@ -259,6 +259,10 @@ exports.createSingleAsset = async (req, res) => {
             }
 
             if (customer) {
+                if (!customer.externalCode && finalCustomerCode) {
+                    customer.externalCode = finalCustomerCode;
+                    await customer.save();
+                }
                 finalCustomerCode = customer.externalCode || searchTarget;
                 // Postal Code is strictly derived from Customer Master with 6-digit validation
                 const rawPin = customer.billingAddress?.pincode || customer.pincode || '';

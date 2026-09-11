@@ -3344,7 +3344,11 @@ const importAssets = async (req, res) => {
                     }
 
                     if (customer) {
-                        customerCodeVal = customer.externalCode || searchTarget;
+                        if (!customer.externalCode && customerCodeInput) {
+                            customer.externalCode = String(customerCodeInput).trim();
+                            await customer.save();
+                        }
+                        customerCodeVal = customer.externalCode || customerCodeInput || searchTarget;
                         // Postal Code is strictly derived/fetched from Customer Master
                         customerPostalCode = customer.billingAddress?.pincode || customer.pincode || '';
                     }

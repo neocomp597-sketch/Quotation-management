@@ -42,6 +42,7 @@ const Customers = ({ isCreatePage, isEditPage }) => {
     const [assetsLoading, setAssetsLoading] = useState(false);
 
     const [formData, setFormData] = useState({
+        externalCode: '',
         customerName: '',
         companyName: '',
         mobile: '',
@@ -245,7 +246,7 @@ const Customers = ({ isCreatePage, isEditPage }) => {
             toast.error('Company Trade Name is required');
             return;
         }
-        if (!formData.customerName?.trim()) {
+        if (!formData.externalCode?.trim()) {
             toast.error('Customer Code is required');
             return;
         }
@@ -269,6 +270,8 @@ const Customers = ({ isCreatePage, isEditPage }) => {
         try {
             const payload = {
                 ...formData,
+                externalCode: formData.externalCode?.trim(),
+                customerName: formData.customerName?.trim() || formData.companyName?.trim() || formData.externalCode?.trim(),
                 territory: formData.territory || undefined
             };
             if (editingCustomer) {
@@ -760,12 +763,27 @@ const Customers = ({ isCreatePage, isEditPage }) => {
                                                     <MdPerson className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
                                                     <input
                                                         type="text"
-                                                        name="customerName"
-                                                        value={formData.customerName}
+                                                        name="externalCode"
+                                                        value={formData.externalCode || ''}
                                                         onChange={handleFormChange}
                                                         className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all outline-none text-sm font-bold placeholder:font-normal placeholder:text-slate-300"
-                                                        placeholder="Enter customer code"
+                                                        placeholder="Enter Customer Code (e.g. TEST102)"
                                                         required
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Contact Person / Customer Name</label>
+                                                <div className="relative">
+                                                    <MdPerson className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                                                    <input
+                                                        type="text"
+                                                        name="customerName"
+                                                        value={formData.customerName || ''}
+                                                        onChange={handleFormChange}
+                                                        className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all outline-none text-sm font-bold placeholder:font-normal placeholder:text-slate-300"
+                                                        placeholder="Enter Contact Person name"
                                                     />
                                                 </div>
                                             </div>
