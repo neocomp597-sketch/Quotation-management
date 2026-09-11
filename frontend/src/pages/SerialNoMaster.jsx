@@ -51,6 +51,7 @@ const SerialNoMaster = () => {
         productCode: '',
         productName: '',
         status: 'SOLD',
+        customerId: '',
         customerCode: '',
         customer: '',
         customerPostalCode: '',
@@ -98,13 +99,12 @@ const SerialNoMaster = () => {
             const nameStr = c.companyName && c.customerName && c.companyName !== c.customerName
                 ? `${c.companyName} (${c.customerName})`
                 : c.companyName || c.customerName || 'Unnamed Customer';
-            const codeStr = c.externalCode ? ` [${c.externalCode}]` : '';
             return {
                 id: c._id,
-                value: c.externalCode || c.companyName || c.customerName || '',
+                value: c._id,
                 label: c.externalCode ? `[${c.externalCode}] ${nameStr}` : nameStr,
                 customerCode: c.externalCode || '',
-                customerName: c.companyName || c.customerName || '',
+                customerName: c.companyName || c.customerName || nameStr,
                 pincode: c.billingAddress?.pincode || c.pincode || '',
                 customerObj: c
             };
@@ -137,18 +137,31 @@ const SerialNoMaster = () => {
     }, [products]);
 
     const handleSelectCustomer = (val, option) => {
-        const custObj = option?.customerObj;
-        const custCode = custObj?.externalCode || option?.customerCode || (customers.find(c => c.externalCode === val)?.externalCode || '');
-        const custName = custObj?.companyName || custObj?.customerName || option?.customerName || option?.label || val;
-        const pincode = custObj?.billingAddress?.pincode || custObj?.pincode || '';
-        const mobile = custObj?.mobile || '';
-        setSingleForm(prev => ({
-            ...prev,
-            customerCode: custCode || prev.customerCode || '',
-            customer: val || custName || '',
-            customerPostalCode: pincode,
-            customerMobile: mobile || prev.customerMobile || ''
-        }));
+        const cleanVal = String(val || '').trim().toLowerCase();
+        const custObj = option?.customerObj || customers.find(c =>
+            String(c._id) === String(val) ||
+            (c.externalCode && c.externalCode.trim().toLowerCase() === cleanVal) ||
+            (c.companyName && c.companyName.trim().toLowerCase() === cleanVal) ||
+            (c.customerName && c.customerName.trim().toLowerCase() === cleanVal)
+        );
+
+        if (custObj) {
+            setSingleForm(prev => ({
+                ...prev,
+                customerId: custObj._id,
+                customerCode: custObj.externalCode || '',
+                customer: custObj.companyName || custObj.customerName || '',
+                customerPostalCode: custObj.billingAddress?.pincode || custObj.pincode || '',
+                customerMobile: custObj.mobile || prev.customerMobile || ''
+            }));
+        } else {
+            setSingleForm(prev => ({
+                ...prev,
+                customer: val || '',
+                customerId: '',
+                customerCode: prev.customerCode || '',
+            }));
+        }
     };
 
     const formatMgrVal = (mgr) => {
@@ -538,7 +551,7 @@ const SerialNoMaster = () => {
                                     <label className="block text-[10px] font-black uppercase tracking-widest text-emerald-600 mb-1.5">Search & Select Customer</label>
                                     <SearchableSelect
                                         options={customerOptions}
-                                        value={singleForm.customer}
+                                        value={singleForm.customerId || (customerOptions.find(o => o.customerCode === singleForm.customerCode || o.customerName === singleForm.customer)?.value || '')}
                                         onChange={handleSelectCustomer}
                                         placeholder="Type or select customer..."
                                         noResultsText="No matching customers found"
@@ -551,31 +564,67 @@ const SerialNoMaster = () => {
                                     <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Customer Code</label>
                                     <input
                                         type="text"
+                                        list="single-entry-customer-codes"
                                         placeholder="e.g. CUST-101"
                                         value={singleForm.customerCode}
                                         onChange={(e) => {
                                             const code = e.target.value;
-                                            const matchedCust = customers.find(c => c.externalCode && c.externalCode.toLowerCase() === code.trim().toLowerCase());
+                                            const cleanCode = code.trim().toLowerCase();
+                                            const matchedCust = customers.find(c => c.externalCode && c.externalCode.trim().toLowerCase() === cleanCode);
                                             setSingleForm(prev => ({
                                                 ...prev,
                                                 customerCode: code,
+                                                customerId: matchedCust ? matchedCust._id : prev.customerId,
                                                 customer: matchedCust ? (matchedCust.companyName || matchedCust.customerName) : prev.customer,
                                                 customerPostalCode: matchedCust ? (matchedCust.billingAddress?.pincode || matchedCust.pincode || '') : prev.customerPostalCode,
-                                                customerMobile: matchedCust ? (matchedCust.mobile || prev.customerMobile) : prev.customerMobile
+                                                customerMobile: matchedCust ? (matchedCust.mobile || '') : prev.customerMobile
                                             }));
                                         }}
                                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
                                     />
+                                    <datalist id="single-entry-customer-codes">
+                                        {customers.map(c => c.externalCode ? (
+                                            <option key={c._id} value={c.externalCode}>{c.companyName || c.customerName || ''}</option>
+                                        ) : null)}
+                                    </datalist>
                                 </div>
                                 <div>
                                     <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Customer Name</label>
                                     <input
                                         type="text"
+                                        list="single-entry-customer-names"
                                         placeholder="e.g. Apex Industrial"
                                         value={singleForm.customer}
-                                        onChange={(e) => setSingleForm({ ...singleForm, customer: e.target.value })}
+                                        onChange={(e) => {
+                                            const nameVal = e.target.value;
+                                            const cleanName = nameVal.trim().toLowerCase();
+                                            const matchedCust = customers.find(c =>
+                                                (c.companyName && c.companyName.trim().toLowerCase() === cleanName) ||
+                                                (c.customerName && c.customerName.trim().toLowerCase() === cleanName) ||
+                                                (c.externalCode && c.externalCode.trim().toLowerCase() === cleanName)
+                                            );
+                                            setSingleForm(prev => ({
+                                                ...prev,
+                                                customer: matchedCust ? (matchedCust.companyName || matchedCust.customerName || nameVal) : nameVal,
+                                                customerId: matchedCust ? matchedCust._id : prev.customerId,
+                                                customerCode: matchedCust ? (matchedCust.externalCode || '') : prev.customerCode,
+                                                customerPostalCode: matchedCust ? (matchedCust.billingAddress?.pincode || matchedCust.pincode || '') : prev.customerPostalCode,
+                                                customerMobile: matchedCust ? (matchedCust.mobile || '') : prev.customerMobile
+                                            }));
+                                        }}
                                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
                                     />
+                                    <datalist id="single-entry-customer-names">
+                                        {customers.map(c => {
+                                            const name = c.companyName || c.customerName;
+                                            if (!name) return null;
+                                            return (
+                                                <option key={c._id} value={name}>
+                                                    {c.externalCode ? `Code: ${c.externalCode}` : ''}
+                                                </option>
+                                            );
+                                        })}
+                                    </datalist>
                                 </div>
                                 <div>
                                     <div className="flex items-center justify-between mb-1.5">
