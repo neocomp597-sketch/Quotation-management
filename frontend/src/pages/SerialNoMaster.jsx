@@ -117,16 +117,17 @@ const SerialNoMaster = () => {
     }, [products]);
 
     const handleSelectCustomer = (val, option) => {
-        const custObj = option?.customerObj;
-        const custName = custObj?.companyName || custObj?.customerName || option?.label || val;
-        const pincode = custObj?.billingAddress?.pincode || custObj?.pincode || '';
-        const mobile = custObj?.mobile || '';
-        setSingleForm(prev => ({
-            ...prev,
-            customer: val || custName || '',
-            customerPostalCode: prev.customerPostalCode || pincode,
-            customerMobile: prev.customerMobile || mobile
-        }));
+    const custObj = option?.customerObj;
+    const custName = custObj?.companyName || custObj?.customerName || option?.label || val;
+    const custCode = custObj?.externalCode || ''; // Customer Code from Master
+    const mobile = custObj?.mobile || '';
+    setSingleForm(prev => ({
+        ...prev,
+        customer: custName || '',
+        customerCode: custCode, // <--- NEW
+        customerMobile: prev.customerMobile || mobile
+    }));
+};
     };
 
     const formatMgrVal = (mgr) => {
@@ -206,30 +207,46 @@ const SerialNoMaster = () => {
         const dataToExport = activeTab === 'returns' ? returnHistory : filteredAssets;
         if (!dataToExport || dataToExport.length === 0) {
             toast.error('No records to export');
-            return;
-        }
+           const handleExport = () => {
+    const dataToExport = activeTab === 'returns' ? returnHistory : filteredAssets;
+    if (!dataToExport || dataToExport.length === 0) {
+        toast.error('No records to export');
+        return;
+    }
 
-        const exportData = dataToExport.map(asset => {
-            const prodName = asset.productId?.productName || asset.productName || '';
-            const prodCode = asset.productId?.productCode || asset.productCode || '';
-            const custName = asset.customerId?.companyName || asset.customerId?.customerName || asset.customerNameStr || asset.customerName || (asset.customerId ? 'Customer' : 'Stock (Unsold)');
-            const sDate = asset.saleDate || asset.invoiceDate;
+    const exportData = dataToExport.map(asset => {
+        const prodName = asset.productId?.productName || asset.productName || '';
+        const prodCode = asset.productId?.productCode || asset.productCode || '';
+        const custName = asset.customerId?.companyName || asset.customerId?.customerName || asset.customerNameStr || asset.customerName || (asset.customerId ? 'Customer' : 'Stock (Unsold)');
+        const custCode = asset.customerCode || asset.customerId?.externalCode || asset.customerId?.customerCode || '';
+        const sDate = asset.saleDate || asset.invoiceDate;
 
-            return {
-                'Serial Number': asset.serialNumber || '',
-                'Product Name': prodName,
-                'Product Code': prodCode,
-                'Status': asset.status || 'IN_STOCK',
-                'Customer': custName,
-                'Customer Postal Code': asset.customerPostalCode || '',
-                'Mobile Number': asset.customerMobile || asset.customerId?.mobile || '',
-                'Invoice Ref': asset.invoiceNumber || '',
-                'Sale Date': sDate ? new Date(sDate).toLocaleDateString('en-IN') : '',
-                'Location': asset.location || '',
-                'Mgr 1': asset.mgr1 || '',
-                'Mgr 2': asset.mgr2 || '',
-                'Mgr 3': asset.mgr3 || '',
-                'Mgr 4': asset.mgr4 || '',
+        return {
+            'Serial Number': asset.serialNumber || '',
+            'Product Name': prodName,
+            'Product Code': prodCode,
+            'Status': asset.status || 'IN_STOCK',
+            'Customer': custName,
+            'Customer Code': custCode, // <--- CHANGE: Postal Code chya jagi Code
+            'Mobile Number': asset.customerMobile || asset.customerId?.mobile || '',
+            'Invoice Ref': asset.invoiceNumber || '',
+            'Sale Date': sDate ? new Date(sDate).toLocaleDateString('en-IN') : '',
+            'Location': asset.location || '',
+            'Mgr 1': asset.mgr1 || '',
+            'Mgr 2': asset.mgr2 || '',
+            'Mgr 3': asset.mgr3 || '',
+            'Mgr 4': asset.mgr4 || '',
+            'Mgr 5': asset.mgr5 || '',
+            'Indicator_Field': asset.indicatorField || ''
+        };
+    });
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, activeTab === 'returns' ? 'Return History' : 'Invoice Bulk Upload');
+    XLSX.writeFile(wb, `Invoice_Bulk_Upload_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    toast.success(`Exported ${exportData.length} records`);
+};
                 'Mgr 5': asset.mgr5 || '',
                 'Indicator_Field': asset.indicatorField || ''
             };
@@ -300,7 +317,7 @@ const SerialNoMaster = () => {
                 productName: '',
                 status: 'SOLD',
                 customer: '',
-                customerPostalCode: '',
+                customerCode: '',
                 customerMobile: '',
                 invoiceNumber: '',
                 saleDate: '',
