@@ -51,25 +51,7 @@ const SerialNoMaster = () => {
         productCode: '',
         productName: '',
         status: 'SOLD',
-        customer: '',
-        customerPostalCode: '',
-        customerMobile: '',
-        invoiceNumber: '',
-        saleDate: '',
-        location: '',
-        mgr1: '',
-        mgr2: '',
-        mgr3: '',
-        mgr4: '',
-        mgr5: '',
-        indicatorField: ''
-    });
-
-    // --- SALES RETURN INLINE STATE ---
-    const [returnReason, setReturnReason] = useState('');
-    const [returnSaving, setReturnSaving] = useState(false);
-
-    useEffect(() => {
+       v
         fetchData();
     }, []);
 
