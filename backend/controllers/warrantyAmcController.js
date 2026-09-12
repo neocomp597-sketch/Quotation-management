@@ -812,8 +812,8 @@ exports.searchSerialNumbers = async (req, res) => {
         })
         .sort({ createdAt: -1, serialNumber: 1 })
         .limit(100)
-        .populate('customerId', 'customerName companyName billingAddress mobile email gstin')
-        .populate('productId', 'productName productCode basePrice mrp')
+        .populate({ path: 'customerId', select: 'customerName companyName billingAddress mobile email gstin', options: { bypassTenant: true } })
+        .populate({ path: 'productId', select: 'productName productCode basePrice mrp', options: { bypassTenant: true } })
         .populate('invoiceId', 'voucherNumber date')
         .lean();
 
@@ -824,8 +824,8 @@ exports.searchSerialNumbers = async (req, res) => {
         })
         .sort({ createdAt: -1 })
         .limit(100)
-        .populate('customerId', 'customerName companyName billingAddress mobile email gstin')
-        .populate('productId', 'productName productCode basePrice mrp')
+        .populate({ path: 'customerId', select: 'customerName companyName billingAddress mobile email gstin', options: { bypassTenant: true } })
+        .populate({ path: 'productId', select: 'productName productCode basePrice mrp', options: { bypassTenant: true } })
         .lean();
 
         const combinedResults = [];

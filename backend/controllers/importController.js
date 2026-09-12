@@ -96,6 +96,26 @@ const pickFirstNonEmpty = (...values) => {
 
     return '';
 };
+
+const getFlexibleRowValue = (row, ...candidateKeys) => {
+    if (!row || typeof row !== 'object') return '';
+    for (const key of candidateKeys) {
+        if (row[key] !== undefined && row[key] !== null) {
+            const val = cleanCellValue(row[key]);
+            if (val) return val;
+        }
+    }
+    const normalizedCandidates = candidateKeys.map(k => String(k).toLowerCase().replace(/[\s\-_]+/g, ''));
+    for (const key of Object.keys(row)) {
+        const normKey = String(key).toLowerCase().replace(/[\s\-_]+/g, '');
+        if (normalizedCandidates.includes(normKey)) {
+            const val = cleanCellValue(row[key]);
+            if (val) return val;
+        }
+    }
+    return '';
+};
+
 const toSafeNumber = (value, fallback = 0) => {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : fallback;
@@ -3221,8 +3241,8 @@ const importAssets = async (req, res) => {
                 }
 
                 // Priority 2 Validation: Product Code / Product Name
-                let productCode = pickFirstNonEmpty(row['Product Code'], row.productCode, row.code, row.Code);
-                let productName = pickFirstNonEmpty(row['Product Name'], row.productName, row.name, row.Name);
+                let productCode = getFlexibleRowValue(row, 'Product Code', 'productCode', 'code', 'Code', 'ProductCode', 'Item Code', 'ItemCode');
+                let productName = getFlexibleRowValue(row, 'Product Name', 'productName', 'name', 'Name', 'ProductName', 'Item Name', 'ItemName', 'Description', 'Product Description');
 
                 if (!productCode && !productName) {
                     throw new Error('Product Code or Product Name is mandatory and missing.');
@@ -3306,7 +3326,7 @@ const importAssets = async (req, res) => {
                         product = await Product.create({
                             ...companyFilter,
                             productCode: productCode || 'PROD-001',
-                            productName: productName || 'General Product',
+                            productName: productName || productCode || 'General Product',
                             hsnCode: 'N/A',
                             gstPercentage: 18,
                             basePrice: 0,
@@ -3328,13 +3348,20 @@ const importAssets = async (req, res) => {
                     }
                 }
 
-                if (product && productName && (!product.productName || product.productName === product.productCode || product.productName === 'General Product')) {
-                    product.productName = productName;
-                    await Product.findByIdAndUpdate(product._id, { productName }).setOptions({ bypassTenant: true });
+                if (product) {
+                    if (productName && productName.trim() !== '') {
+                        if (!product.productName || product.productName === product.productCode || product.productName === 'General Product' || product.productName.trim().toLowerCase() !== productName.trim().toLowerCase()) {
+                            product.productName = productName;
+                            await Product.findByIdAndUpdate(product._id, { productName }).setOptions({ bypassTenant: true });
+                        }
+                    } else {
+                        productName = product.productName || product.productCode || '';
+                    }
+                    productCode = product.productCode || productCode;
+                    if (!productName || productName === productCode) {
+                        productName = product.productName || productName || productCode;
+                    }
                 }
-
-                productCode = product ? (product.productCode || productCode) : productCode;
-                productName = product ? (product.productName || productName) : productName;
 
                 const formatMgrVal = (mgr) => {
                     if (!mgr) return '';
