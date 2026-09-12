@@ -1239,8 +1239,8 @@ const SerialNoMaster = () => {
                                                         )}
                                                     </td>
                                                     <td className="p-4">
-                                                        <span className="block text-sm font-bold text-slate-800">{asset.productId?.productName || 'N/A'}</span>
-                                                        <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">{asset.productId?.productCode || 'N/A'}</span>
+                                                        <span className="block text-sm font-bold text-slate-800">{asset.productId?.productName || asset.productName || 'N/A'}</span>
+                                                        <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">{asset.productId?.productCode || asset.productCode || 'N/A'}</span>
                                                     </td>
                                                     <td className="p-4">
                                                         <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${

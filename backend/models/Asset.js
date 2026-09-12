@@ -8,6 +8,8 @@ const AssetSchema = new mongoose.Schema({
     customerPostalCode: { type: String, default: '' },
     customerMobile: { type: String, default: '' },
     productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
+    productCode: { type: String, default: '' },
+    productName: { type: String, default: '' },
     serialNumber: { type: String, required: true },
     status: {
         type: String,

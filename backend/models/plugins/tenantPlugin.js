@@ -79,24 +79,39 @@ module.exports = function tenantPlugin(schema, options = {}) {
         }
     });
 
-    schema.pre('insertMany', function (docs, insertOptions = {}) {
-        if (hasBypass(insertOptions)) {
+    schema.pre('insertMany', function (next, docs, insertOptions) {
+        let actualDocs = docs;
+        let actualOptions = insertOptions || {};
+        let callback = next;
+
+        if (typeof next !== 'function') {
+            actualDocs = next;
+            actualOptions = docs || {};
+            callback = null;
+        }
+
+        if (hasBypass(actualOptions)) {
+            if (callback) return callback();
             return;
         }
 
         const companyId = getTenantId();
         if (!companyId && required) {
-            throw new Error(`companyId is required for ${this.modelName} and no tenant context found`);
+            const err = new Error(`companyId is required for ${this.modelName} and no tenant context found`);
+            if (callback) return callback(err);
+            throw err;
         }
 
-        if (companyId) {
-            docs.forEach((doc) => {
-                if (!doc.companyId) {
+        if (companyId && actualDocs) {
+            const docList = Array.isArray(actualDocs) ? actualDocs : [actualDocs];
+            docList.forEach((doc) => {
+                if (doc && typeof doc === 'object' && !doc.companyId) {
                     doc.companyId = companyId;
                 }
             });
         }
 
+        if (callback) callback();
     });
 
     TENANT_QUERY_HOOKS.forEach(type => {

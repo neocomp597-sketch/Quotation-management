@@ -198,18 +198,50 @@ exports.createSingleAsset = async (req, res) => {
             .populate('mgr5', 'code description');
         }
 
+        if (!product && cleanProductCode) {
+            product = await Product.findOne({ productCode: buildExactRegex(cleanProductCode) })
+                .setOptions({ bypassTenant: true })
+                .populate('mgr1', 'code description')
+                .populate('mgr2', 'code description')
+                .populate('mgr3', 'code description')
+                .populate('mgr4', 'code description')
+                .populate('mgr5', 'code description');
+        }
+        if (!product && productName) {
+            product = await Product.findOne({ productName: buildExactRegex(productName) })
+                .setOptions({ bypassTenant: true })
+                .populate('mgr1', 'code description')
+                .populate('mgr2', 'code description')
+                .populate('mgr3', 'code description')
+                .populate('mgr4', 'code description')
+                .populate('mgr5', 'code description');
+        }
+
         if (!product) {
-            product = await Product.create({
-                companyId,
-                productCode: cleanProductCode,
-                productName: productName || cleanProductCode,
-                hsnCode: 'N/A',
-                gstPercentage: 18,
-                basePrice: 0,
-                mrp: 0,
-                uom: 'Nos',
-                status: 'Active'
-            });
+            try {
+                product = await Product.create({
+                    companyId,
+                    productCode: cleanProductCode,
+                    productName: productName || cleanProductCode,
+                    hsnCode: 'N/A',
+                    gstPercentage: 18,
+                    basePrice: 0,
+                    mrp: 0,
+                    uom: 'Nos',
+                    status: 'Active'
+                });
+            } catch (createErr) {
+                product = await Product.findOne({ productCode: buildExactRegex(cleanProductCode) })
+                    .setOptions({ bypassTenant: true })
+                    .populate('mgr1', 'code description')
+                    .populate('mgr2', 'code description')
+                    .populate('mgr3', 'code description')
+                    .populate('mgr4', 'code description')
+                    .populate('mgr5', 'code description');
+                if (!product) {
+                    throw createErr;
+                }
+            }
         }
 
         const formatMgrVal = (mgr) => {
@@ -289,18 +321,11 @@ exports.createSingleAsset = async (req, res) => {
             return (a.indicatorField || '').trim().toLowerCase() === cleanIndicator.toLowerCase();
         };
 
-        // 1. Search for active asset match
+        // 1. Search for active asset match (strictly requires S/N + Product Code + Indicator Field)
         let matchedActiveAsset = existingAssets.find(a => {
             const isReturn = a.status === 'RETURN' || a.status === 'RETURNED';
             return !isReturn && isProductMatch(a) && isIndicatorMatch(a);
         });
-
-        if (!matchedActiveAsset) {
-            matchedActiveAsset = existingAssets.find(a => {
-                const isReturn = a.status === 'RETURN' || a.status === 'RETURNED';
-                return !isReturn && isIndicatorMatch(a);
-            });
-        }
 
         if (matchedActiveAsset) {
             return res.status(400).json({
@@ -375,6 +400,8 @@ exports.createSingleAsset = async (req, res) => {
         const newAsset = await Asset.create({
             companyId,
             productId: product._id,
+            productCode: product.productCode || cleanProductCode || '',
+            productName: product.productName || productName || cleanProductCode || '',
             serialNumber: cleanSN,
             status,
             customerId: customer ? customer._id : null,
@@ -499,16 +526,17 @@ exports.getReturnHistory = async (req, res) => {
                 { status: 'RETURNED' }
             ]
         })
-        .populate('customerId', 'customerName companyName externalCode pincode mobile')
+        .populate({ path: 'customerId', select: 'customerName companyName externalCode pincode mobile', options: { bypassTenant: true } })
         .populate({
             path: 'productId',
             select: 'productName productCode mgr1 mgr2 mgr3 mgr4 mgr5',
+            options: { bypassTenant: true },
             populate: [
-                { path: 'mgr1', select: 'code description' },
-                { path: 'mgr2', select: 'code description' },
-                { path: 'mgr3', select: 'code description' },
-                { path: 'mgr4', select: 'code description' },
-                { path: 'mgr5', select: 'code description' }
+                { path: 'mgr1', select: 'code description', options: { bypassTenant: true } },
+                { path: 'mgr2', select: 'code description', options: { bypassTenant: true } },
+                { path: 'mgr3', select: 'code description', options: { bypassTenant: true } },
+                { path: 'mgr4', select: 'code description', options: { bypassTenant: true } },
+                { path: 'mgr5', select: 'code description', options: { bypassTenant: true } }
             ]
         })
         .sort({ returnDate: -1, createdAt: -1 })
@@ -562,16 +590,17 @@ exports.getAssets = async (req, res) => {
         if (req.query.productId) filter.productId = req.query.productId;
 
         const docs = await Asset.find(filter)
-            .populate('customerId', 'customerName companyName externalCode billingAddress pincode mobile')
+            .populate({ path: 'customerId', select: 'customerName companyName externalCode billingAddress pincode mobile', options: { bypassTenant: true } })
             .populate({
                 path: 'productId',
                 select: 'productName productCode mgr1 mgr2 mgr3 mgr4 mgr5',
+                options: { bypassTenant: true },
                 populate: [
-                    { path: 'mgr1', select: 'code description' },
-                    { path: 'mgr2', select: 'code description' },
-                    { path: 'mgr3', select: 'code description' },
-                    { path: 'mgr4', select: 'code description' },
-                    { path: 'mgr5', select: 'code description' }
+                    { path: 'mgr1', select: 'code description', options: { bypassTenant: true } },
+                    { path: 'mgr2', select: 'code description', options: { bypassTenant: true } },
+                    { path: 'mgr3', select: 'code description', options: { bypassTenant: true } },
+                    { path: 'mgr4', select: 'code description', options: { bypassTenant: true } },
+                    { path: 'mgr5', select: 'code description', options: { bypassTenant: true } }
                 ]
             })
             .sort({ createdAt: -1 })
@@ -594,16 +623,17 @@ exports.getAssetSummary = async (req, res) => {
         let asset = null;
         if (assetId) {
             asset = await Asset.findOne({ _id: assetId, companyId })
-                .populate('customerId', 'customerName companyName gstin billingAddress mobile email')
+                .populate({ path: 'customerId', select: 'customerName companyName gstin billingAddress mobile email', options: { bypassTenant: true } })
                 .populate({
                     path: 'productId',
                     select: 'productName productCode basePrice mrp catalogType mgr1 mgr2 mgr3 mgr4 mgr5',
+                    options: { bypassTenant: true },
                     populate: [
-                        { path: 'mgr1', select: 'code description' },
-                        { path: 'mgr2', select: 'code description' },
-                        { path: 'mgr3', select: 'code description' },
-                        { path: 'mgr4', select: 'code description' },
-                        { path: 'mgr5', select: 'code description' }
+                        { path: 'mgr1', select: 'code description', options: { bypassTenant: true } },
+                        { path: 'mgr2', select: 'code description', options: { bypassTenant: true } },
+                        { path: 'mgr3', select: 'code description', options: { bypassTenant: true } },
+                        { path: 'mgr4', select: 'code description', options: { bypassTenant: true } },
+                        { path: 'mgr5', select: 'code description', options: { bypassTenant: true } }
                     ]
                 })
                 .populate('invoiceId', 'voucherNumber date')
@@ -615,16 +645,17 @@ exports.getAssetSummary = async (req, res) => {
                 companyId,
                 serialNumber: { $regex: new RegExp("^" + escapedSN + "$", "i") }
             })
-            .populate('customerId', 'customerName companyName gstin billingAddress mobile email')
+            .populate({ path: 'customerId', select: 'customerName companyName gstin billingAddress mobile email', options: { bypassTenant: true } })
             .populate({
                 path: 'productId',
                 select: 'productName productCode basePrice mrp catalogType mgr1 mgr2 mgr3 mgr4 mgr5',
+                options: { bypassTenant: true },
                 populate: [
-                    { path: 'mgr1', select: 'code description' },
-                    { path: 'mgr2', select: 'code description' },
-                    { path: 'mgr3', select: 'code description' },
-                    { path: 'mgr4', select: 'code description' },
-                    { path: 'mgr5', select: 'code description' }
+                    { path: 'mgr1', select: 'code description', options: { bypassTenant: true } },
+                    { path: 'mgr2', select: 'code description', options: { bypassTenant: true } },
+                    { path: 'mgr3', select: 'code description', options: { bypassTenant: true } },
+                    { path: 'mgr4', select: 'code description', options: { bypassTenant: true } },
+                    { path: 'mgr5', select: 'code description', options: { bypassTenant: true } }
                 ]
             })
             .populate('invoiceId', 'voucherNumber date')

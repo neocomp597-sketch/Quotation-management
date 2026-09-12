@@ -3211,17 +3211,22 @@ const importAssets = async (req, res) => {
         for (let i = 0; i < data.length; i++) {
             const row = data[i];
             try {
+                // Priority 1 Validation: Serial Number
                 const serialNumber = pickFirstNonEmpty(
                     row['Serial Number'], row.serialNumber, row['Serial No'], row.serialNo, row.Serial, row.serial, row.SN, row.sn
                 );
 
                 if (!serialNumber) {
-                    results.skipped++;
-                    continue;
+                    throw new Error('Serial Number is mandatory and missing.');
                 }
 
+                // Priority 2 Validation: Product Code / Product Name
                 let productCode = pickFirstNonEmpty(row['Product Code'], row.productCode, row.code, row.Code);
                 let productName = pickFirstNonEmpty(row['Product Name'], row.productName, row.name, row.Name);
+
+                if (!productCode && !productName) {
+                    throw new Error('Product Code or Product Name is mandatory and missing.');
+                }
                 const rawStatus = pickFirstNonEmpty(row.Status, row.status, 'IN_STOCK');
                 const customerCodeInput = pickFirstNonEmpty(
                     row['Customer Code'], row.customerCode, row['Customer External Code'], row.externalCode
@@ -3277,23 +3282,59 @@ const importAssets = async (req, res) => {
                         .populate('mgr4', 'code description')
                         .populate('mgr5', 'code description');
                 }
-
-                if (!product) {
-                    product = await Product.create({
-                        ...companyFilter,
-                        productCode: productCode || 'PROD-001',
-                        productName: productName || 'General Product',
-                        hsnCode: 'N/A',
-                        gstPercentage: 18,
-                        basePrice: 0,
-                        mrp: 0,
-                        uom: 'Nos',
-                        status: 'Active'
-                    });
+                if (!product && productCode) {
+                    product = await Product.findOne({ productCode: buildExactRegex(productCode) })
+                        .setOptions({ bypassTenant: true })
+                        .populate('mgr1', 'code description')
+                        .populate('mgr2', 'code description')
+                        .populate('mgr3', 'code description')
+                        .populate('mgr4', 'code description')
+                        .populate('mgr5', 'code description');
+                }
+                if (!product && productName) {
+                    product = await Product.findOne({ productName: buildExactRegex(productName) })
+                        .setOptions({ bypassTenant: true })
+                        .populate('mgr1', 'code description')
+                        .populate('mgr2', 'code description')
+                        .populate('mgr3', 'code description')
+                        .populate('mgr4', 'code description')
+                        .populate('mgr5', 'code description');
                 }
 
-                productCode = product.productCode;
-                productName = product.productName;
+                if (!product) {
+                    try {
+                        product = await Product.create({
+                            ...companyFilter,
+                            productCode: productCode || 'PROD-001',
+                            productName: productName || 'General Product',
+                            hsnCode: 'N/A',
+                            gstPercentage: 18,
+                            basePrice: 0,
+                            mrp: 0,
+                            uom: 'Nos',
+                            status: 'Active'
+                        });
+                    } catch (createErr) {
+                        product = await Product.findOne({ productCode: buildExactRegex(productCode || 'PROD-001') })
+                            .setOptions({ bypassTenant: true })
+                            .populate('mgr1', 'code description')
+                            .populate('mgr2', 'code description')
+                            .populate('mgr3', 'code description')
+                            .populate('mgr4', 'code description')
+                            .populate('mgr5', 'code description');
+                        if (!product) {
+                            throw createErr;
+                        }
+                    }
+                }
+
+                if (product && productName && (!product.productName || product.productName === product.productCode || product.productName === 'General Product')) {
+                    product.productName = productName;
+                    await Product.findByIdAndUpdate(product._id, { productName }).setOptions({ bypassTenant: true });
+                }
+
+                productCode = product ? (product.productCode || productCode) : productCode;
+                productName = product ? (product.productName || productName) : productName;
 
                 const formatMgrVal = (mgr) => {
                     if (!mgr) return '';
@@ -3330,14 +3371,35 @@ const importAssets = async (req, res) => {
                     });
 
                     if (!customer) {
-                        customer = await Customer.create({
-                            ...companyFilter,
-                            externalCode: searchTarget,
-                            customerName: customerLookup || searchTarget,
-                            companyName: customerLookup || searchTarget,
-                            mobile: customerMobile || '',
-                            createdBy: req.user?.id || null
-                        });
+                        customer = await Customer.findOne({
+                            $or: [
+                                { externalCode: buildExactRegex(searchTarget) },
+                                { customerName: buildExactRegex(searchTarget) },
+                                { companyName: buildExactRegex(searchTarget) }
+                            ]
+                        }).setOptions({ bypassTenant: true });
+                    }
+
+                    if (!customer) {
+                        try {
+                            customer = await Customer.create({
+                                ...companyFilter,
+                                externalCode: searchTarget,
+                                customerName: customerLookup || searchTarget,
+                                companyName: customerLookup || searchTarget,
+                                mobile: customerMobile || '',
+                                createdBy: req.user?.id || null
+                            });
+                        } catch (custErr) {
+                            customer = await Customer.findOne({
+                                $or: [
+                                    { externalCode: buildExactRegex(searchTarget) },
+                                    { customerName: buildExactRegex(searchTarget) },
+                                    { companyName: buildExactRegex(searchTarget) }
+                                ]
+                            }).setOptions({ bypassTenant: true });
+                            if (!customer) throw custErr;
+                        }
                     } else if (customerMobile && !customer.mobile) {
                         customer.mobile = customerMobile;
                         await customer.save();
@@ -3366,10 +3428,16 @@ const importAssets = async (req, res) => {
                 }
 
                 // --- Unique Identifier Check: Product_Code + Serial No + Indicator_Field ---
-                const existingAssets = await Asset.find({
+                let existingAssets = await Asset.find({
                     ...companyFilter,
                     serialNumber: buildExactRegex(serialNumber)
                 }).populate('productId');
+
+                if (!existingAssets || existingAssets.length === 0) {
+                    existingAssets = await Asset.find({
+                        serialNumber: buildExactRegex(serialNumber)
+                    }).setOptions({ bypassTenant: true }).populate('productId');
+                }
 
                 const isProductMatch = (a) => {
                     if (!a.productId) return false;
@@ -3400,6 +3468,8 @@ const importAssets = async (req, res) => {
                 if (matchedReturnedAsset) {
                     const updatePayload = {
                         productId: product._id,
+                        productCode: productCode || product.productCode || '',
+                        productName: productName || product.productName || '',
                         status: status === 'RETURN' ? 'SOLD' : status,
                         customerId: customer ? customer._id : null,
                         customerCode: customerCodeVal,
@@ -3445,6 +3515,8 @@ const importAssets = async (req, res) => {
                     const newAsset = await Asset.create({
                         ...(companyId ? { companyId } : {}),
                         productId: product._id,
+                        productCode: product.productCode || productCode || '',
+                        productName: product.productName || productName || '',
                         serialNumber,
                         status,
                         customerId: customer ? customer._id : null,
