@@ -70,11 +70,19 @@ const SearchableSelect = ({
             if (typeof option === 'string') {
                 return option === value;
             }
-            return option.value === value;
+            return String(option.value) === String(value);
         });
 
-        if (!found) return value;
-        return typeof found === 'string' ? found : found.label;
+        if (found) {
+            return typeof found === 'string' ? found : found.label;
+        }
+
+        // Do not display raw 24-character hexadecimal MongoDB ObjectIds
+        if (typeof value === 'string' && /^[0-9a-fA-F]{24}$/.test(value.trim())) {
+            return '';
+        }
+
+        return value;
     };
 
     const selectedLabel = getSelectedLabel();
@@ -150,7 +158,7 @@ const SearchableSelect = ({
                                     filteredOptions.map((option, idx) => {
                                         const optVal = typeof option === 'string' ? option : option.value;
                                         const optLabel = typeof option === 'string' ? option : option.label;
-                                        const isSelected = value === optVal;
+                                        const isSelected = String(value) === String(optVal);
 
                                         return (
                                             <div 

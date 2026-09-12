@@ -557,12 +557,68 @@ const CSMTickets = () => {
         }
     }, [showModal, showManualModal, pageView]);
 
+    const getObjId = (obj) => typeof obj === 'object' && obj !== null ? String(obj._id || '') : String(obj || '');
+
+    const fetchCustomerInvoicesAndSalesInvoices = async (customerId) => {
+        if (!customerId) {
+            setInvoices([]);
+            return [];
+        }
+        try {
+            const [voucherRes, assetRes] = await Promise.allSettled([
+                voucherService.getAll({ customerId, voucherType: 'Invoice' }),
+                csmService.getAssets({ customerId })
+            ]);
+
+            const voucherList = voucherRes.status === 'fulfilled' ? (voucherRes.value?.data?.data || voucherRes.value?.data || []) : [];
+            const assetList = assetRes.status === 'fulfilled' ? (assetRes.value?.data || []) : [];
+
+            const combinedInvoices = [...voucherList];
+            const existingVoucherNums = new Set(voucherList.map(v => String(v.voucherNumber || v.invoiceNumber || '').trim().toLowerCase()));
+
+            const assetInvoicesMap = new Map();
+            assetList.forEach(a => {
+                const invNum = String(a.invoiceNumber || a.invoiceRef || '').trim();
+                if (invNum && !existingVoucherNums.has(invNum.toLowerCase())) {
+                    if (!assetInvoicesMap.has(invNum)) {
+                        assetInvoicesMap.set(invNum, {
+                            _id: `inv_sales_${invNum}`,
+                            voucherNumber: invNum,
+                            invoiceNumber: invNum,
+                            date: a.saleDate || a.createdAt || new Date(),
+                            isSalesUpload: true,
+                            items: []
+                        });
+                    }
+                    const invObj = assetInvoicesMap.get(invNum);
+                    const prodIdStr = typeof a.productId === 'object' && a.productId !== null ? a.productId._id : a.productId;
+                    const prodNameStr = a.productName || a.productId?.productName || 'Product';
+                    if (!invObj.items.some(it => String(it.productId) === String(prodIdStr))) {
+                        invObj.items.push({
+                            productId: prodIdStr,
+                            productName: prodNameStr
+                        });
+                    }
+                }
+            });
+
+            assetInvoicesMap.forEach(invObj => {
+                combinedInvoices.push(invObj);
+            });
+
+            setInvoices(combinedInvoices);
+            return combinedInvoices;
+        } catch (err) {
+            console.error('Error fetching combined customer invoices:', err);
+            setInvoices([]);
+            return [];
+        }
+    };
+
     // Fetch customer invoices when customer is selected in creation form
     useEffect(() => {
         if (formData.customerId) {
-            voucherService.getAll({ customerId: formData.customerId, voucherType: 'Invoice' })
-                .then(res => setInvoices(res.data?.data || res.data || []))
-                .catch(err => console.error('Error fetching customer invoices:', err));
+            fetchCustomerInvoicesAndSalesInvoices(formData.customerId);
             csmService.getCustomerContacts({ customerId: formData.customerId })
                 .then(res => setCustomerContacts(res.data || []))
                 .catch(err => {
@@ -903,7 +959,28 @@ const CSMTickets = () => {
             }
         }
 
-        const cleanedFormData = { ...formData, assetId: assetIdToSubmit };
+        const selectedInvObj = invoices.find(i => String(i._id) === String(formData.invoiceId) || String(i.voucherNumber) === String(formData.invoiceId));
+        let finalInvoiceId = formData.invoiceId;
+        let manualInvoiceNoToSubmit = formData.manualInvoiceNo || '';
+
+        if (selectedInvObj) {
+            if (selectedInvObj.isSalesUpload || !/^[0-9a-fA-F]{24}$/.test(String(formData.invoiceId || ''))) {
+                finalInvoiceId = null;
+                manualInvoiceNoToSubmit = selectedInvObj.voucherNumber || selectedInvObj.invoiceNumber || String(formData.invoiceId);
+            } else {
+                manualInvoiceNoToSubmit = selectedInvObj.voucherNumber || selectedInvObj.invoiceNumber || manualInvoiceNoToSubmit;
+            }
+        } else if (formData.invoiceId && !/^[0-9a-fA-F]{24}$/.test(String(formData.invoiceId))) {
+            manualInvoiceNoToSubmit = String(formData.invoiceId);
+            finalInvoiceId = null;
+        }
+
+        const cleanedFormData = { 
+            ...formData, 
+            assetId: assetIdToSubmit,
+            invoiceId: finalInvoiceId,
+            manualInvoiceNo: manualInvoiceNoToSubmit
+        };
         const optionalObjectIdFields = ['contactId', 'contactDesignationId', 'productId', 'assetId', 'invoiceId'];
         optionalObjectIdFields.forEach(field => {
             if (cleanedFormData[field] === '') {
@@ -1206,7 +1283,26 @@ const CSMTickets = () => {
 
             if (asset) {
                 let targetCustId = asset.customerId?._id || (typeof asset.customerId === 'string' ? asset.customerId : null);
+                let custObj = typeof asset.customerId === 'object' && asset.customerId !== null ? asset.customerId : null;
                 let targetCustName = asset.customerName || asset.customerId?.companyName || asset.customerId?.customerName || asset.customerNameStr || '';
+
+                if (custObj && custObj._id) {
+                    setCustomers(prev => {
+                        const exists = prev.some(c => String(c._id) === String(custObj._id));
+                        if (!exists) {
+                            return [{ _id: custObj._id, companyName: custObj.companyName || custObj.customerName, customerName: custObj.customerName || custObj.companyName }, ...prev];
+                        }
+                        return prev;
+                    });
+                } else if (targetCustId && targetCustName) {
+                    setCustomers(prev => {
+                        const exists = prev.some(c => String(c._id) === String(targetCustId));
+                        if (!exists) {
+                            return [{ _id: targetCustId, companyName: targetCustName, customerName: targetCustName }, ...prev];
+                        }
+                        return prev;
+                    });
+                }
 
                 if (customers && customers.length > 0) {
                     if (targetCustId) {
@@ -1220,7 +1316,27 @@ const CSMTickets = () => {
                 }
 
                 let targetProdId = asset.productId?._id || (typeof asset.productId === 'string' ? asset.productId : null);
+                let prodObj = typeof asset.productId === 'object' && asset.productId !== null ? asset.productId : null;
                 let targetProdName = asset.productName || asset.productId?.productName || '';
+                let targetProdCode = asset.productCode || asset.productId?.productCode || '';
+
+                if (prodObj && prodObj._id) {
+                    setProducts(prev => {
+                        const exists = prev.some(p => String(p._id) === String(prodObj._id));
+                        if (!exists) {
+                            return [{ _id: prodObj._id, productName: prodObj.productName || targetProdName, productCode: prodObj.productCode || targetProdCode }, ...prev];
+                        }
+                        return prev;
+                    });
+                } else if (targetProdId && (targetProdName || targetProdCode)) {
+                    setProducts(prev => {
+                        const exists = prev.some(p => String(p._id) === String(targetProdId));
+                        if (!exists) {
+                            return [{ _id: targetProdId, productName: targetProdName || targetProdCode, productCode: targetProdCode }, ...prev];
+                        }
+                        return prev;
+                    });
+                }
 
                 if (products && products.length > 0) {
                     const pCode = (asset.productCode || asset.productId?.productCode || '').toLowerCase();
@@ -1239,14 +1355,7 @@ const CSMTickets = () => {
                 let contactsList = [];
 
                 if (targetCustId) {
-                    try {
-                        const invoiceRes = await voucherService.getAll({ customerId: targetCustId, voucherType: 'Invoice' });
-                        invList = invoiceRes.data?.data || invoiceRes.data || [];
-                        setInvoices(invList);
-                    } catch (e) {
-                        console.error('Invoice fetch error:', e);
-                    }
-                    
+                    invList = await fetchCustomerInvoicesAndSalesInvoices(targetCustId);
                     try {
                         const contactsRes = await csmService.getCustomerContacts({ customerId: targetCustId });
                         contactsList = contactsRes.data || [];
@@ -1277,7 +1386,21 @@ const CSMTickets = () => {
                 // Autofill
                 setFormData(prev => {
                     const custPincode = asset.customerPostalCode || asset.customerId?.billingAddress?.pincode || asset.pincode || asset.locationPincode || prev.pincode || '';
-                    const matchedInvoice = asset.invoiceId?._id || asset.invoiceId || (invList.length > 0 ? invList[0]._id : '');
+                    const targetInvoiceNo = String(asset.invoiceNumber || asset.invoiceRef || asset.invoiceId?.voucherNumber || asset.invoiceId?.invoiceNumber || '').trim();
+                    let matchedInvoice = asset.invoiceId?._id || (typeof asset.invoiceId === 'string' ? asset.invoiceId : '');
+
+                    if (!matchedInvoice && targetInvoiceNo && invList.length > 0) {
+                        const invMatch = invList.find(i => 
+                            String(i.voucherNumber || i.invoiceNumber || '').trim().toLowerCase() === targetInvoiceNo.toLowerCase() ||
+                            String(i._id) === targetInvoiceNo
+                        );
+                        if (invMatch) {
+                            matchedInvoice = invMatch._id;
+                        }
+                    }
+                    if (!matchedInvoice && invList.length > 0) {
+                        matchedInvoice = invList[0]._id;
+                    }
 
                     const nextData = {
                         ...prev,
@@ -1287,6 +1410,7 @@ const CSMTickets = () => {
                         serialNumber: asset.serialNumber || cleanSN,
                         pincode: custPincode,
                         invoiceId: matchedInvoice || prev.invoiceId || '',
+                        manualInvoiceNo: targetInvoiceNo || prev.manualInvoiceNo || '',
                         mgr4Category: mgr4Val || prev.mgr4Category || ''
                     };
                     
@@ -2220,7 +2344,7 @@ const CSMTickets = () => {
                         <div>
                             <div className="flex justify-between items-center mb-1">
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Link Product *</label>
-                                {formData.customerId && assets.some(a => a.customerId?._id === formData.customerId) && (
+                                {formData.customerId && assets.some(a => getObjId(a.customerId) === String(formData.customerId)) && (
                                     <label className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 cursor-pointer">
                                         <input
                                             type="checkbox"
@@ -2235,25 +2359,34 @@ const CSMTickets = () => {
                             <SearchableSelect
                                 options={
                                     (() => {
+                                        let filteredProds = products;
                                         if (formData.invoiceId) {
-                                            const selectedInvoice = invoices.find(i => i._id === formData.invoiceId);
-                                            if (selectedInvoice) {
-                                                return selectedInvoice.items.map(item => ({
-                                                    value: item.productId?.toString() || item._id?.toString(),
-                                                    label: item.productName
+                                            const selectedInvoice = invoices.find(i => String(i._id) === String(formData.invoiceId) || String(i.voucherNumber) === String(formData.invoiceId));
+                                            if (selectedInvoice && selectedInvoice.items && selectedInvoice.items.length > 0) {
+                                                filteredProds = selectedInvoice.items.map(item => ({
+                                                    _id: item.productId?._id || item.productId || item._id,
+                                                    productName: item.productName || 'Product',
+                                                    productCode: item.productCode || ''
                                                 }));
                                             }
-                                            return [];
-                                        } else {
-                                            const customerHasAssets = formData.customerId && assets.some(a => a.customerId?._id === formData.customerId);
-                                            const filteredProds = (formData.customerId && customerHasAssets && !showAllProducts)
-                                                ? products.filter(p => assets.some(a => a.customerId?._id === formData.customerId && a.productId?._id === p._id))
-                                                : products;
-                                            return filteredProds.map(p => ({
-                                                value: p._id,
-                                                label: `${p.productName} (${p.productCode})`
-                                            }));
+                                        } else if (formData.customerId) {
+                                            const customerHasAssets = assets.some(a => getObjId(a.customerId) === String(formData.customerId));
+                                            if (customerHasAssets && !showAllProducts) {
+                                                filteredProds = products.filter(p => assets.some(a => getObjId(a.customerId) === String(formData.customerId) && getObjId(a.productId) === String(p._id)));
+                                            }
                                         }
+
+                                        if (formData.productId && !filteredProds.some(p => String(p._id || p.value) === String(formData.productId))) {
+                                            const selectedP = products.find(p => String(p._id) === String(formData.productId));
+                                            if (selectedP) {
+                                                filteredProds = [selectedP, ...filteredProds];
+                                            }
+                                        }
+
+                                        return filteredProds.map(p => ({
+                                            value: p._id || p.value,
+                                            label: p.productCode ? `${p.productName} (${p.productCode})` : p.productName
+                                        }));
                                     })()
                                 }
                                 value={formData.productId}
