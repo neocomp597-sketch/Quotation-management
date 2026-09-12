@@ -66,23 +66,29 @@ const SearchableSelect = ({
 
     const getSelectedLabel = () => {
         if (!value) return '';
+        const valStr = typeof value === 'object' && value !== null ? String(value.value || value._id || '') : String(value);
+
         const found = options.find(option => {
             if (typeof option === 'string') {
-                return option === value;
+                return option === valStr;
             }
-            return String(option.value) === String(value);
+            return String(option.value || option.id || '') === valStr;
         });
 
         if (found) {
             return typeof found === 'string' ? found : found.label;
         }
 
+        if (typeof value === 'object' && value !== null) {
+            return value.label || value.name || value.companyName || value.customerName || '';
+        }
+
         // Do not display raw 24-character hexadecimal MongoDB ObjectIds
-        if (typeof value === 'string' && /^[0-9a-fA-F]{24}$/.test(value.trim())) {
+        if (typeof valStr === 'string' && /^[0-9a-fA-F]{24}$/.test(valStr.trim())) {
             return '';
         }
 
-        return value;
+        return String(value);
     };
 
     const selectedLabel = getSelectedLabel();
