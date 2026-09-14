@@ -22,8 +22,13 @@ const MGRMaster = ({ isCreatePage = false, isEditPage = false }) => {
     const [formData, setFormData] = useState({
         code: '',
         description: '',
-        status: 'Active'
+        status: 'Active',
+        problemList: []
     });
+
+    const [newProblemText, setNewProblemText] = useState('');
+    const [editingProblemIndex, setEditingProblemIndex] = useState(null);
+    const [editingProblemValue, setEditingProblemValue] = useState('');
 
     useEffect(() => {
         if (isEditPage && id) {
@@ -34,7 +39,8 @@ const MGRMaster = ({ isCreatePage = false, isEditPage = false }) => {
                     setFormData({
                         code: item.code || '',
                         description: item.description || '',
-                        status: item.status || 'Active'
+                        status: item.status || 'Active',
+                        problemList: item.problemList || []
                     });
                     if (item.mgrType) setActiveTab(item.mgrType);
                 }
@@ -81,17 +87,52 @@ const MGRMaster = ({ isCreatePage = false, isEditPage = false }) => {
             setFormData({
                 code: mgr.code,
                 description: mgr.description,
-                status: mgr.status
+                status: mgr.status,
+                problemList: mgr.problemList || []
             });
         } else {
             setEditingMGR(null);
             setFormData({
                 code: '',
                 description: '',
-                status: 'Active'
+                status: 'Active',
+                problemList: []
             });
         }
         setIsModalOpen(true);
+    };
+
+    const handleAddProblem = () => {
+        if (!newProblemText.trim()) return;
+        const clean = newProblemText.trim();
+        if ((formData.problemList || []).some(p => p.toLowerCase() === clean.toLowerCase())) {
+            toast.error('Problem already exists in list');
+            return;
+        }
+        setFormData(prev => ({
+            ...prev,
+            problemList: [...(prev.problemList || []), clean]
+        }));
+        setNewProblemText('');
+    };
+
+    const handleRemoveProblem = (index) => {
+        setFormData(prev => ({
+            ...prev,
+            problemList: (prev.problemList || []).filter((_, i) => i !== index)
+        }));
+    };
+
+    const handleSaveProblemEdit = (index) => {
+        if (!editingProblemValue.trim()) return;
+        const clean = editingProblemValue.trim();
+        setFormData(prev => {
+            const nextList = [...(prev.problemList || [])];
+            nextList[index] = clean;
+            return { ...prev, problemList: nextList };
+        });
+        setEditingProblemIndex(null);
+        setEditingProblemValue('');
     };
 
     const handleFormChange = (e) => {
@@ -346,6 +387,89 @@ const MGRMaster = ({ isCreatePage = false, isEditPage = false }) => {
                                         placeholder="e.g. Desktop"
                                         required
                                     />
+                                </div>
+
+                                {/* Problem List Section */}
+                                <div className="space-y-3 pt-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 block">
+                                        Problem List (Product / Category Specific Issues)
+                                    </label>
+                                    
+                                    <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                                        {(formData.problemList || []).map((prob, idx) => (
+                                            <div key={idx} className="flex items-center justify-between gap-3 p-3 bg-slate-50 border border-slate-200 rounded-2xl">
+                                                {editingProblemIndex === idx ? (
+                                                    <div className="flex items-center gap-2 flex-1">
+                                                        <input
+                                                            type="text"
+                                                            value={editingProblemValue}
+                                                            onChange={(e) => setEditingProblemValue(e.target.value)}
+                                                            className="flex-1 px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleSaveProblemEdit(idx)}
+                                                            className="px-3 py-1.5 bg-primary-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider"
+                                                        >
+                                                            Save
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setEditingProblemIndex(null)}
+                                                            className="px-3 py-1.5 bg-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-wider"
+                                                        >
+                                                            Cancel
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <>
+                                                        <span className="text-xs font-bold text-slate-700">{prob}</span>
+                                                        <div className="flex items-center gap-1">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => { setEditingProblemIndex(idx); setEditingProblemValue(prob); }}
+                                                                className="p-1.5 text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+                                                                title="Edit Problem"
+                                                            >
+                                                                <MdEdit size={16} />
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleRemoveProblem(idx)}
+                                                                className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
+                                                                title="Delete Problem"
+                                                            >
+                                                                <MdDelete size={16} />
+                                                            </button>
+                                                        </div>
+                                                    </>
+                                                )}
+                                            </div>
+                                        ))}
+                                        {(!formData.problemList || formData.problemList.length === 0) && (
+                                            <div className="p-4 text-center text-xs font-bold text-slate-400 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
+                                                No problems configured yet for this item.
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            value={newProblemText}
+                                            onChange={(e) => setNewProblemText(e.target.value)}
+                                            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddProblem(); } }}
+                                            placeholder="e.g. Paper Jam, Print Quality Issue, Power Failure..."
+                                            className="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-semibold focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={handleAddProblem}
+                                            className="px-5 py-3 bg-teal-600 hover:bg-teal-700 text-white rounded-2xl text-xs font-black uppercase tracking-widest flex items-center gap-1 transition-all shadow-md active:scale-95"
+                                        >
+                                            <MdAdd size={16} /> Add Problem
+                                        </button>
+                                    </div>
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Status</label>

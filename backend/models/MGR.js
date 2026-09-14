@@ -5,6 +5,7 @@ const MGRSchema = new mongoose.Schema({
     mgrType: { type: String, enum: ['MGR1', 'MGR2', 'MGR3', 'MGR4', 'MGR5'], required: true },
     code: { type: String, required: true },
     description: { type: String, required: true },
+    problemList: [{ type: String, trim: true }],
     status: { type: String, enum: ['Active', 'Inactive'], default: 'Active' },
     createdAt: { type: Date, default: Date.now }
 });

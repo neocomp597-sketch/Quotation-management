@@ -20,8 +20,10 @@ const uploadPdf = multer({
         fileSize: 10 * 1024 * 1024, // 10MB
     },
     fileFilter: (req, file, cb) => {
-        const isPdfType = file.mimetype === "application/pdf" || file.mimetype === "application/x-pdf";
-        const isPdfExt = String(file.originalname || "").toLowerCase().endsWith(".pdf");
+        const mime = (file.mimetype || "").toLowerCase();
+        const originalName = String(file.originalname || "").toLowerCase().trim();
+        const isPdfType = mime.includes("pdf") || mime.includes("octet") || mime.includes("stream") || mime.includes("download") || mime.includes("binary") || mime.includes("application") || !mime;
+        const isPdfExt = originalName.endsWith(".pdf") || originalName.includes(".pdf");
         if (!isPdfType && !isPdfExt) {
             return cb(new Error("Only PDF files are allowed"), false);
         }

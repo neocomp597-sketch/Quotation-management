@@ -9,6 +9,59 @@ import {
 } from 'react-icons/md';
 import Modal from '../components/Modal';
 
+// Client-side image compression & resizing helper before upload (max 800x800, quality 0.7)
+const compressSelfieImage = (file, maxWidth = 800, maxHeight = 800, quality = 0.7) => {
+    return new Promise((resolve, reject) => {
+        if (!file || !file.type.startsWith('image/')) {
+            return resolve(file);
+        }
+
+        const reader = new FileReader();
+        reader.onerror = (err) => reject(err);
+        reader.onload = (event) => {
+            const img = new Image();
+            img.onerror = (err) => reject(err);
+            img.onload = () => {
+                let { width, height } = img;
+                if (width > maxWidth || height > maxHeight) {
+                    if (width > height) {
+                        height = Math.round((height * maxWidth) / width);
+                        width = maxWidth;
+                    } else {
+                        width = Math.round((width * maxHeight) / height);
+                        height = maxHeight;
+                    }
+                }
+
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+
+                canvas.toBlob(
+                    (blob) => {
+                        if (!blob) {
+                            return resolve(file);
+                        }
+                        const fileName = (file.name || 'selfie.jpg').replace(/\.[^/.]+$/, "") + "_compressed.jpg";
+                        const compressedFile = new File([blob], fileName, {
+                            type: 'image/jpeg',
+                            lastModified: Date.now(),
+                        });
+                        console.log(`Selfie compressed: Original ${(file.size / 1024).toFixed(1)}KB -> Compressed ${(compressedFile.size / 1024).toFixed(1)}KB`);
+                        resolve(compressedFile);
+                    },
+                    'image/jpeg',
+                    quality
+                );
+            };
+            img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+};
+
 // Fixated MGR5 Search Select Component with 2 distinct sections (MGR5 Spare Parts & Products Catalog)
 const Mgr5SearchSelect = ({ mgr5Parts, selectedId, onSelect, isCustomDesc }) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -287,6 +340,8 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
     const [attendanceList, setAttendanceList] = useState([]);
     const [loadingAttendance, setLoadingAttendance] = useState(false);
     const [activeAttendance, setActiveAttendance] = useState(null);
+    const [todayAttendance, setTodayAttendance] = useState(null);
+    const [hasCompletedToday, setHasCompletedToday] = useState(false);
     const [showAttendanceModal, setShowAttendanceModal] = useState(false);
     const [checkInAreaName, setCheckInAreaName] = useState('');
     const [checkInAddress, setCheckInAddress] = useState('');
@@ -301,6 +356,17 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
     const [attendanceDateFilter, setAttendanceDateFilter] = useState('');
     const [attendanceEngineerFilter, setAttendanceEngineerFilter] = useState('all');
     const [selectedAttendanceSelfie, setSelectedAttendanceSelfie] = useState(null);
+
+    // Check-Out Modal State & Logic
+    const [showCheckOutModal, setShowCheckOutModal] = useState(false);
+    const [checkOutAreaName, setCheckOutAreaName] = useState('');
+    const [checkOutAddress, setCheckOutAddress] = useState('');
+    const [checkOutLat, setCheckOutLat] = useState(null);
+    const [checkOutLng, setCheckOutLng] = useState(null);
+    const [checkOutSelfie, setCheckOutSelfie] = useState('');
+    const [checkOutNotes, setCheckOutNotes] = useState('');
+    const [uploadingCheckOutSelfie, setUploadingCheckOutSelfie] = useState(false);
+    const [isCheckOutLocating, setIsCheckOutLocating] = useState(false);
 
     const currentUser = (() => {
         try {
@@ -509,12 +575,18 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
         try {
             const res = await csmService.getActiveAttendance();
             setActiveAttendance(res.data?.activeRecord || null);
+            setTodayAttendance(res.data?.todayRecord || null);
+            setHasCompletedToday(!!res.data?.hasCompletedToday);
         } catch (error) {
             console.error('Failed to fetch active attendance status', error);
         }
     };
 
     const handleOpenAttendanceModal = () => {
+        if (hasCompletedToday) {
+            toast.error('You have already completed your check-in for today. Users are allowed to check in only once per day.');
+            return;
+        }
         setCheckInAreaName('');
         setCheckInAddress('Locking onto high-precision GPS signal...');
         setCheckInLat(null);
@@ -530,20 +602,22 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
         if (!file) return;
         setUploadingSelfie(true);
         try {
-            const res = await uploadService.uploadImage(file);
+            const compressedFile = await compressSelfieImage(file);
+            const res = await uploadService.uploadImage(compressedFile);
             const photoUrl = res.data?.url || res.data?.imageUrl;
             if (photoUrl) {
                 setCheckInSelfie(photoUrl);
-                toast.success('Selfie captured successfully!');
+                toast.success('Selfie compressed & uploaded successfully!');
             } else {
                 const reader = new FileReader();
                 reader.onloadend = () => {
                     setCheckInSelfie(reader.result);
                     toast.success('Selfie attached!');
                 };
-                reader.readAsDataURL(file);
+                reader.readAsDataURL(compressedFile);
             }
         } catch (err) {
+            console.error('Selfie compress/upload error', err);
             const reader = new FileReader();
             reader.onloadend = () => {
                 setCheckInSelfie(reader.result);
@@ -589,43 +663,98 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
         }
     };
 
-    const handleSubmitAttendanceCheckOut = async () => {
+    const handleOpenCheckOutModal = () => {
         if (!activeAttendance) return;
+        setCheckOutAreaName(activeAttendance.checkInLocation?.areaName || '');
+        setCheckOutAddress(activeAttendance.checkInLocation?.address || 'Acquiring high-accuracy GPS signal...');
+        setCheckOutLat(activeAttendance.checkInLocation?.latitude || null);
+        setCheckOutLng(activeAttendance.checkInLocation?.longitude || null);
+        setCheckOutSelfie('');
+        setCheckOutNotes(activeAttendance.notes || '');
+        setShowCheckOutModal(true);
+        fetchCheckOutGpsLocation();
+    };
+
+    const fetchCheckOutGpsLocation = () => {
+        if (!navigator.geolocation) return;
+        setIsCheckOutLocating(true);
+        navigator.geolocation.getCurrentPosition(
+            async (pos) => {
+                const lat = pos.coords.latitude;
+                const lng = pos.coords.longitude;
+                setCheckOutLat(lat);
+                setCheckOutLng(lng);
+                const locData = await fetchAccurateLocation(lat, lng);
+                if (locData.address) setCheckOutAddress(locData.address);
+                if (locData.areaName && !checkOutAreaName) setCheckOutAreaName(locData.areaName);
+                setIsCheckOutLocating(false);
+            },
+            (err) => {
+                console.warn('GPS failed on check-out:', err);
+                setIsCheckOutLocating(false);
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+    };
+
+    const handleCheckOutSelfieChange = async (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        setUploadingCheckOutSelfie(true);
+        try {
+            const compressedFile = await compressSelfieImage(file);
+            const res = await uploadService.uploadImage(compressedFile);
+            const photoUrl = res.data?.url || res.data?.imageUrl;
+            if (photoUrl) {
+                setCheckOutSelfie(photoUrl);
+                toast.success('Check-Out selfie compressed & uploaded successfully!');
+            } else {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    setCheckOutSelfie(reader.result);
+                    toast.success('Check-Out selfie attached!');
+                };
+                reader.readAsDataURL(compressedFile);
+            }
+        } catch (err) {
+            console.error('Check-Out selfie compress/upload error', err);
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setCheckOutSelfie(reader.result);
+                toast.success('Check-Out selfie attached!');
+            };
+            reader.readAsDataURL(file);
+        } finally {
+            setUploadingCheckOutSelfie(false);
+        }
+    };
+
+    const handleSubmitAttendanceCheckOutModal = async (e) => {
+        e.preventDefault();
+        if (!activeAttendance) return;
+        if (!checkOutSelfie) {
+            toast.error('Selfie photo is mandatory to mark Check-Out');
+            return;
+        }
+        if (!checkOutAreaName.trim()) {
+            toast.error('Area / Site Name is required');
+            return;
+        }
+
         setSubmittingCheckOut(true);
         try {
-            let lat = activeAttendance.checkInLocation?.latitude || 18.5204;
-            let lng = activeAttendance.checkInLocation?.longitude || 73.8567;
-            let address = activeAttendance.checkInLocation?.address || 'Site Location';
-            let areaName = activeAttendance.checkInLocation?.areaName || 'Field Location';
-
-            if (navigator.geolocation) {
-                try {
-                    const pos = await new Promise((resolve, reject) => {
-                        navigator.geolocation.getCurrentPosition(resolve, reject, { 
-                            enableHighAccuracy: true, 
-                            timeout: 15000, 
-                            maximumAge: 0 
-                        });
-                    });
-                    lat = pos.coords.latitude;
-                    lng = pos.coords.longitude;
-                    const locData = await fetchAccurateLocation(lat, lng);
-                    address = locData.address;
-                    if (locData.areaName) areaName = locData.areaName;
-                } catch {
-                    // ignore
-                }
-            }
-
             const payload = {
                 attendanceId: activeAttendance._id,
-                areaName,
-                address,
-                latitude: lat,
-                longitude: lng
+                areaName: checkOutAreaName.trim(),
+                address: checkOutAddress,
+                latitude: checkOutLat,
+                longitude: checkOutLng,
+                checkOutSelfieUrl: checkOutSelfie,
+                notes: checkOutNotes
             };
             await csmService.checkOutAttendance(payload);
             toast.success('Field Attendance Check-Out recorded successfully!');
+            setShowCheckOutModal(false);
             fetchActiveAttendance();
             if (activeTab === 'attendance') fetchAttendanceRecords();
         } catch (error) {
@@ -1089,7 +1218,7 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
                     </p>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
-                    {activeTab === 'visits' ? (
+                    {activeTab === 'visits' && (
                         <button
                             onClick={() => handleOpenCreateModal()}
                             className="px-5 py-3 bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-xs tracking-wider rounded-2xl transition-all shadow-md flex items-center justify-center gap-2 active:scale-95 shrink-0"
@@ -1097,25 +1226,6 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
                             <MdAdd size={20} />
                             Schedule Field Visit
                         </button>
-                    ) : (
-                        activeAttendance ? (
-                            <button
-                                onClick={handleSubmitAttendanceCheckOut}
-                                disabled={submittingCheckOut}
-                                className="px-5 py-3 bg-rose-600 hover:bg-rose-700 text-white font-black uppercase text-xs tracking-wider rounded-2xl transition-all shadow-md flex items-center justify-center gap-2 active:scale-95 shrink-0"
-                            >
-                                <MdCheckCircle size={20} />
-                                {submittingCheckOut ? 'Checking Out...' : 'Check-Out Now'}
-                            </button>
-                        ) : (
-                            <button
-                                onClick={handleOpenAttendanceModal}
-                                className="px-5 py-3 bg-teal-600 hover:bg-teal-700 text-white font-black uppercase text-xs tracking-wider rounded-2xl transition-all shadow-md flex items-center justify-center gap-2 active:scale-95 shrink-0"
-                            >
-                                <MdHowToReg size={20} />
-                                Check-In Field Attendance
-                            </button>
-                        )
                     )}
                 </div>
             </div>
@@ -1848,9 +1958,11 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
                     <div className={`rounded-[2rem] p-6 border shadow-2xl transition-all relative overflow-hidden ${
                         activeAttendance 
                             ? 'bg-slate-900 text-white border-teal-500/50 shadow-teal-950/40' 
-                            : 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white border-slate-200 dark:border-slate-800'
+                            : hasCompletedToday
+                                ? 'bg-slate-900 text-white border-indigo-500/50 shadow-indigo-950/40'
+                                : 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white border-slate-200 dark:border-slate-800'
                     }`}>
-                        {activeAttendance && (
+                        {(activeAttendance || hasCompletedToday) && (
                             <div className="absolute -right-16 -bottom-16 w-64 h-64 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
                         )}
                         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5 relative z-10">
@@ -1858,25 +1970,37 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
                                 <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 shadow-inner ${
                                     activeAttendance 
                                         ? 'bg-teal-500/20 text-teal-300 border border-teal-400/40' 
-                                        : 'bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200 dark:border-amber-800'
+                                        : hasCompletedToday
+                                            ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-400/40'
+                                            : 'bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200 dark:border-amber-800'
                                 }`}>
-                                    {activeAttendance ? <MdCheckCircle size={32} /> : <MdHowToReg size={32} />}
+                                    {activeAttendance ? <MdCheckCircle size={32} /> : hasCompletedToday ? <MdCheckCircle size={32} /> : <MdHowToReg size={32} />}
                                 </div>
                                 <div>
                                     <div className="flex items-center gap-2">
                                         <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg border ${
                                             activeAttendance 
                                                 ? 'bg-teal-500/25 text-teal-200 border-teal-400/40' 
-                                                : 'bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200 border-amber-300 dark:border-amber-700'
+                                                : hasCompletedToday
+                                                    ? 'bg-indigo-500/25 text-indigo-200 border-indigo-400/40'
+                                                    : 'bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200 border-amber-300 dark:border-amber-700'
                                         }`}>
-                                            {activeAttendance ? 'STATUS: CURRENTLY CHECKED-IN' : 'STATUS: NOT CHECKED-IN TODAY'}
+                                            {activeAttendance 
+                                                ? 'STATUS: CURRENTLY CHECKED-IN' 
+                                                : hasCompletedToday
+                                                    ? 'STATUS: ATTENDANCE COMPLETED TODAY'
+                                                    : 'STATUS: NOT CHECKED-IN TODAY'}
                                         </span>
-                                        <span className={`text-xs font-bold ${activeAttendance ? 'text-slate-300' : 'text-slate-500 dark:text-slate-400'}`}>
+                                        <span className={`text-xs font-bold ${activeAttendance || hasCompletedToday ? 'text-slate-300' : 'text-slate-500 dark:text-slate-400'}`}>
                                             • Field Engineer Duty
                                         </span>
                                     </div>
-                                    <h3 className={`text-xl sm:text-2xl font-black font-outfit uppercase mt-1.5 ${activeAttendance ? 'text-white' : 'text-slate-900 dark:text-white'}`}>
-                                        {activeAttendance ? activeAttendance.employeeName : (currentUser.name || 'Field Engineer')}
+                                    <h3 className={`text-xl sm:text-2xl font-black font-outfit uppercase mt-1.5 ${activeAttendance || hasCompletedToday ? 'text-white' : 'text-slate-900 dark:text-white'}`}>
+                                        {activeAttendance 
+                                            ? activeAttendance.employeeName 
+                                            : todayAttendance 
+                                                ? todayAttendance.employeeName 
+                                                : (currentUser.name || 'Field Engineer')}
                                     </h3>
                                     {activeAttendance ? (
                                         <div className="text-xs text-slate-300 font-medium mt-1 flex flex-wrap items-center gap-1.5 leading-relaxed">
@@ -1894,6 +2018,18 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
                                                 </span>
                                             )}
                                         </div>
+                                    ) : hasCompletedToday ? (
+                                        <div className="text-xs text-slate-300 font-medium mt-1 flex flex-wrap items-center gap-1.5 leading-relaxed">
+                                            <span>Checked-in at</span>
+                                            <span className="font-extrabold text-indigo-300 bg-indigo-950/80 px-2 py-0.5 rounded-md border border-indigo-800/80">
+                                                {new Date(todayAttendance.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            </span>
+                                            <span>& Checked-out at</span>
+                                            <span className="font-extrabold text-emerald-300 bg-emerald-950/80 px-2 py-0.5 rounded-md border border-emerald-800/80">
+                                                {todayAttendance.checkOutTime ? new Date(todayAttendance.checkOutTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'}
+                                            </span>
+                                            <span className="text-slate-400 font-medium">• 1 Check-in Daily Limit Reached</span>
+                                        </div>
                                     ) : (
                                         <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold mt-1">
                                             Click the Check-In button to record your field attendance with live GPS location & selfie verification.
@@ -1905,11 +2041,20 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
                             <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
                                 {activeAttendance ? (
                                     <button
-                                        onClick={handleSubmitAttendanceCheckOut}
+                                        onClick={handleOpenCheckOutModal}
                                         disabled={submittingCheckOut}
                                         className="px-6 py-3.5 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-black text-xs uppercase tracking-wider rounded-2xl transition-all shadow-lg shadow-rose-600/30 hover:shadow-rose-600/50 active:scale-95 cursor-pointer"
                                     >
                                         {submittingCheckOut ? 'Checking Out...' : 'CHECK-OUT NOW'}
+                                    </button>
+                                ) : hasCompletedToday ? (
+                                    <button
+                                        disabled
+                                        className="px-6 py-3.5 bg-slate-800/80 text-slate-400 font-black text-xs uppercase tracking-wider rounded-2xl border border-slate-700/80 flex items-center gap-2 cursor-not-allowed opacity-90 shadow-inner"
+                                        title="Daily check-in limit reached"
+                                    >
+                                        <MdCheckCircle size={18} className="text-emerald-400" />
+                                        CHECK-IN COMPLETED FOR TODAY
                                     </button>
                                 ) : (
                                     <button
@@ -2031,17 +2176,30 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-3 text-center">
-                                                    {rec.selfieUrl ? (
-                                                        <img
-                                                            src={rec.selfieUrl}
-                                                            alt="Selfie"
-                                                            onClick={() => setSelectedAttendanceSelfie(rec.selfieUrl)}
-                                                            className="w-10 h-10 rounded-xl object-cover border border-slate-200 shadow-2xs mx-auto cursor-pointer hover:scale-105 transition-transform"
-                                                            title="Click to expand selfie"
-                                                        />
-                                                    ) : (
-                                                        <span className="text-[10px] text-slate-400">No Photo</span>
-                                                    )}
+                                                    <div className="flex items-center justify-center gap-1.5">
+                                                        {rec.selfieUrl ? (
+                                                            <img
+                                                                src={rec.selfieUrl}
+                                                                alt="Check-In Selfie"
+                                                                onClick={() => setSelectedAttendanceSelfie(rec.selfieUrl)}
+                                                                className="w-9 h-9 rounded-xl object-cover border border-teal-400 shadow-2xs cursor-pointer hover:scale-105 transition-transform"
+                                                                title="Check-In Selfie (Click to expand)"
+                                                            />
+                                                        ) : (
+                                                            <span className="text-[9px] text-slate-400">No In Selfie</span>
+                                                        )}
+                                                        {rec.checkOutSelfieUrl ? (
+                                                            <img
+                                                                src={rec.checkOutSelfieUrl}
+                                                                alt="Check-Out Selfie"
+                                                                onClick={() => setSelectedAttendanceSelfie(rec.checkOutSelfieUrl)}
+                                                                className="w-9 h-9 rounded-xl object-cover border border-rose-400 shadow-2xs cursor-pointer hover:scale-105 transition-transform"
+                                                                title="Check-Out Selfie (Click to expand)"
+                                                            />
+                                                        ) : rec.status === 'Checked-Out' ? (
+                                                            <span className="text-[9px] text-slate-400">No Out Selfie</span>
+                                                        ) : null}
+                                                    </div>
                                                 </td>
                                                 <td className="px-4 py-3 text-center">
                                                     <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase border tracking-wider ${
@@ -2337,6 +2495,146 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
                             placeholder="Optional check-in notes..."
                             value={checkInNotes}
                             onChange={(e) => setCheckInNotes(e.target.value)}
+                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold h-16"
+                        />
+                    </div>
+                </form>
+            </Modal>
+
+            {/* Field Attendance Check-Out Modal */}
+            <Modal
+                isOpen={showCheckOutModal}
+                onClose={() => setShowCheckOutModal(false)}
+                title="Field Engineer Attendance Check-Out"
+                maxWidth="max-w-md"
+                footer={
+                    <>
+                        <button
+                            type="button"
+                            onClick={() => setShowCheckOutModal(false)}
+                            className="flex-1 w-full py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            form="attendance-checkout-form"
+                            disabled={submittingCheckOut || uploadingCheckOutSelfie}
+                            className="flex-1 w-full py-3.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {submittingCheckOut ? 'Recording Check-Out...' : 'Record Check-Out'}
+                        </button>
+                    </>
+                }
+            >
+                <form id="attendance-checkout-form" onSubmit={handleSubmitAttendanceCheckOutModal} className="space-y-4">
+                    <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Employee Name</label>
+                        <input
+                            type="text"
+                            readOnly
+                            value={activeAttendance?.employeeName || currentUser.name || 'Field Engineer'}
+                            className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 cursor-not-allowed"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Area / Site Name *</label>
+                        <input
+                            type="text"
+                            required
+                            placeholder="e.g. Baner Site, Hinjewadi Phase 1, Pune..."
+                            value={checkOutAreaName}
+                            onChange={(e) => setCheckOutAreaName(e.target.value)}
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-xs font-semibold focus:ring-2 focus:ring-rose-500 outline-none"
+                        />
+                    </div>
+
+                    <div className="p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2 shadow-xs">
+                        <div className="flex items-center justify-between">
+                            <label className="block text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">
+                                GPS Location / Exact Street Address *
+                            </label>
+                            <button
+                                type="button"
+                                onClick={fetchCheckOutGpsLocation}
+                                disabled={isCheckOutLocating}
+                                className="text-[10px] font-bold text-rose-600 dark:text-rose-400 hover:text-rose-800 flex items-center gap-1 cursor-pointer transition-colors"
+                                title="Re-query device GPS hardware for check-out precision"
+                            >
+                                <MdRefresh size={14} className={isCheckOutLocating ? 'animate-spin' : ''} />
+                                {isCheckOutLocating ? 'Acquiring GPS...' : 'Refresh High-Accuracy GPS'}
+                            </button>
+                        </div>
+                        <textarea
+                            rows={2}
+                            value={checkOutAddress}
+                            onChange={(e) => setCheckOutAddress(e.target.value)}
+                            placeholder="Auto-detecting exact location or type full street address..."
+                            className="w-full px-3 py-2 text-xs font-semibold text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-rose-500 outline-none leading-relaxed resize-none shadow-inner"
+                        />
+                        {checkOutLat && checkOutLng && (
+                            <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 dark:border-slate-700/60">
+                                <p className="text-[10px] font-mono text-rose-700 dark:text-rose-300 font-bold">
+                                    Lat: {checkOutLat.toFixed(5)}, Lng: {checkOutLng.toFixed(5)}
+                                </p>
+                                <a
+                                    href={`https://www.google.com/maps?q=${checkOutLat},${checkOutLng}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-[10px] font-bold text-rose-600 dark:text-rose-400 hover:underline flex items-center gap-1"
+                                >
+                                    <MdMap size={12} /> View Map Pin
+                                </a>
+                            </div>
+                        )}
+                    </div>
+
+                    <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Check-Out Selfie Photo Verification *</label>
+                        {checkOutSelfie ? (
+                            <div className="relative p-2 bg-slate-50 border border-rose-300 rounded-xl flex flex-col items-center justify-center space-y-2">
+                                <img src={checkOutSelfie} alt="Check-Out Selfie" className="h-36 rounded-lg object-cover shadow-xs" />
+                                <div className="flex items-center gap-2">
+                                    <label className="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold cursor-pointer transition-all shadow-xs">
+                                        Retake Selfie
+                                        <input type="file" accept="image/*" capture="user" onChange={handleCheckOutSelfieChange} className="hidden" />
+                                    </label>
+                                    <button
+                                        type="button"
+                                        onClick={() => setCheckOutSelfie('')}
+                                        className="px-3 py-1 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded-lg text-xs font-bold transition-all cursor-pointer"
+                                    >
+                                        Remove
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <label className="border-2 border-dashed border-slate-200 hover:border-rose-500 bg-slate-50/70 hover:bg-rose-50/30 rounded-2xl p-5 flex flex-col items-center justify-center cursor-pointer transition-all group text-center">
+                                <input type="file" accept="image/*" capture="user" onChange={handleCheckOutSelfieChange} className="hidden" />
+                                <div className="w-12 h-12 bg-white rounded-2xl border border-slate-200 shadow-xs flex items-center justify-center text-slate-400 group-hover:text-rose-600 group-hover:border-rose-300 transition-all mb-2">
+                                    {uploadingCheckOutSelfie ? (
+                                        <div className="w-5 h-5 border-2 border-rose-600 border-t-transparent rounded-full animate-spin"></div>
+                                    ) : (
+                                        <MdPhotoCamera size={26} />
+                                    )}
+                                </div>
+                                <span className="text-xs font-black text-slate-800 group-hover:text-rose-800">
+                                    {uploadingCheckOutSelfie ? 'Uploading Check-Out Selfie...' : 'Take / Upload Check-Out Selfie'}
+                                </span>
+                                <span className="text-[10px] text-slate-400 font-semibold mt-0.5">
+                                    Capture engineer selfie for duty check-out
+                                </span>
+                            </label>
+                        )}
+                    </div>
+
+                    <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Check-Out Remarks (Optional)</label>
+                        <textarea
+                            placeholder="Optional check-out remarks..."
+                            value={checkOutNotes}
+                            onChange={(e) => setCheckOutNotes(e.target.value)}
                             className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold h-16"
                         />
                     </div>

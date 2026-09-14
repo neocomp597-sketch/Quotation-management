@@ -778,16 +778,96 @@ exports.problems = {
     ...createCrudEndpoints(Problem, 'Problem'),
     getAll: async (req, res) => {
         try {
-            const filter = { companyId: req.user?.companyId };
-            if (req.query.mgr4Category) {
-                filter.mgr4Category = buildExactRegex(req.query.mgr4Category) || req.query.mgr4Category;
+            const companyId = req.user?.companyId;
+            const filter = { companyId };
+            
+            const mgr4Category = req.query.mgr4Category ? String(req.query.mgr4Category).trim() : '';
+            const productId = req.query.productId ? String(req.query.productId).trim() : '';
+
+            if (mgr4Category) {
+                filter.mgr4Category = buildExactRegex(mgr4Category) || mgr4Category;
             }
             if (req.query.categoryId) {
                 filter.categoryId = req.query.categoryId;
             }
+
             const docs = await Problem.find(filter).sort({ createdAt: -1 }).lean();
-            res.json(docs);
+            const combinedMap = new Map();
+
+            docs.forEach(p => {
+                const name = String(p.name || p.title || p.description || '').trim();
+                if (name && !combinedMap.has(name.toLowerCase())) {
+                    combinedMap.set(name.toLowerCase(), {
+                        _id: String(p._id),
+                        name,
+                        mgr4Category: p.mgr4Category || ''
+                    });
+                }
+            });
+
+            // If productId or mgr4Category supplied, also check MGR documents for configured problem lists
+            const MGR = require('../models/MGR');
+            const Product = require('../models/Product');
+            let mgrIds = [];
+
+            if (productId && mongoose.Types.ObjectId.isValid(productId)) {
+                const prod = await Product.findById(productId).select('mgr1 mgr2 mgr3 mgr4 mgr5').lean();
+                if (prod) {
+                    ['mgr1', 'mgr2', 'mgr3', 'mgr4', 'mgr5'].forEach(k => {
+                        const val = prod[k]?._id || prod[k];
+                        if (val && mongoose.Types.ObjectId.isValid(String(val))) {
+                            mgrIds.push(String(val));
+                        }
+                    });
+                }
+            }
+
+            if (mgr4Category) {
+                const mgrMatch = await MGR.find({
+                    companyId,
+                    $or: [
+                        { code: buildExactRegex(mgr4Category) || mgr4Category },
+                        { description: buildExactRegex(mgr4Category) || mgr4Category }
+                    ]
+                }).select('_id problemList').lean();
+                mgrMatch.forEach(m => {
+                    mgrIds.push(String(m._id));
+                    if (Array.isArray(m.problemList)) {
+                        m.problemList.forEach(probName => {
+                            const clean = String(probName || '').trim();
+                            if (clean && !combinedMap.has(clean.toLowerCase())) {
+                                combinedMap.set(clean.toLowerCase(), {
+                                    _id: `mgr_prob_${clean.replace(/[^a-zA-Z0-9]/g, '_')}`,
+                                    name: clean,
+                                    mgr4Category
+                                });
+                            }
+                        });
+                    }
+                });
+            }
+
+            if (mgrIds.length > 0) {
+                const mgrDocs = await MGR.find({ _id: { $in: mgrIds } }).select('code description problemList').lean();
+                mgrDocs.forEach(m => {
+                    if (Array.isArray(m.problemList)) {
+                        m.problemList.forEach(probName => {
+                            const clean = String(probName || '').trim();
+                            if (clean && !combinedMap.has(clean.toLowerCase())) {
+                                combinedMap.set(clean.toLowerCase(), {
+                                    _id: `mgr_prob_${clean.replace(/[^a-zA-Z0-9]/g, '_')}`,
+                                    name: clean,
+                                    mgr4Category: m.code || m.description || ''
+                                });
+                            }
+                        });
+                    }
+                });
+            }
+
+            res.json(Array.from(combinedMap.values()));
         } catch (error) {
+            console.error('Error fetching Problems:', error);
             res.status(500).json({ message: 'Error fetching Problems: ' + error.message });
         }
     }

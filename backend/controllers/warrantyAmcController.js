@@ -134,6 +134,18 @@ exports.verifyEntitlements = async (req, res) => {
 // Asset CRUD
 exports.createAsset = async (req, res) => {
     try {
+        const { serialNumber } = req.body;
+        if (serialNumber && String(serialNumber).trim()) {
+            const cleanSN = String(serialNumber).trim();
+            const existingAssets = await Asset.find({
+                serialNumber: buildExactRegex(cleanSN)
+            }).setOptions({ bypassTenant: true });
+
+            const matchedActiveAsset = existingAssets.find(a => a.status !== 'RETURN' && a.status !== 'RETURNED');
+            if (matchedActiveAsset) {
+                return res.status(400).json({ message: `Duplicate entry: Serial Number (${cleanSN}) already exists in the system. Serial Numbers must be unique.` });
+            }
+        }
         const doc = await Asset.create({ ...req.body, companyId: req.user?.companyId });
         res.status(201).json(doc);
     } catch (error) {
@@ -310,41 +322,29 @@ exports.createSingleAsset = async (req, res) => {
             }
         }
 
-        // Unique Identifier Check: Product Code + Serial No + Indicator_Field
-        const existingAssets = await Asset.find({
+        // Unique Identifier Check: Serial Number (System-wide uniqueness)
+        let existingAssets = await Asset.find({
             companyId,
             serialNumber: buildExactRegex(cleanSN)
         }).populate('productId');
 
-        const isProductMatch = (a) => {
-            if (!a.productId) return false;
-            const sameId = a.productId._id && product._id && a.productId._id.toString() === product._id.toString();
-            const prodCodeA = (a.productId.productCode || '').trim().toLowerCase();
-            const prodCodeTarget = (product.productCode || cleanProductCode).trim().toLowerCase();
-            return sameId || prodCodeA === prodCodeTarget || prodCodeA === cleanProductCode.toLowerCase();
-        };
+        if (!existingAssets || existingAssets.length === 0) {
+            existingAssets = await Asset.find({
+                serialNumber: buildExactRegex(cleanSN)
+            }).setOptions({ bypassTenant: true }).populate('productId');
+        }
 
-        const isIndicatorMatch = (a) => {
-            return (a.indicatorField || '').trim().toLowerCase() === cleanIndicator.toLowerCase();
-        };
-
-        // 1. Search for active asset match (strictly requires S/N + Product Code + Indicator Field)
-        let matchedActiveAsset = existingAssets.find(a => {
-            const isReturn = a.status === 'RETURN' || a.status === 'RETURNED';
-            return !isReturn && isProductMatch(a) && isIndicatorMatch(a);
-        });
+        // 1. Search for active asset match (any active asset with this serial number)
+        let matchedActiveAsset = existingAssets.find(a => a.status !== 'RETURN' && a.status !== 'RETURNED');
 
         if (matchedActiveAsset) {
             return res.status(400).json({
-                message: `Duplicate entry: Serial Number (${cleanSN}) already exists in active inventory. Duplicate entry cannot be created.`
+                message: `Duplicate entry: Serial Number (${cleanSN}) already exists in the system. Duplicate Serial Numbers are not allowed.`
             });
         }
 
         // 2. Search for returned asset match (to re-activate)
-        const matchedReturnedAsset = existingAssets.find(a => {
-            const isReturn = a.status === 'RETURN' || a.status === 'RETURNED';
-            return isReturn && isProductMatch(a) && isIndicatorMatch(a);
-        });
+        const matchedReturnedAsset = existingAssets.find(a => a.status === 'RETURN' || a.status === 'RETURNED');
 
         if (matchedReturnedAsset) {
             const updatePayload = {

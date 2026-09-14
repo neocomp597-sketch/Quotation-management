@@ -450,8 +450,8 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
         if (!file) return;
 
         // Validate PDF file type
-        const isPdfMime = file.type === 'application/pdf' || file.type === 'application/x-pdf';
-        const isPdfExt = file.name.toLowerCase().endsWith('.pdf');
+        const isPdfMime = !file.type || file.type.toLowerCase().includes('pdf') || file.type.toLowerCase().includes('octet') || file.type.toLowerCase().includes('stream') || file.type.toLowerCase().includes('download') || file.type.toLowerCase().includes('application');
+        const isPdfExt = file.name.toLowerCase().endsWith('.pdf') || file.name.toLowerCase().includes('.pdf');
         if (!isPdfMime && !isPdfExt) {
             toast.error(`Invalid file type for ${docTitle}. Only PDF files (.pdf) are allowed.`);
             e.target.value = '';

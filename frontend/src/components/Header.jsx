@@ -83,7 +83,7 @@ const searchablePages = [
     { label: 'CSM Dashboard', path: '/csm/dashboard', permissionKey: 'csm_dashboard', keywords: ['service dashboard'] },
     { label: 'Tickets', path: '/csm/tickets', permissionKey: 'csm_tickets', keywords: ['tickets register', 'service tickets'] },
     { label: 'Service Visits', path: '/csm/visits', permissionKey: 'csm_visits', keywords: ['visits'] },
-    { label: 'Field Attendance', path: '/csm/field-attendance', permissionKey: 'csm_visits', keywords: ['field attendance', 'engineer check-in', 'attendance'] },
+    { label: 'Field Attendance', path: '/csm/field-attendance', permissionKey: 'csm_attendance', keywords: ['field attendance', 'engineer check-in', 'attendance'] },
     { label: 'Warranty & AMC', path: '/csm/warranties-amc', permissionKey: 'csm_warranties_amc', keywords: ['warranty', 'amc'] },
     { label: 'Knowledge Base', path: '/csm/kb', permissionKey: 'csm_kb', keywords: ['kb'] },
     { label: 'CSM Config', path: '/csm/masters', permissionKey: 'csm_masters', keywords: ['csm masters'] },

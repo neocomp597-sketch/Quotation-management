@@ -11,7 +11,8 @@ const uploadToSupabase = async (file) => {
         throw new Error("No file content provided");
     }
 
-    const fileExt = path.extname(file.originalname || '') || '.png';
+    const rawExt = path.extname(file.originalname || '');
+    const fileExt = rawExt || (file.mimetype?.toLowerCase().includes('pdf') ? '.pdf' : '.png');
     const safeBaseName = path.basename(file.originalname || 'upload', fileExt).replace(/[^a-zA-Z0-9_-]/g, '_');
     const uniqueFileName = `${Date.now()}-${crypto.randomUUID().slice(0, 8)}-${safeBaseName}${fileExt}`;
     const storagePath = `uploads/${uniqueFileName}`;

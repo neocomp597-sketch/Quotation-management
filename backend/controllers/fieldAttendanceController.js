@@ -21,27 +21,36 @@ const resolveCompanyId = async (req) => {
 exports.checkIn = async (req, res) => {
     try {
         const companyId = await resolveCompanyId(req);
-        const engineerId = req.user?.id || req.user?._id || 'engineer_user';
-        const employeeName = req.body.employeeName || req.user?.name || 'Field Engineer';
+        const engineerId = req.user?.id || req.user?._id;
+        if (!engineerId) {
+            return res.status(401).json({ message: 'User authentication required for attendance check-in.' });
+        }
+        const employeeName = req.user?.name || req.body.employeeName || 'Field Engineer';
 
         const todayStart = getStartOfDay();
         const tomorrowStart = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
 
-        // Check if active check-in already exists for today
-        const activeQuery = {
-            attendanceDate: { $gte: todayStart, $lt: tomorrowStart },
-            status: 'Checked-In'
+        // Check if ANY check-in record already exists for today (Checked-In or Checked-Out)
+        const todayQuery = {
+            attendanceDate: { $gte: todayStart, $lt: tomorrowStart }
         };
-        if (companyId) activeQuery.companyId = companyId;
-        if (engineerId) activeQuery.engineerId = engineerId;
+        if (companyId) todayQuery.companyId = companyId;
+        if (engineerId) todayQuery.engineerId = engineerId;
 
-        const existingActive = await FieldAttendance.findOne(activeQuery);
+        const existingToday = await FieldAttendance.findOne(todayQuery);
 
-        if (existingActive) {
-            return res.status(400).json({
-                message: 'You have already checked in for today. Please check out before checking in again.',
-                data: existingActive
-            });
+        if (existingToday) {
+            if (existingToday.status === 'Checked-In') {
+                return res.status(400).json({
+                    message: 'You are currently checked in for today. Please check out when finished.',
+                    data: existingToday
+                });
+            } else {
+                return res.status(400).json({
+                    message: 'You have already completed your check-in for today. Users are allowed to check in only once per day.',
+                    data: existingToday
+                });
+            }
         }
 
         const {
@@ -93,6 +102,8 @@ exports.checkOut = async (req, res) => {
             address,
             latitude,
             longitude,
+            selfieUrl,
+            checkOutSelfieUrl,
             notes
         } = req.body;
 
@@ -122,8 +133,12 @@ exports.checkOut = async (req, res) => {
             latitude: latitude ? Number(latitude) : (attendance.checkInLocation?.latitude || null),
             longitude: longitude ? Number(longitude) : (attendance.checkInLocation?.longitude || null)
         };
+        const selfieToSave = checkOutSelfieUrl || selfieUrl;
+        if (selfieToSave) {
+            attendance.checkOutSelfieUrl = selfieToSave;
+        }
         attendance.status = 'Checked-Out';
-        if (notes) attendance.notes = (attendance.notes ? attendance.notes + ' | ' : '') + notes;
+        if (notes) attendance.notes = (attendance.notes && attendance.notes !== notes ? attendance.notes + ' | ' : '') + notes;
 
         await attendance.save();
 
@@ -172,15 +187,20 @@ exports.getActiveStatus = async (req, res) => {
         const tomorrowStart = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
 
         const query = {
-            attendanceDate: { $gte: todayStart, $lt: tomorrowStart },
-            status: 'Checked-In'
+            attendanceDate: { $gte: todayStart, $lt: tomorrowStart }
         };
         if (companyId) query.companyId = companyId;
         if (engineerId) query.engineerId = engineerId;
 
-        const activeRecord = await FieldAttendance.findOne(query).sort({ checkInTime: -1 }).lean();
+        const todayRecord = await FieldAttendance.findOne(query).sort({ checkInTime: -1 }).lean();
+        const activeRecord = (todayRecord && todayRecord.status === 'Checked-In') ? todayRecord : null;
+        const hasCompletedToday = !!(todayRecord && todayRecord.status === 'Checked-Out');
 
-        res.json({ activeRecord });
+        res.json({
+            activeRecord,
+            todayRecord: todayRecord || null,
+            hasCompletedToday
+        });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }

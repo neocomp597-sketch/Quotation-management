@@ -482,13 +482,20 @@ const CSMTickets = () => {
         }
     };
 
-    const fetchProblems = async (mgr4Val = '') => {
+    const fetchProblems = async (params = {}) => {
         setLoadingProblems(true);
         try {
-            const res = await csmService.getProblems({ mgr4Category: mgr4Val });
+            let queryParams = {};
+            if (typeof params === 'string') {
+                queryParams = { mgr4Category: params, productId: formData.productId || '' };
+            } else {
+                queryParams = { productId: formData.productId || '', ...params };
+            }
+            const res = await csmService.getProblems(queryParams);
             setProblems(res.data || []);
         } catch (err) {
             console.error('Error fetching problems:', err);
+            setProblems([]);
         } finally {
             setLoadingProblems(false);
         }
@@ -882,8 +889,8 @@ const CSMTickets = () => {
             serialNumber: autoAsset ? autoAsset.serialNumber : ''
         }));
 
-        if (mgr4Val) {
-            fetchProblems(mgr4Val);
+        if (mgr4Val || productId) {
+            fetchProblems({ productId, mgr4Category: mgr4Val });
         }
         
         if (autoAsset) {
@@ -1845,8 +1852,9 @@ const CSMTickets = () => {
             toast.error('Select a customer first');
             return;
         }
-        if (contactFormData.mobileNo && !isValidMobile(contactFormData.mobileNo)) {
-            toast.error('Invalid Mobile Number. Please enter a valid 10-digit mobile number');
+        const cleanMobile = sanitizePhoneNumber(contactFormData.mobileNo);
+        if (!cleanMobile || cleanMobile.length !== 10 || !/^\d{10}$/.test(cleanMobile)) {
+            toast.error('Please enter a valid 10-digit mobile number.');
             return;
         }
 
@@ -2762,8 +2770,14 @@ const CSMTickets = () => {
                                 onChange={(e) => handleProblemChange(e.target.value)}
                                 className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
                             >
-                                <option value="">Select Problem</option>
-                                {problems.map(p => <option key={p._id} value={p._id}>{p.name}</option>)}
+                                {problems.length === 0 ? (
+                                    <option value="" disabled>No problems configured for this product.</option>
+                                ) : (
+                                    <>
+                                        <option value="">Select Problem</option>
+                                        {problems.map(p => <option key={p._id} value={p._id}>{p.name}</option>)}
+                                    </>
+                                )}
                             </select>
                         </div>
                         <div>

@@ -112,13 +112,11 @@ exports.create = async (req, res) => {
             return res.status(400).json({ message: 'Contact person name is required' });
         }
 
-        if (payload.mobileNo) {
-            const cleanMobile = payload.mobileNo.replace(/\D/g, '');
-            if (cleanMobile.length !== 10) {
-                return res.status(400).json({ message: 'Invalid Mobile Number. Please enter a valid 10-digit mobile number' });
-            }
-            payload.mobileNo = cleanMobile;
+        const cleanMobile = String(payload.mobileNo || '').replace(/\D/g, '');
+        if (!cleanMobile || cleanMobile.length !== 10) {
+            return res.status(400).json({ message: 'Please enter a valid 10-digit mobile number.' });
         }
+        payload.mobileNo = cleanMobile;
 
         const refResult = await validateReferences({ customerId: payload.customerId, designationId: payload.designationId, companyId: userCompanyId });
         if (refResult.error) return res.status(400).json({ message: refResult.error });

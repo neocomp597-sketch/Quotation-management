@@ -186,6 +186,7 @@ const MENU_GROUPS = [
             { key: 'csm_tickets', label: 'My Complaints', description: 'Complaints created by or assigned to the logged-in user' },
             { key: 'csm_tickets', label: 'My Team Complaints', description: 'Complaints for the logged-in user reporting hierarchy' },
             { key: 'csm_visits', label: 'Service Visits', description: 'Schedule and manage service engineer visits' },
+            { key: 'csm_attendance', label: 'Field Engineer Attendance', description: 'View and manage field engineer check-in/out attendance register' },
             { key: 'csm_warranties_amc', label: 'Warranty & AMC', description: 'Manage customer warranty details and AMC contracts' },
             { key: 'csm_kb', label: 'Knowledge Base', description: 'Manage troubleshooting articles and FAQs' },
             { key: 'csm_masters', label: 'CSM Config', description: 'Configure categories, priorities, teams, and SLAs' },
@@ -239,12 +240,12 @@ const FULL_ACCESS_KEYS = getAllPermissionKeys();
 
 // Manager: everything except the admin panel
 // Sales: lightweight access - dashboard, enquiry, quotation, inventory items/transfers
-// Employee: employee access - payslips, payroll, csm tickets, csm kb, dashboard
+// Employee: employee access - payslips, payroll, csm tickets, csm attendance, csm kb, dashboard
 const DEFAULT_ROLE_PERMISSIONS = {
     admin: buildPermissions(FULL_ACCESS_KEYS),
     manager: buildPermissions(['dashboard', 'master', 'enquiry', 'sales_pipeline', 'quotation', 'meetings', 'sale', 'purchase', 'inventory', 'planning', 'reports', 'settings', 'csm', 'tender', 'payroll_org_chart']),
-    sales: buildPermissions(['dashboard', 'enquiry', 'sales_pipeline', 'quotation', 'meetings', 'inventory_items', 'inventory_stock_in', 'inventory_stock_out', 'inventory_transfers', 'csm_tickets', 'csm_kb', 'tender_dashboard', 'tender_register', 'payroll_org_chart']),
-    employee: buildPermissions(['dashboard', 'payroll_payslips', 'payroll_org_chart', 'csm_tickets', 'csm_kb', 'settings_profile'])
+    sales: buildPermissions(['dashboard', 'enquiry', 'sales_pipeline', 'quotation', 'meetings', 'inventory_items', 'inventory_stock_in', 'inventory_stock_out', 'inventory_transfers', 'csm_tickets', 'csm_attendance', 'csm_kb', 'tender_dashboard', 'tender_register', 'payroll_org_chart']),
+    employee: buildPermissions(['dashboard', 'payroll_payslips', 'payroll_org_chart', 'csm_tickets', 'csm_attendance', 'csm_kb', 'settings_profile'])
 };
 
 /**

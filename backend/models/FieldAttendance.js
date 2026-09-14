@@ -44,6 +44,10 @@ const fieldAttendanceSchema = new mongoose.Schema({
         type: String,
         default: ''
     },
+    checkOutSelfieUrl: {
+        type: String,
+        default: ''
+    },
     status: {
         type: String,
         enum: ['Checked-In', 'Checked-Out'],

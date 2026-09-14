@@ -3228,17 +3228,28 @@ const importAssets = async (req, res) => {
         const companyId = req.user?.companyId;
         const companyFilter = companyId ? { companyId } : {};
 
+        const seenSerialsInFile = new Set();
+
         for (let i = 0; i < data.length; i++) {
             const row = data[i];
             try {
                 // Priority 1 Validation: Serial Number
-                const serialNumber = pickFirstNonEmpty(
-                    row['Serial Number'], row.serialNumber, row['Serial No'], row.serialNo, row.Serial, row.serial, row.SN, row.sn
+                const rawSerial = pickFirstNonEmpty(
+                    row['Serial Number'], row.serialNumber, row['Serial No'], row.serialNo, row.Serial, row.serial, row.SN, row.sn, row['Serial Num'], row['Serial num']
                 );
 
-                if (!serialNumber) {
+                if (!rawSerial || !String(rawSerial).trim()) {
                     throw new Error('Serial Number is mandatory and missing.');
                 }
+
+                const serialNumber = String(rawSerial).trim();
+                const normSerial = serialNumber.toLowerCase();
+
+                // Check for duplicate Serial Number within the uploaded file
+                if (seenSerialsInFile.has(normSerial)) {
+                    throw new Error(`Duplicate Serial Number "${serialNumber}" found multiple times within the uploaded file.`);
+                }
+                seenSerialsInFile.add(normSerial);
 
                 // Priority 2 Validation: Product Code / Product Name
                 let productCode = getFlexibleRowValue(row, 'Product Code', 'productCode', 'code', 'Code', 'ProductCode', 'Item Code', 'ItemCode');
@@ -3454,7 +3465,7 @@ const importAssets = async (req, res) => {
                     }
                 }
 
-                // --- Unique Identifier Check: Product_Code + Serial No + Indicator_Field ---
+                // --- Unique Identifier Check: Serial Number (System-wide uniqueness) ---
                 let existingAssets = await Asset.find({
                     ...companyFilter,
                     serialNumber: buildExactRegex(serialNumber)
@@ -3466,30 +3477,24 @@ const importAssets = async (req, res) => {
                     }).setOptions({ bypassTenant: true }).populate('productId');
                 }
 
+                // Any existing active asset with this Serial Number is a duplicate
+                let matchedActiveAsset = existingAssets.find(a => a.status !== 'RETURN' && a.status !== 'RETURNED');
+
+                if (matchedActiveAsset) {
+                    throw new Error(`Duplicate entry: Serial Number (${serialNumber}) already exists in the system. Duplicate Serial Numbers are not allowed.`);
+                }
+
                 const isProductMatch = (a) => {
-                    if (!a.productId) return false;
+                    if (!a.productId) return true;
                     const sameId = a.productId._id && product._id && a.productId._id.toString() === product._id.toString();
                     const prodCodeA = (a.productId.productCode || '').trim().toLowerCase();
                     const prodCodeTarget = (product.productCode || productCode).trim().toLowerCase();
                     return sameId || prodCodeA === prodCodeTarget || prodCodeA === productCode.trim().toLowerCase();
                 };
 
-                const isIndicatorMatch = (a) => {
-                    return (a.indicatorField || '').trim().toLowerCase() === indicatorField.toLowerCase();
-                };
-
-                let matchedActiveAsset = existingAssets.find(a => {
-                    const isReturn = a.status === 'RETURN' || a.status === 'RETURNED';
-                    return !isReturn && isProductMatch(a) && isIndicatorMatch(a);
-                });
-
-                if (matchedActiveAsset) {
-                    throw new Error(`Duplicate entry: Serial Number (${serialNumber}) already exists in active inventory. Duplicate entry cannot be created.`);
-                }
-
                 const matchedReturnedAsset = existingAssets.find(a => {
                     const isReturn = a.status === 'RETURN' || a.status === 'RETURNED';
-                    return isReturn && isProductMatch(a) && isIndicatorMatch(a);
+                    return isReturn;
                 });
 
                 if (matchedReturnedAsset) {

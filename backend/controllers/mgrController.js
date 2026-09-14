@@ -29,7 +29,7 @@ exports.getAllMGRs = async (req, res) => {
             const { page, limit, skip } = getPagination(req.query);
             const [mgrs, total] = await Promise.all([
                 MGR.find(query)
-                    .select('code description mgrType status createdAt updatedAt')
+                    .select('code description mgrType status problemList createdAt updatedAt')
                     .sort({ mgrType: 1, createdAt: -1 })
                     .skip(skip)
                     .limit(limit)
@@ -51,7 +51,7 @@ exports.getAllMGRs = async (req, res) => {
         }
 
         const mgrs = await MGR.find(query)
-            .select('code description mgrType status createdAt updatedAt')
+            .select('code description mgrType status problemList createdAt updatedAt')
             .sort({ mgrType: 1, createdAt: -1 })
             .lean();
         await setCachedJson(redis, cacheKey, mgrs, MGR_CACHE_TTL_SECONDS);
@@ -65,7 +65,7 @@ exports.getAllMGRs = async (req, res) => {
 exports.getMGRById = async (req, res) => {
     try {
         const mgr = await MGR.findById(req.params.id)
-            .select('code description mgrType status createdAt updatedAt')
+            .select('code description mgrType status problemList createdAt updatedAt')
             .lean();
         if (!mgr) return res.status(404).json({ message: 'MGR not found' });
         res.json(mgr);
