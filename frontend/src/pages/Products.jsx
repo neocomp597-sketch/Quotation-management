@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { MdAdd, MdSearch, MdEdit, MdDelete, MdInventory, MdCategory, MdQrCode, MdPayments, MdProductionQuantityLimits, MdCloudUpload, MdVisibility, MdFileUpload, MdCheckBox, MdCheckBoxOutlineBlank, MdDeleteSweep, MdSync, MdImage, MdFileDownload, MdArrowBack } from 'react-icons/md';
+import { MdAdd, MdSearch, MdEdit, MdDelete, MdInventory, MdCategory, MdQrCode, MdPayments, MdProductionQuantityLimits, MdCloudUpload, MdVisibility, MdFileUpload, MdCheckBox, MdCheckBoxOutlineBlank, MdDeleteSweep, MdSync, MdImage, MdFileDownload, MdArrowBack, MdPictureAsPdf, MdDescription } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
 import { productService, uploadService, importService, mgrService, attributeService, productAttributeService, vendorService, categoryService, vendorCatalogService } from '../services/api';
@@ -97,7 +97,16 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
         catalogType: 'Product',
         subscriptionDetails: { billingCycle: 'Monthly', setupFee: 0, renewalPrice: 0 },
         rentalDetails: { minLeaseTerm: 1, securityDeposit: 0, baseRatePerDay: 0, baseRatePerMonth: 0 },
-        pricing: { baseCost: 0, minPrice: 0, maxPrice: 0, marginPercent: 0, currency: 'INR' }
+        pricing: { baseCost: 0, minPrice: 0, maxPrice: 0, marginPercent: 0, currency: 'INR' },
+        technicalSpecificationUrl: '',
+        operatingUserManualUrl: '',
+        repairTroubleshootingUrl: ''
+    });
+
+    const [uploadingPdf, setUploadingPdf] = useState({
+        technicalSpecification: false,
+        operatingUserManual: false,
+        repairTroubleshooting: false
     });
 
     useEffect(() => {
@@ -313,7 +322,10 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                 catalogType: 'Product',
                 subscriptionDetails: { billingCycle: 'Monthly', setupFee: 0, renewalPrice: 0 },
                 rentalDetails: { minLeaseTerm: 1, securityDeposit: 0, baseRatePerDay: 0, baseRatePerMonth: 0 },
-                pricing: { baseCost: 0, minPrice: 0, maxPrice: 0, marginPercent: 0, currency: 'INR' }
+                pricing: { baseCost: 0, minPrice: 0, maxPrice: 0, marginPercent: 0, currency: 'INR' },
+                technicalSpecificationUrl: '',
+                operatingUserManualUrl: '',
+                repairTroubleshootingUrl: ''
             });
             setIsModalOpen(true);
         } else if (isEditPage && routeId) {
@@ -331,6 +343,9 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                     mgr3: item.mgr3?._id || item.mgr3 || '',
                     mgr4: item.mgr4?._id || item.mgr4 || '',
                     mgr5: item.mgr5?._id || item.mgr5 || '',
+                    technicalSpecificationUrl: item.technicalSpecificationUrl || '',
+                    operatingUserManualUrl: item.operatingUserManualUrl || '',
+                    repairTroubleshootingUrl: item.repairTroubleshootingUrl || '',
                     attributes: (item.attributes || []).map(a => a._id || a),
                     vendors: item.vendors?.length ? item.vendors.map(v => ({
                         vendorId: v.vendorId?._id || v.vendorId,
@@ -427,6 +442,58 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
             toast.error('Failed to upload image');
         } finally {
             setIsUploading(false);
+        }
+    };
+
+    const handlePdfUpload = async (e, fieldName, docTitle) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+
+        // Validate PDF file type
+        const isPdfMime = file.type === 'application/pdf' || file.type === 'application/x-pdf';
+        const isPdfExt = file.name.toLowerCase().endsWith('.pdf');
+        if (!isPdfMime && !isPdfExt) {
+            toast.error(`Invalid file type for ${docTitle}. Only PDF files (.pdf) are allowed.`);
+            e.target.value = '';
+            return;
+        }
+
+        // Validate max 10MB size limit
+        const maxSizeInBytes = 10 * 1024 * 1024;
+        if (file.size > maxSizeInBytes) {
+            const sizeInMb = (file.size / (1024 * 1024)).toFixed(2);
+            toast.error(`File size (${sizeInMb} MB) exceeds the 10 MB limit for ${docTitle}.`);
+            e.target.value = '';
+            return;
+        }
+
+        setUploadingPdf(prev => ({ ...prev, [fieldName]: true }));
+        try {
+            const res = await uploadService.uploadPdf(file);
+            const fileUrl = res.data?.url || res.data?.fileUrl || res.data?.imageUrl;
+            if (fileUrl) {
+                setFormData(prev => ({ ...prev, [`${fieldName}Url`]: fileUrl }));
+                toast.success(`${docTitle} PDF uploaded successfully!`);
+            } else {
+                toast.error(`Failed to get uploaded URL for ${docTitle}`);
+            }
+        } catch (err) {
+            console.error(`Error uploading ${docTitle}:`, err);
+            toast.error(err.response?.data?.message || `Failed to upload ${docTitle} PDF`);
+        } finally {
+            setUploadingPdf(prev => ({ ...prev, [fieldName]: false }));
+            e.target.value = '';
+        }
+    };
+
+    const getPdfFileName = (url) => {
+        if (!url) return '';
+        try {
+            const parts = url.split('/');
+            const raw = parts[parts.length - 1] || 'Document.pdf';
+            return decodeURIComponent(raw.replace(/^\d+-[a-f0-9]{8}-/, ''));
+        } catch {
+            return 'Document.pdf';
         }
     };
 
@@ -1188,6 +1255,43 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                                                                                 ))}
                                                                             </div>
                                                                         )}
+                                                                        {(p.technicalSpecificationUrl || p.operatingUserManualUrl || p.repairTroubleshootingUrl) && (
+                                                                            <div className="flex flex-wrap items-center gap-1">
+                                                                                {p.technicalSpecificationUrl && (
+                                                                                    <a
+                                                                                        href={resolveImageUrl(p.technicalSpecificationUrl)}
+                                                                                        target="_blank"
+                                                                                        rel="noopener noreferrer"
+                                                                                        className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-rose-50 hover:bg-rose-100 text-rose-700 text-[8px] font-black uppercase tracking-widest rounded border border-rose-200 transition-all"
+                                                                                        title="View Technical Specification PDF"
+                                                                                    >
+                                                                                        <MdPictureAsPdf size={10} /> Tech Spec
+                                                                                    </a>
+                                                                                )}
+                                                                                {p.operatingUserManualUrl && (
+                                                                                    <a
+                                                                                        href={resolveImageUrl(p.operatingUserManualUrl)}
+                                                                                        target="_blank"
+                                                                                        rel="noopener noreferrer"
+                                                                                        className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[8px] font-black uppercase tracking-widest rounded border border-indigo-200 transition-all"
+                                                                                        title="View Operating User Manual PDF"
+                                                                                    >
+                                                                                        <MdPictureAsPdf size={10} /> Manual
+                                                                                    </a>
+                                                                                )}
+                                                                                {p.repairTroubleshootingUrl && (
+                                                                                    <a
+                                                                                        href={resolveImageUrl(p.repairTroubleshootingUrl)}
+                                                                                        target="_blank"
+                                                                                        rel="noopener noreferrer"
+                                                                                        className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-amber-50 hover:bg-amber-100 text-amber-700 text-[8px] font-black uppercase tracking-widest rounded border border-amber-200 transition-all"
+                                                                                        title="View Repair & Troubleshooting PDF"
+                                                                                    >
+                                                                                        <MdPictureAsPdf size={10} /> Repair
+                                                                                    </a>
+                                                                                )}
+                                                                            </div>
+                                                                        )}
                                                                     </div>
                                                                 </div>
                                                             </div>
@@ -1474,6 +1578,133 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                                         </select>
                                     </div>
                                 ))}
+                            </div>
+
+                            {/* Service Visit Parts Documentation (PDF Uploads) */}
+                            <div className="mt-8 pt-6 border-t border-slate-200/80">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div>
+                                        <h5 className="text-[11px] font-black text-amber-700 uppercase tracking-[0.15em] flex items-center gap-2">
+                                            <MdPictureAsPdf className="text-rose-500" size={18} />
+                                            Service Visit Parts — Documentation & Manuals (PDFs)
+                                        </h5>
+                                        <p className="text-[10px] font-bold text-slate-400 mt-0.5">
+                                            Upload technical specifications, operating manuals, and repair guides (PDF format only, Max 10 MB per file)
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    {[
+                                        {
+                                            field: 'technicalSpecification',
+                                            title: 'Technical Specification',
+                                            description: 'Technical specs, dimensional diagrams & datasheets'
+                                        },
+                                        {
+                                            field: 'operatingUserManual',
+                                            title: 'Operating User Manual',
+                                            description: 'User operation manual, safety guidelines & setup'
+                                        },
+                                        {
+                                            field: 'repairTroubleshooting',
+                                            title: 'Repair & Troubleshooting',
+                                            description: 'Service manuals, fault codes & repair instructions'
+                                        }
+                                    ].map(doc => {
+                                        const fieldUrlKey = `${doc.field}Url`;
+                                        const pdfUrl = formData[fieldUrlKey];
+                                        const isUploadingThis = uploadingPdf[doc.field];
+
+                                        return (
+                                            <div key={doc.field} className="p-4 bg-slate-50/90 rounded-2xl border border-slate-200 flex flex-col justify-between space-y-3 hover:border-amber-300 transition-all shadow-xs">
+                                                <div>
+                                                    <div className="flex items-center justify-between mb-1.5">
+                                                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                                                            <MdPictureAsPdf className="text-rose-600 flex-shrink-0" size={16} />
+                                                            {doc.title}
+                                                        </span>
+                                                        {pdfUrl && (
+                                                            <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-md text-[9px] font-black uppercase tracking-wider">
+                                                                Uploaded
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-[10px] text-slate-400 font-medium leading-normal">
+                                                        {doc.description}
+                                                    </p>
+                                                </div>
+
+                                                {pdfUrl ? (
+                                                    <div className="p-2.5 bg-white rounded-xl border border-slate-200 space-y-2">
+                                                        <div className="flex items-center justify-between gap-2">
+                                                            <span className="text-xs font-bold text-slate-700 truncate flex items-center gap-1.5" title={pdfUrl}>
+                                                                <MdDescription className="text-rose-500 flex-shrink-0" size={16} />
+                                                                <span className="truncate">{getPdfFileName(pdfUrl)}</span>
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex items-center gap-1.5 pt-1.5 border-t border-slate-100">
+                                                            <a
+                                                                href={resolveImageUrl(pdfUrl)}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="flex-1 py-1.5 px-2 bg-teal-50 hover:bg-teal-100 text-teal-700 rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center justify-center gap-1 transition-all border border-teal-200"
+                                                            >
+                                                                <MdVisibility size={14} /> View PDF
+                                                            </a>
+                                                            <label className="py-1.5 px-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[9px] font-black uppercase tracking-wider cursor-pointer flex items-center justify-center gap-1 transition-all border border-slate-200">
+                                                                <input
+                                                                    type="file"
+                                                                    accept=".pdf,application/pdf"
+                                                                    onChange={(e) => handlePdfUpload(e, doc.field, doc.title)}
+                                                                    disabled={isUploadingThis}
+                                                                    className="hidden"
+                                                                />
+                                                                <MdFileUpload size={14} /> Replace
+                                                            </label>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setFormData(prev => ({ ...prev, [fieldUrlKey]: '' }))}
+                                                                className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg transition-all border border-rose-200"
+                                                                title="Remove PDF"
+                                                            >
+                                                                <MdDelete size={14} />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <label className="border-2 border-dashed border-slate-200 hover:border-amber-500 bg-white rounded-xl p-3 flex flex-col items-center justify-center cursor-pointer transition-all group text-center">
+                                                        <input
+                                                            type="file"
+                                                            accept=".pdf,application/pdf"
+                                                            onChange={(e) => handlePdfUpload(e, doc.field, doc.title)}
+                                                            disabled={isUploadingThis}
+                                                            className="hidden"
+                                                        />
+                                                        {isUploadingThis ? (
+                                                            <div className="flex items-center gap-2 py-1">
+                                                                <div className="w-4 h-4 border-2 border-amber-600 border-t-transparent rounded-full animate-spin"></div>
+                                                                <span className="text-[10px] font-black text-amber-700 uppercase tracking-widest">Uploading...</span>
+                                                            </div>
+                                                        ) : (
+                                                            <>
+                                                                <div className="w-8 h-8 bg-rose-50 rounded-xl flex items-center justify-center text-rose-500 group-hover:scale-110 transition-transform mb-1 border border-rose-100">
+                                                                    <MdCloudUpload size={18} />
+                                                                </div>
+                                                                <span className="text-[10px] font-black text-slate-700 uppercase tracking-wider group-hover:text-amber-600">
+                                                                    Upload PDF
+                                                                </span>
+                                                                <span className="text-[9px] text-slate-400 font-semibold mt-0.5">
+                                                                    Max 10 MB (.pdf)
+                                                                </span>
+                                                            </>
+                                                        )}
+                                                    </label>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
                             </div>
 
                             {/* Attributes Selection */}

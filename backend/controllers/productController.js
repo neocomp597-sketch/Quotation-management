@@ -182,7 +182,7 @@ const buildProductResponse = (productDoc) => {
 
 const fetchProductByIdWithRelations = (id) => {
     return Product.findById(id)
-        .select('productCode productName categoryId hsnCode gstPercentage basePrice mrp uom productImageUrl status mgr1 mgr2 mgr3 mgr4 mgr5 attributes vendors catalogType subscriptionDetails rentalDetails inventory pricing createdAt updatedAt')
+        .select('productCode productName categoryId hsnCode gstPercentage basePrice mrp uom productImageUrl status mgr1 mgr2 mgr3 mgr4 mgr5 attributes vendors catalogType subscriptionDetails rentalDetails inventory pricing technicalSpecificationUrl operatingUserManualUrl repairTroubleshootingUrl createdAt updatedAt')
         .populate('categoryId', 'name status')
         .populate('mgr1', 'code description status')
         .populate('mgr2', 'code description status')
@@ -219,7 +219,10 @@ const createProduct = async (req, res) => {
             subscriptionDetails,
             rentalDetails,
             inventory,
-            pricing
+            pricing,
+            technicalSpecificationUrl,
+            operatingUserManualUrl,
+            repairTroubleshootingUrl
         } = req.body;
 
         if (!productCode || !productName || !hsnCode) {
@@ -285,7 +288,10 @@ const createProduct = async (req, res) => {
             subscriptionDetails,
             rentalDetails,
             inventory,
-            pricing
+            pricing,
+            technicalSpecificationUrl: technicalSpecificationUrl || '',
+            operatingUserManualUrl: operatingUserManualUrl || '',
+            repairTroubleshootingUrl: repairTroubleshootingUrl || ''
         });
 
         if (preparedVendors.length) {
@@ -324,7 +330,7 @@ const getAllProducts = async (req, res) => {
         }
 
         let productsQuery = Product.find(query)
-            .select('productCode productName categoryId hsnCode gstPercentage basePrice mrp uom productImageUrl status mgr1 mgr2 mgr3 mgr4 mgr5 attributes vendors catalogType subscriptionDetails rentalDetails inventory pricing updatedAt')
+            .select('productCode productName categoryId hsnCode gstPercentage basePrice mrp uom productImageUrl status mgr1 mgr2 mgr3 mgr4 mgr5 attributes vendors catalogType subscriptionDetails rentalDetails inventory pricing technicalSpecificationUrl operatingUserManualUrl repairTroubleshootingUrl updatedAt')
             .populate('categoryId', 'name status')
             .populate('mgr1', 'code description status')
             .populate('mgr2', 'code description status')
@@ -455,7 +461,10 @@ const updateProduct = async (req, res) => {
             subscriptionDetails,
             rentalDetails,
             inventory,
-            pricing
+            pricing,
+            technicalSpecificationUrl,
+            operatingUserManualUrl,
+            repairTroubleshootingUrl
         } = req.body;
 
         const updateData = {
@@ -480,6 +489,9 @@ const updateProduct = async (req, res) => {
             rentalDetails,
             inventory,
             pricing,
+            technicalSpecificationUrl: technicalSpecificationUrl ?? '',
+            operatingUserManualUrl: operatingUserManualUrl ?? '',
+            repairTroubleshootingUrl: repairTroubleshootingUrl ?? '',
             updatedAt: new Date()
         };
 
@@ -497,7 +509,7 @@ const updateProduct = async (req, res) => {
             updateData,
             { new: true, runValidators: true }
         )
-            .select('productCode productName categoryId hsnCode gstPercentage basePrice mrp uom productImageUrl status mgr1 mgr2 mgr3 mgr4 mgr5 attributes vendors catalogType subscriptionDetails rentalDetails inventory pricing createdAt updatedAt')
+            .select('productCode productName categoryId hsnCode gstPercentage basePrice mrp uom productImageUrl status mgr1 mgr2 mgr3 mgr4 mgr5 attributes vendors catalogType subscriptionDetails rentalDetails inventory pricing technicalSpecificationUrl operatingUserManualUrl repairTroubleshootingUrl createdAt updatedAt')
             .populate('categoryId', 'name status')
             .populate('mgr1', 'code description status')
             .populate('mgr2', 'code description status')

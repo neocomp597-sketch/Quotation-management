@@ -295,6 +295,7 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
     const [checkInSelfie, setCheckInSelfie] = useState('');
     const [checkInNotes, setCheckInNotes] = useState('');
     const [uploadingSelfie, setUploadingSelfie] = useState(false);
+    const [isLocating, setIsLocating] = useState(false);
     const [submittingCheckIn, setSubmittingCheckIn] = useState(false);
     const [submittingCheckOut, setSubmittingCheckOut] = useState(false);
     const [attendanceDateFilter, setAttendanceDateFilter] = useState('');
@@ -308,6 +309,185 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
             return {};
         }
     })();
+
+    const fetchAccurateLocation = async (lat, lng) => {
+        let detailedAddress = '';
+        let detailedArea = '';
+
+        // 1. Google Maps JS API Geocoder (if available)
+        if (window.google && window.google.maps && window.google.maps.Geocoder) {
+            try {
+                const geocoder = new window.google.maps.Geocoder();
+                const result = await new Promise((resolve) => {
+                    geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+                        if (status === 'OK' && results && results[0]) {
+                            resolve(results[0].formatted_address);
+                        } else {
+                            resolve(null);
+                        }
+                    });
+                });
+                if (result) {
+                    detailedAddress = result;
+                    detailedArea = result.split(',').slice(0, 2).join(', ').trim();
+                }
+            } catch (gErr) {
+                console.warn('Google Maps Geocoder error:', gErr);
+            }
+        }
+
+        // 2. Photon (Komoot Reverse Geocoding API based on OSM)
+        if (!detailedAddress) {
+            try {
+                const pRes = await fetch(`https://photon.komoot.io/reverse?lat=${lat}&lon=${lng}`);
+                if (pRes.ok) {
+                    const pData = await pRes.json();
+                    if (pData?.features?.length > 0) {
+                        const props = pData.features[0].properties || {};
+                        const name = props.name || props.housenumber || '';
+                        const street = props.street || '';
+                        const district = props.district || props.suburb || props.neighbourhood || props.quarter || '';
+                        const city = props.city || props.town || props.county || '';
+                        const state = props.state || '';
+                        const postcode = props.postcode ? ` - ${props.postcode}` : '';
+
+                        const parts = [name, street, district, city, state ? `${state}${postcode}` : postcode].filter(Boolean);
+                        if (parts.length >= 2) {
+                            detailedAddress = parts.join(', ');
+                            detailedArea = [name || street, district || city].filter(Boolean).join(', ');
+                        }
+                    }
+                }
+            } catch (pErr) {
+                console.warn('Photon geocoding error:', pErr);
+            }
+        }
+
+        // 3. OpenStreetMap / Nominatim API (with zoom=18 & extratags)
+        try {
+            const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&extratags=1`, {
+                headers: { 'Accept-Language': 'en-US,en;q=0.9' }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                let nomAddr = '';
+                let nomArea = '';
+
+                if (data && data.address) {
+                    const addr = data.address;
+                    const spot = addr.building || addr.amenity || addr.shop || addr.office || addr.commercial || addr.industrial || addr.historic || addr.tourism || addr.leisure || (addr.house_number ? `No. ${addr.house_number}` : '');
+                    const street = addr.road || addr.street || addr.pedestrian || addr.footway || addr.path || '';
+                    const subLocality = addr.suburb || addr.neighbourhood || addr.residential || addr.quarter || addr.city_district || addr.hamlet || addr.subdistrict || '';
+                    const mainLocality = addr.city || addr.town || addr.village || addr.municipality || addr.county || '';
+                    const stateStr = addr.state || '';
+                    const pinStr = addr.postcode ? ` - ${addr.postcode}` : '';
+
+                    const areaParts = [spot, street, subLocality, mainLocality].filter(Boolean);
+                    if (areaParts.length > 0) {
+                        nomArea = areaParts.slice(0, 2).join(', ');
+                    }
+
+                    const addrParts = [spot, street, subLocality, mainLocality, stateStr ? `${stateStr}${pinStr}` : pinStr].filter(Boolean);
+                    if (addrParts.length >= 3) {
+                        nomAddr = addrParts.join(', ');
+                    }
+                }
+
+                // If display_name is richer than constructed address (or if constructed address has less detail), use display_name
+                if (data?.display_name) {
+                    const cleanDisplayName = data.display_name.replace(/,\s*India$/i, '').trim();
+                    if (!nomAddr || cleanDisplayName.split(',').length > nomAddr.split(',').length) {
+                        nomAddr = cleanDisplayName;
+                    }
+                }
+
+                if (nomAddr && (!detailedAddress || nomAddr.split(',').length > detailedAddress.split(',').length)) {
+                    detailedAddress = nomAddr;
+                }
+                if (nomArea && (!detailedArea || detailedArea.split(',').length < 2)) {
+                    detailedArea = nomArea;
+                }
+            }
+        } catch (e) {
+            console.warn('Nominatim reverse geocoding error:', e);
+        }
+
+        // 4. BigDataCloud API (fallback)
+        if (!detailedAddress || detailedAddress.split(',').length < 2) {
+            try {
+                const bdcRes = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`);
+                if (bdcRes.ok) {
+                    const bdcData = await bdcRes.json();
+                    if (bdcData) {
+                        const locality = bdcData.locality || bdcData.city || bdcData.principalSubdivision || '';
+                        const informative = bdcData.localityInfo?.informative || [];
+                        const infoNames = informative.map(i => i.name).filter(n => n && n !== locality);
+                        const subLocality = infoNames.join(', ');
+
+                        if (subLocality || locality) {
+                            const bdcAddr = [subLocality, locality, bdcData.principalSubdivision, bdcData.postcode].filter(Boolean).join(', ');
+                            if (bdcAddr && (!detailedAddress || bdcAddr.length > detailedAddress.length)) {
+                                detailedAddress = bdcAddr;
+                            }
+                            if (!detailedArea) {
+                                detailedArea = [infoNames[0] || subLocality, locality].filter(Boolean).join(', ');
+                            }
+                        }
+                    }
+                }
+            } catch (err) {
+                console.warn('BigDataCloud geocoding error:', err);
+            }
+        }
+
+        if (!detailedArea && detailedAddress) {
+            detailedArea = detailedAddress.split(',').slice(0, 2).join(', ').trim();
+        }
+
+        return {
+            address: detailedAddress || `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`,
+            areaName: detailedArea || 'Field Location'
+        };
+    };
+
+    const fetchGpsLocation = () => {
+        setIsLocating(true);
+        setCheckInAddress('Locking onto high-precision GPS signal...');
+
+        if (!navigator.geolocation) {
+            setCheckInLat(18.5204);
+            setCheckInLng(73.8567);
+            setCheckInAddress('Shivajinagar, Pune');
+            setCheckInAreaName(prev => prev ? prev : 'Shivajinagar Area');
+            setIsLocating(false);
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+            async (pos) => {
+                const lat = pos.coords.latitude;
+                const lng = pos.coords.longitude;
+                setCheckInLat(lat);
+                setCheckInLng(lng);
+
+                const locData = await fetchAccurateLocation(lat, lng);
+                setCheckInAddress(locData.address);
+                if (locData.areaName) {
+                    setCheckInAreaName(prev => prev ? prev : locData.areaName);
+                }
+                setIsLocating(false);
+            },
+            (err) => {
+                console.warn('Geolocation error:', err);
+                setCheckInLat(18.5204);
+                setCheckInLng(73.8567);
+                setCheckInAddress('Pune Field Location (Lat: 18.5204, Lng: 73.8567)');
+                setCheckInAreaName(prev => prev ? prev : 'Pune Central Area');
+                setIsLocating(false);
+            },
+            { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+        );
+    };
 
     const fetchAttendanceRecords = async () => {
         setLoadingAttendance(true);
@@ -336,52 +516,13 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
 
     const handleOpenAttendanceModal = () => {
         setCheckInAreaName('');
-        setCheckInAddress('Fetching GPS location...');
+        setCheckInAddress('Locking onto high-precision GPS signal...');
         setCheckInLat(null);
         setCheckInLng(null);
         setCheckInSelfie('');
         setCheckInNotes('');
         setShowAttendanceModal(true);
-
-        if (!navigator.geolocation) {
-            setCheckInLat(18.5204);
-            setCheckInLng(73.8567);
-            setCheckInAddress('Shivajinagar, Pune');
-            setCheckInAreaName('Shivajinagar Area');
-            return;
-        }
-
-        navigator.geolocation.getCurrentPosition(
-            async (pos) => {
-                const lat = pos.coords.latitude;
-                const lng = pos.coords.longitude;
-                setCheckInLat(lat);
-                setCheckInLng(lng);
-                let addressName = `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`;
-                try {
-                    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
-                    const data = await response.json();
-                    if (data && data.display_name) {
-                        const parts = data.display_name.split(',');
-                        addressName = parts.slice(0, 4).join(',').trim();
-                        if (parts.length > 1) {
-                            setCheckInAreaName(parts[0].trim());
-                        }
-                    }
-                } catch (e) {
-                    console.warn('Reverse geocoding error:', e);
-                }
-                setCheckInAddress(addressName);
-            },
-            (err) => {
-                console.warn('Geolocation error:', err);
-                setCheckInLat(18.5204);
-                setCheckInLng(73.8567);
-                setCheckInAddress('Pune Field Location (Lat: 18.5204, Lng: 73.8567)');
-                setCheckInAreaName('Pune Central Area');
-            },
-            { enableHighAccuracy: true, timeout: 10000 }
-        );
+        fetchGpsLocation();
     };
 
     const handleSelfieChange = async (e) => {
@@ -455,14 +596,22 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
             let lat = activeAttendance.checkInLocation?.latitude || 18.5204;
             let lng = activeAttendance.checkInLocation?.longitude || 73.8567;
             let address = activeAttendance.checkInLocation?.address || 'Site Location';
+            let areaName = activeAttendance.checkInLocation?.areaName || 'Field Location';
 
             if (navigator.geolocation) {
                 try {
                     const pos = await new Promise((resolve, reject) => {
-                        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 });
+                        navigator.geolocation.getCurrentPosition(resolve, reject, { 
+                            enableHighAccuracy: true, 
+                            timeout: 15000, 
+                            maximumAge: 0 
+                        });
                     });
                     lat = pos.coords.latitude;
                     lng = pos.coords.longitude;
+                    const locData = await fetchAccurateLocation(lat, lng);
+                    address = locData.address;
+                    if (locData.areaName) areaName = locData.areaName;
                 } catch {
                     // ignore
                 }
@@ -470,7 +619,7 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
 
             const payload = {
                 attendanceId: activeAttendance._id,
-                areaName: activeAttendance.checkInLocation?.areaName || 'Field Location',
+                areaName,
                 address,
                 latitude: lat,
                 longitude: lng
@@ -663,26 +812,13 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
             return;
         }
 
-        toast.info('Fetching GPS location & area address...');
+        toast.info('Locking onto high-precision GPS location...');
         navigator.geolocation.getCurrentPosition(
             async (pos) => {
                 const lat = pos.coords.latitude;
                 const lng = pos.coords.longitude;
-                let addressName = '';
-                try {
-                    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
-                    const data = await response.json();
-                    if (data && data.display_name) {
-                        const parts = data.display_name.split(',');
-                        addressName = parts.slice(0, 4).join(',').trim();
-                    }
-                } catch (e) {
-                    console.warn('Reverse geocoding error:', e);
-                }
-
-                const formattedAddress = addressName
-                    ? `${addressName} (Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)})`
-                    : `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`;
+                const locData = await fetchAccurateLocation(lat, lng);
+                const formattedAddress = `${locData.address} (Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)})`;
 
                 executeCheckIn(visitId, lat, lng, formattedAddress);
             },
@@ -690,7 +826,7 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
                 console.warn('Geolocation error, falling back:', err);
                 executeCheckIn(visitId, 18.5204, 73.8567, 'Pune Technical Hub (Lat: 18.5204, Lng: 73.8567)');
             },
-            { enableHighAccuracy: true, timeout: 10000 }
+            { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
         );
     };
 
@@ -2116,11 +2252,43 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
                         />
                     </div>
 
-                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
-                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest">GPS Location Detected</label>
-                        <p className="text-xs font-semibold text-slate-800">{checkInAddress}</p>
+                    <div className="p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2 shadow-xs">
+                        <div className="flex items-center justify-between">
+                            <label className="block text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">
+                                GPS Location / Exact Street Address *
+                            </label>
+                            <button
+                                type="button"
+                                onClick={fetchGpsLocation}
+                                disabled={isLocating}
+                                className="text-[10px] font-bold text-teal-600 dark:text-teal-400 hover:text-teal-800 dark:hover:text-teal-300 flex items-center gap-1 cursor-pointer transition-colors"
+                                title="Re-query device GPS hardware for maximum precision"
+                            >
+                                <MdRefresh size={14} className={isLocating ? 'animate-spin' : ''} />
+                                {isLocating ? 'Acquiring GPS...' : 'Refresh High-Accuracy GPS'}
+                            </button>
+                        </div>
+                        <textarea
+                            rows={2}
+                            value={checkInAddress}
+                            onChange={(e) => setCheckInAddress(e.target.value)}
+                            placeholder="Auto-detecting exact location or type full street address..."
+                            className="w-full px-3 py-2 text-xs font-semibold text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none leading-relaxed resize-none shadow-inner"
+                        />
                         {checkInLat && checkInLng && (
-                            <p className="text-[10px] font-mono text-teal-700">Lat: {checkInLat.toFixed(5)}, Lng: {checkInLng.toFixed(5)}</p>
+                            <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 dark:border-slate-700/60">
+                                <p className="text-[10px] font-mono text-teal-700 dark:text-teal-300 font-bold">
+                                    Lat: {checkInLat.toFixed(5)}, Lng: {checkInLng.toFixed(5)}
+                                </p>
+                                <a
+                                    href={`https://www.google.com/maps?q=${checkInLat},${checkInLng}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-[10px] font-bold text-teal-600 dark:text-teal-400 hover:underline flex items-center gap-1"
+                                >
+                                    <MdMap size={12} /> View Map Pin
+                                </a>
+                            </div>
                         )}
                     </div>
 

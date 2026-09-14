@@ -336,6 +336,15 @@ export const uploadService = {
       },
     });
   },
+  uploadPdf: (file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return api.post("/upload/pdf", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+  },
 };
 
 export const importService = {

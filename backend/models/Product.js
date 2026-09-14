@@ -39,6 +39,11 @@ const ProductSchema = new mongoose.Schema({
     attributes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Attribute' }],
     vendors: { type: [ProductVendorSchema], default: [] },
 
+    // Service Visit Parts & Documentation PDFs
+    technicalSpecificationUrl: { type: String, trim: true, default: '' },
+    operatingUserManualUrl: { type: String, trim: true, default: '' },
+    repairTroubleshootingUrl: { type: String, trim: true, default: '' },
+
     // Catalog Sub-Types Extensions
     catalogType: {
         type: String,

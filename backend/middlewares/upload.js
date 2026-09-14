@@ -14,4 +14,20 @@ const upload = multer({
     },
 });
 
+const uploadPdf = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+        fileSize: 10 * 1024 * 1024, // 10MB
+    },
+    fileFilter: (req, file, cb) => {
+        const isPdfType = file.mimetype === "application/pdf" || file.mimetype === "application/x-pdf";
+        const isPdfExt = String(file.originalname || "").toLowerCase().endsWith(".pdf");
+        if (!isPdfType && !isPdfExt) {
+            return cb(new Error("Only PDF files are allowed"), false);
+        }
+        cb(null, true);
+    },
+});
+
 module.exports = upload;
+module.exports.uploadPdf = uploadPdf;
