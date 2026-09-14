@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { csmService, customerService, productService, voucherService, userService, importService, uploadService, branchService } from '../services/api';
@@ -225,6 +225,12 @@ const CSMTickets = () => {
     const [isSearchingManualSerials, setIsSearchingManualSerials] = useState(false);
     const [showManualSerialDropdown, setShowManualSerialDropdown] = useState(false);
 
+    const lookupInFlightRef = useRef(false);
+    const lastLookedUpSNRef = useRef('');
+
+    const manualLookupInFlightRef = useRef(false);
+    const lastManualLookedUpSNRef = useRef('');
+
     const handleSerialInputChange = async (val) => {
         setFormData(prev => ({ ...prev, serialNumber: val }));
         const query = val ? String(val).trim() : '';
@@ -252,7 +258,7 @@ const CSMTickets = () => {
         if (asset) {
             if (asset.serialNumber) {
                 setFormData(prev => ({ ...prev, serialNumber: asset.serialNumber }));
-                handleSerialNoLookup(asset.serialNumber, asset);
+                handleSerialNoLookup(asset.serialNumber, asset, true);
             }
         }
     };
@@ -284,14 +290,22 @@ const CSMTickets = () => {
         if (asset) {
             if (asset.serialNumber) {
                 setManualFormData(prev => ({ ...prev, serialNumber: asset.serialNumber }));
-                handleManualSerialLookup(asset.serialNumber, asset);
+                handleManualSerialLookup(asset.serialNumber, asset, true);
             }
         }
     };
 
-    const handleManualSerialLookup = async (serialNo, preloadedAsset = null) => {
+    const handleManualSerialLookup = async (serialNo, preloadedAsset = null, isExplicit = false) => {
         const cleanSN = String(serialNo || '').trim();
         if (!cleanSN && !preloadedAsset) return;
+
+        const lookupKey = preloadedAsset?._id ? ('id:' + preloadedAsset._id) : ('sn:' + cleanSN.toLowerCase());
+        if (manualLookupInFlightRef.current && lastManualLookedUpSNRef.current === lookupKey) return;
+        if (!isExplicit && !preloadedAsset && lastManualLookedUpSNRef.current === lookupKey) return;
+
+        manualLookupInFlightRef.current = true;
+        lastManualLookedUpSNRef.current = lookupKey;
+
         try {
             const summaryParams = preloadedAsset?._id ? { assetId: preloadedAsset._id } : { serialNumber: cleanSN };
             const res = await csmService.getAssetSummary(summaryParams);
@@ -406,7 +420,14 @@ const CSMTickets = () => {
                 toast.info('No matching serial number found in Invoice Bulk Upload. Continuing with manual entry.');
             }
         } catch (err) {
-            console.error('Error looking up manual serial number:', err);
+            if (err.response?.status === 404) {
+                toast.info('No matching serial number found in Invoice Bulk Upload. Continuing with manual entry.');
+            } else {
+                console.error('Error looking up manual serial number:', err);
+                toast.error(err.response?.data?.message || 'Failed to lookup serial number');
+            }
+        } finally {
+            manualLookupInFlightRef.current = false;
         }
     };
 
@@ -1297,10 +1318,17 @@ const CSMTickets = () => {
         fetchTickets();
     };
 
-    const handleSerialNoLookup = async (serialNo, preloadedAsset = null) => {
+    const handleSerialNoLookup = async (serialNo, preloadedAsset = null, isExplicit = false) => {
         const cleanSN = String(serialNo || '').trim();
         if (!cleanSN && !preloadedAsset) return;
         
+        const lookupKey = preloadedAsset?._id ? ('id:' + preloadedAsset._id) : ('sn:' + cleanSN.toLowerCase());
+        if (lookupInFlightRef.current && lastLookedUpSNRef.current === lookupKey) return;
+        if (!isExplicit && !preloadedAsset && lastLookedUpSNRef.current === lookupKey) return;
+
+        lookupInFlightRef.current = true;
+        lastLookedUpSNRef.current = lookupKey;
+
         try {
             const summaryParams = preloadedAsset?._id ? { assetId: preloadedAsset._id } : { serialNumber: cleanSN };
             const res = await csmService.getAssetSummary(summaryParams);
@@ -1521,8 +1549,14 @@ const CSMTickets = () => {
                 toast.info('No matching serial number found in Master or Transaction data. Continuing with manual entry.');
             }
         } catch (err) {
-            console.error('Error looking up serial number:', err);
-            toast.error('Failed to lookup serial number');
+            if (err.response?.status === 404) {
+                toast.info('No matching serial number found in Master or Transaction data. Continuing with manual entry.');
+            } else {
+                console.error('Error looking up serial number:', err);
+                toast.error(err.response?.data?.message || 'Failed to lookup serial number');
+            }
+        } finally {
+            lookupInFlightRef.current = false;
         }
     };
 
@@ -2305,7 +2339,7 @@ const CSMTickets = () => {
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter') {
                                             e.preventDefault();
-                                            handleSerialNoLookup(formData.serialNumber);
+                                            handleSerialNoLookup(formData.serialNumber, null, true);
                                         }
                                     }}
                                     onFocus={() => {
@@ -2316,7 +2350,7 @@ const CSMTickets = () => {
                                     onBlur={() => {
                                         setTimeout(() => setShowSerialDropdown(false), 200);
                                         if (formData.serialNumber && formData.serialNumber.trim().length >= 2) {
-                                            handleSerialNoLookup(formData.serialNumber);
+                                            handleSerialNoLookup(formData.serialNumber, null, false);
                                         }
                                     }}
                                     className="w-full pl-4 pr-12 py-3 rounded-xl border border-primary-200 bg-white text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all shadow-sm"
@@ -2324,7 +2358,7 @@ const CSMTickets = () => {
                                 />
                                 <button
                                     type="button"
-                                    onClick={() => handleSerialNoLookup(formData.serialNumber)}
+                                    onClick={() => handleSerialNoLookup(formData.serialNumber, null, true)}
                                     className="absolute right-2 top-1.5 p-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-all shadow-sm flex items-center justify-center"
                                     title="Lookup Serial Number & Auto-fill Details"
                                 >
@@ -3191,7 +3225,7 @@ const CSMTickets = () => {
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter') {
                                             e.preventDefault();
-                                            handleManualSerialLookup(manualFormData.serialNumber);
+                                            handleManualSerialLookup(manualFormData.serialNumber, null, true);
                                         }
                                     }}
                                     onFocus={() => {
@@ -3202,14 +3236,14 @@ const CSMTickets = () => {
                                     onBlur={() => {
                                         setTimeout(() => setShowManualSerialDropdown(false), 200);
                                         if (manualFormData.serialNumber && manualFormData.serialNumber.trim().length >= 2) {
-                                            handleManualSerialLookup(manualFormData.serialNumber);
+                                            handleManualSerialLookup(manualFormData.serialNumber, null, false);
                                         }
                                     }}
                                     className="w-full pl-4 pr-12 py-3 rounded-xl border border-primary-200 bg-white text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all shadow-sm"
                                 />
                                 <button
                                     type="button"
-                                    onClick={() => handleManualSerialLookup(manualFormData.serialNumber)}
+                                    onClick={() => handleManualSerialLookup(manualFormData.serialNumber, null, true)}
                                     className="absolute right-2 top-1.5 p-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-all shadow-sm flex items-center justify-center"
                                     title="Lookup Serial Number & Auto-fill Details"
                                 >

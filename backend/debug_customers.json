@@ -40,5 +40,12 @@
     "customerName": "rohit shirsagar",
     "companyName": "rohit shirsagar",
     "gstin": ""
+  },
+  {
+    "_id": "6aa5274927f751c81c90d425",
+    "customerName": "Gautam Budha",
+    "companyName": "BUDANIA GREEN ENERGY PRIVATE LIMITED",
+    "gstin": "",
+    "logoUrl": ""
   }
 ]
