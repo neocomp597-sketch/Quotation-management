@@ -163,6 +163,7 @@ export const MENU_PERMISSION_GROUPS = [
             { key: 'csm_tickets', label: 'My Tickets', description: 'Tickets created by or assigned to the logged-in user', defaultRoute: '/csm/tickets?tab=my' },
             { key: 'csm_tickets', label: 'My Team Tickets', description: 'Tickets for the logged-in user reporting hierarchy', defaultRoute: '/csm/tickets?tab=team' },
             { key: 'csm_visits', label: 'Service Visits', description: 'Schedule and manage service engineer visits', defaultRoute: '/csm/visits' },
+            { key: 'csm_visits', label: 'Field Attendance', description: 'Field engineer attendance register and GPS check-in/out', defaultRoute: '/csm/field-attendance' },
             { key: 'csm_warranties_amc', label: 'Warranty & AMC', description: 'Manage customer warranty details and AMC contracts', defaultRoute: '/csm/warranties-amc' },
             { key: 'csm_kb', label: 'Knowledge Base', description: 'Manage troubleshooting articles and FAQs', defaultRoute: '/csm/kb' },
             { key: 'csm_masters', label: 'CSM Config', description: 'Configure categories, priorities, teams, and SLAs', defaultRoute: '/csm/masters' },

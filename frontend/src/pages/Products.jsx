@@ -796,8 +796,8 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                     'Category': p.categoryId?.name || '',
                     'HSN Code': p.hsnCode || '',
                     'GST (%)': p.gstPercentage || 0,
-                    'Base Price': p.basePrice || 0,
-                    'MRP': p.mrp || 0,
+                    'Base Price (Excl. GST)': p.basePrice || 0,
+                    'Selling Price (Incl. GST)': p.mrp || 0,
                     'UOM': p.uom || '',
                     'Status': p.status || '',
                     'MGR 1': p.mgr1?.code || '',
@@ -1130,7 +1130,7 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                                                     </th>
                                                     <th className="px-4 py-5">Product Info</th>
                                                     <th className="px-8 py-5">Code & HSN</th>
-                                                    <th className="px-8 py-5 text-right">Pricing (Base / MRP)</th>
+                                                    <th className="px-8 py-5 text-right">Pricing (Base / Selling)</th>
                                                     <th className="px-8 py-5 text-center">Status</th>
                                                     <th className="px-8 py-5 text-right">Actions</th>
                                                 </tr>
@@ -1199,7 +1199,7 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                                                         <td className="px-8 py-5 text-right">
                                                             <div className="text-sm font-black text-slate-900">₹{p.basePrice?.toLocaleString()}</div>
                                                             <div className="text-[10px] text-slate-400">{p.vendors?.length || 0} vendors mapped</div>
-                                                            <div className="text-[10px] text-slate-400 line-through">MRP: ₹{p.mrp?.toLocaleString()}</div>
+                                                            <div className="text-[10px] text-slate-400">Selling (Incl. GST): ₹{p.mrp?.toLocaleString()}</div>
                                                         </td>
                                                         <td className="px-8 py-5 text-center">
                                                             <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-[0.1em] ${p.status === 'Active' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-slate-100 text-slate-400 border border-slate-200'
@@ -1280,7 +1280,7 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                                                         <div>
                                                             <div className="text-lg font-black text-slate-900">₹{p.basePrice?.toLocaleString()}</div>
                                                             <div className="text-[10px] text-slate-400">{p.vendors?.length || 0} vendors</div>
-                                                            <div className="text-[10px] text-slate-400 line-through">MRP: ₹{p.mrp?.toLocaleString()}</div>
+                                                            <div className="text-[10px] text-slate-400">Selling (Incl. GST): ₹{p.mrp?.toLocaleString()}</div>
                                                         </div>
                                                         <div className="flex gap-2">
                                                             <button
@@ -1574,7 +1574,7 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                                     </select>
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Excl. Tax (Base) <span className="text-rose-500">*</span></label>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Base Price (Excl. GST) <span className="text-rose-500">*</span></label>
                                     <div className="relative">
                                         <MdPayments className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
                                         <input
@@ -1589,7 +1589,7 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                                     </div>
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Incl. Tax (MRP) <span className="text-rose-500">*</span></label>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Selling Price (Incl. GST) <span className="text-rose-500">*</span></label>
                                     <input
                                         type="number"
                                         name="mrp"

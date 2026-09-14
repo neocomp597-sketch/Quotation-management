@@ -743,7 +743,36 @@ exports.types = createCrudEndpoints(TicketType, 'TicketType');
 exports.priorities = createCrudEndpoints(Priority, 'Priority');
 exports.slaPolicies = createCrudEndpoints(SlaPolicy, 'SlaPolicy');
 exports.serviceTeams = createCrudEndpoints(ServiceTeam, 'ServiceTeam');
-exports.sources = createCrudEndpoints(TicketSource, 'TicketSource');
+exports.sources = {
+    ...createCrudEndpoints(TicketSource, 'TicketSource'),
+    delete: async (req, res) => {
+        try {
+            const companyId = req.user?.companyId;
+            const Ticket = require('../models/Ticket');
+            const sourceDoc = await TicketSource.findOne({ _id: req.params.id, companyId });
+            if (!sourceDoc) return res.status(404).json({ message: 'Ticket Source not found' });
+
+            const usageCount = await Ticket.countDocuments({
+                companyId,
+                $or: [
+                    { source: sourceDoc.name },
+                    { sourceId: sourceDoc._id }
+                ]
+            });
+
+            if (usageCount > 0) {
+                return res.status(400).json({
+                    message: `Cannot delete Ticket Source '${sourceDoc.name}' because it is currently used in ${usageCount} support ticket(s).`
+                });
+            }
+
+            await TicketSource.deleteOne({ _id: sourceDoc._id });
+            res.json({ message: 'Ticket Source deleted successfully' });
+        } catch (error) {
+            res.status(500).json({ message: 'Error deleting Ticket Source: ' + error.message });
+        }
+    }
+};
 exports.designations = createCrudEndpoints(Designation, 'Designation');
 exports.problems = {
     ...createCrudEndpoints(Problem, 'Problem'),

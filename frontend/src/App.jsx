@@ -77,6 +77,7 @@ import CSMDashboard from './pages/CSMDashboard';
 import CSMTickets from './pages/CSMTickets';
 import TicketDetail from './pages/TicketDetail';
 import ServiceVisits from './pages/ServiceVisits';
+import FieldAttendance from './pages/FieldAttendance';
 import CSMVisitPlanner from './pages/CSMVisitPlanner';
 import WarrantyAMC from './pages/WarrantyAMC';
 import KnowledgeBase from './pages/KnowledgeBase';
@@ -331,6 +332,8 @@ function App() {
             <Route path="/csm/tickets" element={<PermissionRoute permissionKey="csm_tickets"><Layout><CSMTickets /></Layout></PermissionRoute>} />
             <Route path="/csm/tickets/:id" element={<PermissionRoute permissionKey="csm_tickets"><Layout><TicketDetail /></Layout></PermissionRoute>} />
             <Route path="/csm/visits" element={<PermissionRoute permissionKey="csm_visits"><Layout><ServiceVisits /></Layout></PermissionRoute>} />
+            <Route path="/csm/field-attendance" element={<PermissionRoute permissionKey="csm_visits"><Layout><FieldAttendance /></Layout></PermissionRoute>} />
+            <Route path="/csm/attendance" element={<PermissionRoute permissionKey="csm_visits"><Layout><FieldAttendance /></Layout></PermissionRoute>} />
             <Route path="/csm/visit-planner" element={<PermissionRoute permissionKey="csm_visits"><Layout><CSMVisitPlanner /></Layout></PermissionRoute>} />
             <Route path="/csm/warranties-amc" element={<PermissionRoute permissionKey="csm_warranties_amc"><Layout><WarrantyAMC /></Layout></PermissionRoute>} />
             <Route path="/csm/kb" element={<PermissionRoute permissionKey="csm_kb"><Layout><KnowledgeBase /></Layout></PermissionRoute>} />

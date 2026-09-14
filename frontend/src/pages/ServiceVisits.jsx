@@ -4,7 +4,8 @@ import { toast } from 'react-toastify';
 import { 
     MdLocalShipping, MdMyLocation, MdCheckCircle, 
     MdAssignment, MdEvent, MdAttachMoney, MdDelete, MdAdd, MdCalendarMonth, MdPhotoCamera,
-    MdMap, MdOpenInNew, MdSearch, MdClose, MdExpandMore, MdBuild, MdInventory2, MdEdit, MdPushPin
+    MdMap, MdOpenInNew, MdSearch, MdClose, MdExpandMore, MdBuild, MdInventory2, MdEdit, MdPushPin,
+    MdHowToReg, MdBadge, MdAccessTime, MdLocationOn, MdCameraAlt, MdRefresh
 } from 'react-icons/md';
 import Modal from '../components/Modal';
 
@@ -226,8 +227,17 @@ const Mgr5SearchSelect = ({ mgr5Parts, selectedId, onSelect, isCustomDesc }) => 
     );
 };
 
-const ServiceVisits = () => {
+const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
     const canvasRef = useRef(null);
+
+    // Active module tab ('visits' | 'attendance')
+    const [activeTab, setActiveTab] = useState(initialTab || 'visits');
+
+    useEffect(() => {
+        if (initialTab) {
+            setActiveTab(initialTab);
+        }
+    }, [initialTab]);
 
     const [loading, setLoading] = useState(false);
     const [visits, setVisits] = useState([]);
@@ -272,6 +282,209 @@ const ServiceVisits = () => {
     const [isPartChange, setIsPartChange] = useState(true);
     const [isCustomExpDesc, setIsCustomExpDesc] = useState(false);
     const [isDrawing, setIsDrawing] = useState(false);
+
+    // Field Attendance State & Logic
+    const [attendanceList, setAttendanceList] = useState([]);
+    const [loadingAttendance, setLoadingAttendance] = useState(false);
+    const [activeAttendance, setActiveAttendance] = useState(null);
+    const [showAttendanceModal, setShowAttendanceModal] = useState(false);
+    const [checkInAreaName, setCheckInAreaName] = useState('');
+    const [checkInAddress, setCheckInAddress] = useState('');
+    const [checkInLat, setCheckInLat] = useState(null);
+    const [checkInLng, setCheckInLng] = useState(null);
+    const [checkInSelfie, setCheckInSelfie] = useState('');
+    const [checkInNotes, setCheckInNotes] = useState('');
+    const [uploadingSelfie, setUploadingSelfie] = useState(false);
+    const [submittingCheckIn, setSubmittingCheckIn] = useState(false);
+    const [submittingCheckOut, setSubmittingCheckOut] = useState(false);
+    const [attendanceDateFilter, setAttendanceDateFilter] = useState('');
+    const [attendanceEngineerFilter, setAttendanceEngineerFilter] = useState('all');
+    const [selectedAttendanceSelfie, setSelectedAttendanceSelfie] = useState(null);
+
+    const currentUser = (() => {
+        try {
+            return JSON.parse(localStorage.getItem('user') || '{}');
+        } catch {
+            return {};
+        }
+    })();
+
+    const fetchAttendanceRecords = async () => {
+        setLoadingAttendance(true);
+        try {
+            const params = {};
+            if (attendanceDateFilter) params.date = attendanceDateFilter;
+            if (attendanceEngineerFilter && attendanceEngineerFilter !== 'all') params.engineerId = attendanceEngineerFilter;
+            const res = await csmService.getAttendance(params);
+            const data = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+            setAttendanceList(data);
+        } catch (error) {
+            console.error('Failed to load attendance history', error);
+        } finally {
+            setLoadingAttendance(false);
+        }
+    };
+
+    const fetchActiveAttendance = async () => {
+        try {
+            const res = await csmService.getActiveAttendance();
+            setActiveAttendance(res.data?.activeRecord || null);
+        } catch (error) {
+            console.error('Failed to fetch active attendance status', error);
+        }
+    };
+
+    const handleOpenAttendanceModal = () => {
+        setCheckInAreaName('');
+        setCheckInAddress('Fetching GPS location...');
+        setCheckInLat(null);
+        setCheckInLng(null);
+        setCheckInSelfie('');
+        setCheckInNotes('');
+        setShowAttendanceModal(true);
+
+        if (!navigator.geolocation) {
+            setCheckInLat(18.5204);
+            setCheckInLng(73.8567);
+            setCheckInAddress('Shivajinagar, Pune');
+            setCheckInAreaName('Shivajinagar Area');
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+            async (pos) => {
+                const lat = pos.coords.latitude;
+                const lng = pos.coords.longitude;
+                setCheckInLat(lat);
+                setCheckInLng(lng);
+                let addressName = `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`;
+                try {
+                    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
+                    const data = await response.json();
+                    if (data && data.display_name) {
+                        const parts = data.display_name.split(',');
+                        addressName = parts.slice(0, 4).join(',').trim();
+                        if (parts.length > 1) {
+                            setCheckInAreaName(parts[0].trim());
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Reverse geocoding error:', e);
+                }
+                setCheckInAddress(addressName);
+            },
+            (err) => {
+                console.warn('Geolocation error:', err);
+                setCheckInLat(18.5204);
+                setCheckInLng(73.8567);
+                setCheckInAddress('Pune Field Location (Lat: 18.5204, Lng: 73.8567)');
+                setCheckInAreaName('Pune Central Area');
+            },
+            { enableHighAccuracy: true, timeout: 10000 }
+        );
+    };
+
+    const handleSelfieChange = async (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        setUploadingSelfie(true);
+        try {
+            const res = await uploadService.uploadImage(file);
+            const photoUrl = res.data?.url || res.data?.imageUrl;
+            if (photoUrl) {
+                setCheckInSelfie(photoUrl);
+                toast.success('Selfie captured successfully!');
+            } else {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    setCheckInSelfie(reader.result);
+                    toast.success('Selfie attached!');
+                };
+                reader.readAsDataURL(file);
+            }
+        } catch (err) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setCheckInSelfie(reader.result);
+                toast.success('Selfie attached!');
+            };
+            reader.readAsDataURL(file);
+        } finally {
+            setUploadingSelfie(false);
+        }
+    };
+
+    const handleSubmitAttendanceCheckIn = async (e) => {
+        e.preventDefault();
+        if (!checkInSelfie) {
+            toast.error('Selfie photo is mandatory to mark Check-In');
+            return;
+        }
+        if (!checkInAreaName.trim()) {
+            toast.error('Area Name is required');
+            return;
+        }
+
+        setSubmittingCheckIn(true);
+        try {
+            const payload = {
+                employeeName: currentUser.name || 'Field Engineer',
+                areaName: checkInAreaName.trim(),
+                address: checkInAddress,
+                latitude: checkInLat,
+                longitude: checkInLng,
+                selfieUrl: checkInSelfie,
+                notes: checkInNotes
+            };
+            await csmService.checkInAttendance(payload);
+            toast.success('Field Attendance Check-In recorded successfully!');
+            setShowAttendanceModal(false);
+            fetchActiveAttendance();
+            if (activeTab === 'attendance') fetchAttendanceRecords();
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Attendance Check-In failed');
+        } finally {
+            setSubmittingCheckIn(false);
+        }
+    };
+
+    const handleSubmitAttendanceCheckOut = async () => {
+        if (!activeAttendance) return;
+        setSubmittingCheckOut(true);
+        try {
+            let lat = activeAttendance.checkInLocation?.latitude || 18.5204;
+            let lng = activeAttendance.checkInLocation?.longitude || 73.8567;
+            let address = activeAttendance.checkInLocation?.address || 'Site Location';
+
+            if (navigator.geolocation) {
+                try {
+                    const pos = await new Promise((resolve, reject) => {
+                        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 });
+                    });
+                    lat = pos.coords.latitude;
+                    lng = pos.coords.longitude;
+                } catch {
+                    // ignore
+                }
+            }
+
+            const payload = {
+                attendanceId: activeAttendance._id,
+                areaName: activeAttendance.checkInLocation?.areaName || 'Field Location',
+                address,
+                latitude: lat,
+                longitude: lng
+            };
+            await csmService.checkOutAttendance(payload);
+            toast.success('Field Attendance Check-Out recorded successfully!');
+            fetchActiveAttendance();
+            if (activeTab === 'attendance') fetchAttendanceRecords();
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Attendance Check-Out failed');
+        } finally {
+            setSubmittingCheckOut(false);
+        }
+    };
 
     const handleSelectVisit = (v) => {
         setSelectedVisit(v);
@@ -388,7 +601,14 @@ const ServiceVisits = () => {
         fetchEngineers();
         fetchTickets();
         fetchMgr5Parts();
+        fetchActiveAttendance();
     }, []);
+
+    useEffect(() => {
+        if (activeTab === 'attendance') {
+            fetchAttendanceRecords();
+        }
+    }, [activeTab, attendanceDateFilter, attendanceEngineerFilter]);
 
     // Open create visit modal
     const handleOpenCreateModal = async (preselectedTicketId = '') => {
@@ -721,26 +941,95 @@ const ServiceVisits = () => {
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-black tracking-tight text-slate-900 font-outfit uppercase">
-                        Field Service Visits Queue
+                    <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white font-outfit uppercase">
+                        {hideTabs 
+                            ? (activeTab === 'attendance' ? 'Field Engineer Attendance' : 'Field Service Visits Queue') 
+                            : 'Field Service Visits & Attendance'}
                     </h1>
-                    <p className="text-slate-500 font-semibold text-sm">
-                        Manage service engineers visits, check-ins, reports, and customer approvals.
+                    <p className="text-slate-500 dark:text-slate-400 font-semibold text-sm">
+                        {activeTab === 'attendance' 
+                            ? 'Track daily engineer duty, check-in timestamps, GPS location, and selfie verification.' 
+                            : 'Manage field engineer dispatches, service reports, check-ins, and daily field attendance.'}
                     </p>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
-                    <button
-                        onClick={() => handleOpenCreateModal()}
-                        className="px-5 py-3 bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-xs tracking-wider rounded-2xl transition-all shadow-md flex items-center justify-center gap-2 active:scale-95 shrink-0"
-                    >
-                        <MdAdd size={20} />
-                        Schedule Field Visit
-                    </button>
+                    {activeTab === 'visits' ? (
+                        <button
+                            onClick={() => handleOpenCreateModal()}
+                            className="px-5 py-3 bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-xs tracking-wider rounded-2xl transition-all shadow-md flex items-center justify-center gap-2 active:scale-95 shrink-0"
+                        >
+                            <MdAdd size={20} />
+                            Schedule Field Visit
+                        </button>
+                    ) : (
+                        activeAttendance ? (
+                            <button
+                                onClick={handleSubmitAttendanceCheckOut}
+                                disabled={submittingCheckOut}
+                                className="px-5 py-3 bg-rose-600 hover:bg-rose-700 text-white font-black uppercase text-xs tracking-wider rounded-2xl transition-all shadow-md flex items-center justify-center gap-2 active:scale-95 shrink-0"
+                            >
+                                <MdCheckCircle size={20} />
+                                {submittingCheckOut ? 'Checking Out...' : 'Check-Out Now'}
+                            </button>
+                        ) : (
+                            <button
+                                onClick={handleOpenAttendanceModal}
+                                className="px-5 py-3 bg-teal-600 hover:bg-teal-700 text-white font-black uppercase text-xs tracking-wider rounded-2xl transition-all shadow-md flex items-center justify-center gap-2 active:scale-95 shrink-0"
+                            >
+                                <MdHowToReg size={20} />
+                                Check-In Field Attendance
+                            </button>
+                        )
+                    )}
                 </div>
             </div>
 
-            {/* List & Simulator Panels */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Navigation Tabs (Only rendered if hideTabs is false) */}
+            {!hideTabs && (
+                <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800">
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => setActiveTab('visits')}
+                            className={`px-5 py-3 font-black text-xs uppercase tracking-wider transition-all border-b-2 ${
+                                activeTab === 'visits'
+                                    ? 'border-primary-600 text-primary-600 bg-primary-50/50 rounded-t-xl'
+                                    : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-t-xl'
+                            } flex items-center gap-2`}
+                        >
+                            <MdLocalShipping size={18} />
+                            Service Visits Queue
+                            <span className="ml-1 px-2 py-0.5 text-[10px] font-bold rounded-full bg-slate-200 text-slate-700">
+                                {visits.length}
+                            </span>
+                        </button>
+
+                        <button
+                            onClick={() => setActiveTab('attendance')}
+                            className={`px-5 py-3 font-black text-xs uppercase tracking-wider transition-all border-b-2 ${
+                                activeTab === 'attendance'
+                                    ? 'border-teal-600 text-teal-700 bg-teal-50/50 rounded-t-xl'
+                                    : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-t-xl'
+                            } flex items-center gap-2`}
+                        >
+                            <MdHowToReg size={18} />
+                            Field Engineer Attendance
+                            {activeAttendance ? (
+                                <span className="ml-1 px-2 py-0.5 text-[10px] font-extrabold rounded-full bg-teal-100 text-teal-800 border border-teal-300">
+                                    Checked-In
+                                </span>
+                            ) : (
+                                <span className="ml-1 px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-100 text-amber-800">
+                                    Not Checked-In
+                                </span>
+                            )}
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {activeTab === 'visits' ? (
+                /* List & Simulator Panels */
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 
                 {/* Left Queue list */}
                 {!isQueueCollapsed && (
@@ -1416,6 +1705,224 @@ const ServiceVisits = () => {
                     )}
                 </div>
             </div>
+            ) : (
+                /* Field Engineer Attendance View */
+                <div className="space-y-6">
+                    {/* Active Status Card */}
+                    <div className={`rounded-[2rem] p-6 border shadow-2xl transition-all relative overflow-hidden ${
+                        activeAttendance 
+                            ? 'bg-slate-900 text-white border-teal-500/50 shadow-teal-950/40' 
+                            : 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white border-slate-200 dark:border-slate-800'
+                    }`}>
+                        {activeAttendance && (
+                            <div className="absolute -right-16 -bottom-16 w-64 h-64 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
+                        )}
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5 relative z-10">
+                            <div className="flex items-center gap-4">
+                                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 shadow-inner ${
+                                    activeAttendance 
+                                        ? 'bg-teal-500/20 text-teal-300 border border-teal-400/40' 
+                                        : 'bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200 dark:border-amber-800'
+                                }`}>
+                                    {activeAttendance ? <MdCheckCircle size={32} /> : <MdHowToReg size={32} />}
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg border ${
+                                            activeAttendance 
+                                                ? 'bg-teal-500/25 text-teal-200 border-teal-400/40' 
+                                                : 'bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200 border-amber-300 dark:border-amber-700'
+                                        }`}>
+                                            {activeAttendance ? 'STATUS: CURRENTLY CHECKED-IN' : 'STATUS: NOT CHECKED-IN TODAY'}
+                                        </span>
+                                        <span className={`text-xs font-bold ${activeAttendance ? 'text-slate-300' : 'text-slate-500 dark:text-slate-400'}`}>
+                                            • Field Engineer Duty
+                                        </span>
+                                    </div>
+                                    <h3 className={`text-xl sm:text-2xl font-black font-outfit uppercase mt-1.5 ${activeAttendance ? 'text-white' : 'text-slate-900 dark:text-white'}`}>
+                                        {activeAttendance ? activeAttendance.employeeName : (currentUser.name || 'Field Engineer')}
+                                    </h3>
+                                    {activeAttendance ? (
+                                        <div className="text-xs text-slate-300 font-medium mt-1 flex flex-wrap items-center gap-1.5 leading-relaxed">
+                                            <span>Checked in at</span>
+                                            <span className="font-extrabold text-teal-300 bg-teal-950/80 px-2 py-0.5 rounded-md border border-teal-800/80">
+                                                {new Date(activeAttendance.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            </span>
+                                            <span>— Location:</span>
+                                            <span className="font-bold text-emerald-300 bg-slate-800 px-2 py-0.5 rounded-md border border-slate-700">
+                                                {activeAttendance.checkInLocation?.areaName || 'Field Site'}
+                                            </span>
+                                            {activeAttendance.checkInLocation?.address && (
+                                                <span className="text-slate-400 font-normal">
+                                                    ({activeAttendance.checkInLocation.address})
+                                                </span>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold mt-1">
+                                            Click the Check-In button to record your field attendance with live GPS location & selfie verification.
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
+                                {activeAttendance ? (
+                                    <button
+                                        onClick={handleSubmitAttendanceCheckOut}
+                                        disabled={submittingCheckOut}
+                                        className="px-6 py-3.5 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-black text-xs uppercase tracking-wider rounded-2xl transition-all shadow-lg shadow-rose-600/30 hover:shadow-rose-600/50 active:scale-95 cursor-pointer"
+                                    >
+                                        {submittingCheckOut ? 'Checking Out...' : 'CHECK-OUT NOW'}
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={handleOpenAttendanceModal}
+                                        className="px-6 py-3.5 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-black text-xs uppercase tracking-wider rounded-2xl transition-all shadow-lg shadow-teal-600/30 hover:shadow-teal-600/50 active:scale-95 flex items-center gap-2 cursor-pointer"
+                                    >
+                                        <MdHowToReg size={18} />
+                                        CHECK-IN FIELD ATTENDANCE
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Register Filter & Table Card */}
+                    <div className="glass shadow-premium rounded-[2rem] p-6 bg-white border border-slate-100 space-y-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+                            <div>
+                                <h3 className="text-lg font-black text-slate-900 font-outfit uppercase">
+                                    Field Engineer Attendance Register
+                                </h3>
+                                <p className="text-xs text-slate-500 font-semibold">
+                                    Historical log of field check-ins, check-outs, area locations, and selfie captures.
+                                </p>
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-3">
+                                <input
+                                    type="date"
+                                    value={attendanceDateFilter}
+                                    onChange={(e) => setAttendanceDateFilter(e.target.value)}
+                                    className="px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                />
+
+                                <select
+                                    value={attendanceEngineerFilter}
+                                    onChange={(e) => setAttendanceEngineerFilter(e.target.value)}
+                                    className="px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                >
+                                    <option value="all">All Engineers</option>
+                                    {engineers.map(e => (
+                                        <option key={e._id} value={e._id}>{e.name}</option>
+                                    ))}
+                                </select>
+
+                                <button
+                                    onClick={fetchAttendanceRecords}
+                                    className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-all"
+                                    title="Refresh Register"
+                                >
+                                    <MdRefresh size={18} />
+                                </button>
+                            </div>
+                        </div>
+
+                        {loadingAttendance ? (
+                            <div className="flex flex-col items-center justify-center py-16 space-y-3">
+                                <div className="w-10 h-10 border-4 border-teal-200 border-t-teal-600 rounded-full animate-spin"></div>
+                                <p className="text-slate-400 font-bold uppercase text-xs tracking-widest">Loading Attendance Logs...</p>
+                            </div>
+                        ) : attendanceList.length === 0 ? (
+                            <div className="text-center py-16 text-slate-400 space-y-3">
+                                <p className="text-base font-bold">No attendance records found.</p>
+                                <p className="text-xs">Field check-in records will appear here once engineers mark attendance.</p>
+                            </div>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left border-collapse text-xs">
+                                    <thead>
+                                        <tr className="bg-slate-50 text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100">
+                                            <th className="px-4 py-3">Employee Name</th>
+                                            <th className="px-4 py-3">Date</th>
+                                            <th className="px-4 py-3">Check-In Details</th>
+                                            <th className="px-4 py-3">Check-Out Details</th>
+                                            <th className="px-4 py-3 text-center">Selfie</th>
+                                            <th className="px-4 py-3 text-center">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-50 font-semibold text-slate-700">
+                                        {attendanceList.map((rec) => (
+                                            <tr key={rec._id} className="hover:bg-slate-50/70 transition-colors">
+                                                <td className="px-4 py-3 font-bold text-slate-900">
+                                                    {rec.employeeName || rec.engineerId?.name || 'Engineer'}
+                                                </td>
+                                                <td className="px-4 py-3 text-slate-600">
+                                                    {new Date(rec.attendanceDate).toLocaleDateString()}
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <div className="space-y-0.5">
+                                                        <span className="font-bold text-slate-900">
+                                                            {new Date(rec.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                        </span>
+                                                        <p className="text-[10px] text-teal-700 font-bold">{rec.checkInLocation?.areaName || 'Field Location'}</p>
+                                                        {rec.checkInLocation?.address && (
+                                                            <p className="text-[10px] text-slate-400 max-w-xs truncate">{rec.checkInLocation.address}</p>
+                                                        )}
+                                                        {rec.checkInLocation?.latitude && rec.checkInLocation?.longitude && (
+                                                            <a
+                                                                href={`https://www.google.com/maps?q=${rec.checkInLocation.latitude},${rec.checkInLocation.longitude}`}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="inline-flex items-center gap-1 text-[9px] font-bold text-teal-600 hover:underline pt-0.5"
+                                                            >
+                                                                <MdMap size={12} /> Map GPS
+                                                            </a>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    {rec.checkOutTime ? (
+                                                        <div className="space-y-0.5">
+                                                            <span className="font-bold text-slate-900">
+                                                                {new Date(rec.checkOutTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                            </span>
+                                                            <p className="text-[10px] text-slate-500">{rec.checkOutLocation?.areaName || rec.checkInLocation?.areaName}</p>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded">Active Duty</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3 text-center">
+                                                    {rec.selfieUrl ? (
+                                                        <img
+                                                            src={rec.selfieUrl}
+                                                            alt="Selfie"
+                                                            onClick={() => setSelectedAttendanceSelfie(rec.selfieUrl)}
+                                                            className="w-10 h-10 rounded-xl object-cover border border-slate-200 shadow-2xs mx-auto cursor-pointer hover:scale-105 transition-transform"
+                                                            title="Click to expand selfie"
+                                                        />
+                                                    ) : (
+                                                        <span className="text-[10px] text-slate-400">No Photo</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3 text-center">
+                                                    <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase border tracking-wider ${
+                                                        rec.status === 'Checked-In' ? 'bg-teal-50 text-teal-700 border-teal-200' : 'bg-slate-100 text-slate-600 border-slate-200'
+                                                    }`}>
+                                                        {rec.status}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
 
             {/* Reschedule Visit Modal */}
             <Modal
@@ -1558,6 +2065,128 @@ const ServiceVisits = () => {
                         </select>
                     </div>
                 </form>
+            </Modal>
+
+            {/* Field Attendance Check-In Modal */}
+            <Modal
+                isOpen={showAttendanceModal}
+                onClose={() => setShowAttendanceModal(false)}
+                title="Field Engineer Attendance Check-In"
+                maxWidth="max-w-md"
+                footer={
+                    <>
+                        <button
+                            type="button"
+                            onClick={() => setShowAttendanceModal(false)}
+                            className="flex-1 w-full py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            form="attendance-checkin-form"
+                            disabled={submittingCheckIn || uploadingSelfie}
+                            className="flex-1 w-full py-3.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {submittingCheckIn ? 'Recording Check-In...' : 'Record Check-In'}
+                        </button>
+                    </>
+                }
+            >
+                <form id="attendance-checkin-form" onSubmit={handleSubmitAttendanceCheckIn} className="space-y-4">
+                    <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Employee Name</label>
+                        <input
+                            type="text"
+                            readOnly
+                            value={currentUser.name || 'Field Engineer'}
+                            className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 cursor-not-allowed"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Area / Site Name *</label>
+                        <input
+                            type="text"
+                            required
+                            placeholder="e.g. Baner Site, Hinjewadi Phase 1, Pune..."
+                            value={checkInAreaName}
+                            onChange={(e) => setCheckInAreaName(e.target.value)}
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-xs font-semibold focus:ring-2 focus:ring-teal-500 outline-none"
+                        />
+                    </div>
+
+                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest">GPS Location Detected</label>
+                        <p className="text-xs font-semibold text-slate-800">{checkInAddress}</p>
+                        {checkInLat && checkInLng && (
+                            <p className="text-[10px] font-mono text-teal-700">Lat: {checkInLat.toFixed(5)}, Lng: {checkInLng.toFixed(5)}</p>
+                        )}
+                    </div>
+
+                    <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Selfie Photo Verification *</label>
+                        {checkInSelfie ? (
+                            <div className="relative p-2 bg-slate-50 border border-teal-300 rounded-xl flex flex-col items-center justify-center space-y-2">
+                                <img src={checkInSelfie} alt="Selfie" className="h-36 rounded-lg object-cover shadow-xs" />
+                                <div className="flex items-center gap-2">
+                                    <label className="px-3 py-1 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-bold cursor-pointer transition-all shadow-xs">
+                                        Retake Selfie
+                                        <input type="file" accept="image/*" capture="user" onChange={handleSelfieChange} className="hidden" />
+                                    </label>
+                                    <button
+                                        type="button"
+                                        onClick={() => setCheckInSelfie('')}
+                                        className="px-3 py-1 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded-lg text-xs font-bold transition-all"
+                                    >
+                                        Remove
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <label className="border-2 border-dashed border-slate-200 hover:border-teal-500 bg-slate-50/70 hover:bg-teal-50/30 rounded-2xl p-5 flex flex-col items-center justify-center cursor-pointer transition-all group text-center">
+                                <input type="file" accept="image/*" capture="user" onChange={handleSelfieChange} className="hidden" />
+                                <div className="w-12 h-12 bg-white rounded-2xl border border-slate-200 shadow-xs flex items-center justify-center text-slate-400 group-hover:text-teal-600 group-hover:border-teal-300 transition-all mb-2">
+                                    {uploadingSelfie ? (
+                                        <div className="w-5 h-5 border-2 border-teal-600 border-t-transparent rounded-full animate-spin"></div>
+                                    ) : (
+                                        <MdPhotoCamera size={26} />
+                                    )}
+                                </div>
+                                <span className="text-xs font-black text-slate-800 group-hover:text-teal-800">
+                                    {uploadingSelfie ? 'Uploading Selfie...' : 'Take / Upload Selfie'}
+                                </span>
+                                <span className="text-[10px] text-slate-400 font-semibold mt-0.5">
+                                    Capture engineer selfie for attendance record
+                                </span>
+                            </label>
+                        )}
+                    </div>
+
+                    <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Notes / Remarks (Optional)</label>
+                        <textarea
+                            placeholder="Optional check-in notes..."
+                            value={checkInNotes}
+                            onChange={(e) => setCheckInNotes(e.target.value)}
+                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold h-16"
+                        />
+                    </div>
+                </form>
+            </Modal>
+
+            {/* Selfie Image Preview Modal */}
+            <Modal
+                isOpen={!!selectedAttendanceSelfie}
+                onClose={() => setSelectedAttendanceSelfie(null)}
+                title="Field Engineer Selfie Photo"
+                maxWidth="max-w-sm"
+            >
+                {selectedAttendanceSelfie && (
+                    <div className="flex flex-col items-center p-2">
+                        <img src={selectedAttendanceSelfie} alt="Selfie Full View" className="max-h-96 rounded-2xl object-contain shadow-md" />
+                    </div>
+                )}
             </Modal>
         </div>
     );

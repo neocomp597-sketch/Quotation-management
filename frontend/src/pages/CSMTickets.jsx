@@ -1840,7 +1840,8 @@ const CSMTickets = () => {
 
     const handleCreateCustomerContact = async (e) => {
         e.preventDefault();
-        if (!formData.customerId) {
+        const targetCustId = (typeof formData.customerId === 'object' ? (formData.customerId._id || formData.customerId.id) : formData.customerId) || '';
+        if (!targetCustId) {
             toast.error('Select a customer first');
             return;
         }
@@ -1851,10 +1852,10 @@ const CSMTickets = () => {
 
         try {
             const res = await csmService.createCustomerContact({
-                customerId: formData.customerId,
+                customerId: targetCustId,
                 ...contactFormData
             });
-            const contactsRes = await csmService.getCustomerContacts({ customerId: formData.customerId });
+            const contactsRes = await csmService.getCustomerContacts({ customerId: targetCustId });
             setCustomerContacts(contactsRes.data || []);
             setFormData(prev => ({
                 ...prev,

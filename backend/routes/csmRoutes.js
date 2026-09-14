@@ -5,6 +5,7 @@ const { protect } = require('../middlewares/authMiddleware');
 const csmDashboardController = require('../controllers/csmDashboardController');
 const ticketController = require('../controllers/ticketController');
 const serviceVisitController = require('../controllers/serviceVisitController');
+const fieldAttendanceController = require('../controllers/fieldAttendanceController');
 const warrantyAmcController = require('../controllers/warrantyAmcController');
 const kbController = require('../controllers/kbController');
 const csmMasterController = require('../controllers/csmMasterController');
@@ -45,6 +46,12 @@ router.get('/visits/:id', protect, serviceVisitController.getVisitById);
 router.post('/visits/:id/check-in', protect, serviceVisitController.checkIn);
 router.post('/visits/:id/check-out', protect, serviceVisitController.checkOut);
 router.patch('/visits/:id/reschedule', protect, serviceVisitController.rescheduleVisit);
+
+// ─── FIELD ENGINEER ATTENDANCE ───────────────────────────────────────────────
+router.post('/attendance/check-in', protect, fieldAttendanceController.checkIn);
+router.post('/attendance/check-out', protect, fieldAttendanceController.checkOut);
+router.get('/attendance', protect, fieldAttendanceController.getAttendance);
+router.get('/attendance/active', protect, fieldAttendanceController.getActiveStatus);
 
 // ─── ENTITLEMENTS (WARRANTY / AMC / ASSETS) ─────────────────────────────────
 router.get('/entitlements/verify', protect, warrantyAmcController.verifyEntitlements);

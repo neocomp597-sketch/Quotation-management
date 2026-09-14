@@ -83,6 +83,7 @@ const searchablePages = [
     { label: 'CSM Dashboard', path: '/csm/dashboard', permissionKey: 'csm_dashboard', keywords: ['service dashboard'] },
     { label: 'Tickets', path: '/csm/tickets', permissionKey: 'csm_tickets', keywords: ['tickets register', 'service tickets'] },
     { label: 'Service Visits', path: '/csm/visits', permissionKey: 'csm_visits', keywords: ['visits'] },
+    { label: 'Field Attendance', path: '/csm/field-attendance', permissionKey: 'csm_visits', keywords: ['field attendance', 'engineer check-in', 'attendance'] },
     { label: 'Warranty & AMC', path: '/csm/warranties-amc', permissionKey: 'csm_warranties_amc', keywords: ['warranty', 'amc'] },
     { label: 'Knowledge Base', path: '/csm/kb', permissionKey: 'csm_kb', keywords: ['kb'] },
     { label: 'CSM Config', path: '/csm/masters', permissionKey: 'csm_masters', keywords: ['csm masters'] },
@@ -327,7 +328,12 @@ const moduleSubmodulesMap = {
     ],
     '/csm/visits': [
         { label: 'Field Service Visits', path: '/csm/visits' },
+        { label: 'Field Engineer Attendance', path: '/csm/field-attendance' },
         { label: 'Service Engineers Log', path: '/csm/visits' }
+    ],
+    '/csm/field-attendance': [
+        { label: 'Field Engineer Attendance', path: '/csm/field-attendance' },
+        { label: 'Field Service Visits Queue', path: '/csm/visits' }
     ],
     '/csm/warranties-amc': [
         { label: 'Warranty & AMC Contracts', path: '/csm/warranties-amc' },

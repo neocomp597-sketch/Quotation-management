@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const CustomerContact = require('../models/CustomerContact');
 const Customer = require('../models/Customer');
 const Designation = require('../models/Designation');
@@ -8,10 +9,16 @@ const normalizeBoolean = (value, fallback = true) => {
     return fallback;
 };
 
+const extractId = (val) => {
+    if (!val) return null;
+    if (typeof val === 'object') return val._id || val.id || null;
+    return String(val).trim();
+};
+
 const buildPayload = (body) => ({
-    customerId: body.customerId,
+    customerId: extractId(body.customerId),
     contactName: String(body.contactName || '').trim(),
-    designationId: body.designationId || null,
+    designationId: extractId(body.designationId),
     mobileNo: String(body.mobileNo || '').trim(),
     email: String(body.email || '').trim().toLowerCase(),
     isPrimary: normalizeBoolean(body.isPrimary, false),
@@ -19,29 +26,108 @@ const buildPayload = (body) => ({
 });
 
 const validateReferences = async ({ customerId, designationId, companyId }) => {
-    const customer = await Customer.findOne({ _id: customerId, companyId }).select('_id').lean();
-    if (!customer) return 'Invalid customer selected';
+    let resolvedCustomer = null;
+    const rawCustStr = String(customerId || '').trim();
+    const isMongoId = rawCustStr && mongoose.Types.ObjectId.isValid(rawCustStr) && /^[0-9a-fA-F]{24}$/.test(rawCustStr);
+    
+    if (isMongoId) {
+        if (companyId) {
+            resolvedCustomer = await Customer.findOne({ _id: rawCustStr, companyId }).select('_id companyId').lean();
+        }
+        if (!resolvedCustomer) {
+            resolvedCustomer = await Customer.findById(rawCustStr).select('_id companyId').lean();
+        }
+    }
+    
+    if (!resolvedCustomer && rawCustStr) {
+        const escaped = rawCustStr.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+        const exactRegex = new RegExp(`^${escaped}$`, 'i');
+        const flexRegex = new RegExp(escaped, 'i');
+        
+        if (companyId) {
+            resolvedCustomer = await Customer.findOne({
+                companyId,
+                $or: [
+                    { externalCode: exactRegex },
+                    { companyName: exactRegex },
+                    { customerName: exactRegex },
+                    { companyName: flexRegex },
+                    { customerName: flexRegex }
+                ]
+            }).select('_id companyId').lean();
+        }
 
-    if (designationId) {
-        const designation = await Designation.findOne({ _id: designationId, companyId }).select('_id').lean();
-        if (!designation) return 'Invalid designation selected';
+        if (!resolvedCustomer) {
+            resolvedCustomer = await Customer.findOne({
+                $or: [
+                    { externalCode: exactRegex },
+                    { companyName: exactRegex },
+                    { customerName: exactRegex },
+                    { companyName: flexRegex },
+                    { customerName: flexRegex }
+                ]
+            }).select('_id companyId').lean();
+        }
     }
 
-    return null;
+    if (!resolvedCustomer) return { error: 'Invalid customer selected' };
+
+    let resolvedDesignationId = null;
+    if (designationId) {
+        const rawDesigStr = String(designationId || '').trim();
+        const isDesigId = rawDesigStr && mongoose.Types.ObjectId.isValid(rawDesigStr) && /^[0-9a-fA-F]{24}$/.test(rawDesigStr);
+        if (isDesigId) {
+            let designation = null;
+            if (companyId) {
+                designation = await Designation.findOne({ _id: rawDesigStr, companyId }).select('_id').lean();
+            }
+            if (!designation) {
+                designation = await Designation.findById(rawDesigStr).select('_id').lean();
+            }
+            if (designation) resolvedDesignationId = designation._id;
+        } else if (rawDesigStr) {
+            let designation = null;
+            if (companyId) {
+                designation = await Designation.findOne({ companyId, name: new RegExp(`^${rawDesigStr}$`, 'i') }).select('_id').lean();
+            }
+            if (!designation) {
+                designation = await Designation.findOne({ name: new RegExp(`^${rawDesigStr}$`, 'i') }).select('_id').lean();
+            }
+            if (designation) resolvedDesignationId = designation._id;
+        }
+    }
+
+    return { 
+        resolvedCustomerId: resolvedCustomer._id, 
+        resolvedCompanyId: resolvedCustomer.companyId || companyId,
+        resolvedDesignationId
+    };
 };
 
 exports.create = async (req, res) => {
     try {
-        const companyId = req.user?.companyId;
+        const userCompanyId = req.user?.companyId;
         const payload = buildPayload(req.body);
         if (!payload.contactName) {
             return res.status(400).json({ message: 'Contact person name is required' });
         }
 
-        const referenceError = await validateReferences({ ...payload, companyId });
-        if (referenceError) return res.status(400).json({ message: referenceError });
+        if (payload.mobileNo) {
+            const cleanMobile = payload.mobileNo.replace(/\D/g, '');
+            if (cleanMobile.length !== 10) {
+                return res.status(400).json({ message: 'Invalid Mobile Number. Please enter a valid 10-digit mobile number' });
+            }
+            payload.mobileNo = cleanMobile;
+        }
 
-        const contact = await CustomerContact.create({ ...payload, companyId });
+        const refResult = await validateReferences({ customerId: payload.customerId, designationId: payload.designationId, companyId: userCompanyId });
+        if (refResult.error) return res.status(400).json({ message: refResult.error });
+
+        payload.customerId = refResult.resolvedCustomerId;
+        if (refResult.resolvedDesignationId) payload.designationId = refResult.resolvedDesignationId;
+        const targetCompanyId = refResult.resolvedCompanyId || userCompanyId;
+
+        const contact = await CustomerContact.create({ ...payload, ...(targetCompanyId ? { companyId: targetCompanyId } : {}) });
         await contact.populate('designationId', 'name');
         res.status(201).json(contact);
     } catch (error) {
@@ -52,8 +138,14 @@ exports.create = async (req, res) => {
 exports.getAll = async (req, res) => {
     try {
         const companyId = req.user?.companyId;
-        const filter = { companyId };
-        if (req.query.customerId) filter.customerId = req.query.customerId;
+        const filter = {};
+        if (companyId && req.user?.role !== 'super_admin') {
+            filter.companyId = companyId;
+        }
+        if (req.query.customerId) {
+            const custIdStr = typeof req.query.customerId === 'object' ? (req.query.customerId._id || req.query.customerId.id) : req.query.customerId;
+            filter.customerId = custIdStr;
+        }
         if (req.query.activeOnly !== 'false') filter.status = true;
 
         const contacts = await CustomerContact.find(filter)
@@ -69,17 +161,32 @@ exports.getAll = async (req, res) => {
 
 exports.update = async (req, res) => {
     try {
-        const companyId = req.user?.companyId;
+        const userCompanyId = req.user?.companyId;
         const payload = buildPayload(req.body);
         if (!payload.contactName) {
             return res.status(400).json({ message: 'Contact person name is required' });
         }
 
-        const referenceError = await validateReferences({ ...payload, companyId });
-        if (referenceError) return res.status(400).json({ message: referenceError });
+        if (payload.mobileNo) {
+            const cleanMobile = payload.mobileNo.replace(/\D/g, '');
+            if (cleanMobile.length !== 10) {
+                return res.status(400).json({ message: 'Invalid Mobile Number. Please enter a valid 10-digit mobile number' });
+            }
+            payload.mobileNo = cleanMobile;
+        }
+
+        const refResult = await validateReferences({ customerId: payload.customerId, designationId: payload.designationId, companyId: userCompanyId });
+        if (refResult.error) return res.status(400).json({ message: refResult.error });
+        payload.customerId = refResult.resolvedCustomerId;
+        if (refResult.resolvedDesignationId) payload.designationId = refResult.resolvedDesignationId;
+
+        const queryFilter = { _id: req.params.id };
+        if (userCompanyId && req.user?.role !== 'super_admin') {
+            queryFilter.companyId = userCompanyId;
+        }
 
         const contact = await CustomerContact.findOneAndUpdate(
-            { _id: req.params.id, companyId },
+            queryFilter,
             { $set: payload },
             { new: true, runValidators: true }
         ).populate('designationId', 'name');
@@ -93,11 +200,12 @@ exports.update = async (req, res) => {
 
 exports.delete = async (req, res) => {
     try {
-        const contact = await CustomerContact.findOneAndDelete({
-            _id: req.params.id,
-            companyId: req.user?.companyId
-        });
+        const queryFilter = { _id: req.params.id };
+        if (req.user?.companyId && req.user?.role !== 'super_admin') {
+            queryFilter.companyId = req.user.companyId;
+        }
 
+        const contact = await CustomerContact.findOneAndDelete(queryFilter);
         if (!contact) return res.status(404).json({ message: 'Customer contact not found' });
         res.json({ message: 'Customer contact deleted successfully' });
     } catch (error) {
