@@ -35,7 +35,7 @@ const validateReferences = async ({ customerId, designationId, companyId }) => {
             resolvedCustomer = await Customer.findOne({ _id: rawCustStr, companyId }).select('_id companyId').lean();
         }
         if (!resolvedCustomer) {
-            resolvedCustomer = await Customer.findById(rawCustStr).select('_id companyId').lean();
+            resolvedCustomer = await Customer.findById(rawCustStr).setOptions({ bypassTenant: true }).select('_id companyId').lean();
         }
     }
     
@@ -66,7 +66,7 @@ const validateReferences = async ({ customerId, designationId, companyId }) => {
                     { companyName: flexRegex },
                     { customerName: flexRegex }
                 ]
-            }).select('_id companyId').lean();
+            }).setOptions({ bypassTenant: true }).select('_id companyId').lean();
         }
     }
 
@@ -82,18 +82,33 @@ const validateReferences = async ({ customerId, designationId, companyId }) => {
                 designation = await Designation.findOne({ _id: rawDesigStr, companyId }).select('_id').lean();
             }
             if (!designation) {
-                designation = await Designation.findById(rawDesigStr).select('_id').lean();
+                designation = await Designation.findById(rawDesigStr).setOptions({ bypassTenant: true }).select('_id').lean();
             }
             if (designation) resolvedDesignationId = designation._id;
-        } else if (rawDesigStr) {
+        }
+        
+        if (!resolvedDesignationId && rawDesigStr) {
+            const escaped = rawDesigStr.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
             let designation = null;
             if (companyId) {
-                designation = await Designation.findOne({ companyId, name: new RegExp(`^${rawDesigStr}$`, 'i') }).select('_id').lean();
+                designation = await Designation.findOne({ companyId, name: new RegExp(`^${escaped}$`, 'i') }).select('_id').lean();
             }
             if (!designation) {
-                designation = await Designation.findOne({ name: new RegExp(`^${rawDesigStr}$`, 'i') }).select('_id').lean();
+                designation = await Designation.findOne({ name: new RegExp(`^${escaped}$`, 'i') }).setOptions({ bypassTenant: true }).select('_id').lean();
             }
-            if (designation) resolvedDesignationId = designation._id;
+            if (designation) {
+                resolvedDesignationId = designation._id;
+            } else {
+                try {
+                    const newDes = await Designation.create({
+                        name: rawDesigStr,
+                        ...(companyId ? { companyId } : {})
+                    });
+                    resolvedDesignationId = newDes._id;
+                } catch (e) {
+                    console.error('Auto-create designation failed:', e);
+                }
+            }
         }
     }
 
@@ -112,23 +127,33 @@ exports.create = async (req, res) => {
             return res.status(400).json({ message: 'Contact person name is required' });
         }
 
-        const cleanMobile = String(payload.mobileNo || '').replace(/\D/g, '');
-        if (!cleanMobile || cleanMobile.length !== 10) {
-            return res.status(400).json({ message: 'Please enter a valid 10-digit mobile number.' });
+        if (payload.mobileNo) {
+            let cleanMobile = String(payload.mobileNo || '').trim().replace(/[\s\-\(\)]/g, '');
+            if (cleanMobile.startsWith('+91')) cleanMobile = cleanMobile.slice(3);
+            else if (cleanMobile.startsWith('91') && cleanMobile.length > 10) cleanMobile = cleanMobile.slice(2);
+            else if (cleanMobile.startsWith('0') && cleanMobile.length === 11) cleanMobile = cleanMobile.slice(1);
+            cleanMobile = cleanMobile.replace(/\D/g, '');
+
+            if (cleanMobile.length !== 10) {
+                return res.status(400).json({ message: 'Please enter a valid 10-digit mobile number.' });
+            }
+            payload.mobileNo = cleanMobile;
+        } else {
+            payload.mobileNo = '';
         }
-        payload.mobileNo = cleanMobile;
 
         const refResult = await validateReferences({ customerId: payload.customerId, designationId: payload.designationId, companyId: userCompanyId });
         if (refResult.error) return res.status(400).json({ message: refResult.error });
 
         payload.customerId = refResult.resolvedCustomerId;
-        if (refResult.resolvedDesignationId) payload.designationId = refResult.resolvedDesignationId;
+        payload.designationId = refResult.resolvedDesignationId || null;
         const targetCompanyId = refResult.resolvedCompanyId || userCompanyId;
 
         const contact = await CustomerContact.create({ ...payload, ...(targetCompanyId ? { companyId: targetCompanyId } : {}) });
         await contact.populate('designationId', 'name');
         res.status(201).json(contact);
     } catch (error) {
+        console.error('Error creating customer contact:', error);
         res.status(500).json({ message: error.message || 'Failed to create customer contact' });
     }
 };
@@ -137,22 +162,30 @@ exports.getAll = async (req, res) => {
     try {
         const companyId = req.user?.companyId;
         const filter = {};
-        if (companyId && req.user?.role !== 'super_admin') {
-            filter.companyId = companyId;
-        }
         if (req.query.customerId) {
             const custIdStr = typeof req.query.customerId === 'object' ? (req.query.customerId._id || req.query.customerId.id) : req.query.customerId;
             filter.customerId = custIdStr;
+        } else if (companyId && req.user?.role !== 'super_admin') {
+            filter.companyId = companyId;
         }
         if (req.query.activeOnly !== 'false') filter.status = true;
 
-        const contacts = await CustomerContact.find(filter)
+        let contacts = await CustomerContact.find(filter)
             .populate('designationId', 'name')
             .sort({ isPrimary: -1, contactName: 1 })
             .lean();
 
+        if (contacts.length === 0 && req.query.customerId) {
+            contacts = await CustomerContact.find({ customerId: filter.customerId, ...(req.query.activeOnly !== 'false' ? { status: true } : {}) })
+                .setOptions({ bypassTenant: true })
+                .populate('designationId', 'name')
+                .sort({ isPrimary: -1, contactName: 1 })
+                .lean();
+        }
+
         res.json(contacts);
     } catch (error) {
+        console.error('Error fetching customer contacts:', error);
         res.status(500).json({ message: error.message || 'Failed to fetch customer contacts' });
     }
 };

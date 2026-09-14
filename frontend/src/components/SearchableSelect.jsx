@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MdSearch, MdKeyboardArrowDown, MdDelete, MdAdd } from 'react-icons/md';
+import { MdSearch, MdKeyboardArrowDown, MdDelete, MdEdit, MdAdd } from 'react-icons/md';
 
 const SearchableSelect = ({ 
     options = [], // Can be array of strings or array of objects { value, label, id }
@@ -12,6 +12,7 @@ const SearchableSelect = ({
     inputClass = '',
     menuClass = '',
     onAddOption, // Callback: async (name) => { ... }
+    onEditOption, // Callback: async (option) => { ... }
     onDeleteOption, // Callback: async (option) => { ... }
 }) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -176,29 +177,48 @@ const SearchableSelect = ({
                                                 <button
                                                     type="button"
                                                     onClick={() => handleSelect(option)}
-                                                    className={`flex-1 text-left px-3 py-2 text-xs font-semibold ${
+                                                    className={`flex-1 text-left px-3 py-2 text-xs font-semibold truncate ${
                                                         isSelected ? 'text-white' : 'text-slate-600 hover:text-slate-800'
                                                     }`}
                                                 >
                                                     {optLabel}
                                                 </button>
-                                                {onDeleteOption && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            onDeleteOption(option);
-                                                        }}
-                                                        className={`p-1.5 rounded-lg mr-1 opacity-0 group-hover/item:opacity-100 transition-opacity duration-150 ${
-                                                            isSelected 
-                                                                ? 'text-indigo-200 hover:text-white hover:bg-indigo-700' 
-                                                                : 'text-slate-400 hover:text-rose-600 hover:bg-rose-50'
-                                                        }`}
-                                                        title="Delete Option"
-                                                    >
-                                                        <MdDelete size={14} />
-                                                    </button>
-                                                )}
+                                                <div className="flex items-center gap-0.5 pr-1">
+                                                    {onEditOption && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                onEditOption(option);
+                                                            }}
+                                                            className={`p-1.5 rounded-lg transition-colors ${
+                                                                isSelected 
+                                                                    ? 'text-indigo-200 hover:text-white hover:bg-indigo-700' 
+                                                                    : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'
+                                                            }`}
+                                                            title="Edit Option"
+                                                        >
+                                                            <MdEdit size={14} />
+                                                        </button>
+                                                    )}
+                                                    {onDeleteOption && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                onDeleteOption(option);
+                                                            }}
+                                                            className={`p-1.5 rounded-lg transition-colors ${
+                                                                isSelected 
+                                                                    ? 'text-indigo-200 hover:text-white hover:bg-indigo-700' 
+                                                                    : 'text-slate-400 hover:text-rose-600 hover:bg-rose-50'
+                                                            }`}
+                                                            title="Delete Option"
+                                                        >
+                                                            <MdDelete size={14} />
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </div>
                                         );
                                     })

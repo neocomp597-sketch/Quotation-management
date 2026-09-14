@@ -10,7 +10,7 @@ import PortalDropdown from '../components/PortalDropdown';
 import Modal from '../components/Modal';
 import SearchableSelect from '../components/SearchableSelect';
 import { useSubmitGuard } from '../hooks/useSubmitGuard';
-import { isValidMobile, isValidPincode } from '../utils/validation';
+import { isValidMobile, isValidPincode, sanitizePhoneNumber } from '../utils/validation';
 
 const statusStyles = {
     'Open': 'bg-emerald-50 text-emerald-600 border-emerald-200',
@@ -1847,13 +1847,21 @@ const CSMTickets = () => {
 
     const handleCreateCustomerContact = async (e) => {
         e.preventDefault();
-        const targetCustId = (typeof formData.customerId === 'object' ? (formData.customerId._id || formData.customerId.id) : formData.customerId) || '';
+        const targetCustId = (typeof formData.customerId === 'object' 
+            ? (formData.customerId._id || formData.customerId.id) 
+            : formData.customerId) 
+            || (typeof manualFormData.customerId === 'object' 
+                ? (manualFormData.customerId._id || manualFormData.customerId.id) 
+                : manualFormData.customerId) 
+            || '';
+
         if (!targetCustId) {
             toast.error('Select a customer first');
             return;
         }
+
         const cleanMobile = sanitizePhoneNumber(contactFormData.mobileNo);
-        if (!cleanMobile || cleanMobile.length !== 10 || !/^\d{10}$/.test(cleanMobile)) {
+        if (contactFormData.mobileNo && (!cleanMobile || cleanMobile.length !== 10 || !/^\d{10}$/.test(cleanMobile))) {
             toast.error('Please enter a valid 10-digit mobile number.');
             return;
         }
@@ -1861,19 +1869,33 @@ const CSMTickets = () => {
         try {
             const res = await csmService.createCustomerContact({
                 customerId: targetCustId,
-                ...contactFormData
+                ...contactFormData,
+                mobileNo: cleanMobile || contactFormData.mobileNo || ''
             });
+
             const contactsRes = await csmService.getCustomerContacts({ customerId: targetCustId });
             setCustomerContacts(contactsRes.data || []);
+
+            // Auto-select the newly added contact
             setFormData(prev => ({
                 ...prev,
                 contactId: res.data._id,
                 contactName: res.data.contactName || '',
-                contactDesignationId: res.data.designationId?._id || '',
+                contactDesignationId: res.data.designationId?._id || (typeof res.data.designationId === 'string' ? res.data.designationId : ''),
                 contactDesignation: res.data.designationId?.name || '',
                 contactPhone: res.data.mobileNo || '',
                 contactEmail: res.data.email || ''
             }));
+
+            if (showManualModal) {
+                setManualFormData(prev => ({
+                    ...prev,
+                    contactName: res.data.contactName || '',
+                    contactPhone: res.data.mobileNo || '',
+                    contactEmail: res.data.email || ''
+                }));
+            }
+
             setShowContactModal(false);
             setContactFormData({
                 contactName: '',
@@ -1882,8 +1904,9 @@ const CSMTickets = () => {
                 email: '',
                 isPrimary: false
             });
-            toast.success('Customer contact added');
+            toast.success('Customer contact added successfully');
         } catch (error) {
+            console.error('Failed to add customer contact:', error);
             toast.error(error.response?.data?.message || 'Failed to add customer contact');
         }
     };
@@ -1960,6 +1983,164 @@ const CSMTickets = () => {
             setActiveMiniMaster(null);
         } catch (error) {
             toast.error(error.response?.data?.message || 'Failed to add item');
+        }
+    };
+
+    // Dropdown Quick Actions (Add / Edit / Delete directly from SearchableSelect dropdowns)
+    const handleAddSourceDropdown = async (name) => {
+        try {
+            const res = await csmService.createSource({ name });
+            toast.success('Ticket source added!');
+            const srcRes = await csmService.getSources();
+            setSources(srcRes.data || []);
+            setFormData(prev => ({ ...prev, source: name }));
+            if (showManualModal) setManualFormData(prev => ({ ...prev, source: name }));
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Failed to add source');
+        }
+    };
+
+    const handleEditSourceDropdown = (option) => {
+        const item = sources.find(s => s._id === (option.id || option._id) || s.name === (option.value || option.label));
+        if (item) {
+            handleOpenMiniMaster('source');
+            handleStartEditMiniMaster(item);
+        }
+    };
+
+    const handleDeleteSourceDropdown = async (option) => {
+        const item = sources.find(s => s._id === (option.id || option._id) || s.name === (option.value || option.label));
+        if (item) {
+            setActiveMiniMaster('source');
+            handleDeleteMiniMaster(item._id);
+        }
+    };
+
+    const handleAddDesignationDropdown = async (name) => {
+        try {
+            const res = await csmService.createDesignation({ name });
+            toast.success('Designation added!');
+            const desRes = await csmService.getDesignations();
+            setDesignations(desRes.data || []);
+            setFormData(prev => ({
+                ...prev,
+                contactDesignationId: res.data._id,
+                contactDesignation: res.data.name
+            }));
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Failed to add designation');
+        }
+    };
+
+    const handleEditDesignationDropdown = (option) => {
+        const item = designations.find(d => d._id === (option.id || option._id || option.value));
+        if (item) {
+            handleOpenMiniMaster('designation');
+            handleStartEditMiniMaster(item);
+        }
+    };
+
+    const handleDeleteDesignationDropdown = async (option) => {
+        const item = designations.find(d => d._id === (option.id || option._id || option.value));
+        if (item) {
+            setActiveMiniMaster('designation');
+            handleDeleteMiniMaster(item._id);
+        }
+    };
+
+    const handleAddPriorityDropdown = async (name) => {
+        try {
+            const res = await csmService.createPriority({
+                name,
+                responseSlaHours: 1,
+                resolutionSlaHours: 4,
+                color: '#3b82f6'
+            });
+            toast.success('Priority added!');
+            const priRes = await csmService.getPriorities();
+            setPriorities(priRes.data || []);
+            setFormData(prev => ({ ...prev, priorityId: res.data._id }));
+            if (showManualModal) setManualFormData(prev => ({ ...prev, priority: name }));
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Failed to add priority');
+        }
+    };
+
+    const handleEditPriorityDropdown = (option) => {
+        const item = priorities.find(p => p._id === (option.id || option._id || option.value) || p.name === option.label);
+        if (item) {
+            handleOpenMiniMaster('priority');
+            handleStartEditMiniMaster(item);
+        }
+    };
+
+    const handleDeletePriorityDropdown = async (option) => {
+        const item = priorities.find(p => p._id === (option.id || option._id || option.value) || p.name === option.label);
+        if (item) {
+            setActiveMiniMaster('priority');
+            handleDeleteMiniMaster(item._id);
+        }
+    };
+
+    const handleAddProblemDropdown = async (name) => {
+        try {
+            const res = await csmService.createProblem({
+                name,
+                categoryName: formData.mgr4Category || 'General / All',
+                description: name
+            });
+            toast.success('Problem added!');
+            if (formData.mgr4Category) {
+                fetchProblems(formData.mgr4Category);
+            } else {
+                const probRes = await csmService.getProblems();
+                setProblems(probRes.data || []);
+            }
+            setFormData(prev => ({ ...prev, problemId: res.data._id }));
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Failed to add problem');
+        }
+    };
+
+    const handleEditProblemDropdown = async (option) => {
+        const item = problems.find(p => p._id === (option.id || option._id || option.value));
+        if (item) {
+            const newTitle = window.prompt('Edit Problem Title:', item.name);
+            if (newTitle && newTitle.trim() && newTitle.trim() !== item.name) {
+                try {
+                    await csmService.updateProblem(item._id, { name: newTitle.trim() });
+                    toast.success('Problem updated!');
+                    if (formData.mgr4Category) fetchProblems(formData.mgr4Category);
+                    else {
+                        const res = await csmService.getProblems();
+                        setProblems(res.data || []);
+                    }
+                } catch (err) {
+                    toast.error(err.response?.data?.message || 'Failed to update problem');
+                }
+            }
+        }
+    };
+
+    const handleDeleteProblemDropdown = async (option) => {
+        const item = problems.find(p => p._id === (option.id || option._id || option.value));
+        if (item) {
+            if (window.confirm(`Are you sure you want to delete problem "${item.name}"?`)) {
+                try {
+                    await csmService.deleteProblem(item._id);
+                    toast.success('Problem deleted!');
+                    if (formData.mgr4Category) fetchProblems(formData.mgr4Category);
+                    else {
+                        const res = await csmService.getProblems();
+                        setProblems(res.data || []);
+                    }
+                    if (formData.problemId === item._id) {
+                        setFormData(prev => ({ ...prev, problemId: '' }));
+                    }
+                } catch (err) {
+                    toast.error(err.response?.data?.message || 'Failed to delete problem');
+                }
+            }
         }
     };
 
@@ -2648,14 +2829,15 @@ const CSMTickets = () => {
                                     + Quick Add
                                 </button>
                             </div>
-                            <select
+                            <SearchableSelect
+                                options={sources.map(s => ({ value: s.name, label: s.name, id: s._id }))}
                                 value={formData.source}
-                                onChange={(e) => setFormData({ ...formData, source: e.target.value })}
-                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
-                            >
-                                <option value="">Select Source</option>
-                                {sources.map(s => <option key={s._id} value={s.name}>{s.name}</option>)}
-                            </select>
+                                onChange={(val) => setFormData({ ...formData, source: val })}
+                                placeholder="Select Source"
+                                onAddOption={handleAddSourceDropdown}
+                                onEditOption={handleEditSourceDropdown}
+                                onDeleteOption={handleDeleteSourceDropdown}
+                            />
                         </div>
                         <div>
                             <div className="flex justify-between items-center mb-1">
@@ -2693,22 +2875,21 @@ const CSMTickets = () => {
                                     + Quick Add
                                 </button>
                             </div>
-                            <select
+                            <SearchableSelect
+                                options={designations.map(d => ({ value: d._id, label: d.name, id: d._id }))}
                                 value={formData.contactDesignationId}
-                                disabled={Boolean(formData.contactId)}
-                                onChange={(e) => {
-                                    const designation = designations.find(d => d._id === e.target.value);
+                                onChange={(val, option) => {
                                     setFormData({
                                         ...formData,
-                                        contactDesignationId: e.target.value,
-                                        contactDesignation: designation?.name || ''
+                                        contactDesignationId: val,
+                                        contactDesignation: option?.label || ''
                                     });
                                 }}
-                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold disabled:bg-slate-50 disabled:text-slate-400"
-                            >
-                                <option value="">Select Designation</option>
-                                {designations.map(d => <option key={d._id} value={d._id}>{d.name}</option>)}
-                            </select>
+                                placeholder="Select Designation"
+                                onAddOption={handleAddDesignationDropdown}
+                                onEditOption={handleEditDesignationDropdown}
+                                onDeleteOption={handleDeleteDesignationDropdown}
+                            />
                         </div>
                         <div>
                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Contact Phone</label>
@@ -2765,20 +2946,16 @@ const CSMTickets = () => {
                                     + Quick Add
                                 </button>
                             </div>
-                            <select
+                            <SearchableSelect
+                                options={problems.map(p => ({ value: p._id, label: p.name, id: p._id }))}
                                 value={formData.problemId || ''}
-                                onChange={(e) => handleProblemChange(e.target.value)}
-                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
-                            >
-                                {problems.length === 0 ? (
-                                    <option value="" disabled>No problems configured for this product.</option>
-                                ) : (
-                                    <>
-                                        <option value="">Select Problem</option>
-                                        {problems.map(p => <option key={p._id} value={p._id}>{p.name}</option>)}
-                                    </>
-                                )}
-                            </select>
+                                onChange={(val) => handleProblemChange(val)}
+                                placeholder="Select Problem"
+                                noResultsText={problems.length === 0 ? "No problems configured for this product." : "No matching problem found"}
+                                onAddOption={handleAddProblemDropdown}
+                                onEditOption={handleEditProblemDropdown}
+                                onDeleteOption={handleDeleteProblemDropdown}
+                            />
                         </div>
                         <div>
                             <div className="flex justify-between items-center mb-1">
@@ -2791,15 +2968,15 @@ const CSMTickets = () => {
                                     + Quick Add
                                 </button>
                             </div>
-                            <select
-                                required
+                            <SearchableSelect
+                                options={priorities.map(p => ({ value: p._id, label: p.name, id: p._id }))}
                                 value={formData.priorityId}
-                                onChange={(e) => setFormData({ ...formData, priorityId: e.target.value })}
-                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
-                            >
-                                <option value="">Select Priority</option>
-                                {priorities.map(p => <option key={p._id} value={p._id}>{p.name}</option>)}
-                            </select>
+                                onChange={(val) => setFormData({ ...formData, priorityId: val })}
+                                placeholder="Select Priority"
+                                onAddOption={handleAddPriorityDropdown}
+                                onEditOption={handleEditPriorityDropdown}
+                                onDeleteOption={handleDeletePriorityDropdown}
+                            />
                         </div>
                         
                         {/* SLA Preview box */}
@@ -3444,14 +3621,15 @@ const CSMTickets = () => {
                                     + Quick Add
                                 </button>
                             </div>
-                            <select
+                            <SearchableSelect
+                                options={sources.map(s => ({ value: s.name, label: s.name, id: s._id }))}
                                 value={manualFormData.source}
-                                onChange={(e) => setManualFormData({ ...manualFormData, source: e.target.value })}
-                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500"
-                            >
-                                <option value="">Select Source</option>
-                                {sources.map(s => <option key={s._id} value={s.name}>{s.name}</option>)}
-                            </select>
+                                onChange={(val) => setManualFormData({ ...manualFormData, source: val })}
+                                placeholder="Select Source"
+                                onAddOption={handleAddSourceDropdown}
+                                onEditOption={handleEditSourceDropdown}
+                                onDeleteOption={handleDeleteSourceDropdown}
+                            />
                         </div>
 
                         {/* Contact Person Name */}
@@ -3499,14 +3677,15 @@ const CSMTickets = () => {
                                     + Quick Add
                                 </button>
                             </div>
-                            <select
+                            <SearchableSelect
+                                options={priorities.map(p => ({ value: p.name, label: p.name, id: p._id }))}
                                 value={manualFormData.priority}
-                                onChange={(e) => setManualFormData({ ...manualFormData, priority: e.target.value })}
-                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500"
-                            >
-                                <option value="">Select Priority</option>
-                                {priorities.map(p => <option key={p._id} value={p.name}>{p.name}</option>)}
-                            </select>
+                                onChange={(val) => setManualFormData({ ...manualFormData, priority: val })}
+                                placeholder="Select Priority"
+                                onAddOption={handleAddPriorityDropdown}
+                                onEditOption={handleEditPriorityDropdown}
+                                onDeleteOption={handleDeletePriorityDropdown}
+                            />
                         </div>
 
                         {/* Subject */}
