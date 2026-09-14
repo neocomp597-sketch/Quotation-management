@@ -51,6 +51,8 @@ const CSMMasters = ({ isCreatePage, isEditPage }) => {
         { id: 'categories', label: 'Categories', icon: <MdCategory size={20} /> },
         { id: 'types', label: 'Ticket Types', icon: <MdSettings size={20} /> },
         { id: 'priorities', label: 'Priorities', icon: <MdPriorityHigh size={20} /> },
+        { id: 'sources', label: 'Ticket Sources', icon: <MdAssignmentTurnedIn size={20} /> },
+        { id: 'designations', label: 'Designations', icon: <MdPeople size={20} /> },
         { id: 'teams', label: 'Service Teams', icon: <MdPeople size={20} /> },
         { id: 'engineers', label: 'Engineers Master', icon: <MdBuild size={20} /> }
     ];
@@ -80,6 +82,8 @@ const CSMMasters = ({ isCreatePage, isEditPage }) => {
             if (activeTab === 'categories') res = await csmService.getCategories();
             else if (activeTab === 'types') res = await csmService.getTypes();
             else if (activeTab === 'priorities') res = await csmService.getPriorities();
+            else if (activeTab === 'sources') res = await csmService.getSources();
+            else if (activeTab === 'designations') res = await csmService.getDesignations();
             else if (activeTab === 'teams') res = await csmService.getTeams();
             else if (activeTab === 'engineers') res = await csmService.getEngineers();
             
@@ -195,6 +199,12 @@ const CSMMasters = ({ isCreatePage, isEditPage }) => {
             } else if (activeTab === 'priorities') {
                 if (editId) await csmService.updatePriority(editId, formData);
                 else await csmService.createPriority(formData);
+            } else if (activeTab === 'sources') {
+                if (editId) await csmService.updateSource(editId, formData);
+                else await csmService.createSource(formData);
+            } else if (activeTab === 'designations') {
+                if (editId) await csmService.updateDesignation(editId, formData);
+                else await csmService.createDesignation(formData);
             } else if (activeTab === 'teams') {
                 if (editId) await csmService.updateTeam(editId, formData);
                 else await csmService.createTeam(formData);
@@ -239,6 +249,8 @@ const CSMMasters = ({ isCreatePage, isEditPage }) => {
             if (activeTab === 'categories') await csmService.deleteCategory(id);
             else if (activeTab === 'types') await csmService.deleteType(id);
             else if (activeTab === 'priorities') await csmService.deletePriority(id);
+            else if (activeTab === 'sources') await csmService.deleteSource(id);
+            else if (activeTab === 'designations') await csmService.deleteDesignation(id);
             else if (activeTab === 'teams') await csmService.deleteTeam(id);
             toast.success('Deleted successfully');
             fetchItems();

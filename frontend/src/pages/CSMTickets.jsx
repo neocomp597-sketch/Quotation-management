@@ -2905,8 +2905,6 @@ const CSMTickets = () => {
                                 onChange={(val) => setFormData({ ...formData, source: val })}
                                 placeholder="Select Source"
                                 onAddOption={handleAddSourceDropdown}
-                                onEditOption={handleEditSourceDropdown}
-                                onDeleteOption={handleDeleteSourceDropdown}
                             />
                         </div>
                         <div>
@@ -2957,8 +2955,6 @@ const CSMTickets = () => {
                                 }}
                                 placeholder="Select Designation"
                                 onAddOption={handleAddDesignationDropdown}
-                                onEditOption={handleEditDesignationDropdown}
-                                onDeleteOption={handleDeleteDesignationDropdown}
                             />
                         </div>
                         <div>
@@ -3027,8 +3023,6 @@ const CSMTickets = () => {
                                         : "No problems available"
                                 }
                                 onAddOption={handleAddProblemDropdown}
-                                onEditOption={handleEditProblemDropdown}
-                                onDeleteOption={handleDeleteProblemDropdown}
                             />
                         </div>
                         <div>
@@ -3048,8 +3042,6 @@ const CSMTickets = () => {
                                 onChange={(val) => setFormData({ ...formData, priorityId: val })}
                                 placeholder="Select Priority"
                                 onAddOption={handleAddPriorityDropdown}
-                                onEditOption={handleEditPriorityDropdown}
-                                onDeleteOption={handleDeletePriorityDropdown}
                             />
                         </div>
                         
@@ -3701,8 +3693,6 @@ const CSMTickets = () => {
                                 onChange={(val) => setManualFormData({ ...manualFormData, source: val })}
                                 placeholder="Select Source"
                                 onAddOption={handleAddSourceDropdown}
-                                onEditOption={handleEditSourceDropdown}
-                                onDeleteOption={handleDeleteSourceDropdown}
                             />
                         </div>
 
@@ -3757,8 +3747,6 @@ const CSMTickets = () => {
                                 onChange={(val) => setManualFormData({ ...manualFormData, priority: val })}
                                 placeholder="Select Priority"
                                 onAddOption={handleAddPriorityDropdown}
-                                onEditOption={handleEditPriorityDropdown}
-                                onDeleteOption={handleDeletePriorityDropdown}
                             />
                         </div>
 
