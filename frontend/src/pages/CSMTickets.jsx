@@ -231,6 +231,19 @@ const CSMTickets = () => {
     const manualLookupInFlightRef = useRef(false);
     const lastManualLookedUpSNRef = useRef('');
 
+    const deduplicateSerialSuggestions = (list = []) => {
+        const seen = new Set();
+        return list.filter(item => {
+            const sn = String(item.serialNumber || '').trim().toLowerCase();
+            const cust = String(item.customerName || item.customerId?.companyName || item.customerId?.customerName || '').trim().toLowerCase();
+            const prod = String(item.productName || item.productId?.productName || item.productCode || item.productId?.productCode || '').trim().toLowerCase();
+            const key = `${sn}|${cust}|${prod}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
+    };
+
     const handleSerialInputChange = async (val) => {
         setFormData(prev => ({ ...prev, serialNumber: val }));
         const query = val ? String(val).trim() : '';
@@ -239,7 +252,7 @@ const CSMTickets = () => {
             setShowSerialDropdown(true);
             try {
                 const res = await csmService.searchSerialNumbers(query);
-                setSerialSuggestions(res.data || []);
+                setSerialSuggestions(deduplicateSerialSuggestions(res.data || []));
             } catch (err) {
                 console.error('Serial search error:', err);
                 setSerialSuggestions([]);
@@ -271,7 +284,7 @@ const CSMTickets = () => {
             setShowManualSerialDropdown(true);
             try {
                 const res = await csmService.searchSerialNumbers(query);
-                setManualSerialSuggestions(res.data || []);
+                setManualSerialSuggestions(deduplicateSerialSuggestions(res.data || []));
             } catch (err) {
                 console.error('Manual serial search error:', err);
                 setManualSerialSuggestions([]);

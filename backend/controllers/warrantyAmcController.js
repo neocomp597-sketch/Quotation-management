@@ -5,6 +5,7 @@ const AssetHistory = require('../models/AssetHistory');
 const Product = require('../models/Product');
 const Customer = require('../models/Customer');
 const RolePermission = require('../models/RolePermission');
+const mongoose = require('mongoose');
 
 // Utility for regex matching
 const buildExactRegex = (str) => {
@@ -12,6 +13,12 @@ const buildExactRegex = (str) => {
     const clean = String(str).trim();
     const escaped = clean.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
     return new RegExp(`^${escaped}$`, 'i');
+};
+
+const isValidObjectId = (id) => {
+    if (!id) return false;
+    const str = String(id);
+    return mongoose.Types.ObjectId.isValid(str) && /^[0-9a-fA-F]{24}$/.test(str);
 };
 
 // Warranty CRUD
@@ -621,7 +628,7 @@ exports.getAssetSummary = async (req, res) => {
         const ServiceVisit = require('../models/ServiceVisit');
 
         let asset = null;
-        if (assetId) {
+        if (assetId && isValidObjectId(assetId)) {
             asset = await Asset.findOne({ _id: assetId, companyId })
                 .populate({ path: 'customerId', select: 'customerName companyName gstin billingAddress mobile email', options: { bypassTenant: true } })
                 .populate({
@@ -767,11 +774,19 @@ exports.getAssetSummary = async (req, res) => {
 
         const now = new Date();
         
+        const custIdVal = typeof asset.customerId === 'object' && asset.customerId !== null ? asset.customerId._id : asset.customerId;
+        const prodIdVal = typeof asset.productId === 'object' && asset.productId !== null ? asset.productId._id : asset.productId;
+        const assetIdVal = asset._id;
+
+        const validCustId = isValidObjectId(custIdVal) ? custIdVal : null;
+        const validProdId = isValidObjectId(prodIdVal) ? prodIdVal : null;
+        const validAssetId = isValidObjectId(assetIdVal) ? assetIdVal : null;
+
         let warranty = null;
-        if (asset.customerId) {
+        if (validCustId && validProdId) {
             warranty = await Warranty.findOne({
-                customerId: asset.customerId._id,
-                productId: asset.productId._id,
+                customerId: validCustId,
+                productId: validProdId,
                 serialNumber: asset.serialNumber,
                 companyId
             }).lean();
@@ -786,9 +801,9 @@ exports.getAssetSummary = async (req, res) => {
         }
 
         let amc = null;
-        if (asset.customerId) {
+        if (validCustId) {
             amc = await AMC.findOne({
-                customerId: asset.customerId._id,
+                customerId: validCustId,
                 status: 'Active',
                 companyId,
                 startDate: { $lte: now },
@@ -796,33 +811,38 @@ exports.getAssetSummary = async (req, res) => {
             }).lean();
         }
 
-        const openTicketsCount = await Ticket.countDocuments({
-            assetId: asset._id,
-            status: { $in: ['Open', 'Assigned', 'In Progress', 'Pending Customer', 'Escalated'] },
-            companyId
-        });
-
-        const closedTicketsCount = await Ticket.countDocuments({
-            assetId: asset._id,
-            status: { $in: ['Resolved', 'Closed'] },
-            companyId
-        });
-
-        const tickets = await Ticket.find({ assetId: asset._id, companyId }).select('_id').lean();
-        const ticketIds = tickets.map(t => t._id);
-        
+        let openTicketsCount = 0;
+        let closedTicketsCount = 0;
         let lastServiceDate = null;
-        if (ticketIds.length > 0) {
-            const lastVisit = await ServiceVisit.findOne({
-                ticketId: { $in: ticketIds },
-                status: 'Completed',
+
+        if (validAssetId) {
+            openTicketsCount = await Ticket.countDocuments({
+                assetId: validAssetId,
+                status: { $in: ['Open', 'Assigned', 'In Progress', 'Pending Customer', 'Escalated'] },
                 companyId
-            })
-            .sort({ scheduledDate: -1 })
-            .select('scheduledDate')
-            .lean();
-            if (lastVisit) {
-                lastServiceDate = lastVisit.scheduledDate;
+            });
+
+            closedTicketsCount = await Ticket.countDocuments({
+                assetId: validAssetId,
+                status: { $in: ['Resolved', 'Closed'] },
+                companyId
+            });
+
+            const tickets = await Ticket.find({ assetId: validAssetId, companyId }).select('_id').lean();
+            const ticketIds = tickets.map(t => t._id);
+            
+            if (ticketIds.length > 0) {
+                const lastVisit = await ServiceVisit.findOne({
+                    ticketId: { $in: ticketIds },
+                    status: 'Completed',
+                    companyId
+                })
+                .sort({ scheduledDate: -1 })
+                .select('scheduledDate')
+                .lean();
+                if (lastVisit) {
+                    lastServiceDate = lastVisit.scheduledDate;
+                }
             }
         }
 
@@ -888,10 +908,31 @@ exports.searchSerialNumbers = async (req, res) => {
         const combinedResults = [];
         const seenSerials = new Set();
 
+        const buildSNKey = (sn, cust, prod) => {
+            const cleanSN = String(sn || '').trim().toLowerCase();
+            const custStr = String(
+                typeof cust === 'object' && cust !== null
+                    ? (cust.companyName || cust.customerName || cust._id || '')
+                    : (cust || '')
+            ).trim().toLowerCase();
+            const prodStr = String(
+                typeof prod === 'object' && prod !== null
+                    ? (prod.productName || prod.productCode || prod._id || '')
+                    : (prod || '')
+            ).trim().toLowerCase();
+            return `${cleanSN}|${custStr}|${prodStr}`;
+        };
+
         // Add active assets from Invoice Bulk Upload
         for (const a of assets) {
-            const snKey = `${(a.serialNumber || '').trim().toLowerCase()}-${a.productId?.productCode || ''}`;
+            const snKey = buildSNKey(
+                a.serialNumber,
+                a.customerId || a.customerNameStr,
+                a.productId || a.productName || a.productCode
+            );
+            if (seenSerials.has(snKey)) continue;
             seenSerials.add(snKey);
+
             combinedResults.push({
                 _id: a._id,
                 serialNumber: a.serialNumber,
@@ -917,7 +958,11 @@ exports.searchSerialNumbers = async (req, res) => {
 
         // Add historical records if not already in active list
         for (const h of historyDocs) {
-            const snKey = `${(h.serialNumber || '').trim().toLowerCase()}-${h.productCode || ''}`;
+            const snKey = buildSNKey(
+                h.serialNumber,
+                h.customerId || h.customerName,
+                h.productId || h.productName || h.productCode
+            );
             if (!seenSerials.has(snKey)) {
                 seenSerials.add(snKey);
                 combinedResults.push({
