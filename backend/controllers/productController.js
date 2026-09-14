@@ -226,6 +226,22 @@ const createProduct = async (req, res) => {
             return res.status(400).json({ message: 'Product code, name and HSN code are required' });
         }
 
+        const cleanProductCode = String(productCode).trim();
+        const cleanProductName = String(productName).trim();
+
+        // Pre-check for duplicate product code within company
+        if (cleanProductCode) {
+            const existingCode = await Product.findOne({
+                companyId: req.user?.companyId,
+                productCode: new RegExp(`^${cleanProductCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i')
+            });
+            if (existingCode) {
+                return res.status(400).json({
+                    message: `Product Code "${cleanProductCode}" already exists. Please enter a unique Product Code.`
+                });
+            }
+        }
+
         if (catalogType === 'Product' && Object.prototype.hasOwnProperty.call(req.body, 'vendors') && Array.isArray(vendors) && vendors.length === 0) {
             return res.status(400).json({ message: 'At least one vendor is required when vendor mapping is provided' });
         }
@@ -247,8 +263,8 @@ const createProduct = async (req, res) => {
         const preparedVendors = await validateAndPrepareVendors(vendors || [], { allowEmpty: true });
 
         const newProduct = new Product({
-            productCode,
-            productName,
+            productCode: cleanProductCode,
+            productName: cleanProductName,
             categoryId: categoryId || undefined,
             hsnCode,
             gstPercentage,
@@ -281,7 +297,15 @@ const createProduct = async (req, res) => {
         const hydrated = await fetchProductByIdWithRelations(newProduct._id);
         res.status(201).json(buildProductResponse(hydrated));
     } catch (error) {
-        console.error(error);
+        console.error('createProduct error:', error);
+        if (error.code === 11000 || String(error.message || '').includes('E11000') || String(error.message || '').includes('duplicate key')) {
+            try {
+                await Product.collection.dropIndex('productCode_1').catch(() => {});
+            } catch (e) {}
+            return res.status(400).json({
+                message: `Product Code "${req.body.productCode || 'code'}" already exists. Please enter a unique Product Code.`
+            });
+        }
         res.status(statusForProductError(error)).json({ message: error.message || 'Error creating product' });
     }
 };

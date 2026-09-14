@@ -659,6 +659,19 @@ const startBackgroundServices = async () => {
     console.error("Error auto-seeding super@gmail.com employees:", err);
   }
 
+  // Cleanup legacy single-field productCode_1 index on Product model if present
+  try {
+    const Product = require('./models/Product');
+    const indexes = await Product.collection.indexes();
+    const legacyIdx = indexes.find(i => i.name === 'productCode_1' && Object.keys(i.key).length === 1);
+    if (legacyIdx) {
+      await Product.collection.dropIndex('productCode_1');
+      console.log('Successfully dropped legacy single-field index productCode_1');
+    }
+  } catch (idxErr) {
+    // ignore if index not found or error
+  }
+
   // Seed current platform release notes
   try {
     const SystemUpdate = require("./models/models/SystemUpdate" ? "./models/SystemUpdate" : "./models/SystemUpdate");

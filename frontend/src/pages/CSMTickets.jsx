@@ -300,41 +300,70 @@ const CSMTickets = () => {
                 let custName = asset.customerName || asset.customerId?.companyName || asset.customerId?.customerName || asset.customerNameStr || '';
                 let custId = asset.customerId?._id || (typeof asset.customerId === 'string' ? asset.customerId : '');
                 
-                // Attempt to match customer in customers master array by ID or Name
-                if (customers && customers.length > 0) {
-                    if (custId) {
-                        const match = customers.find(c => String(c._id) === String(custId));
-                        if (match) custName = match.companyName || match.customerName;
-                    }
-                    if (!custId && custName) {
-                        const match = customers.find(c => (c.companyName || c.customerName || '').toLowerCase() === custName.toLowerCase());
-                        if (match) custId = match._id;
+                // Match customer in customers master array or dynamically inject
+                if (custId) {
+                    const match = customers.find(c => String(c._id) === String(custId));
+                    if (match) custName = match.companyName || match.customerName;
+                }
+                if (!custId && custName) {
+                    const match = customers.find(c => (c.companyName || c.customerName || '').toLowerCase() === custName.toLowerCase());
+                    if (match) {
+                        custId = match._id;
+                    } else {
+                        const tempCustId = asset.customerId?._id || (asset._id + '_cust');
+                        const tempCustObj = {
+                            _id: tempCustId,
+                            companyName: custName,
+                            customerName: custName,
+                            externalCode: asset.customerCode || '',
+                            mobile: asset.customerMobile || '',
+                            billingAddress: { pincode: asset.customerPostalCode || '' }
+                        };
+                        setCustomers(prev => {
+                            const exists = prev.some(c => String(c._id) === String(tempCustId) || (c.companyName || c.customerName || '').toLowerCase() === custName.toLowerCase());
+                            if (!exists) return [tempCustObj, ...prev];
+                            return prev;
+                        });
+                        custId = tempCustId;
                     }
                 }
 
                 let prodName = asset.productName || asset.productId?.productName || '';
+                let prodCode = asset.productCode || asset.productId?.productCode || '';
                 let prodId = asset.productId?._id || (typeof asset.productId === 'string' ? asset.productId : '');
 
-                // Attempt to match product in products master array by ID, Code, or Name
-                if (products && products.length > 0) {
-                    const pCode = (asset.productCode || asset.productId?.productCode || '').toLowerCase();
-                    const pName = (prodName || '').toLowerCase();
-                    if (prodId) {
-                        const match = products.find(p => String(p._id) === String(prodId));
-                        if (match) prodName = match.productName;
-                    }
-                    if (!prodId && (pCode || pName)) {
-                        const match = products.find(p => (p.productCode || '').toLowerCase() === pCode || (p.productName || '').toLowerCase() === pName);
-                        if (match) {
-                            prodId = match._id;
-                            prodName = match.productName;
-                        }
+                // Match product in products master array or dynamically inject
+                const pCodeLow = (prodCode || '').toLowerCase();
+                const pNameLow = (prodName || '').toLowerCase();
+                if (prodId) {
+                    const match = products.find(p => String(p._id) === String(prodId));
+                    if (match) prodName = match.productName;
+                }
+                if (!prodId && (pCodeLow || pNameLow)) {
+                    const match = products.find(p => (p.productCode || '').toLowerCase() === pCodeLow || (p.productName || '').toLowerCase() === pNameLow);
+                    if (match) {
+                        prodId = match._id;
+                        prodName = match.productName;
+                    } else {
+                        const tempProdId = asset.productId?._id || (asset._id + '_prod');
+                        const tempProdObj = {
+                            _id: tempProdId,
+                            productName: prodName || prodCode || 'Product',
+                            productCode: prodCode || ''
+                        };
+                        setProducts(prev => {
+                            const exists = prev.some(p => String(p._id) === String(tempProdId) || (p.productCode || '').toLowerCase() === pCodeLow);
+                            if (!exists) return [tempProdObj, ...prev];
+                            return prev;
+                        });
+                        prodId = tempProdId;
                     }
                 }
 
                 const invNo = asset.invoiceNumber || (asset.invoiceId?.voucherNumber || '');
                 const invDate = asset.saleDate || asset.invoiceDate ? new Date(asset.saleDate || asset.invoiceDate).toISOString().slice(0, 10) : '';
-                const pincode = asset.customerPostalCode || asset.customerId?.billingAddress?.pincode || asset.locationPincode || '';
+                const pincode = asset.customerPostalCode || asset.customerId?.billingAddress?.pincode || asset.locationPincode || asset.pincode || '';
+                const mobile = asset.customerMobile || asset.customerId?.mobile || '';
 
                 setManualFormData(prev => ({
                     ...prev,
@@ -345,11 +374,12 @@ const CSMTickets = () => {
                     customProductName: prodName || prev.customProductName,
                     invoiceNo: invNo || prev.invoiceNo,
                     invoiceDate: invDate || prev.invoiceDate,
-                    pincode: pincode || prev.pincode
+                    pincode: pincode || prev.pincode,
+                    contactPhone: mobile || prev.contactPhone
                 }));
 
                 // Auto-fetch contacts for matched customer
-                if (custId) {
+                if (custId && !String(custId).startsWith('cust_')) {
                     try {
                         const contactsRes = await csmService.getCustomerContacts({ customerId: custId });
                         const contacts = contactsRes.data || [];
@@ -358,7 +388,7 @@ const CSMTickets = () => {
                             setManualFormData(prev => ({
                                 ...prev,
                                 contactName: primaryContact.contactName || prev.contactName,
-                                contactPhone: primaryContact.mobileNo || prev.contactPhone,
+                                contactPhone: primaryContact.mobileNo || mobile || prev.contactPhone,
                                 contactEmail: primaryContact.email || prev.contactEmail
                             }));
                         } else if (asset.customerId && typeof asset.customerId === 'object') {
@@ -1285,12 +1315,15 @@ const CSMTickets = () => {
                 let targetCustId = asset.customerId?._id || (typeof asset.customerId === 'string' ? asset.customerId : null);
                 let custObj = typeof asset.customerId === 'object' && asset.customerId !== null ? asset.customerId : null;
                 let targetCustName = asset.customerName || asset.customerId?.companyName || asset.customerId?.customerName || asset.customerNameStr || '';
+                let custCode = asset.customerCode || asset.customerId?.externalCode || '';
+                let custMobile = asset.customerMobile || asset.customerId?.mobile || '';
+                let custPostal = asset.customerPostalCode || asset.customerId?.billingAddress?.pincode || asset.locationPincode || asset.pincode || '';
 
                 if (custObj && custObj._id) {
                     setCustomers(prev => {
                         const exists = prev.some(c => String(c._id) === String(custObj._id));
                         if (!exists) {
-                            return [{ _id: custObj._id, companyName: custObj.companyName || custObj.customerName, customerName: custObj.customerName || custObj.companyName }, ...prev];
+                            return [{ _id: custObj._id, companyName: custObj.companyName || custObj.customerName, customerName: custObj.customerName || custObj.companyName, externalCode: custCode, mobile: custMobile, billingAddress: { pincode: custPostal } }, ...prev];
                         }
                         return prev;
                     });
@@ -1298,7 +1331,7 @@ const CSMTickets = () => {
                     setCustomers(prev => {
                         const exists = prev.some(c => String(c._id) === String(targetCustId));
                         if (!exists) {
-                            return [{ _id: targetCustId, companyName: targetCustName, customerName: targetCustName }, ...prev];
+                            return [{ _id: targetCustId, companyName: targetCustName, customerName: targetCustName, externalCode: custCode, mobile: custMobile, billingAddress: { pincode: custPostal } }, ...prev];
                         }
                         return prev;
                     });
@@ -1313,6 +1346,24 @@ const CSMTickets = () => {
                         const match = customers.find(c => (c.companyName || c.customerName || '').toLowerCase() === targetCustName.toLowerCase());
                         if (match) targetCustId = match._id;
                     }
+                }
+
+                if (!targetCustId && targetCustName) {
+                    const tempCustId = asset.customerId?._id || (asset._id + '_cust');
+                    const tempCustObj = {
+                        _id: tempCustId,
+                        companyName: targetCustName,
+                        customerName: targetCustName,
+                        externalCode: custCode,
+                        mobile: custMobile,
+                        billingAddress: { pincode: custPostal }
+                    };
+                    setCustomers(prev => {
+                        const exists = prev.some(c => String(c._id) === String(tempCustId) || (c.companyName || c.customerName || '').toLowerCase() === targetCustName.toLowerCase());
+                        if (!exists) return [tempCustObj, ...prev];
+                        return prev;
+                    });
+                    targetCustId = tempCustId;
                 }
 
                 let targetProdId = asset.productId?._id || (typeof asset.productId === 'string' ? asset.productId : null);
@@ -1349,6 +1400,21 @@ const CSMTickets = () => {
                         const match = products.find(p => (p.productCode || '').toLowerCase() === pCode || (p.productName || '').toLowerCase() === pName);
                         if (match) targetProdId = match._id;
                     }
+                }
+
+                if (!targetProdId && (targetProdName || targetProdCode)) {
+                    const tempProdId = asset.productId?._id || (asset._id + '_prod');
+                    const tempProdObj = {
+                        _id: tempProdId,
+                        productName: targetProdName || targetProdCode || 'Product',
+                        productCode: targetProdCode || ''
+                    };
+                    setProducts(prev => {
+                        const exists = prev.some(p => String(p._id) === String(tempProdId) || (p.productCode || '').toLowerCase() === (targetProdCode || '').toLowerCase());
+                        if (!exists) return [tempProdObj, ...prev];
+                        return prev;
+                    });
+                    targetProdId = tempProdId;
                 }
                 
                 let invList = [];

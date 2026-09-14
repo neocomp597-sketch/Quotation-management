@@ -641,10 +641,10 @@ exports.getAssetSummary = async (req, res) => {
         } else if (serialNumber) {
             const cleanSN = String(serialNumber).trim();
             const escapedSN = cleanSN.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-            const matches = await Asset.find({
-                companyId,
-                serialNumber: { $regex: new RegExp("^" + escapedSN + "$", "i") }
-            })
+            const assetQuery = { serialNumber: { $regex: new RegExp("^" + escapedSN + "$", "i") } };
+            if (companyId) assetQuery.companyId = companyId;
+
+            let matches = await Asset.find(assetQuery)
             .populate({ path: 'customerId', select: 'customerName companyName gstin billingAddress mobile email', options: { bypassTenant: true } })
             .populate({
                 path: 'productId',
@@ -661,6 +661,27 @@ exports.getAssetSummary = async (req, res) => {
             .populate('invoiceId', 'voucherNumber date')
             .lean();
 
+            // Fallback search across tenant boundary if no matches found
+            if (matches.length === 0 && companyId) {
+                matches = await Asset.find({ serialNumber: { $regex: new RegExp("^" + escapedSN + "$", "i") } })
+                .setOptions({ bypassTenant: true })
+                .populate({ path: 'customerId', select: 'customerName companyName gstin billingAddress mobile email', options: { bypassTenant: true } })
+                .populate({
+                    path: 'productId',
+                    select: 'productName productCode basePrice mrp catalogType mgr1 mgr2 mgr3 mgr4 mgr5',
+                    options: { bypassTenant: true },
+                    populate: [
+                        { path: 'mgr1', select: 'code description', options: { bypassTenant: true } },
+                        { path: 'mgr2', select: 'code description', options: { bypassTenant: true } },
+                        { path: 'mgr3', select: 'code description', options: { bypassTenant: true } },
+                        { path: 'mgr4', select: 'code description', options: { bypassTenant: true } },
+                        { path: 'mgr5', select: 'code description', options: { bypassTenant: true } }
+                    ]
+                })
+                .populate('invoiceId', 'voucherNumber date')
+                .lean();
+            }
+
             if (matches.length > 0) {
                 const statusPriority = { 'SOLD': 1, 'ALLOCATED': 2, 'RETURNED': 3, 'RETURN': 3, 'IN_STOCK': 4, 'SCRAPPED': 5 };
                 matches.sort((a, b) => {
@@ -672,25 +693,61 @@ exports.getAssetSummary = async (req, res) => {
                     return 0;
                 });
                 asset = matches[0];
+
+                // Ensure customerId object fallback if unpopulated
+                if (!asset.customerId && (asset.customerNameStr || asset.customerCode || asset.customerMobile)) {
+                    asset.customerId = {
+                        _id: 'cust_' + asset._id,
+                        companyName: asset.customerNameStr || asset.customerCode || 'Customer',
+                        customerName: asset.customerNameStr || asset.customerCode || 'Customer',
+                        externalCode: asset.customerCode || '',
+                        mobile: asset.customerMobile || '',
+                        billingAddress: { pincode: asset.customerPostalCode || '' }
+                    };
+                }
+
+                // Ensure productId object fallback if unpopulated
+                if (!asset.productId && (asset.productName || asset.productCode)) {
+                    asset.productId = {
+                        _id: 'prod_' + asset._id,
+                        productName: asset.productName || asset.productCode || 'Product',
+                        productCode: asset.productCode || ''
+                    };
+                }
             } else {
                 // FALLBACK: Search AssetHistory (Transaction Data) if not found in Asset Master
-                const historyDoc = await AssetHistory.findOne({
-                    companyId,
-                    serialNumber: { $regex: new RegExp("^" + escapedSN + "$", "i") }
-                })
+                const historyQuery = { serialNumber: { $regex: new RegExp("^" + escapedSN + "$", "i") } };
+                if (companyId) historyQuery.companyId = companyId;
+
+                let historyDoc = await AssetHistory.findOne(historyQuery)
                 .sort({ createdAt: -1 })
                 .populate('customerId', 'customerName companyName gstin billingAddress mobile email')
                 .populate('productId', 'productName productCode basePrice mrp catalogType')
                 .lean();
 
+                if (!historyDoc && companyId) {
+                    historyDoc = await AssetHistory.findOne({ serialNumber: { $regex: new RegExp("^" + escapedSN + "$", "i") } })
+                    .setOptions({ bypassTenant: true })
+                    .sort({ createdAt: -1 })
+                    .populate('customerId', 'customerName companyName gstin billingAddress mobile email')
+                    .populate('productId', 'productName productCode basePrice mrp catalogType')
+                    .lean();
+                }
+
                 if (historyDoc) {
                     asset = {
                         _id: historyDoc.assetId || historyDoc._id,
                         serialNumber: historyDoc.serialNumber,
-                        productId: historyDoc.productId || { productName: historyDoc.productName, productCode: historyDoc.productCode },
+                        productId: historyDoc.productId || { _id: 'prod_' + historyDoc._id, productName: historyDoc.productName || 'Product', productCode: historyDoc.productCode || '' },
                         productName: historyDoc.productName || historyDoc.productId?.productName || '',
                         productCode: historyDoc.productCode || historyDoc.productId?.productCode || '',
-                        customerId: historyDoc.customerId || (historyDoc.customerName ? { customerName: historyDoc.customerName, companyName: historyDoc.customerName } : null),
+                        customerId: historyDoc.customerId || {
+                            _id: 'cust_' + historyDoc._id,
+                            companyName: historyDoc.customerName || 'Customer',
+                            customerName: historyDoc.customerName || 'Customer',
+                            mobile: historyDoc.customerMobile || '',
+                            billingAddress: { pincode: historyDoc.customerPostalCode || '' }
+                        },
                         customerNameStr: historyDoc.customerName || '',
                         customerPostalCode: historyDoc.customerPostalCode || '',
                         invoiceNumber: historyDoc.invoiceNumber || '',
