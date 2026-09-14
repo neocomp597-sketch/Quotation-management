@@ -1335,7 +1335,9 @@ app.use(
     console.log(`[Static] Serving file: ${req.path}`);
     next();
   },
+  express.static(path.join(__dirname, "public/uploads")),
   express.static(path.join(__dirname, "uploads")),
+  express.static(path.join(__dirname, "public"))
 );
 
 // Serve Static Files - Frontend (Production & Deployment)

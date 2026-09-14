@@ -497,6 +497,34 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
         }
     };
 
+    const handleViewPdf = (url) => {
+        if (!url) return;
+        const trimmed = String(url).trim();
+        if (trimmed.startsWith('data:')) {
+            try {
+                const parts = trimmed.split(';base64,');
+                const contentType = parts[0].replace('data:', '') || 'application/pdf';
+                const raw = window.atob(parts[1]);
+                const rawLength = raw.length;
+                const uInt8Array = new Uint8Array(rawLength);
+                for (let i = 0; i < rawLength; ++i) {
+                    uInt8Array[i] = raw.charCodeAt(i);
+                }
+                const blob = new Blob([uInt8Array], { type: contentType });
+                const blobUrl = URL.createObjectURL(blob);
+                window.open(blobUrl, '_blank');
+            } catch (e) {
+                console.error('Error opening base64 PDF:', e);
+                toast.error('Failed to open PDF preview');
+            }
+        } else {
+            const fullUrl = resolveImageUrl(trimmed);
+            if (fullUrl) {
+                window.open(fullUrl, '_blank', 'noopener,noreferrer');
+            }
+        }
+    };
+
     const { isSubmitting: isSaving, execute: handleSubmit } = useSubmitGuard(async (e) => {
         e.preventDefault();
 
@@ -1258,37 +1286,34 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                                                                         {(p.technicalSpecificationUrl || p.operatingUserManualUrl || p.repairTroubleshootingUrl) && (
                                                                             <div className="flex flex-wrap items-center gap-1">
                                                                                 {p.technicalSpecificationUrl && (
-                                                                                    <a
-                                                                                        href={resolveImageUrl(p.technicalSpecificationUrl)}
-                                                                                        target="_blank"
-                                                                                        rel="noopener noreferrer"
-                                                                                        className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-rose-50 hover:bg-rose-100 text-rose-700 text-[8px] font-black uppercase tracking-widest rounded border border-rose-200 transition-all"
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() => handleViewPdf(p.technicalSpecificationUrl)}
+                                                                                        className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-rose-50 hover:bg-rose-100 text-rose-700 text-[8px] font-black uppercase tracking-widest rounded border border-rose-200 transition-all cursor-pointer"
                                                                                         title="View Technical Specification PDF"
                                                                                     >
                                                                                         <MdPictureAsPdf size={10} /> Tech Spec
-                                                                                    </a>
+                                                                                    </button>
                                                                                 )}
                                                                                 {p.operatingUserManualUrl && (
-                                                                                    <a
-                                                                                        href={resolveImageUrl(p.operatingUserManualUrl)}
-                                                                                        target="_blank"
-                                                                                        rel="noopener noreferrer"
-                                                                                        className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[8px] font-black uppercase tracking-widest rounded border border-indigo-200 transition-all"
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() => handleViewPdf(p.operatingUserManualUrl)}
+                                                                                        className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[8px] font-black uppercase tracking-widest rounded border border-indigo-200 transition-all cursor-pointer"
                                                                                         title="View Operating User Manual PDF"
                                                                                     >
                                                                                         <MdPictureAsPdf size={10} /> Manual
-                                                                                    </a>
+                                                                                    </button>
                                                                                 )}
                                                                                 {p.repairTroubleshootingUrl && (
-                                                                                    <a
-                                                                                        href={resolveImageUrl(p.repairTroubleshootingUrl)}
-                                                                                        target="_blank"
-                                                                                        rel="noopener noreferrer"
-                                                                                        className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-amber-50 hover:bg-amber-100 text-amber-700 text-[8px] font-black uppercase tracking-widest rounded border border-amber-200 transition-all"
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() => handleViewPdf(p.repairTroubleshootingUrl)}
+                                                                                        className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-amber-50 hover:bg-amber-100 text-amber-700 text-[8px] font-black uppercase tracking-widest rounded border border-amber-200 transition-all cursor-pointer"
                                                                                         title="View Repair & Troubleshooting PDF"
                                                                                     >
                                                                                         <MdPictureAsPdf size={10} /> Repair
-                                                                                    </a>
+                                                                                    </button>
                                                                                 )}
                                                                             </div>
                                                                         )}
@@ -1594,7 +1619,7 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                                     {[
                                         {
                                             field: 'technicalSpecification',
@@ -1617,42 +1642,41 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                                         const isUploadingThis = uploadingPdf[doc.field];
 
                                         return (
-                                            <div key={doc.field} className="p-4 bg-slate-50/90 rounded-2xl border border-slate-200 flex flex-col justify-between space-y-3 hover:border-amber-300 transition-all shadow-xs">
+                                            <div key={doc.field} className="p-6 bg-white rounded-3xl border border-slate-200/90 shadow-sm flex flex-col justify-between space-y-5 hover:border-amber-400 hover:shadow-md transition-all h-full">
                                                 <div>
-                                                    <div className="flex items-center justify-between mb-1.5">
-                                                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                                                            <MdPictureAsPdf className="text-rose-600 flex-shrink-0" size={16} />
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <span className="text-[11px] font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                                                            <MdPictureAsPdf className="text-rose-600 flex-shrink-0" size={18} />
                                                             {doc.title}
                                                         </span>
                                                         {pdfUrl && (
-                                                            <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-md text-[9px] font-black uppercase tracking-wider">
+                                                            <span className="px-2.5 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-md text-[9px] font-black uppercase tracking-wider">
                                                                 Uploaded
                                                             </span>
                                                         )}
                                                     </div>
-                                                    <p className="text-[10px] text-slate-400 font-medium leading-normal">
+                                                    <p className="text-[10px] text-slate-400 font-medium leading-relaxed">
                                                         {doc.description}
                                                     </p>
                                                 </div>
 
                                                 {pdfUrl ? (
-                                                    <div className="p-2.5 bg-white rounded-xl border border-slate-200 space-y-2">
+                                                    <div className="p-3 bg-slate-50/80 rounded-2xl border border-slate-200 space-y-3">
                                                         <div className="flex items-center justify-between gap-2">
-                                                            <span className="text-xs font-bold text-slate-700 truncate flex items-center gap-1.5" title={pdfUrl}>
+                                                            <span className="text-xs font-bold text-slate-700 truncate flex items-center gap-2" title={pdfUrl}>
                                                                 <MdDescription className="text-rose-500 flex-shrink-0" size={16} />
                                                                 <span className="truncate">{getPdfFileName(pdfUrl)}</span>
                                                             </span>
                                                         </div>
-                                                        <div className="flex items-center gap-1.5 pt-1.5 border-t border-slate-100">
-                                                            <a
-                                                                href={resolveImageUrl(pdfUrl)}
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                                className="flex-1 py-1.5 px-2 bg-teal-50 hover:bg-teal-100 text-teal-700 rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center justify-center gap-1 transition-all border border-teal-200"
+                                                        <div className="flex items-center gap-2 pt-2 border-t border-slate-200/60">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleViewPdf(pdfUrl)}
+                                                                className="flex-1 py-2 px-3 bg-teal-50 hover:bg-teal-100 text-teal-700 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all border border-teal-200 shadow-2xs active:scale-95"
                                                             >
-                                                                <MdVisibility size={14} /> View PDF
-                                                            </a>
-                                                            <label className="py-1.5 px-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[9px] font-black uppercase tracking-wider cursor-pointer flex items-center justify-center gap-1 transition-all border border-slate-200">
+                                                                <MdVisibility size={15} /> View PDF
+                                                            </button>
+                                                            <label className="py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-[10px] font-black uppercase tracking-wider cursor-pointer flex items-center justify-center gap-1.5 transition-all border border-slate-200 shadow-2xs">
                                                                 <input
                                                                     type="file"
                                                                     accept=".pdf,application/pdf"
@@ -1660,20 +1684,20 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                                                                     disabled={isUploadingThis}
                                                                     className="hidden"
                                                                 />
-                                                                <MdFileUpload size={14} /> Replace
+                                                                <MdFileUpload size={15} /> Replace
                                                             </label>
                                                             <button
                                                                 type="button"
                                                                 onClick={() => setFormData(prev => ({ ...prev, [fieldUrlKey]: '' }))}
-                                                                className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg transition-all border border-rose-200"
+                                                                className="p-2 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl transition-all border border-rose-200 shadow-2xs"
                                                                 title="Remove PDF"
                                                             >
-                                                                <MdDelete size={14} />
+                                                                <MdDelete size={16} />
                                                             </button>
                                                         </div>
                                                     </div>
                                                 ) : (
-                                                    <label className="border-2 border-dashed border-slate-200 hover:border-amber-500 bg-white rounded-xl p-3 flex flex-col items-center justify-center cursor-pointer transition-all group text-center">
+                                                    <label className="border-2 border-dashed border-slate-200 hover:border-amber-500 bg-slate-50/50 hover:bg-amber-50/20 rounded-2xl p-5 flex flex-col items-center justify-center cursor-pointer transition-all group text-center min-h-[100px]">
                                                         <input
                                                             type="file"
                                                             accept=".pdf,application/pdf"
@@ -1688,8 +1712,8 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                                                             </div>
                                                         ) : (
                                                             <>
-                                                                <div className="w-8 h-8 bg-rose-50 rounded-xl flex items-center justify-center text-rose-500 group-hover:scale-110 transition-transform mb-1 border border-rose-100">
-                                                                    <MdCloudUpload size={18} />
+                                                                <div className="w-9 h-9 bg-rose-50 rounded-2xl flex items-center justify-center text-rose-500 group-hover:scale-110 transition-transform mb-1.5 border border-rose-100 shadow-2xs">
+                                                                    <MdCloudUpload size={20} />
                                                                 </div>
                                                                 <span className="text-[10px] font-black text-slate-700 uppercase tracking-wider group-hover:text-amber-600">
                                                                     Upload PDF

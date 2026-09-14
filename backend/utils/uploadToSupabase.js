@@ -41,13 +41,17 @@ const uploadToSupabase = async (file) => {
     }
 
     // 2. Local Disk Fallback
-    const uploadDir = path.join(__dirname, "../public/uploads");
-    if (!fs.existsSync(uploadDir)) {
-        fs.mkdirSync(uploadDir, { recursive: true });
-    }
+    const dirsToSave = [
+        path.join(__dirname, "../public/uploads"),
+        path.join(__dirname, "../uploads")
+    ];
 
-    const localFilePath = path.join(uploadDir, uniqueFileName);
-    fs.writeFileSync(localFilePath, file.buffer);
+    dirsToSave.forEach(dir => {
+        if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+        }
+        fs.writeFileSync(path.join(dir, uniqueFileName), file.buffer);
+    });
 
     return `/uploads/${uniqueFileName}`;
 };

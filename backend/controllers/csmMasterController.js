@@ -799,10 +799,10 @@ exports.problems = {
     getAll: async (req, res) => {
         try {
             const companyId = req.user?.companyId;
-            const mgr4Category = req.query.mgr4Category ? String(req.query.mgr4Category).trim() : '';
+            let mgr4Category = req.query.mgr4Category ? String(req.query.mgr4Category).trim() : '';
             const productId = req.query.productId ? String(req.query.productId).trim() : '';
 
-            // If neither Product nor MGR4 category is provided, return empty array (Product/MGR must be selected first)
+            // If neither Product nor MGR4 category is provided, return empty array
             if (!mgr4Category && !productId) {
                 return res.json([]);
             }
@@ -810,81 +810,105 @@ exports.problems = {
             const MGR = require('../models/MGR');
             const Product = require('../models/Product');
             const combinedMap = new Map();
-            let mgrIds = [];
+            let mgrDocs = [];
 
-            // 1. If productId supplied, check Product document to get associated MGRs and direct Product problems
+            // 1. If productId supplied, resolve Product and populated MGRs
             if (productId && mongoose.Types.ObjectId.isValid(productId)) {
-                const prod = await Product.findById(productId).select('mgr1 mgr2 mgr3 mgr4 mgr5').lean();
+                const prod = await Product.findById(productId)
+                    .setOptions({ bypassTenant: true })
+                    .populate('mgr1 mgr2 mgr3 mgr4 mgr5')
+                    .lean();
+
                 if (prod) {
                     ['mgr1', 'mgr2', 'mgr3', 'mgr4', 'mgr5'].forEach(k => {
-                        const val = prod[k]?._id || prod[k];
-                        if (val && mongoose.Types.ObjectId.isValid(String(val))) {
-                            mgrIds.push(String(val));
+                        if (prod[k] && typeof prod[k] === 'object') {
+                            mgrDocs.push(prod[k]);
+                        } else if (prod[k] && mongoose.Types.ObjectId.isValid(String(prod[k]))) {
+                            // fetch raw ID
+                            MGR.findById(prod[k]).setOptions({ bypassTenant: true }).lean().then(m => {
+                                if (m) mgrDocs.push(m);
+                            }).catch(() => {});
                         }
                     });
                 }
             }
 
-            // 2. If mgr4Category text is supplied, find matching MGR documents by code or description
-            let mgrCategoryReg = null;
+            // 2. Resolve MGR by mgr4Category (ObjectId, code, description, or composite "code - description")
             if (mgr4Category) {
-                mgrCategoryReg = buildExactRegex(mgr4Category) || mgr4Category;
-                const mgrMatch = await MGR.find({
-                    companyId,
-                    $or: [
-                        { code: mgrCategoryReg },
-                        { description: mgrCategoryReg }
-                    ]
-                }).select('_id code description problemList').lean();
-
-                mgrMatch.forEach(m => {
-                    mgrIds.push(String(m._id));
-                    if (Array.isArray(m.problemList)) {
-                        m.problemList.forEach(probName => {
-                            const clean = String(probName || '').trim();
-                            if (clean && !combinedMap.has(clean.toLowerCase())) {
-                                combinedMap.set(clean.toLowerCase(), {
-                                    _id: `mgr_prob_${clean.replace(/[^a-zA-Z0-9]/g, '_')}`,
-                                    name: clean,
-                                    mgr4Category: m.code || m.description || mgr4Category
-                                });
-                            }
-                        });
+                let extraMgrs = [];
+                if (mongoose.Types.ObjectId.isValid(mgr4Category)) {
+                    extraMgrs = await MGR.find({ _id: mgr4Category }).setOptions({ bypassTenant: true }).lean();
+                } else {
+                    const escaped = mgr4Category.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+                    const parts = mgr4Category.split(/\s*[-–—]\s*/);
+                    const queryOr = [
+                        { code: new RegExp(`^${escaped}$`, 'i') },
+                        { description: new RegExp(`^${escaped}$`, 'i') }
+                    ];
+                    parts.forEach(part => {
+                        const pEsc = part.trim().replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+                        if (pEsc) {
+                            queryOr.push({ code: new RegExp(`^${pEsc}$`, 'i') });
+                            queryOr.push({ description: new RegExp(`^${pEsc}$`, 'i') });
+                        }
+                    });
+                    extraMgrs = await MGR.find({ $or: queryOr }).setOptions({ bypassTenant: true }).lean();
+                }
+                extraMgrs.forEach(m => {
+                    if (!mgrDocs.some(existing => String(existing._id) === String(m._id))) {
+                        mgrDocs.push(m);
                     }
                 });
             }
 
-            // 3. Fetch problem lists for any MGR IDs linked to the product
-            if (mgrIds.length > 0) {
-                const mgrDocs = await MGR.find({ _id: { $in: mgrIds } }).select('code description problemList').lean();
-                mgrDocs.forEach(m => {
-                    if (Array.isArray(m.problemList)) {
-                        m.problemList.forEach(probName => {
-                            const clean = String(probName || '').trim();
-                            if (clean && !combinedMap.has(clean.toLowerCase())) {
-                                combinedMap.set(clean.toLowerCase(), {
-                                    _id: `mgr_prob_${clean.replace(/[^a-zA-Z0-9]/g, '_')}`,
-                                    name: clean,
-                                    mgr4Category: m.code || m.description || ''
-                                });
-                            }
-                        });
-                    }
-                });
-            }
+            // Collect search terms for ProblemMaster matching
+            const searchTermsSet = new Set();
+            if (mgr4Category) searchTermsSet.add(mgr4Category.toLowerCase());
 
-            // 4. Fetch problems explicitly created in ProblemMaster for this Product or MGR Category
-            const problemFilter = { companyId, $or: [] };
-            if (mgrCategoryReg) {
-                problemFilter.$or.push({ mgr4Category: mgrCategoryReg });
-            }
+            mgrDocs.forEach(m => {
+                if (m.code) searchTermsSet.add(String(m.code).trim().toLowerCase());
+                if (m.description) searchTermsSet.add(String(m.description).trim().toLowerCase());
+                if (m.code && m.description) {
+                    searchTermsSet.add(`${m.code} - ${m.description}`.toLowerCase());
+                    searchTermsSet.add(`${m.code} (${m.description})`.toLowerCase());
+                }
+                // Extract embedded problemList items from MGR document
+                if (Array.isArray(m.problemList)) {
+                    m.problemList.forEach(probName => {
+                        const clean = String(probName || '').trim();
+                        if (clean && !combinedMap.has(clean.toLowerCase())) {
+                            combinedMap.set(clean.toLowerCase(), {
+                                _id: `mgr_prob_${clean.replace(/[^a-zA-Z0-9]/g, '_')}`,
+                                name: clean,
+                                mgr4Category: m.code || m.description || ''
+                            });
+                        }
+                    });
+                }
+            });
+
+            // 3. Find problems in ProblemMaster matching search terms or productId
+            const orConditions = [];
             if (productId && mongoose.Types.ObjectId.isValid(productId)) {
-                problemFilter.$or.push({ productId });
+                orConditions.push({ productId });
             }
 
-            if (problemFilter.$or.length > 0) {
-                const docs = await Problem.find(problemFilter).sort({ createdAt: -1 }).lean();
-                docs.forEach(p => {
+            searchTermsSet.forEach(term => {
+                const escaped = term.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+                orConditions.push({ mgr4Category: new RegExp(`^${escaped}$`, 'i') });
+                orConditions.push({ mgr4Category: new RegExp(escaped, 'i') });
+            });
+
+            if (orConditions.length > 0) {
+                const dbProblems = await Problem.find({
+                    ...(companyId ? { companyId } : {}),
+                    $or: orConditions
+                })
+                .setOptions({ bypassTenant: true })
+                .sort({ createdAt: -1 })
+                .lean();
+
+                dbProblems.forEach(p => {
                     const name = String(p.name || p.title || p.description || '').trim();
                     if (name && !combinedMap.has(name.toLowerCase())) {
                         combinedMap.set(name.toLowerCase(), {
