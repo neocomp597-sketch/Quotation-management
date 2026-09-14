@@ -1874,7 +1874,11 @@ const CSMTickets = () => {
             });
 
             const contactsRes = await csmService.getCustomerContacts({ customerId: targetCustId });
-            setCustomerContacts(contactsRes.data || []);
+            let fetchedList = contactsRes.data || [];
+            if (res.data && res.data._id && !fetchedList.some(c => c._id === res.data._id)) {
+                fetchedList = [res.data, ...fetchedList];
+            }
+            setCustomerContacts(fetchedList);
 
             // Auto-select the newly added contact
             setFormData(prev => ({
@@ -2000,19 +2004,42 @@ const CSMTickets = () => {
         }
     };
 
-    const handleEditSourceDropdown = (option) => {
+    const handleEditSourceDropdown = async (option) => {
         const item = sources.find(s => s._id === (option.id || option._id) || s.name === (option.value || option.label));
         if (item) {
-            handleOpenMiniMaster('source');
-            handleStartEditMiniMaster(item);
+            const newName = window.prompt("Edit Ticket Source Name:", item.name);
+            if (newName && newName.trim() && newName.trim() !== item.name) {
+                try {
+                    await csmService.updateSource(item._id, { name: newName.trim() });
+                    toast.success('Source updated!');
+                    const res = await csmService.getSources();
+                    setSources(res.data || []);
+                    if (formData.source === item.name) {
+                        setFormData(prev => ({ ...prev, source: newName.trim() }));
+                    }
+                } catch (error) {
+                    toast.error(error.response?.data?.message || 'Failed to update source');
+                }
+            }
         }
     };
 
     const handleDeleteSourceDropdown = async (option) => {
         const item = sources.find(s => s._id === (option.id || option._id) || s.name === (option.value || option.label));
         if (item) {
-            setActiveMiniMaster('source');
-            handleDeleteMiniMaster(item._id);
+            if (window.confirm(`Are you sure you want to delete source "${item.name}"?`)) {
+                try {
+                    await csmService.deleteSource(item._id);
+                    toast.success('Source deleted!');
+                    const res = await csmService.getSources();
+                    setSources(res.data || []);
+                    if (formData.source === item.name) {
+                        setFormData(prev => ({ ...prev, source: '' }));
+                    }
+                } catch (error) {
+                    toast.error(error.response?.data?.message || 'Failed to delete source');
+                }
+            }
         }
     };
 
@@ -2032,19 +2059,42 @@ const CSMTickets = () => {
         }
     };
 
-    const handleEditDesignationDropdown = (option) => {
+    const handleEditDesignationDropdown = async (option) => {
         const item = designations.find(d => d._id === (option.id || option._id || option.value));
         if (item) {
-            handleOpenMiniMaster('designation');
-            handleStartEditMiniMaster(item);
+            const newName = window.prompt("Edit Designation Name:", item.name);
+            if (newName && newName.trim() && newName.trim() !== item.name) {
+                try {
+                    await csmService.updateDesignation(item._id, { name: newName.trim() });
+                    toast.success('Designation updated!');
+                    const desRes = await csmService.getDesignations();
+                    setDesignations(desRes.data || []);
+                    if (formData.contactDesignationId === item._id) {
+                        setFormData(prev => ({ ...prev, contactDesignation: newName.trim() }));
+                    }
+                } catch (error) {
+                    toast.error(error.response?.data?.message || 'Failed to update designation');
+                }
+            }
         }
     };
 
     const handleDeleteDesignationDropdown = async (option) => {
         const item = designations.find(d => d._id === (option.id || option._id || option.value));
         if (item) {
-            setActiveMiniMaster('designation');
-            handleDeleteMiniMaster(item._id);
+            if (window.confirm(`Are you sure you want to delete designation "${item.name}"?`)) {
+                try {
+                    await csmService.deleteDesignation(item._id);
+                    toast.success('Designation deleted!');
+                    const desRes = await csmService.getDesignations();
+                    setDesignations(desRes.data || []);
+                    if (formData.contactDesignationId === item._id) {
+                        setFormData(prev => ({ ...prev, contactDesignationId: '', contactDesignation: '' }));
+                    }
+                } catch (error) {
+                    toast.error(error.response?.data?.message || 'Failed to delete designation');
+                }
+            }
         }
     };
 
@@ -2066,19 +2116,39 @@ const CSMTickets = () => {
         }
     };
 
-    const handleEditPriorityDropdown = (option) => {
+    const handleEditPriorityDropdown = async (option) => {
         const item = priorities.find(p => p._id === (option.id || option._id || option.value) || p.name === option.label);
         if (item) {
-            handleOpenMiniMaster('priority');
-            handleStartEditMiniMaster(item);
+            const newName = window.prompt("Edit Priority Name:", item.name);
+            if (newName && newName.trim() && newName.trim() !== item.name) {
+                try {
+                    await csmService.updatePriority(item._id, { name: newName.trim() });
+                    toast.success('Priority updated!');
+                    const priRes = await csmService.getPriorities();
+                    setPriorities(priRes.data || []);
+                } catch (error) {
+                    toast.error(error.response?.data?.message || 'Failed to update priority');
+                }
+            }
         }
     };
 
     const handleDeletePriorityDropdown = async (option) => {
         const item = priorities.find(p => p._id === (option.id || option._id || option.value) || p.name === option.label);
         if (item) {
-            setActiveMiniMaster('priority');
-            handleDeleteMiniMaster(item._id);
+            if (window.confirm(`Are you sure you want to delete priority "${item.name}"?`)) {
+                try {
+                    await csmService.deletePriority(item._id);
+                    toast.success('Priority deleted!');
+                    const priRes = await csmService.getPriorities();
+                    setPriorities(priRes.data || []);
+                    if (formData.priorityId === item._id) {
+                        setFormData(prev => ({ ...prev, priorityId: '' }));
+                    }
+                } catch (error) {
+                    toast.error(error.response?.data?.message || 'Failed to delete priority');
+                }
+            }
         }
     };
 
@@ -2950,8 +3020,12 @@ const CSMTickets = () => {
                                 options={problems.map(p => ({ value: p._id, label: p.name, id: p._id }))}
                                 value={formData.problemId || ''}
                                 onChange={(val) => handleProblemChange(val)}
-                                placeholder="Select Problem"
-                                noResultsText={problems.length === 0 ? "No problems configured for this product." : "No matching problem found"}
+                                placeholder={formData.productId || formData.mgr4Category ? "Select Problem" : "Select Product First"}
+                                noResultsText={
+                                    !(formData.productId || formData.mgr4Category)
+                                        ? "Select Product/MGR First"
+                                        : "No problems available"
+                                }
                                 onAddOption={handleAddProblemDropdown}
                                 onEditOption={handleEditProblemDropdown}
                                 onDeleteOption={handleDeleteProblemDropdown}

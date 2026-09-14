@@ -8,6 +8,14 @@ const Designation = require('../models/Designation');
 const Engineer = require('../models/Engineer');
 const Problem = require('../models/Problem');
 
+const buildExactRegex = (str) => {
+    if (!str) return null;
+    const clean = String(str).trim();
+    if (!clean) return null;
+    const escaped = clean.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    return new RegExp(`^${escaped}$`, 'i');
+};
+
 // Seed default master configurations
 exports.seedDefaults = async (req, res) => {
     try {
@@ -776,40 +784,35 @@ exports.sources = {
 exports.designations = createCrudEndpoints(Designation, 'Designation');
 exports.problems = {
     ...createCrudEndpoints(Problem, 'Problem'),
+    create: async (req, res) => {
+        try {
+            const payload = { ...req.body, companyId: req.user?.companyId };
+            if (payload.productId && !mongoose.Types.ObjectId.isValid(payload.productId)) {
+                delete payload.productId;
+            }
+            const doc = await Problem.create(payload);
+            res.status(201).json(doc);
+        } catch (error) {
+            res.status(400).json({ message: 'Error creating Problem: ' + error.message });
+        }
+    },
     getAll: async (req, res) => {
         try {
             const companyId = req.user?.companyId;
-            const filter = { companyId };
-            
             const mgr4Category = req.query.mgr4Category ? String(req.query.mgr4Category).trim() : '';
             const productId = req.query.productId ? String(req.query.productId).trim() : '';
 
-            if (mgr4Category) {
-                filter.mgr4Category = buildExactRegex(mgr4Category) || mgr4Category;
-            }
-            if (req.query.categoryId) {
-                filter.categoryId = req.query.categoryId;
+            // If neither Product nor MGR4 category is provided, return empty array (Product/MGR must be selected first)
+            if (!mgr4Category && !productId) {
+                return res.json([]);
             }
 
-            const docs = await Problem.find(filter).sort({ createdAt: -1 }).lean();
-            const combinedMap = new Map();
-
-            docs.forEach(p => {
-                const name = String(p.name || p.title || p.description || '').trim();
-                if (name && !combinedMap.has(name.toLowerCase())) {
-                    combinedMap.set(name.toLowerCase(), {
-                        _id: String(p._id),
-                        name,
-                        mgr4Category: p.mgr4Category || ''
-                    });
-                }
-            });
-
-            // If productId or mgr4Category supplied, also check MGR documents for configured problem lists
             const MGR = require('../models/MGR');
             const Product = require('../models/Product');
+            const combinedMap = new Map();
             let mgrIds = [];
 
+            // 1. If productId supplied, check Product document to get associated MGRs and direct Product problems
             if (productId && mongoose.Types.ObjectId.isValid(productId)) {
                 const prod = await Product.findById(productId).select('mgr1 mgr2 mgr3 mgr4 mgr5').lean();
                 if (prod) {
@@ -822,14 +825,18 @@ exports.problems = {
                 }
             }
 
+            // 2. If mgr4Category text is supplied, find matching MGR documents by code or description
+            let mgrCategoryReg = null;
             if (mgr4Category) {
+                mgrCategoryReg = buildExactRegex(mgr4Category) || mgr4Category;
                 const mgrMatch = await MGR.find({
                     companyId,
                     $or: [
-                        { code: buildExactRegex(mgr4Category) || mgr4Category },
-                        { description: buildExactRegex(mgr4Category) || mgr4Category }
+                        { code: mgrCategoryReg },
+                        { description: mgrCategoryReg }
                     ]
-                }).select('_id problemList').lean();
+                }).select('_id code description problemList').lean();
+
                 mgrMatch.forEach(m => {
                     mgrIds.push(String(m._id));
                     if (Array.isArray(m.problemList)) {
@@ -839,7 +846,7 @@ exports.problems = {
                                 combinedMap.set(clean.toLowerCase(), {
                                     _id: `mgr_prob_${clean.replace(/[^a-zA-Z0-9]/g, '_')}`,
                                     name: clean,
-                                    mgr4Category
+                                    mgr4Category: m.code || m.description || mgr4Category
                                 });
                             }
                         });
@@ -847,6 +854,7 @@ exports.problems = {
                 });
             }
 
+            // 3. Fetch problem lists for any MGR IDs linked to the product
             if (mgrIds.length > 0) {
                 const mgrDocs = await MGR.find({ _id: { $in: mgrIds } }).select('code description problemList').lean();
                 mgrDocs.forEach(m => {
@@ -860,6 +868,29 @@ exports.problems = {
                                     mgr4Category: m.code || m.description || ''
                                 });
                             }
+                        });
+                    }
+                });
+            }
+
+            // 4. Fetch problems explicitly created in ProblemMaster for this Product or MGR Category
+            const problemFilter = { companyId, $or: [] };
+            if (mgrCategoryReg) {
+                problemFilter.$or.push({ mgr4Category: mgrCategoryReg });
+            }
+            if (productId && mongoose.Types.ObjectId.isValid(productId)) {
+                problemFilter.$or.push({ productId });
+            }
+
+            if (problemFilter.$or.length > 0) {
+                const docs = await Problem.find(problemFilter).sort({ createdAt: -1 }).lean();
+                docs.forEach(p => {
+                    const name = String(p.name || p.title || p.description || '').trim();
+                    if (name && !combinedMap.has(name.toLowerCase())) {
+                        combinedMap.set(name.toLowerCase(), {
+                            _id: String(p._id),
+                            name,
+                            mgr4Category: p.mgr4Category || ''
                         });
                     }
                 });

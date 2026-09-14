@@ -162,9 +162,13 @@ exports.getAll = async (req, res) => {
     try {
         const companyId = req.user?.companyId;
         const filter = {};
+        let rawCustId = null;
+
         if (req.query.customerId) {
-            const custIdStr = typeof req.query.customerId === 'object' ? (req.query.customerId._id || req.query.customerId.id) : req.query.customerId;
-            filter.customerId = custIdStr;
+            rawCustId = typeof req.query.customerId === 'object' 
+                ? (req.query.customerId._id || req.query.customerId.id) 
+                : req.query.customerId;
+            filter.customerId = rawCustId;
         } else if (companyId && req.user?.role !== 'super_admin') {
             filter.companyId = companyId;
         }
@@ -175,12 +179,34 @@ exports.getAll = async (req, res) => {
             .sort({ isPrimary: -1, contactName: 1 })
             .lean();
 
-        if (contacts.length === 0 && req.query.customerId) {
-            contacts = await CustomerContact.find({ customerId: filter.customerId, ...(req.query.activeOnly !== 'false' ? { status: true } : {}) })
+        if (contacts.length === 0 && rawCustId) {
+            contacts = await CustomerContact.find({ customerId: rawCustId, ...(req.query.activeOnly !== 'false' ? { status: true } : {}) })
                 .setOptions({ bypassTenant: true })
                 .populate('designationId', 'name')
                 .sort({ isPrimary: -1, contactName: 1 })
                 .lean();
+        }
+
+        // If still no contacts found, attempt resolving Customer by name or code
+        if (contacts.length === 0 && rawCustId && typeof rawCustId === 'string') {
+            const escaped = String(rawCustId).trim().replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+            if (escaped) {
+                const resolvedCustomer = await Customer.findOne({
+                    $or: [
+                        { externalCode: new RegExp(`^${escaped}$`, 'i') },
+                        { companyName: new RegExp(`^${escaped}$`, 'i') },
+                        { customerName: new RegExp(`^${escaped}$`, 'i') }
+                    ]
+                }).setOptions({ bypassTenant: true }).select('_id').lean();
+
+                if (resolvedCustomer) {
+                    contacts = await CustomerContact.find({ customerId: resolvedCustomer._id, ...(req.query.activeOnly !== 'false' ? { status: true } : {}) })
+                        .setOptions({ bypassTenant: true })
+                        .populate('designationId', 'name')
+                        .sort({ isPrimary: -1, contactName: 1 })
+                        .lean();
+                }
+            }
         }
 
         res.json(contacts);

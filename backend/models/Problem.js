@@ -5,6 +5,7 @@ const ProblemSchema = new mongoose.Schema({
     name: { type: String, required: true },
     description: { type: String, default: '' },
     mgr4Category: { type: String, default: '' },
+    productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
     categoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'TicketCategory' },
     status: { type: String, enum: ['Active', 'Inactive'], default: 'Active' },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },

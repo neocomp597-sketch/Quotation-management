@@ -925,13 +925,15 @@ exports.searchSerialNumbers = async (req, res) => {
 
         // Add active assets from Invoice Bulk Upload
         for (const a of assets) {
+            const cleanSN = String(a.serialNumber || '').trim().toLowerCase();
             const snKey = buildSNKey(
                 a.serialNumber,
                 a.customerId || a.customerNameStr,
                 a.productId || a.productName || a.productCode
             );
-            if (seenSerials.has(snKey)) continue;
+            if (seenSerials.has(snKey) || (cleanSN && seenSerials.has(cleanSN))) continue;
             seenSerials.add(snKey);
+            if (cleanSN) seenSerials.add(cleanSN);
 
             combinedResults.push({
                 _id: a._id,
@@ -958,13 +960,15 @@ exports.searchSerialNumbers = async (req, res) => {
 
         // Add historical records if not already in active list
         for (const h of historyDocs) {
+            const cleanSN = String(h.serialNumber || '').trim().toLowerCase();
             const snKey = buildSNKey(
                 h.serialNumber,
                 h.customerId || h.customerName,
                 h.productId || h.productName || h.productCode
             );
-            if (!seenSerials.has(snKey)) {
+            if (!seenSerials.has(snKey) && (!cleanSN || !seenSerials.has(cleanSN))) {
                 seenSerials.add(snKey);
+                if (cleanSN) seenSerials.add(cleanSN);
                 combinedResults.push({
                     _id: h.assetId || h._id,
                     serialNumber: h.serialNumber,
