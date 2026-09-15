@@ -1062,12 +1062,29 @@ const CSMTickets = () => {
             invoiceId: finalInvoiceId,
             manualInvoiceNo: manualInvoiceNoToSubmit
         };
-        const optionalObjectIdFields = ['contactId', 'contactDesignationId', 'productId', 'assetId', 'invoiceId'];
+        const optionalObjectIdFields = ['contactId', 'contactDesignationId', 'productId', 'assetId', 'invoiceId', 'categoryId', 'typeId', 'problemId'];
         optionalObjectIdFields.forEach(field => {
-            if (cleanedFormData[field] === '') {
+            if (!cleanedFormData[field] || !/^[0-9a-fA-F]{24}$/.test(String(cleanedFormData[field]))) {
                 cleanedFormData[field] = null;
             }
         });
+
+        // Attach uploaded images to standard ticket if present
+        const allUploadedUrls = Object.values(manualImages).filter(Boolean);
+        if (allUploadedUrls.length > 0) {
+            const imageUrls = Object.entries(manualImages)
+                .filter(([_, url]) => url !== null)
+                .map(([key, url]) => ({ label: key, url }));
+                
+            let desc = cleanedFormData.description || '';
+            if (!desc.includes('--- Uploaded Images ---')) {
+                desc += '\n\n--- Uploaded Images ---';
+                imageUrls.forEach(img => {
+                    desc += `\n• ${img.label.toUpperCase()}: ${img.url}`;
+                });
+                cleanedFormData.description = desc;
+            }
+        }
 
         // Client-side pre-check for active open ticket with same serial number / assetId
         const checkSerial = (formData.serialNumber || generatedSerial || '').trim();
@@ -1089,8 +1106,18 @@ const CSMTickets = () => {
         }
 
         try {
-            await csmService.createTicket(cleanedFormData);
+            const ticketRes = await csmService.createTicket(cleanedFormData);
+            const newTicketId = ticketRes.data?._id;
+
+            if (newTicketId && allUploadedUrls.length > 0) {
+                await csmService.addComment(newTicketId, {
+                    text: 'Support ticket attachments uploaded during registration.',
+                    attachments: allUploadedUrls
+                });
+            }
+
             toast.success('Support ticket generated successfully!');
+            setManualImages({ front: null, back: null, left: null, right: null, invoice: null });
             setShowModal(false);
             setPageView('list');
             navigate('/csm/tickets');
@@ -3071,6 +3098,197 @@ const CSMTickets = () => {
                                 className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold h-24"
                             />
                         </div>
+
+                        {/* 3 Upload Cards Grid with Balanced Spacing */}
+                        <div className="md:col-span-2 lg:col-span-3 border-t border-slate-100 pt-6 space-y-4">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                                        <MdCloudUpload className="text-primary-600" size={16} />
+                                        Attachments & Supporting Uploads
+                                    </h4>
+                                    <p className="text-[10px] text-slate-400 font-semibold mt-0.5">
+                                        Upload images or documents (Product Photo, Serial Number Photo, Invoice Document)
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-1">
+                                {/* Upload 1: Product Photo */}
+                                <div className="p-4 bg-slate-50/70 border border-slate-200/80 rounded-2xl space-y-3 hover:border-primary-300 transition-colors shadow-2xs">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                                            <MdPhotoCamera className="text-slate-500" size={14} />
+                                            1. Product Photo
+                                        </span>
+                                        {manualImages.front && (
+                                            <button 
+                                                type="button" 
+                                                onClick={() => setManualImages(prev => ({ ...prev, front: null }))}
+                                                className="text-[9px] font-bold text-rose-500 hover:text-rose-700 uppercase"
+                                            >
+                                                Remove
+                                            </button>
+                                        )}
+                                    </div>
+                                    <div
+                                        onClick={() => !uploadingImage.front && document.getElementById('upload-front-std').click()}
+                                        className={`relative h-36 rounded-xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all ${
+                                            manualImages.front 
+                                                ? 'border-teal-500 bg-teal-50/30' 
+                                                : 'border-slate-300 bg-white hover:border-primary-500 hover:bg-slate-50'
+                                        }`}
+                                    >
+                                        <input
+                                            type="file"
+                                            id="upload-front-std"
+                                            accept="image/*"
+                                            className="hidden"
+                                            onChange={(e) => handleImageUpload('front', e.target.files[0])}
+                                        />
+                                        {uploadingImage.front ? (
+                                            <div className="flex flex-col items-center gap-1.5 text-slate-400">
+                                                <div className="w-5 h-5 border-2 border-slate-300 border-t-primary-600 rounded-full animate-spin"></div>
+                                                <span className="text-[10px] font-bold uppercase tracking-wider">Uploading...</span>
+                                            </div>
+                                        ) : manualImages.front ? (
+                                            <div className="absolute inset-0 p-1 flex flex-col items-center justify-center">
+                                                <img
+                                                    src={manualImages.front}
+                                                    alt="Product photo preview"
+                                                    className="w-full h-full object-cover rounded-lg"
+                                                />
+                                                <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 rounded-lg flex items-center justify-center text-white transition-opacity">
+                                                    <span className="text-[9px] font-black uppercase tracking-widest">Change Photo</span>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="text-center p-3 text-slate-400 space-y-1">
+                                                <MdPhotoCamera size={26} className="mx-auto text-slate-400" />
+                                                <p className="text-xs font-bold text-slate-700">Product Image</p>
+                                                <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-tight">Click to upload</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Upload 2: Serial / Issue Photo */}
+                                <div className="p-4 bg-slate-50/70 border border-slate-200/80 rounded-2xl space-y-3 hover:border-primary-300 transition-colors shadow-2xs">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                                            <MdPhotoCamera className="text-slate-500" size={14} />
+                                            2. Serial / Issue Photo
+                                        </span>
+                                        {manualImages.back && (
+                                            <button 
+                                                type="button" 
+                                                onClick={() => setManualImages(prev => ({ ...prev, back: null }))}
+                                                className="text-[9px] font-bold text-rose-500 hover:text-rose-700 uppercase"
+                                            >
+                                                Remove
+                                            </button>
+                                        )}
+                                    </div>
+                                    <div
+                                        onClick={() => !uploadingImage.back && document.getElementById('upload-back-std').click()}
+                                        className={`relative h-36 rounded-xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all ${
+                                            manualImages.back 
+                                                ? 'border-teal-500 bg-teal-50/30' 
+                                                : 'border-slate-300 bg-white hover:border-primary-500 hover:bg-slate-50'
+                                        }`}
+                                    >
+                                        <input
+                                            type="file"
+                                            id="upload-back-std"
+                                            accept="image/*"
+                                            className="hidden"
+                                            onChange={(e) => handleImageUpload('back', e.target.files[0])}
+                                        />
+                                        {uploadingImage.back ? (
+                                            <div className="flex flex-col items-center gap-1.5 text-slate-400">
+                                                <div className="w-5 h-5 border-2 border-slate-300 border-t-primary-600 rounded-full animate-spin"></div>
+                                                <span className="text-[10px] font-bold uppercase tracking-wider">Uploading...</span>
+                                            </div>
+                                        ) : manualImages.back ? (
+                                            <div className="absolute inset-0 p-1 flex flex-col items-center justify-center">
+                                                <img
+                                                    src={manualImages.back}
+                                                    alt="Serial photo preview"
+                                                    className="w-full h-full object-cover rounded-lg"
+                                                />
+                                                <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 rounded-lg flex items-center justify-center text-white transition-opacity">
+                                                    <span className="text-[9px] font-black uppercase tracking-widest">Change Photo</span>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="text-center p-3 text-slate-400 space-y-1">
+                                                <MdPhotoCamera size={26} className="mx-auto text-slate-400" />
+                                                <p className="text-xs font-bold text-slate-700">Serial / Issue Photo</p>
+                                                <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-tight">Click to upload</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Upload 3: Invoice Image */}
+                                <div className="p-4 bg-slate-50/70 border border-slate-200/80 rounded-2xl space-y-3 hover:border-primary-300 transition-colors shadow-2xs">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                                            <MdCloudUpload className="text-slate-500" size={14} />
+                                            3. Invoice / Bill Image
+                                        </span>
+                                        {manualImages.invoice && (
+                                            <button 
+                                                type="button" 
+                                                onClick={() => setManualImages(prev => ({ ...prev, invoice: null }))}
+                                                className="text-[9px] font-bold text-rose-500 hover:text-rose-700 uppercase"
+                                            >
+                                                Remove
+                                            </button>
+                                        )}
+                                    </div>
+                                    <div
+                                        onClick={() => !uploadingImage.invoice && document.getElementById('upload-invoice-std').click()}
+                                        className={`relative h-36 rounded-xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all ${
+                                            manualImages.invoice 
+                                                ? 'border-teal-500 bg-teal-50/30' 
+                                                : 'border-slate-300 bg-white hover:border-primary-500 hover:bg-slate-50'
+                                        }`}
+                                    >
+                                        <input
+                                            type="file"
+                                            id="upload-invoice-std"
+                                            accept="image/*"
+                                            className="hidden"
+                                            onChange={(e) => handleImageUpload('invoice', e.target.files[0])}
+                                        />
+                                        {uploadingImage.invoice ? (
+                                            <div className="flex flex-col items-center gap-1.5 text-slate-400">
+                                                <div className="w-5 h-5 border-2 border-slate-300 border-t-primary-600 rounded-full animate-spin"></div>
+                                                <span className="text-[10px] font-bold uppercase tracking-wider">Uploading...</span>
+                                            </div>
+                                        ) : manualImages.invoice ? (
+                                            <div className="absolute inset-0 p-1 flex flex-col items-center justify-center">
+                                                <img
+                                                    src={manualImages.invoice}
+                                                    alt="Invoice preview"
+                                                    className="w-full h-full object-cover rounded-lg"
+                                                />
+                                                <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 rounded-lg flex items-center justify-center text-white transition-opacity">
+                                                    <span className="text-[9px] font-black uppercase tracking-widest">Change Photo</span>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="text-center p-3 text-slate-400 space-y-1">
+                                                <MdCloudUpload size={26} className="mx-auto text-slate-400" />
+                                                <p className="text-xs font-bold text-slate-700">Invoice / Bill Photo</p>
+                                                <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-tight">Click to upload</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </form>
                     </div>
@@ -3775,100 +3993,189 @@ const CSMTickets = () => {
 
                     </div>
 
-                    {/* Image Upload Grid */}
-                    <div className="border-t border-slate-100 pt-6 space-y-6">
-                        {/* Device Images */}
-                        <div className="space-y-3">
-                            <h4 className="text-xs font-black uppercase tracking-wider text-slate-700">Device / Product Images</h4>
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                                {['front', 'back', 'left', 'right'].map((key) => {
-                                    const hasImage = !!manualImages[key];
-                                    const isUploading = uploadingImage[key];
-                                    return (
-                                        <div
-                                            key={key}
-                                            onClick={() => !isUploading && document.getElementById(`upload-${key}`).click()}
-                                            className={`relative aspect-[4/3] sm:h-36 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all ${
-                                                hasImage 
-                                                    ? 'border-teal-500 bg-teal-50/20' 
-                                                    : 'border-slate-300 bg-slate-50/50 hover:border-primary-500 hover:bg-slate-50'
-                                            }`}
-                                        >
-                                            <input
-                                                type="file"
-                                                id={`upload-${key}`}
-                                                accept="image/*"
-                                                className="hidden"
-                                                onChange={(e) => handleImageUpload(key, e.target.files[0])}
-                                            />
-                                            {isUploading ? (
-                                                <div className="flex flex-col items-center gap-1.5 text-slate-400">
-                                                    <div className="w-6 h-6 border-2 border-slate-300 border-t-primary-600 rounded-full animate-spin"></div>
-                                                    <span className="text-[10px] font-bold uppercase tracking-wider">Uploading...</span>
-                                                </div>
-                                            ) : hasImage ? (
-                                                <div className="absolute inset-0 p-1.5 flex flex-col items-center justify-center">
-                                                    <img
-                                                        src={manualImages[key]}
-                                                        alt={`${key} preview`}
-                                                        className="w-full h-full object-cover rounded-xl"
-                                                    />
-                                                    <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 rounded-xl flex items-center justify-center text-white transition-opacity">
-                                                        <span className="text-[9px] font-black uppercase tracking-widest">Change Photo</span>
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <div className="text-center p-3 text-slate-400 space-y-1">
-                                                    <MdPhotoCamera size={24} className="mx-auto text-slate-400" />
-                                                    <p className="text-xs font-bold text-slate-700 capitalize">{key} Image</p>
-                                                    <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-tight">Click to upload</p>
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
-                                })}
+                    {/* 3 Upload Cards Grid with Balanced Spacing */}
+                    <div className="border-t border-slate-100 pt-6 space-y-4">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                                    <MdCloudUpload className="text-primary-600" size={16} />
+                                    Attachments & Supporting Uploads
+                                </h4>
+                                <p className="text-[10px] text-slate-400 font-semibold mt-0.5">
+                                    Upload images or documents (Product Photo, Serial Number Photo, Invoice Document)
+                                </p>
                             </div>
                         </div>
 
-                        {/* Invoice Image */}
-                        <div className="space-y-3">
-                            <h4 className="text-xs font-black uppercase tracking-wider text-slate-700">Invoice Image</h4>
-                            <div className="max-w-xs">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-1">
+                            {/* Upload 1: Product Photo */}
+                            <div className="p-4 bg-slate-50/70 border border-slate-200/80 rounded-2xl space-y-3 hover:border-primary-300 transition-colors shadow-2xs">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                                        <MdPhotoCamera className="text-slate-500" size={14} />
+                                        1. Product Photo
+                                    </span>
+                                    {manualImages.front && (
+                                        <button 
+                                            type="button" 
+                                            onClick={() => setManualImages(prev => ({ ...prev, front: null }))}
+                                            className="text-[9px] font-bold text-rose-500 hover:text-rose-700 uppercase"
+                                        >
+                                            Remove
+                                        </button>
+                                    )}
+                                </div>
                                 <div
-                                    onClick={() => !uploadingImage.invoice && document.getElementById('upload-invoice').click()}
-                                    className={`relative aspect-[4/3] h-36 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all ${
-                                        manualImages.invoice 
-                                            ? 'border-teal-500 bg-teal-50/20' 
-                                            : 'border-slate-300 bg-slate-50/50 hover:border-primary-500 hover:bg-slate-50'
+                                    onClick={() => !uploadingImage.front && document.getElementById('upload-front-man').click()}
+                                    className={`relative h-36 rounded-xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all ${
+                                        manualImages.front 
+                                            ? 'border-teal-500 bg-teal-50/30' 
+                                            : 'border-slate-300 bg-white hover:border-primary-500 hover:bg-slate-50'
                                     }`}
                                 >
                                     <input
                                         type="file"
-                                        id="upload-invoice"
+                                        id="upload-front-man"
+                                        accept="image/*"
+                                        className="hidden"
+                                        onChange={(e) => handleImageUpload('front', e.target.files[0])}
+                                    />
+                                    {uploadingImage.front ? (
+                                        <div className="flex flex-col items-center gap-1.5 text-slate-400">
+                                            <div className="w-5 h-5 border-2 border-slate-300 border-t-primary-600 rounded-full animate-spin"></div>
+                                            <span className="text-[10px] font-bold uppercase tracking-wider">Uploading...</span>
+                                        </div>
+                                    ) : manualImages.front ? (
+                                        <div className="absolute inset-0 p-1 flex flex-col items-center justify-center">
+                                            <img
+                                                src={manualImages.front}
+                                                alt="Product photo preview"
+                                                className="w-full h-full object-cover rounded-lg"
+                                            />
+                                            <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 rounded-lg flex items-center justify-center text-white transition-opacity">
+                                                <span className="text-[9px] font-black uppercase tracking-widest">Change Photo</span>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="text-center p-3 text-slate-400 space-y-1">
+                                            <MdPhotoCamera size={26} className="mx-auto text-slate-400" />
+                                            <p className="text-xs font-bold text-slate-700">Product Image</p>
+                                            <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-tight">Click to upload</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Upload 2: Serial / Issue Photo */}
+                            <div className="p-4 bg-slate-50/70 border border-slate-200/80 rounded-2xl space-y-3 hover:border-primary-300 transition-colors shadow-2xs">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                                        <MdPhotoCamera className="text-slate-500" size={14} />
+                                        2. Serial / Issue Photo
+                                    </span>
+                                    {manualImages.back && (
+                                        <button 
+                                            type="button" 
+                                            onClick={() => setManualImages(prev => ({ ...prev, back: null }))}
+                                            className="text-[9px] font-bold text-rose-500 hover:text-rose-700 uppercase"
+                                        >
+                                            Remove
+                                        </button>
+                                    )}
+                                </div>
+                                <div
+                                    onClick={() => !uploadingImage.back && document.getElementById('upload-back-man').click()}
+                                    className={`relative h-36 rounded-xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all ${
+                                        manualImages.back 
+                                            ? 'border-teal-500 bg-teal-50/30' 
+                                            : 'border-slate-300 bg-white hover:border-primary-500 hover:bg-slate-50'
+                                    }`}
+                                >
+                                    <input
+                                        type="file"
+                                        id="upload-back-man"
+                                        accept="image/*"
+                                        className="hidden"
+                                        onChange={(e) => handleImageUpload('back', e.target.files[0])}
+                                    />
+                                    {uploadingImage.back ? (
+                                        <div className="flex flex-col items-center gap-1.5 text-slate-400">
+                                            <div className="w-5 h-5 border-2 border-slate-300 border-t-primary-600 rounded-full animate-spin"></div>
+                                            <span className="text-[10px] font-bold uppercase tracking-wider">Uploading...</span>
+                                        </div>
+                                    ) : manualImages.back ? (
+                                        <div className="absolute inset-0 p-1 flex flex-col items-center justify-center">
+                                            <img
+                                                src={manualImages.back}
+                                                alt="Serial photo preview"
+                                                className="w-full h-full object-cover rounded-lg"
+                                            />
+                                            <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 rounded-lg flex items-center justify-center text-white transition-opacity">
+                                                <span className="text-[9px] font-black uppercase tracking-widest">Change Photo</span>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="text-center p-3 text-slate-400 space-y-1">
+                                            <MdPhotoCamera size={26} className="mx-auto text-slate-400" />
+                                            <p className="text-xs font-bold text-slate-700">Serial / Issue Photo</p>
+                                            <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-tight">Click to upload</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Upload 3: Invoice Image */}
+                            <div className="p-4 bg-slate-50/70 border border-slate-200/80 rounded-2xl space-y-3 hover:border-primary-300 transition-colors shadow-2xs">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                                        <MdCloudUpload className="text-slate-500" size={14} />
+                                        3. Invoice / Bill Image
+                                    </span>
+                                    {manualImages.invoice && (
+                                        <button 
+                                            type="button" 
+                                            onClick={() => setManualImages(prev => ({ ...prev, invoice: null }))}
+                                            className="text-[9px] font-bold text-rose-500 hover:text-rose-700 uppercase"
+                                        >
+                                            Remove
+                                        </button>
+                                    )}
+                                </div>
+                                <div
+                                    onClick={() => !uploadingImage.invoice && document.getElementById('upload-invoice-man').click()}
+                                    className={`relative h-36 rounded-xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all ${
+                                        manualImages.invoice 
+                                            ? 'border-teal-500 bg-teal-50/30' 
+                                            : 'border-slate-300 bg-white hover:border-primary-500 hover:bg-slate-50'
+                                    }`}
+                                >
+                                    <input
+                                        type="file"
+                                        id="upload-invoice-man"
                                         accept="image/*"
                                         className="hidden"
                                         onChange={(e) => handleImageUpload('invoice', e.target.files[0])}
                                     />
                                     {uploadingImage.invoice ? (
                                         <div className="flex flex-col items-center gap-1.5 text-slate-400">
-                                            <div className="w-6 h-6 border-2 border-slate-300 border-t-primary-600 rounded-full animate-spin"></div>
+                                            <div className="w-5 h-5 border-2 border-slate-300 border-t-primary-600 rounded-full animate-spin"></div>
                                             <span className="text-[10px] font-bold uppercase tracking-wider">Uploading...</span>
                                         </div>
                                     ) : manualImages.invoice ? (
-                                        <div className="absolute inset-0 p-1.5 flex flex-col items-center justify-center">
+                                        <div className="absolute inset-0 p-1 flex flex-col items-center justify-center">
                                             <img
                                                 src={manualImages.invoice}
-                                                alt="invoice preview"
-                                                className="w-full h-full object-cover rounded-xl"
+                                                alt="Invoice preview"
+                                                className="w-full h-full object-cover rounded-lg"
                                             />
-                                            <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 rounded-xl flex items-center justify-center text-white transition-opacity">
+                                            <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 rounded-lg flex items-center justify-center text-white transition-opacity">
                                                 <span className="text-[9px] font-black uppercase tracking-widest">Change Photo</span>
                                             </div>
                                         </div>
                                     ) : (
                                         <div className="text-center p-3 text-slate-400 space-y-1">
-                                            <MdCloudUpload size={24} className="mx-auto text-slate-400" />
-                                            <p className="text-xs font-bold text-slate-700">Upload Invoice</p>
+                                            <MdCloudUpload size={26} className="mx-auto text-slate-400" />
+                                            <p className="text-xs font-bold text-slate-700">Invoice / Bill Photo</p>
                                             <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-tight">Click to upload</p>
                                         </div>
                                     )}

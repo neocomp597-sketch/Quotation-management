@@ -114,10 +114,10 @@ exports.createTicket = async (req, res) => {
             }
         }
 
-        // Clean empty string values for optional ObjectId fields to avoid Cast to ObjectId errors
+        // Clean empty string or invalid ObjectId values for optional ObjectId fields to avoid Cast to ObjectId errors
         const optionalObjectIdFields = ['contactId', 'contactDesignationId', 'productId', 'assetId', 'invoiceId', 'categoryId', 'typeId', 'problemId', 'assignedTeamId', 'assignedEngineerId', 'assignedSalespersonId'];
         for (const field of optionalObjectIdFields) {
-            if (ticketBody[field] === '') {
+            if (!ticketBody[field] || !mongoose.Types.ObjectId.isValid(ticketBody[field])) {
                 ticketBody[field] = null;
             }
         }
@@ -611,9 +611,9 @@ exports.updateTicket = async (req, res) => {
             }
         }
 
-        const optionalObjectIdFields = ['contactId', 'contactDesignationId', 'productId', 'assetId', 'invoiceId', 'assignedTeamId', 'assignedEngineerId', 'assignedSalespersonId'];
+        const optionalObjectIdFields = ['contactId', 'contactDesignationId', 'productId', 'assetId', 'invoiceId', 'categoryId', 'typeId', 'problemId', 'assignedTeamId', 'assignedEngineerId', 'assignedSalespersonId'];
         for (const field of optionalObjectIdFields) {
-            if (ticketBody[field] === '') {
+            if (ticketBody[field] !== undefined && (!ticketBody[field] || !mongoose.Types.ObjectId.isValid(ticketBody[field]))) {
                 ticketBody[field] = null;
             }
         }
