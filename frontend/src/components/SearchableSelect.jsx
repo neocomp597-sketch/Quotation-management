@@ -225,19 +225,6 @@ const SearchableSelect = ({
                                 )}
                             </div>
 
-                            {/* Add New Option Button */}
-                            {onAddOption && (
-                                <div className="mt-2 pt-2 border-t border-slate-100 flex-shrink-0">
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowInlineAdd(true)}
-                                        className="w-full flex items-center justify-center gap-1.5 py-2 hover:bg-indigo-50 text-indigo-600 rounded-xl text-xs font-black uppercase tracking-widest transition-all"
-                                    >
-                                        <MdAdd size={16} />
-                                        Add New Option
-                                    </button>
-                                </div>
-                            )}
                         </>
                     ) : (
                         /* Inline Add Form */

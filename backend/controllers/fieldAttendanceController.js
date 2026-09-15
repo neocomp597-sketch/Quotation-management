@@ -155,11 +155,15 @@ exports.checkOut = async (req, res) => {
 exports.getAttendance = async (req, res) => {
     try {
         const companyId = await resolveCompanyId(req);
-        const { date, engineerId } = req.query;
+        const userRole = String(req.user?.role || '').toLowerCase();
+        const isAdmin = userRole === 'admin' || userRole === 'super_admin' || userRole === 'superadmin';
 
-        const filter = {};
-        if (companyId) filter.companyId = companyId;
-        if (engineerId) filter.engineerId = engineerId;
+        if (!isAdmin) {
+            // Non-admin users are strictly restricted to their own attendance records
+            filter.engineerId = req.user?.id || req.user?._id;
+        } else if (engineerId && engineerId !== 'all') {
+            filter.engineerId = engineerId;
+        }
 
         if (date) {
             const start = getStartOfDay(new Date(date));

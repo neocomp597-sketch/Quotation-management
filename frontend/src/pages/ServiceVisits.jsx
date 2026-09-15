@@ -5,7 +5,7 @@ import {
     MdLocalShipping, MdMyLocation, MdCheckCircle, 
     MdAssignment, MdEvent, MdAttachMoney, MdDelete, MdAdd, MdCalendarMonth, MdPhotoCamera,
     MdMap, MdOpenInNew, MdSearch, MdClose, MdExpandMore, MdBuild, MdInventory2, MdEdit, MdPushPin,
-    MdHowToReg, MdBadge, MdAccessTime, MdLocationOn, MdCameraAlt, MdRefresh
+    MdHowToReg, MdBadge, MdAccessTime, MdLocationOn, MdCameraAlt, MdRefresh, MdArrowBack
 } from 'react-icons/md';
 import Modal from '../components/Modal';
 
@@ -342,7 +342,7 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
     const [activeAttendance, setActiveAttendance] = useState(null);
     const [todayAttendance, setTodayAttendance] = useState(null);
     const [hasCompletedToday, setHasCompletedToday] = useState(false);
-    const [showAttendanceModal, setShowAttendanceModal] = useState(false);
+    const [showAttendanceForm, setShowAttendanceForm] = useState(false);
     const [checkInAreaName, setCheckInAreaName] = useState('');
     const [checkInAddress, setCheckInAddress] = useState('');
     const [checkInLat, setCheckInLat] = useState(null);
@@ -357,8 +357,8 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
     const [attendanceEngineerFilter, setAttendanceEngineerFilter] = useState('all');
     const [selectedAttendanceSelfie, setSelectedAttendanceSelfie] = useState(null);
 
-    // Check-Out Modal State & Logic
-    const [showCheckOutModal, setShowCheckOutModal] = useState(false);
+    // Check-Out Form State & Logic
+    const [showCheckOutForm, setShowCheckOutForm] = useState(false);
     const [checkOutAreaName, setCheckOutAreaName] = useState('');
     const [checkOutAddress, setCheckOutAddress] = useState('');
     const [checkOutLat, setCheckOutLat] = useState(null);
@@ -560,7 +560,16 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
         try {
             const params = {};
             if (attendanceDateFilter) params.date = attendanceDateFilter;
-            if (attendanceEngineerFilter && attendanceEngineerFilter !== 'all') params.engineerId = attendanceEngineerFilter;
+
+            const userRole = String(currentUser?.role || '').toLowerCase();
+            const isAdmin = ['admin', 'super_admin', 'superadmin'].includes(userRole);
+
+            if (!isAdmin && (currentUser?._id || currentUser?.id)) {
+                params.engineerId = currentUser._id || currentUser.id;
+            } else if (attendanceEngineerFilter && attendanceEngineerFilter !== 'all') {
+                params.engineerId = attendanceEngineerFilter;
+            }
+
             const res = await csmService.getAttendance(params);
             const data = Array.isArray(res.data) ? res.data : (res.data?.data || []);
             setAttendanceList(data);
@@ -577,6 +586,13 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
             setActiveAttendance(res.data?.activeRecord || null);
             setTodayAttendance(res.data?.todayRecord || null);
             setHasCompletedToday(!!res.data?.hasCompletedToday);
+            if (!res.data?.activeRecord && !res.data?.hasCompletedToday) {
+                fetchGpsLocation();
+            } else if (res.data?.activeRecord) {
+                setCheckOutAreaName(res.data.activeRecord.checkInLocation?.areaName || '');
+                setCheckOutAddress(res.data.activeRecord.checkInLocation?.address || '');
+                fetchCheckOutGpsLocation();
+            }
         } catch (error) {
             console.error('Failed to fetch active attendance status', error);
         }
@@ -593,7 +609,7 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
         setCheckInLng(null);
         setCheckInSelfie('');
         setCheckInNotes('');
-        setShowAttendanceModal(true);
+        setShowAttendanceForm(true);
         fetchGpsLocation();
     };
 
@@ -653,7 +669,7 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
             };
             await csmService.checkInAttendance(payload);
             toast.success('Field Attendance Check-In recorded successfully!');
-            setShowAttendanceModal(false);
+            setShowAttendanceForm(false);
             fetchActiveAttendance();
             if (activeTab === 'attendance') fetchAttendanceRecords();
         } catch (error) {
@@ -671,7 +687,7 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
         setCheckOutLng(activeAttendance.checkInLocation?.longitude || null);
         setCheckOutSelfie('');
         setCheckOutNotes(activeAttendance.notes || '');
-        setShowCheckOutModal(true);
+        setShowCheckOutForm(true);
         fetchCheckOutGpsLocation();
     };
 
@@ -754,7 +770,7 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
             };
             await csmService.checkOutAttendance(payload);
             toast.success('Field Attendance Check-Out recorded successfully!');
-            setShowCheckOutModal(false);
+            setShowCheckOutForm(false);
             fetchActiveAttendance();
             if (activeTab === 'attendance') fetchAttendanceRecords();
         } catch (error) {
@@ -1953,121 +1969,459 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
             </div>
             ) : (
                 /* Field Engineer Attendance View */
-                <div className="space-y-6">
-                    {/* Active Status Card */}
-                    <div className={`rounded-[2rem] p-6 border shadow-2xl transition-all relative overflow-hidden ${
-                        activeAttendance 
-                            ? 'bg-slate-900 text-white border-teal-500/50 shadow-teal-950/40' 
-                            : hasCompletedToday
-                                ? 'bg-slate-900 text-white border-indigo-500/50 shadow-indigo-950/40'
-                                : 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white border-slate-200 dark:border-slate-800'
-                    }`}>
-                        {(activeAttendance || hasCompletedToday) && (
-                            <div className="absolute -right-16 -bottom-16 w-64 h-64 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
-                        )}
-                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5 relative z-10">
-                            <div className="flex items-center gap-4">
-                                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 shadow-inner ${
-                                    activeAttendance 
-                                        ? 'bg-teal-500/20 text-teal-300 border border-teal-400/40' 
-                                        : hasCompletedToday
-                                            ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-400/40'
-                                            : 'bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200 dark:border-amber-800'
-                                }`}>
-                                    {activeAttendance ? <MdCheckCircle size={32} /> : hasCompletedToday ? <MdCheckCircle size={32} /> : <MdHowToReg size={32} />}
-                                </div>
+                showAttendanceForm ? (
+                    /* Full Page Check-In Form View */
+                    <div className="space-y-6 max-w-3xl mx-auto animate-fade-in-up">
+                        <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+                            <button
+                                type="button"
+                                onClick={() => setShowAttendanceForm(false)}
+                                className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs"
+                            >
+                                <MdArrowBack size={18} />
+                                Back to Attendance Register
+                            </button>
+                            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                                Field Duty Check-In Page
+                            </span>
+                        </div>
+
+                        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6 relative">
+                            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
                                 <div>
-                                    <div className="flex items-center gap-2">
-                                        <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg border ${
-                                            activeAttendance 
-                                                ? 'bg-teal-500/25 text-teal-200 border-teal-400/40' 
-                                                : hasCompletedToday
-                                                    ? 'bg-indigo-500/25 text-indigo-200 border-indigo-400/40'
-                                                    : 'bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200 border-amber-300 dark:border-amber-700'
-                                        }`}>
-                                            {activeAttendance 
-                                                ? 'STATUS: CURRENTLY CHECKED-IN' 
-                                                : hasCompletedToday
-                                                    ? 'STATUS: ATTENDANCE COMPLETED TODAY'
-                                                    : 'STATUS: NOT CHECKED-IN TODAY'}
-                                        </span>
-                                        <span className={`text-xs font-bold ${activeAttendance || hasCompletedToday ? 'text-slate-300' : 'text-slate-500 dark:text-slate-400'}`}>
-                                            • Field Engineer Duty
-                                        </span>
+                                    <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-outfit uppercase tracking-tight">
+                                        Field Engineer Attendance Check-In
+                                    </h2>
+                                    <div className="w-16 h-1.5 bg-emerald-500 rounded-full mt-1.5" />
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowAttendanceForm(false)}
+                                    className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer"
+                                    title="Close Form View"
+                                >
+                                    <MdClose size={22} />
+                                </button>
+                            </div>
+
+                            <form onSubmit={handleSubmitAttendanceCheckIn} className="space-y-5">
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5">
+                                        Employee Name
+                                    </label>
+                                    <input
+                                        type="text"
+                                        readOnly
+                                        value={currentUser.name || 'Field Engineer'}
+                                        className="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 cursor-not-allowed"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5">
+                                        Area / Site Name *
+                                    </label>
+                                    <input
+                                        type="text"
+                                        required
+                                        placeholder="e.g. Aditraj Complex, Jodhpur Village..."
+                                        value={checkInAreaName}
+                                        onChange={(e) => setCheckInAreaName(e.target.value)}
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold focus:ring-2 focus:ring-teal-500 outline-none bg-white dark:bg-slate-900 text-slate-800 dark:text-white"
+                                    />
+                                </div>
+
+                                <div className="p-4 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-2 shadow-xs">
+                                    <div className="flex items-center justify-between">
+                                        <label className="block text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">
+                                            GPS Location / Exact Street Address *
+                                        </label>
+                                        <button
+                                            type="button"
+                                            onClick={fetchGpsLocation}
+                                            disabled={isLocating}
+                                            className="text-[10px] font-bold text-teal-600 dark:text-teal-400 hover:text-teal-800 dark:hover:text-teal-300 flex items-center gap-1 cursor-pointer transition-colors"
+                                            title="Re-query device GPS hardware for maximum precision"
+                                        >
+                                            <MdRefresh size={14} className={isLocating ? 'animate-spin' : ''} />
+                                            {isLocating ? 'Acquiring GPS...' : 'Refresh High-Accuracy GPS'}
+                                        </button>
                                     </div>
-                                    <h3 className={`text-xl sm:text-2xl font-black font-outfit uppercase mt-1.5 ${activeAttendance || hasCompletedToday ? 'text-white' : 'text-slate-900 dark:text-white'}`}>
-                                        {activeAttendance 
-                                            ? activeAttendance.employeeName 
-                                            : todayAttendance 
-                                                ? todayAttendance.employeeName 
-                                                : (currentUser.name || 'Field Engineer')}
-                                    </h3>
-                                    {activeAttendance ? (
-                                        <div className="text-xs text-slate-300 font-medium mt-1 flex flex-wrap items-center gap-1.5 leading-relaxed">
-                                            <span>Checked in at</span>
-                                            <span className="font-extrabold text-teal-300 bg-teal-950/80 px-2 py-0.5 rounded-md border border-teal-800/80">
-                                                {new Date(activeAttendance.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                            </span>
-                                            <span>— Location:</span>
-                                            <span className="font-bold text-emerald-300 bg-slate-800 px-2 py-0.5 rounded-md border border-slate-700">
-                                                {activeAttendance.checkInLocation?.areaName || 'Field Site'}
-                                            </span>
-                                            {activeAttendance.checkInLocation?.address && (
-                                                <span className="text-slate-400 font-normal">
-                                                    ({activeAttendance.checkInLocation.address})
-                                                </span>
-                                            )}
+                                    <textarea
+                                        rows={2}
+                                        value={checkInAddress}
+                                        onChange={(e) => setCheckInAddress(e.target.value)}
+                                        placeholder="Auto-detecting exact location or type full street address..."
+                                        className="w-full px-3.5 py-2.5 text-xs font-semibold text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none leading-relaxed resize-none shadow-inner"
+                                    />
+                                    {checkInLat && checkInLng && (
+                                        <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 dark:border-slate-700/60">
+                                            <p className="text-[10px] font-mono text-teal-700 dark:text-teal-300 font-bold">
+                                                Lat: {checkInLat.toFixed(5)}, Lng: {checkInLng.toFixed(5)}
+                                            </p>
+                                            <a
+                                                href={`https://www.google.com/maps?q=${checkInLat},${checkInLng}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-[10px] font-bold text-teal-600 dark:text-teal-400 hover:underline flex items-center gap-1"
+                                            >
+                                                <MdMap size={12} /> View Map Pin
+                                            </a>
                                         </div>
-                                    ) : hasCompletedToday ? (
-                                        <div className="text-xs text-slate-300 font-medium mt-1 flex flex-wrap items-center gap-1.5 leading-relaxed">
-                                            <span>Checked-in at</span>
-                                            <span className="font-extrabold text-indigo-300 bg-indigo-950/80 px-2 py-0.5 rounded-md border border-indigo-800/80">
-                                                {new Date(todayAttendance.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                            </span>
-                                            <span>& Checked-out at</span>
-                                            <span className="font-extrabold text-emerald-300 bg-emerald-950/80 px-2 py-0.5 rounded-md border border-emerald-800/80">
-                                                {todayAttendance.checkOutTime ? new Date(todayAttendance.checkOutTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'}
-                                            </span>
-                                            <span className="text-slate-400 font-medium">• 1 Check-in Daily Limit Reached</span>
+                                    )}
+                                </div>
+
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5">
+                                        Selfie Photo Verification *
+                                    </label>
+                                    {checkInSelfie ? (
+                                        <div className="relative p-3 bg-slate-50 dark:bg-slate-800 border border-teal-300 dark:border-teal-700 rounded-2xl flex flex-col items-center justify-center space-y-3">
+                                            <img src={checkInSelfie} alt="Selfie" className="h-44 rounded-xl object-cover shadow-md" />
+                                            <div className="flex items-center gap-3">
+                                                <label className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold cursor-pointer transition-all shadow-md">
+                                                    Retake Selfie
+                                                    <input type="file" accept="image/*" capture="user" onChange={handleSelfieChange} className="hidden" />
+                                                </label>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setCheckInSelfie('')}
+                                                    className="px-4 py-2 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                                                >
+                                                    Remove
+                                                </button>
+                                            </div>
                                         </div>
                                     ) : (
-                                        <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold mt-1">
-                                            Click the Check-In button to record your field attendance with live GPS location & selfie verification.
-                                        </p>
+                                        <label className="border-2 border-dashed border-slate-200 dark:border-slate-700 hover:border-teal-500 dark:hover:border-teal-400 bg-slate-50/70 dark:bg-slate-800/50 hover:bg-teal-50/30 dark:hover:bg-teal-950/20 rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer transition-all group text-center">
+                                            <input type="file" accept="image/*" capture="user" onChange={handleSelfieChange} className="hidden" />
+                                            <div className="w-14 h-14 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs flex items-center justify-center text-slate-400 group-hover:text-teal-600 group-hover:border-teal-300 transition-all mb-3">
+                                                {uploadingSelfie ? (
+                                                    <div className="w-6 h-6 border-2 border-teal-600 border-t-transparent rounded-full animate-spin" />
+                                                ) : (
+                                                    <MdPhotoCamera size={28} />
+                                                )}
+                                            </div>
+                                            <span className="text-xs font-black text-slate-800 dark:text-slate-200 group-hover:text-teal-700 dark:group-hover:text-teal-300">
+                                                {uploadingSelfie ? 'Uploading Selfie...' : 'Take / Upload Selfie'}
+                                            </span>
+                                            <span className="text-[10px] text-slate-400 font-semibold mt-1">
+                                                Capture engineer selfie for attendance record
+                                            </span>
+                                        </label>
+                                    )}
+                                </div>
+
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5">
+                                        Notes / Remarks (Optional)
+                                    </label>
+                                    <textarea
+                                        placeholder="Optional check-in notes..."
+                                        value={checkInNotes}
+                                        onChange={(e) => setCheckInNotes(e.target.value)}
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold h-20 outline-none focus:ring-2 focus:ring-teal-500 bg-white dark:bg-slate-900 text-slate-800 dark:text-white"
+                                    />
+                                </div>
+
+                                <div className="pt-2">
+                                    <button
+                                        type="submit"
+                                        disabled={submittingCheckIn || uploadingSelfie}
+                                        className="w-full py-4 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-teal-600/30 active:scale-[0.99] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                    >
+                                        <MdHowToReg size={20} />
+                                        {submittingCheckIn ? 'Recording Check-In...' : 'Record Check-In'}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                ) : showCheckOutForm ? (
+                    /* Full Page Check-Out Form View */
+                    <div className="space-y-6 max-w-3xl mx-auto animate-fade-in-up">
+                        <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+                            <button
+                                type="button"
+                                onClick={() => setShowCheckOutForm(false)}
+                                className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs"
+                            >
+                                <MdArrowBack size={18} />
+                                Back to Attendance Register
+                            </button>
+                            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                                Field Duty Check-Out Page
+                            </span>
+                        </div>
+
+                        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6 relative">
+                            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
+                                <div>
+                                    <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-outfit uppercase tracking-tight">
+                                        Field Engineer Attendance Check-Out
+                                    </h2>
+                                    <div className="w-16 h-1.5 bg-rose-500 rounded-full mt-1.5" />
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowCheckOutForm(false)}
+                                    className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer"
+                                    title="Close Form View"
+                                >
+                                    <MdClose size={22} />
+                                </button>
+                            </div>
+
+                            <form onSubmit={handleSubmitAttendanceCheckOutModal} className="space-y-5">
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5">
+                                        Employee Name
+                                    </label>
+                                    <input
+                                        type="text"
+                                        readOnly
+                                        value={activeAttendance?.employeeName || currentUser.name || 'Field Engineer'}
+                                        className="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 cursor-not-allowed"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5">
+                                        Area / Site Name *
+                                    </label>
+                                    <input
+                                        type="text"
+                                        required
+                                        placeholder="e.g. Baner Site, Hinjewadi Phase 1, Pune..."
+                                        value={checkOutAreaName}
+                                        onChange={(e) => setCheckOutAreaName(e.target.value)}
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold focus:ring-2 focus:ring-rose-500 outline-none bg-white dark:bg-slate-900 text-slate-800 dark:text-white"
+                                    />
+                                </div>
+
+                                <div className="p-4 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-2 shadow-xs">
+                                    <div className="flex items-center justify-between">
+                                        <label className="block text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">
+                                            GPS Location / Exact Street Address *
+                                        </label>
+                                        <button
+                                            type="button"
+                                            onClick={fetchCheckOutGpsLocation}
+                                            disabled={isCheckOutLocating}
+                                            className="text-[10px] font-bold text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300 flex items-center gap-1 cursor-pointer transition-colors"
+                                        >
+                                            <MdRefresh size={14} className={isCheckOutLocating ? 'animate-spin' : ''} />
+                                            {isCheckOutLocating ? 'Acquiring GPS...' : 'Refresh High-Accuracy GPS'}
+                                        </button>
+                                    </div>
+                                    <textarea
+                                        rows={2}
+                                        value={checkOutAddress}
+                                        onChange={(e) => setCheckOutAddress(e.target.value)}
+                                        placeholder="Auto-detecting exact location or type full street address..."
+                                        className="w-full px-3.5 py-2.5 text-xs font-semibold text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-rose-500 outline-none leading-relaxed resize-none shadow-inner"
+                                    />
+                                    {checkOutLat && checkOutLng && (
+                                        <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 dark:border-slate-700/60">
+                                            <p className="text-[10px] font-mono text-rose-700 dark:text-rose-300 font-bold">
+                                                Lat: {checkOutLat.toFixed(5)}, Lng: {checkOutLng.toFixed(5)}
+                                            </p>
+                                            <a
+                                                href={`https://www.google.com/maps?q=${checkOutLat},${checkOutLng}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-[10px] font-bold text-rose-600 dark:text-rose-400 hover:underline flex items-center gap-1"
+                                            >
+                                                <MdMap size={12} /> View Map Pin
+                                            </a>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5">
+                                        Check-Out Selfie Photo Verification *
+                                    </label>
+                                    {checkOutSelfie ? (
+                                        <div className="relative p-3 bg-slate-50 dark:bg-slate-800 border border-rose-300 dark:border-rose-700 rounded-2xl flex flex-col items-center justify-center space-y-3">
+                                            <img src={checkOutSelfie} alt="Check-Out Selfie" className="h-44 rounded-xl object-cover shadow-md" />
+                                            <div className="flex items-center gap-3">
+                                                <label className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold cursor-pointer transition-all shadow-md">
+                                                    Retake Selfie
+                                                    <input type="file" accept="image/*" capture="user" onChange={handleCheckOutSelfieChange} className="hidden" />
+                                                </label>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setCheckOutSelfie('')}
+                                                    className="px-4 py-2 bg-slate-200 text-slate-700 hover:bg-slate-300 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                                                >
+                                                    Remove
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <label className="border-2 border-dashed border-slate-200 dark:border-slate-700 hover:border-rose-500 dark:hover:border-rose-400 bg-slate-50/70 dark:bg-slate-800/50 hover:bg-rose-50/30 dark:hover:bg-rose-950/20 rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer transition-all group text-center">
+                                            <input type="file" accept="image/*" capture="user" onChange={handleCheckOutSelfieChange} className="hidden" />
+                                            <div className="w-14 h-14 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs flex items-center justify-center text-slate-400 group-hover:text-rose-600 group-hover:border-rose-300 transition-all mb-3">
+                                                {uploadingCheckOutSelfie ? (
+                                                    <div className="w-6 h-6 border-2 border-rose-600 border-t-transparent rounded-full animate-spin" />
+                                                ) : (
+                                                    <MdPhotoCamera size={28} />
+                                                )}
+                                            </div>
+                                            <span className="text-xs font-black text-slate-800 dark:text-slate-200 group-hover:text-rose-700 dark:group-hover:text-rose-300">
+                                                {uploadingCheckOutSelfie ? 'Uploading Check-Out Selfie...' : 'Take / Upload Check-Out Selfie'}
+                                            </span>
+                                            <span className="text-[10px] text-slate-400 font-semibold mt-1">
+                                                Capture engineer selfie for duty check-out
+                                            </span>
+                                        </label>
+                                    )}
+                                </div>
+
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5">
+                                        Check-Out Remarks (Optional)
+                                    </label>
+                                    <textarea
+                                        placeholder="Optional check-out remarks..."
+                                        value={checkOutNotes}
+                                        onChange={(e) => setCheckOutNotes(e.target.value)}
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold h-20 outline-none focus:ring-2 focus:ring-rose-500 bg-white dark:bg-slate-900 text-slate-800 dark:text-white"
+                                    />
+                                </div>
+
+                                <div className="pt-2">
+                                    <button
+                                        type="submit"
+                                        disabled={submittingCheckOut || uploadingCheckOutSelfie}
+                                        className="w-full py-4 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-rose-600/30 active:scale-[0.99] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                    >
+                                        <MdCheckCircle size={20} />
+                                        {submittingCheckOut ? 'Recording Check-Out...' : 'Record Check-Out'}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                ) : (
+                    /* Main Attendance Status & Register Table View */
+                    <div className="space-y-6">
+                        {/* Active Status Card */}
+                        <div className={`rounded-[2rem] p-6 border shadow-2xl transition-all relative overflow-hidden ${
+                            activeAttendance 
+                                ? 'bg-slate-900 text-white border-teal-500/50 shadow-teal-950/40' 
+                                : hasCompletedToday
+                                    ? 'bg-slate-900 text-white border-indigo-500/50 shadow-indigo-950/40'
+                                    : 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white border-slate-200 dark:border-slate-800'
+                        }`}>
+                            {(activeAttendance || hasCompletedToday) && (
+                                <div className="absolute -right-16 -bottom-16 w-64 h-64 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
+                            )}
+                            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5 relative z-10">
+                                <div className="flex items-center gap-4">
+                                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 shadow-inner ${
+                                        activeAttendance 
+                                            ? 'bg-teal-500/20 text-teal-300 border border-teal-400/40' 
+                                            : hasCompletedToday
+                                                ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-400/40'
+                                                : 'bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200 dark:border-amber-800'
+                                    }`}>
+                                        {activeAttendance ? <MdCheckCircle size={32} /> : hasCompletedToday ? <MdCheckCircle size={32} /> : <MdHowToReg size={32} />}
+                                    </div>
+                                    <div>
+                                        <div className="flex items-center gap-2">
+                                            <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg border ${
+                                                activeAttendance 
+                                                    ? 'bg-teal-500/25 text-teal-200 border-teal-400/40' 
+                                                    : hasCompletedToday
+                                                        ? 'bg-indigo-500/25 text-indigo-200 border-indigo-400/40'
+                                                        : 'bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200 border-amber-300 dark:border-amber-700'
+                                            }`}>
+                                                {activeAttendance 
+                                                    ? 'STATUS: CURRENTLY CHECKED-IN' 
+                                                    : hasCompletedToday
+                                                        ? 'STATUS: ATTENDANCE COMPLETED TODAY'
+                                                        : 'STATUS: NOT CHECKED-IN TODAY'}
+                                            </span>
+                                            <span className={`text-xs font-bold ${activeAttendance || hasCompletedToday ? 'text-slate-300' : 'text-slate-500 dark:text-slate-400'}`}>
+                                                • Field Engineer Duty
+                                            </span>
+                                        </div>
+                                        <h3 className={`text-xl sm:text-2xl font-black font-outfit uppercase mt-1.5 ${activeAttendance || hasCompletedToday ? 'text-white' : 'text-slate-900 dark:text-white'}`}>
+                                            {activeAttendance 
+                                                ? activeAttendance.employeeName 
+                                                : todayAttendance 
+                                                    ? todayAttendance.employeeName 
+                                                    : (currentUser.name || 'Field Engineer')}
+                                        </h3>
+                                        {activeAttendance ? (
+                                            <div className="text-xs text-slate-300 font-medium mt-1 flex flex-wrap items-center gap-1.5 leading-relaxed">
+                                                <span>Checked in at</span>
+                                                <span className="font-extrabold text-teal-300 bg-teal-950/80 px-2 py-0.5 rounded-md border border-teal-800/80">
+                                                    {new Date(activeAttendance.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                </span>
+                                                <span>— Location:</span>
+                                                <span className="font-bold text-emerald-300 bg-slate-800 px-2 py-0.5 rounded-md border border-slate-700">
+                                                    {activeAttendance.checkInLocation?.areaName || 'Field Site'}
+                                                </span>
+                                                {activeAttendance.checkInLocation?.address && (
+                                                    <span className="text-slate-400 font-normal">
+                                                        ({activeAttendance.checkInLocation.address})
+                                                    </span>
+                                                )}
+                                            </div>
+                                        ) : hasCompletedToday ? (
+                                            <div className="text-xs text-slate-300 font-medium mt-1 flex flex-wrap items-center gap-1.5 leading-relaxed">
+                                                <span>Checked-in at</span>
+                                                <span className="font-extrabold text-indigo-300 bg-indigo-950/80 px-2 py-0.5 rounded-md border border-indigo-800/80">
+                                                    {new Date(todayAttendance.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                </span>
+                                                <span>& Checked-out at</span>
+                                                <span className="font-extrabold text-emerald-300 bg-emerald-950/80 px-2 py-0.5 rounded-md border border-emerald-800/80">
+                                                    {todayAttendance.checkOutTime ? new Date(todayAttendance.checkOutTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'}
+                                                </span>
+                                                <span className="text-slate-400 font-medium">• 1 Check-in Daily Limit Reached</span>
+                                            </div>
+                                        ) : (
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold mt-1">
+                                                Click the Check-In button to record your field attendance with live GPS location & selfie verification.
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
+                                    {activeAttendance ? (
+                                        <button
+                                            onClick={handleOpenCheckOutModal}
+                                            disabled={submittingCheckOut}
+                                            className="px-6 py-3.5 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-black text-xs uppercase tracking-wider rounded-2xl transition-all shadow-lg shadow-rose-600/30 hover:shadow-rose-600/50 active:scale-95 cursor-pointer"
+                                        >
+                                            {submittingCheckOut ? 'Checking Out...' : 'CHECK-OUT NOW'}
+                                        </button>
+                                    ) : hasCompletedToday ? (
+                                        <button
+                                            disabled
+                                            className="px-6 py-3.5 bg-slate-800/80 text-slate-400 font-black text-xs uppercase tracking-wider rounded-2xl border border-slate-700/80 flex items-center gap-2 cursor-not-allowed opacity-90 shadow-inner"
+                                            title="Daily check-in limit reached"
+                                        >
+                                            <MdCheckCircle size={18} className="text-emerald-400" />
+                                            CHECK-IN COMPLETED FOR TODAY
+                                        </button>
+                                    ) : (
+                                        <button
+                                            onClick={handleOpenAttendanceModal}
+                                            className="px-6 py-3.5 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-black text-xs uppercase tracking-wider rounded-2xl transition-all shadow-lg shadow-teal-600/30 hover:shadow-teal-600/50 active:scale-95 flex items-center gap-2 cursor-pointer"
+                                        >
+                                            <MdHowToReg size={18} />
+                                            CHECK-IN FIELD ATTENDANCE
+                                        </button>
                                     )}
                                 </div>
                             </div>
-
-                            <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
-                                {activeAttendance ? (
-                                    <button
-                                        onClick={handleOpenCheckOutModal}
-                                        disabled={submittingCheckOut}
-                                        className="px-6 py-3.5 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-black text-xs uppercase tracking-wider rounded-2xl transition-all shadow-lg shadow-rose-600/30 hover:shadow-rose-600/50 active:scale-95 cursor-pointer"
-                                    >
-                                        {submittingCheckOut ? 'Checking Out...' : 'CHECK-OUT NOW'}
-                                    </button>
-                                ) : hasCompletedToday ? (
-                                    <button
-                                        disabled
-                                        className="px-6 py-3.5 bg-slate-800/80 text-slate-400 font-black text-xs uppercase tracking-wider rounded-2xl border border-slate-700/80 flex items-center gap-2 cursor-not-allowed opacity-90 shadow-inner"
-                                        title="Daily check-in limit reached"
-                                    >
-                                        <MdCheckCircle size={18} className="text-emerald-400" />
-                                        CHECK-IN COMPLETED FOR TODAY
-                                    </button>
-                                ) : (
-                                    <button
-                                        onClick={handleOpenAttendanceModal}
-                                        className="px-6 py-3.5 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-black text-xs uppercase tracking-wider rounded-2xl transition-all shadow-lg shadow-teal-600/30 hover:shadow-teal-600/50 active:scale-95 flex items-center gap-2 cursor-pointer"
-                                    >
-                                        <MdHowToReg size={18} />
-                                        CHECK-IN FIELD ATTENDANCE
-                                    </button>
-                                )}
-                            </div>
                         </div>
-                    </div>
+
 
                     {/* Register Filter & Table Card */}
                     <div className="glass shadow-premium rounded-[2rem] p-6 bg-white border border-slate-100 space-y-4">
@@ -2089,16 +2443,18 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
                                     className="px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500"
                                 />
 
-                                <select
-                                    value={attendanceEngineerFilter}
-                                    onChange={(e) => setAttendanceEngineerFilter(e.target.value)}
-                                    className="px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500"
-                                >
-                                    <option value="all">All Engineers</option>
-                                    {engineers.map(e => (
-                                        <option key={e._id} value={e._id}>{e.name}</option>
-                                    ))}
-                                </select>
+                                {['admin', 'super_admin', 'superadmin'].includes(String(currentUser?.role || '').toLowerCase()) && (
+                                    <select
+                                        value={attendanceEngineerFilter}
+                                        onChange={(e) => setAttendanceEngineerFilter(e.target.value)}
+                                        className="px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                    >
+                                        <option value="all">All Engineers</option>
+                                        {engineers.map(e => (
+                                            <option key={e._id} value={e._id}>{e.name}</option>
+                                        ))}
+                                    </select>
+                                )}
 
                                 <button
                                     onClick={fetchAttendanceRecords}
@@ -2216,7 +2572,8 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
                         )}
                     </div>
                 </div>
-            )}
+            )
+        )}
 
             {/* Reschedule Visit Modal */}
             <Modal
@@ -2357,286 +2714,6 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
                             <option value="Under AMC">Covered Under AMC Contract</option>
                             <option value="Free Service">Complimentary Service</option>
                         </select>
-                    </div>
-                </form>
-            </Modal>
-
-            {/* Field Attendance Check-In Modal */}
-            <Modal
-                isOpen={showAttendanceModal}
-                onClose={() => setShowAttendanceModal(false)}
-                title="Field Engineer Attendance Check-In"
-                maxWidth="max-w-md"
-                footer={
-                    <>
-                        <button
-                            type="button"
-                            onClick={() => setShowAttendanceModal(false)}
-                            className="flex-1 w-full py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            form="attendance-checkin-form"
-                            disabled={submittingCheckIn || uploadingSelfie}
-                            className="flex-1 w-full py-3.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            {submittingCheckIn ? 'Recording Check-In...' : 'Record Check-In'}
-                        </button>
-                    </>
-                }
-            >
-                <form id="attendance-checkin-form" onSubmit={handleSubmitAttendanceCheckIn} className="space-y-4">
-                    <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Employee Name</label>
-                        <input
-                            type="text"
-                            readOnly
-                            value={currentUser.name || 'Field Engineer'}
-                            className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 cursor-not-allowed"
-                        />
-                    </div>
-
-                    <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Area / Site Name *</label>
-                        <input
-                            type="text"
-                            required
-                            placeholder="e.g. Baner Site, Hinjewadi Phase 1, Pune..."
-                            value={checkInAreaName}
-                            onChange={(e) => setCheckInAreaName(e.target.value)}
-                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-xs font-semibold focus:ring-2 focus:ring-teal-500 outline-none"
-                        />
-                    </div>
-
-                    <div className="p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2 shadow-xs">
-                        <div className="flex items-center justify-between">
-                            <label className="block text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">
-                                GPS Location / Exact Street Address *
-                            </label>
-                            <button
-                                type="button"
-                                onClick={fetchGpsLocation}
-                                disabled={isLocating}
-                                className="text-[10px] font-bold text-teal-600 dark:text-teal-400 hover:text-teal-800 dark:hover:text-teal-300 flex items-center gap-1 cursor-pointer transition-colors"
-                                title="Re-query device GPS hardware for maximum precision"
-                            >
-                                <MdRefresh size={14} className={isLocating ? 'animate-spin' : ''} />
-                                {isLocating ? 'Acquiring GPS...' : 'Refresh High-Accuracy GPS'}
-                            </button>
-                        </div>
-                        <textarea
-                            rows={2}
-                            value={checkInAddress}
-                            onChange={(e) => setCheckInAddress(e.target.value)}
-                            placeholder="Auto-detecting exact location or type full street address..."
-                            className="w-full px-3 py-2 text-xs font-semibold text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none leading-relaxed resize-none shadow-inner"
-                        />
-                        {checkInLat && checkInLng && (
-                            <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 dark:border-slate-700/60">
-                                <p className="text-[10px] font-mono text-teal-700 dark:text-teal-300 font-bold">
-                                    Lat: {checkInLat.toFixed(5)}, Lng: {checkInLng.toFixed(5)}
-                                </p>
-                                <a
-                                    href={`https://www.google.com/maps?q=${checkInLat},${checkInLng}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-[10px] font-bold text-teal-600 dark:text-teal-400 hover:underline flex items-center gap-1"
-                                >
-                                    <MdMap size={12} /> View Map Pin
-                                </a>
-                            </div>
-                        )}
-                    </div>
-
-                    <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Selfie Photo Verification *</label>
-                        {checkInSelfie ? (
-                            <div className="relative p-2 bg-slate-50 border border-teal-300 rounded-xl flex flex-col items-center justify-center space-y-2">
-                                <img src={checkInSelfie} alt="Selfie" className="h-36 rounded-lg object-cover shadow-xs" />
-                                <div className="flex items-center gap-2">
-                                    <label className="px-3 py-1 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-bold cursor-pointer transition-all shadow-xs">
-                                        Retake Selfie
-                                        <input type="file" accept="image/*" capture="user" onChange={handleSelfieChange} className="hidden" />
-                                    </label>
-                                    <button
-                                        type="button"
-                                        onClick={() => setCheckInSelfie('')}
-                                        className="px-3 py-1 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded-lg text-xs font-bold transition-all"
-                                    >
-                                        Remove
-                                    </button>
-                                </div>
-                            </div>
-                        ) : (
-                            <label className="border-2 border-dashed border-slate-200 hover:border-teal-500 bg-slate-50/70 hover:bg-teal-50/30 rounded-2xl p-5 flex flex-col items-center justify-center cursor-pointer transition-all group text-center">
-                                <input type="file" accept="image/*" capture="user" onChange={handleSelfieChange} className="hidden" />
-                                <div className="w-12 h-12 bg-white rounded-2xl border border-slate-200 shadow-xs flex items-center justify-center text-slate-400 group-hover:text-teal-600 group-hover:border-teal-300 transition-all mb-2">
-                                    {uploadingSelfie ? (
-                                        <div className="w-5 h-5 border-2 border-teal-600 border-t-transparent rounded-full animate-spin"></div>
-                                    ) : (
-                                        <MdPhotoCamera size={26} />
-                                    )}
-                                </div>
-                                <span className="text-xs font-black text-slate-800 group-hover:text-teal-800">
-                                    {uploadingSelfie ? 'Uploading Selfie...' : 'Take / Upload Selfie'}
-                                </span>
-                                <span className="text-[10px] text-slate-400 font-semibold mt-0.5">
-                                    Capture engineer selfie for attendance record
-                                </span>
-                            </label>
-                        )}
-                    </div>
-
-                    <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Notes / Remarks (Optional)</label>
-                        <textarea
-                            placeholder="Optional check-in notes..."
-                            value={checkInNotes}
-                            onChange={(e) => setCheckInNotes(e.target.value)}
-                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold h-16"
-                        />
-                    </div>
-                </form>
-            </Modal>
-
-            {/* Field Attendance Check-Out Modal */}
-            <Modal
-                isOpen={showCheckOutModal}
-                onClose={() => setShowCheckOutModal(false)}
-                title="Field Engineer Attendance Check-Out"
-                maxWidth="max-w-md"
-                footer={
-                    <>
-                        <button
-                            type="button"
-                            onClick={() => setShowCheckOutModal(false)}
-                            className="flex-1 w-full py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            form="attendance-checkout-form"
-                            disabled={submittingCheckOut || uploadingCheckOutSelfie}
-                            className="flex-1 w-full py-3.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            {submittingCheckOut ? 'Recording Check-Out...' : 'Record Check-Out'}
-                        </button>
-                    </>
-                }
-            >
-                <form id="attendance-checkout-form" onSubmit={handleSubmitAttendanceCheckOutModal} className="space-y-4">
-                    <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Employee Name</label>
-                        <input
-                            type="text"
-                            readOnly
-                            value={activeAttendance?.employeeName || currentUser.name || 'Field Engineer'}
-                            className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 cursor-not-allowed"
-                        />
-                    </div>
-
-                    <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Area / Site Name *</label>
-                        <input
-                            type="text"
-                            required
-                            placeholder="e.g. Baner Site, Hinjewadi Phase 1, Pune..."
-                            value={checkOutAreaName}
-                            onChange={(e) => setCheckOutAreaName(e.target.value)}
-                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-xs font-semibold focus:ring-2 focus:ring-rose-500 outline-none"
-                        />
-                    </div>
-
-                    <div className="p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2 shadow-xs">
-                        <div className="flex items-center justify-between">
-                            <label className="block text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">
-                                GPS Location / Exact Street Address *
-                            </label>
-                            <button
-                                type="button"
-                                onClick={fetchCheckOutGpsLocation}
-                                disabled={isCheckOutLocating}
-                                className="text-[10px] font-bold text-rose-600 dark:text-rose-400 hover:text-rose-800 flex items-center gap-1 cursor-pointer transition-colors"
-                                title="Re-query device GPS hardware for check-out precision"
-                            >
-                                <MdRefresh size={14} className={isCheckOutLocating ? 'animate-spin' : ''} />
-                                {isCheckOutLocating ? 'Acquiring GPS...' : 'Refresh High-Accuracy GPS'}
-                            </button>
-                        </div>
-                        <textarea
-                            rows={2}
-                            value={checkOutAddress}
-                            onChange={(e) => setCheckOutAddress(e.target.value)}
-                            placeholder="Auto-detecting exact location or type full street address..."
-                            className="w-full px-3 py-2 text-xs font-semibold text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-rose-500 outline-none leading-relaxed resize-none shadow-inner"
-                        />
-                        {checkOutLat && checkOutLng && (
-                            <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 dark:border-slate-700/60">
-                                <p className="text-[10px] font-mono text-rose-700 dark:text-rose-300 font-bold">
-                                    Lat: {checkOutLat.toFixed(5)}, Lng: {checkOutLng.toFixed(5)}
-                                </p>
-                                <a
-                                    href={`https://www.google.com/maps?q=${checkOutLat},${checkOutLng}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-[10px] font-bold text-rose-600 dark:text-rose-400 hover:underline flex items-center gap-1"
-                                >
-                                    <MdMap size={12} /> View Map Pin
-                                </a>
-                            </div>
-                        )}
-                    </div>
-
-                    <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Check-Out Selfie Photo Verification *</label>
-                        {checkOutSelfie ? (
-                            <div className="relative p-2 bg-slate-50 border border-rose-300 rounded-xl flex flex-col items-center justify-center space-y-2">
-                                <img src={checkOutSelfie} alt="Check-Out Selfie" className="h-36 rounded-lg object-cover shadow-xs" />
-                                <div className="flex items-center gap-2">
-                                    <label className="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold cursor-pointer transition-all shadow-xs">
-                                        Retake Selfie
-                                        <input type="file" accept="image/*" capture="user" onChange={handleCheckOutSelfieChange} className="hidden" />
-                                    </label>
-                                    <button
-                                        type="button"
-                                        onClick={() => setCheckOutSelfie('')}
-                                        className="px-3 py-1 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded-lg text-xs font-bold transition-all cursor-pointer"
-                                    >
-                                        Remove
-                                    </button>
-                                </div>
-                            </div>
-                        ) : (
-                            <label className="border-2 border-dashed border-slate-200 hover:border-rose-500 bg-slate-50/70 hover:bg-rose-50/30 rounded-2xl p-5 flex flex-col items-center justify-center cursor-pointer transition-all group text-center">
-                                <input type="file" accept="image/*" capture="user" onChange={handleCheckOutSelfieChange} className="hidden" />
-                                <div className="w-12 h-12 bg-white rounded-2xl border border-slate-200 shadow-xs flex items-center justify-center text-slate-400 group-hover:text-rose-600 group-hover:border-rose-300 transition-all mb-2">
-                                    {uploadingCheckOutSelfie ? (
-                                        <div className="w-5 h-5 border-2 border-rose-600 border-t-transparent rounded-full animate-spin"></div>
-                                    ) : (
-                                        <MdPhotoCamera size={26} />
-                                    )}
-                                </div>
-                                <span className="text-xs font-black text-slate-800 group-hover:text-rose-800">
-                                    {uploadingCheckOutSelfie ? 'Uploading Check-Out Selfie...' : 'Take / Upload Check-Out Selfie'}
-                                </span>
-                                <span className="text-[10px] text-slate-400 font-semibold mt-0.5">
-                                    Capture engineer selfie for duty check-out
-                                </span>
-                            </label>
-                        )}
-                    </div>
-
-                    <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Check-Out Remarks (Optional)</label>
-                        <textarea
-                            placeholder="Optional check-out remarks..."
-                            value={checkOutNotes}
-                            onChange={(e) => setCheckOutNotes(e.target.value)}
-                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold h-16"
-                        />
                     </div>
                 </form>
             </Modal>

@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const TicketCategory = require('../models/TicketCategory');
 const TicketType = require('../models/TicketType');
 const Priority = require('../models/Priority');
@@ -814,18 +815,28 @@ exports.problems = {
 
             // 1. If productId supplied, resolve Product and populated MGRs
             if (productId && mongoose.Types.ObjectId.isValid(productId)) {
-                const prod = await Product.findById(productId)
+                const prod = await Product.findOne({ _id: productId })
                     .setOptions({ bypassTenant: true })
-                    .populate('mgr1 mgr2 mgr3 mgr4 mgr5')
                     .lean();
 
                 if (prod) {
                     for (const k of ['mgr1', 'mgr2', 'mgr3', 'mgr4', 'mgr5']) {
-                        if (prod[k] && typeof prod[k] === 'object') {
-                            mgrDocs.push(prod[k]);
-                        } else if (prod[k] && mongoose.Types.ObjectId.isValid(String(prod[k]))) {
-                            const m = await MGR.findById(prod[k]).setOptions({ bypassTenant: true }).lean();
-                            if (m) mgrDocs.push(m);
+                        if (prod[k]) {
+                            if (typeof prod[k] === 'object' && prod[k] !== null && (prod[k].code || Array.isArray(prod[k].problemList))) {
+                                mgrDocs.push(prod[k]);
+                            } else if (mongoose.Types.ObjectId.isValid(String(prod[k]._id || prod[k]))) {
+                                const targetId = prod[k]._id || prod[k];
+                                const m = await MGR.findOne({ _id: targetId }).setOptions({ bypassTenant: true }).lean();
+                                if (m) mgrDocs.push(m);
+                            } else if (typeof prod[k] === 'string' && prod[k].trim()) {
+                                const m = await MGR.findOne({
+                                    $or: [
+                                        { code: new RegExp(`^${prod[k].trim()}$`, 'i') },
+                                        { description: new RegExp(`^${prod[k].trim()}$`, 'i') }
+                                    ]
+                                }).setOptions({ bypassTenant: true }).lean();
+                                if (m) mgrDocs.push(m);
+                            }
                         }
                     }
                 }
