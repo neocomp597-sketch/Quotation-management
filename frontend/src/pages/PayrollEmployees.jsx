@@ -354,9 +354,8 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
         // 1. Mobile Number validation
         if (form.mobile && form.mobile.trim()) {
             const cleanMobile = form.mobile.trim().replace(/\D/g, '');
-            const mobileRegex = /^[6-9]\d{9}$/;
-            if (!mobileRegex.test(cleanMobile)) {
-                errors.mobile = 'Mobile Number must be a valid 10-digit number starting with 6-9 (e.g. 9876543210)';
+            if (cleanMobile.length < 8 || cleanMobile.length > 15) {
+                errors.mobile = 'Mobile Number must be a valid contact number (8 to 15 digits)';
             }
         }
 
@@ -537,7 +536,9 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
         }
         const exportData = employees.map(emp => ({
             'Employee Name': emp.name,
+            'EMP Code': emp.externalEmployeeCode || '',
             'Email': emp.email || '',
+            'Mobile': emp.mobile || '',
             'PAN': emp.pan || '',
             'Aadhaar': emp.aadhaar || '',
             'UAN': emp.uan || '',
@@ -866,7 +867,7 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                                     )}
                                                     <div>
                                                         <div className="flex items-center gap-2 flex-wrap">
-                                                            <p className="text-slate-900 font-bold">{emp.name}</p>
+                                                            <p className="text-slate-900 font-bold text-base">{emp.name}</p>
                                                             {emp.employeeId && (
                                                                 <span className="px-2 py-0.5 bg-primary-100 dark:bg-primary-950 text-primary-700 dark:text-primary-300 font-black text-[10px] rounded-lg">
                                                                     {emp.employeeId}
@@ -893,9 +894,26 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                                                 </span>
                                                             )}
                                                         </div>
-                                                        <p className="text-xs text-slate-400">{emp.email || 'No email registered'}</p>
+                                                        <div className="mt-1 space-y-0.5 text-xs">
+                                                            <div className="flex items-center gap-1.5 text-slate-600">
+                                                                <span className="text-slate-400 font-semibold">Email:</span>
+                                                                {emp.email ? (
+                                                                    <span className="font-semibold text-slate-700">{emp.email}</span>
+                                                                ) : (
+                                                                    <span className="text-slate-400 italic text-[11px]">No email registered</span>
+                                                                )}
+                                                            </div>
+                                                            <div className="flex items-center gap-1.5 text-slate-600">
+                                                                <span className="text-slate-400 font-semibold">Phone:</span>
+                                                                {emp.mobile ? (
+                                                                    <span className="font-semibold text-slate-700">{emp.mobile}</span>
+                                                                ) : (
+                                                                    <span className="text-slate-400 italic text-[11px]">No phone registered</span>
+                                                                )}
+                                                            </div>
+                                                        </div>
                                                         {emp.reportingTo?.name && (
-                                                            <p className="text-[11px] text-teal-600 font-medium mt-0.5">
+                                                            <p className="text-[11px] text-teal-600 font-medium mt-1">
                                                                 Supervisor: {emp.reportingTo.name}
                                                             </p>
                                                         )}
@@ -1214,15 +1232,15 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                                 <label className={labelClass}>Mobile Number</label>
                                                 <input
                                                     type="text"
-                                                    maxLength={10}
+                                                    maxLength={15}
                                                     value={basicForm.mobile}
                                                     onChange={(e) => {
-                                                        const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                                                        const val = e.target.value.replace(/[^\d+ -]/g, '').slice(0, 15);
                                                         setBasicForm({ ...basicForm, mobile: val });
                                                         if (formErrors.mobile) setFormErrors({ ...formErrors, mobile: null });
                                                     }}
                                                     className={`${inputClass} ${formErrors.mobile ? 'border-rose-500 ring-2 ring-rose-500/20 bg-rose-50/20' : ''}`}
-                                                    placeholder="9876543210"
+                                                    placeholder="e.g. 9876543210"
                                                 />
                                                 {formErrors.mobile && (
                                                     <p className="text-[11px] font-semibold text-rose-500 mt-1">{formErrors.mobile}</p>

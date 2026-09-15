@@ -500,6 +500,8 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
     const handleViewPdf = (url) => {
         if (!url) return;
         const trimmed = String(url).trim();
+        if (!trimmed) return;
+
         if (trimmed.startsWith('data:')) {
             try {
                 const parts = trimmed.split(';base64,');
@@ -512,7 +514,14 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                 }
                 const blob = new Blob([uInt8Array], { type: contentType });
                 const blobUrl = URL.createObjectURL(blob);
-                window.open(blobUrl, '_blank');
+                
+                const link = document.createElement('a');
+                link.href = blobUrl;
+                link.target = '_blank';
+                link.rel = 'noopener noreferrer';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
             } catch (e) {
                 console.error('Error opening base64 PDF:', e);
                 toast.error('Failed to open PDF preview');
@@ -520,7 +529,13 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
         } else {
             const fullUrl = resolveImageUrl(trimmed);
             if (fullUrl) {
-                window.open(fullUrl, '_blank', 'noopener,noreferrer');
+                const link = document.createElement('a');
+                link.href = fullUrl;
+                link.target = '_blank';
+                link.rel = 'noopener noreferrer';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
             }
         }
     };

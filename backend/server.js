@@ -1327,17 +1327,19 @@ const startBackgroundServices = async () => {
   }
 };
 
-// Serve Static Files
 // Serve Static Files with logging
 app.use(
-  "/uploads",
+  ["/uploads", "/api/uploads"],
   (req, res, next) => {
     console.log(`[Static] Serving file: ${req.path}`);
     next();
   },
   express.static(path.join(__dirname, "public/uploads")),
   express.static(path.join(__dirname, "uploads")),
-  express.static(path.join(__dirname, "public"))
+  express.static(path.join(__dirname, "public")),
+  (req, res) => {
+    res.status(404).json({ message: `Uploaded file not found: ${req.path}` });
+  }
 );
 
 // Serve Static Files - Frontend (Production & Deployment)
@@ -1346,9 +1348,9 @@ app.use(express.static(path.join(rootDir, "dist")));
 
 // SPA fallback — Only in production or if dist exists
 app.get(/.*/, (req, res, next) => {
-  // If it's an API route that reached here, it's a 404 for API
-  if (req.path.startsWith("/api")) {
-    return res.status(404).json({ message: `API route ${req.path} not found` });
+  // If it's an API route or uploads route that reached here, return 404, DO NOT serve index.html!
+  if (req.path.startsWith("/api") || req.path.startsWith("/uploads")) {
+    return res.status(404).json({ message: `Route ${req.path} not found` });
   }
 
   const indexPath = path.join(rootDir, "dist", "index.html");

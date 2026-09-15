@@ -79,24 +79,97 @@ export const formatDateTime = (date) => {
  */
 export const resolveImageUrl = (url) => {
   if (!url) return null;
-  const trimmedUrl = url.trim();
-  if (trimmedUrl.startsWith("http")) return trimmedUrl;
+  const trimmedUrl = String(url).trim();
+  if (!trimmedUrl) return null;
+  if (trimmedUrl.startsWith("http://") || trimmedUrl.startsWith("https://") || trimmedUrl.startsWith("data:")) {
+    return trimmedUrl;
+  }
 
-  // For local development, assuming backend on 4003
-  const base = import.meta.env.VITE_BACKEND_URL || (import.meta.env.PROD ? "" : "http://localhost:4003");
-  let cleanUrl = trimmedUrl.replace(/\\/g, "/"); // Fix windows backslashes
+  // 1. Determine Backend Base URL
+  let base = import.meta.env.VITE_BACKEND_URL || "";
+  
+  if (!base && import.meta.env.VITE_API_URL) {
+    // Strip trailing /api or /api/ if present
+    base = import.meta.env.VITE_API_URL.replace(/\/api\/?$/i, "");
+  }
 
-  // If it's just a filename (no slashes), prepend /uploads/
-  if (!cleanUrl.includes("/")) {
+  if (!base) {
+    if (typeof window !== "undefined" && window.location) {
+      base = import.meta.env.PROD ? window.location.origin : "http://localhost:4003";
+    } else {
+      base = "http://localhost:4003";
+    }
+  }
+
+  base = base.replace(/\/+$/, "");
+
+  // 2. Clean up Windows backslashes and directory prefixes
+  let cleanUrl = trimmedUrl.replace(/\\/g, "/");
+
+  if (/\/uploads\//i.test(cleanUrl)) {
+    cleanUrl = cleanUrl.replace(/^.*\/uploads\//i, "/uploads/");
+  } else if (!cleanUrl.includes("/")) {
     cleanUrl = `/uploads/${cleanUrl}`;
   }
 
-  // Ensure it starts with / if not present
   if (!cleanUrl.startsWith("/")) {
     cleanUrl = `/${cleanUrl}`;
   }
 
+  // In production, route /uploads/ via /api/uploads/ to bypass Nginx SPA routing rules
+  if (import.meta.env.PROD && cleanUrl.startsWith("/uploads/")) {
+    if (!import.meta.env.VITE_BACKEND_URL || (typeof window !== "undefined" && window.location && base === window.location.origin)) {
+      cleanUrl = `/api${cleanUrl}`;
+    }
+  }
+
   return `${base}${cleanUrl}`;
+};
+
+const trimTrailingSlash = (value = '') => String(value).replace(/\/+$/, '');
+
+export const getPublicUrl = (destination, filename) => {
+    if (!destination) return filename ? `/uploads/${filename}` : '';
+    const normalizedDest = String(destination).replace(/\\/g, '/');
+    const parts = normalizedDest.split('/uploads/');
+    const subPath = parts.length > 1 ? parts[1] : '';
+    return subPath ? `/uploads/${subPath}/${filename}` : `/uploads/${filename}`;
+};
+
+export const getPublicAssetBaseUrl = () => {
+    const candidates = [
+        import.meta.env.PUBLIC_API_URL,
+        import.meta.env.VITE_API_URL,
+        import.meta.env.VITE_BACKEND_URL,
+        typeof window !== 'undefined' && window.location ? window.location.origin : ''
+    ];
+
+    for (const candidate of candidates) {
+        const trimmed = trimTrailingSlash(candidate || '');
+        if (!trimmed) continue;
+
+        try {
+            const parsed = new URL(trimmed);
+            return trimTrailingSlash(parsed.toString());
+        } catch {
+            if (trimmed.startsWith('http')) return trimmed;
+        }
+    }
+
+    return typeof window !== 'undefined' && window.location ? window.location.origin : '';
+};
+
+export const toAbsolutePublicUrl = (pathOrUrl = '') => {
+    if (!pathOrUrl) return '';
+    if (/^https?:\/\//i.test(pathOrUrl) || String(pathOrUrl).startsWith('data:')) return pathOrUrl;
+
+    const normalizedPath = String(pathOrUrl).replace(/\\/g, '/');
+    let cleanPath = normalizedPath;
+    if (/\/uploads\//i.test(cleanPath)) {
+        cleanPath = cleanPath.replace(/^.*\/uploads\//i, '/uploads/');
+    }
+    const finalPath = cleanPath.startsWith('/') ? cleanPath : `/${cleanPath}`;
+    return resolveImageUrl(finalPath);
 };
 
 export const fetchPdfImageBase64 = async (url) => {

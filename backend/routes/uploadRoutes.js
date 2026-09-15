@@ -59,4 +59,43 @@ router.post('/pdf', (req, res, next) => {
     });
 });
 
+// GET endpoint to view uploaded files inline
+router.get('/file/*', (req, res) => {
+    const fs = require('fs');
+    const path = require('path');
+    try {
+        const fileRelativePath = req.params[0] || '';
+        const cleanPath = fileRelativePath.replace(/^.*\/uploads\//i, '').replace(/\\/g, '/');
+        
+        const candidatePaths = [
+            path.join(__dirname, '../public/uploads', cleanPath),
+            path.join(__dirname, '../uploads', cleanPath),
+            path.join(__dirname, '../public', cleanPath)
+        ];
+
+        let foundPath = null;
+        for (const p of candidatePaths) {
+            if (fs.existsSync(p) && fs.statSync(p).isFile()) {
+                foundPath = p;
+                break;
+            }
+        }
+
+        if (!foundPath) {
+            return res.status(404).json({ message: 'File not found on server' });
+        }
+
+        const ext = path.extname(foundPath).toLowerCase();
+        if (ext === '.pdf') {
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', 'inline');
+        }
+
+        res.sendFile(path.resolve(foundPath));
+    } catch (err) {
+        console.error('Error serving file:', err);
+        res.status(500).json({ message: 'Error opening file' });
+    }
+});
+
 module.exports = router;

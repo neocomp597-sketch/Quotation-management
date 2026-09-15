@@ -150,9 +150,8 @@ exports.getEmployee = async (req, res) => {
 const validateEmployeeFieldsBackend = (data) => {
     if (data.mobile && data.mobile.trim()) {
         const cleanMobile = data.mobile.trim().replace(/\D/g, '');
-        const mobileRegex = /^[6-9]\d{9}$/;
-        if (!mobileRegex.test(cleanMobile)) {
-            return 'Invalid Mobile Number. Must be a valid 10-digit number starting with 6-9 (e.g. 9876543210)';
+        if (cleanMobile.length < 8 || cleanMobile.length > 15) {
+            return 'Invalid Mobile Number. Must be a valid contact number (8 to 15 digits)';
         }
     }
     if (data.pan && data.pan.trim()) {
