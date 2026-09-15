@@ -820,16 +820,14 @@ exports.problems = {
                     .lean();
 
                 if (prod) {
-                    ['mgr1', 'mgr2', 'mgr3', 'mgr4', 'mgr5'].forEach(k => {
+                    for (const k of ['mgr1', 'mgr2', 'mgr3', 'mgr4', 'mgr5']) {
                         if (prod[k] && typeof prod[k] === 'object') {
                             mgrDocs.push(prod[k]);
                         } else if (prod[k] && mongoose.Types.ObjectId.isValid(String(prod[k]))) {
-                            // fetch raw ID
-                            MGR.findById(prod[k]).setOptions({ bypassTenant: true }).lean().then(m => {
-                                if (m) mgrDocs.push(m);
-                            }).catch(() => {});
+                            const m = await MGR.findById(prod[k]).setOptions({ bypassTenant: true }).lean();
+                            if (m) mgrDocs.push(m);
                         }
-                    });
+                    }
                 }
             }
 
@@ -901,7 +899,6 @@ exports.problems = {
 
             if (orConditions.length > 0) {
                 const dbProblems = await Problem.find({
-                    ...(companyId ? { companyId } : {}),
                     $or: orConditions
                 })
                 .setOptions({ bypassTenant: true })

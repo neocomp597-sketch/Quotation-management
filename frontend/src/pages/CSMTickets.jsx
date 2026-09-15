@@ -488,8 +488,11 @@ const CSMTickets = () => {
             let queryParams = {};
             if (typeof params === 'string') {
                 queryParams = { mgr4Category: params, productId: formData.productId || '' };
-            } else {
-                queryParams = { productId: formData.productId || '', ...params };
+            } else if (typeof params === 'object' && params !== null) {
+                queryParams = {
+                    productId: params.productId !== undefined ? params.productId : (formData.productId || ''),
+                    mgr4Category: params.mgr4Category !== undefined ? params.mgr4Category : (formData.mgr4Category || '')
+                };
             }
             const res = await csmService.getProblems(queryParams);
             setProblems(res.data || []);
@@ -510,7 +513,8 @@ const CSMTickets = () => {
         try {
             const res = await csmService.createProblem({
                 name: quickProblemName.trim(),
-                mgr4Category: formData.mgr4Category || ''
+                mgr4Category: formData.mgr4Category || '',
+                productId: formData.productId || undefined
             });
             toast.success('New problem added successfully!');
             const newProb = res.data;
@@ -868,9 +872,15 @@ const CSMTickets = () => {
         const selectedProd = products.find(p => p._id === productId);
         let mgr4Val = '';
         if (selectedProd && selectedProd.mgr4) {
-            mgr4Val = typeof selectedProd.mgr4 === 'object'
-                ? (selectedProd.mgr4.code || selectedProd.mgr4.description || '')
-                : selectedProd.mgr4;
+            if (typeof selectedProd.mgr4 === 'object' && selectedProd.mgr4 !== null) {
+                if (selectedProd.mgr4.code && selectedProd.mgr4.description && selectedProd.mgr4.code.toLowerCase() !== selectedProd.mgr4.description.toLowerCase()) {
+                    mgr4Val = `${selectedProd.mgr4.code} - ${selectedProd.mgr4.description}`;
+                } else {
+                    mgr4Val = selectedProd.mgr4.code || selectedProd.mgr4.description || '';
+                }
+            } else {
+                mgr4Val = String(selectedProd.mgr4);
+            }
         }
 
         // Find if there is any matching asset for this product & customer
@@ -886,12 +896,12 @@ const CSMTickets = () => {
             productId,
             mgr4Category: mgr4Val || prev.mgr4Category || '',
             assetId: autoAsset ? autoAsset._id : '',
-            serialNumber: autoAsset ? autoAsset.serialNumber : ''
+            serialNumber: autoAsset ? autoAsset.serialNumber : '',
+            problemId: '',
+            problemName: ''
         }));
 
-        if (mgr4Val || productId) {
-            fetchProblems({ productId, mgr4Category: mgr4Val });
-        }
+        fetchProblems({ productId, mgr4Category: mgr4Val });
         
         if (autoAsset) {
             setGeneratedSerial('');
@@ -1480,12 +1490,19 @@ const CSMTickets = () => {
                 }
                 
                 // Derive MGR4 category from asset or product
-                let mgr4Val = asset.mgr4 || '';
+                let mgr4Val = '';
+                if (asset.mgr4) {
+                    if (typeof asset.mgr4 === 'object' && asset.mgr4 !== null) {
+                        mgr4Val = asset.mgr4.code || asset.mgr4.description || '';
+                    } else {
+                        mgr4Val = String(asset.mgr4);
+                    }
+                }
                 if (!mgr4Val && asset.productId) {
                     if (typeof asset.productId === 'object' && asset.productId.mgr4) {
                         mgr4Val = typeof asset.productId.mgr4 === 'object' 
                             ? (asset.productId.mgr4.code || asset.productId.mgr4.description || '') 
-                            : asset.productId.mgr4;
+                            : String(asset.productId.mgr4);
                     }
                 }
                 if (!mgr4Val && targetProdId) {
@@ -1493,7 +1510,7 @@ const CSMTickets = () => {
                     if (pMatch && pMatch.mgr4) {
                         mgr4Val = typeof pMatch.mgr4 === 'object' 
                             ? (pMatch.mgr4.code || pMatch.mgr4.description || '') 
-                            : pMatch.mgr4;
+                            : String(pMatch.mgr4);
                     }
                 }
 
@@ -1550,9 +1567,7 @@ const CSMTickets = () => {
                     return nextData;
                 });
 
-                if (mgr4Val) {
-                    fetchProblems(mgr4Val);
-                }
+                fetchProblems({ productId: targetProdId || '', mgr4Category: mgr4Val || '' });
                 
                 toast.success(`Asset found! Auto-filled details for Serial No: ${asset.serialNumber || cleanSN}`);
                 
@@ -2156,16 +2171,12 @@ const CSMTickets = () => {
         try {
             const res = await csmService.createProblem({
                 name,
-                categoryName: formData.mgr4Category || 'General / All',
+                mgr4Category: formData.mgr4Category || '',
+                productId: formData.productId || undefined,
                 description: name
             });
             toast.success('Problem added!');
-            if (formData.mgr4Category) {
-                fetchProblems(formData.mgr4Category);
-            } else {
-                const probRes = await csmService.getProblems();
-                setProblems(probRes.data || []);
-            }
+            fetchProblems({ productId: formData.productId, mgr4Category: formData.mgr4Category });
             setFormData(prev => ({ ...prev, problemId: res.data._id }));
         } catch (error) {
             toast.error(error.response?.data?.message || 'Failed to add problem');
@@ -2180,11 +2191,7 @@ const CSMTickets = () => {
                 try {
                     await csmService.updateProblem(item._id, { name: newTitle.trim() });
                     toast.success('Problem updated!');
-                    if (formData.mgr4Category) fetchProblems(formData.mgr4Category);
-                    else {
-                        const res = await csmService.getProblems();
-                        setProblems(res.data || []);
-                    }
+                    fetchProblems({ productId: formData.productId, mgr4Category: formData.mgr4Category });
                 } catch (err) {
                     toast.error(err.response?.data?.message || 'Failed to update problem');
                 }
@@ -2199,11 +2206,7 @@ const CSMTickets = () => {
                 try {
                     await csmService.deleteProblem(item._id);
                     toast.success('Problem deleted!');
-                    if (formData.mgr4Category) fetchProblems(formData.mgr4Category);
-                    else {
-                        const res = await csmService.getProblems();
-                        setProblems(res.data || []);
-                    }
+                    fetchProblems({ productId: formData.productId, mgr4Category: formData.mgr4Category });
                     if (formData.problemId === item._id) {
                         setFormData(prev => ({ ...prev, problemId: '' }));
                     }
@@ -2995,7 +2998,7 @@ const CSMTickets = () => {
                                 onChange={(e) => {
                                     const val = e.target.value;
                                     setFormData(prev => ({ ...prev, mgr4Category: val }));
-                                    fetchProblems(val);
+                                    fetchProblems({ mgr4Category: val, productId: formData.productId });
                                 }}
                                 placeholder="Auto-selected MGR4 Category"
                                 className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold bg-slate-50 focus:outline-none focus:ring-2 focus:ring-primary-500"
