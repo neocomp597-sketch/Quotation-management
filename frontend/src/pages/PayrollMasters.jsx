@@ -157,7 +157,7 @@ const PayrollMasters = ({ isCreatePage, isEditPage }) => {
     // Department / Designation modal
     const [showModal, setShowModal] = useState(false);
     const [editId, setEditId] = useState(null);
-    const [formData, setFormData] = useState({ name: '', description: '' });
+    const [formData, setFormData] = useState({ code: '', name: '', status: 'Active', description: '' });
 
     // Assign Person modal
     const [showAssignModal, setShowAssignModal] = useState(false);
@@ -220,7 +220,7 @@ const PayrollMasters = ({ isCreatePage, isEditPage }) => {
     useEffect(() => {
         if (isCreatePage) {
             setEditId(null);
-            setFormData({ name: '', description: '' });
+            setFormData({ code: '', name: '', status: 'Active', description: '' });
             setShowModal(true);
         } else if (isEditPage && routeId) {
             setShowModal(true);
@@ -228,7 +228,9 @@ const PayrollMasters = ({ isCreatePage, isEditPage }) => {
             if (found) {
                 setEditId(found._id);
                 setFormData({
-                    name: found.name,
+                    code: found.code || '',
+                    name: found.name || '',
+                    status: found.isActive === false ? 'Inactive' : 'Active',
                     description: found.description || ''
                 });
             }
@@ -239,11 +241,15 @@ const PayrollMasters = ({ isCreatePage, isEditPage }) => {
         if (item) {
             setEditId(item._id);
             setFormData({
-                name: item.name,
+                code: item.code || '',
+                name: item.name || '',
+                status: item.isActive === false ? 'Inactive' : 'Active',
                 description: item.description || ''
             });
             setShowModal(true);
         } else {
+            setEditId(null);
+            setFormData({ code: '', name: '', status: 'Active', description: '' });
             navigate('/payroll/masters/new');
         }
     };
@@ -255,21 +261,28 @@ const PayrollMasters = ({ isCreatePage, isEditPage }) => {
             return;
         }
 
+        const payload = {
+            code: formData.code.trim() || undefined,
+            name: formData.name.trim(),
+            isActive: formData.status === 'Active',
+            description: formData.description.trim() || undefined
+        };
+
         try {
             if (activeTab === 'departments') {
                 if (editId) {
-                    await payrollService.updateDepartment(editId, formData);
+                    await payrollService.updateDepartment(editId, payload);
                     toast.success('Department updated successfully');
                 } else {
-                    await payrollService.createDepartment(formData);
+                    await payrollService.createDepartment(payload);
                     toast.success('Department created successfully');
                 }
             } else {
                 if (editId) {
-                    await payrollService.updateDesignation(editId, formData);
+                    await payrollService.updateDesignation(editId, payload);
                     toast.success('Designation updated successfully');
                 } else {
-                    await payrollService.createDesignation(formData);
+                    await payrollService.createDesignation(payload);
                     toast.success('Designation created successfully');
                 }
             }
@@ -831,6 +844,18 @@ const PayrollMasters = ({ isCreatePage, isEditPage }) => {
                                 </div>
 
                                 <div>
+                                    <label className="block text-xs font-bold text-slate-700 mb-1.5">Status</label>
+                                    <select
+                                        value={masterForm.status}
+                                        onChange={(e) => setMasterForm({ ...masterForm, status: e.target.value })}
+                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white"
+                                    >
+                                        <option value="Active">Active</option>
+                                        <option value="Inactive">Inactive</option>
+                                    </select>
+                                </div>
+
+                                <div>
                                     <label className="block text-xs font-bold text-slate-700 mb-1.5">Department Head</label>
                                     <select
                                         value={masterForm.head}
@@ -841,18 +866,6 @@ const PayrollMasters = ({ isCreatePage, isEditPage }) => {
                                         {employees.map(emp => (
                                             <option key={emp._id} value={emp.name}>{emp.name} ({emp.designation || 'Staff'})</option>
                                         ))}
-                                    </select>
-                                </div>
-
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-700 mb-1.5">Status</label>
-                                    <select
-                                        value={masterForm.status}
-                                        onChange={(e) => setMasterForm({ ...masterForm, status: e.target.value })}
-                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white"
-                                    >
-                                        <option value="Active">Active</option>
-                                        <option value="Inactive">Inactive</option>
                                     </select>
                                 </div>
                             </div>
@@ -1174,21 +1187,34 @@ const PayrollMasters = ({ isCreatePage, isEditPage }) => {
                         <table className="w-full text-left border-collapse">
                             <thead>
                                 <tr className="bg-slate-50 text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100">
+                                    <th className="px-6 py-4">Code</th>
                                     <th className="px-6 py-4">Name</th>
+                                    <th className="px-6 py-4 text-center">Status</th>
                                     <th className="px-6 py-4">Description</th>
                                     <th className="px-6 py-4 text-center">Assigned Personnel</th>
                                     <th className="px-6 py-4 text-center">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 text-sm font-semibold text-slate-700">
-                                {filteredItems.map((item) => {
+                                {filteredItems.map((item, index) => {
                                     const personnelCount = activeTab === 'departments' 
                                         ? getDepartmentPersonnel(item.name).length 
                                         : employees.filter(emp => emp.designation === item.name).length;
+                                    const itemCode = item.code || `${activeTab === 'departments' ? 'DEP' : 'DES'}00${index + 1}`;
 
                                     return (
                                         <tr key={item._id} className="hover:bg-slate-50/50 transition-colors">
+                                            <td className="px-6 py-4 font-mono font-bold text-slate-500">{itemCode}</td>
                                             <td className="px-6 py-4 font-black text-slate-900">{item.name}</td>
+                                            <td className="px-6 py-4 text-center">
+                                                <span className={`text-xs font-bold px-3 py-1 rounded-full ${
+                                                    item.isActive !== false 
+                                                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+                                                        : 'bg-rose-50 text-rose-700 border border-rose-200'
+                                                }`}>
+                                                    {item.isActive !== false ? 'Active' : 'Inactive'}
+                                                </span>
+                                            </td>
                                             <td className="px-6 py-4 text-slate-500 max-w-sm truncate">{item.description || '-'}</td>
                                             <td className="px-6 py-4 text-center">
                                                 <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${
@@ -1271,6 +1297,18 @@ const PayrollMasters = ({ isCreatePage, isEditPage }) => {
                             <form id="master-record-form" onSubmit={handleSubmit} className="space-y-6">
                                 <div>
                                     <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">
+                                        {activeTab === 'departments' ? 'Department Code' : 'Designation Code'}
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={formData.code}
+                                        onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                                        className="w-full px-4 py-3.5 rounded-2xl border border-slate-200 bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white text-sm font-semibold"
+                                        placeholder={activeTab === 'departments' ? 'e.g. DEP001' : 'e.g. DES001'}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">
                                         {activeTab === 'departments' ? 'Department Name' : 'Designation Name'} *
                                     </label>
                                     <input
@@ -1281,6 +1319,17 @@ const PayrollMasters = ({ isCreatePage, isEditPage }) => {
                                         className="w-full px-4 py-3.5 rounded-2xl border border-slate-200 bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white text-sm font-semibold"
                                         placeholder={activeTab === 'departments' ? 'e.g. Sales Department' : 'e.g. Sales Executive'}
                                     />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Status</label>
+                                    <select
+                                        value={formData.status}
+                                        onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                                        className="w-full px-4 py-3.5 rounded-2xl border border-slate-200 bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white text-sm font-semibold"
+                                    >
+                                        <option value="Active">Active</option>
+                                        <option value="Inactive">Inactive</option>
+                                    </select>
                                 </div>
                                 <div>
                                     <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Description</label>

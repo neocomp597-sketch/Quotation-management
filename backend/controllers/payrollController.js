@@ -920,14 +920,17 @@ exports.getDepartments = async (req, res) => {
             return res.status(400).json({ message: 'Company context missing' });
         }
         let query = { companyId };
+        if (req.query.activeOnly === 'true') {
+            query.isActive = { $ne: false };
+        }
         let departments = await Department.find(query).sort({ name: 1 }).lean();
         if (departments.length === 0) {
             const defaults = [
-                { name: 'Sales Department', description: 'Sales and business development', companyId },
-                { name: 'Support Department', description: 'Customer support and service', companyId },
-                { name: 'Marketing Department', description: 'Marketing and brand management', companyId },
-                { name: 'Accounts Department', description: 'Finance, accounts, and tax', companyId },
-                { name: 'HR Department', description: 'Human resources and recruitment', companyId }
+                { code: 'DEP001', name: 'Sales Department', description: 'Sales and business development', companyId },
+                { code: 'DEP002', name: 'Support Department', description: 'Customer support and service', companyId },
+                { code: 'DEP003', name: 'Marketing Department', description: 'Marketing and brand management', companyId },
+                { code: 'DEP004', name: 'Accounts Department', description: 'Finance, accounts, and tax', companyId },
+                { code: 'DEP005', name: 'HR Department', description: 'Human resources and recruitment', companyId }
             ];
             await Department.insertMany(defaults, { bypassTenant: true });
             departments = await Department.find(query).sort({ name: 1 }).lean();
@@ -942,6 +945,15 @@ exports.getDepartments = async (req, res) => {
 exports.createDepartment = async (req, res) => {
     try {
         const companyId = await getEffectiveCompanyId(req);
+        if (req.body.code && req.body.code.trim()) {
+            const existingCode = await Department.findOne({
+                ...(companyId ? { companyId } : {}),
+                code: { $regex: new RegExp(`^${req.body.code.trim()}$`, 'i') }
+            }).lean();
+            if (existingCode) {
+                return res.status(400).json({ message: 'Department with this code already exists' });
+            }
+        }
         const existing = await Department.findOne({
             ...(companyId ? { companyId } : {}),
             name: { $regex: new RegExp(`^${req.body.name.trim()}$`, 'i') }
@@ -960,6 +972,16 @@ exports.createDepartment = async (req, res) => {
 exports.updateDepartment = async (req, res) => {
     try {
         const companyId = await getEffectiveCompanyId(req);
+        if (req.body.code && req.body.code.trim()) {
+            const existingCode = await Department.findOne({
+                ...(companyId ? { companyId } : {}),
+                _id: { $ne: req.params.id },
+                code: { $regex: new RegExp(`^${req.body.code.trim()}$`, 'i') }
+            }).lean();
+            if (existingCode) {
+                return res.status(400).json({ message: 'Another department with this code already exists' });
+            }
+        }
         if (req.body.name) {
             const existing = await Department.findOne({
                 ...(companyId ? { companyId } : {}),
@@ -1009,14 +1031,17 @@ exports.getDesignations = async (req, res) => {
             return res.status(400).json({ message: 'Company context missing' });
         }
         let query = { companyId };
+        if (req.query.activeOnly === 'true') {
+            query.isActive = { $ne: false };
+        }
         let designations = await Designation.find(query).sort({ name: 1 }).lean();
         if (designations.length === 0) {
             const defaults = [
-                { name: 'Sales Executive', description: 'Sales executive role', companyId },
-                { name: 'Sales Manager', description: 'Managing sales team', companyId },
-                { name: 'Accounts Executive', description: 'Finance and billing executive', companyId },
-                { name: 'HR Manager', description: 'Human resources head', companyId },
-                { name: 'Software Engineer', description: 'Developer and engineering role', companyId }
+                { code: 'DES001', name: 'Sales Executive', description: 'Sales executive role', companyId },
+                { code: 'DES002', name: 'Sales Manager', description: 'Managing sales team', companyId },
+                { code: 'DES003', name: 'Accounts Executive', description: 'Finance and billing executive', companyId },
+                { code: 'DES004', name: 'HR Manager', description: 'Human resources head', companyId },
+                { code: 'DES005', name: 'Software Engineer', description: 'Developer and engineering role', companyId }
             ];
             await Designation.insertMany(defaults, { bypassTenant: true });
             designations = await Designation.find(query).sort({ name: 1 }).lean();
@@ -1031,6 +1056,15 @@ exports.getDesignations = async (req, res) => {
 exports.createDesignation = async (req, res) => {
     try {
         const companyId = await getEffectiveCompanyId(req);
+        if (req.body.code && req.body.code.trim()) {
+            const existingCode = await Designation.findOne({
+                ...(companyId ? { companyId } : {}),
+                code: { $regex: new RegExp(`^${req.body.code.trim()}$`, 'i') }
+            }).lean();
+            if (existingCode) {
+                return res.status(400).json({ message: 'Designation with this code already exists' });
+            }
+        }
         const existing = await Designation.findOne({
             ...(companyId ? { companyId } : {}),
             name: { $regex: new RegExp(`^${req.body.name.trim()}$`, 'i') }
@@ -1048,6 +1082,16 @@ exports.createDesignation = async (req, res) => {
 exports.updateDesignation = async (req, res) => {
     try {
         const companyId = await getEffectiveCompanyId(req);
+        if (req.body.code && req.body.code.trim()) {
+            const existingCode = await Designation.findOne({
+                ...(companyId ? { companyId } : {}),
+                _id: { $ne: req.params.id },
+                code: { $regex: new RegExp(`^${req.body.code.trim()}$`, 'i') }
+            }).lean();
+            if (existingCode) {
+                return res.status(400).json({ message: 'Another designation with this code already exists' });
+            }
+        }
         if (req.body.name) {
             const existing = await Designation.findOne({
                 ...(companyId ? { companyId } : {}),

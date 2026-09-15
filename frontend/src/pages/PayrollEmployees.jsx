@@ -17,6 +17,7 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
     const navigate = useNavigate();
     const { id: routeId } = useParams();
     const [employees, setEmployees] = useState([]);
+    const [allEmployees, setAllEmployees] = useState([]);
     const [branches, setBranches] = useState([]);
     const [territories, setTerritories] = useState([]);
     const [search, setSearch] = useState('');
@@ -139,8 +140,12 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
             if (branchFilter) params.branchId = branchFilter;
             if (search) params.search = search;
             
-            const res = await payrollService.getEmployees(params);
+            const [res, allRes] = await Promise.all([
+                payrollService.getEmployees(params),
+                payrollService.getEmployees({})
+            ]);
             setEmployees(res.data || []);
+            setAllEmployees(allRes.data || []);
         } catch (error) {
             console.error('Failed to load employee list', error);
             toast.error('Failed to load employee list');
@@ -1204,7 +1209,7 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                             <div>
                                                 <label className={labelClass}>Reporting To</label>
                                                 <SearchableSelect
-                                                    options={employees
+                                                    options={(allEmployees.length ? allEmployees : employees)
                                                         .filter(emp => (emp.status === 'Active' || !emp.status) && String(emp._id) !== String(selectedEmp?._id))
                                                         .map(emp => ({
                                                             value: emp._id,
@@ -1288,7 +1293,9 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                             <div>
                                                 <label className={labelClass}>Department</label>
                                                 <SearchableSelect
-                                                    options={departments.map((d) => d.name)}
+                                                    options={departments
+                                                        .filter(d => d.isActive !== false || d.name === basicForm.department)
+                                                        .map((d) => d.name)}
                                                     value={basicForm.department}
                                                     onChange={(val) => setBasicForm({ ...basicForm, department: val })}
                                                     placeholder="Select Department"
@@ -1297,7 +1304,9 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                             <div>
                                                 <label className={labelClass}>Designation</label>
                                                 <SearchableSelect
-                                                    options={designations.map((d) => d.name)}
+                                                    options={designations
+                                                        .filter(d => d.isActive !== false || d.name === basicForm.designation)
+                                                        .map((d) => d.name)}
                                                     value={basicForm.designation}
                                                     onChange={(val) => setBasicForm({ ...basicForm, designation: val })}
                                                     placeholder="Select Designation"

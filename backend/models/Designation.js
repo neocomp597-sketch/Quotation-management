@@ -2,6 +2,10 @@ const mongoose = require('mongoose');
 const tenantPlugin = require('./plugins/tenantPlugin');
 
 const DesignationSchema = new mongoose.Schema({
+    code: {
+        type: String,
+        trim: true
+    },
     name: {
         type: String,
         required: true,
