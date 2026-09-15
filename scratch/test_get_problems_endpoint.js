@@ -7,8 +7,8 @@ const Problem = require('../backend/models/Problem');
 
 async function test() {
     try {
-        const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/tally_quotations';
-        await mongoose.connect(mongoUri);
+        const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017/test';
+        await mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 30000, socketTimeoutMS: 45000 });
         console.log('Connected to Mongo DB');
 
         const prods = await Product.find({}).populate('mgr1 mgr2 mgr3 mgr4 mgr5').lean();

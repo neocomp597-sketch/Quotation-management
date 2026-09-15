@@ -803,46 +803,51 @@ exports.problems = {
             let mgr4Category = req.query.mgr4Category ? String(req.query.mgr4Category).trim() : '';
             const productId = req.query.productId ? String(req.query.productId).trim() : '';
 
-            // If neither Product nor MGR4 category is provided, return empty array
-            if (!mgr4Category && !productId) {
-                return res.json([]);
-            }
-
             const MGR = require('../models/MGR');
             const Product = require('../models/Product');
             const combinedMap = new Map();
             let mgrDocs = [];
 
-            // 1. If productId supplied, resolve Product and populated MGRs
-            if (productId && mongoose.Types.ObjectId.isValid(productId)) {
-                const prod = await Product.findOne({ _id: productId })
-                    .setOptions({ bypassTenant: true })
-                    .lean();
+            // 1. Resolve Product if productId supplied (by ObjectId, productName, or productCode)
+            let prod = null;
+            if (productId) {
+                if (mongoose.Types.ObjectId.isValid(productId)) {
+                    prod = await Product.findOne({ _id: productId }).setOptions({ bypassTenant: true }).lean();
+                }
+                if (!prod) {
+                    const escapedP = productId.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+                    prod = await Product.findOne({
+                        $or: [
+                            { productName: new RegExp(`^${escapedP}$`, 'i') },
+                            { productCode: new RegExp(`^${escapedP}$`, 'i') }
+                        ]
+                    }).setOptions({ bypassTenant: true }).lean();
+                }
+            }
 
-                if (prod) {
-                    for (const k of ['mgr1', 'mgr2', 'mgr3', 'mgr4', 'mgr5']) {
-                        if (prod[k]) {
-                            if (typeof prod[k] === 'object' && prod[k] !== null && (prod[k].code || Array.isArray(prod[k].problemList))) {
-                                mgrDocs.push(prod[k]);
-                            } else if (mongoose.Types.ObjectId.isValid(String(prod[k]._id || prod[k]))) {
-                                const targetId = prod[k]._id || prod[k];
-                                const m = await MGR.findOne({ _id: targetId }).setOptions({ bypassTenant: true }).lean();
-                                if (m) mgrDocs.push(m);
-                            } else if (typeof prod[k] === 'string' && prod[k].trim()) {
-                                const m = await MGR.findOne({
-                                    $or: [
-                                        { code: new RegExp(`^${prod[k].trim()}$`, 'i') },
-                                        { description: new RegExp(`^${prod[k].trim()}$`, 'i') }
-                                    ]
-                                }).setOptions({ bypassTenant: true }).lean();
-                                if (m) mgrDocs.push(m);
-                            }
+            if (prod) {
+                for (const k of ['mgr1', 'mgr2', 'mgr3', 'mgr4', 'mgr5']) {
+                    if (prod[k]) {
+                        if (typeof prod[k] === 'object' && prod[k] !== null && (prod[k].code || Array.isArray(prod[k].problemList))) {
+                            mgrDocs.push(prod[k]);
+                        } else if (mongoose.Types.ObjectId.isValid(String(prod[k]._id || prod[k]))) {
+                            const targetId = prod[k]._id || prod[k];
+                            const m = await MGR.findOne({ _id: targetId }).setOptions({ bypassTenant: true }).lean();
+                            if (m) mgrDocs.push(m);
+                        } else if (typeof prod[k] === 'string' && prod[k].trim()) {
+                            const m = await MGR.findOne({
+                                $or: [
+                                    { code: new RegExp(`^${prod[k].trim()}$`, 'i') },
+                                    { description: new RegExp(`^${prod[k].trim()}$`, 'i') }
+                                ]
+                            }).setOptions({ bypassTenant: true }).lean();
+                            if (m) mgrDocs.push(m);
                         }
                     }
                 }
             }
 
-            // 2. Resolve MGR by mgr4Category (ObjectId, code, description, or composite "code - description")
+            // 2. Resolve MGR by mgr4Category
             if (mgr4Category) {
                 let extraMgrs = [];
                 if (mongoose.Types.ObjectId.isValid(mgr4Category)) {
@@ -881,7 +886,7 @@ exports.problems = {
                     searchTermsSet.add(`${m.code} - ${m.description}`.toLowerCase());
                     searchTermsSet.add(`${m.code} (${m.description})`.toLowerCase());
                 }
-                // Extract embedded problemList items from MGR document
+                // Extract embedded problemList items from matched MGR document
                 if (Array.isArray(m.problemList)) {
                     m.problemList.forEach(probName => {
                         const clean = String(probName || '').trim();
@@ -898,7 +903,9 @@ exports.problems = {
 
             // 3. Find problems in ProblemMaster matching search terms or productId
             const orConditions = [];
-            if (productId && mongoose.Types.ObjectId.isValid(productId)) {
+            if (prod?._id) {
+                orConditions.push({ productId: prod._id });
+            } else if (productId && mongoose.Types.ObjectId.isValid(productId)) {
                 orConditions.push({ productId });
             }
 
@@ -909,14 +916,48 @@ exports.problems = {
             });
 
             if (orConditions.length > 0) {
-                const dbProblems = await Problem.find({
-                    $or: orConditions
-                })
-                .setOptions({ bypassTenant: true })
-                .sort({ createdAt: -1 })
-                .lean();
+                const dbProblems = await Problem.find({ $or: orConditions })
+                    .setOptions({ bypassTenant: true })
+                    .sort({ createdAt: -1 })
+                    .lean();
 
                 dbProblems.forEach(p => {
+                    const name = String(p.name || p.title || p.description || '').trim();
+                    if (name && !combinedMap.has(name.toLowerCase())) {
+                        combinedMap.set(name.toLowerCase(), {
+                            _id: String(p._id),
+                            name,
+                            mgr4Category: p.mgr4Category || ''
+                        });
+                    }
+                });
+            }
+
+            // 4. Fallback: If no product/category filter was provided OR if no product-specific problems were found,
+            // include all MGR4 problem lists and all Problem collection records as fallback so dropdown is never empty.
+            if (combinedMap.size === 0 || (!mgr4Category && !productId)) {
+                const allMGR4s = await MGR.find({ mgrType: 'MGR4' }).setOptions({ bypassTenant: true }).lean();
+                allMGR4s.forEach(m => {
+                    if (Array.isArray(m.problemList)) {
+                        m.problemList.forEach(probName => {
+                            const clean = String(probName || '').trim();
+                            if (clean && !combinedMap.has(clean.toLowerCase())) {
+                                combinedMap.set(clean.toLowerCase(), {
+                                    _id: `mgr_prob_${clean.replace(/[^a-zA-Z0-9]/g, '_')}`,
+                                    name: clean,
+                                    mgr4Category: m.code || m.description || ''
+                                });
+                            }
+                        });
+                    }
+                });
+
+                const allDbProblems = await Problem.find({})
+                    .setOptions({ bypassTenant: true })
+                    .sort({ createdAt: -1 })
+                    .lean();
+
+                allDbProblems.forEach(p => {
                     const name = String(p.name || p.title || p.description || '').trim();
                     if (name && !combinedMap.has(name.toLowerCase())) {
                         combinedMap.set(name.toLowerCase(), {

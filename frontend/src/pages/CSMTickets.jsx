@@ -3019,12 +3019,8 @@ const CSMTickets = () => {
                                 options={problems.map(p => ({ value: p._id, label: p.name, id: p._id }))}
                                 value={formData.problemId || ''}
                                 onChange={(val) => handleProblemChange(val)}
-                                placeholder={formData.productId || formData.mgr4Category ? "Select Problem" : "Select Product First"}
-                                noResultsText={
-                                    !(formData.productId || formData.mgr4Category)
-                                        ? "Select Product/MGR First"
-                                        : "No problems available"
-                                }
+                                placeholder="Select Problem..."
+                                noResultsText="No problems available"
                                 onAddOption={handleAddProblemDropdown}
                             />
                         </div>
