@@ -1,25 +1,23 @@
+const path = require('path');
 const mongoose = require('mongoose');
-require('dotenv').config();
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
-const connectDB = require('./config/db');
-const User = require('./models/User');
+const User = require('../models/User');
+const EmployeeProfile = require('../models/EmployeeProfile');
 
-async function test() {
-    try {
-        console.log('Connecting to database...');
-        await connectDB();
-        console.log('Database connected.');
+async function inspectUsers() {
+    await mongoose.connect(process.env.MONGO_URI);
+    const superUser = await User.findOne({ email: 'super@gmail.com' });
+    const companyId = superUser.companyId;
 
-        console.log('Finding all users...');
-        const users = await User.find({}).lean();
-        console.log('Users found:', users.length);
-        console.log('First user:', users[0]);
-    } catch (error) {
-        console.error('Error during query:', error);
-    } finally {
-        await mongoose.disconnect();
-        process.exit();
-    }
+    const users = await User.find({ companyId }).lean();
+    console.log(`Total users for company (${companyId}): ${users.length}`);
+
+    users.forEach(u => {
+        console.log(`User: email=${u.email}, name="${u.name}", role=${u.role}, _id=${u._id}`);
+    });
+
+    process.exit(0);
 }
 
-test();
+inspectUsers();

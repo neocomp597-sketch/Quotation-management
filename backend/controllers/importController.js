@@ -66,6 +66,7 @@ const Planning = require('../models/Planning');
 const PriceBook = require('../models/PriceBook');
 const PriceBookItem = require('../models/PriceBookItem');
 const EmployeeProfile = require('../models/EmployeeProfile');
+const Branch = require('../models/Branch');
 const Contact = require('../models/Contact');
 const Contract = require('../models/Contract');
 const Asset = require('../models/Asset');
@@ -2402,6 +2403,36 @@ const importEmployees = async (req, res) => {
 
         const companyId = req.user?.companyId;
 
+        // Fetch existing branches for company to perform Location -> Branch matching
+        const existingBranches = await Branch.find({ companyId }).lean();
+        const norm = (s) => s ? String(s).trim().toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+
+        const findMatchingBranch = (locationStr) => {
+            if (!locationStr) return null;
+            const normLoc = norm(locationStr);
+            if (!normLoc) return null;
+
+            for (const b of existingBranches) {
+                const normName = norm(b.name);
+                const normCode = norm(b.code);
+                const normPrefix = norm(b.branchPrefix);
+                const normCity = norm(b.city);
+
+                if (normLoc === normName || normLoc === normCode || normLoc === normPrefix || (normCity && normLoc === normCity)) {
+                    return b;
+                }
+                if (
+                    (normLoc === 'usgaon' && normName === 'usgoan') ||
+                    (normLoc === 'usgoan' && normName === 'usgaon') ||
+                    (normLoc === 'ullaria' && normName === 'ularia') ||
+                    (normLoc === 'ularia' && normName === 'ullaria')
+                ) {
+                    return b;
+                }
+            }
+            return null;
+        };
+
         const existingEmployees = await EmployeeProfile.find({ companyId }).lean();
         const employeeNameMap = new Map();
         existingEmployees.forEach(e => {
@@ -2418,8 +2449,10 @@ const importEmployees = async (req, res) => {
                     throw new Error('Employee Name is required');
                 }
 
+                const empCode = pickFirstNonEmpty(row['Employee code'], row['Employee Code'], row.employeeCode, row['EMP Code'], row.empCode, row['Emp Code']);
                 const email = pickFirstNonEmpty(row['Email'], row['EMAIL'], row['Email ID'], row['EMAIL ID'], row['Email Id'], row['Official Email'], row['Personal Email'], row.email);
                 const mobile = pickFirstNonEmpty(row['Mobile'], row['MOBILE'], row['Mobile Number'], row['MOBILE NO'], row['Mobile No.'], row['Phone'], row['PHONE'], row['Phone Number'], row['Contact'], row['CONTACT NO'], row['Contact No.'], row['Cell'], row['CONTACT'], row.mobile, row.phone);
+                const locationRaw = pickFirstNonEmpty(row['Location'], row['LOCATION'], row.location, row['Branch Location'], row['Branch']);
                 const pan = pickFirstNonEmpty(row['PAN'], row.pan);
                 const aadhaar = pickFirstNonEmpty(row['Aadhaar'], row.aadhaar);
                 const uan = pickFirstNonEmpty(row['UAN'], row.uan);
@@ -2444,12 +2477,21 @@ const importEmployees = async (req, res) => {
                 const da = toSafeNumber(row['DA'] || row.da, 0);
                 const specialAllowance = toSafeNumber(row['Special Allowance'] || row.specialAllowance, 0);
 
+                const matchedBranch = findMatchingBranch(locationRaw);
+                const locationStr = locationRaw ? String(locationRaw).trim() : '';
+
                 const empData = {
+                    employeeId: empCode || undefined,
+                    externalEmployeeCode: empCode || '',
                     name,
                     email,
                     mobile,
                     phone: mobile,
                     contactNumber: mobile,
+                    location: locationStr,
+                    branchId: matchedBranch ? matchedBranch._id : null,
+                    assignedBranches: matchedBranch ? [matchedBranch._id] : [],
+                    branchPrefix: matchedBranch ? matchedBranch.branchPrefix : null,
                     pan,
                     aadhaar,
                     uan,
