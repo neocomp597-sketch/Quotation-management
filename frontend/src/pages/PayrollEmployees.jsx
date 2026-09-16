@@ -593,9 +593,20 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
             {!(isModalOpen || isCreatePage || isEditPage) ? (
                 <>
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-black text-slate-900 tracking-tight">Employee Profiles</h1>
-                </div>
+                        <div>
+                            <div className="flex items-center gap-3">
+                            <h1 className="text-3xl font-black text-slate-900 tracking-tight">Employee Profiles</h1>
+                            <span className="px-2.5 py-0.5 bg-primary-50 text-primary-700 font-black text-xs rounded-full border border-primary-200/80 shadow-xs">
+                                Total: {allEmployees.length || employees.length}
+                            </span>
+                        </div>
+                        <p className="text-xs font-semibold text-slate-500 mt-1">
+                            Total Employees: <span className="font-bold text-slate-800">{allEmployees.length || employees.length}</span>
+                            {employees.length !== (allEmployees.length || employees.length) && (
+                                <span className="text-slate-400 ml-1.5">({employees.length} shown)</span>
+                            )}
+                        </p>
+                    </div>
                 <div className="flex items-center gap-3">
                     <button
                         onClick={() => navigate('/payroll/org-chart')}
@@ -991,6 +1002,10 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                 })}
                             </tbody>
                         </table>
+                    </div>
+                    <div className="px-6 py-3.5 bg-slate-50/70 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-semibold">
+                        <span>Showing <strong className="text-slate-800">{employees.length}</strong> of <strong className="text-slate-800">{allEmployees.length || employees.length}</strong> employee profiles</span>
+                        <span className="px-2 py-0.5 bg-white text-primary-700 font-black rounded-lg border border-slate-200 shadow-2xs">Total: {allEmployees.length || employees.length}</span>
                     </div>
                 </div>
             )}

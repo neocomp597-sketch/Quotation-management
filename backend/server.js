@@ -651,13 +651,15 @@ const startBackgroundServices = async () => {
   await dbStartupPromise;
   const redisReady = await redisStartupPromise;
 
-  // Seed employees for super@gmail.com organisation
+  // Auto-seeding of old SBU2 employees disabled to prevent re-populating removed employee data
+  /*
   try {
     const { seedSuperEmployees } = require("./services/seedSuperEmployeesService");
     await seedSuperEmployees();
   } catch (err) {
     console.error("Error auto-seeding super@gmail.com employees:", err);
   }
+  */
 
   // Cleanup legacy single-field productCode_1 index on Product model if present
   try {

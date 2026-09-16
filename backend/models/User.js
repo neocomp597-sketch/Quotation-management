@@ -25,6 +25,7 @@ const UserSchema = new mongoose.Schema({
         index: true,
     },
     vendorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Vendor', default: null },
+    employeeProfileId: { type: mongoose.Schema.Types.ObjectId, ref: 'EmployeeProfile', default: null },
     customPermissions: { type: Map, of: Boolean, default: {} },
     resetPasswordToken: { type: String, default: null },
     resetPasswordExpires: { type: Date, default: null },

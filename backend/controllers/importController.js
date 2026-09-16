@@ -2407,10 +2407,12 @@ const importEmployees = async (req, res) => {
         const existingBranches = await Branch.find({ companyId }).lean();
         const norm = (s) => s ? String(s).trim().toLowerCase().replace(/[^a-z0-9]/g, '') : '';
 
+        const otherBranchObj = existingBranches.find(b => norm(b.name) === 'other' || norm(b.code) === 'oth' || norm(b.code) === 'other') || null;
+
         const findMatchingBranch = (locationStr) => {
-            if (!locationStr) return null;
+            if (!locationStr) return otherBranchObj;
             const normLoc = norm(locationStr);
-            if (!normLoc) return null;
+            if (!normLoc) return otherBranchObj;
 
             for (const b of existingBranches) {
                 const normName = norm(b.name);
@@ -2430,7 +2432,7 @@ const importEmployees = async (req, res) => {
                     return b;
                 }
             }
-            return null;
+            return otherBranchObj;
         };
 
         const existingEmployees = await EmployeeProfile.find({ companyId }).lean();
