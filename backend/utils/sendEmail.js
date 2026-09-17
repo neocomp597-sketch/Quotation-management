@@ -66,7 +66,9 @@ const sendEmail = async ({ to, subject, html, text }) => {
         } catch (error) {
             console.error(`[Email Service] Primary transport error (${isGmail ? 'Gmail Service' : 'SMTP'}):`, error.message);
 
-            if (isGmail) {
+            let isGmailAuthError = error.message && (error.message.includes('534') || error.message.includes('Invalid login') || error.message.includes('WebLoginRequired'));
+
+            if (isGmail && !isGmailAuthError) {
                 try {
                     console.log(`[Email Service] Attempting Gmail fallback on port 465 SSL...`);
                     const fallbackTransporter = nodemailer.createTransport({
@@ -89,8 +91,14 @@ const sendEmail = async ({ to, subject, html, text }) => {
                     return { success: true, messageId: info.messageId };
                 } catch (fallbackError) {
                     console.error(`[Email Service] Gmail SSL fallback failed:`, fallbackError.message);
-                    return { success: false, error: fallbackError.message };
                 }
+            }
+
+            if (isGmailAuthError) {
+                return { 
+                    success: false, 
+                    error: `Gmail SMTP authentication failed (534 5.7.9). Please update SMTP_PASS in backend/.env with a valid 16-character App Password generated from https://myaccount.google.com/apppasswords` 
+                };
             }
 
             return { success: false, error: error.message };

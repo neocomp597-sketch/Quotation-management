@@ -4,6 +4,7 @@ const tenantPlugin = require('./plugins/tenantPlugin');
 const CityMasterSchema = new mongoose.Schema({
     country: { type: String, default: 'India', trim: true },
     state: { type: String, required: true, trim: true },
+    stateCode: { type: String, uppercase: true, trim: true, default: '' },
     district: { type: String, required: true, trim: true },
     area: { type: String, trim: true, default: '' },
     city: { type: String, required: true, trim: true },
@@ -29,7 +30,9 @@ CityMasterSchema.pre('save', function() {
     this.updatedAt = new Date();
 });
 
+CityMasterSchema.index({ stateCode: 1, pincode: 1 }, { unique: false });
 CityMasterSchema.index({ district: 1, city: 1 }, { unique: false });
+CityMasterSchema.index({ pincode: 1 }, { unique: false });
 CityMasterSchema.plugin(tenantPlugin);
 
 module.exports = mongoose.model('CityMaster', CityMasterSchema);

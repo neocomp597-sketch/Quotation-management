@@ -999,6 +999,13 @@ export const cityMasterService = {
   create: (data) => api.post("/city-master", data),
   update: (id, data) => api.put(`/city-master/${id}`, data),
   delete: (id) => api.delete(`/city-master/${id}`),
+  upload: (file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return api.post("/city-master/upload", formData, {
+      headers: { "Content-Type": "multipart/form-data" }
+    });
+  },
 };
 
 export const flowchartService = {

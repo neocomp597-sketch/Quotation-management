@@ -15,23 +15,27 @@ const syncUserForEmployee = async (employeeOrId) => {
             employee = await EmployeeProfile.findById(employeeOrId).lean();
         }
 
-        if (!employee || !employee.email) {
+        if (!employee) {
             return null;
         }
 
-        const emailStr = String(employee.email).trim().toLowerCase();
-        if (!emailStr) {
-            return null;
-        }
-
-        // Search for existing user with matching email (case insensitive regex)
-        const escapedEmail = emailStr.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-        const existingUser = await User.findOne({
-            email: { $regex: new RegExp("^" + escapedEmail + "$", "i") }
-        });
-
-        // Safely extract ObjectId reference for branchId & assignedBranches (handling populated objects)
         const mongoose = require('mongoose');
+        const companyId = employee.companyId || null;
+
+        // Try to find user account linked by employeeProfileId or email
+        let existingUser = await User.findOne({ companyId, employeeProfileId: employee._id });
+
+        let emailStr = employee.email ? String(employee.email).trim().toLowerCase() : '';
+        if (!existingUser && emailStr) {
+            const escapedEmail = emailStr.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+            existingUser = await User.findOne({
+                companyId,
+                email: { $regex: new RegExp("^" + escapedEmail + "$", "i") },
+                employeeProfileId: null
+            });
+        }
+
+        // Safely extract ObjectId reference for branchId & assignedBranches
         const rawBranchId = employee.branchId?._id || (typeof employee.branchId === 'string' || employee.branchId instanceof mongoose.Types.ObjectId ? employee.branchId : null);
 
         let rawAssignedBranches = [];
@@ -49,8 +53,24 @@ const syncUserForEmployee = async (employeeOrId) => {
         if (existingUser) {
             existingUser.branchId = finalBranchId;
             existingUser.assignedBranches = rawAssignedBranches;
+            existingUser.employeeProfileId = employee._id;
             await existingUser.save();
             return existingUser;
+        }
+
+        // Generate fallback email if missing or already taken
+        const allUsers = await User.find({}).select('email').lean();
+        const claimedEmails = new Set(allUsers.map(u => u.email.toLowerCase()));
+
+        if (!emailStr || claimedEmails.has(emailStr)) {
+            const codeClean = (employee.employeeId || employee.externalEmployeeCode || `emp_${employee._id}`).replace(/[^a-z0-9]/gi, '').toLowerCase();
+            let fallback = `${codeClean}@stelmec.com`;
+            let counter = 1;
+            while (claimedEmails.has(fallback)) {
+                fallback = `${codeClean}_${counter}@stelmec.com`;
+                counter++;
+            }
+            emailStr = fallback;
         }
 
         // Create new User with default password '123456'
@@ -63,9 +83,10 @@ const syncUserForEmployee = async (employeeOrId) => {
             passwordHash,
             mustChangePassword: true,
             role: 'employee',
-            companyId: employee.companyId || null,
+            companyId: companyId,
             branchId: finalBranchId,
             assignedBranches: rawAssignedBranches,
+            employeeProfileId: employee._id,
             status: employee.status === 'Active' || employee.status === undefined,
             isActive: employee.status === 'Active' || employee.status === undefined
         });
@@ -80,7 +101,7 @@ const syncUserForEmployee = async (employeeOrId) => {
 
 /**
  * Syncs user accounts for all existing employees.
- * Finds all EmployeeProfiles with an email and creates missing User accounts.
+ * Finds all EmployeeProfiles and ensures a 1-to-1 User account exists for each.
  */
 const syncUsersForExistingEmployees = async (companyId = null) => {
     try {
@@ -94,20 +115,13 @@ const syncUsersForExistingEmployees = async (companyId = null) => {
         let existingCount = 0;
 
         for (const emp of employees) {
-            if (!emp.email) continue;
-            const emailStr = String(emp.email).trim().toLowerCase();
-            if (!emailStr) continue;
-
-            const escapedEmail = emailStr.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-            const existingUser = await User.findOne({
-                email: { $regex: new RegExp("^" + escapedEmail + "$", "i") }
-            }).lean();
-
-            if (!existingUser) {
-                const user = await syncUserForEmployee(emp);
-                if (user) createdCount++;
-            } else {
-                existingCount++;
+            const user = await syncUserForEmployee(emp);
+            if (user) {
+                if (user.createdAt && (Date.now() - new Date(user.createdAt).getTime() < 5000)) {
+                    createdCount++;
+                } else {
+                    existingCount++;
+                }
             }
         }
 
