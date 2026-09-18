@@ -16,7 +16,7 @@ const sendEmail = async ({ to, subject, html, text }) => {
     const envPass = (process.env.SMTP_PASS || process.env.EMAIL_PASS || '').trim();
 
     const user = (!envUser || envUser.includes('your-email')) ? 'rrtechgrove@gmail.com' : envUser;
-    const rawPass = (!envPass || envPass.includes('your-email')) ? 'zaplvruahsxmlmyc' : envPass;
+    const rawPass = (!envPass || envPass.includes('your-email')) ? 'vmueoxdfdbjiqzmh' : envPass;
     const pass = rawPass.replace(/\s+/g, '');
     const host = process.env.SMTP_HOST || process.env.EMAIL_HOST || 'smtp.gmail.com';
     const port = parseInt(process.env.SMTP_PORT || process.env.EMAIL_PORT || '587', 10);
@@ -31,10 +31,15 @@ const sendEmail = async ({ to, subject, html, text }) => {
         let transporter;
         if (isGmail) {
             transporter = nodemailer.createTransport({
-                service: 'gmail',
+                host: 'smtp.gmail.com',
+                port: 465,
+                secure: true,
                 auth: {
                     user,
                     pass
+                },
+                tls: {
+                    rejectUnauthorized: false
                 }
             });
         } else {
