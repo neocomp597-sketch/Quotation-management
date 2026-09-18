@@ -114,6 +114,9 @@ const Login = () => {
   return (
     <div className="auth-container">
       <div className="auth-card">
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+          <img src="/site-logo.svg" alt="Site Logo" style={{ height: '56px', width: '56px', objectFit: 'contain' }} />
+        </div>
         <h2>Welcome Back</h2>
         <p className="subtitle">Sign in to manage your sales pipeline</p>
         {error && <div className="error-msg">{error}</div>}

@@ -85,9 +85,12 @@ const Register = () => {
   return (
     <div className="auth-container">
       <div className="auth-card">
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+          <img src="/site-logo.svg" alt="Site Logo" style={{ height: '56px', width: '56px', objectFit: 'contain' }} />
+        </div>
         <h2>Create Account</h2>
         <p className="subtitle">
-          Join ARCRM to start creating professional quotes
+          Join ARCRM to start managing your sales pipeline
         </p>
         {error && <div className="error-msg">{error}</div>}
         <form onSubmit={onSubmit}>

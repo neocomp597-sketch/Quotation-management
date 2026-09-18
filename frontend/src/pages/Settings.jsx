@@ -907,10 +907,10 @@ const [logoUploading, setLogoUploading] = useState(false);
                         <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100">
                             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Sidebar Preview</p>
                             <div className="bg-white rounded-xl p-4 border border-slate-100 shadow-sm max-w-[240px]">
-                                {/* Top row: ARCRM badge + title */}
+                                {/* Top row: ARCRM logo + title */}
                                 <div className="flex items-center gap-2.5">
-                                    <div className="w-9 h-9 rounded-xl flex items-center justify-center shadow-lg shrink-0" style={{ background: companySettings.primaryBrandColor ? `linear-gradient(135deg, ${companySettings.primaryBrandColor}, ${companySettings.primaryBrandColor}cc)` : 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
-                                        <span className="text-white font-black text-lg">A</span>
+                                    <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-white border border-slate-200 p-1 shadow-md shrink-0">
+                                        <img src="/site-logo.svg" alt="App Logo" className="w-full h-full object-contain" />
                                     </div>
                                     <div className="min-w-0 uppercase">
                                         <p className="text-base font-black tracking-tighter text-slate-900 leading-tight truncate">{companySettings.whitelabelAppTitle || 'ARCRM'}</p>

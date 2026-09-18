@@ -402,11 +402,10 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                             <button
                                 onClick={toggleSidebar}
                                 title="Open / Expand Sidebar"
-                                className="w-10 h-10 rounded-2xl flex items-center justify-center shadow-md shadow-primary-600/20 hover:scale-105 transition-all group cursor-pointer"
-                                style={{ background: brandSettings?.primaryBrandColor ? `linear-gradient(135deg, ${brandSettings.primaryBrandColor}, ${brandSettings.primaryBrandColor}cc)` : 'linear-gradient(135deg, var(--color-primary-600), var(--color-accent))' }}
+                                className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white dark:bg-slate-800 p-1.5 shadow-md hover:scale-105 transition-all group cursor-pointer border border-slate-200/60 dark:border-slate-700/60"
                             >
-                                <span className="text-white font-black text-xl group-hover:hidden">A</span>
-                                <MdChevronRight size={22} className="text-white hidden group-hover:block transition-transform" />
+                                <img src="/site-logo.svg" alt="App Logo" className="w-full h-full object-contain group-hover:hidden" />
+                                <MdChevronRight size={22} className="text-primary-600 dark:text-primary-400 hidden group-hover:block transition-transform" />
                             </button>
                             <button
                                 onClick={toggleSidebar}
@@ -418,11 +417,11 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                         </div>
                     ) : (
                         <div className="w-full transition-all duration-300">
-                            {/* Top row: ARCRM badge + App title + collapse button */}
+                            {/* Top row: ARCRM logo + App title + collapse button */}
                             <div className="flex items-center justify-between gap-2">
                                 <div className="flex items-center gap-2.5 min-w-0">
-                                    <div className="w-10 h-10 rounded-2xl flex items-center justify-center shadow-md shadow-primary-600/20 shrink-0" style={{ background: brandSettings?.primaryBrandColor ? `linear-gradient(135deg, ${brandSettings.primaryBrandColor}, ${brandSettings.primaryBrandColor}cc)` : 'linear-gradient(135deg, var(--color-primary-600), var(--color-accent))' }}>
-                                        <span className="text-white font-black text-xl">A</span>
+                                    <div className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white dark:bg-slate-800 p-1.5 shadow-md border border-slate-200/60 dark:border-slate-700/60 shrink-0">
+                                        <img src="/site-logo.svg" alt="App Logo" className="w-full h-full object-contain" />
                                     </div>
                                     <div className="min-w-0 text-slate-900 dark:text-slate-100 font-outfit uppercase">
                                         <p className="text-lg font-black tracking-tight leading-none truncate">{brandSettings?.whitelabelAppTitle || 'ARCRM'}</p>
