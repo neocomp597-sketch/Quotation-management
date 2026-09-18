@@ -496,9 +496,9 @@ const LandingPage = () => {
             <header className="fixed top-0 w-full z-50 bg-[#f7f9fb]/80 backdrop-blur-md border-b border-[#bbcabf]/30 shadow-sm transition-all duration-300">
                 <nav className="max-w-[1280px] mx-auto flex items-center justify-between px-6 h-20">
                     <div className="flex items-center gap-10">
-                        <Link to="/" className="text-xl font-extrabold text-[#006c49] tracking-tight flex items-center gap-2">
-                            <span className="material-symbols-outlined text-[#10b981]" style={{ fontVariationSettings: "'FILL' 1" }}>dataset</span>
-                            ARCRM
+                        <Link to="/" className="text-xl font-extrabold text-[#006c49] tracking-tight flex items-center gap-2.5">
+                            <img src="/site-logo.svg" alt="ARCRM Logo" className="w-9 h-9 object-contain" />
+                            <span>ARCRM</span>
                         </Link>
                         <div className="hidden md:flex gap-6">
                             <a className="font-semibold text-xs text-[#006c49] border-b-2 border-[#006c49] pb-1" href="#features">Features</a>
@@ -728,7 +728,10 @@ const LandingPage = () => {
             <footer className="bg-[#ffffff] border-t border-[#bbcabf]/30 w-full py-16">
                 <div className="max-w-[1280px] mx-auto px-6 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
                     <div className="col-span-2 text-left">
-                        <span className="text-xl font-bold text-[#006c49] mb-4 block">ARCRM</span>
+                        <div className="flex items-center gap-2.5 mb-4">
+                            <img src="/site-logo.svg" alt="ARCRM Logo" className="w-8 h-8 object-contain" />
+                            <span className="text-xl font-bold text-[#006c49]">ARCRM</span>
+                        </div>
                         <p className="text-[#3c4a42] text-xs mb-6 max-w-xs leading-relaxed">The enterprise standard for quotation management and sales automation. Built for speed, scale, and accuracy.</p>
                         <div className="flex gap-4">
                             <a className="w-10 h-10 rounded-full bg-[#e6e8ea] flex items-center justify-center text-[#006c49] hover:bg-[#006c49] hover:text-white transition-all" href="#"><span className="material-symbols-outlined text-[20px]">public</span></a>
