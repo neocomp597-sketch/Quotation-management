@@ -488,11 +488,52 @@ exports.getTickets = async (req, res) => {
         const search = String(req.query.search || '').trim();
         if (search) {
             const regex = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+
+            // Columns shown in the register live on related collections, so resolve
+            // the matching ids first and search the ticket by reference as well.
+            const Asset = require('../models/Asset');
+            const Voucher = require('../models/Voucher');
+            const Engineer = require('../models/Engineer');
+            const Product = require('../models/Product');
+            const Salesperson = require('../models/Salesperson');
+
+            const [customerIds, assetIds, invoiceIds, engineerIds, productIds, salespersonIds, contactIds] = await Promise.all([
+                Customer.find({ companyId, $or: [{ customerName: regex }, { companyName: regex }, { mobile: regex }, { email: regex }] }).distinct('_id'),
+                Asset.find({ companyId, serialNumber: regex }).distinct('_id'),
+                Voucher.find({ companyId, $or: [{ voucherNumber: regex }, { invoiceNumber: regex }] }).distinct('_id'),
+                Engineer.find({ companyId, $or: [{ name: regex }, { email: regex }] }).distinct('_id'),
+                Product.find({ companyId, $or: [{ productName: regex }, { productCode: regex }] }).distinct('_id'),
+                Salesperson.find({ companyId, name: regex }).distinct('_id'),
+                CustomerContact.find({ companyId, $or: [{ contactName: regex }, { mobileNo: regex }, { email: regex }] }).distinct('_id')
+            ]);
+
             andConditions.push({
                 $or: [
+                    // Sr. No. / Ticket No.
                     { ticketNo: regex },
+                    // Subject
                     { issueTitle: regex },
-                    { contactName: regex }
+                    { problemName: regex },
+                    // Customer & contact
+                    { contactName: regex },
+                    { contactPhone: regex },
+                    { contactAlternatePhone: regex },
+                    { contactEmail: regex },
+                    { pincode: regex },
+                    { customerId: { $in: customerIds } },
+                    { contactId: { $in: contactIds } },
+                    // Invoice no.
+                    { manualInvoiceNo: regex },
+                    { invoiceId: { $in: invoiceIds } },
+                    // Product no. / serial no.
+                    { serialNumber: regex },
+                    { manualProductName: regex },
+                    { assetId: { $in: assetIds } },
+                    { productId: { $in: productIds } },
+                    // Engineer
+                    { assignedEngineerId: { $in: engineerIds } },
+                    { assignedEngineerIds: { $in: engineerIds } },
+                    { assignedSalespersonId: { $in: salespersonIds } }
                 ]
             });
         }
@@ -1076,7 +1117,7 @@ exports.updateTicketLocation = async (req, res) => {
 
 exports.closeTicket = async (req, res) => {
     try {
-        const { resolutionNotes, isFirstCallResolved, rating, comment, latitude, longitude, address, productImage, customerSignature } = req.body;
+        const { resolutionNotes, isFirstCallResolved, rating, comment, latitude, longitude, address, productImage, customerSignature, expenses } = req.body;
         const companyId = req.user?.companyId;
 
         const ticket = await Ticket.findOne({ _id: req.params.id, companyId });
@@ -1087,7 +1128,29 @@ exports.closeTicket = async (req, res) => {
         ticket.closedAt = now;
         if (!ticket.resolvedAt) {
             ticket.resolvedAt = now;
+            if (ticket.slaResolutionDue && now > ticket.slaResolutionDue) {
+                ticket.isSlaBreached.resolution = true;
+            }
         }
+        if (resolutionNotes) {
+            ticket.resolutionNotes = resolutionNotes;
+        }
+
+        const closureExpenses = (Array.isArray(expenses) ? expenses : [])
+            .filter(ex => ex && String(ex.description || '').trim())
+            .map(ex => {
+                const quantity = Number(ex.quantity) || 1;
+                const rate = Number(ex.rate) || 0;
+                return {
+                    description: String(ex.description).trim(),
+                    quantity,
+                    rate,
+                    amount: quantity * rate,
+                    isPartChange: Boolean(ex.isPartChange),
+                    mgr5Id: mongoose.Types.ObjectId.isValid(ex.mgr5Id) ? ex.mgr5Id : null
+                };
+            });
+        ticket.closureExpenses = closureExpenses;
 
         if (productImage) {
             ticket.productImage = productImage;
@@ -1118,6 +1181,16 @@ exports.closeTicket = async (req, res) => {
         }
 
         const validUserId = mongoose.Types.ObjectId.isValid(req.user?.id) ? req.user.id : null;
+        const partChanges = closureExpenses.filter(ex => ex.isPartChange || ex.mgr5Id);
+        if (partChanges.length > 0) {
+            const partsSummary = partChanges.map(p => `${p.description} (Qty: ${p.quantity})`).join(', ');
+            ticket.timeline.push({
+                activityType: 'Part Change',
+                description: `Spare Parts Changed at Ticket Closure: ${partsSummary}`,
+                performedBy: validUserId
+            });
+        }
+
         const desc = `Ticket closed${resolutionNotes ? `: ${resolutionNotes}` : ''}`;
         ticket.timeline.push({
             activityType: 'Closed',

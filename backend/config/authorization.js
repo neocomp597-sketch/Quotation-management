@@ -190,7 +190,8 @@ const MENU_GROUPS = [
             { key: 'csm_warranties_amc', label: 'Warranty & AMC', description: 'Manage customer warranty details and AMC contracts' },
             { key: 'csm_kb', label: 'Knowledge Base', description: 'Manage troubleshooting articles and FAQs' },
             { key: 'csm_masters', label: 'CSM Config', description: 'Configure categories, priorities, teams, and SLAs' },
-            { key: 'csm_reports', label: 'Service Reports', description: 'Customer service analytics and resolution reports' }
+            { key: 'csm_reports', label: 'Service Reports', description: 'Customer service analytics and resolution reports' },
+            { key: 'csm_rca', label: 'RCA Report', description: 'Root Cause Analysis reports and CAPA management' }
         ]
     },
     {
@@ -238,6 +239,17 @@ const buildPermissions = (enabledKeys = []) => {
 
 const FULL_ACCESS_KEYS = getAllPermissionKeys();
 
+// Keys added after roles were already saved inherit the key that used to gate the same screen,
+// so existing users keep their access until an admin sets the new key explicitly.
+const LEGACY_PERMISSION_FALLBACKS = {
+    csm_rca: 'csm_dashboard'
+};
+
+const getLegacyFallback = (input, key) => {
+    const fallbackKey = LEGACY_PERMISSION_FALLBACKS[key];
+    return fallbackKey && typeof input[fallbackKey] === 'boolean' ? input[fallbackKey] : undefined;
+};
+
 // Manager: everything except the admin panel
 // Sales: lightweight access - dashboard, enquiry, quotation, inventory items/transfers
 // Employee: employee access - payslips, payroll, csm tickets, csm attendance, csm kb, dashboard
@@ -260,9 +272,12 @@ const sanitizePermissions = (input = {}) => {
         let enabledChildren = 0;
 
         childKeys.forEach((key) => {
+            const legacyFallback = getLegacyFallback(input, key);
             const childEnabled = typeof input[key] === 'boolean'
                 ? input[key]
-                : legacyParentEnabled;
+                : typeof legacyFallback === 'boolean'
+                    ? legacyFallback
+                    : legacyParentEnabled;
 
             permissions[key] = childEnabled;
             if (childEnabled) enabledChildren += 1;
@@ -294,9 +309,12 @@ const resolvePermissions = (role, storedPermissions = {}) => {
         childKeys.forEach((key) => {
             const stored = storedPermissions[key];
             const hasStoredValue = typeof stored === 'boolean';
+            const legacyFallback = getLegacyFallback(storedPermissions, key);
             const childEnabled = hasStoredValue
                 ? stored
-                : hasStoredParent && !hasStoredChildren
+                : typeof legacyFallback === 'boolean'
+                    ? legacyFallback
+                    : hasStoredParent && !hasStoredChildren
                     ? storedParent
                     : Boolean(defaults[key]);
 

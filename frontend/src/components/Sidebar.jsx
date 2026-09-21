@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
+import SiteLogo from './SiteLogo';
 import {
     MdDashboard,
     MdPeople,
@@ -404,7 +405,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                                 title="Open / Expand Sidebar"
                                 className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white dark:bg-slate-800 p-1.5 shadow-md hover:scale-105 transition-all group cursor-pointer border border-slate-200/60 dark:border-slate-700/60"
                             >
-                                <img src="/site-logo.svg" alt="App Logo" className="w-full h-full object-contain group-hover:hidden" />
+                                <SiteLogo className="w-full h-full group-hover:hidden" />
                                 <MdChevronRight size={22} className="text-primary-600 dark:text-primary-400 hidden group-hover:block transition-transform" />
                             </button>
                             <button
@@ -421,7 +422,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                             <div className="flex items-center justify-between gap-2">
                                 <div className="flex items-center gap-2.5 min-w-0">
                                     <div className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white dark:bg-slate-800 p-1.5 shadow-md border border-slate-200/60 dark:border-slate-700/60 shrink-0">
-                                        <img src="/site-logo.svg" alt="App Logo" className="w-full h-full object-contain" />
+                                        <SiteLogo className="w-full h-full" />
                                     </div>
                                     <div className="min-w-0 text-slate-900 dark:text-slate-100 font-outfit uppercase">
                                         <p className="text-lg font-black tracking-tight leading-none truncate">{brandSettings?.whitelabelAppTitle || 'ARCRM'}</p>

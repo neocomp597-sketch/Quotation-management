@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { authService } from "../services/api";
 import { Eye, EyeOff, CheckCircle } from "lucide-react";
 import { getFallbackRoute } from "../constants/menuPermissions";
+import SiteLogo from "../components/SiteLogo";
 import "./Auth.css";
 
 const Login = () => {
@@ -115,7 +116,7 @@ const Login = () => {
     <div className="auth-container">
       <div className="auth-card">
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
-          <img src="/site-logo.svg" alt="Site Logo" style={{ height: '56px', width: '56px', objectFit: 'contain' }} />
+          <SiteLogo className="w-14 h-14" />
         </div>
         <h2>Welcome Back</h2>
         <p className="subtitle">Sign in to manage your sales pipeline</p>

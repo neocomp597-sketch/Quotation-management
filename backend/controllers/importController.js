@@ -1894,10 +1894,14 @@ const getTicketTemplate = async (req, res) => {
         XLSX.utils.book_append_sheet(workbook, worksheet, 'Tickets');
 
         worksheet['!cols'] = [
-            { wch: 15 }, { wch: 18 }, { wch: 15 }, { wch: 20 }, { wch: 25 }, { wch: 45 },
-            { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 10 }, { wch: 12 }
+            { wch: 15 }, { wch: 18 }, { wch: 15 }, { wch: 22 }, { wch: 15 }, { wch: 18 },
+            { wch: 25 }, { wch: 45 }, { wch: 10 }, { wch: 10 }, { wch: 12 }
         ];
 
+        const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename=ticket_import_template.xlsx');
         res.send(buffer);
     } catch (error) {
         console.error('Template error:', error);

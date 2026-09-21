@@ -339,8 +339,8 @@ function App() {
             <Route path="/csm/kb" element={<PermissionRoute permissionKey="csm_kb"><Layout><KnowledgeBase /></Layout></PermissionRoute>} />
             <Route path="/csm/masters" element={<PermissionRoute permissionKey="csm_masters"><Layout><CSMMasters /></Layout></PermissionRoute>} />
             <Route path="/csm/masters/new" element={<PermissionRoute permissionKey="csm_masters"><Layout><CSMMasters isCreatePage={true} /></Layout></PermissionRoute>} />
-            <Route path="/csm/reports" element={<PermissionRoute permissionKey="csm_dashboard"><Layout><CSMReports /></Layout></PermissionRoute>} />
-            <Route path="/csm/rca" element={<PermissionRoute permissionKey="csm_dashboard"><Layout><CSMRcaReport /></Layout></PermissionRoute>} />
+            <Route path="/csm/reports" element={<PermissionRoute permissionKey="csm_reports"><Layout><CSMReports /></Layout></PermissionRoute>} />
+            <Route path="/csm/rca" element={<PermissionRoute permissionKey="csm_rca"><Layout><CSMRcaReport /></Layout></PermissionRoute>} />
             
             {/* Tender Routes */}
             <Route path="/tender/dashboard" element={<PermissionRoute permissionKey="tender_dashboard"><Layout><TenderDashboard /></Layout></PermissionRoute>} />

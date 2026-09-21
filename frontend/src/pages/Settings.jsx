@@ -1,10 +1,22 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { MdBusiness, MdPerson, MdLocationOn, MdAccountBalance, MdDescription, MdCloudUpload, MdSave, MdEdit, MdVisibility, MdVisibilityOff, MdColorLens } from 'react-icons/md';
-import { userService, companySettingsService, uploadService, footerPageService } from '../services/api';
-import { resolveImageUrl } from '../utils/helpers';
+import {
+    MdPerson,
+    MdBusiness,
+    MdLocationOn,
+    MdAccountBalance,
+    MdDescription,
+    MdColorLens,
+    MdSave,
+    MdCloudUpload,
+    MdVisibility,
+    MdVisibilityOff
+} from 'react-icons/md';
 import { useAuth } from '../context/AuthContext';
+import { userService, companySettingsService, uploadService, footerPagesService } from '../services/api';
+import { resolveImageUrl } from '../utils/helpers';
+import SiteLogo from '../components/SiteLogo';
 import { ROLE_LABELS } from '../constants/menuPermissions';
 import RichTextEditor from '../components/RichTextEditor';
 
@@ -910,7 +922,7 @@ const [logoUploading, setLogoUploading] = useState(false);
                                 {/* Top row: ARCRM logo + title */}
                                 <div className="flex items-center gap-2.5">
                                     <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-white border border-slate-200 p-1 shadow-md shrink-0">
-                                        <img src="/site-logo.svg" alt="App Logo" className="w-full h-full object-contain" />
+                                        <SiteLogo className="w-full h-full" />
                                     </div>
                                     <div className="min-w-0 uppercase">
                                         <p className="text-base font-black tracking-tighter text-slate-900 leading-tight truncate">{companySettings.whitelabelAppTitle || 'ARCRM'}</p>

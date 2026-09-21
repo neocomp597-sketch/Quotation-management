@@ -614,13 +614,8 @@ exports.forgotPassword = async (req, res) => {
 
         if (!emailResult || (!emailResult.success && !emailResult.simulated)) {
             console.error('[forgotPassword] Email dispatch failed:', emailResult?.error);
-            console.log(`[forgotPassword] Direct Reset Link generated for ${user.email}: ${resetUrl}`);
-
-            // Return success response so user/admin is not blocked by Gmail security locks
-            return res.status(200).json({ 
-                success: true,
-                message: `Password reset link generated successfully! If you do not receive the email shortly due to Gmail security verification, please contact your system administrator or use link: ${resetUrl}`,
-                resetUrl
+            return res.status(500).json({ 
+                message: `Failed to send password reset email: ${emailResult?.error || 'Email service error'}` 
             });
         }
 

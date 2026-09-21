@@ -4,6 +4,7 @@ import { toast } from "react-toastify";
 import { useAuth } from "../context/AuthContext";
 import { authService } from "../services/api";
 import { CheckCircle } from "lucide-react";
+import SiteLogo from "../components/SiteLogo";
 import "./Auth.css";
 
 const Register = () => {
@@ -86,7 +87,7 @@ const Register = () => {
     <div className="auth-container">
       <div className="auth-card">
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
-          <img src="/site-logo.svg" alt="Site Logo" style={{ height: '56px', width: '56px', objectFit: 'contain' }} />
+          <SiteLogo className="w-14 h-14" />
         </div>
         <h2>Create Account</h2>
         <p className="subtitle">

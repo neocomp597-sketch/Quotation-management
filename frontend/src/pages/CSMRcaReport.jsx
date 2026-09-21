@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import * as XLSX from 'xlsx';
-import { csmService } from '../services/api';
+import { csmService, companySettingsService } from '../services/api';
+import { resolveImageUrl } from '../utils/helpers';
 import { 
     MdAssessment, MdAdd, MdPrint, MdRefresh, MdDelete, 
     MdEdit, MdArrowBack, MdSave, MdFormatListBulleted, MdCheckCircle,
@@ -46,6 +47,37 @@ const CSMRcaReport = () => {
     const [viewMode, setViewMode] = useState('list'); // 'list' | 'view' | 'form'
     const [selectedReportId, setSelectedReportId] = useState(null);
     const [formData, setFormData] = useState(INITIAL_FORM);
+    const [branding, setBranding] = useState({ logo: null, companyName: '' });
+
+    // Company logo for the RCA document header. It is converted to a data URL so
+    // html2canvas can draw it into the PDF without tainting the canvas.
+    useEffect(() => {
+        let cancelled = false;
+        const loadBranding = async () => {
+            try {
+                const res = await companySettingsService.get();
+                const settings = res.data || {};
+                const companyName = settings.companyName || settings.whitelabelAppTitle || '';
+                const url = resolveImageUrl(settings.logoUrl);
+                if (!url) {
+                    if (!cancelled) setBranding({ logo: null, companyName });
+                    return;
+                }
+                const blob = await fetch(url, { mode: 'cors' }).then(r => (r.ok ? r.blob() : Promise.reject(new Error('logo fetch failed'))));
+                const dataUrl = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(reader.result);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(blob);
+                });
+                if (!cancelled) setBranding({ logo: dataUrl, companyName });
+            } catch (err) {
+                console.warn('RCA header logo unavailable:', err);
+            }
+        };
+        loadBranding();
+        return () => { cancelled = true; };
+    }, []);
 
     const fetchReports = async () => {
         setLoading(true);
@@ -524,21 +556,32 @@ const CSMRcaReport = () => {
             {viewMode === 'view' && (
                 <div id="rca-document-sheet" className="bg-white border border-slate-200 rounded-3xl shadow-xl p-6 sm:p-10 space-y-6 print-container max-w-5xl mx-auto text-slate-900">
                     {/* Quality Header Block */}
-                    <div className="border-b-2 border-slate-900 pb-4 flex justify-between items-end">
-                        <div>
-                            <span className="text-[10px] font-black uppercase text-teal-800 tracking-widest block mb-1">
-                                Quality & Technical Audit Document
-                            </span>
-                            <h2 className="text-2xl font-black font-outfit uppercase tracking-tight text-slate-900">
-                                ROOT CAUSE ANALYSIS REPORT
-                            </h2>
-                            <p className="text-xs text-slate-500 font-semibold">
-                                Customer Service & Technical Quality Root Cause Investigation
-                            </p>
+                    <div className="border-b-2 border-slate-900 pb-4 flex justify-between items-end gap-6">
+                        <div className="flex items-end gap-4 min-w-0">
+                            {branding.logo && (
+                                <img
+                                    src={branding.logo}
+                                    alt={branding.companyName || 'Company Logo'}
+                                    crossOrigin="anonymous"
+                                    className="h-12 w-auto max-w-[160px] object-contain shrink-0"
+                                />
+                            )}
+                            <div className="min-w-0">
+                                <span className="text-[10px] font-black uppercase text-teal-800 tracking-widest block mb-1">
+                                    Quality & Technical Audit Document
+                                </span>
+                                <h2 className="text-2xl font-black font-outfit uppercase tracking-tight text-slate-900">
+                                    ROOT CAUSE ANALYSIS REPORT
+                                </h2>
+                                <p className="text-xs text-slate-500 font-semibold">
+                                    Customer Service & Technical Quality Root Cause Investigation
+                                </p>
+                            </div>
                         </div>
-                        <div className="text-right">
-                            <div className="text-lg font-black text-slate-900">{formData.rcaNumber || 'RCA-DRAFT'}</div>
-                            <div className="text-xs font-bold text-slate-500">Date: {formData.date || new Date().toLocaleDateString()}</div>
+                        {/* RCA number stands alone here; the document date is shown in section 1 */}
+                        <div className="text-right shrink-0 border border-slate-300 rounded-lg px-3 py-1.5">
+                            <span className="block text-[9px] font-black uppercase text-slate-400 tracking-widest leading-none mb-1">RCA No.</span>
+                            <span className="text-base font-black text-slate-900 leading-none whitespace-nowrap">{formData.rcaNumber || 'RCA-DRAFT'}</span>
                         </div>
                     </div>
 

@@ -28,6 +28,15 @@ const TicketCommentSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now }
 }, { _id: false });
 
+const TicketExpenseSchema = new mongoose.Schema({
+    description: { type: String, required: true },
+    quantity: { type: Number, default: 1 },
+    rate: { type: Number, default: 0 },
+    amount: { type: Number, required: true },
+    isPartChange: { type: Boolean, default: false },
+    mgr5Id: { type: mongoose.Schema.Types.ObjectId, default: null }
+}, { _id: false });
+
 const TicketSchema = new mongoose.Schema({
     ticketNo: { type: String, required: true },
     customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', required: true },
@@ -97,6 +106,8 @@ const TicketSchema = new mongoose.Schema({
     serialNumber: { type: String, default: '', index: true },
     productImage: { type: String, default: '' },
     customerSignature: { type: String, default: '' },
+    resolutionNotes: { type: String, default: '' },
+    closureExpenses: { type: [TicketExpenseSchema], default: [] },
     rcaReport: {
         problemDescription: { type: String, default: '' },
         rootCause: { type: String, default: '' },

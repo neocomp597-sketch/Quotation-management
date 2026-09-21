@@ -2370,7 +2370,7 @@ const CSMTickets = () => {
                     <form onSubmit={handleSearchSubmit} className="flex-1 max-w-md relative">
                         <input
                             type="text"
-                            placeholder="Search ticket no, title, contact..."
+                            placeholder="Search ticket no, customer, subject, invoice, serial no, engineer..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                             className="w-full pl-12 pr-4 py-3 rounded-2xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-semibold"

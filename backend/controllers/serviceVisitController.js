@@ -285,8 +285,46 @@ exports.rescheduleVisit = async (req, res) => {
             return res.status(404).json({ message: 'Service visit not found' });
         }
 
-        if (['Completed', 'Cancelled'].includes(visit.status)) {
-            return res.status(400).json({ message: 'Cannot reschedule a completed or cancelled service visit' });
+        const isReopen = ['Completed', 'Cancelled'].includes(visit.status);
+
+        if (isReopen) {
+            // Re-opening makes this visit active again: keep the one-active-visit-per-customer rule
+            const visitTicket = await Ticket.findOne({ _id: visit.ticketId, companyId }).select('customerId').lean();
+            if (visitTicket) {
+                const customerTickets = await Ticket.find({ customerId: visitTicket.customerId, companyId }).select('_id').lean();
+                const otherActiveVisit = await ServiceVisit.findOne({
+                    _id: { $ne: visit._id },
+                    ticketId: { $in: customerTickets.map(t => t._id) },
+                    status: { $in: ['Scheduled', 'In Transit', 'Started'] },
+                    companyId
+                }).select('visitNo').lean();
+                if (otherActiveVisit) {
+                    return res.status(400).json({
+                        message: `Another service visit (${otherActiveVisit.visitNo}) is already active for this customer. Please reschedule that visit instead.`
+                    });
+                }
+            }
+
+            // Preserve the completed visit's report, photo, signature and expenses before resetting it
+            if (visit.status === 'Completed') {
+                visit.completionHistory.push({
+                    checkIn: visit.checkIn,
+                    checkOut: visit.checkOut,
+                    visitReport: visit.visitReport,
+                    nextAction: visit.nextAction,
+                    customerSignature: visit.customerSignature,
+                    productPhoto: visit.productPhoto,
+                    billingStatus: visit.billingStatus,
+                    expenses: visit.expenses,
+                    reopenedAt: new Date(),
+                    reopenedBy: req.user?.id
+                });
+                visit.visitReport = '';
+                visit.nextAction = '';
+                visit.customerSignature = '';
+                visit.productPhoto = '';
+                visit.expenses = [];
+            }
         }
 
         if (scheduledDate) visit.scheduledDate = new Date(scheduledDate);
@@ -322,9 +360,21 @@ exports.rescheduleVisit = async (req, res) => {
 
             ticket.timeline.push({
                 activityType: 'StatusChange',
-                description: `Field Service Visit rescheduled (${visit.visitNo}) to ${new Date(visit.scheduledDate).toLocaleString()} with engineer ${engineerName}${typeText}`,
+                description: `Field Service Visit ${isReopen ? 're-opened and rescheduled' : 'rescheduled'} (${visit.visitNo}) to ${new Date(visit.scheduledDate).toLocaleString()} with engineer ${engineerName}${typeText}`,
                 performedBy: req.user?.id
             });
+
+            // A visit that closed the ticket is being re-opened, so the ticket is no longer resolved
+            if (isReopen && ['Closed', 'Resolved'].includes(ticket.status)) {
+                ticket.status = 'Assigned';
+                ticket.resolvedAt = undefined;
+                ticket.closedAt = undefined;
+                ticket.timeline.push({
+                    activityType: 'StatusChange',
+                    description: `Ticket re-opened because Service Visit (${visit.visitNo}) was re-opened`,
+                    performedBy: req.user?.id
+                });
+            }
             await ticket.save({ validateBeforeSave: false });
         }
 

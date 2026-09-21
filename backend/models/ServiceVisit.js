@@ -4,8 +4,8 @@ const tenantPlugin = require('./plugins/tenantPlugin');
 const VisitCheckLogSchema = new mongoose.Schema({
     time: { type: Date, required: true },
     location: {
-        lat: { type: Number, required: true },
-        lng: { type: Number, required: true },
+        lat: { type: Number, default: null },
+        lng: { type: Number, default: null },
         address: { type: String, default: '' }
     }
 }, { _id: false });
@@ -26,6 +26,20 @@ const RescheduleHistorySchema = new mongoose.Schema({
     engineerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Engineer' },
     ticketType: { type: String, default: '' },
     rescheduledAt: { type: Date, default: Date.now }
+}, { _id: false });
+
+// Snapshot of a completed visit's outcome, kept when the visit is re-opened
+const CompletionHistorySchema = new mongoose.Schema({
+    checkIn: { type: VisitCheckLogSchema, default: null },
+    checkOut: { type: VisitCheckLogSchema, default: null },
+    visitReport: { type: String, default: '' },
+    nextAction: { type: String, default: '' },
+    customerSignature: { type: String, default: '' },
+    productPhoto: { type: String, default: '' },
+    billingStatus: { type: String, default: '' },
+    expenses: { type: [VisitExpenseSchema], default: [] },
+    reopenedAt: { type: Date, default: Date.now },
+    reopenedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
 }, { _id: false });
 
 const ServiceVisitSchema = new mongoose.Schema({
@@ -52,6 +66,7 @@ const ServiceVisitSchema = new mongoose.Schema({
         default: 'Paid' 
     },
     expenses: { type: [VisitExpenseSchema], default: [] },
+    completionHistory: { type: [CompletionHistorySchema], default: [] },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
 });

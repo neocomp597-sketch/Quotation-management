@@ -520,12 +520,16 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
         setIsLocating(true);
         setCheckInAddress('Locking onto high-precision GPS signal...');
 
-        if (!navigator.geolocation) {
-            setCheckInLat(18.5204);
-            setCheckInLng(73.8567);
-            setCheckInAddress('Shivajinagar, Pune');
-            setCheckInAreaName(prev => prev ? prev : 'Shivajinagar Area');
+        const handleGpsUnavailable = () => {
+            setCheckInLat(null);
+            setCheckInLng(null);
+            setCheckInAddress('');
+            toast.warn('Could not get GPS location. Please allow location access or type the street address.');
             setIsLocating(false);
+        };
+
+        if (!navigator.geolocation) {
+            handleGpsUnavailable();
             return;
         }
 
@@ -545,11 +549,7 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
             },
             (err) => {
                 console.warn('Geolocation error:', err);
-                setCheckInLat(18.5204);
-                setCheckInLng(73.8567);
-                setCheckInAddress('Pune Field Location (Lat: 18.5204, Lng: 73.8567)');
-                setCheckInAreaName(prev => prev ? prev : 'Pune Central Area');
-                setIsLocating(false);
+                handleGpsUnavailable();
             },
             { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
         );
@@ -949,30 +949,38 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
         }
     };
 
-    // Geolocation Check-in simulation with Reverse Geocoding
-    const handleCheckIn = (visitId) => {
+    // Resolves to the device's GPS position with a reverse-geocoded address, or null if unavailable
+    const getDeviceLocation = () => new Promise((resolve) => {
         if (!navigator.geolocation) {
-            toast.error('Geolocation is not supported by your browser');
-            executeCheckIn(visitId, 18.5204, 73.8567, 'Shivajinagar, Pune (Lat: 18.5204, Lng: 73.8567)');
+            resolve(null);
             return;
         }
-
-        toast.info('Locking onto high-precision GPS location...');
         navigator.geolocation.getCurrentPosition(
             async (pos) => {
                 const lat = pos.coords.latitude;
                 const lng = pos.coords.longitude;
                 const locData = await fetchAccurateLocation(lat, lng);
-                const formattedAddress = `${locData.address} (Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)})`;
-
-                executeCheckIn(visitId, lat, lng, formattedAddress);
+                resolve({ lat, lng, address: `${locData.address} (Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)})` });
             },
             (err) => {
-                console.warn('Geolocation error, falling back:', err);
-                executeCheckIn(visitId, 18.5204, 73.8567, 'Pune Technical Hub (Lat: 18.5204, Lng: 73.8567)');
+                console.warn('Geolocation error:', err);
+                resolve(null);
             },
             { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
         );
+    });
+
+    const GPS_UNAVAILABLE = 'GPS location unavailable';
+
+    const handleCheckIn = async (visitId) => {
+        toast.info('Locking onto high-precision GPS location...');
+        const loc = await getDeviceLocation();
+        if (!loc) {
+            toast.warn('Could not get GPS location. Check-in recorded without location - please allow location access.');
+            executeCheckIn(visitId, null, null, GPS_UNAVAILABLE);
+            return;
+        }
+        executeCheckIn(visitId, loc.lat, loc.lng, loc.address);
     };
 
     const executeCheckIn = async (visitId, lat, lng, address) => {
@@ -1170,10 +1178,14 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
         }
 
         try {
+            const loc = await getDeviceLocation();
+            if (!loc) {
+                toast.warn('Could not get GPS location. Check-out recorded without location - please allow location access.');
+            }
             const res = await csmService.checkOutVisit(selectedVisit._id, {
-                latitude: 18.5205,
-                longitude: 73.8568,
-                address: selectedVisit.checkIn?.location?.address || 'Site Location Address',
+                latitude: loc ? loc.lat : null,
+                longitude: loc ? loc.lng : null,
+                address: loc ? loc.address : GPS_UNAVAILABLE,
                 visitReport: report,
                 customerSignature: signatureData,
                 productPhoto,

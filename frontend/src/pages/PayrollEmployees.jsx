@@ -1222,6 +1222,16 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                                 />
                                             </div>
                                             <div>
+                                                <label className={labelClass}>Email Address</label>
+                                                <input
+                                                    type="email"
+                                                    value={basicForm.email}
+                                                    onChange={(e) => setBasicForm({ ...basicForm, email: e.target.value })}
+                                                    className={inputClass}
+                                                    placeholder="rajesh@company.com"
+                                                />
+                                            </div>
+                                            <div>
                                                 <label className={labelClass}>Reporting To</label>
                                                 <SearchableSelect
                                                     options={(allEmployees.length ? allEmployees : employees)
@@ -1236,16 +1246,6 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                                     placeholder="-- None (No Supervisor) --"
                                                     noResultsText="No active employee found"
                                                     inputClass="w-full px-3.5 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all cursor-pointer"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className={labelClass}>Email Address</label>
-                                                <input
-                                                    type="email"
-                                                    value={basicForm.email}
-                                                    onChange={(e) => setBasicForm({ ...basicForm, email: e.target.value })}
-                                                    className={inputClass}
-                                                    placeholder="rajesh@company.com"
                                                 />
                                             </div>
                                             <div>

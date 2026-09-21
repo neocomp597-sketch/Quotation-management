@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { landingPlanService } from '../services/api';
+import SiteLogo from '../components/SiteLogo';
 import './LandingPage.css';
 
 const CounterItem = ({ 
@@ -497,7 +498,7 @@ const LandingPage = () => {
                 <nav className="max-w-[1280px] mx-auto flex items-center justify-between px-6 h-20">
                     <div className="flex items-center gap-10">
                         <Link to="/" className="text-xl font-extrabold text-[#006c49] tracking-tight flex items-center gap-2.5">
-                            <img src="/site-logo.svg" alt="ARCRM Logo" className="w-9 h-9 object-contain" />
+                            <SiteLogo className="w-9 h-9" />
                             <span>ARCRM</span>
                         </Link>
                         <div className="hidden md:flex gap-6">
@@ -729,7 +730,7 @@ const LandingPage = () => {
                 <div className="max-w-[1280px] mx-auto px-6 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
                     <div className="col-span-2 text-left">
                         <div className="flex items-center gap-2.5 mb-4">
-                            <img src="/site-logo.svg" alt="ARCRM Logo" className="w-8 h-8 object-contain" />
+                            <SiteLogo className="w-8 h-8" />
                             <span className="text-xl font-bold text-[#006c49]">ARCRM</span>
                         </div>
                         <p className="text-[#3c4a42] text-xs mb-6 max-w-xs leading-relaxed">The enterprise standard for quotation management and sales automation. Built for speed, scale, and accuracy.</p>

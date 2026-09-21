@@ -342,7 +342,8 @@ const TicketDetail = () => {
         };
 
         if (!navigator.geolocation) {
-            await executeCheckIn(18.5204, 73.8567, 'Shivajinagar, Pune (Lat: 18.5204, Lng: 73.8567)');
+            toast.warn('Could not get GPS location. Check-in recorded without location - please allow location access.');
+            await executeCheckIn(null, null, 'GPS location unavailable');
             return;
         }
 
@@ -370,8 +371,9 @@ const TicketDetail = () => {
                 await executeCheckIn(lat, lng, formattedAddress);
             },
             async (err) => {
-                console.warn('Geolocation error, falling back:', err);
-                await executeCheckIn(18.5204, 73.8567, 'Pune Technical Hub (Lat: 18.5204, Lng: 73.8567)');
+                console.warn('Geolocation error:', err);
+                toast.warn('Could not get GPS location. Check-in recorded without location - please allow location access.');
+                await executeCheckIn(null, null, 'GPS location unavailable');
             },
             { enableHighAccuracy: true, timeout: 10000 }
         );
@@ -470,6 +472,7 @@ const TicketDetail = () => {
                 comment: closeFeedbackComment,
                 productImage: closeProductImage,
                 customerSignature: signatureData,
+                expenses: closeExpenses,
                 ...locData
             });
 
