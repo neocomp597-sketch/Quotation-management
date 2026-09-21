@@ -1086,25 +1086,9 @@ const CSMTickets = () => {
             }
         }
 
-        // Client-side pre-check for active open ticket with same serial number / assetId
-        const checkSerial = (formData.serialNumber || generatedSerial || '').trim();
-        const activeDuplicate = tickets.find(t => {
-            const isClosed = ['closed', 'cancelled'].includes((t.status || '').toLowerCase());
-            if (isClosed) return false;
-
-            const tSerial = (t.serialNumber || t.assetId?.serialNumber || '').trim().toLowerCase();
-            const tAssetId = t.assetId?._id || t.assetId;
-
-            if (checkSerial && tSerial && tSerial === checkSerial.toLowerCase()) return true;
-            if (assetIdToSubmit && tAssetId && String(tAssetId) === String(assetIdToSubmit)) return true;
-            return false;
-        });
-
-        if (activeDuplicate) {
-            toast.error(`An active ticket (${activeDuplicate.ticketNo}) in status '${activeDuplicate.status}' already exists for Product Serial No. "${checkSerial || 'selected asset'}". Please close the existing ticket before raising a new one.`);
-            return;
-        }
-
+        // Duplicate detection is done by the server, which checks every ticket in the
+        // database. The list loaded here is only the current page of the register, so
+        // checking against it produced false "already exists" errors on stale data.
         try {
             const ticketRes = await csmService.createTicket(cleanedFormData);
             const newTicketId = ticketRes.data?._id;
@@ -1253,25 +1237,8 @@ const CSMTickets = () => {
                 }
             }
 
-            // Client-side pre-check for active open ticket with same serial number / assetId
-            if (cleanSerial || assetId) {
-                const activeDuplicate = tickets.find(t => {
-                    const isClosed = ['closed', 'cancelled'].includes((t.status || '').toLowerCase());
-                    if (isClosed) return false;
-
-                    const tSerial = (t.serialNumber || t.assetId?.serialNumber || '').trim().toLowerCase();
-                    const tAssetId = t.assetId?._id || t.assetId;
-
-                    if (cleanSerial && tSerial && tSerial === cleanSerial.toLowerCase()) return true;
-                    if (assetId && tAssetId && String(tAssetId) === String(assetId)) return true;
-                    return false;
-                });
-
-                if (activeDuplicate) {
-                    toast.error(`An active ticket (${activeDuplicate.ticketNo}) in status '${activeDuplicate.status}' already exists for Product Serial No. "${cleanSerial}". Please close the existing ticket before raising a new one.`);
-                    return;
-                }
-            }
+            // Duplicate detection is left to the server (see note in the standard form
+            // submit): the locally loaded ticket list is only one page of the register.
 
             // 7. Construct description with uploads
             const imageUrls = Object.entries(manualImages)
