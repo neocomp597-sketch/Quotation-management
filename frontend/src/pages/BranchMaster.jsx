@@ -9,6 +9,7 @@ import { branchService, stateMasterService } from '../services/api';
 import Modal from '../components/Modal';
 import CascadingLocationSelector from '../components/CascadingLocationSelector';
 import { isValidGSTIN, isValidMobile, isValidPincode } from '../utils/validation';
+import { resolveImageUrl } from '../utils/helpers';
 
 const BranchMaster = ({ isCreatePage, isEditPage }) => {
     const navigate = useNavigate();
@@ -276,8 +277,8 @@ const BranchMaster = ({ isCreatePage, isEditPage }) => {
                                     <div className="flex items-center gap-3">
                                         {branch.logoUrl ? (
                                             <img 
-                                                src={branch.logoUrl} 
-                                                alt={branch.name} 
+                                                src={resolveImageUrl(branch.logoUrl)}
+                                                alt={branch.name}
                                                 className="w-12 h-12 rounded-2xl object-cover border border-slate-200 dark:border-slate-700" 
                                             />
                                         ) : (

@@ -7,10 +7,52 @@ import {
     MdFeedback, MdArrowBack, MdSave, 
     MdWarning, MdCheckCircleOutline, MdCheckCircle, MdChat,
     MdMyLocation, MdLocationOn, MdStar, MdStarBorder, MdMap, MdOpenInNew,
-    MdPhotoCamera, MdCloudUpload, MdDelete, MdAssignmentTurnedIn
+    MdPhotoCamera, MdCloudUpload, MdDelete, MdAssignmentTurnedIn,
+    MdZoomIn, MdClose
 } from 'react-icons/md';
 import Modal from '../components/Modal';
 import { useSubmitGuard } from '../hooks/useSubmitGuard';
+
+const parseDescriptionAndImages = (rawDesc = '') => {
+    if (!rawDesc) return { text: '', images: [] };
+
+    const parts = rawDesc.split(/--- Uploaded Images ---/i);
+    const mainText = parts[0].trim();
+    const imagesPart = parts.length > 1 ? parts.slice(1).join('\n') : (rawDesc.includes('http') ? rawDesc : '');
+
+    const extractedImages = [];
+    const seenUrls = new Set();
+
+    if (imagesPart) {
+        const lineRegex = /(?:[•\-*]\s*)?([A-Za-z0-9_\-\s]{2,30}):\s*[\r\n]*\s*(https?:\/\/[^\s]+)/gi;
+        let match;
+        while ((match = lineRegex.exec(imagesPart)) !== null) {
+            const label = match[1].trim();
+            const url = match[2].trim();
+            if (url && !seenUrls.has(url)) {
+                seenUrls.add(url);
+                extractedImages.push({ label, url });
+            }
+        }
+
+        if (extractedImages.length === 0 && parts.length > 1) {
+            const urlRegex = /(https?:\/\/[^\s]+)/gi;
+            let urlMatch;
+            while ((urlMatch = urlRegex.exec(imagesPart)) !== null) {
+                const url = urlMatch[1].trim();
+                if (url && !seenUrls.has(url)) {
+                    seenUrls.add(url);
+                    extractedImages.push({ label: 'Attachment', url });
+                }
+            }
+        }
+    }
+
+    return {
+        text: mainText,
+        images: extractedImages
+    };
+};
 
 const TicketDetail = () => {
     const { id } = useParams();
@@ -18,6 +60,7 @@ const TicketDetail = () => {
     const [loading, setLoading] = useState(true);
     const [ticket, setTicket] = useState(null);
     const [activeTab, setActiveTab] = useState('communication');
+    const [previewImage, setPreviewImage] = useState(null);
     
     // Entitlements (Warranty/AMC check results)
     const [entitlements, setEntitlements] = useState(null);
@@ -752,10 +795,82 @@ const TicketDetail = () => {
                                 </div>
                             )}
 
-                            <div>
-                                <span className="block text-[10px] font-black uppercase tracking-widest text-slate-400">Description</span>
-                                <p className="text-xs text-slate-500 font-medium whitespace-pre-wrap leading-relaxed">{ticket.description || 'No description provided'}</p>
-                            </div>
+                            {(() => {
+                                const { text, images } = parseDescriptionAndImages(ticket.description);
+                                const allImages = [...images];
+                                if (ticket.productImage && !allImages.some(img => img.url === ticket.productImage)) {
+                                    allImages.push({ label: 'Completion Evidence', url: ticket.productImage });
+                                }
+
+                                return (
+                                    <div className="space-y-3 pt-1 border-t border-slate-100">
+                                        <div>
+                                            <span className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">
+                                                Description
+                                            </span>
+                                            <div className="text-xs text-slate-700 font-semibold whitespace-pre-wrap leading-relaxed bg-slate-50/70 p-3.5 rounded-xl border border-slate-100">
+                                                {text || 'No description provided.'}
+                                            </div>
+                                        </div>
+
+                                        {allImages.length > 0 && (
+                                            <div className="space-y-2 pt-2 border-t border-slate-100">
+                                                <span className="block text-[10px] font-black uppercase tracking-widest text-teal-700 flex items-center gap-1.5">
+                                                    <MdPhotoCamera size={14} className="text-teal-600" />
+                                                    Uploaded Images ({allImages.length})
+                                                </span>
+                                                <div className="grid grid-cols-2 gap-2.5">
+                                                    {allImages.map((img, idx) => (
+                                                        <div
+                                                            key={idx}
+                                                            className="group relative rounded-xl border border-slate-200/80 bg-white overflow-hidden shadow-2xs hover:shadow-md transition-all flex flex-col"
+                                                        >
+                                                            <div className="px-2.5 py-1 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                                                                <span className="text-[9px] font-black text-slate-700 uppercase tracking-wider truncate">
+                                                                    {img.label}
+                                                                </span>
+                                                                <span className="text-[8px] font-extrabold text-teal-700 bg-teal-50 px-1.5 py-0.5 rounded border border-teal-100">
+                                                                    IMAGE
+                                                                </span>
+                                                            </div>
+                                                            <div
+                                                                className="relative aspect-4/3 cursor-pointer overflow-hidden bg-slate-100"
+                                                                onClick={() => setPreviewImage(img)}
+                                                            >
+                                                                <img
+                                                                    src={img.url}
+                                                                    alt={img.label}
+                                                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                                                    onError={(e) => {
+                                                                        e.target.onerror = null;
+                                                                        e.target.src = 'https://via.placeholder.com/300x200?text=Image+Unavailable';
+                                                                    }}
+                                                                />
+                                                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white p-2">
+                                                                    <MdZoomIn size={22} className="drop-shadow-sm mb-0.5" />
+                                                                    <span className="text-[9px] font-black uppercase tracking-widest">Click to Zoom</span>
+                                                                </div>
+                                                            </div>
+                                                            <div className="p-1.5 text-center bg-white border-t border-slate-50 flex items-center justify-center">
+                                                                <a
+                                                                    href={img.url}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    onClick={(e) => e.stopPropagation()}
+                                                                    className="text-[9px] font-bold text-primary-600 hover:text-primary-800 uppercase tracking-wider inline-flex items-center gap-1"
+                                                                >
+                                                                    <span>Open Link</span>
+                                                                    <MdOpenInNew size={10} />
+                                                                </a>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })()}
 
                             {ticket.assignedSalespersonId && (
                                 <div className="p-4 rounded-2xl bg-primary-50 border border-primary-100 space-y-1.5 mt-3">
@@ -1365,15 +1480,6 @@ const TicketDetail = () => {
                                                     className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md"
                                                 >
                                                     Reschedule Visit
-                                                </button>
-                                            </div>
-
-                                            <div className="pt-1 text-center">
-                                                <button
-                                                    onClick={() => navigate('/csm/visits')}
-                                                    className="text-[10px] font-black text-indigo-700 uppercase tracking-widest hover:underline"
-                                                >
-                                                    Go to Field Service Visits Queue & Dispatch Simulator →
                                                 </button>
                                             </div>
                                         </div>
@@ -1986,6 +2092,45 @@ const TicketDetail = () => {
                         )}
                     </div>
                 </form>
+            </Modal>
+
+            {/* Image Preview Lightbox Modal */}
+            <Modal
+                isOpen={!!previewImage}
+                onClose={() => setPreviewImage(null)}
+                title={`${previewImage?.label || 'Image Preview'} - ${ticket?.ticketNo || ''}`}
+                maxWidth="max-w-4xl"
+                footer={
+                    <div className="flex justify-between items-center w-full">
+                        {previewImage?.url && (
+                            <a
+                                href={previewImage.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-4 py-2 bg-primary-50 text-primary-700 hover:bg-primary-100 rounded-xl text-xs font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors"
+                            >
+                                <MdOpenInNew size={14} /> Open Full High-Res Image
+                            </a>
+                        )}
+                        <button
+                            type="button"
+                            onClick={() => setPreviewImage(null)}
+                            className="px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors"
+                        >
+                            Close
+                        </button>
+                    </div>
+                }
+            >
+                {previewImage && (
+                    <div className="p-2 flex flex-col items-center justify-center bg-slate-950/90 rounded-2xl overflow-hidden min-h-[300px]">
+                        <img
+                            src={previewImage.url}
+                            alt={previewImage.label}
+                            className="max-h-[70vh] w-auto object-contain rounded-lg shadow-2xl"
+                        />
+                    </div>
+                )}
             </Modal>
         </div>
     );

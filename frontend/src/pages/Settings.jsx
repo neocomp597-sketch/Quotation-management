@@ -14,7 +14,7 @@ import {
     MdVisibilityOff
 } from 'react-icons/md';
 import { useAuth } from '../context/AuthContext';
-import { userService, companySettingsService, uploadService, footerPagesService } from '../services/api';
+import { userService, companySettingsService, uploadService, footerPageService } from '../services/api';
 import { resolveImageUrl } from '../utils/helpers';
 import SiteLogo from '../components/SiteLogo';
 import { ROLE_LABELS } from '../constants/menuPermissions';
