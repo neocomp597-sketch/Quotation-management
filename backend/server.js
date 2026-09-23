@@ -56,6 +56,9 @@ app.use(
     credentials: true,
   }),
 );
+// Compress API responses. Several list endpoints return hundreds of KB of JSON
+// (the employee list is ~1 MB), which shrinks by roughly 10x over the wire.
+app.use(require("compression")());
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 app.use((req, res, next) => {
