@@ -989,7 +989,7 @@ exports.engineers = {
             const companyId = req.user?.companyId;
 
             if (companyId) {
-                await syncAllEngineers(companyId);
+                await syncAllEngineers(companyId, { returnEngineers: false });
             }
 
             const docs = await Engineer.find({ companyId })

@@ -1,140 +1,143 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import Layout from './components/Layout';
 import PermissionRoute from './components/PermissionRoute';
-import Dashboard from './pages/Dashboard';
-import Customers from './pages/Customers';
-import Products from './pages/Products';
-import MGRMaster from './pages/MGRMaster';
-import Quotations from './pages/Quotations';
-import CreateQuotation from './pages/CreateQuotation';
-import QuoteConversionReport from './pages/QuoteConversionReport';
-import Terms from './pages/Terms';
-import LandingPage from './pages/LandingPage';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import Enquiries from './pages/Enquiries';
-import EnquiryDetail from './pages/EnquiryDetail';
-import ScheduleEnquiryVisit from './pages/ScheduleEnquiryVisit';
-import CreateEnquiry from './pages/CreateEnquiry';
-import EnquiryAnalytics from './pages/EnquiryAnalytics';
-import Meetings from './pages/Meetings';
-import CreateMeeting from './pages/CreateMeeting';
-import Salespersons from './pages/Salespersons';
-import Settings from './pages/Settings';
-import Attributes from './pages/Attributes';
-import Simulations from './pages/Simulations';
-import PlanningScreen from './pages/PlanningScreen';
-import Reports from './pages/Reports';
-import Vendors from './pages/Vendors';
-import Vendor360Workspace from './pages/Vendor360Workspace';
-import Vouchers from './pages/Vouchers';
-import CreateVoucher from './pages/CreateVoucher';
-import Authorization from './pages/Authorization';
-import StatusMaster from './pages/StatusMaster';
-import TerritoryMaster from './pages/TerritoryMaster';
-import BranchMaster from './pages/BranchMaster';
-import StateMaster from './pages/StateMaster';
-import CityMaster from './pages/CityMaster';
-import SerialNoMaster from './pages/SerialNoMaster';
-import Contacts from './pages/Contacts';
-import Contact360Workspace from './pages/Contact360Workspace';
-import SuperAdmin from './pages/SuperAdmin';
 import ErrorBoundary from './components/ErrorBoundary';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 
-import FooterPageView from './pages/FooterPageView';
-import SystemUpdates from './pages/SystemUpdates';
-import LandingPlanManager from './pages/LandingPlanManager';
+// Route components are loaded on demand so the first page load only ships
+// the shell (router, layout, auth) instead of every screen in the app.
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Customers = lazy(() => import('./pages/Customers'));
+const Products = lazy(() => import('./pages/Products'));
+const MGRMaster = lazy(() => import('./pages/MGRMaster'));
+const Quotations = lazy(() => import('./pages/Quotations'));
+const CreateQuotation = lazy(() => import('./pages/CreateQuotation'));
+const QuoteConversionReport = lazy(() => import('./pages/QuoteConversionReport'));
+const Terms = lazy(() => import('./pages/Terms'));
+const LandingPage = lazy(() => import('./pages/LandingPage'));
+const Login = lazy(() => import('./pages/Login'));
+const Register = lazy(() => import('./pages/Register'));
+const Enquiries = lazy(() => import('./pages/Enquiries'));
+const EnquiryDetail = lazy(() => import('./pages/EnquiryDetail'));
+const ScheduleEnquiryVisit = lazy(() => import('./pages/ScheduleEnquiryVisit'));
+const CreateEnquiry = lazy(() => import('./pages/CreateEnquiry'));
+const EnquiryAnalytics = lazy(() => import('./pages/EnquiryAnalytics'));
+const Meetings = lazy(() => import('./pages/Meetings'));
+const CreateMeeting = lazy(() => import('./pages/CreateMeeting'));
+const Salespersons = lazy(() => import('./pages/Salespersons'));
+const Settings = lazy(() => import('./pages/Settings'));
+const Attributes = lazy(() => import('./pages/Attributes'));
+const Simulations = lazy(() => import('./pages/Simulations'));
+const PlanningScreen = lazy(() => import('./pages/PlanningScreen'));
+const Reports = lazy(() => import('./pages/Reports'));
+const Vendors = lazy(() => import('./pages/Vendors'));
+const Vendor360Workspace = lazy(() => import('./pages/Vendor360Workspace'));
+const Vouchers = lazy(() => import('./pages/Vouchers'));
+const CreateVoucher = lazy(() => import('./pages/CreateVoucher'));
+const Authorization = lazy(() => import('./pages/Authorization'));
+const StatusMaster = lazy(() => import('./pages/StatusMaster'));
+const TerritoryMaster = lazy(() => import('./pages/TerritoryMaster'));
+const BranchMaster = lazy(() => import('./pages/BranchMaster'));
+const StateMaster = lazy(() => import('./pages/StateMaster'));
+const CityMaster = lazy(() => import('./pages/CityMaster'));
+const SerialNoMaster = lazy(() => import('./pages/SerialNoMaster'));
+const Contacts = lazy(() => import('./pages/Contacts'));
+const Contact360Workspace = lazy(() => import('./pages/Contact360Workspace'));
+const SuperAdmin = lazy(() => import('./pages/SuperAdmin'));
+const FooterPageView = lazy(() => import('./pages/FooterPageView'));
+const SystemUpdates = lazy(() => import('./pages/SystemUpdates'));
+const LandingPlanManager = lazy(() => import('./pages/LandingPlanManager'));
+const DeveloperLayout = lazy(() => import('./pages/Developer/DeveloperLayout'));
+const DeveloperOverview = lazy(() => import('./pages/Developer/pages/Overview'));
+const DeveloperQuickStart = lazy(() => import('./pages/Developer/pages/QuickStart'));
+const DeveloperAuthentication = lazy(() => import('./pages/Developer/pages/Authentication'));
+const DeveloperApiKeys = lazy(() => import('./pages/Developer/pages/ApiKeys'));
+const DeveloperApiReference = lazy(() => import('./pages/Developer/pages/ApiReference'));
+const DeveloperWebhooks = lazy(() => import('./pages/Developer/pages/Webhooks'));
+const DeveloperErrors = lazy(() => import('./pages/Developer/pages/Errors'));
+const DeveloperRateLimits = lazy(() => import('./pages/Developer/pages/RateLimits'));
+const DeveloperLogs = lazy(() => import('./pages/Developer/pages/Logs'));
+const PayrollDashboard = lazy(() => import('./pages/PayrollDashboard'));
+const PayrollEmployees = lazy(() => import('./pages/PayrollEmployees'));
+const PayrollRuns = lazy(() => import('./pages/PayrollRuns'));
+const PayrollPayments = lazy(() => import('./pages/PayrollPayments'));
+const PayrollPayslips = lazy(() => import('./pages/PayrollPayslips'));
+const PayrollLetters = lazy(() => import('./pages/PayrollLetters'));
+const PayrollReports = lazy(() => import('./pages/PayrollReports'));
+const PayrollSettingsPage = lazy(() => import('./pages/PayrollSettingsPage'));
+const PayrollMasters = lazy(() => import('./pages/PayrollMasters'));
+const OrgChart = lazy(() => import('./pages/OrgChart'));
+const Flowcharts = lazy(() => import('./pages/Flowcharts'));
+const CSMDashboard = lazy(() => import('./pages/CSMDashboard'));
+const CSMTickets = lazy(() => import('./pages/CSMTickets'));
+const TicketDetail = lazy(() => import('./pages/TicketDetail'));
+const ServiceVisits = lazy(() => import('./pages/ServiceVisits'));
+const FieldAttendance = lazy(() => import('./pages/FieldAttendance'));
+const CSMVisitPlanner = lazy(() => import('./pages/CSMVisitPlanner'));
+const WarrantyAMC = lazy(() => import('./pages/WarrantyAMC'));
+const KnowledgeBase = lazy(() => import('./pages/KnowledgeBase'));
+const CSMMasters = lazy(() => import('./pages/CSMMasters'));
+const CSMReports = lazy(() => import('./pages/CSMReports'));
+const CSMRcaReport = lazy(() => import('./pages/CSMRcaReport'));
+const SalesDashboard = lazy(() => import('./pages/SalesDashboard'));
+const DealBoard = lazy(() => import('./pages/DealBoard'));
+const DealDetail = lazy(() => import('./pages/DealDetail'));
+const SalesPipelines = lazy(() => import('./pages/SalesPipelines'));
+const SalesForecasting = lazy(() => import('./pages/SalesForecasting'));
+const SalesActivities = lazy(() => import('./pages/SalesActivities'));
+const SalesTargets = lazy(() => import('./pages/SalesTargets'));
+const SalesReports = lazy(() => import('./pages/SalesReports'));
+const SalesAnalytics = lazy(() => import('./pages/SalesAnalytics'));
+const TenderDashboard = lazy(() => import('./pages/TenderDashboard'));
+const TenderRegister = lazy(() => import('./pages/TenderRegister'));
+const TenderReports = lazy(() => import('./pages/TenderReports'));
+const InventoryDashboard = lazy(() => import('./pages/inventory/InventoryDashboard'));
+const StockMatrix = lazy(() => import('./pages/inventory/StockMatrix'));
+const ProductStockDetail = lazy(() => import('./pages/inventory/ProductStockDetail'));
+const WarehouseMaster = lazy(() => import('./pages/inventory/WarehouseMaster'));
+const WarehouseForm = lazy(() => import('./pages/inventory/WarehouseForm'));
+const StockTransfers = lazy(() => import('./pages/inventory/StockTransfers'));
+const CreateTransfer = lazy(() => import('./pages/inventory/CreateTransfer'));
+const StockAdjustments = lazy(() => import('./pages/inventory/StockAdjustments'));
+const CreateAdjustment = lazy(() => import('./pages/inventory/CreateAdjustment'));
+const StockAudits = lazy(() => import('./pages/inventory/StockAudits'));
+const CreateAudit = lazy(() => import('./pages/inventory/CreateAudit'));
+const RecordAuditCount = lazy(() => import('./pages/inventory/RecordAuditCount'));
+const StockAlertsPage = lazy(() => import('./pages/inventory/StockAlertsPage'));
+const InventoryReports = lazy(() => import('./pages/inventory/InventoryReports'));
+const CatalogSubmodule = lazy(() => import('./pages/CatalogSubmodule'));
+const PriceManagement = lazy(() => import('./pages/PriceManagement'));
+const GuidedSelling = lazy(() => import('./pages/GuidedSelling'));
+const CPQConfigurator = lazy(() => import('./pages/CPQConfigurator'));
+const QuoteSimulator = lazy(() => import('./pages/QuoteSimulator'));
+const Approvals = lazy(() => import('./pages/Approvals'));
+const Contracts = lazy(() => import('./pages/Contracts'));
+const Orders = lazy(() => import('./pages/Orders'));
+const RevenueAnalytics = lazy(() => import('./pages/RevenueAnalytics'));
+const CompetitorIntel = lazy(() => import('./pages/CompetitorIntel'));
+const AIPricingInsights = lazy(() => import('./pages/AIPricingInsights'));
+const CustomerPricingDashboard = lazy(() => import('./pages/CustomerPricingDashboard'));
+const CustomerAnalytics = lazy(() => import('./pages/CustomerAnalytics'));
+const Customer360Workspace = lazy(() => import('./pages/Customer360Workspace'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
+const SelectBranch = lazy(() => import('./pages/SelectBranch'));
 
-import DeveloperLayout from './pages/Developer/DeveloperLayout';
-import DeveloperOverview from './pages/Developer/pages/Overview';
-import DeveloperQuickStart from './pages/Developer/pages/QuickStart';
-import DeveloperAuthentication from './pages/Developer/pages/Authentication';
-import DeveloperApiKeys from './pages/Developer/pages/ApiKeys';
-import DeveloperApiReference from './pages/Developer/pages/ApiReference';
-import DeveloperWebhooks from './pages/Developer/pages/Webhooks';
-import DeveloperErrors from './pages/Developer/pages/Errors';
-import DeveloperRateLimits from './pages/Developer/pages/RateLimits';
-import DeveloperLogs from './pages/Developer/pages/Logs';
 
-import PayrollDashboard from './pages/PayrollDashboard';
-import PayrollEmployees from './pages/PayrollEmployees';
-import PayrollRuns from './pages/PayrollRuns';
-import PayrollPayments from './pages/PayrollPayments';
-import PayrollPayslips from './pages/PayrollPayslips';
-import PayrollLetters from './pages/PayrollLetters';
-import PayrollReports from './pages/PayrollReports';
-import PayrollSettingsPage from './pages/PayrollSettingsPage';
-import PayrollMasters from './pages/PayrollMasters';
-import OrgChart from './pages/OrgChart';
-import Flowcharts from './pages/Flowcharts';
 
-import CSMDashboard from './pages/CSMDashboard';
-import CSMTickets from './pages/CSMTickets';
-import TicketDetail from './pages/TicketDetail';
-import ServiceVisits from './pages/ServiceVisits';
-import FieldAttendance from './pages/FieldAttendance';
-import CSMVisitPlanner from './pages/CSMVisitPlanner';
-import WarrantyAMC from './pages/WarrantyAMC';
-import KnowledgeBase from './pages/KnowledgeBase';
-import CSMMasters from './pages/CSMMasters';
-import CSMReports from './pages/CSMReports';
-import CSMRcaReport from './pages/CSMRcaReport';
 
-import SalesDashboard from './pages/SalesDashboard';
-import DealBoard from './pages/DealBoard';
-import DealDetail from './pages/DealDetail';
-import SalesPipelines from './pages/SalesPipelines';
-import SalesForecasting from './pages/SalesForecasting';
-import SalesActivities from './pages/SalesActivities';
-import SalesTargets from './pages/SalesTargets';
-import SalesReports from './pages/SalesReports';
-import SalesAnalytics from './pages/SalesAnalytics';
+
 
 // Tender Pages
-import TenderDashboard from './pages/TenderDashboard';
-import TenderRegister from './pages/TenderRegister';
-import TenderReports from './pages/TenderReports';
 
 // Inventory Pages
-import InventoryDashboard from './pages/inventory/InventoryDashboard';
-import StockMatrix from './pages/inventory/StockMatrix';
-import ProductStockDetail from './pages/inventory/ProductStockDetail';
-import WarehouseMaster from './pages/inventory/WarehouseMaster';
-import WarehouseForm from './pages/inventory/WarehouseForm';
-import StockTransfers from './pages/inventory/StockTransfers';
-import CreateTransfer from './pages/inventory/CreateTransfer';
-import StockAdjustments from './pages/inventory/StockAdjustments';
-import CreateAdjustment from './pages/inventory/CreateAdjustment';
-import StockAudits from './pages/inventory/StockAudits';
-import CreateAudit from './pages/inventory/CreateAudit';
-import RecordAuditCount from './pages/inventory/RecordAuditCount';
-import StockAlertsPage from './pages/inventory/StockAlertsPage';
-import InventoryReports from './pages/inventory/InventoryReports';
 
 // CPQ Pages
-import CatalogSubmodule from './pages/CatalogSubmodule';
-import PriceManagement from './pages/PriceManagement';
-import GuidedSelling from './pages/GuidedSelling';
-import CPQConfigurator from './pages/CPQConfigurator';
-import QuoteSimulator from './pages/QuoteSimulator';
-import Approvals from './pages/Approvals';
-import Contracts from './pages/Contracts';
-import Orders from './pages/Orders';
-import RevenueAnalytics from './pages/RevenueAnalytics';
-import CompetitorIntel from './pages/CompetitorIntel';
-import AIPricingInsights from './pages/AIPricingInsights';
-import CustomerPricingDashboard from './pages/CustomerPricingDashboard';
-import CustomerAnalytics from './pages/CustomerAnalytics';
-import Customer360Workspace from './pages/Customer360Workspace';
 
-import ForgotPassword from './pages/ForgotPassword';
-import ResetPassword from './pages/ResetPassword';
-import SelectBranch from './pages/SelectBranch';
 
 function App() {
   return (
@@ -157,6 +160,12 @@ function App() {
         }}
       />
       <Router>
+        <Suspense fallback={
+          <div style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: 38, height: 38, border: '3px solid #e2e8f0', borderTopColor: '#0f766e', borderRadius: '50%', animation: 'arcrm-spin 0.7s linear infinite' }} />
+            <style>{'@keyframes arcrm-spin{to{transform:rotate(360deg)}}'}</style>
+          </div>
+        }>
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<LandingPage />} />
@@ -370,6 +379,7 @@ function App() {
           {/* Fallback route */}
           <Route path="*" element={<Navigate to="/dashboard" />} />
         </Routes>
+        </Suspense>
       </Router>
     </AuthProvider>
   );

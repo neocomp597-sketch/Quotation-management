@@ -8,6 +8,7 @@ import { calculateLineItem, resolveImageUrl, getPlaceholderImage } from '../util
 import Modal from '../components/Modal';
 import { clearQuotationDraft, setAutosaveStatus, setQuotationDraft } from '../store/quotationDraftSlice';
 import { useSubmitGuard } from '../hooks/useSubmitGuard';
+import { loadGoogleMaps } from '../utils/loadGoogleMaps';
 
 // Skeleton loader for product rows
 const SkeletonRow = () => (
@@ -563,11 +564,15 @@ const CreateQuotation = () => {
         }
     }, [header.customerId]);
 
-    // Google Maps Autocomplete Setup
+    // Google Maps Autocomplete Setup. The API is fetched on demand the first time
+    // the site modal opens, instead of on every page load of the whole app.
     useEffect(() => {
         let timer;
+        let cancelled = false;
         if (isSiteModalOpen && addressInputRef.current) {
-            timer = setTimeout(() => {
+            loadGoogleMaps().then(() => {
+                if (cancelled) return;
+                timer = setTimeout(() => {
                 if (window.google && window.google.maps && window.google.maps.places) {
                     autocompleteRef.current = new window.google.maps.places.Autocomplete(addressInputRef.current, {
                         types: ['geocode', 'establishment'],
@@ -599,9 +604,13 @@ const CreateQuotation = () => {
                         return () => input.removeEventListener('keydown', handleKeyDown);
                     }
                 }
-            }, 500);
+                }, 500);
+            });
         }
-        return () => clearTimeout(timer);
+        return () => {
+            cancelled = true;
+            clearTimeout(timer);
+        };
     }, [isSiteModalOpen]);
 
     // Derived Data

@@ -10,6 +10,10 @@
   <link rel="shortcut icon" href="/favicon.ico" />
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
   <link rel="manifest" href="/site.webmanifest" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;600;700&display=swap" />
   <meta name="theme-color" content="#2563eb" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ARCRM</title>
@@ -62,8 +66,7 @@
       window.process = { env: {} };
     }
   </script>
-  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDJeMis1L5Dlg1c22uhKBZqYq2W5MJ2ezU&libraries=places&loading=async"
-    async defer></script>
+  <!-- Google Maps is loaded on demand by the screens that use it (src/utils/loadGoogleMaps.js) -->
 </head>
 
 <body>

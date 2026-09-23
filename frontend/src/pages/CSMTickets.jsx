@@ -4,7 +4,6 @@ import { useAuth } from '../context/AuthContext';
 import { csmService, customerService, productService, voucherService, userService, importService, uploadService, branchService } from '../services/api';
 import { toast } from 'react-toastify';
 import { MdAdd, MdSearch, MdFilterList, MdArrowForward, MdEdit, MdDelete, MdPublish, MdFileDownload, MdWarning, MdInfoOutline, MdPhotoCamera, MdCloudUpload, MdPeople, MdAccountTree, MdCorporateFare } from 'react-icons/md';
-import * as XLSX from 'xlsx';
 import PaginationControls from '../components/PaginationControls';
 import PortalDropdown from '../components/PortalDropdown';
 import Modal from '../components/Modal';
@@ -1629,6 +1628,8 @@ const CSMTickets = () => {
                 'Assigned Engineer': t.assignedEngineerId?.name || 'Unassigned'
             }));
 
+            // SheetJS (~1.2 MB) is fetched only when the user actually exports.
+            const XLSX = await import('xlsx');
             const ws = XLSX.utils.json_to_sheet(exportData);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, 'Tickets');

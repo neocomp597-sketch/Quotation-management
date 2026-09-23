@@ -113,7 +113,19 @@ exports.protect = async (req, res, next) => {
                 reportsTo: user.reportsTo || null
             };
 
-            runWithTenant(req.user.companyId, () => next(), { bypassTenant: isSuperAdmin });
+            // Branch scoping: admins and super admins see every branch; everyone else is
+            // limited to the branches assigned to them, enforced for all queries by
+            // tenantPlugin so it cannot be bypassed by calling the API directly.
+            const { getScopedBranchIds } = require('../utils/accessControl');
+            const isAdminRole = ['admin', 'company_admin'].includes(String(user.role || '').toLowerCase());
+            const branchIds = getScopedBranchIds(req.user);
+            const branchScoped = !isSuperAdmin && !isAdminRole && branchIds.length > 0;
+
+            runWithTenant(req.user.companyId, () => next(), {
+                bypassTenant: isSuperAdmin,
+                branchScoped,
+                branchIds
+            });
         } catch (error) {
             if (error?.name === 'TokenExpiredError') {
                 return res.status(401).json({ message: 'Not authorized, token expired' });

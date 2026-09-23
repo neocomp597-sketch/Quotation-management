@@ -8,6 +8,7 @@ import {
     MdHowToReg, MdBadge, MdAccessTime, MdLocationOn, MdCameraAlt, MdRefresh, MdArrowBack
 } from 'react-icons/md';
 import Modal from '../components/Modal';
+import { loadGoogleMaps } from '../utils/loadGoogleMaps';
 
 // Client-side image compression & resizing helper before upload (max 800x800, quality 0.7)
 const compressSelfieImage = (file, maxWidth = 800, maxHeight = 800, quality = 0.7) => {
@@ -379,6 +380,10 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
     const fetchAccurateLocation = async (lat, lng) => {
         let detailedAddress = '';
         let detailedArea = '';
+
+        // The Maps API is fetched on demand (it is no longer loaded by index.html);
+        // if it is unavailable we fall through to the OpenStreetMap lookup below.
+        await loadGoogleMaps().catch(() => false);
 
         // 1. Google Maps JS API Geocoder (if available)
         if (window.google && window.google.maps && window.google.maps.Geocoder) {

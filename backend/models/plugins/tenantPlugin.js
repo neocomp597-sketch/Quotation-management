@@ -1,4 +1,4 @@
-const { getTenantId, isTenantBypassed } = require('../../middlewares/tenantContext');
+const { getTenantId, isTenantBypassed, getScopedBranches } = require('../../middlewares/tenantContext');
 const mongoose = require('mongoose');
 
 const TENANT_QUERY_HOOKS = [
@@ -46,6 +46,30 @@ const addTenantFilter = (query, companyId) => {
         return;
     }
     query.setQuery({ $and: [currentQuery, { companyId }] });
+};
+
+/**
+ * Restricts a query to the branches the current user is assigned to.
+ *
+ * Applied on top of whatever the caller asked for (never instead of it), so a user
+ * cannot widen their own access by passing a branchId of their choosing. Records
+ * that carry no branch stay visible to everyone - they are not owned by a branch.
+ */
+const addBranchFilter = (query, branchIds) => {
+    const ids = branchIds.map(id => toObjectId(id));
+    const currentQuery = query.getQuery();
+    query.setQuery({
+        $and: [
+            currentQuery,
+            {
+                $or: [
+                    { branchId: { $in: ids } },
+                    { branchId: null },
+                    { branchId: { $exists: false } }
+                ]
+            }
+        ]
+    });
 };
 
 module.exports = function tenantPlugin(schema, options = {}) {
@@ -118,6 +142,14 @@ module.exports = function tenantPlugin(schema, options = {}) {
         schema.pre(type, function () {
             if (hasBypass(this.options)) {
                 return;
+            }
+
+            // Only models that actually carry a branch can be branch-scoped.
+            if (schema.path('branchId')) {
+                const branchIds = getScopedBranches();
+                if (branchIds) {
+                    addBranchFilter(this, branchIds);
+                }
             }
 
             const companyId = getTenantId();

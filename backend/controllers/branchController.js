@@ -18,6 +18,15 @@ exports.getAllBranches = async (req, res) => {
     try {
         const companyId = await getEffectiveCompanyId(req);
         const query = companyId ? { companyId } : {};
+
+        // Branch-restricted users only get the branches assigned to them, so the
+        // branch switcher cannot be used to reach another branch's data.
+        const { getScopedBranches } = require('../middlewares/tenantContext');
+        const scopedBranchIds = getScopedBranches();
+        if (scopedBranchIds) {
+            query._id = { $in: scopedBranchIds };
+        }
+
         const branches = await Branch.find(query)
             .sort({ name: 1 })
             .lean();

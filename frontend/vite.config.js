@@ -15,6 +15,11 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    // Routes are lazy-loaded (see src/App.jsx), so the remaining job here is to keep
+    // the shared libraries in their own long-lived chunks instead of one giant file.
+    chunkSizeWarningLimit: 1200
+  },
   server: {
     port: 3000,
     hmr: {
@@ -25,7 +30,6 @@ export default defineConfig({
     }
   },
   optimizeDeps: {
-    include: ['tslib'],
-    force: true
+    include: ['tslib']
   }
 })
