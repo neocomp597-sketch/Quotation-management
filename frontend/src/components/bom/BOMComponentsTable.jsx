@@ -1,55 +1,61 @@
 import React from 'react';
+import { hasChildren, levelStyle, formatCurrency } from './bomUi';
 
-const MGR_KEYS = ['mgr1', 'mgr2', 'mgr3', 'mgr4', 'mgr5'];
+const fmtQty = (value) => (value === null || value === undefined || value === '' ? '-' : Number(value).toLocaleString('en-IN', { maximumFractionDigits: 4 }));
 
-const MgrCell = ({ mgr }) => (
-    mgr
-        ? <span title={mgr.code}>{mgr.description || mgr.code}</span>
-        : <span className="text-slate-300">-</span>
-);
+// Display-only multi-level component list. Deliberately has no edit/delete controls.
+const BOMComponentsTable = ({ components = [], showCost = true, compact = false }) => {
+    const cell = compact ? 'px-2 py-1.5' : 'px-3 py-2';
 
-// Display-only list of BOM components. Deliberately has no edit/delete controls.
-const BOMComponentsTable = ({ items = [], compact = false }) => {
-    const cell = compact ? 'px-3 py-2' : 'p-4';
-
-    if (!items.length) {
+    if (!components.length) {
         return <p className="p-6 text-center text-sm font-medium text-slate-400">This BOM has no components.</p>;
     }
 
+    const headers = ['Level', 'Component Code', 'Description', 'Type', 'Qty', 'UOM', 'Scrap %', 'Total Qty', 'Operation', 'Mandatory',
+        ...(showCost ? ['Rate', 'Amount'] : []), 'Remarks'];
+
     return (
         <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full min-w-[1000px] border-collapse text-left text-sm">
                 <thead>
-                    <tr className="bg-slate-50">
-                        {['#', 'Item Code', 'Description', 'Qty', 'Batch', 'Serial No', 'MGR1', 'MGR2', 'MGR3', 'MGR4', 'MGR5'].map((label) => (
-                            <th key={label} className={`${cell} text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap`}>{label}</th>
+                    <tr>
+                        {headers.map((label) => (
+                            <th key={label} className={`${cell} border border-[#d7dee7] bg-[#eaf2f9] text-[11px] font-bold uppercase text-[#244c6c] whitespace-nowrap`}>{label}</th>
                         ))}
                     </tr>
                 </thead>
                 <tbody>
-                    {items.map((item, index) => (
-                        <tr key={item._id} className="border-b last:border-0 border-slate-50 text-sm">
-                            <td className={`${cell} text-slate-400 font-bold`}>{item.lineNo || index + 1}</td>
-                            <td className={`${cell} font-bold text-slate-800 whitespace-nowrap`}>{item.itemCode}</td>
-                            <td className={`${cell} text-slate-600 min-w-[12rem]`}>
-                                {item.itemDescription || '-'}
-                                {!item.inProductMaster && (
-                                    <span
-                                        className="ml-2 inline-block rounded-md bg-amber-50 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-amber-600"
-                                        title="Item code not found in Product Master; showing the uploaded description"
-                                    >
-                                        Not in master
-                                    </span>
+                    {components.map((component, index) => {
+                        const style = levelStyle(component.level);
+                        const parent = hasChildren(components, index);
+                        return (
+                            <tr key={component._id || index} className={style.row}>
+                                <td className={`${cell} border border-[#d7dee7] text-center`}>
+                                    <span className={`inline-block min-w-[2rem] rounded px-1.5 py-0.5 text-xs font-bold ${style.badge}`}>L{component.level}</span>
+                                </td>
+                                <td className={`${cell} border border-[#d7dee7] whitespace-nowrap`}>
+                                    <div className={`border-l-4 ${style.border} pl-2 font-semibold text-slate-800`} style={{ marginLeft: `${(Number(component.level) - 1) * 18}px` }}>
+                                        {component.componentCode}
+                                    </div>
+                                </td>
+                                <td className={`${cell} border border-[#d7dee7] ${parent ? 'font-semibold' : ''}`}>{component.description || '-'}</td>
+                                <td className={`${cell} border border-[#d7dee7] whitespace-nowrap`}>{component.componentType}</td>
+                                <td className={`${cell} border border-[#d7dee7] text-right`}>{fmtQty(component.qty)}</td>
+                                <td className={`${cell} border border-[#d7dee7]`}>{component.uom || '-'}</td>
+                                <td className={`${cell} border border-[#d7dee7] text-right`}>{fmtQty(component.scrapPercent)}</td>
+                                <td className={`${cell} border border-[#d7dee7] text-right`}>{fmtQty(component.totalQty)}</td>
+                                <td className={`${cell} border border-[#d7dee7]`}>{component.operationNo || '-'}</td>
+                                <td className={`${cell} border border-[#d7dee7]`}>{component.mandatory === false ? 'No' : 'Yes'}</td>
+                                {showCost && (
+                                    <>
+                                        <td className={`${cell} border border-[#d7dee7] text-right whitespace-nowrap`}>{parent ? '-' : formatCurrency(component.rate)}</td>
+                                        <td className={`${cell} border border-[#d7dee7] text-right whitespace-nowrap`}>{parent ? <span className="text-xs text-slate-400">from children</span> : formatCurrency(component.amount)}</td>
+                                    </>
                                 )}
-                            </td>
-                            <td className={`${cell} font-bold text-slate-700`}>{item.qty}</td>
-                            <td className={`${cell} text-slate-600 whitespace-nowrap`}>{item.batchNumber || '-'}</td>
-                            <td className={`${cell} text-slate-600 whitespace-nowrap`}>{item.componentSerialNumber || '-'}</td>
-                            {MGR_KEYS.map((key) => (
-                                <td key={key} className={`${cell} text-slate-600 whitespace-nowrap`}><MgrCell mgr={item[key]} /></td>
-                            ))}
-                        </tr>
-                    ))}
+                                <td className={`${cell} border border-[#d7dee7] text-slate-600`}>{component.remarks || ''}</td>
+                            </tr>
+                        );
+                    })}
                 </tbody>
             </table>
         </div>

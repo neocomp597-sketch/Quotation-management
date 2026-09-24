@@ -5,14 +5,16 @@ const bomController = require('../controllers/bomController');
 const { protect } = require('../middlewares/authMiddleware');
 const { requirePermission } = require('../middlewares/permissionMiddleware');
 
+const ATTACHMENT_EXTENSIONS = /\.(pdf|xlsx|xls|docx|doc|jpg|jpeg|png|dwg|dxf)$/i;
+
 const upload = multer({
     storage: multer.memoryStorage(),
     limits: { fileSize: 20 * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
-        if (/\.(xlsx|xls|csv)$/i.test(file.originalname)) {
+        if (ATTACHMENT_EXTENSIONS.test(file.originalname)) {
             cb(null, true);
         } else {
-            cb(new Error('Only Excel and CSV files are allowed'), false);
+            cb(new Error('Allowed files: PDF, XLSX, DOCX, JPG, PNG, DWG, DXF'), false);
         }
     }
 });
@@ -24,16 +26,36 @@ const handleUpload = (req, res, next) => upload.single('file')(req, res, (error)
     return next();
 });
 
+const canViewBOM = requirePermission('master_bom');
+const canEditBOM = requirePermission('bom_create');
+
 router.use(protect);
 
-// Complaint screens read BOMs through these, so they only need a logged-in user.
+// Complaint screens read the Active BOM through these, so they only need a logged-in user.
 // There are deliberately no write endpoints for complaint BOMs.
-router.get('/serial/:serialNumber', bomController.getBOMBySerial);
-router.get('/ticket/:ticketId', bomController.getBOMForTicket);
+router.get('/complaint/ticket/:ticketId', bomController.getComplaintBOMForTicket);
+router.get('/complaint/lookup', bomController.getComplaintBOMLookup);
 
-router.get('/template', requirePermission('master_bom'), bomController.downloadTemplate);
-router.post('/upload', requirePermission('master_bom'), handleUpload, bomController.uploadBOM);
-router.get('/', requirePermission('master_bom'), bomController.listBOMs);
-router.get('/:id', requirePermission('master_bom'), bomController.getBOMById);
+router.get('/options', canViewBOM, bomController.getOptions);
+router.get('/materials', canViewBOM, bomController.searchMaterials);
+router.post('/validate', canEditBOM, bomController.validateDraft);
+
+router.get('/', canViewBOM, bomController.listBOMs);
+router.post('/', canEditBOM, bomController.createBOM);
+router.get('/:id', canViewBOM, bomController.getBOM);
+router.put('/:id', canEditBOM, bomController.updateBOM);
+router.delete('/:id', canEditBOM, bomController.deleteBOM);
+
+// Workflow. Stage approvals check the stage-specific permission inside the controller.
+router.post('/:id/submit', canEditBOM, bomController.submitBOM);
+router.post('/:id/approve', bomController.approveBOM);
+router.post('/:id/send-back', bomController.sendBackBOM);
+router.post('/:id/reject', bomController.rejectBOM);
+router.post('/:id/release', bomController.releaseBOM);
+router.post('/:id/obsolete', bomController.obsoleteBOM);
+router.post('/:id/revise', canEditBOM, bomController.reviseBOM);
+
+router.post('/:id/attachments', canEditBOM, handleUpload, bomController.addAttachment);
+router.delete('/:id/attachments/:attachmentId', canEditBOM, bomController.removeAttachment);
 
 module.exports = router;

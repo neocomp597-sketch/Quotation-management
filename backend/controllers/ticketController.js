@@ -240,6 +240,21 @@ const getEngineerForUser = async (user) => {
     }).lean();
 };
 
+/**
+ * Whether the user may open a ticket's details: admins and managers may open any ticket in
+ * their company; everyone else only tickets assigned to their engineer record.
+ */
+const canViewTicketDetails = async (user, ticket) => {
+    if (isAdminOrManagerUser(user)) return true;
+    const engineer = await getEngineerForUser(user);
+    if (!engineer) return false;
+    const engIdStr = engineer._id.toString();
+    const primaryEngIdStr = ticket.assignedEngineerId?._id?.toString() || ticket.assignedEngineerId?.toString();
+    const assignedEngIdsStr = (ticket.assignedEngineerIds || []).map(e => e._id?.toString() || e.toString());
+    return primaryEngIdStr === engIdStr || assignedEngIdsStr.includes(engIdStr);
+};
+exports.canViewTicketDetails = canViewTicketDetails;
+
 const EmployeeProfile = require('../models/EmployeeProfile');
 
 const getHierarchyUserAndStaffIds = async (user) => {
@@ -612,19 +627,8 @@ exports.getTicketById = async (req, res) => {
             return res.status(404).json({ message: 'Ticket not found' });
         }
 
-        if (!isAdminOrManagerUser(req.user)) {
-            const engineer = await getEngineerForUser(req.user);
-            if (!engineer) {
-                return res.status(403).json({ message: 'Access denied: You can only view complaints assigned to you.' });
-            }
-            const engIdStr = engineer._id.toString();
-            const primaryEngIdStr = ticket.assignedEngineerId?._id?.toString() || ticket.assignedEngineerId?.toString();
-            const assignedEngIdsStr = (ticket.assignedEngineerIds || []).map(e => e._id?.toString() || e.toString());
-            const isAssigned = (primaryEngIdStr === engIdStr) || assignedEngIdsStr.includes(engIdStr);
-
-            if (!isAssigned) {
-                return res.status(403).json({ message: 'Access denied: You can only view complaints assigned to you.' });
-            }
+        if (!(await canViewTicketDetails(req.user, ticket))) {
+            return res.status(403).json({ message: 'Access denied: You can only view complaints assigned to you.' });
         }
 
         res.json(ticket);
