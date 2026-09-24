@@ -7,6 +7,7 @@ import PermissionRoute from './components/PermissionRoute';
 import ErrorBoundary from './components/ErrorBoundary';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import PageSkeleton from './components/Skeletons';
 
 // Route components are loaded on demand so the first page load only ships
 // the shell (router, layout, auth) instead of every screen in the app.
@@ -139,32 +140,19 @@ const SelectBranch = lazy(() => import('./pages/SelectBranch'));
 // CPQ Pages
 
 
-// Shown while a screen's code is still downloading. A greyed-out outline of a page
-// reads as "this is loading" faster than a spinner, and avoids the blank flash.
-const RouteSkeleton = () => (
-  <div style={{ padding: '28px 32px' }} aria-busy="true" aria-label="Loading screen">
-    <style>{'@keyframes arcrm-pulse{0%,100%{opacity:.55}50%{opacity:.25}}'}</style>
-    <div style={{ animation: 'arcrm-pulse 1.2s ease-in-out infinite' }}>
-      <div style={{ height: 28, width: 260, borderRadius: 8, background: '#e2e8f0' }} />
-      <div style={{ height: 14, width: 380, borderRadius: 6, background: '#e2e8f0', marginTop: 12 }} />
-      <div style={{ display: 'flex', gap: 16, marginTop: 28 }}>
-        {[0, 1, 2, 3].map(i => (
-          <div key={i} style={{ flex: 1, height: 86, borderRadius: 16, background: '#e2e8f0' }} />
-        ))}
-      </div>
-      <div style={{ marginTop: 28, borderRadius: 16, background: '#f1f5f9', padding: 18 }}>
-        {[0, 1, 2, 3, 4, 5].map(i => (
-          <div key={i} style={{ height: 16, borderRadius: 6, background: '#e2e8f0', marginBottom: 14, width: `${100 - i * 4}%` }} />
-        ))}
-      </div>
-    </div>
-  </div>
-);
-
 // Warm up the screens people open most, once the browser is idle after first paint.
 // Their chunks are then already in memory when the menu is clicked, so the route
 // spinner does not appear at all.
 const prefetchCommonRoutes = () => {
+  // Never spend someone else's bandwidth: skip on Data Saver or a slow connection.
+  const connection = typeof navigator !== 'undefined'
+    ? (navigator.connection || navigator.mozConnection || navigator.webkitConnection)
+    : null;
+  if (connection) {
+    if (connection.saveData) return;
+    if (/(^|-)(2g|slow-2g)$/.test(connection.effectiveType || '')) return;
+  }
+
   const load = () => Promise.allSettled([
     import('./pages/Dashboard'),
     import('./pages/CSMTickets'),
@@ -206,7 +194,7 @@ function App() {
         }}
       />
       <Router>
-        <Suspense fallback={<RouteSkeleton />}>
+        <Suspense fallback={<PageSkeleton />}>
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<LandingPage />} />

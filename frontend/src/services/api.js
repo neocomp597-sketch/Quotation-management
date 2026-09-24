@@ -1,4 +1,5 @@
 import axios from "axios";
+import { cachedGet, invalidateApiCache } from "./apiCache";
 
 let accessToken = null;
 let refreshPromise = null;
@@ -165,96 +166,35 @@ api.interceptors.response.use(
 /* ------------------------------------------------------------------ *
  * Master-data cache
  *
- * Most screens re-fetch the same reference lists on every visit (branches,
- * territories, departments, designations, engineers, employees...). That is what
- * keeps the loading spinner on screen when moving between pages.
+ * Screens re-fetch the same reference lists on every visit (branches, territories,
+ * employees, engineers...), which is what keeps a loading spinner on screen when
+ * moving between pages. All services share this axios instance, so caching and
+ * de-duplication are applied here once for the whole app.
  *
- * This caches GET responses for those endpoints for a short time and collapses
- * identical requests that are in flight at the same moment, so opening a screen a
- * second time renders from memory. Any write to a resource clears the cached reads
- * for that resource, so saved changes still show up immediately.
+ * Policy lives in cacheConfig.js, the store in apiCache.js.
  * ------------------------------------------------------------------ */
-const CACHE_TTL_MS = 5 * 60 * 1000;
-
-// Reference data that changes rarely. Live/transactional lists are intentionally
-// absent so they are always fetched fresh.
-// Anchored to the exact list endpoints so action sub-routes (exports, templates,
-// lookups) are never served from cache.
-const CACHEABLE_PATHS = [
-  /^\/(branches|territories|states|cities|mgrs|designations|company-settings|users|products|customers)(\?|$)/,
-  /^\/payroll\/(departments|designations|employees)(\?|$)/,
-  /^\/csm\/masters\/(categories|types|priorities|sources|designations|teams|engineers|problems|sla-policies)(\?|$)/,
-  /^\/csm\/tickets\/customers(\?|$)/,
-];
-
-const apiCache = new Map();   // key -> { expires, data }
-const inFlight = new Map();   // key -> Promise
-
-const cacheKeyFor = (url, config = {}) => {
-  const params = config.params ? JSON.stringify(config.params) : "";
-  return `${url}|${params}`;
-};
-
-const isCacheable = (url, config = {}) =>
-  config.cache !== false &&
-  !config.responseType &&           // never cache file downloads (blob / arraybuffer)
-  CACHEABLE_PATHS.some((re) => re.test(url));
-
-/** Drops cached reads for a resource, e.g. "/payroll/employees/123" clears "/payroll". */
-export const invalidateApiCache = (url = "") => {
-  if (!url) {
-    apiCache.clear();
-    return;
-  }
-  const root = "/" + String(url).replace(/^\//, "").split("/")[0];
-  for (const key of [...apiCache.keys()]) {
-    if (key.startsWith(root)) apiCache.delete(key);
-  }
-};
-
-export const clearApiCache = () => {
-  apiCache.clear();
-  inFlight.clear();
-};
-
 const rawGet = api.get.bind(api);
-api.get = (url, config = {}) => {
-  if (!isCacheable(url, config)) return rawGet(url, config);
+api.get = (url, config = {}) => cachedGet(url, config, () => rawGet(url, config));
 
-  const key = cacheKeyFor(url, config);
-  const hit = apiCache.get(key);
-  if (hit && hit.expires > Date.now()) {
-    return Promise.resolve(hit.data);
-  }
-
-  // Same request already on the way: share it instead of firing a second one.
-  const pending = inFlight.get(key);
-  if (pending) return pending;
-
-  const request = rawGet(url, config)
-    .then((response) => {
-      apiCache.set(key, { expires: Date.now() + CACHE_TTL_MS, data: response });
-      return response;
-    })
-    .finally(() => inFlight.delete(key));
-
-  inFlight.set(key, request);
-  return request;
-};
-
-// Writes invalidate the cached reads for the same resource.
+// A successful write drops the cached reads for that resource, so saved changes
+// are visible immediately. Failed writes invalidate too: the server state is unknown.
 ["post", "put", "patch", "delete"].forEach((method) => {
   const raw = api[method].bind(api);
   api[method] = (url, ...rest) => {
     const result = raw(url, ...rest);
     if (typeof result?.then === "function") {
-      result.then(() => invalidateApiCache(url)).catch(() => invalidateApiCache(url));
+      result.then(
+        () => invalidateApiCache(url),
+        () => invalidateApiCache(url),
+      );
     } else {
       invalidateApiCache(url);
     }
     return result;
   };
 });
+
+export { clearApiCache, invalidateApiCache, cacheStats } from "./apiCache";
 
 export const customerService = {
   getAll: (params) => api.get("/customers", { params }),
