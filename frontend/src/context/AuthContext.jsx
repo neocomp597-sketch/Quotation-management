@@ -1,7 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useCallback, useContext, useEffect, useState, useMemo } from "react";
 import { useDispatch } from "react-redux";
-import { authService, authorizationService, setAccessToken } from "../services/api";
+import { authService, authorizationService, setAccessToken, clearApiCache } from "../services/api";
 import { MENU_PERMISSION_GROUPS } from "../constants/menuPermissions";
 import { clearCredentials, setCredentials, setPermissions as setReduxPermissions } from "../store/authSlice";
 
@@ -104,6 +104,7 @@ export const AuthProvider = ({ children }) => {
     }, []);
 
     const clearSession = useCallback(() => {
+        clearApiCache(); // never let the next user see this session's cached data
         setAccessToken(null);
         localStorage.removeItem("user");
         localStorage.removeItem("activeBranchId");
