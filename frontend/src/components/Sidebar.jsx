@@ -142,6 +142,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                 { key: 'master_branches', name: 'City Master', icon: <MdLocationCity size={18} />, path: '/city-master' },
                 { key: 'csm_masters', name: 'Engineers Master', icon: <MdBuildCircle size={18} />, path: '/csm/masters?tab=engineers' },
                 { key: 'master_mgrs', name: 'MGR Master', icon: <MdCategory size={18} />, path: '/mgrs' },
+                { key: 'master_bom', name: 'BOM Master', icon: <MdAccountTree size={18} />, path: '/bom-master' },
                 { key: 'master_attributes', name: 'Attributes', icon: <MdAssignment size={18} />, path: '/attributes' },
                 { key: 'master_terms', name: 'Terms & Conditions', icon: <MdDescription size={18} />, path: '/terms' },
                 { key: 'master_statuses', name: 'Status Master', icon: <MdBarChart size={18} />, path: '/status-master', adminOnly: true },

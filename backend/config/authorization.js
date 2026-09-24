@@ -18,6 +18,7 @@ const MENU_GROUPS = [
             { key: 'payroll_org_chart_full', label: 'Org Chart (Full Company)', description: 'Full company org chart access' },
             { key: 'master_vendors', label: 'Vendors', description: 'Vendor master records' },
             { key: 'master_products', label: 'Products', description: 'Product master records' },
+            { key: 'master_bom', label: 'BOM Master', description: 'Serial-number-wise BOM upload and view' },
             { key: 'master_contacts', label: 'Contacts', description: 'Contact management records' },
             { key: 'master_mgrs', label: 'MGR Master', description: 'MGR master hierarchy' },
             { key: 'master_attributes', label: 'Attributes', description: 'Attribute master definitions' },
@@ -242,7 +243,8 @@ const FULL_ACCESS_KEYS = getAllPermissionKeys();
 // Keys added after roles were already saved inherit the key that used to gate the same screen,
 // so existing users keep their access until an admin sets the new key explicitly.
 const LEGACY_PERMISSION_FALLBACKS = {
-    csm_rca: 'csm_dashboard'
+    csm_rca: 'csm_dashboard',
+    master_bom: 'master_products'
 };
 
 const getLegacyFallback = (input, key) => {

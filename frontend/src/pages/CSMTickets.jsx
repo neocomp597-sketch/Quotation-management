@@ -8,6 +8,7 @@ import PaginationControls from '../components/PaginationControls';
 import PortalDropdown from '../components/PortalDropdown';
 import Modal from '../components/Modal';
 import SearchableSelect from '../components/SearchableSelect';
+import ComplaintBOMPanel from '../components/bom/ComplaintBOMPanel';
 import { useSubmitGuard } from '../hooks/useSubmitGuard';
 import { isValidMobile, isValidPincode, sanitizePhoneNumber } from '../utils/validation';
 
@@ -3259,6 +3260,14 @@ const CSMTickets = () => {
                         </div>
                     </div>
                 </form>
+                {formData.serialNumber?.trim() && (
+                    <section className="mt-6 border-t border-slate-100 pt-6">
+                        <h3 className="mb-3 text-xs font-black uppercase tracking-widest text-slate-700">
+                            BOM <span className="text-slate-400">(read only)</span>
+                        </h3>
+                        <ComplaintBOMPanel serialNumber={formData.serialNumber} />
+                    </section>
+                )}
                     </div>
                 </div>
             )}
@@ -4152,6 +4161,14 @@ const CSMTickets = () => {
                         </div>
                     </div>
                 </form>
+                {manualFormData.serialNumber?.trim() && (
+                    <section className="mt-6 border-t border-slate-100 pt-6">
+                        <h3 className="mb-3 text-xs font-black uppercase tracking-widest text-slate-700">
+                            BOM <span className="text-slate-400">(read only)</span>
+                        </h3>
+                        <ComplaintBOMPanel serialNumber={manualFormData.serialNumber} />
+                    </section>
+                )}
                     </div>
                 </div>
             )}

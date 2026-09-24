@@ -8,8 +8,9 @@ import {
     MdWarning, MdCheckCircleOutline, MdCheckCircle, MdChat,
     MdMyLocation, MdLocationOn, MdStar, MdStarBorder, MdMap, MdOpenInNew,
     MdPhotoCamera, MdCloudUpload, MdDelete, MdAssignmentTurnedIn,
-    MdZoomIn, MdClose
+    MdZoomIn, MdClose, MdAccountTree
 } from 'react-icons/md';
+import ComplaintBOMPanel from '../components/bom/ComplaintBOMPanel';
 import Modal from '../components/Modal';
 import { useSubmitGuard } from '../hooks/useSubmitGuard';
 
@@ -1257,7 +1258,7 @@ const TicketDetail = () => {
                 {/* Right Panel: Tabs */}
                 <div className="lg:col-span-2 space-y-6 flex flex-col">
                     {/* Tab Navigation */}
-                    <div className="flex border-b border-slate-200 gap-2">
+                    <div className="flex border-b border-slate-200 gap-2 overflow-x-auto">
                         <button
                             onClick={() => setActiveTab('communication')}
                             className={`flex items-center gap-2 px-6 py-4 border-b-2 font-bold text-sm transition-all ${
@@ -1290,6 +1291,17 @@ const TicketDetail = () => {
                         >
                             <MdFeedback size={18} />
                             Feedback Survey
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('bom')}
+                            className={`flex items-center gap-2 px-6 py-4 border-b-2 font-bold text-sm transition-all ${
+                                activeTab === 'bom'
+                                    ? 'border-primary-600 text-primary-600 font-black'
+                                    : 'border-transparent text-slate-500 hover:text-slate-700'
+                            }`}
+                        >
+                            <MdAccountTree size={18} />
+                            BOM
                         </button>
                     </div>
 
@@ -1563,6 +1575,9 @@ const TicketDetail = () => {
                                      )}
                                 </div>
                             </div>
+                        )}
+                        {activeTab === 'bom' && (
+                            <ComplaintBOMPanel ticketId={id} />
                         )}
                         {activeTab === 'feedback' && (
                             <div className="max-w-md mx-auto space-y-6">

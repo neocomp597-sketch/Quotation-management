@@ -349,6 +349,24 @@ export const mgrService = {
   delete: (id) => api.delete(`/mgrs/${id}`),
 };
 
+// BOM is maintained only through Excel upload; complaint screens read it through the serial/ticket lookups.
+export const bomService = {
+  getAll: (params = {}) => api.get("/bom", { params }),
+  getById: (id) => api.get(`/bom/${id}`),
+  getBySerial: (serialNumber) => api.get(`/bom/serial/${encodeURIComponent(serialNumber)}`),
+  getForTicket: (ticketId) => api.get(`/bom/ticket/${ticketId}`),
+  upload: (file, onUploadProgress) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return api.post("/bom/upload", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+      timeout: 300000,
+      onUploadProgress,
+    });
+  },
+  getTemplate: () => api.get("/bom/template", { responseType: "blob" }),
+};
+
 export const companySettingsService = {
   get: () => api.get("/company-settings"),
   update: (data) => api.put("/company-settings", data),

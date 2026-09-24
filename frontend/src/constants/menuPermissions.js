@@ -21,6 +21,7 @@ export const MENU_PERMISSION_GROUPS = [
             { key: 'master_vendors', label: 'Vendors', description: 'Vendor master records', defaultRoute: '/vendors' },
             { key: 'master_contacts', label: 'Contacts', description: 'Contact management records', defaultRoute: '/contacts' },
             { key: 'master_products', label: 'Products', description: 'Product master records', defaultRoute: '/products' },
+            { key: 'master_bom', label: 'BOM Master', description: 'Serial-number-wise BOM upload and view', defaultRoute: '/bom-master' },
             { key: 'master_territories', label: 'Territory Master', description: 'Territory master management', defaultRoute: '/territory-master' },
             { key: 'master_branches', label: 'Branch Master', description: 'Branch master management', defaultRoute: '/branches' },
             { key: 'state_master_create', label: 'State Master', description: 'State master management', defaultRoute: '/state-master' },
