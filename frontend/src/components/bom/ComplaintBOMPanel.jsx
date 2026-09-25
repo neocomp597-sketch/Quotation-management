@@ -4,14 +4,13 @@ import { bomService } from '../../services/api';
 import BOMComponentsTable from './BOMComponentsTable';
 
 /**
- * Read-only Active BOM for a complaint. Pass `ticketId` for an existing complaint, or
- * `serialNumber` while booking one; the FG item is resolved from the serial number.
- * The BOM cannot be changed from here.
+ * Read-only BOM for a complaint. Pass `ticketId` for an existing complaint, or `serialNumber`
+ * while booking one. The BOM is looked up through the FG serial number and cannot be changed here.
  */
 const ComplaintBOMPanel = ({ ticketId, serialNumber }) => {
     const serial = String(serialNumber || '').trim();
     const lookupKey = ticketId ? `ticket:${ticketId}` : serial ? `serial:${serial}` : '';
-    const [state, setState] = useState({ key: '', error: '', data: null });
+    const [state, setState] = useState({ key: '', error: '', bom: null, serial: '' });
 
     useEffect(() => {
         if (!lookupKey) return undefined;
@@ -19,13 +18,15 @@ const ComplaintBOMPanel = ({ ticketId, serialNumber }) => {
         let cancelled = false;
         // Debounce so typing a serial number doesn't fire a lookup per keystroke.
         const timer = setTimeout(() => {
-            const request = ticketId
-                ? bomService.getForTicket(ticketId)
-                : bomService.lookupForComplaint({ serialNumber: serial });
+            const request = ticketId ? bomService.getForTicket(ticketId) : bomService.getBySerial(serial);
             request
-                .then((res) => { if (!cancelled) setState({ key: lookupKey, error: '', data: res.data }); })
+                .then((res) => {
+                    if (cancelled) return;
+                    setState({ key: lookupKey, error: '', bom: res.data?.bom || null, serial: res.data?.serialNumber ?? serial });
+                })
                 .catch((err) => {
-                    if (!cancelled) setState({ key: lookupKey, error: err.response?.data?.message || 'Could not load BOM', data: null });
+                    if (cancelled) return;
+                    setState({ key: lookupKey, error: err.response?.data?.message || 'Could not load BOM', bom: null, serial });
                 });
         }, ticketId ? 0 : 400);
 
@@ -35,27 +36,26 @@ const ComplaintBOMPanel = ({ ticketId, serialNumber }) => {
         };
     }, [lookupKey, ticketId, serial]);
 
+    const loading = state.key !== lookupKey;
+    const { error, bom } = state;
+
     if (!lookupKey) {
         return <p className="p-4 text-sm font-medium text-slate-400">Enter the product serial number to see its BOM.</p>;
     }
-    if (state.key !== lookupKey) {
+    if (loading) {
         return (
             <div className="p-6 text-center">
-                <div className="inline-block h-6 w-6 animate-spin rounded-full border-4 border-primary-500 border-t-transparent"></div>
+                <div className="inline-block animate-spin rounded-full h-6 w-6 border-4 border-primary-500 border-t-transparent"></div>
             </div>
         );
     }
-    if (state.error) {
-        return <p className="p-4 text-sm font-medium text-rose-500">{state.error}</p>;
+    if (error) {
+        return <p className="p-4 text-sm font-medium text-rose-500">{error}</p>;
     }
-
-    const { bom, fgItemCode } = state.data || {};
     if (!bom) {
         return (
             <p className="p-4 text-sm font-medium text-slate-400">
-                {fgItemCode
-                    ? <>There is no Active BOM for FG item <span className="font-bold text-slate-600">{fgItemCode}</span>.</>
-                    : 'The FG item for this serial number could not be identified, so no BOM can be shown.'}
+                {state.serial ? <>No BOM has been entered for serial number <span className="font-bold text-slate-600">{state.serial}</span>.</> : 'This complaint has no product serial number, so no BOM can be shown.'}
             </p>
         );
     }
@@ -65,27 +65,25 @@ const ComplaintBOMPanel = ({ ticketId, serialNumber }) => {
             <div className="flex flex-wrap items-center gap-x-8 gap-y-2 rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
                 <MdAccountTree className="text-primary-600" size={20} />
                 <div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">FG Item</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">FG Item Code</p>
                     <p className="text-sm font-bold text-slate-800">
                         {bom.fgItemCode}
-                        {bom.fgDescription && <span className="ml-2 font-medium text-slate-500">{bom.fgDescription}</span>}
+                        {bom.fgItemDescription && <span className="ml-2 font-medium text-slate-500">{bom.fgItemDescription}</span>}
                     </p>
                 </div>
                 <div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">BOM No. / Revision</p>
-                    <p className="text-sm font-bold text-slate-800">{bom.bomNumber} · {bom.revision}</p>
-                </div>
-                <div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Plant</p>
-                    <p className="text-sm font-bold text-slate-800">{bom.plantName || '-'}{bom.alternativeBom ? ` (Alt ${bom.alternativeBom})` : ''}</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">FG Serial No</p>
+                    <p className="text-sm font-bold text-slate-800">{bom.fgSerialNumber}</p>
                 </div>
                 <div>
                     <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Components</p>
-                    <p className="text-sm font-bold text-slate-800">{bom.components?.length || 0}</p>
+                    <p className="text-sm font-bold text-slate-800">{bom.items?.length || 0}</p>
                 </div>
                 <span className="ml-auto text-[10px] font-black uppercase tracking-widest text-slate-400">Read only</span>
             </div>
-            <BOMComponentsTable components={bom.components || []} showCost={false} compact />
+            <div className="rounded-2xl border border-slate-100">
+                <BOMComponentsTable items={bom.items || []} compact />
+            </div>
         </div>
     );
 };

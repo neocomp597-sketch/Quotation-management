@@ -23,7 +23,7 @@ const modulePathMap = {
     'Enquiry': '/enquiries',
     'Customers': '/customers',
     'Quotation': '/quotations',
-    'Payroll': '/payroll/dashboard',
+    'Payroll': '/payroll/employees',
     'Payroll & HR': '/payroll/employees',
     'Employee Master': '/payroll/employees',
     'Org Chart': '/payroll/org-chart',

@@ -349,36 +349,16 @@ export const mgrService = {
   delete: (id) => api.delete(`/mgrs/${id}`),
 };
 
-// BOMs are entered one at a time and go through a Checked -> Engineering -> Finance -> Management approval chain.
+// One BOM per FG serial number, entered on the BOM Master form; complaint screens only read it.
 export const bomService = {
   getAll: (params = {}) => api.get("/bom", { params }),
   getById: (id) => api.get(`/bom/${id}`),
-  getOptions: () => api.get("/bom/options"),
-  searchMaterials: (q) => api.get("/bom/materials", { params: { q } }),
-  validate: (data) => api.post("/bom/validate", data),
   create: (data) => api.post("/bom", data),
   update: (id, data) => api.put(`/bom/${id}`, data),
   delete: (id) => api.delete(`/bom/${id}`),
-  submit: (id, remarks) => api.post(`/bom/${id}/submit`, { remarks }),
-  approve: (id, remarks) => api.post(`/bom/${id}/approve`, { remarks }),
-  sendBack: (id, remarks) => api.post(`/bom/${id}/send-back`, { remarks }),
-  reject: (id, remarks) => api.post(`/bom/${id}/reject`, { remarks }),
-  release: (id, remarks) => api.post(`/bom/${id}/release`, { remarks }),
-  obsolete: (id, remarks) => api.post(`/bom/${id}/obsolete`, { remarks }),
-  revise: (id, reason) => api.post(`/bom/${id}/revise`, { reason }),
-  addAttachment: (id, file, category) => {
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("category", category);
-    return api.post(`/bom/${id}/attachments`, formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-      timeout: 120000,
-    });
-  },
-  removeAttachment: (id, attachmentId) => api.delete(`/bom/${id}/attachments/${attachmentId}`),
-  // Read-only lookups for complaint screens.
-  getForTicket: (ticketId) => api.get(`/bom/complaint/ticket/${ticketId}`),
-  lookupForComplaint: (params) => api.get("/bom/complaint/lookup", { params }),
+  searchMaterials: (q) => api.get("/bom/materials", { params: { q } }),
+  getBySerial: (serialNumber) => api.get(`/bom/serial/${encodeURIComponent(serialNumber)}`),
+  getForTicket: (ticketId) => api.get(`/bom/ticket/${ticketId}`),
 };
 
 export const companySettingsService = {

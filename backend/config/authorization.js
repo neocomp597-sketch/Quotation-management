@@ -18,12 +18,7 @@ const MENU_GROUPS = [
             { key: 'payroll_org_chart_full', label: 'Org Chart (Full Company)', description: 'Full company org chart access' },
             { key: 'master_vendors', label: 'Vendors', description: 'Vendor master records' },
             { key: 'master_products', label: 'Products', description: 'Product master records' },
-            { key: 'master_bom', label: 'BOM Master', description: 'View BOMs (needed by approvers too)' },
-            { key: 'bom_create', label: 'BOM - Create / Edit', description: 'Create, edit, submit and revise BOMs' },
-            { key: 'eng_bom_check', label: 'BOM - Checked By', description: 'First approval stage: check a submitted BOM' },
-            { key: 'eng_bom_approve_engineering', label: 'BOM - Engineering Approval', description: 'Engineering approval stage for BOMs' },
-            { key: 'eng_bom_approve_finance', label: 'BOM - Finance / Costing Review', description: 'Finance and costing review stage for BOMs' },
-            { key: 'eng_bom_approve_management', label: 'BOM - Management Approval', description: 'Final approval, release and obsolete BOMs' },
+            { key: 'master_bom', label: 'BOM Master', description: 'Create, edit and view serial-number-wise BOMs' },
             { key: 'master_contacts', label: 'Contacts', description: 'Contact management records' },
             { key: 'master_mgrs', label: 'MGR Master', description: 'MGR master hierarchy' },
             { key: 'master_attributes', label: 'Attributes', description: 'Attribute master definitions' },
@@ -245,8 +240,7 @@ const FULL_ACCESS_KEYS = getAllPermissionKeys();
 // so existing users keep their access until an admin sets the new key explicitly.
 const LEGACY_PERMISSION_FALLBACKS = {
     csm_rca: 'csm_dashboard',
-    master_bom: 'master_products',
-    bom_create: 'master_products'
+    master_bom: 'master_products'
 };
 
 const getLegacyFallback = (input, key) => {

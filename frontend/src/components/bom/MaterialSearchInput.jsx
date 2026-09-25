@@ -6,7 +6,7 @@ import useAnchoredPosition from './useAnchoredPosition';
 
 /**
  * Text input with a Product Master lookup. Typing searches by code or name; picking a result
- * calls onSelect with the material (code, description, uom, rate, materialGroup, status...).
+ * calls onSelect with the material (code, description, mgr1..mgr5).
  */
 const MaterialSearchInput = ({ value, onChange, onSelect, placeholder = 'Search code', disabled = false, className = '' }) => {
     const [open, setOpen] = useState(false);
@@ -67,7 +67,7 @@ const MaterialSearchInput = ({ value, onChange, onSelect, placeholder = 'Search 
             />
             <MdSearch className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
             {listStyle && createPortal(
-                <div ref={listRef} style={listStyle} className="max-h-72 w-[26rem] max-w-[90vw] overflow-auto rounded-md border border-[#d7dee7] bg-white shadow-lg">
+                <div ref={listRef} style={listStyle} className="max-h-72 w-[26rem] max-w-[90vw] overflow-auto rounded-2xl border border-slate-200 bg-white py-1 shadow-xl">
                     {loading && <p className="px-3 py-2 text-xs text-slate-400">Searching...</p>}
                     {!loading && items.length === 0 && <p className="px-3 py-2 text-xs text-slate-400">No material found in Product Master.</p>}
                     {items.map((material, index) => (
@@ -76,14 +76,15 @@ const MaterialSearchInput = ({ value, onChange, onSelect, placeholder = 'Search 
                             key={material.productId}
                             onMouseDown={(event) => { event.preventDefault(); choose(material); }}
                             onMouseEnter={() => setHighlight(index)}
-                            className={`block w-full px-3 py-2 text-left text-sm ${index === highlight ? 'bg-[#eef5fb]' : ''}`}
+                            className={`block w-full px-4 py-2 text-left text-sm ${index === highlight ? 'bg-primary-50' : ''}`}
                         >
-                            <span className="font-semibold text-[#1f4e78]">{material.code}</span>
-                            <span className="ml-2 text-slate-700">{material.description}</span>
-                            <span className="mt-0.5 block text-[11px] text-slate-500">
-                                {[material.uom, material.materialGroup, material.rate ? `₹${material.rate}` : '', material.status !== 'Active' ? material.status : '']
-                                    .filter(Boolean).join(' · ')}
-                            </span>
+                            <span className="font-bold text-slate-800">{material.code}</span>
+                            <span className="ml-2 text-slate-600">{material.description}</span>
+                            {(material.mgr1 || material.mgr2) && (
+                                <span className="mt-0.5 block text-[11px] text-slate-400">
+                                    {[material.mgr1?.description, material.mgr2?.description].filter(Boolean).join(' · ')}
+                                </span>
+                            )}
                         </button>
                     ))}
                 </div>,
