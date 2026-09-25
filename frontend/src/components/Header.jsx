@@ -72,14 +72,7 @@ const searchablePages = [
     { label: 'Revenue Analytics', path: '/sales/revenue-analytics', permissionKey: 'sales_revenue_analytics', keywords: ['revenue'] },
     { label: 'Competitor Intel', path: '/sales/competitors', permissionKey: 'sales_competitors', keywords: ['competitors'] },
     { label: 'AI Pricing Insights', path: '/sales/ai-pricing', permissionKey: 'sales_ai_pricing', keywords: ['ai pricing'] },
-    { label: 'Payroll Dashboard', path: '/payroll/dashboard', permissionKey: 'payroll_runs', keywords: ['payroll overview'] },
     { label: 'Employees', path: '/payroll/employees', permissionKey: 'payroll_employees', keywords: ['payroll employees'] },
-    { label: 'Run Payroll', path: '/payroll/runs', permissionKey: 'payroll_runs', keywords: ['payroll run'] },
-    { label: 'Payroll Payments', path: '/payroll/payments', permissionKey: 'payroll_payments', keywords: ['salary payments'] },
-    { label: 'Payslips', path: '/payroll/payslips', permissionKey: 'payroll_runs', keywords: ['pay slips'] },
-    { label: 'Payroll Letters', path: '/payroll/letters', permissionKey: 'payroll_letters', keywords: ['offer letters'] },
-    { label: 'Payroll Reports', path: '/payroll/reports', permissionKey: 'payroll_reports', keywords: ['salary reports'] },
-    { label: 'Payroll Settings', path: '/payroll/settings', permissionKey: 'payroll_settings', keywords: ['payroll config'] },
     { label: 'CSM Dashboard', path: '/csm/dashboard', permissionKey: 'csm_dashboard', keywords: ['service dashboard'] },
     { label: 'Tickets', path: '/csm/tickets', permissionKey: 'csm_tickets', keywords: ['tickets register', 'service tickets'] },
     { label: 'Service Visits', path: '/csm/visits', permissionKey: 'csm_visits', keywords: ['visits'] },
@@ -271,42 +264,10 @@ const moduleSubmodulesMap = {
         { label: 'AI Dynamic Pricing Engine', path: '/sales/ai-pricing' },
         { label: 'Win Probability Calculator', path: '/sales/ai-pricing' }
     ],
-    '/payroll/dashboard': [
-        { label: 'Payroll Summary', path: '/payroll/dashboard' },
-        { label: 'Active Employees', path: '/payroll/employees' },
-        { label: 'Run Payroll Process', path: '/payroll/runs' },
-        { label: 'Salary Payments', path: '/payroll/payments' },
-        { label: 'Department Master', path: '/payroll/masters?tab=departments' }
-    ],
     '/payroll/employees': [
         { label: 'Employee Directory', path: '/payroll/employees' },
         { label: 'Department Master', path: '/payroll/masters?tab=departments' },
         { label: 'Designation Master', path: '/payroll/masters?tab=designations' }
-    ],
-    '/payroll/runs': [
-        { label: 'Payroll Execution Runs', path: '/payroll/runs' },
-        { label: 'Payslips Register', path: '/payroll/payslips' },
-        { label: 'Salary Payments', path: '/payroll/payments' }
-    ],
-    '/payroll/payments': [
-        { label: 'Payment Disbursement', path: '/payroll/payments' },
-        { label: 'Payslips', path: '/payroll/payslips' }
-    ],
-    '/payroll/payslips': [
-        { label: 'Salary Payslips Directory', path: '/payroll/payslips' },
-        { label: 'Employee Payroll Runs', path: '/payroll/runs' }
-    ],
-    '/payroll/letters': [
-        { label: 'Offer & Appointment Letters', path: '/payroll/letters' },
-        { label: 'Letter Templates', path: '/payroll/letters' }
-    ],
-    '/payroll/reports': [
-        { label: 'Payroll Reports & Analytics', path: '/payroll/reports' },
-        { label: 'Tax & PF Breakdown', path: '/payroll/reports' }
-    ],
-    '/payroll/settings': [
-        { label: 'Payroll Rules & Configuration', path: '/payroll/settings' },
-        { label: 'Salary Components', path: '/payroll/settings' }
     ],
     '/payroll/masters': [
         { label: 'Department Structure', path: '/payroll/masters?tab=departments' },
@@ -374,8 +335,7 @@ const moduleSubmodulesMap = {
     ],
     '/reports': [
         { label: 'Reports Hub', path: '/reports' },
-        { label: 'Sales Reports', path: '/sales/reports' },
-        { label: 'Payroll Reports', path: '/payroll/reports' }
+        { label: 'Sales Reports', path: '/sales/reports' }
     ],
     '/terms': [
         { label: 'Terms & Conditions Master', path: '/terms' },

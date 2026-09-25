@@ -168,18 +168,14 @@ const MENU_GROUPS = [
     },
     {
         key: 'payroll',
-        label: 'Payroll',
-        description: 'Manage payroll settings, runs, calculations, and letters',
+        label: 'Employee Records',
+        // Salary processing (runs, payments, payslips, letters, settings, reports) has been
+        // withdrawn from the app. Only the employee master data permissions remain.
+        description: 'Employee directory, org chart, and department/designation masters',
         children: [
-            { key: 'payroll_payslips', label: 'My Payslips', description: 'View and download monthly payslips' },
             { key: 'payroll_employees', label: 'Employees', description: 'Employee directory and profile management' },
             { key: 'payroll_org_chart', label: 'Org Chart', description: 'Direct reporting org chart access' },
-            { key: 'payroll_masters', label: 'Department & Designation Masters', description: 'Manage departments and designations' },
-            { key: 'payroll_runs', label: 'Run Payroll', description: 'Create and run monthly payroll batches' },
-            { key: 'payroll_payments', label: 'Payments', description: 'Record payment slips and transaction references' },
-            { key: 'payroll_settings', label: 'Payroll Settings', description: 'Manage payroll month and calculation configuration' },
-            { key: 'payroll_letters', label: 'Letter Management', description: 'Generate offer, appointment, promotion, and relieving letters' },
-            { key: 'payroll_reports', label: 'Payroll Reports', description: 'Access monthly register, deduction logs, and allocation charts' }
+            { key: 'payroll_masters', label: 'Department & Designation Masters', description: 'Manage departments and designations' }
         ]
     },
     {
@@ -265,7 +261,7 @@ const DEFAULT_ROLE_PERMISSIONS = {
     admin: buildPermissions(FULL_ACCESS_KEYS),
     manager: buildPermissions(['dashboard', 'master', 'enquiry', 'sales_pipeline', 'quotation', 'meetings', 'sale', 'purchase', 'inventory', 'planning', 'reports', 'settings', 'csm', 'tender', 'payroll_org_chart']),
     sales: buildPermissions(['dashboard', 'enquiry', 'sales_pipeline', 'quotation', 'meetings', 'inventory_items', 'inventory_stock_in', 'inventory_stock_out', 'inventory_transfers', 'csm_tickets', 'csm_attendance', 'csm_kb', 'tender_dashboard', 'tender_register', 'payroll_org_chart']),
-    employee: buildPermissions(['dashboard', 'payroll_payslips', 'payroll_org_chart', 'csm_tickets', 'csm_attendance', 'csm_kb', 'settings_profile'])
+    employee: buildPermissions(['dashboard', 'payroll_org_chart', 'csm_tickets', 'csm_attendance', 'csm_kb', 'settings_profile'])
 };
 
 /**

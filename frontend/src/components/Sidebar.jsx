@@ -150,20 +150,9 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                 { key: 'flowchart_view', name: 'Flowchart Builder', icon: <MdAccountTree size={18} />, path: '/flowcharts' },
             ]
         },
-        {
-            type: 'group',
-            name: 'Payroll',
-            key: 'payroll',
-            icon: <MdCalendarMonth size={22} />,
-            children: [
-                { key: 'payroll_runs', name: 'Overview', icon: <MdDashboard size={18} />, path: '/payroll/dashboard' },
-                { key: 'payroll_runs', name: 'Run Payroll', icon: <MdReceipt size={18} />, path: '/payroll/runs' },
-                { key: 'payroll_payments', name: 'Payments', icon: <MdReceipt size={18} />, path: '/payroll/payments' },
-                { key: 'payroll_runs', name: 'Payslips', icon: <MdReceipt size={18} />, path: '/payroll/payslips' },
-                { key: 'payroll_letters', name: 'Letters', icon: <MdDescription size={18} />, path: '/payroll/letters' },
-                { key: 'payroll_settings', name: 'Settings', icon: <MdSettings size={18} />, path: '/payroll/settings' }
-            ]
-        },
+        // The Payroll group (salary runs, payments, payslips, letters, settings) has been
+        // withdrawn from the app. Employees, Department/Designation masters and the Org
+        // Chart stay under Master - other modules read that data.
         {
             type: 'group',
             name: 'Enquiry',
@@ -318,7 +307,6 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             icon: <MdBarChart size={22} />,
             children: [
                 { key: 'reports_main', name: 'Reports', icon: <MdBarChart size={18} />, path: '/reports' },
-                { key: 'payroll_reports', name: 'Payroll Reports', icon: <MdBarChart size={18} />, path: '/payroll/reports' },
                 { key: 'sales_reports', name: 'Sales Reports', icon: <MdBarChart size={18} />, path: '/sales/reports' },
                 { key: 'sales_analytics', name: 'Sales Analytics', icon: <MdSpeed size={18} />, path: '/sales/analytics' },
                 { key: 'master_customers', name: 'Customer Analytics', icon: <MdAnalytics size={18} />, path: '/customers/analytics' },

@@ -12,7 +12,7 @@ const modulePathMap = {
     'Enquiry': '/enquiries',
     'Customers': '/customers',
     'Quotation': '/quotations',
-    'Payroll': '/payroll/dashboard',
+    'Payroll': '/payroll/employees',
     'Employee Master': '/payroll/employees',
     'State Master': '/state-master',
     'Master Management': '/state-master',

@@ -41,19 +41,8 @@ export const MENU_PERMISSION_GROUPS = [
             { key: 'flowchart_view', label: 'Flowchart Builder', description: 'Visual process flowchart builder', defaultRoute: '/flowcharts' }
         ]
     },
-    {
-        key: 'payroll',
-        label: 'Payroll',
-        description: 'Manage salary profiles, monthly runs, payments, payslips, letters, and settings',
-        defaultRoute: '/payroll/dashboard',
-        children: [
-            { key: 'payroll_runs', label: 'Overview & Runs', description: 'Payroll dashboard and monthly payroll run execution', defaultRoute: '/payroll/runs' },
-            { key: 'payroll_payments', label: 'Payments', description: 'Record employee payments', defaultRoute: '/payroll/payments' },
-            { key: 'payroll_payslips', label: 'Payslips', description: 'View and print monthly payslips', defaultRoute: '/payroll/payslips' },
-            { key: 'payroll_letters', label: 'Letters', description: 'Generate offer, appointment, promotion, relieving letters', defaultRoute: '/payroll/letters' },
-            { key: 'payroll_settings', label: 'Settings', description: 'Manage payroll settings and lock dates', defaultRoute: '/payroll/settings' }
-        ]
-    },
+    // The Payroll group (runs, payments, payslips, letters, settings) has been withdrawn
+    // from the app. Employee and Org Chart permissions live under Master.
     {
         key: 'enquiry',
         label: 'Enquiry',

@@ -65,14 +65,7 @@ const DeveloperWebhooks = lazy(() => import('./pages/Developer/pages/Webhooks'))
 const DeveloperErrors = lazy(() => import('./pages/Developer/pages/Errors'));
 const DeveloperRateLimits = lazy(() => import('./pages/Developer/pages/RateLimits'));
 const DeveloperLogs = lazy(() => import('./pages/Developer/pages/Logs'));
-const PayrollDashboard = lazy(() => import('./pages/PayrollDashboard'));
 const PayrollEmployees = lazy(() => import('./pages/PayrollEmployees'));
-const PayrollRuns = lazy(() => import('./pages/PayrollRuns'));
-const PayrollPayments = lazy(() => import('./pages/PayrollPayments'));
-const PayrollPayslips = lazy(() => import('./pages/PayrollPayslips'));
-const PayrollLetters = lazy(() => import('./pages/PayrollLetters'));
-const PayrollReports = lazy(() => import('./pages/PayrollReports'));
-const PayrollSettingsPage = lazy(() => import('./pages/PayrollSettingsPage'));
 const PayrollMasters = lazy(() => import('./pages/PayrollMasters'));
 const OrgChart = lazy(() => import('./pages/OrgChart'));
 const Flowcharts = lazy(() => import('./pages/Flowcharts'));
@@ -357,18 +350,11 @@ function App() {
             <Route path="/sales/customer-pricing" element={<PermissionRoute permissionKey="master_customers"><Layout><CustomerPricingDashboard /></Layout></PermissionRoute>} />
 
             {/* Payroll Routes */}
-            <Route path="/payroll/dashboard" element={<PermissionRoute permissionKey="payroll_runs"><Layout><PayrollDashboard /></Layout></PermissionRoute>} />
             <Route path="/payroll/employees" element={<PermissionRoute permissionKey="payroll_employees"><Layout><PayrollEmployees /></Layout></PermissionRoute>} />
             <Route path="/payroll/employees/new" element={<PermissionRoute permissionKey="payroll_employees"><Layout><PayrollEmployees isCreatePage={true} /></Layout></PermissionRoute>} />
             <Route path="/payroll/employees/edit/:id" element={<PermissionRoute permissionKey="payroll_employees"><Layout><PayrollEmployees isEditPage={true} /></Layout></PermissionRoute>} />
             <Route path="/payroll/org-chart" element={<PermissionRoute permissionKey="payroll_org_chart"><Layout><OrgChart /></Layout></PermissionRoute>} />
             <Route path="/org-chart" element={<PermissionRoute permissionKey="payroll_org_chart"><Layout><OrgChart /></Layout></PermissionRoute>} />
-            <Route path="/payroll/runs" element={<PermissionRoute permissionKey="payroll_runs"><Layout><PayrollRuns /></Layout></PermissionRoute>} />
-            <Route path="/payroll/payments" element={<PermissionRoute permissionKey="payroll_payments"><Layout><PayrollPayments /></Layout></PermissionRoute>} />
-            <Route path="/payroll/payslips" element={<PermissionRoute permissionKey="payroll_runs"><Layout><PayrollPayslips /></Layout></PermissionRoute>} />
-            <Route path="/payroll/letters" element={<PermissionRoute permissionKey="payroll_letters"><Layout><PayrollLetters /></Layout></PermissionRoute>} />
-            <Route path="/payroll/reports" element={<PermissionRoute permissionKey="payroll_reports"><Layout><PayrollReports /></Layout></PermissionRoute>} />
-            <Route path="/payroll/settings" element={<PermissionRoute permissionKey="payroll_settings"><Layout><PayrollSettingsPage /></Layout></PermissionRoute>} />
             <Route path="/payroll/masters" element={<PermissionRoute permissionKey="payroll_employees"><Layout><PayrollMasters /></Layout></PermissionRoute>} />
             <Route path="/payroll/masters/new" element={<PermissionRoute permissionKey="payroll_employees"><Layout><PayrollMasters isCreatePage={true} /></Layout></PermissionRoute>} />
 
