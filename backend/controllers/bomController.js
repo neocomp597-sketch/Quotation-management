@@ -4,6 +4,7 @@ const BOMItem = require('../models/BOMItem');
 const Ticket = require('../models/Ticket');
 const { canViewTicketDetails } = require('./ticketController');
 const { prepareBOM, searchMaterials, toKey, cleanText, escapeRegex } = require('../services/bomService');
+const { importBOMWorkbook, buildTemplateBuffer } = require('../services/bomImportService');
 
 const MGR_POPULATE = 'code description';
 
@@ -219,5 +220,33 @@ exports.getBOMForTicket = async (req, res) => {
         return res.json({ serialNumber, bom: await findBOMBySerial(serialNumber) });
     } catch (error) {
         return res.status(500).json({ message: 'Failed to load BOM', error: error.message });
+    }
+};
+
+/** Downloads the bulk-upload template (sample row + a guide sheet). */
+exports.downloadTemplate = async (req, res) => {
+    try {
+        const buffer = buildTemplateBuffer();
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename=bom_import_template.xlsx');
+        return res.send(buffer);
+    } catch (error) {
+        return res.status(500).json({ message: 'Failed to build the BOM template', error: error.message });
+    }
+};
+
+/** Bulk-uploads BOMs from an Excel/CSV workbook. One BOM per FG serial number. */
+exports.uploadBOM = async (req, res) => {
+    try {
+        if (!req.file?.buffer?.length) {
+            return res.status(400).json({ message: 'Choose an .xlsx, .xls or .csv file to upload.' });
+        }
+        const summary = await importBOMWorkbook(req.file.buffer, {
+            fileName: req.file.originalname || '',
+            userId: req.user?.id || null
+        });
+        return res.status(summary.failed && !summary.created && !summary.updated ? 400 : 200).json(summary);
+    } catch (error) {
+        return res.status(error.status || 500).json({ message: error.message || 'Failed to import the BOM file' });
     }
 };

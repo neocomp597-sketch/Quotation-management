@@ -11,6 +11,8 @@ const BOMMasterSchema = new mongoose.Schema({
     fgSerialKey: { type: String, required: true },
     assetId: { type: mongoose.Schema.Types.ObjectId, ref: 'Asset', default: null },
     componentCount: { type: Number, default: 0 },
+    // Name of the workbook a bulk-uploaded BOM came from (blank for manual entry)
+    sourceFileName: { type: String, default: '' },
     status: { type: String, enum: ['Active', 'Inactive'], default: 'Active' },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }

@@ -357,6 +357,12 @@ export const bomService = {
   update: (id, data) => api.put(`/bom/${id}`, data),
   delete: (id) => api.delete(`/bom/${id}`),
   searchMaterials: (q) => api.get("/bom/materials", { params: { q } }),
+  downloadTemplate: () => api.get("/bom/template", { responseType: "blob" }),
+  upload: (file) => {
+    const form = new FormData();
+    form.append("file", file);
+    return api.post("/bom/upload", form, { headers: { "Content-Type": "multipart/form-data" } });
+  },
   getBySerial: (serialNumber) => api.get(`/bom/serial/${encodeURIComponent(serialNumber)}`),
   getForTicket: (ticketId) => api.get(`/bom/ticket/${ticketId}`),
 };

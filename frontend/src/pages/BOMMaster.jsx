@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MdAdd, MdEdit, MdSearch, MdVisibility } from 'react-icons/md';
+import { MdAdd, MdEdit, MdSearch, MdVisibility, MdFileDownload, MdPublish } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import { bomService } from '../services/api';
 import PaginationControls from '../components/PaginationControls';
@@ -14,6 +14,47 @@ const BOMMaster = () => {
     const [search, setSearch] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const [pagination, setPagination] = useState({ page: 1, limit: LIST_PAGE_SIZE, total: 0, pages: 1 });
+    const [refreshCount, setRefreshCount] = useState(0);
+    const [uploading, setUploading] = useState(false);
+    const [uploadSummary, setUploadSummary] = useState(null);
+
+    const handleTemplate = async () => {
+        try {
+            const res = await bomService.downloadTemplate();
+            const url = URL.createObjectURL(new Blob([res.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'bom_import_template.xlsx';
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(url);
+        } catch {
+            toast.error('Could not download the template.');
+        }
+    };
+
+    const handleUpload = async (event) => {
+        const file = event.target.files?.[0];
+        event.target.value = '';
+        if (!file) return;
+        setUploading(true);
+        try {
+            const res = await bomService.upload(file);
+            const summary = res.data || {};
+            setUploadSummary(summary);
+            const saved = (summary.created || 0) + (summary.updated || 0);
+            if (saved) toast.success(`${saved} BOM(s) imported from ${file.name}.`);
+            if (summary.failed) toast.warn(`${summary.failed} serial(s) could not be imported.`);
+            setRefreshCount((count) => count + 1);
+        } catch (error) {
+            const data = error.response?.data;
+            if (data?.errors?.length || data?.failed) setUploadSummary(data);
+            toast.error(data?.message || 'Could not import the file.');
+        } finally {
+            setUploading(false);
+        }
+    };
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -24,7 +65,7 @@ const BOMMaster = () => {
     }, [search]);
 
     // The list is loading whenever the rows on screen belong to a different request.
-    const requestKey = `${page}|${debouncedSearch}`;
+    const requestKey = `${page}|${debouncedSearch}|${refreshCount}`;
     const [loadedKey, setLoadedKey] = useState(null);
     const loading = loadedKey !== requestKey;
 
@@ -54,6 +95,20 @@ const BOMMaster = () => {
                     <h1 className="text-3xl font-black text-slate-900 tracking-tight">BOM Master</h1>
                     <p className="text-slate-500 font-medium">Bill of materials for each finished-good serial number.</p>
                 </div>
+                <div className="flex flex-wrap items-center gap-3">
+                <button
+                    type="button"
+                    onClick={handleTemplate}
+                    className="flex items-center justify-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-5 py-3 rounded-2xl font-bold transition-all uppercase text-xs tracking-widest active:scale-95"
+                >
+                    <MdFileDownload size={18} />
+                    <span>Template</span>
+                </button>
+                <label className={`flex items-center justify-center gap-2 bg-slate-900 hover:bg-black text-white px-5 py-3 rounded-2xl font-bold transition-all uppercase text-xs tracking-widest active:scale-95 ${uploading ? 'opacity-60 pointer-events-none' : 'cursor-pointer'}`}>
+                    <MdPublish size={18} />
+                    <span>{uploading ? 'Uploading…' : 'Upload'}</span>
+                    <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleUpload} disabled={uploading} />
+                </label>
                 <button
                     onClick={() => navigate('/bom-master/new')}
                     className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
@@ -61,7 +116,31 @@ const BOMMaster = () => {
                     <MdAdd size={20} />
                     <span>New BOM</span>
                 </button>
+                </div>
             </div>
+
+            {uploadSummary && (
+                <div className="rounded-[2rem] border border-slate-100 bg-white p-5 shadow-sm">
+                    <div className="flex items-start justify-between gap-4">
+                        <div>
+                            <h2 className="text-sm font-black uppercase tracking-widest text-slate-700">Import summary</h2>
+                            <p className="mt-1 text-sm font-semibold text-slate-500">
+                                {uploadSummary.fileName ? `${uploadSummary.fileName} — ` : ''}
+                                {uploadSummary.created || 0} created, {uploadSummary.updated || 0} updated, {uploadSummary.failed || 0} failed
+                                {uploadSummary.components ? `, ${uploadSummary.components} component(s)` : ''}
+                            </p>
+                        </div>
+                        <button type="button" onClick={() => setUploadSummary(null)} className="text-xs font-black uppercase tracking-widest text-slate-400 hover:text-slate-700">Close</button>
+                    </div>
+                    {uploadSummary.errors?.length > 0 && (
+                        <ul className="mt-3 max-h-48 space-y-1 overflow-auto text-xs font-semibold text-rose-600">
+                            {uploadSummary.errors.map((err, index) => (
+                                <li key={index}>Row {err.row}{err.serial ? ` (${err.serial})` : ''}: {err.message}</li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
+            )}
 
             <div className="mobile-master-shell bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
                 <div className="mobile-master-toolbar p-4 border-b border-slate-100 bg-slate-50">
