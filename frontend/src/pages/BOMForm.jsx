@@ -4,6 +4,7 @@ import { MdAdd, MdArrowBack, MdDelete } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import { bomService } from '../services/api';
 import MaterialSearchInput from '../components/bom/MaterialSearchInput';
+import SerialSearchInput from '../components/bom/SerialSearchInput';
 
 const MGR_KEYS = ['mgr1', 'mgr2', 'mgr3', 'mgr4', 'mgr5'];
 const inputClass = 'w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-medium transition-all disabled:text-slate-500';
@@ -164,12 +165,31 @@ const BOMForm = () => {
                     </div>
                     <div className="space-y-2">
                         <label className={labelClass}>FG Serial Number <span className="text-rose-500">*</span></label>
-                        <input
-                            className={inputClass}
+                        <SerialSearchInput
                             value={fg.fgSerialNumber}
-                            onChange={(e) => setFg((prev) => ({ ...prev, fgSerialNumber: e.target.value }))}
-                            placeholder="e.g. FG-SN-001"
+                            className={inputClass}
+                            placeholder="Search the serial number (e.g. SR454213)"
+                            onChange={(value) => setFg((prev) => ({ ...prev, fgSerialNumber: value, serialMatched: false, serialCustomer: '' }))}
+                            onSelect={(asset) => setFg((prev) => ({
+                                ...prev,
+                                fgSerialNumber: asset.serialNumber || prev.fgSerialNumber,
+                                // Take the finished good from the registered serial so the BOM
+                                // is attached to the product that was actually sold.
+                                fgItemCode: asset.productId?.productCode || prev.fgItemCode,
+                                fgItemDescription: asset.productId?.productName || prev.fgItemDescription,
+                                serialMatched: true,
+                                serialCustomer: asset.customerId?.customerName || asset.customerId?.companyName || ''
+                            }))}
                         />
+                        {fg.serialMatched ? (
+                            <p className="ml-1 text-xs font-medium text-emerald-600">
+                                Registered serial{fg.serialCustomer ? ` · ${fg.serialCustomer}` : ''}
+                            </p>
+                        ) : (
+                            <p className="ml-1 text-xs font-medium text-slate-400">
+                                Pick a serial from Invoice Bulk Upload so the BOM can be found from a complaint.
+                            </p>
+                        )}
                     </div>
                 </div>
             </div>
