@@ -77,10 +77,11 @@ const prepareBOM = async (body) => {
             itemDescription: cleanText(row.itemDescription),
             qtyText: cleanText(row.qty),
             componentSerialNumber: cleanText(row.componentSerialNumber),
-            batchNumber: cleanText(row.batchNumber)
+            batchNumber: cleanText(row.batchNumber),
+            remarks: cleanText(row.remarks)
         }))
         // Rows left completely empty on the form are ignored.
-        .filter((row) => row.itemCode || row.itemDescription || row.qtyText || row.componentSerialNumber || row.batchNumber);
+        .filter((row) => row.itemCode || row.itemDescription || row.qtyText || row.componentSerialNumber || row.batchNumber || row.remarks);
     if (!rows.length) errors.push('Add at least one component.');
 
     const productsByCode = await findProductsByCode([fgItemCode, ...rows.map((row) => row.itemCode)]);
@@ -114,7 +115,8 @@ const prepareBOM = async (body) => {
             productId: product?._id || null,
             qty,
             componentSerialNumber: row.componentSerialNumber,
-            batchNumber: row.batchNumber
+            batchNumber: row.batchNumber,
+            remarks: row.remarks
         };
         MGR_FIELDS.forEach((field) => { item[field] = product?.[field] || null; });
         return item;

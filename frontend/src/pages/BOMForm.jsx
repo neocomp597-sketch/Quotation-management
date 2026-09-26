@@ -19,6 +19,7 @@ const emptyRow = () => ({
     qty: 1,
     componentSerialNumber: '',
     batchNumber: '',
+    remarks: '',
     // Set when the item code was picked from Product Master; its description and MGRs then come from there.
     fromMaster: false,
     mgrs: {}
@@ -31,6 +32,7 @@ const rowFromSaved = (item) => ({
     qty: item.qty,
     componentSerialNumber: item.componentSerialNumber || '',
     batchNumber: item.batchNumber || '',
+    remarks: item.remarks || '',
     fromMaster: Boolean(item.inProductMaster),
     mgrs: Object.fromEntries(MGR_KEYS.map((key) => [key, item[key]]))
 });
@@ -75,8 +77,8 @@ const BOMForm = () => {
         const payload = {
             fgItemCode: fg.fgItemCode,
             fgSerialNumber: fg.fgSerialNumber,
-            items: rows.map(({ itemCode, itemDescription, qty, componentSerialNumber, batchNumber }) => ({
-                itemCode, itemDescription, qty, componentSerialNumber, batchNumber
+            items: rows.map(({ itemCode, itemDescription, qty, componentSerialNumber, batchNumber, remarks }) => ({
+                itemCode, itemDescription, qty, componentSerialNumber, batchNumber, remarks
             }))
         };
         try {
@@ -213,7 +215,7 @@ const BOMForm = () => {
                     <table className="w-full min-w-[1100px] text-left border-collapse">
                         <thead>
                             <tr className="bg-slate-50">
-                                {['#', 'Item Code *', 'Description', 'Qty *', 'Batch', 'Serial No', 'MGR1', 'MGR2', 'MGR3', 'MGR4', 'MGR5', ''].map((label) => (
+                                {['#', 'Item Code *', 'Description', 'Qty *', 'Batch', 'Serial No', 'Remarks', 'MGR1', 'MGR2', 'MGR3', 'MGR4', 'MGR5', ''].map((label) => (
                                     <th key={label} className="px-3 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">{label}</th>
                                 ))}
                             </tr>
@@ -254,6 +256,9 @@ const BOMForm = () => {
                                     </td>
                                     <td className="px-2 py-2 min-w-[8rem]">
                                         <input className={cellClass} value={row.componentSerialNumber} onChange={(e) => updateRow(index, { componentSerialNumber: e.target.value })} placeholder="Optional" />
+                                    </td>
+                                    <td className="px-2 py-2 min-w-[10rem]">
+                                        <input className={cellClass} value={row.remarks} onChange={(e) => updateRow(index, { remarks: e.target.value })} placeholder="Remarks" />
                                     </td>
                                     {MGR_KEYS.map((key) => (
                                         <td key={key} className="px-3 py-2 pt-4 text-xs text-slate-500 whitespace-nowrap">

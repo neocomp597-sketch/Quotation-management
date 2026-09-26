@@ -29,6 +29,7 @@ router.get('/template', canManageBOM, bomController.downloadTemplate);
 router.post('/upload', canManageBOM, upload.single('file'), bomController.uploadBOM);
 router.get('/', canManageBOM, bomController.listBOMs);
 router.post('/', canManageBOM, bomController.createBOM);
+router.get('/:id/export', canManageBOM, bomController.exportBOM);
 router.get('/:id', canManageBOM, bomController.getBOMById);
 router.put('/:id', canManageBOM, bomController.updateBOM);
 router.delete('/:id', canManageBOM, bomController.deleteBOM);

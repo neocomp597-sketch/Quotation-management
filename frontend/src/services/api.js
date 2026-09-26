@@ -357,6 +357,7 @@ export const bomService = {
   update: (id, data) => api.put(`/bom/${id}`, data),
   delete: (id) => api.delete(`/bom/${id}`),
   searchMaterials: (q) => api.get("/bom/materials", { params: { q } }),
+  exportToExcel: (id) => api.get(`/bom/${id}/export`, { responseType: "blob" }),
   downloadTemplate: () => api.get("/bom/template", { responseType: "blob" }),
   upload: (file) => {
     const form = new FormData();

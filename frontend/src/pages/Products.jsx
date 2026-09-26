@@ -939,7 +939,7 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                 <>
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-black text-slate-900 tracking-tight font-outfit uppercase">Product Catalog</h1>
+                    <h1 className="text-3xl font-black text-slate-900 tracking-tight font-outfit uppercase">Product Master</h1>
                     <p className="text-slate-500 font-medium">All products at one place.</p>
                 </div>
                 <div className="flex gap-3">

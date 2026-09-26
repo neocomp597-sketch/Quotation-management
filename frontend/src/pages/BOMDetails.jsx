@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { MdArrowBack, MdDelete, MdEdit } from 'react-icons/md';
+import { MdArrowBack, MdDelete, MdEdit, MdFileDownload } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import { bomService } from '../services/api';
 import BOMComponentsTable from '../components/bom/BOMComponentsTable';
@@ -31,6 +31,22 @@ const BOMDetails = () => {
         return () => { cancelled = true; };
     }, [id]);
 
+    const handleExport = async () => {
+        try {
+            const res = await bomService.exportToExcel(bom._id);
+            const url = URL.createObjectURL(new Blob([res.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `BOM_${bom.fgSerialNumber || bom._id}.xlsx`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(url);
+        } catch {
+            toast.error('Could not export the BOM.');
+        }
+    };
+
     const handleDelete = async () => {
         if (!window.confirm(`Delete the BOM for FG serial ${bom.fgSerialNumber}? This cannot be undone.`)) return;
         try {
@@ -60,6 +76,13 @@ const BOMDetails = () => {
                 </div>
                 {bom && (
                     <div className="ml-auto flex gap-3">
+                        <button
+                            type="button"
+                            onClick={handleExport}
+                            className="flex items-center gap-2 px-5 py-3 rounded-2xl border border-slate-200 text-slate-600 font-black uppercase text-xs tracking-widest hover:bg-slate-50 transition-all"
+                        >
+                            <MdFileDownload size={18} /> Export to Excel
+                        </button>
                         <button
                             type="button"
                             onClick={handleDelete}

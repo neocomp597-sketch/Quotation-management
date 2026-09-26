@@ -66,17 +66,17 @@ const sheetToBuffer = (rows) => {
     const headers = XLSX.utils.sheet_to_json(tpl.Sheets[tpl.SheetNames[0]], { header: 1 })[0] || [];
     check('template downloads as a workbook', tplRes.status === 200 && tplBuf.length > 1000, `${tplBuf.length} bytes`);
     check('template has the columns from the spec',
-        ['Item code_FG', 'FG Serial number', 'Item code', 'Item description', 'Qty', 'Component serial number', 'Batch number']
+        ['Item code_FG', 'FG Serial number', 'Item code', 'Item description', 'Qty', 'Component serial number', 'Batch number', 'Remarks']
             .every(h => headers.includes(h)), headers.join(' | '));
     check('template includes a guide sheet', tpl.SheetNames.includes('Guide'), tpl.SheetNames.join(', '));
 
     console.log('\nUpload with the original layout (two "Serial number" columns):');
     const buffer = sheetToBuffer([
-        ['Item code_FG', 'Serial number', 'Item code', 'Item description', 'Qty', 'Serial number', 'Batch number'],
-        ['ZZ-FG-IMP', SERIAL_A, code, 'ignored, master wins', 2, 'CMP-SN-1', 'BATCH-1'],
-        ['ZZ-FG-IMP', SERIAL_A, 'ZZ-UNKNOWN-ITEM', 'Kept from the file', 1, '', 'BATCH-2'],
-        ['ZZ-FG-IMP', SERIAL_B, code, '', 3, 'CMP-SN-2', ''],
-        ['ZZ-FG-IMP', `ZZ-IMP-BAD-${STAMP}`, code, '', 'abc', '', ''],
+        ['Item code_FG', 'Serial number', 'Item code', 'Item description', 'Qty', 'Serial number', 'Batch number', 'Remarks'],
+        ['ZZ-FG-IMP', SERIAL_A, code, 'ignored, master wins', 2, 'CMP-SN-1', 'BATCH-1', 'Imported remark'],
+        ['ZZ-FG-IMP', SERIAL_A, 'ZZ-UNKNOWN-ITEM', 'Kept from the file', 1, '', 'BATCH-2', ''],
+        ['ZZ-FG-IMP', SERIAL_B, code, '', 3, 'CMP-SN-2', '', ''],
+        ['ZZ-FG-IMP', `ZZ-IMP-BAD-${STAMP}`, code, '', 'abc', '', '', ''],
     ]);
     const up = await postFile(buffer, 'bom-test.xlsx');
     const s = up.body || {};
@@ -93,6 +93,7 @@ const sheetToBuffer = (rows) => {
     check('first "Serial number" column became the FG serial', (a.body?.bom || a.body)?.fgSerialNumber === SERIAL_A);
     check('second "Serial number" column became the component serial', known?.componentSerialNumber === 'CMP-SN-1', known?.componentSerialNumber || '(blank)');
     check('batch number imported', known?.batchNumber === 'BATCH-1', known?.batchNumber || '(blank)');
+    check('remarks imported', known?.remarks === 'Imported remark', known?.remarks || '(blank)');
     check('description and MGRs resolved from Product Master', Boolean(known?.itemDescription) && known.itemDescription !== 'ignored, master wins', known?.itemDescription || '');
     check('unknown item keeps the description from the file', unknown?.itemDescription === 'Kept from the file', unknown?.itemDescription || '');
 

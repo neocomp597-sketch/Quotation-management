@@ -92,7 +92,7 @@ const BOMMaster = () => {
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-black text-slate-900 tracking-tight">BOM Master</h1>
+                    <h1 className="text-3xl font-black text-slate-900 tracking-tight">Product BOM Master</h1>
                     <p className="text-slate-500 font-medium">Bill of materials for each finished-good serial number.</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">

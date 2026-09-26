@@ -1,7 +1,9 @@
 const mongoose = require('mongoose');
+const XLSX = require('xlsx');
 const BOMMaster = require('../models/BOMMaster');
 const BOMItem = require('../models/BOMItem');
 const Ticket = require('../models/Ticket');
+const Product = require('../models/Product');
 const { canViewTicketDetails } = require('./ticketController');
 const { prepareBOM, searchMaterials, toKey, cleanText, escapeRegex } = require('../services/bomService');
 const { importBOMWorkbook, buildTemplateBuffer } = require('../services/bomImportService');
@@ -18,6 +20,23 @@ const formatMgr = (mgr) => (mgr ? { _id: mgr._id, code: mgr.code, description: m
 
 const loadBOM = async (master) => {
     if (!master) return null;
+
+    // The finished good's own MGR1-MGR5, taken from its product record.
+    let fgMgrs = { mgr1: null, mgr2: null, mgr3: null, mgr4: null, mgr5: null };
+    if (master.fgProductId) {
+        const fgProduct = await Product.findById(master.fgProductId)
+            .select('mgr1 mgr2 mgr3 mgr4 mgr5')
+            .populate('mgr1', MGR_POPULATE).populate('mgr2', MGR_POPULATE).populate('mgr3', MGR_POPULATE)
+            .populate('mgr4', MGR_POPULATE).populate('mgr5', MGR_POPULATE)
+            .lean();
+        if (fgProduct) {
+            fgMgrs = {
+                mgr1: formatMgr(fgProduct.mgr1), mgr2: formatMgr(fgProduct.mgr2), mgr3: formatMgr(fgProduct.mgr3),
+                mgr4: formatMgr(fgProduct.mgr4), mgr5: formatMgr(fgProduct.mgr5)
+            };
+        }
+    }
+
     const items = await BOMItem.find({ bomMasterId: master._id })
         .sort({ lineNo: 1 })
         .populate('mgr1', MGR_POPULATE)
@@ -29,6 +48,7 @@ const loadBOM = async (master) => {
 
     return {
         ...master,
+        fgMgr: fgMgrs,
         items: items.map((item) => ({
             ...item,
             inProductMaster: Boolean(item.productId),
@@ -248,5 +268,56 @@ exports.uploadBOM = async (req, res) => {
         return res.status(summary.failed && !summary.created && !summary.updated ? 400 : 200).json(summary);
     } catch (error) {
         return res.status(error.status || 500).json({ message: error.message || 'Failed to import the BOM file' });
+    }
+};
+
+/** Exports one BOM to Excel: FG columns and MGR1-5, then a row per component. */
+exports.exportBOM = async (req, res) => {
+    try {
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+            return res.status(400).json({ message: 'Invalid BOM ID' });
+        }
+        const bom = await loadBOMById(req.params.id);
+        if (!bom) return res.status(404).json({ message: 'BOM not found' });
+
+        const label = (mgr) => (mgr ? (mgr.description || mgr.code || '') : '');
+        const rows = (bom.items || []).map((item) => ({
+            'FG_Item Code': bom.fgItemCode || '',
+            'FG_Desc': bom.fgItemDescription || '',
+            'FG_Serial Number': bom.fgSerialNumber || '',
+            'FG_MGR1': label(bom.fgMgr?.mgr1),
+            'FG_MGR2': label(bom.fgMgr?.mgr2),
+            'FG_MGR3': label(bom.fgMgr?.mgr3),
+            'FG_MGR4': label(bom.fgMgr?.mgr4),
+            'FG_MGR5': label(bom.fgMgr?.mgr5),
+            'BOM_Item Code': item.itemCode || '',
+            'BOM_Desc': item.itemDescription || '',
+            'BOM_Batch': item.batchNumber || '',
+            'BOM_Serial Number': item.componentSerialNumber || '',
+            'BOM_Qty': item.qty ?? '',
+            'BOM_MGR1': label(item.mgr1),
+            'BOM_MGR2': label(item.mgr2),
+            'BOM_MGR3': label(item.mgr3),
+            'BOM_MGR4': label(item.mgr4),
+            'BOM_MGR5': label(item.mgr5),
+            'BOM_Remarks': item.remarks || ''
+        }));
+
+        const headers = Object.keys(rows[0] || {
+            'FG_Item Code': '', 'FG_Desc': '', 'FG_Serial Number': '', 'FG_MGR1': '', 'FG_MGR2': '', 'FG_MGR3': '',
+            'FG_MGR4': '', 'FG_MGR5': '', 'BOM_Item Code': '', 'BOM_Desc': '', 'BOM_Batch': '', 'BOM_Serial Number': '',
+            'BOM_Qty': '', 'BOM_MGR1': '', 'BOM_MGR2': '', 'BOM_MGR3': '', 'BOM_MGR4': '', 'BOM_MGR5': '', 'BOM_Remarks': ''
+        });
+        const sheet = XLSX.utils.json_to_sheet(rows, { header: headers });
+        sheet['!cols'] = headers.map((header) => ({ wch: /Desc/.test(header) ? 42 : 18 }));
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, sheet, 'BOM');
+
+        const safeSerial = String(bom.fgSerialNumber || 'bom').replace(/[^A-Za-z0-9._-]+/g, '-');
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename=BOM_${safeSerial}.xlsx`);
+        return res.send(XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }));
+    } catch (error) {
+        return res.status(500).json({ message: 'Failed to export BOM', error: error.message });
     }
 };

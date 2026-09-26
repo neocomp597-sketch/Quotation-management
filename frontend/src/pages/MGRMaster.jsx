@@ -205,7 +205,7 @@ const MGRMaster = ({ isCreatePage = false, isEditPage = false }) => {
                 <>
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-black text-slate-900 tracking-tight">MGR Master</h1>
+                    <h1 className="text-3xl font-black text-slate-900 tracking-tight">Product MGR Master</h1>
                     <p className="text-slate-500 font-medium">Manage MGRs for product grouping.</p>
                 </div>
                 <div className="flex gap-3">

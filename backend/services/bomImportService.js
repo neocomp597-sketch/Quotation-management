@@ -19,7 +19,8 @@ const TEMPLATE_HEADERS = [
     'Item description',
     'Qty',
     'Component serial number',
-    'Batch number'
+    'Batch number',
+    'Remarks'
 ];
 
 const cleanCell = (value) => String(value ?? '').trim().replace(/\s+/g, ' ');
@@ -47,7 +48,11 @@ const HEADER_ALIASES = {
     serialnumbercomponent: 'componentSerialNumber',
     batchnumber: 'batchNumber',
     batchno: 'batchNumber',
-    batch: 'batchNumber'
+    batch: 'batchNumber',
+    remarks: 'remarks',
+    remark: 'remarks',
+    note: 'remarks',
+    notes: 'remarks'
 };
 
 const GENERIC_SERIAL_HEADERS = ['serialnumber', 'serialno', 'srno', 'slno'];
@@ -145,7 +150,8 @@ const groupBySerial = (rows) => {
             itemDescription: row.itemDescription,
             qty: row.qty,
             componentSerialNumber: row.componentSerialNumber,
-            batchNumber: row.batchNumber
+            batchNumber: row.batchNumber,
+            remarks: row.remarks
         });
     });
     return [...groups.values()];
@@ -217,11 +223,12 @@ const buildTemplateBuffer = () => {
         'Item description': 'Used only when the item code is not in Product Master',
         'Qty': 2,
         'Component serial number': 'SN-CMP-0001',
-        'Batch number': 'BATCH-01'
+        'Batch number': 'BATCH-01',
+        'Remarks': 'Free text, optional'
     }];
 
     const sheet = XLSX.utils.json_to_sheet(sample, { header: TEMPLATE_HEADERS });
-    sheet['!cols'] = [{ wch: 16 }, { wch: 18 }, { wch: 16 }, { wch: 52 }, { wch: 8 }, { wch: 22 }, { wch: 16 }];
+    sheet['!cols'] = [{ wch: 16 }, { wch: 18 }, { wch: 16 }, { wch: 52 }, { wch: 8 }, { wch: 22 }, { wch: 16 }, { wch: 30 }];
 
     const guide = XLSX.utils.aoa_to_sheet([
         ['Column', 'Required', 'Notes'],
@@ -232,6 +239,7 @@ const buildTemplateBuffer = () => {
         ['Qty', 'Yes', 'Must be a number greater than 0.'],
         ['Component serial number', 'No', 'Serial number of the component, if tracked.'],
         ['Batch number', 'No', 'Batch of the component, if tracked.'],
+        ['Remarks', 'No', 'Free text kept against the component.'],
         [],
         ['Re-uploading a serial replaces the components of its existing BOM.']
     ]);

@@ -3,11 +3,13 @@
  *
  * Creates a BOM against a throwaway FG serial, checks that component descriptions and
  * MGR1-MGR5 resolve from Product Master, that serial/batch round-trip, that lookup by
- * serial and by ticket work, and that a duplicate serial is rejected. Deletes the BOM.
+ * serial and by ticket work, that remarks survive a create/edit, that Export to Excel
+ * returns the agreed columns, and that a duplicate serial is rejected. Deletes the BOM.
  *
  * Usage: TEST_ADMIN_EMAIL=... TEST_ADMIN_PASSWORD=... node scripts/testBomApi.js
  */
 require('dotenv').config();
+const XLSX = require('xlsx');
 
 const API = process.env.TEST_API_URL || 'http://localhost:4003/api';
 const EMAIL = process.env.TEST_ADMIN_EMAIL;
@@ -54,8 +56,8 @@ const check = (label, passed, detail = '') => {
         fgItemDescription: 'Test finished good',
         fgSerialNumber: FG_SERIAL,
         items: [
-            { itemCode: product?.productCode, itemDescription: 'ignored when product is found', qty: 2, componentSerialNumber: 'COMP-SN-1', batchNumber: 'BATCH-A' },
-            { itemCode: 'ZZ-NOT-IN-MASTER', itemDescription: 'Uploaded description kept', qty: 5, componentSerialNumber: '', batchNumber: 'BATCH-B' },
+            { itemCode: product?.productCode, itemDescription: 'ignored when product is found', qty: 2, componentSerialNumber: 'COMP-SN-1', batchNumber: 'BATCH-A', remarks: 'Replaced under warranty' },
+            { itemCode: 'ZZ-NOT-IN-MASTER', itemDescription: 'Uploaded description kept', qty: 5, componentSerialNumber: '', batchNumber: 'BATCH-B', remarks: '' },
         ]
     };
     const created = await call('POST', '/bom', payload);
@@ -81,6 +83,38 @@ const check = (label, passed, detail = '') => {
     check('MGR1-MGR5 present on the response', mgrs.every(m => m in (known || {})), `${present.length} of 5 populated on this product`);
     check('unknown item keeps its uploaded description', unknown?.itemDescription === 'Uploaded description kept', unknown?.itemDescription || '(empty)');
     check('serial and batch round-trip', known?.componentSerialNumber === 'COMP-SN-1' && known?.batchNumber === 'BATCH-A', `${known?.componentSerialNumber} / ${known?.batchNumber}`);
+    check('remarks round-trip', known?.remarks === 'Replaced under warranty', known?.remarks || '(empty)');
+
+    console.log('\nEdit keeps remarks:');
+    const edited = await call('PUT', `/bom/${bomId}`, {
+        ...payload,
+        items: [{ itemCode: product?.productCode, qty: 4, componentSerialNumber: 'COMP-SN-1', batchNumber: 'BATCH-A', remarks: 'Edited remark' }]
+    });
+    const afterEdit = (await call('GET', `/bom/${bomId}`)).body;
+    check('edit saved', edited.status < 300, `HTTP ${edited.status}`);
+    check('edited remark stored', afterEdit?.items?.[0]?.remarks === 'Edited remark', afterEdit?.items?.[0]?.remarks || '(empty)');
+
+    console.log('\nExport to Excel:');
+    const exportRes = await fetch(`${API}/bom/${bomId}/export`, { headers: { Authorization: H.Authorization } });
+    const exportBuf = Buffer.from(await exportRes.arrayBuffer());
+    check('export downloads a workbook', exportRes.status === 200 && exportBuf.length > 1000, `HTTP ${exportRes.status}, ${exportBuf.length} bytes`);
+    check('filename carries the FG serial', /BOM_/.test(exportRes.headers.get('content-disposition') || ''), exportRes.headers.get('content-disposition') || '');
+    const wb = exportRes.status === 200 ? XLSX.read(exportBuf, { type: 'buffer' }) : null;
+    const exportSheet = wb ? wb.Sheets[wb.SheetNames[0]] : null;
+    const exportRows = exportSheet ? XLSX.utils.sheet_to_json(exportSheet, { defval: '' }) : [];
+    const exportHeaders = exportSheet ? (XLSX.utils.sheet_to_json(exportSheet, { header: 1 })[0] || []) : [];
+    const expected = [
+        'FG_Item Code', 'FG_Desc', 'FG_Serial Number', 'FG_MGR1', 'FG_MGR2', 'FG_MGR3', 'FG_MGR4', 'FG_MGR5',
+        'BOM_Item Code', 'BOM_Desc', 'BOM_Batch', 'BOM_Serial Number', 'BOM_Qty',
+        'BOM_MGR1', 'BOM_MGR2', 'BOM_MGR3', 'BOM_MGR4', 'BOM_MGR5', 'BOM_Remarks'
+    ];
+    check('export has every agreed column', expected.every(h => exportHeaders.includes(h)),
+        expected.filter(h => !exportHeaders.includes(h)).join(', ') || exportHeaders.length + ' columns');
+    check('one export row per component', exportRows.length === 1, `${exportRows.length} row(s)`);
+    check('export carries the FG serial and component data',
+        exportRows[0]?.['FG_Serial Number'] === FG_SERIAL && exportRows[0]?.['BOM_Item Code'] === product?.productCode && exportRows[0]?.['BOM_Qty'] === 4,
+        `${exportRows[0]?.['FG_Serial Number']} / ${exportRows[0]?.['BOM_Item Code']} / qty ${exportRows[0]?.['BOM_Qty']}`);
+    check('export carries remarks', exportRows[0]?.['BOM_Remarks'] === 'Edited remark', exportRows[0]?.['BOM_Remarks'] || '(empty)');
 
     console.log('\nLookup for a serial with no BOM:');
     const missing = await call('GET', '/bom/serial/ZZ-NO-SUCH-SERIAL-123');

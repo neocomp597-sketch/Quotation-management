@@ -21,7 +21,7 @@ const BOMComponentsTable = ({ items = [], compact = false }) => {
             <table className="w-full text-left border-collapse">
                 <thead>
                     <tr className="bg-slate-50">
-                        {['#', 'Item Code', 'Description', 'Qty', 'Batch', 'Serial No', 'MGR1', 'MGR2', 'MGR3', 'MGR4', 'MGR5'].map((label) => (
+                        {['#', 'Item Code', 'Description', 'Qty', 'Batch', 'Serial No', 'Remarks', 'MGR1', 'MGR2', 'MGR3', 'MGR4', 'MGR5'].map((label) => (
                             <th key={label} className={`${cell} text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap`}>{label}</th>
                         ))}
                     </tr>
@@ -45,6 +45,7 @@ const BOMComponentsTable = ({ items = [], compact = false }) => {
                             <td className={`${cell} font-bold text-slate-700`}>{item.qty}</td>
                             <td className={`${cell} text-slate-600 whitespace-nowrap`}>{item.batchNumber || '-'}</td>
                             <td className={`${cell} text-slate-600 whitespace-nowrap`}>{item.componentSerialNumber || '-'}</td>
+                            <td className={`${cell} text-slate-500 min-w-[10rem]`}>{item.remarks || '-'}</td>
                             {MGR_KEYS.map((key) => (
                                 <td key={key} className={`${cell} text-slate-600 whitespace-nowrap`}><MgrCell mgr={item[key]} /></td>
                             ))}
