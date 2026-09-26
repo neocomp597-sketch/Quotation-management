@@ -14,6 +14,16 @@ const BOMMasterSchema = new mongoose.Schema({
     // Name of the workbook a bulk-uploaded BOM came from (blank for manual entry)
     sourceFileName: { type: String, default: '' },
     status: { type: String, enum: ['Active', 'Inactive'], default: 'Active' },
+    // Who activated or deactivated this BOM, and when. BOMs are never deleted from the
+    // screens; they are switched off, and every switch is kept here.
+    statusHistory: [{
+        _id: false,
+        status: { type: String, enum: ['Active', 'Inactive'] },
+        reason: { type: String, trim: true, default: '' },
+        changedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        changedByName: { type: String, trim: true, default: '' },
+        changedAt: { type: Date, default: Date.now }
+    }],
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
 }, { timestamps: true });

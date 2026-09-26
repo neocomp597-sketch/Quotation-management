@@ -10,7 +10,8 @@ const escapeRegex = (value = '') => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 const masterDescription = (product) => cleanText(product?.productName) || cleanText(product?.description);
 
 // Case-insensitive product lookup by code without a regex scan per row.
-const findProductsByCode = async (codes) => {
+// withMgrs is used when the caller needs MGR1-MGR5 spelled out rather than as ids.
+const findProductsByCode = async (codes, { withMgrs = false } = {}) => {
     const variants = new Set();
     codes.filter(Boolean).forEach((code) => {
         variants.add(code);
@@ -19,9 +20,10 @@ const findProductsByCode = async (codes) => {
     });
     if (!variants.size) return new Map();
 
-    const products = await Product.find({ productCode: { $in: [...variants] } })
-        .select(`productCode productName description ${MGR_FIELDS.join(' ')}`)
-        .lean();
+    let query = Product.find({ productCode: { $in: [...variants] } })
+        .select(`productCode productName description ${MGR_FIELDS.join(' ')}`);
+    if (withMgrs) query = query.populate(MGR_FIELDS.map((path) => ({ path, select: 'code description' })));
+    const products = await query.lean();
 
     const byKey = new Map();
     products.forEach((product) => {
@@ -140,4 +142,7 @@ const prepareBOM = async (body) => {
     };
 };
 
-module.exports = { prepareBOM, searchMaterials, findAssetBySerial, toKey, cleanText, escapeRegex };
+module.exports = {
+    prepareBOM, searchMaterials, findAssetBySerial, findProductsByCode, masterDescription,
+    MGR_FIELDS, toKey, cleanText, escapeRegex
+};

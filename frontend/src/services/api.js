@@ -355,6 +355,8 @@ export const bomService = {
   getById: (id) => api.get(`/bom/${id}`),
   create: (data) => api.post("/bom", data),
   update: (id, data) => api.put(`/bom/${id}`, data),
+  // BOM screens deactivate instead of deleting; the hard delete stays for administrators.
+  setStatus: (id, status, reason = "") => api.patch(`/bom/${id}/status`, { status, reason }),
   delete: (id) => api.delete(`/bom/${id}`),
   searchMaterials: (q) => api.get("/bom/materials", { params: { q } }),
   exportToExcel: (id) => api.get(`/bom/${id}/export`, { responseType: "blob" }),

@@ -116,6 +116,24 @@ const check = (label, passed, detail = '') => {
         `${exportRows[0]?.['FG_Serial Number']} / ${exportRows[0]?.['BOM_Item Code']} / qty ${exportRows[0]?.['BOM_Qty']}`);
     check('export carries remarks', exportRows[0]?.['BOM_Remarks'] === 'Edited remark', exportRows[0]?.['BOM_Remarks'] || '(empty)');
 
+    console.log('\nActivate / deactivate instead of deleting:');
+    const off = await call('PATCH', `/bom/${bomId}/status`, { status: 'Inactive', reason: 'Superseded' });
+    check('BOM can be deactivated', off.status === 200 && off.body?.status === 'Inactive', `HTTP ${off.status}, status ${off.body?.status}`);
+    const log = off.body?.statusHistory || [];
+    const last = log[log.length - 1];
+    check('the switch is logged with the user and reason',
+        last?.status === 'Inactive' && Boolean(last?.changedBy) && Boolean(last?.changedByName) && last?.reason === 'Superseded',
+        JSON.stringify(last || {}).slice(0, 120));
+    check('creation is the first log entry', log[0]?.status === 'Active' && /created/i.test(log[0]?.reason || ''), log[0]?.reason || '(none)');
+    const stillThere = await call('GET', `/bom/${bomId}`);
+    check('an inactive BOM keeps its components', (stillThere.body?.items || []).length === 1, `${(stillThere.body?.items || []).length} component(s)`);
+    const hiddenFromComplaint = await call('GET', `/bom/serial/${encodeURIComponent(FG_SERIAL)}`);
+    check('an inactive BOM is not offered on complaints', !(hiddenFromComplaint.body?.bom), hiddenFromComplaint.body?.bom ? 'still returned' : 'bom: null');
+    const on = await call('PATCH', `/bom/${bomId}/status`, { status: 'Active' });
+    check('BOM can be activated again', on.body?.status === 'Active' && (on.body?.statusHistory || []).length === 3, `${(on.body?.statusHistory || []).length} log entries`);
+    const badStatus = await call('PATCH', `/bom/${bomId}/status`, { status: 'Deleted' });
+    check('an unknown status is refused', badStatus.status === 400, `HTTP ${badStatus.status}`);
+
     console.log('\nLookup for a serial with no BOM:');
     const missing = await call('GET', '/bom/serial/ZZ-NO-SUCH-SERIAL-123');
     check('responds without an error', missing.status === 200 || missing.status === 404, `HTTP ${missing.status}`);

@@ -161,7 +161,7 @@ const groupBySerial = (rows) => {
  * Imports a workbook. Existing BOMs for a serial are replaced so re-uploading a corrected
  * file is safe. Returns per-serial counts plus the reason for every serial that failed.
  */
-const importBOMWorkbook = async (buffer, { fileName = '', userId = null } = {}) => {
+const importBOMWorkbook = async (buffer, { fileName = '', userId = null, userName = '' } = {}) => {
     const groups = groupBySerial(readRows(buffer));
     if (!groups.length) {
         throw Object.assign(new Error('No data rows found in the file.'), { status: 400 });
@@ -182,10 +182,22 @@ const importBOMWorkbook = async (buffer, { fileName = '', userId = null } = {}) 
             const existing = await BOMMaster.findOne({ fgSerialKey: master.fgSerialKey });
             if (existing) {
                 await BOMItem.deleteMany({ bomMasterId: existing._id });
-                await BOMMaster.updateOne(
-                    { _id: existing._id },
-                    { ...master, sourceFileName: fileName, status: 'Active', updatedBy: userId }
-                );
+                const update = {
+                    $set: { ...master, sourceFileName: fileName, status: 'Active', updatedBy: userId }
+                };
+                // Re-uploading brings a switched-off BOM back; that is a status change and is logged.
+                if (existing.status !== 'Active') {
+                    update.$push = {
+                        statusHistory: {
+                            status: 'Active',
+                            reason: `Reactivated by upload${fileName ? ` of ${fileName}` : ''}`,
+                            changedBy: userId,
+                            changedByName: userName,
+                            changedAt: new Date()
+                        }
+                    };
+                }
+                await BOMMaster.updateOne({ _id: existing._id }, update);
                 await BOMItem.insertMany(items.map((item) => ({ ...item, bomMasterId: existing._id })));
                 summary.updated++;
             } else {
@@ -193,6 +205,13 @@ const importBOMWorkbook = async (buffer, { fileName = '', userId = null } = {}) 
                     ...master,
                     sourceFileName: fileName,
                     status: 'Active',
+                    statusHistory: [{
+                        status: 'Active',
+                        reason: `Created by upload${fileName ? ` of ${fileName}` : ''}`,
+                        changedBy: userId,
+                        changedByName: userName,
+                        changedAt: new Date()
+                    }],
                     createdBy: userId,
                     updatedBy: userId
                 });

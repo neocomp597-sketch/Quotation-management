@@ -30,8 +30,10 @@ router.post('/upload', canManageBOM, upload.single('file'), bomController.upload
 router.get('/', canManageBOM, bomController.listBOMs);
 router.post('/', canManageBOM, bomController.createBOM);
 router.get('/:id/export', canManageBOM, bomController.exportBOM);
+router.patch('/:id/status', canManageBOM, bomController.setBOMStatus);
 router.get('/:id', canManageBOM, bomController.getBOMById);
 router.put('/:id', canManageBOM, bomController.updateBOM);
+// The screens deactivate a BOM instead of removing it; a hard delete is admin-only.
 router.delete('/:id', canManageBOM, bomController.deleteBOM);
 
 module.exports = router;

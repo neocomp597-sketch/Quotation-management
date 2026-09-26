@@ -17,6 +17,7 @@ const BOMMaster = () => {
     const [refreshCount, setRefreshCount] = useState(0);
     const [uploading, setUploading] = useState(false);
     const [uploadSummary, setUploadSummary] = useState(null);
+    const [statusFilter, setStatusFilter] = useState('');
 
     const handleTemplate = async () => {
         try {
@@ -65,13 +66,13 @@ const BOMMaster = () => {
     }, [search]);
 
     // The list is loading whenever the rows on screen belong to a different request.
-    const requestKey = `${page}|${debouncedSearch}|${refreshCount}`;
+    const requestKey = `${page}|${debouncedSearch}|${statusFilter}|${refreshCount}`;
     const [loadedKey, setLoadedKey] = useState(null);
     const loading = loadedKey !== requestKey;
 
     useEffect(() => {
         let cancelled = false;
-        bomService.getAll({ page, limit: LIST_PAGE_SIZE, search: debouncedSearch || undefined })
+        bomService.getAll({ page, limit: LIST_PAGE_SIZE, search: debouncedSearch || undefined, status: statusFilter || undefined })
             .then((res) => {
                 if (cancelled) return;
                 setBoms(res.data?.data || []);
@@ -84,7 +85,7 @@ const BOMMaster = () => {
                 if (!cancelled) setLoadedKey(requestKey);
             });
         return () => { cancelled = true; };
-    }, [page, debouncedSearch, requestKey]);
+    }, [page, debouncedSearch, statusFilter, requestKey]);
 
     const offset = (pagination.page - 1) * pagination.limit;
 
@@ -144,15 +145,26 @@ const BOMMaster = () => {
 
             <div className="mobile-master-shell bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
                 <div className="mobile-master-toolbar p-4 border-b border-slate-100 bg-slate-50">
-                    <div className="relative max-w-md">
-                        <MdSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-                        <input
-                            type="text"
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            placeholder="Search FG serial number or item code"
-                            className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-medium"
-                        />
+                    <div className="flex flex-wrap items-center gap-3">
+                        <div className="relative w-full max-w-md">
+                            <MdSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+                            <input
+                                type="text"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                placeholder="Search FG serial number or item code"
+                                className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-medium"
+                            />
+                        </div>
+                        <select
+                            value={statusFilter}
+                            onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+                            className="px-4 py-3 bg-white border border-slate-200 rounded-2xl text-sm font-semibold text-slate-700 outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500"
+                        >
+                            <option value="">All statuses</option>
+                            <option value="Active">Active only</option>
+                            <option value="Inactive">Inactive only</option>
+                        </select>
                     </div>
                 </div>
 

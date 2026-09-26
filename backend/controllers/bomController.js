@@ -5,7 +5,11 @@ const BOMItem = require('../models/BOMItem');
 const Ticket = require('../models/Ticket');
 const Product = require('../models/Product');
 const { canViewTicketDetails } = require('./ticketController');
-const { prepareBOM, searchMaterials, toKey, cleanText, escapeRegex } = require('../services/bomService');
+const { isSuperAdminRole } = require('../middlewares/authMiddleware');
+const {
+    prepareBOM, searchMaterials, findProductsByCode, masterDescription, MGR_FIELDS,
+    toKey, cleanText, escapeRegex
+} = require('../services/bomService');
 const { importBOMWorkbook, buildTemplateBuffer } = require('../services/bomImportService');
 
 const MGR_POPULATE = 'code description';
@@ -21,22 +25,6 @@ const formatMgr = (mgr) => (mgr ? { _id: mgr._id, code: mgr.code, description: m
 const loadBOM = async (master) => {
     if (!master) return null;
 
-    // The finished good's own MGR1-MGR5, taken from its product record.
-    let fgMgrs = { mgr1: null, mgr2: null, mgr3: null, mgr4: null, mgr5: null };
-    if (master.fgProductId) {
-        const fgProduct = await Product.findById(master.fgProductId)
-            .select('mgr1 mgr2 mgr3 mgr4 mgr5')
-            .populate('mgr1', MGR_POPULATE).populate('mgr2', MGR_POPULATE).populate('mgr3', MGR_POPULATE)
-            .populate('mgr4', MGR_POPULATE).populate('mgr5', MGR_POPULATE)
-            .lean();
-        if (fgProduct) {
-            fgMgrs = {
-                mgr1: formatMgr(fgProduct.mgr1), mgr2: formatMgr(fgProduct.mgr2), mgr3: formatMgr(fgProduct.mgr3),
-                mgr4: formatMgr(fgProduct.mgr4), mgr5: formatMgr(fgProduct.mgr5)
-            };
-        }
-    }
-
     const items = await BOMItem.find({ bomMasterId: master._id })
         .sort({ lineNo: 1 })
         .populate('mgr1', MGR_POPULATE)
@@ -46,18 +34,39 @@ const loadBOM = async (master) => {
         .populate('mgr5', MGR_POPULATE)
         .lean();
 
+    // Descriptions and MGR1-MGR5 are read from Product Master every time, so a product
+    // maintained after the BOM was saved shows up without re-entering the BOM. What was
+    // stored with the BOM is the fallback for codes that are still not in the master.
+    const byCode = await findProductsByCode(
+        [master.fgItemCode, ...items.map((item) => item.itemCode)],
+        { withMgrs: true }
+    );
+
+    const mgrsOf = (source) => Object.fromEntries(MGR_FIELDS.map((field) => [field, formatMgr(source?.[field])]));
+
+    let fgProduct = byCode.get(toKey(master.fgItemCode)) || null;
+    if (!fgProduct && master.fgProductId) {
+        fgProduct = await Product.findById(master.fgProductId)
+            .select(`productCode productName description ${MGR_FIELDS.join(' ')}`)
+            .populate(MGR_FIELDS.map((path) => ({ path, select: MGR_POPULATE })))
+            .lean();
+    }
+
     return {
         ...master,
-        fgMgr: fgMgrs,
-        items: items.map((item) => ({
-            ...item,
-            inProductMaster: Boolean(item.productId),
-            mgr1: formatMgr(item.mgr1),
-            mgr2: formatMgr(item.mgr2),
-            mgr3: formatMgr(item.mgr3),
-            mgr4: formatMgr(item.mgr4),
-            mgr5: formatMgr(item.mgr5)
-        }))
+        fgItemDescription: masterDescription(fgProduct) || master.fgItemDescription,
+        fgMgr: mgrsOf(fgProduct),
+        items: items.map((item) => {
+            const product = byCode.get(toKey(item.itemCode));
+            return {
+                ...item,
+                inProductMaster: Boolean(product),
+                itemDescription: product
+                    ? masterDescription(product)
+                    : (item.enteredDescription || item.itemDescription),
+                ...mgrsOf(product || item)
+            };
+        })
     };
 };
 
@@ -144,7 +153,13 @@ exports.createBOM = async (req, res) => {
             return res.status(409).json({ message: serialTakenMessage(master.fgSerialNumber) });
         }
 
-        const created = await BOMMaster.create({ ...master, status: 'Active', createdBy: req.user?.id, updatedBy: req.user?.id });
+        const created = await BOMMaster.create({
+            ...master,
+            status: 'Active',
+            statusHistory: [statusEntry('Active', 'BOM created', req)],
+            createdBy: req.user?.id,
+            updatedBy: req.user?.id
+        });
         try {
             await BOMItem.insertMany(items.map((item) => ({ ...item, bomMasterId: created._id })));
         } catch (itemError) {
@@ -191,8 +206,59 @@ exports.updateBOM = async (req, res) => {
     }
 };
 
+const statusEntry = (status, reason, req) => ({
+    status,
+    reason: cleanText(reason),
+    changedBy: req.user?.id || null,
+    changedByName: req.user?.name || '',
+    changedAt: new Date()
+});
+
+/**
+ * Activate or deactivate a BOM. Nothing is removed: an inactive BOM stays in the register
+ * with its components and stops being offered to the complaint screens, and every switch is
+ * written to the BOM's status log with the user who made it.
+ */
+exports.setBOMStatus = async (req, res) => {
+    try {
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+            return res.status(400).json({ message: 'Invalid BOM ID' });
+        }
+        const status = cleanText(req.body.status);
+        if (!['Active', 'Inactive'].includes(status)) {
+            return res.status(400).json({ message: 'Status must be Active or Inactive.' });
+        }
+        const master = await BOMMaster.findById(req.params.id).select('_id status').lean();
+        if (!master) {
+            return res.status(404).json({ message: 'BOM not found' });
+        }
+        if (master.status === status) {
+            return res.json(await loadBOMById(master._id));
+        }
+
+        const reason = req.body.reason || (status === 'Active' ? 'Activated' : 'Deactivated');
+        await BOMMaster.updateOne(
+            { _id: master._id },
+            {
+                $set: { status, updatedBy: req.user?.id },
+                $push: { statusHistory: statusEntry(status, reason, req) }
+            }
+        );
+        return res.json(await loadBOMById(master._id));
+    } catch (error) {
+        return res.status(500).json({ message: 'Failed to change the BOM status', error: error.message });
+    }
+};
+
+// The screens deactivate a BOM instead; a permanent delete is left to administrators.
 exports.deleteBOM = async (req, res) => {
     try {
+        const role = req.user?.role || '';
+        if (role !== 'admin' && !isSuperAdminRole(role)) {
+            return res.status(403).json({
+                message: 'BOMs are deactivated rather than deleted. Only an administrator can delete one permanently.'
+            });
+        }
         if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
             return res.status(400).json({ message: 'Invalid BOM ID' });
         }
@@ -263,7 +329,8 @@ exports.uploadBOM = async (req, res) => {
         }
         const summary = await importBOMWorkbook(req.file.buffer, {
             fileName: req.file.originalname || '',
-            userId: req.user?.id || null
+            userId: req.user?.id || null,
+            userName: req.user?.name || ''
         });
         return res.status(summary.failed && !summary.created && !summary.updated ? 400 : 200).json(summary);
     } catch (error) {
