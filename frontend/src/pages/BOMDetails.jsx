@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { MdArrowBack, MdEdit, MdFileDownload, MdToggleOff, MdToggleOn, MdHistory } from 'react-icons/md';
+import { MdArrowBack, MdEdit, MdFileDownload, MdPictureAsPdf, MdToggleOff, MdToggleOn, MdHistory } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import { bomService } from '../services/api';
 import BOMComponentsTable from '../components/bom/BOMComponentsTable';
@@ -13,6 +13,8 @@ const Field = ({ label, children }) => (
 );
 
 const formatDateTime = (value) => (value ? new Date(value).toLocaleString('en-IN') : '');
+const formatDate = (value) => (value ? new Date(value).toLocaleDateString('en-IN') : '');
+const mgrLabel = (mgr) => (mgr ? (mgr.description || mgr.code || '') : '');
 
 const BOMDetails = () => {
     const navigate = useNavigate();
@@ -30,6 +32,24 @@ const BOMDetails = () => {
             });
         return () => { cancelled = true; };
     }, [id]);
+
+    // The PDF carries the BOM and any sub-BOM underneath it, so it needs the print payload.
+    const [printing, setPrinting] = useState(false);
+    const handleExportPdf = async () => {
+        setPrinting(true);
+        try {
+            const [{ data }, { buildBOMPdf }] = await Promise.all([
+                bomService.getForPrint(bom._id),
+                import('../utils/bomPdf'),
+            ]);
+            const doc = await buildBOMPdf(data);
+            doc.save(`BOM_${bom.fgSerialNumber || bom._id}.pdf`);
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Could not export the BOM as PDF.');
+        } finally {
+            setPrinting(false);
+        }
+    };
 
     const handleExport = async () => {
         try {
@@ -93,6 +113,14 @@ const BOMDetails = () => {
                             className="flex items-center gap-2 px-5 py-3 rounded-2xl border border-slate-200 text-slate-600 font-black uppercase text-xs tracking-widest hover:bg-slate-50 transition-all"
                         >
                             <MdFileDownload size={18} /> Export to Excel
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleExportPdf}
+                            disabled={printing}
+                            className="flex items-center gap-2 px-5 py-3 rounded-2xl border border-slate-200 text-slate-600 font-black uppercase text-xs tracking-widest hover:bg-slate-50 transition-all disabled:opacity-60"
+                        >
+                            <MdPictureAsPdf size={18} /> {printing ? 'Preparing…' : 'Export to PDF'}
                         </button>
                         <button
                             type="button"
@@ -177,14 +205,13 @@ const BOMDetails = () => {
                                 {bom.status}
                             </span>
                         </Field>
-                        <Field label="Created">
-                            {formatDateTime(bom.createdAt)}
-                            {bom.createdBy?.name && <span className="block text-xs font-medium text-slate-500">{bom.createdBy.name}</span>}
-                        </Field>
-                        <Field label="Last Updated">
-                            {formatDateTime(bom.updatedAt)}
-                            {bom.updatedBy?.name && <span className="block text-xs font-medium text-slate-500">{bom.updatedBy.name}</span>}
-                        </Field>
+                        <Field label="Invoice No">{bom.invoice?.invoiceNumber}</Field>
+                        <Field label="Invoice Date">{formatDate(bom.invoice?.invoiceDate)}</Field>
+                        <Field label="Customer Code">{bom.invoice?.customerCode}</Field>
+                        <Field label="Customer Name">{bom.invoice?.customerName}</Field>
+                        {[1, 2, 3, 4, 5].map((n) => (
+                            <Field key={n} label={`MGR${n}`}>{mgrLabel(bom.fgMgr?.[`mgr${n}`])}</Field>
+                        ))}
                     </div>
 
                     <div className="rounded-3xl border border-slate-100 bg-white shadow-sm">

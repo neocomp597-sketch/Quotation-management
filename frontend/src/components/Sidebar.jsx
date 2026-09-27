@@ -350,10 +350,14 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
 
             return {
                 ...item,
-                children: item.children.filter((child) => {
-                    if (child.superAdminOnly) return isSuperAdmin;
-                    return child.adminOnly ? (isAdmin || isSuperAdmin) : hasAccess(child.key);
-                }),
+                // Every submenu is listed alphabetically, so a new entry lands in the right
+                // place without anyone having to keep the list in order by hand.
+                children: item.children
+                    .filter((child) => {
+                        if (child.superAdminOnly) return isSuperAdmin;
+                        return child.adminOnly ? (isAdmin || isSuperAdmin) : hasAccess(child.key);
+                    })
+                    .sort((a, b) => a.name.localeCompare(b.name, 'en', { sensitivity: 'base' })),
             };
         }).filter((item) => {
             if (item.type === 'link') {
@@ -408,7 +412,12 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                         <div className="w-full transition-all duration-300">
                             {/* Top row: ARCRM logo + App title + collapse button */}
                             <div className="flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-2.5 min-w-0">
+                                <NavLink
+                                    to="/dashboard"
+                                    onClick={handleNavClick}
+                                    title="Go to the dashboard"
+                                    className="flex items-center gap-2.5 min-w-0 rounded-2xl hover:opacity-80 transition-opacity cursor-pointer"
+                                >
                                     <div className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white dark:bg-slate-800 p-1.5 shadow-md border border-slate-200/60 dark:border-slate-700/60 shrink-0">
                                         <SiteLogo className="w-full h-full" />
                                     </div>
@@ -416,7 +425,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                                         <p className="text-lg font-black tracking-tight leading-none truncate">{brandSettings?.whitelabelAppTitle || 'ARCRM'}</p>
                                         <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-0.5 truncate tracking-wide">Always Ready CRM</p>
                                     </div>
-                                </div>
+                                </NavLink>
                                 <button
                                     onClick={toggleSidebar}
                                     className="p-1.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-400 dark:text-slate-400 hover:text-primary-600 dark:hover:text-primary-400 transition-all shrink-0 cursor-pointer"

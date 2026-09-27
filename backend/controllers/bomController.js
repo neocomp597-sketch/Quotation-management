@@ -4,6 +4,7 @@ const BOMMaster = require('../models/BOMMaster');
 const BOMItem = require('../models/BOMItem');
 const Ticket = require('../models/Ticket');
 const Product = require('../models/Product');
+const Asset = require('../models/Asset');
 const { canViewTicketDetails } = require('./ticketController');
 const { isSuperAdminRole } = require('../middlewares/authMiddleware');
 const {
@@ -44,6 +45,14 @@ const loadBOM = async (master) => {
 
     const mgrsOf = (source) => Object.fromEntries(MGR_FIELDS.map((field) => [field, formatMgr(source?.[field])]));
 
+    // Invoice and customer of the finished good, from the serial registered in Invoice
+    // Bulk Upload. Looked up by serial when the BOM was saved before the serial existed.
+    const asset = await Asset.findOne(
+        master.assetId
+            ? { _id: master.assetId }
+            : { serialNumber: { $in: [...new Set([master.fgSerialNumber, toKey(master.fgSerialNumber)])] } }
+    ).select('invoiceNumber invoiceDate customerCode customerNameStr customerId').lean();
+
     let fgProduct = byCode.get(toKey(master.fgItemCode)) || null;
     if (!fgProduct && master.fgProductId) {
         fgProduct = await Product.findById(master.fgProductId)
@@ -56,6 +65,12 @@ const loadBOM = async (master) => {
         ...master,
         fgItemDescription: masterDescription(fgProduct) || master.fgItemDescription,
         fgMgr: mgrsOf(fgProduct),
+        invoice: {
+            invoiceNumber: asset?.invoiceNumber || '',
+            invoiceDate: asset?.invoiceDate || null,
+            customerCode: asset?.customerCode || '',
+            customerName: asset?.customerNameStr || ''
+        },
         items: items.map((item) => {
             const product = byCode.get(toKey(item.itemCode));
             return {
@@ -339,6 +354,69 @@ exports.uploadBOM = async (req, res) => {
 };
 
 /** Exports one BOM to Excel: FG columns and MGR1-5, then a row per component. */
+/**
+ * A component is a sub-BOM when it has a BOM of its own: first by its serial number, and
+ * failing that by its item code when exactly one BOM exists for that code. Nesting is
+ * followed a few levels deep, and a serial already printed is never expanded twice.
+ */
+const MAX_SUB_BOM_DEPTH = 3;
+
+const loadSubBOMs = async (bom, seen, depth = 1) => {
+    if (depth > MAX_SUB_BOM_DEPTH) return [];
+
+    const items = bom.items || [];
+    const serialKeys = [...new Set(items.map((item) => toKey(item.componentSerialNumber)).filter(Boolean))];
+    const codes = [...new Set(items.map((item) => item.itemCode).filter(Boolean))];
+    if (!serialKeys.length && !codes.length) return [];
+
+    const candidates = await BOMMaster.find({
+        status: 'Active',
+        $or: [{ fgSerialKey: { $in: serialKeys } }, { fgItemCode: { $in: codes } }]
+    }).lean();
+
+    const bySerial = new Map();
+    const byItemCode = new Map();
+    candidates.forEach((candidate) => {
+        bySerial.set(candidate.fgSerialKey, candidate);
+        const key = toKey(candidate.fgItemCode);
+        // Only an unambiguous item code is used; several serials for one code is not a match.
+        byItemCode.set(key, byItemCode.has(key) ? null : candidate);
+    });
+
+    const result = [];
+    for (const item of items) {
+        const match = bySerial.get(toKey(item.componentSerialNumber)) || byItemCode.get(toKey(item.itemCode));
+        if (!match || seen.has(String(match._id))) continue;
+        seen.add(String(match._id));
+
+        const child = await loadBOM(match);
+        result.push({
+            level: depth,
+            forItemCode: item.itemCode,
+            forSerialNumber: item.componentSerialNumber || '',
+            bom: child
+        });
+        result.push(...await loadSubBOMs(child, seen, depth + 1));
+    }
+    return result;
+};
+
+/** Everything the Export to PDF needs in one call: the BOM, its invoice and its sub-BOMs. */
+exports.getBOMForPrint = async (req, res) => {
+    try {
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+            return res.status(400).json({ message: 'Invalid BOM ID' });
+        }
+        const bom = await loadBOMById(req.params.id);
+        if (!bom) return res.status(404).json({ message: 'BOM not found' });
+
+        const subBoms = await loadSubBOMs(bom, new Set([String(bom._id)]));
+        return res.json({ bom, subBoms });
+    } catch (error) {
+        return res.status(500).json({ message: 'Failed to prepare the BOM for printing', error: error.message });
+    }
+};
+
 exports.exportBOM = async (req, res) => {
     try {
         if (!mongoose.Types.ObjectId.isValid(req.params.id)) {

@@ -30,6 +30,7 @@ router.post('/upload', canManageBOM, upload.single('file'), bomController.upload
 router.get('/', canManageBOM, bomController.listBOMs);
 router.post('/', canManageBOM, bomController.createBOM);
 router.get('/:id/export', canManageBOM, bomController.exportBOM);
+router.get('/:id/print', canManageBOM, bomController.getBOMForPrint);
 router.patch('/:id/status', canManageBOM, bomController.setBOMStatus);
 router.get('/:id', canManageBOM, bomController.getBOMById);
 router.put('/:id', canManageBOM, bomController.updateBOM);

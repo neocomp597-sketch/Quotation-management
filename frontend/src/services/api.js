@@ -360,6 +360,8 @@ export const bomService = {
   delete: (id) => api.delete(`/bom/${id}`),
   searchMaterials: (q) => api.get("/bom/materials", { params: { q } }),
   exportToExcel: (id) => api.get(`/bom/${id}/export`, { responseType: "blob" }),
+  // BOM plus its sub-BOMs, for Export to PDF.
+  getForPrint: (id) => api.get(`/bom/${id}/print`),
   downloadTemplate: () => api.get("/bom/template", { responseType: "blob" }),
   upload: (file) => {
     const form = new FormData();
