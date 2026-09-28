@@ -150,7 +150,8 @@ const prefetchCommonRoutes = () => {
   }
 
   const load = () => Promise.allSettled([
-    import('./pages/Dashboard'),
+    // The home page is blank now, so the screens people actually open come first.
+    import('./pages/Quotations'),
     import('./pages/CSMTickets'),
     import('./pages/CSMDashboard'),
     import('./pages/Customers'),
