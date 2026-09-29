@@ -23,6 +23,28 @@ const CSMRcaReportSchema = new mongoose.Schema({
     status: { type: String, enum: ['Open', 'In Progress', 'Closed', 'Resolved'], default: 'Open' },
     problemStatement: { type: String, default: '' },
     impact: { type: String, default: '' },
+
+    // Fields of the Stelmec "Why Why Analysis Sheet (Maintenance)" the report prints as.
+    sectionCell: { type: String, default: '' },
+    machineNo: { type: String, default: '' },
+    machineDescription: { type: String, default: '' },
+    breakdownDate: { type: Date, default: null },
+    symptomBeforeBreakdown: { type: String, default: '' },
+    // Which of the two boxes on the sheet is filled in.
+    sparePartReplaced: { type: Boolean, default: false },
+    finalCountermeasure: { type: String, default: '' },
+    dueTo: { type: String, default: '' },
+    // The sheet's own list: the root cause is always one of these five.
+    rootCauseReason: {
+        type: String,
+        enum: ['', 'Poor Basic Condition', 'Poor Operating Condition', 'Deterioration', 'Weak Design', 'Poor Skill'],
+        default: ''
+    },
+    kaizenIdea: { type: String, default: '' },
+    inCharge: { type: String, default: '' },
+    youDidNot: { type: String, default: '' },
+    actionThatDay: { type: String, default: '' },
+    schedule: { type: String, default: '' },
     fiveWhys: {
         type: [RcaWhySchema],
         default: [

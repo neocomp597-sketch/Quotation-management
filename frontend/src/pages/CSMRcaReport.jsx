@@ -4,6 +4,7 @@ import jsPDF from 'jspdf';
 import * as XLSX from 'xlsx';
 import { csmService, companySettingsService } from '../services/api';
 import { resolveImageUrl } from '../utils/helpers';
+import WhyWhySheet, { SHEET_WIDTH } from '../components/csm/WhyWhySheet';
 import { 
     MdAssessment, MdAdd, MdPrint, MdRefresh, MdDelete, 
     MdEdit, MdArrowBack, MdSave, MdFormatListBulleted, MdCheckCircle,
@@ -11,6 +12,14 @@ import {
     MdPictureAsPdf, MdDownload, MdFileDownload
 } from 'react-icons/md';
 import { toast } from 'react-toastify';
+
+// The paper sheet is written dd.mm.yyyy.
+const sheetDate = (value) => {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value);
+    return `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}.${date.getFullYear()}`;
+};
 
 const INITIAL_FORM = {
     rcaNumber: '',
@@ -20,6 +29,20 @@ const INITIAL_FORM = {
     priority: 'Medium',
     problemStatement: '',
     impact: '',
+    sectionCell: '',
+    machineNo: '',
+    machineDescription: '',
+    breakdownDate: '',
+    symptomBeforeBreakdown: '',
+    sparePartReplaced: false,
+    finalCountermeasure: '',
+    dueTo: '',
+    rootCauseReason: '',
+    kaizenIdea: '',
+    inCharge: '',
+    youDidNot: '',
+    actionThatDay: '',
+    schedule: '',
     fiveWhys: [
         { whyNo: 1, analysis: '' },
         { whyNo: 2, analysis: '' },
@@ -118,6 +141,20 @@ const CSMRcaReport = () => {
             priority: report.priority || 'Medium',
             problemStatement: report.problemStatement || '',
             impact: report.impact || '',
+            sectionCell: report.sectionCell || '',
+            machineNo: report.machineNo || '',
+            machineDescription: report.machineDescription || '',
+            breakdownDate: report.breakdownDate ? new Date(report.breakdownDate).toISOString().split('T')[0] : '',
+            symptomBeforeBreakdown: report.symptomBeforeBreakdown || '',
+            sparePartReplaced: Boolean(report.sparePartReplaced),
+            finalCountermeasure: report.finalCountermeasure || '',
+            dueTo: report.dueTo || '',
+            rootCauseReason: report.rootCauseReason || '',
+            kaizenIdea: report.kaizenIdea || '',
+            inCharge: report.inCharge || '',
+            youDidNot: report.youDidNot || '',
+            actionThatDay: report.actionThatDay || '',
+            schedule: report.schedule || '',
             fiveWhys: report.fiveWhys && report.fiveWhys.length === 5 ? report.fiveWhys : INITIAL_FORM.fiveWhys,
             category: report.category || 'Man / People',
             rootCause: report.rootCause || '',
@@ -178,26 +215,27 @@ const CSMRcaReport = () => {
                     backgroundColor: '#ffffff'
                 });
 
-                const imgData = canvas.toDataURL('image/png');
-                const pdf = new jsPDF('p', 'mm', 'a4');
-                const pdfWidth = pdf.internal.pageSize.getWidth();
-                const pdfHeight = pdf.internal.pageSize.getHeight();
+                // The sheet is a landscape form and is meant to come out on one page, so it
+                // is scaled to whichever of the two page dimensions runs out first.
+                const pdf = new jsPDF('l', 'mm', 'a4');
+                const pageWidth = pdf.internal.pageSize.getWidth();
+                const pageHeight = pdf.internal.pageSize.getHeight();
+                const margin = 6;
+                const scale = Math.min(
+                    (pageWidth - margin * 2) / canvas.width,
+                    (pageHeight - margin * 2) / canvas.height
+                );
+                const imgWidth = canvas.width * scale;
+                const imgHeight = canvas.height * scale;
 
-                const imgWidth = pdfWidth - 20; // 10mm left/right margin
-                const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-                let heightLeft = imgHeight;
-                let position = 10;
-
-                pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
-                heightLeft -= (pdfHeight - 20);
-
-                while (heightLeft > 0) {
-                    position = heightLeft - imgHeight + 10;
-                    pdf.addPage();
-                    pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
-                    heightLeft -= (pdfHeight - 20);
-                }
+                pdf.addImage(
+                    canvas.toDataURL('image/png'),
+                    'PNG',
+                    (pageWidth - imgWidth) / 2,
+                    margin,
+                    imgWidth,
+                    imgHeight
+                );
 
                 const docName = targetReport?.rcaNumber || formData.rcaNumber || 'RCA-Report';
                 pdf.save(`${docName.replace(/\//g, '-')}.pdf`);
@@ -220,8 +258,24 @@ const CSMRcaReport = () => {
                 rows.push({ Section: 'Document Header', Field: 'Date', Detail: targetReport.date || '' });
                 rows.push({ Section: 'Document Header', Field: 'Department', Detail: targetReport.department || '' });
                 rows.push({ Section: 'Document Header', Field: 'Priority', Detail: targetReport.priority || '' });
-                rows.push({ Section: 'Incident', Field: 'Problem Statement', Detail: targetReport.problemStatement || '' });
+                rows.push({ Section: 'Incident', Field: 'Breakdown (Physical Phenomenon)', Detail: targetReport.problemStatement || '' });
                 rows.push({ Section: 'Incident', Field: 'Impact', Detail: targetReport.impact || '' });
+
+                // The boxes of the printed Why-Why Analysis Sheet, in the order they appear on it.
+                rows.push({ Section: 'Why-Why Sheet', Field: 'Section / Cell', Detail: targetReport.sectionCell || '' });
+                rows.push({ Section: 'Why-Why Sheet', Field: 'Machine No.', Detail: targetReport.machineNo || '' });
+                rows.push({ Section: 'Why-Why Sheet', Field: 'Machine Description', Detail: targetReport.machineDescription || '' });
+                rows.push({ Section: 'Why-Why Sheet', Field: 'Date of Breakdown', Detail: sheetDate(targetReport.breakdownDate || targetReport.date) });
+                rows.push({ Section: 'Why-Why Sheet', Field: 'Symptom Before Breakdown', Detail: targetReport.symptomBeforeBreakdown || '' });
+                rows.push({ Section: 'Why-Why Sheet', Field: 'Spare Part Replacement', Detail: targetReport.sparePartReplaced ? 'In case of spare part replacement' : 'In case of no spare part replacement' });
+                rows.push({ Section: 'Why-Why Sheet', Field: 'Final Action or Countermeasure', Detail: targetReport.finalCountermeasure || '' });
+                rows.push({ Section: 'Why-Why Sheet', Field: 'Due To', Detail: targetReport.dueTo || '' });
+                rows.push({ Section: 'Why-Why Sheet', Field: 'Root Cause Reason', Detail: targetReport.rootCauseReason || '' });
+                rows.push({ Section: 'Why-Why Sheet', Field: 'Kaizen Idea', Detail: targetReport.kaizenIdea || '' });
+                rows.push({ Section: 'Why-Why Sheet', Field: 'In-Charge', Detail: targetReport.inCharge || '' });
+                rows.push({ Section: 'Why-Why Sheet', Field: 'You Did Not', Detail: targetReport.youDidNot || '' });
+                rows.push({ Section: 'Why-Why Sheet', Field: 'Action or Countermeasure "That Day"', Detail: targetReport.actionThatDay || '' });
+                rows.push({ Section: 'Why-Why Sheet', Field: 'Schedule', Detail: targetReport.schedule || '' });
 
                 if (targetReport.fiveWhys && Array.isArray(targetReport.fiveWhys)) {
                     targetReport.fiveWhys.forEach(w => {
@@ -249,7 +303,9 @@ const CSMRcaReport = () => {
                         'Priority': r.priority,
                         'Category': r.category,
                         'Confirmed Root Cause': r.rootCause,
-                        'Problem Statement': r.problemStatement
+                        'Machine No.': r.machineNo || '',
+                        'Date of Breakdown': sheetDate(r.breakdownDate),
+                        'Breakdown (Physical Phenomenon)': r.problemStatement
                     });
                 });
             }
@@ -554,179 +610,45 @@ const CSMRcaReport = () => {
 
             {/* VIEW READ-ONLY DOCUMENT MODE */}
             {viewMode === 'view' && (
-                <div id="rca-document-sheet" className="bg-white border border-slate-200 rounded-3xl shadow-xl p-6 sm:p-10 space-y-6 print-container max-w-5xl mx-auto text-slate-900">
-                    {/* Quality Header Block */}
-                    <div className="border-b-2 border-slate-900 pb-4 flex justify-between items-end gap-6">
-                        <div className="flex items-end gap-4 min-w-0">
-                            {branding.logo && (
-                                <img
-                                    src={branding.logo}
-                                    alt={branding.companyName || 'Company Logo'}
-                                    crossOrigin="anonymous"
-                                    className="h-12 w-auto max-w-[160px] object-contain shrink-0"
-                                />
-                            )}
-                            <div className="min-w-0">
-                                <span className="text-[10px] font-black uppercase text-teal-800 tracking-widest block mb-1">
-                                    Quality & Technical Audit Document
-                                </span>
-                                <h2 className="text-2xl font-black font-outfit uppercase tracking-tight text-slate-900">
-                                    ROOT CAUSE ANALYSIS REPORT
-                                </h2>
-                                <p className="text-xs text-slate-500 font-semibold">
-                                    Customer Service & Technical Quality Root Cause Investigation
-                                </p>
-                            </div>
-                        </div>
-                        {/* RCA number stands alone here; the document date is shown in section 1 */}
-                        <div className="text-right shrink-0 border border-slate-300 rounded-lg px-3 py-1.5">
-                            <span className="block text-[9px] font-black uppercase text-slate-400 tracking-widest leading-none mb-1">RCA No.</span>
-                            <span className="text-base font-black text-slate-900 leading-none whitespace-nowrap">{formData.rcaNumber || 'RCA-DRAFT'}</span>
-                        </div>
-                    </div>
-
-                    {/* Incident Information */}
-                    <div className="space-y-2">
-                        <div className="bg-slate-900 text-white px-4 py-2 font-black text-xs uppercase tracking-widest">
-                            1. Incident Overview
-                        </div>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs">
-                            <div>
-                                <span className="block text-[10px] font-black uppercase text-slate-400">Ticket No</span>
-                                <span className="font-extrabold text-teal-800">{formData.ticketNo || 'N/A'}</span>
-                            </div>
-                            <div>
-                                <span className="block text-[10px] font-black uppercase text-slate-400">Department</span>
-                                <span className="font-extrabold text-slate-800">{formData.department}</span>
-                            </div>
-                            <div>
-                                <span className="block text-[10px] font-black uppercase text-slate-400">Priority</span>
-                                <span className="font-extrabold text-slate-800">{formData.priority}</span>
-                            </div>
-                            <div>
-                                <span className="block text-[10px] font-black uppercase text-slate-400">Date</span>
-                                <span className="font-extrabold text-slate-800">{formData.date}</span>
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
-                            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
-                                <span className="block text-[10px] font-black uppercase text-slate-500 mb-1">Problem Statement</span>
-                                <p className="text-xs font-bold text-slate-800 whitespace-pre-wrap">{formData.problemStatement || 'None specified'}</p>
-                            </div>
-                            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
-                                <span className="block text-[10px] font-black uppercase text-slate-500 mb-1">Impact Analysis</span>
-                                <p className="text-xs font-bold text-slate-800 whitespace-pre-wrap">{formData.impact || 'None specified'}</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* 5-Why Analysis */}
-                    <div className="space-y-2">
-                        <div className="bg-slate-900 text-white px-4 py-2 font-black text-xs uppercase tracking-widest">
-                            2. 5-Why Root Cause Breakdown
-                        </div>
-                        <table className="w-full border-collapse border border-slate-200 text-xs">
-                            <thead>
-                                <tr className="bg-slate-100 font-black uppercase text-[10px] text-slate-600 border-b border-slate-200">
-                                    <th className="p-2 w-12 text-center border-r border-slate-200">Why #</th>
-                                    <th className="p-2 text-left">Analysis Description</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-200">
-                                {formData.fiveWhys.map((w) => (
-                                    <tr key={w.whyNo}>
-                                        <td className="p-2 text-center font-black bg-slate-50 border-r border-slate-200 text-teal-800">
-                                            Why {w.whyNo}
-                                        </td>
-                                        <td className="p-2 font-semibold text-slate-800">{w.analysis || '-'}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    {/* Category & Final Root Cause */}
-                    <div className="space-y-2">
-                        <div className="bg-slate-900 text-white px-4 py-2 font-black text-xs uppercase tracking-widest">
-                            3. Categorization & Root Cause
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs">
-                            <div>
-                                <span className="block text-[10px] font-black uppercase text-slate-400 mb-0.5">Category</span>
-                                <span className="font-extrabold text-slate-900">{formData.category}</span>
-                            </div>
-                            <div>
-                                <span className="block text-[10px] font-black uppercase text-slate-400 mb-0.5">Confirmed Root Cause</span>
-                                <span className="font-extrabold text-rose-700">{formData.rootCause || 'Not specified'}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* CAPA Actions */}
-                    <div className="space-y-2">
-                        <div className="bg-slate-900 text-white px-4 py-2 font-black text-xs uppercase tracking-widest">
-                            4. Corrective & Preventive Actions (CAPA)
-                        </div>
-                        <table className="w-full border-collapse border border-slate-200 text-xs">
-                            <thead>
-                                <tr className="bg-slate-100 font-black uppercase text-[10px] text-slate-600 border-b border-slate-200">
-                                    <th className="p-2 text-left border-r border-slate-200">Action Type</th>
-                                    <th className="p-2 text-left border-r border-slate-200">Action Plan</th>
-                                    <th className="p-2 text-left border-r border-slate-200">Responsible</th>
-                                    <th className="p-2 text-left border-r border-slate-200">Target Date</th>
-                                    <th className="p-2 text-left">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-200 font-semibold text-slate-800">
-                                {formData.capaActions.map((c, i) => (
-                                    <tr key={i}>
-                                        <td className="p-2 font-black border-r border-slate-200 text-teal-800">{c.actionType || 'Action'}</td>
-                                        <td className="p-2 border-r border-slate-200">{c.action || '-'}</td>
-                                        <td className="p-2 border-r border-slate-200">{c.responsiblePerson || '-'}</td>
-                                        <td className="p-2 border-r border-slate-200">{c.targetDate || '-'}</td>
-                                        <td className="p-2 font-bold">{c.status}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    {/* Verification */}
-                    <div className="space-y-2">
-                        <div className="bg-slate-900 text-white px-4 py-2 font-black text-xs uppercase tracking-widest">
-                            5. Effectiveness Verification
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs">
-                            <div>
-                                <span className="block text-[10px] font-black uppercase text-slate-400">Verification Date</span>
-                                <span className="font-extrabold text-slate-900">{formData.verificationDate || 'Pending'}</span>
-                            </div>
-                            <div>
-                                <span className="block text-[10px] font-black uppercase text-slate-400">Effectiveness</span>
-                                <span className="font-extrabold text-emerald-700">{formData.effectiveness}</span>
-                            </div>
-                            <div>
-                                <span className="block text-[10px] font-black uppercase text-slate-400">Remarks</span>
-                                <span className="font-bold text-slate-700">{formData.verificationRemarks || 'None'}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Sign-off / Print Footer */}
-                    <div className="pt-8 border-t border-slate-300 grid grid-cols-3 text-center text-[10px] font-black uppercase tracking-wider text-slate-500">
-                        <div>
-                            <div className="h-10"></div>
-                            <div className="border-t border-slate-300 pt-1">Prepared By (Quality Engg)</div>
-                        </div>
-                        <div>
-                            <div className="h-10"></div>
-                            <div className="border-t border-slate-300 pt-1">Reviewed By (HOD)</div>
-                        </div>
-                        <div>
-                            <div className="h-10"></div>
-                            <div className="border-t border-slate-300 pt-1">Approved By (Plant / CS Head)</div>
-                        </div>
+                <div className="overflow-x-auto pb-2 print:overflow-visible">
+                    {/* Printing the sheet: one landscape page, borders and filled boxes kept.
+                        The rule only exists while the sheet is on screen, so printing any
+                        other screen is unaffected. */}
+                    <style>{`@media print {
+                        @page { size: A4 landscape; margin: 6mm; }
+                        /* Only the sheet is printed, from the very top of the page: any
+                           page padding left around it costs height the sheet needs. */
+                        body * { visibility: hidden !important; }
+                        #rca-document-sheet, #rca-document-sheet * { visibility: visible !important; }
+                        #rca-document-sheet {
+                            position: absolute !important;
+                            left: 0 !important;
+                            top: 0 !important;
+                            width: 100% !important;
+                            margin: 0 !important;
+                            padding: 0 !important;
+                            overflow: visible !important;
+                            /* zoom scales the layout itself, so the sheet is paginated as
+                               one page rather than split in two. */
+                            zoom: 0.9;
+                        }
+                        #rca-document-sheet table { width: 100% !important; page-break-inside: avoid; }
+                        #rca-document-sheet, #rca-document-sheet * {
+                            -webkit-print-color-adjust: exact !important;
+                            print-color-adjust: exact !important;
+                        }
+                    }`}</style>
+                    {/* Fixed width so the sheet keeps the proportions of the paper form. */}
+                    <div
+                        id="rca-document-sheet"
+                        className="print-container mx-auto bg-white p-2"
+                        style={{ width: `${SHEET_WIDTH + 16}px` }}
+                    >
+                        <WhyWhySheet
+                            data={{ ...formData, breakdownDate: sheetDate(formData.breakdownDate || formData.date) }}
+                            logo={branding.logo}
+                            companyName={branding.companyName}
+                        />
                     </div>
                 </div>
             )}
@@ -863,7 +785,7 @@ const CSMRcaReport = () => {
 
                             <div className="md:col-span-2">
                                 <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
-                                    Problem Statement
+                                    Breakdown (Physical Phenomenon)
                                 </label>
                                 <textarea
                                     rows="3"
@@ -889,10 +811,113 @@ const CSMRcaReport = () => {
                         </div>
                     </div>
 
-                    {/* Section 2: Root Cause Analysis - 5 Why */}
+                    {/* Section 2: the boxes on the printed Why-Why Analysis Sheet */}
                     <div className="space-y-4">
                         <div className="bg-gradient-to-r from-teal-700 to-emerald-800 text-white px-5 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-sm flex items-center gap-2">
-                            <MdHistory size={18} /> 2. Root Cause Analysis – 5 Why
+                            <MdFormatListBulleted size={18} /> 2. Why-Why Analysis Sheet (Maintenance)
+                        </div>
+                        <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 -mt-1">
+                            These are the boxes on the printed sheet. Department, the breakdown and the five whys come from the sections above and below.
+                        </p>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
+                            <div>
+                                <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">Section / Cell</label>
+                                <input type="text" value={formData.sectionCell} onChange={(e) => handleInputChange('sectionCell', e.target.value)} placeholder="e.g. Assembly Cell 2" className="w-full p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-semibold text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all outline-none" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">Machine No.</label>
+                                <input type="text" value={formData.machineNo} onChange={(e) => handleInputChange('machineNo', e.target.value)} placeholder="e.g. M-114" className="w-full p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-semibold text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all outline-none" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">Date of Breakdown</label>
+                                <input type="date" value={formData.breakdownDate} onChange={(e) => handleInputChange('breakdownDate', e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-semibold text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all outline-none" />
+                            </div>
+
+                            <div className="md:col-span-3">
+                                <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">Machine Description</label>
+                                <input type="text" value={formData.machineDescription} onChange={(e) => handleInputChange('machineDescription', e.target.value)} placeholder="e.g. 11kV VCB panel, outdoor kiosk" className="w-full p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-semibold text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all outline-none" />
+                            </div>
+
+                            <div className="md:col-span-3">
+                                <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">Symptom Before Breakdown</label>
+                                <textarea rows="2" value={formData.symptomBeforeBreakdown} onChange={(e) => handleInputChange('symptomBeforeBreakdown', e.target.value)} placeholder="What was seen or heard before it failed..." className="w-full p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-semibold text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all outline-none resize-y"></textarea>
+                            </div>
+
+                            <div className="md:col-span-3">
+                                <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">Spare Part Replacement</label>
+                                <div className="flex flex-wrap gap-3">
+                                    {[{ text: 'In case of spare part replacement', flag: true }, { text: 'In case of no spare part replacement', flag: false }].map((option) => (
+                                        <button
+                                            key={String(option.flag)}
+                                            type="button"
+                                            onClick={() => handleInputChange('sparePartReplaced', option.flag)}
+                                            className={`px-4 py-2.5 rounded-xl border text-xs font-bold transition-all ${formData.sparePartReplaced === option.flag
+                                                ? 'border-teal-600 bg-teal-50 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300'
+                                                : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                                        >
+                                            {option.text}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="md:col-span-3">
+                                <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">What is your final Action or Countermeasure</label>
+                                <textarea rows="2" value={formData.finalCountermeasure} onChange={(e) => handleInputChange('finalCountermeasure', e.target.value)} placeholder="The action that was finally taken..." className="w-full p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-semibold text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all outline-none resize-y"></textarea>
+                            </div>
+
+                            <div className="md:col-span-3">
+                                <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">Due To (why that countermeasure was taken)</label>
+                                <textarea rows="2" value={formData.dueTo} onChange={(e) => handleInputChange('dueTo', e.target.value)} placeholder="Always ask the first why to the final action taken..." className="w-full p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-semibold text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all outline-none resize-y"></textarea>
+                            </div>
+
+                            <div className="md:col-span-3">
+                                <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">Root Cause is always from these 5 reasons</label>
+                                <div className="flex flex-wrap gap-2">
+                                    {['Poor Basic Condition', 'Poor Operating Condition', 'Deterioration', 'Weak Design', 'Poor Skill'].map((reason, index) => (
+                                        <button
+                                            key={reason}
+                                            type="button"
+                                            onClick={() => handleInputChange('rootCauseReason', formData.rootCauseReason === reason ? '' : reason)}
+                                            className={`px-4 py-2.5 rounded-xl border text-xs font-bold transition-all ${formData.rootCauseReason === reason
+                                                ? 'border-teal-600 bg-teal-50 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300'
+                                                : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                                        >
+                                            {index + 1}. {reason}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="md:col-span-2">
+                                <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">Kaizen Idea</label>
+                                <textarea rows="2" value={formData.kaizenIdea} onChange={(e) => handleInputChange('kaizenIdea', e.target.value)} placeholder="Improvement to stop it happening again..." className="w-full p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-semibold text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all outline-none resize-y"></textarea>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">In-Charge</label>
+                                <input type="text" value={formData.inCharge} onChange={(e) => handleInputChange('inCharge', e.target.value)} placeholder="Who owns the kaizen" className="w-full p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-semibold text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all outline-none" />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">You Did Not</label>
+                                <textarea rows="2" value={formData.youDidNot} onChange={(e) => handleInputChange('youDidNot', e.target.value)} placeholder="What was not done..." className="w-full p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-semibold text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all outline-none resize-y"></textarea>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">Action or Countermeasure &quot;That Day&quot;</label>
+                                <textarea rows="2" value={formData.actionThatDay} onChange={(e) => handleInputChange('actionThatDay', e.target.value)} placeholder="What was done on the day..." className="w-full p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-semibold text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all outline-none resize-y"></textarea>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">Schedule</label>
+                                <input type="text" value={formData.schedule} onChange={(e) => handleInputChange('schedule', e.target.value)} placeholder="e.g. 15.10.2026" className="w-full p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-semibold text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all outline-none" />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Section 3: Root Cause Analysis - 5 Why */}
+                    <div className="space-y-4">
+                        <div className="bg-gradient-to-r from-teal-700 to-emerald-800 text-white px-5 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-sm flex items-center gap-2">
+                            <MdHistory size={18} /> 3. Root Cause Analysis – 5 Why
                         </div>
 
                         <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800">
@@ -932,7 +957,7 @@ const CSMRcaReport = () => {
                     {/* Section 3: Root Cause Category */}
                     <div className="space-y-4">
                         <div className="bg-gradient-to-r from-teal-700 to-emerald-800 text-white px-5 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-sm flex items-center gap-2">
-                            <MdTune size={18} /> 3. Root Cause Category
+                            <MdTune size={18} /> 4. Root Cause Category
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
@@ -974,7 +999,7 @@ const CSMRcaReport = () => {
                     <div className="space-y-4">
                         <div className="flex justify-between items-center bg-gradient-to-r from-teal-700 to-emerald-800 text-white px-5 py-3 rounded-2xl shadow-sm">
                             <span className="font-black text-xs uppercase tracking-widest flex items-center gap-2">
-                                <MdAssignmentTurnedIn size={18} /> 4. Corrective & Preventive Action (CAPA)
+                                <MdAssignmentTurnedIn size={18} /> 5. Corrective & Preventive Action (CAPA)
                             </span>
                             <button
                                 type="button"
@@ -1055,7 +1080,7 @@ const CSMRcaReport = () => {
                     {/* Section 5: Effectiveness Verification */}
                     <div className="space-y-4">
                         <div className="bg-gradient-to-r from-teal-700 to-emerald-800 text-white px-5 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-sm flex items-center gap-2">
-                            <MdCheckCircle size={18} /> 5. Effectiveness Verification
+                            <MdCheckCircle size={18} /> 6. Effectiveness Verification
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
