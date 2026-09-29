@@ -9,6 +9,11 @@ const CompanySettingsSchema = new mongoose.Schema({
     // Company Logo
     logoUrl: { type: String },
 
+    // Logos printed on the Why-Why Analysis Sheet (the RCA report). The right one falls
+    // back to the company logo above when it is not set.
+    rcaLeftLogoUrl: { type: String, default: '' },
+    rcaRightLogoUrl: { type: String, default: '' },
+
     // Dual Logo Branding & Whitelabeling
     showDualBranding: { type: Boolean, default: true },
     whitelabelAppTitle: { type: String, default: '' },

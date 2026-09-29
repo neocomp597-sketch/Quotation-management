@@ -375,6 +375,8 @@ export const bomService = {
 export const companySettingsService = {
   get: () => api.get("/company-settings"),
   update: (data) => api.put("/company-settings", data),
+  // Only the two logos printed on the RCA sheet.
+  updateRcaLogos: (data) => api.put("/company-settings/rca-logos", data),
 };
 
 export const siteService = {
@@ -850,6 +852,8 @@ export const csmService = {
   createRcaReport: (data) => api.post("/csm/rca-reports", data),
   updateRcaReport: (id, data) => api.put(`/csm/rca-reports/${id}`, data),
   deleteRcaReport: (id) => api.delete(`/csm/rca-reports/${id}`),
+  // The report as the Why-Why Analysis Sheet in Excel, laid out like the printed sheet.
+  exportRcaSheet: (id) => api.get(`/csm/rca-reports/${id}/sheet.xlsx`, { responseType: "blob" }),
 
   getVisits: (params = {}) => api.get("/csm/visits", { params }),
   getVisitById: (id) => api.get(`/csm/visits/${id}`),

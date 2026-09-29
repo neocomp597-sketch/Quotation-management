@@ -136,6 +136,7 @@ router.delete('/masters/engineers/:id', protect, csmMasterController.engineers.d
 
 // ─── RCA REPORTS ─────────────────────────────────────────────────────────────
 router.get('/rca-reports', protect, rcaReportController.getReports);
+router.get('/rca-reports/:id/sheet.xlsx', protect, rcaReportController.exportReportSheet);
 router.get('/rca-reports/:id', protect, rcaReportController.getReportById);
 router.post('/rca-reports', protect, rcaReportController.createReport);
 router.put('/rca-reports/:id', protect, rcaReportController.updateReport);

@@ -1,4 +1,5 @@
 const CSMRcaReport = require('../models/CSMRcaReport');
+const { buildRcaSheetWorkbook } = require('../services/rcaSheetExcel');
 
 exports.getReports = async (req, res) => {
     try {
@@ -95,5 +96,28 @@ exports.deleteReport = async (req, res) => {
     } catch (error) {
         console.error('Error deleting RCA report:', error);
         res.status(500).json({ message: 'Failed to delete RCA report' });
+    }
+};
+
+/** The report as the Why-Why Analysis Sheet in Excel, laid out like the printed sheet. */
+exports.exportReportSheet = async (req, res) => {
+    try {
+        const companyId = req.user?.companyId;
+        const filter = { _id: req.params.id };
+        if (companyId) filter.companyId = companyId;
+
+        const report = await CSMRcaReport.findOne(filter).lean();
+        if (!report) {
+            return res.status(404).json({ message: 'RCA report not found' });
+        }
+
+        const workbook = await buildRcaSheetWorkbook(report, { companyId, userId: req.user?.id });
+        const safeName = String(report.rcaNumber || 'RCA-Report').replace(/[^A-Za-z0-9._-]+/g, '-');
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename=${safeName}.xlsx`);
+        return res.send(Buffer.from(await workbook.xlsx.writeBuffer()));
+    } catch (error) {
+        console.error('Error exporting RCA sheet:', error);
+        return res.status(500).json({ message: 'Failed to export the RCA sheet', error: error.message });
     }
 };

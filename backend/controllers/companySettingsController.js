@@ -58,7 +58,9 @@ exports.updateCompanySettings = async (req, res) => {
             quotationPrefix,
             showDualBranding,
             whitelabelAppTitle,
-            primaryBrandColor
+            primaryBrandColor,
+            rcaLeftLogoUrl,
+            rcaRightLogoUrl
         } = req.body;
 
         // Validate required fields
@@ -112,6 +114,8 @@ exports.updateCompanySettings = async (req, res) => {
             if (typeof showDualBranding === 'boolean') settings.showDualBranding = showDualBranding;
             if (typeof whitelabelAppTitle === 'string') settings.whitelabelAppTitle = whitelabelAppTitle;
             if (typeof primaryBrandColor === 'string') settings.primaryBrandColor = primaryBrandColor;
+            if (typeof rcaLeftLogoUrl === 'string') settings.rcaLeftLogoUrl = rcaLeftLogoUrl;
+            if (typeof rcaRightLogoUrl === 'string') settings.rcaRightLogoUrl = rcaRightLogoUrl;
             settings.companyId = req.user.companyId;
             settings.userId = settings.userId || req.user.id;
 
@@ -150,7 +154,9 @@ exports.updateCompanySettings = async (req, res) => {
                 quotationPrefix: (quotationPrefix && quotationPrefix.toUpperCase().startsWith('ARM')) ? quotationPrefix : 'ARM/QTN',
                 showDualBranding: typeof showDualBranding === 'boolean' ? showDualBranding : true,
                 whitelabelAppTitle: whitelabelAppTitle || '',
-                primaryBrandColor: primaryBrandColor || ''
+                primaryBrandColor: primaryBrandColor || '',
+                rcaLeftLogoUrl: rcaLeftLogoUrl || '',
+                rcaRightLogoUrl: rcaRightLogoUrl || ''
             });
         }
 
@@ -159,6 +165,43 @@ exports.updateCompanySettings = async (req, res) => {
     } catch (error) {
         console.error('Error updating company settings:', error);
         res.status(500).json({ message: 'Error updating company settings', error: error.message });
+    }
+};
+
+/**
+ * Sets only the two logos printed on the Why-Why Analysis Sheet. Kept apart from the full
+ * settings save so changing a logo from the RCA screen cannot overwrite anything else.
+ */
+exports.updateRcaLogos = async (req, res) => {
+    try {
+        const update = {};
+        if (typeof req.body.rcaLeftLogoUrl === 'string') update.rcaLeftLogoUrl = req.body.rcaLeftLogoUrl.trim();
+        if (typeof req.body.rcaRightLogoUrl === 'string') update.rcaRightLogoUrl = req.body.rcaRightLogoUrl.trim();
+        if (!Object.keys(update).length) {
+            return res.status(400).json({ message: 'Nothing to change.' });
+        }
+
+        const settings = await CompanySettings.findOne({
+            $or: [
+                { companyId: req.user.companyId },
+                { userId: req.user.id }
+            ]
+        }).setOptions(SETTINGS_QUERY_OPTIONS);
+
+        if (!settings) {
+            return res.status(404).json({ message: 'Set the company details up first, then the sheet logos.' });
+        }
+
+        Object.assign(settings, update);
+        await settings.save();
+        await invalidateViaQueueOrNow('company-settings:*');
+        return res.json({
+            rcaLeftLogoUrl: settings.rcaLeftLogoUrl || '',
+            rcaRightLogoUrl: settings.rcaRightLogoUrl || ''
+        });
+    } catch (error) {
+        console.error('Error updating RCA sheet logos:', error);
+        return res.status(500).json({ message: 'Could not save the sheet logos', error: error.message });
     }
 };
 

@@ -47,7 +47,7 @@ const ReasonRow = ({ text, chosen, style = {} }) => (
     </>
 );
 
-const WhyWhySheet = ({ data = {}, logo = null, companyName = '' }) => {
+const WhyWhySheet = ({ data = {}, logo = null, leftLogo = null, companyName = '' }) => {
     const whys = Array.isArray(data.fiveWhys) && data.fiveWhys.length
         ? data.fiveWhys
         : [1, 2, 3, 4, 5].map((whyNo) => ({ whyNo, analysis: '' }));
@@ -84,13 +84,17 @@ const WhyWhySheet = ({ data = {}, logo = null, companyName = '' }) => {
                 <tr>
                     <td colSpan={2} rowSpan={2} style={cell({ verticalAlign: 'middle', padding: '6px 8px' })}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <div style={{
-                                width: '42px', height: '42px', border: '1px solid #000000', borderRadius: '3px',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                fontWeight: 900, fontSize: '13px', letterSpacing: '0.5px', flexShrink: 0
-                            }}>
-                                TPM
-                            </div>
+                            {leftLogo ? (
+                                <img src={leftLogo} alt="TPM" crossOrigin="anonymous" style={{ width: '46px', height: '46px', objectFit: 'contain', flexShrink: 0 }} />
+                            ) : (
+                                <div style={{
+                                    width: '42px', height: '42px', border: '1px solid #000000', borderRadius: '3px',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    fontWeight: 900, fontSize: '13px', letterSpacing: '0.5px', flexShrink: 0
+                                }}>
+                                    TPM
+                                </div>
+                            )}
                             <div style={{ flex: 1, textAlign: 'center', fontWeight: 700, fontSize: '19px', lineHeight: 1.2 }}>
                                 Why Why Analysis Sheet<br />(Maintenance)
                             </div>

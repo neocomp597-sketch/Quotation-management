@@ -2,14 +2,14 @@ import React, { useState, useEffect } from 'react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import * as XLSX from 'xlsx';
-import { csmService, companySettingsService } from '../services/api';
+import { csmService, companySettingsService, uploadService } from '../services/api';
 import { resolveImageUrl } from '../utils/helpers';
 import WhyWhySheet, { SHEET_WIDTH } from '../components/csm/WhyWhySheet';
 import { 
     MdAssessment, MdAdd, MdPrint, MdRefresh, MdDelete, 
     MdEdit, MdArrowBack, MdSave, MdFormatListBulleted, MdCheckCircle,
     MdTune, MdFactCheck, MdAssignmentTurnedIn, MdHistory, MdVisibility,
-    MdPictureAsPdf, MdDownload, MdFileDownload
+    MdPictureAsPdf, MdDownload, MdFileDownload, MdImage, MdClose
 } from 'react-icons/md';
 import { toast } from 'react-toastify';
 
@@ -70,37 +70,89 @@ const CSMRcaReport = () => {
     const [viewMode, setViewMode] = useState('list'); // 'list' | 'view' | 'form'
     const [selectedReportId, setSelectedReportId] = useState(null);
     const [formData, setFormData] = useState(INITIAL_FORM);
-    const [branding, setBranding] = useState({ logo: null, companyName: '' });
+    // Both logos on the sheet: the left one (TPM by default) and the right one, which
+    // falls back to the company logo. They are held as data URLs so html2canvas can draw
+    // them into the PDF without tainting the canvas.
+    const [branding, setBranding] = useState({ logo: null, leftLogo: null, companyName: '' });
+    const [logoUrls, setLogoUrls] = useState({ rcaLeftLogoUrl: '', rcaRightLogoUrl: '' });
+    const [logoEditor, setLogoEditor] = useState({ open: false, saving: false, side: null });
+    const [brandingRefresh, setBrandingRefresh] = useState(0);
 
     // Company logo for the RCA document header. It is converted to a data URL so
     // html2canvas can draw it into the PDF without tainting the canvas.
     useEffect(() => {
         let cancelled = false;
-        const loadBranding = async () => {
+        const toDataUrl = async (url) => {
+            if (!url) return null;
             try {
-                const res = await companySettingsService.get();
-                const settings = res.data || {};
-                const companyName = settings.companyName || settings.whitelabelAppTitle || '';
-                const url = resolveImageUrl(settings.logoUrl);
-                if (!url) {
-                    if (!cancelled) setBranding({ logo: null, companyName });
-                    return;
-                }
                 const blob = await fetch(url, { mode: 'cors' }).then(r => (r.ok ? r.blob() : Promise.reject(new Error('logo fetch failed'))));
-                const dataUrl = await new Promise((resolve, reject) => {
+                return await new Promise((resolve, reject) => {
                     const reader = new FileReader();
                     reader.onloadend = () => resolve(reader.result);
                     reader.onerror = reject;
                     reader.readAsDataURL(blob);
                 });
-                if (!cancelled) setBranding({ logo: dataUrl, companyName });
+            } catch (err) {
+                console.warn('RCA sheet logo unavailable:', err);
+                return null;
+            }
+        };
+
+        const loadBranding = async () => {
+            try {
+                const res = await companySettingsService.get();
+                const settings = res.data || {};
+                const companyName = settings.companyName || settings.whitelabelAppTitle || '';
+                if (!cancelled) {
+                    setLogoUrls({
+                        rcaLeftLogoUrl: settings.rcaLeftLogoUrl || '',
+                        rcaRightLogoUrl: settings.rcaRightLogoUrl || ''
+                    });
+                }
+                const [right, left] = await Promise.all([
+                    toDataUrl(resolveImageUrl(settings.rcaRightLogoUrl || settings.logoUrl)),
+                    toDataUrl(resolveImageUrl(settings.rcaLeftLogoUrl))
+                ]);
+                if (!cancelled) setBranding({ logo: right, leftLogo: left, companyName });
             } catch (err) {
                 console.warn('RCA header logo unavailable:', err);
             }
         };
+
         loadBranding();
         return () => { cancelled = true; };
-    }, []);
+    }, [brandingRefresh]);
+
+    // Changing a sheet logo saves it against the company, so it applies wherever the
+    // sheet is printed, and only these two fields are written.
+    const applyLogos = async (update) => {
+        setLogoEditor((state) => ({ ...state, saving: true }));
+        try {
+            const res = await companySettingsService.updateRcaLogos(update);
+            setLogoUrls({
+                rcaLeftLogoUrl: res.data?.rcaLeftLogoUrl || '',
+                rcaRightLogoUrl: res.data?.rcaRightLogoUrl || ''
+            });
+            setBrandingRefresh((n) => n + 1);
+            toast.success('Sheet logo saved');
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Could not save the sheet logo');
+        } finally {
+            setLogoEditor((state) => ({ ...state, saving: false, side: null }));
+        }
+    };
+
+    const handleLogoFile = async (side, file) => {
+        if (!file) return;
+        setLogoEditor((state) => ({ ...state, saving: true, side }));
+        try {
+            const res = await uploadService.uploadImage(file);
+            await applyLogos({ [side]: res.data.imageUrl });
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Could not upload the image');
+            setLogoEditor((state) => ({ ...state, saving: false, side: null }));
+        }
+    };
 
     const fetchReports = async () => {
         setLoading(true);
@@ -247,8 +299,32 @@ const CSMRcaReport = () => {
         }, 400);
     };
 
-    const handleDownloadExcel = (report) => {
+    const handleDownloadExcel = async (report) => {
         const targetReport = report || (selectedReportId ? reports.find(r => r._id === selectedReportId) : null) || formData;
+
+        // A saved report is exported as the Why-Why sheet itself, built on the server so it
+        // can carry the borders, the merged boxes and the logos. The register as a whole
+        // still exports as the plain list below.
+        if (targetReport?._id) {
+            toast.info('Generating Excel file download...');
+            try {
+                const res = await csmService.exportRcaSheet(targetReport._id);
+                const url = URL.createObjectURL(new Blob([res.data]));
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `${(targetReport.rcaNumber || 'RCA-Report').replace(/\//g, '-')}.xlsx`;
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                URL.revokeObjectURL(url);
+                toast.success('RCA Report downloaded successfully as Excel!');
+            } catch (err) {
+                console.error('Excel Download Error:', err);
+                toast.error('Failed to download Excel file');
+            }
+            return;
+        }
+
         toast.info('Generating Excel file download...');
         try {
             const rows = [];
@@ -441,6 +517,15 @@ const CSMRcaReport = () => {
 
                             {viewMode === 'view' && (
                                 <button
+                                    onClick={() => setLogoEditor({ open: true, saving: false, side: null })}
+                                    className="px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-slate-50 dark:hover:bg-slate-700 transition-all flex items-center gap-2 no-print"
+                                    title="Change the logos printed on the sheet"
+                                >
+                                    <MdImage size={18} /> Edit Logos
+                                </button>
+                            )}
+                            {viewMode === 'view' && (
+                                <button
                                     onClick={() => setViewMode('form')}
                                     className="flex items-center gap-1.5 px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
                                 >
@@ -609,6 +694,66 @@ const CSMRcaReport = () => {
             )}
 
             {/* VIEW READ-ONLY DOCUMENT MODE */}
+            {logoEditor.open && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 no-print">
+                    <div className="w-full max-w-2xl rounded-3xl bg-white dark:bg-slate-900 p-6 shadow-2xl">
+                        <div className="flex items-start justify-between gap-4">
+                            <div>
+                                <h2 className="text-lg font-black text-slate-900 dark:text-slate-100">Sheet Logos</h2>
+                                <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                                    Used on the printed sheet, the PDF and the Excel export. They apply to every RCA report of this company.
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setLogoEditor({ open: false, saving: false, side: null })}
+                                className="p-2 rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                            >
+                                <MdClose size={20} />
+                            </button>
+                        </div>
+
+                        <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {[
+                                { side: 'rcaLeftLogoUrl', title: 'Top left (TPM)', hint: 'Left of the sheet title. A plain TPM box is drawn when this is empty.' },
+                                { side: 'rcaRightLogoUrl', title: 'Top right (Company)', hint: 'Right of the header. The company logo is used when this is empty.' }
+                            ].map(({ side, title, hint }) => (
+                                <div key={side} className="rounded-2xl border border-slate-200 dark:border-slate-700 p-4">
+                                    <p className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300">{title}</p>
+                                    <div className="mt-3 flex h-24 items-center justify-center rounded-xl border border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 p-2">
+                                        {logoUrls[side]
+                                            ? <img src={resolveImageUrl(logoUrls[side])} alt={title} className="max-h-full max-w-full object-contain" />
+                                            : <span className="text-[11px] font-bold text-slate-400">Not set</span>}
+                                    </div>
+                                    <p className="mt-2 text-[11px] font-medium text-slate-500 dark:text-slate-400">{hint}</p>
+                                    <div className="mt-3 flex gap-2">
+                                        <label className={`flex-1 text-center px-3 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-[11px] font-black uppercase tracking-wider transition-all ${logoEditor.saving ? 'opacity-60 pointer-events-none' : 'cursor-pointer'}`}>
+                                            {logoEditor.saving && logoEditor.side === side ? 'Uploading...' : 'Upload'}
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                className="hidden"
+                                                onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ''; handleLogoFile(side, file); }}
+                                            />
+                                        </label>
+                                        {logoUrls[side] && (
+                                            <button
+                                                type="button"
+                                                disabled={logoEditor.saving}
+                                                onClick={() => applyLogos({ [side]: '' })}
+                                                className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-[11px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-60"
+                                            >
+                                                Remove
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {viewMode === 'view' && (
                 <div className="overflow-x-auto pb-2 print:overflow-visible">
                     {/* Printing the sheet: one landscape page, borders and filled boxes kept.
@@ -647,6 +792,7 @@ const CSMRcaReport = () => {
                         <WhyWhySheet
                             data={{ ...formData, breakdownDate: sheetDate(formData.breakdownDate || formData.date) }}
                             logo={branding.logo}
+                            leftLogo={branding.leftLogo}
                             companyName={branding.companyName}
                         />
                     </div>
