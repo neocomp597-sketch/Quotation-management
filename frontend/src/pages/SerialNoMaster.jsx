@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { csmService, productService, customerService, importService } from '../services/api';
+import { csmService, productService, importService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
@@ -11,7 +11,6 @@ import {
 import Modal from '../components/Modal';
 import ImportModal from '../components/ImportModal';
 import PaginationControls from '../components/PaginationControls';
-import SearchableSelect from '../components/SearchableSelect';
 
 const PAGE_SIZE = 15;
 
@@ -20,13 +19,12 @@ const SerialNoMaster = () => {
     const [assets, setAssets] = useState([]);
     const [returnHistory, setReturnHistory] = useState([]);
     const [products, setProducts] = useState([]);
-    const [customers, setCustomers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [loadingHistory, setLoadingHistory] = useState(false);
     const [activeTab, setActiveTab] = useState('active'); // 'active' | 'returns'
 
     const [searchQuery, setSearchQuery] = useState('');
-    const [selectedStatus, setSelectedStatus] = useState('SOLD');
+    const [selectedStatus, setSelectedStatus] = useState('ALL');
     const [selectedProduct, setSelectedProduct] = useState('ALL');
     const [currentPage, setCurrentPage] = useState(1);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -38,25 +36,22 @@ const SerialNoMaster = () => {
         return Boolean(perms.invoice_bulk_upload_delete || perms.master_serials_delete);
     }, [user, isAdmin, isSuperAdmin]);
 
-    // Detailed view state: 'list' | 'single' | 'detail'
+    // Detailed modal view
     const [selectedAssetSerial, setSelectedAssetSerial] = useState(null);
     const [assetSummary, setAssetSummary] = useState(null);
     const [loadingSummary, setLoadingSummary] = useState(false);
+    const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
     // Page View State: 'list' | 'single'
     const [pageView, setPageView] = useState('list');
     const [singleSaving, setSingleSaving] = useState(false);
-    const [showMgrFields, setShowMgrFields] = useState(false);
     const [singleForm, setSingleForm] = useState({
         serialNumber: '',
         productCode: '',
         productName: '',
-        status: 'SOLD',
-        customerId: '',
-        customerCode: '',
+        status: 'IN_STOCK',
         customer: '',
         customerPostalCode: '',
-        customerMobile: '',
         invoiceNumber: '',
         saleDate: '',
         location: '',
@@ -68,7 +63,9 @@ const SerialNoMaster = () => {
         indicatorField: ''
     });
 
-    // --- SALES RETURN INLINE STATE ---
+    // --- SALES RETURN MODAL ---
+    const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
+    const [returnTargetAsset, setReturnTargetAsset] = useState(null);
     const [returnReason, setReturnReason] = useState('');
     const [returnSaving, setReturnSaving] = useState(false);
 
@@ -79,141 +76,18 @@ const SerialNoMaster = () => {
     const fetchData = async () => {
         setLoading(true);
         try {
-            const [assetsRes, productsRes, customersRes] = await Promise.all([
+            const [assetsRes, productsRes] = await Promise.all([
                 csmService.getAssets(),
-                productService.getAll({ limit: 1000 }),
-                customerService.getAll({ limit: 1000 })
+                productService.getAll()
             ]);
             setAssets(assetsRes.data || []);
-            setProducts(productsRes.data?.data || productsRes.data || []);
-            setCustomers(customersRes.data?.data || customersRes.data || []);
+            setProducts(productsRes.data || []);
         } catch (err) {
             console.error('Error fetching Invoice Bulk Upload data:', err);
             toast.error('Failed to load invoice bulk upload data');
         } finally {
             setLoading(false);
         }
-    };
-
-    const customerOptions = useMemo(() => {
-        return customers.map(c => {
-            const nameStr = c.companyName && c.customerName && c.companyName !== c.customerName
-                ? `${c.companyName} (${c.customerName})`
-                : c.companyName || c.customerName || 'Unnamed Customer';
-            return {
-                id: c._id,
-                value: c._id,
-                label: c.externalCode ? `[${c.externalCode}] ${nameStr}` : nameStr,
-                customerCode: c.externalCode || '',
-                customerName: c.companyName || c.customerName || nameStr,
-                pincode: c.billingAddress?.pincode || c.pincode || '',
-                customerObj: c
-            };
-        });
-    }, [customers]);
-
-    const productOptions = useMemo(() => {
-        return products.map(p => {
-            const code = p.productCode || '';
-            const name = p.productName || '';
-            return {
-                id: p._id,
-                value: code || p._id,
-                label: code && name ? `${code} - ${name}` : (code || name),
-                productCode: code,
-                productName: name,
-                productObj: p
-            };
-        });
-    }, [products]);
-
-    const productFilterOptions = useMemo(() => {
-        return [
-            { value: 'ALL', label: 'All Products' },
-            ...products.map(p => ({
-                value: p._id,
-                label: p.productCode ? `${p.productCode} - ${p.productName}` : p.productName
-            }))
-        ];
-    }, [products]);
-
-    const handleSelectCustomer = (val, option) => {
-        const cleanVal = String(val || '').trim().toLowerCase();
-        const custObj = option?.customerObj || customers.find(c =>
-            String(c._id) === String(val) ||
-            (c.externalCode && c.externalCode.trim().toLowerCase() === cleanVal) ||
-            (c.companyName && c.companyName.trim().toLowerCase() === cleanVal) ||
-            (c.customerName && c.customerName.trim().toLowerCase() === cleanVal)
-        );
-
-        if (custObj) {
-            setSingleForm(prev => ({
-                ...prev,
-                customerId: custObj._id,
-                customerCode: custObj.externalCode || '',
-                customer: custObj.companyName || custObj.customerName || '',
-                customerPostalCode: custObj.billingAddress?.pincode || custObj.pincode || '',
-                customerMobile: custObj.mobile || prev.customerMobile || ''
-            }));
-        } else {
-            setSingleForm(prev => ({
-                ...prev,
-                customer: val || '',
-                customerId: '',
-                customerCode: prev.customerCode || '',
-            }));
-        }
-    };
-
-    const formatMgrVal = (mgr) => {
-        if (!mgr) return '';
-        if (typeof mgr === 'string') return mgr;
-        if (mgr.code && mgr.description && mgr.code.toLowerCase() !== mgr.description.toLowerCase()) {
-            return `${mgr.code} - ${mgr.description}`;
-        }
-        return mgr.description || mgr.code || '';
-    };
-
-    const handleSelectProduct = (val, option) => {
-        const prodObj = option?.productObj || products.find(p => p.productCode === val || p.productName === val || p._id === val);
-        const prodCode = prodObj?.productCode || option?.productCode || val;
-        const prodName = prodObj?.productName || option?.productName || '';
-
-        setSingleForm(prev => ({
-            ...prev,
-            productCode: prodCode || '',
-            productName: prodName || prev.productName || '',
-            mgr1: prodObj ? formatMgrVal(prodObj.mgr1) : prev.mgr1,
-            mgr2: prodObj ? formatMgrVal(prodObj.mgr2) : prev.mgr2,
-            mgr3: prodObj ? formatMgrVal(prodObj.mgr3) : prev.mgr3,
-            mgr4: prodObj ? formatMgrVal(prodObj.mgr4) : prev.mgr4,
-            mgr5: prodObj ? formatMgrVal(prodObj.mgr5) : prev.mgr5,
-        }));
-    };
-
-    const handleProductInputChange = (field, value) => {
-        const updatedForm = { ...singleForm, [field]: value };
-        const cleanVal = String(value || '').trim().toLowerCase();
-        if (cleanVal) {
-            const matchedProduct = products.find(p =>
-                (p.productName && p.productName.trim().toLowerCase() === cleanVal) ||
-                (p.productCode && p.productCode.trim().toLowerCase() === cleanVal)
-            );
-            if (matchedProduct) {
-                if (field === 'productName' && matchedProduct.productCode) {
-                    updatedForm.productCode = matchedProduct.productCode;
-                }
-                if (field === 'productCode' && matchedProduct.productName) {
-                    updatedForm.productName = matchedProduct.productName;
-                }
-                if (matchedProduct.mgr1) updatedForm.mgr1 = formatMgrVal(matchedProduct.mgr1);
-                if (matchedProduct.mgr2) updatedForm.mgr2 = formatMgrVal(matchedProduct.mgr2);
-                if (matchedProduct.mgr3) updatedForm.mgr3 = formatMgrVal(matchedProduct.mgr3);
-                if (matchedProduct.mgr4) updatedForm.mgr4 = formatMgrVal(matchedProduct.mgr4);
-                if (matchedProduct.mgr5) updatedForm.mgr5 = formatMgrVal(matchedProduct.mgr5);
-            }
-        }
-        setSingleForm(updatedForm);
     };
 
     const fetchReturnHistory = async () => {
@@ -237,7 +111,7 @@ const SerialNoMaster = () => {
         }
     };
 
-    // Standardized 16-Column Export (Requirement #3)
+    // Standardized 15-Column Export (Requirement #2)
     const handleExport = () => {
         const dataToExport = activeTab === 'returns' ? returnHistory : filteredAssets;
         if (!dataToExport || dataToExport.length === 0) {
@@ -248,38 +122,25 @@ const SerialNoMaster = () => {
         const exportData = dataToExport.map(asset => {
             const prodName = asset.productId?.productName || asset.productName || '';
             const prodCode = asset.productId?.productCode || asset.productCode || '';
-            let custCode = asset.customerId?.externalCode || asset.customerCode || '';
             const custName = asset.customerId?.companyName || asset.customerId?.customerName || asset.customerNameStr || asset.customerName || (asset.customerId ? 'Customer' : 'Stock (Unsold)');
-            if (custCode && custName && custCode.trim().toLowerCase() === custName.trim().toLowerCase()) {
-                custCode = asset.customerId?.externalCode || '';
-            }
-            const postalCode = asset.customerId?.billingAddress?.pincode || asset.customerId?.pincode || asset.customerPostalCode || '';
             const sDate = asset.saleDate || asset.invoiceDate;
 
-            // MGR information determined dynamically from the current Product / MGR Master mapping
-            const mgr1Val = asset.productId?.mgr1 ? formatMgrVal(asset.productId.mgr1) : (asset.mgr1 || '');
-            const mgr2Val = asset.productId?.mgr2 ? formatMgrVal(asset.productId.mgr2) : (asset.mgr2 || '');
-            const mgr3Val = asset.productId?.mgr3 ? formatMgrVal(asset.productId.mgr3) : (asset.mgr3 || '');
-            const mgr4Val = asset.productId?.mgr4 ? formatMgrVal(asset.productId.mgr4) : (asset.mgr4 || '');
-            const mgr5Val = asset.productId?.mgr5 ? formatMgrVal(asset.productId.mgr5) : (asset.mgr5 || '');
-
             return {
-                'Serial Num': asset.serialNumber || '',
+                'Serial Number': asset.serialNumber || '',
                 'Product Name': prodName,
                 'Product Code': prodCode,
                 'Status': asset.status || 'IN_STOCK',
-                'Customer Code': custCode,
-                'Customer Name': custName,
-                'Mobile Number': asset.customerMobile || asset.customerId?.mobile || '',
-                'Postal Code (From Master)': postalCode,
+                'Customer': custName,
+                'Customer Postal Code': asset.customerPostalCode || '',
                 'Invoice Ref': asset.invoiceNumber || '',
                 'Sale Date': sDate ? new Date(sDate).toLocaleDateString('en-IN') : '',
                 'Location': asset.location || '',
-                'Mgr 1': mgr1Val,
-                'Mgr 2': mgr2Val,
-                'Mgr 3': mgr3Val,
-                'Mgr 4': mgr4Val,
-                'Mgr 5': mgr5Val
+                'Mgr 1': asset.mgr1 || '',
+                'Mgr 2': asset.mgr2 || '',
+                'Mgr 3': asset.mgr3 || '',
+                'Mgr 4': asset.mgr4 || '',
+                'Mgr 5': asset.mgr5 || '',
+                'Indicator_Field': asset.indicatorField || ''
             };
         });
 
@@ -292,7 +153,7 @@ const SerialNoMaster = () => {
 
     const handleViewDetail = async (serialNumber) => {
         setSelectedAssetSerial(serialNumber);
-        setPageView('detail');
+        setIsDetailModalOpen(true);
         setLoadingSummary(true);
         setAssetSummary(null);
         try {
@@ -306,6 +167,36 @@ const SerialNoMaster = () => {
         }
     };
 
+    // Open Sales Return Modal (Requirement #6)
+    const handleOpenReturnModal = (asset) => {
+        setReturnTargetAsset(asset);
+        setReturnReason('');
+        setIsReturnModalOpen(true);
+    };
+
+    // Submit Sales Return (Requirement #6, #7, #8)
+    const handleSalesReturnSubmit = async () => {
+        if (!returnReason.trim()) {
+            return toast.error('Please enter return reason');
+        }
+        if (!returnTargetAsset) return;
+
+        setReturnSaving(true);
+        try {
+            await csmService.returnAsset(returnTargetAsset._id, returnReason);
+            toast.success(`Sales return recorded for Serial: ${returnTargetAsset.serialNumber}`);
+            setIsReturnModalOpen(false);
+            setReturnTargetAsset(null);
+            setReturnReason('');
+            fetchData();
+            if (activeTab === 'returns') fetchReturnHistory();
+        } catch (err) {
+            console.error('Sales return error:', err);
+            toast.error(err.response?.data?.message || 'Failed to process sales return');
+        } finally {
+            setReturnSaving(false);
+        }
+    };
 
     // Delete Entry (Requirement #11, #12)
     const handleDeleteEntry = async (asset) => {
@@ -323,21 +214,11 @@ const SerialNoMaster = () => {
         }
     };
 
-    // Single Entry Submit (Requirement #15, #3 Mobile Mandatory)
+    // Single Entry Submit (Requirement #15)
     const handleSingleEntrySubmit = async (e) => {
         e.preventDefault();
         if (!singleForm.serialNumber.trim() || !singleForm.productCode.trim()) {
             return toast.error('Serial Number and Product Code are required');
-        }
-        if (!singleForm.customerMobile || !singleForm.customerMobile.trim()) {
-            return toast.error('Mobile Number is mandatory. Please enter a valid mobile number.');
-        }
-        const cleanMobile = singleForm.customerMobile.trim().replace(/\D/g, '');
-        if (cleanMobile.length !== 10) {
-            return toast.error('Please enter a valid 10-digit mobile number');
-        }
-        if (singleForm.customerPostalCode && !/^\d{6}$/.test(String(singleForm.customerPostalCode).trim())) {
-            return toast.error(`Postal Code in Customer Master is invalid. Pincode must be exactly 6 numeric digits. (Got: "${singleForm.customerPostalCode}")`);
         }
 
         setSingleSaving(true);
@@ -349,11 +230,9 @@ const SerialNoMaster = () => {
                 serialNumber: '',
                 productCode: '',
                 productName: '',
-                status: 'SOLD',
-                customerCode: '',
+                status: 'IN_STOCK',
                 customer: '',
                 customerPostalCode: '',
-                customerMobile: '',
                 invoiceNumber: '',
                 saleDate: '',
                 location: '',
@@ -373,20 +252,9 @@ const SerialNoMaster = () => {
         }
     };
 
-    // Customer Name Search + Product Code + Product Name + Serial No + Invoice Ref (Requirement #10, #1 Sold Only)
+    // Customer Name Search + Product Code + Product Name + Serial No + Invoice Ref (Requirement #10)
     const filteredAssets = useMemo(() => {
         return assets.filter(asset => {
-            // Requirement #1: Show only products/entries from the Sold List (exclude unsold stock entries)
-            if (asset.status === 'IN_STOCK' && selectedStatus !== 'IN_STOCK') {
-                return false;
-            }
-
-            const custCode = (
-                asset.customerId?.externalCode ||
-                asset.customerCode ||
-                ''
-            ).toLowerCase();
-
             const custName = (
                 asset.customerId?.companyName ||
                 asset.customerId?.customerName ||
@@ -405,7 +273,6 @@ const SerialNoMaster = () => {
                 prodName.includes(query) ||
                 prodCode.includes(query) ||
                 invNo.includes(query) ||
-                custCode.includes(query) ||
                 custName.includes(query);
 
             const matchesStatus = selectedStatus === 'ALL' || asset.status === selectedStatus;
@@ -508,26 +375,13 @@ const SerialNoMaster = () => {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-emerald-600 mb-1.5">Search & Select Product</label>
-                                    <SearchableSelect
-                                        options={productOptions}
-                                        value={singleForm.productCode}
-                                        onChange={handleSelectProduct}
-                                        placeholder="Type or select product..."
-                                        noResultsText="No matching products found"
-                                        allowCustom={true}
-                                        inputClass="w-full flex items-center justify-between px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900 text-xs text-left cursor-pointer"
-                                        menuClass="max-h-60"
-                                    />
-                                </div>
-                                <div>
                                     <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Product Code *</label>
                                     <input
                                         type="text"
                                         required
                                         placeholder="e.g. PROD-001"
                                         value={singleForm.productCode}
-                                        onChange={(e) => handleProductInputChange('productCode', e.target.value)}
+                                        onChange={(e) => setSingleForm({ ...singleForm, productCode: e.target.value })}
                                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
                                     />
                                 </div>
@@ -538,7 +392,7 @@ const SerialNoMaster = () => {
                                         required
                                         placeholder="e.g. 10KVA Transformer"
                                         value={singleForm.productName}
-                                        onChange={(e) => handleProductInputChange('productName', e.target.value)}
+                                        onChange={(e) => setSingleForm({ ...singleForm, productName: e.target.value })}
                                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
                                     />
                                 </div>
@@ -557,118 +411,22 @@ const SerialNoMaster = () => {
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-emerald-600 mb-1.5">Search & Select Customer</label>
-                                    <SearchableSelect
-                                        options={customerOptions}
-                                        value={singleForm.customerId || (customerOptions.find(o => o.customerCode === singleForm.customerCode || o.customerName === singleForm.customer)?.value || '')}
-                                        onChange={handleSelectCustomer}
-                                        placeholder="Type or select customer..."
-                                        noResultsText="No matching customers found"
-                                        allowCustom={true}
-                                        inputClass="w-full flex items-center justify-between px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900 text-xs text-left cursor-pointer"
-                                        menuClass="max-h-60"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Customer Code</label>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Customer Name / Code</label>
                                     <input
                                         type="text"
-                                        list="single-entry-customer-codes"
-                                        placeholder="e.g. CUST-101"
-                                        value={singleForm.customerCode}
-                                        onChange={(e) => {
-                                            const code = e.target.value;
-                                            const cleanCode = code.trim().toLowerCase();
-                                            const matchedCust = customers.find(c => c.externalCode && c.externalCode.trim().toLowerCase() === cleanCode);
-                                            setSingleForm(prev => ({
-                                                ...prev,
-                                                customerCode: code,
-                                                customerId: matchedCust ? matchedCust._id : prev.customerId,
-                                                customer: matchedCust ? (matchedCust.companyName || matchedCust.customerName) : prev.customer,
-                                                customerPostalCode: matchedCust ? (matchedCust.billingAddress?.pincode || matchedCust.pincode || '') : prev.customerPostalCode,
-                                                customerMobile: matchedCust ? (matchedCust.mobile || '') : prev.customerMobile
-                                            }));
-                                        }}
-                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
-                                    />
-                                    <datalist id="single-entry-customer-codes">
-                                        {customers.map(c => c.externalCode ? (
-                                            <option key={c._id} value={c.externalCode}>{c.companyName || c.customerName || ''}</option>
-                                        ) : null)}
-                                    </datalist>
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Customer Name</label>
-                                    <input
-                                        type="text"
-                                        list="single-entry-customer-names"
                                         placeholder="e.g. Apex Industrial"
                                         value={singleForm.customer}
-                                        onChange={(e) => {
-                                            const nameVal = e.target.value;
-                                            const cleanName = nameVal.trim().toLowerCase();
-                                            const matchedCust = customers.find(c =>
-                                                (c.companyName && c.companyName.trim().toLowerCase() === cleanName) ||
-                                                (c.customerName && c.customerName.trim().toLowerCase() === cleanName) ||
-                                                (c.externalCode && c.externalCode.trim().toLowerCase() === cleanName)
-                                            );
-                                            setSingleForm(prev => ({
-                                                ...prev,
-                                                customer: matchedCust ? (matchedCust.companyName || matchedCust.customerName || nameVal) : nameVal,
-                                                customerId: matchedCust ? matchedCust._id : prev.customerId,
-                                                customerCode: matchedCust ? (matchedCust.externalCode || '') : prev.customerCode,
-                                                customerPostalCode: matchedCust ? (matchedCust.billingAddress?.pincode || matchedCust.pincode || '') : prev.customerPostalCode,
-                                                customerMobile: matchedCust ? (matchedCust.mobile || '') : prev.customerMobile
-                                            }));
-                                        }}
+                                        onChange={(e) => setSingleForm({ ...singleForm, customer: e.target.value })}
                                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
                                     />
-                                    <datalist id="single-entry-customer-names">
-                                        {customers.map(c => {
-                                            const name = c.companyName || c.customerName;
-                                            if (!name) return null;
-                                            return (
-                                                <option key={c._id} value={name}>
-                                                    {c.externalCode ? `Code: ${c.externalCode}` : ''}
-                                                </option>
-                                            );
-                                        })}
-                                    </datalist>
                                 </div>
                                 <div>
-                                    <div className="flex items-center justify-between mb-1.5">
-                                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400">Postal Code</label>
-                                        {/^\d{6}$/.test(String(singleForm.customerPostalCode || '').trim()) ? (
-                                            <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">✓ Valid 6-Digit Code (From Master)</span>
-                                        ) : singleForm.customerPostalCode ? (
-                                            <span className="text-[9px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">⚠ Invalid Pincode (Must be 6 digits)</span>
-                                        ) : (
-                                            <span className="text-[9px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">From Customer Master</span>
-                                        )}
-                                    </div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Customer Postal Code</label>
                                     <input
                                         type="text"
-                                        readOnly={true}
-                                        placeholder="Auto-fetched from Customer Master"
+                                        placeholder="e.g. 400001"
                                         value={singleForm.customerPostalCode}
-                                        className={`w-full px-4 py-3 border rounded-xl outline-none font-semibold cursor-not-allowed transition-all ${
-                                            /^\d{6}$/.test(String(singleForm.customerPostalCode || '').trim())
-                                                ? 'bg-slate-50 border-slate-200 text-slate-900'
-                                                : singleForm.customerPostalCode
-                                                ? 'bg-rose-50/50 border-rose-200 text-rose-800'
-                                                : 'bg-slate-100 border-slate-200 text-slate-500'
-                                        }`}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-emerald-600 mb-1.5">Mobile Number *</label>
-                                    <input
-                                        type="tel"
-                                        required
-                                        maxLength={10}
-                                        placeholder="e.g. 9823012345"
-                                        value={singleForm.customerMobile}
-                                        onChange={(e) => setSingleForm({ ...singleForm, customerMobile: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+                                        onChange={(e) => setSingleForm({ ...singleForm, customerPostalCode: e.target.value })}
                                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
                                     />
                                 </div>
@@ -701,80 +459,56 @@ const SerialNoMaster = () => {
                                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
                                     />
                                 </div>
-                                 <div className="col-span-full pt-2 border-t border-slate-100 flex items-center justify-between">
-                                     <div className="flex items-center gap-2">
-                                         <span className="text-xs font-bold text-slate-700">Product Grouping (Mgr 1 to Mgr 5)</span>
-                                         <span className="text-[10px] text-slate-400 font-semibold">(Auto-populated from Product Master)</span>
-                                     </div>
-                                     <button
-                                         type="button"
-                                         onClick={() => setShowMgrFields(prev => !prev)}
-                                         className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
-                                     >
-                                         {showMgrFields ? '👁 Hide Mgr 1 - Mgr 5 Fields' : '👁 Show Mgr 1 - Mgr 5 Fields'}
-                                     </button>
-                                 </div>
-
-                                 {showMgrFields && (
-                                     <>
-                                         <div className="col-span-full">
-                                             <div className="flex items-center gap-2 p-3 bg-amber-50/90 border border-amber-200/90 rounded-2xl text-amber-900 text-xs font-bold">
-                                                 <MdInfoOutline size={20} className="text-amber-600 flex-shrink-0" />
-                                                 <span>Product Grouping (Mgr 1 to Mgr 5): Automatically populated from Product Master when Product Name or Product Code matches.</span>
-                                             </div>
-                                         </div>
-                                         <div>
-                                             <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Mgr 1</label>
-                                             <input
-                                                 type="text"
-                                                 placeholder="Mgr 1"
-                                                 value={singleForm.mgr1}
-                                                 onChange={(e) => setSingleForm({ ...singleForm, mgr1: e.target.value })}
-                                                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
-                                             />
-                                         </div>
-                                         <div>
-                                             <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Mgr 2</label>
-                                             <input
-                                                 type="text"
-                                                 placeholder="Mgr 2"
-                                                 value={singleForm.mgr2}
-                                                 onChange={(e) => setSingleForm({ ...singleForm, mgr2: e.target.value })}
-                                                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
-                                             />
-                                         </div>
-                                         <div>
-                                             <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Mgr 3</label>
-                                             <input
-                                                 type="text"
-                                                 placeholder="Mgr 3"
-                                                 value={singleForm.mgr3}
-                                                 onChange={(e) => setSingleForm({ ...singleForm, mgr3: e.target.value })}
-                                                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
-                                             />
-                                         </div>
-                                         <div>
-                                             <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Mgr 4</label>
-                                             <input
-                                                 type="text"
-                                                 placeholder="Mgr 4"
-                                                 value={singleForm.mgr4}
-                                                 onChange={(e) => setSingleForm({ ...singleForm, mgr4: e.target.value })}
-                                                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
-                                             />
-                                         </div>
-                                         <div>
-                                             <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Mgr 5</label>
-                                             <input
-                                                 type="text"
-                                                 placeholder="Mgr 5"
-                                                 value={singleForm.mgr5}
-                                                 onChange={(e) => setSingleForm({ ...singleForm, mgr5: e.target.value })}
-                                                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
-                                             />
-                                         </div>
-                                     </>
-                                 )}
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Mgr 1</label>
+                                    <input
+                                        type="text"
+                                        placeholder="Mgr 1"
+                                        value={singleForm.mgr1}
+                                        onChange={(e) => setSingleForm({ ...singleForm, mgr1: e.target.value })}
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Mgr 2</label>
+                                    <input
+                                        type="text"
+                                        placeholder="Mgr 2"
+                                        value={singleForm.mgr2}
+                                        onChange={(e) => setSingleForm({ ...singleForm, mgr2: e.target.value })}
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Mgr 3</label>
+                                    <input
+                                        type="text"
+                                        placeholder="Mgr 3"
+                                        value={singleForm.mgr3}
+                                        onChange={(e) => setSingleForm({ ...singleForm, mgr3: e.target.value })}
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Mgr 4</label>
+                                    <input
+                                        type="text"
+                                        placeholder="Mgr 4"
+                                        value={singleForm.mgr4}
+                                        onChange={(e) => setSingleForm({ ...singleForm, mgr4: e.target.value })}
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Mgr 5</label>
+                                    <input
+                                        type="text"
+                                        placeholder="Mgr 5"
+                                        value={singleForm.mgr5}
+                                        onChange={(e) => setSingleForm({ ...singleForm, mgr5: e.target.value })}
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
+                                    />
+                                </div>
                                 <div>
                                     <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Indicator Field (Max 20 chars)</label>
                                     <input
@@ -789,216 +523,6 @@ const SerialNoMaster = () => {
                             </div>
                         </form>
                     </div>
-                </div>
-            )}
-
-            {pageView === 'detail' && (
-                /* --- FULL PAGE ASSET LIFECYCLE & SALES RETURN DETAIL VIEW --- */
-                <div className="space-y-6 animate-fade-in-up">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                        <div>
-                            <button
-                                type="button"
-                                onClick={() => { setPageView('list'); setSelectedAssetSerial(null); setAssetSummary(null); }}
-                                className="text-xs font-black uppercase tracking-widest text-primary-600 hover:text-primary-700 mb-2 flex items-center gap-1 transition-all cursor-pointer"
-                            >
-                                ← Back to Invoice Bulk Upload
-                            </button>
-                            <h1 className="text-3xl font-black tracking-tight text-slate-900 font-outfit uppercase flex items-center gap-3">
-                                <span>Asset Lifecycle Detail</span>
-                                {selectedAssetSerial && (
-                                    <span className="font-mono text-base font-bold text-primary-600 bg-primary-50 border border-primary-200 px-3 py-1 rounded-xl">
-                                        {selectedAssetSerial}
-                                    </span>
-                                )}
-                            </h1>
-                            <p className="text-slate-500 font-semibold text-sm">
-                                Complete asset specifications, customer details, lifecycle history, and sales return processing.
-                            </p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <button
-                                type="button"
-                                onClick={() => { setPageView('list'); setSelectedAssetSerial(null); setAssetSummary(null); }}
-                                className="px-6 py-3.5 bg-slate-900 hover:bg-black text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg active:scale-95 cursor-pointer"
-                            >
-                                Back to List
-                            </button>
-                        </div>
-                    </div>
-
-                    {loadingSummary ? (
-                        <div className="glass shadow-premium rounded-[2rem] p-12 text-center text-slate-400 font-medium bg-white border border-slate-100">
-                            <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-primary-500 border-t-transparent mb-4"></div>
-                            <p className="text-xs uppercase font-black tracking-widest">Fetching Asset Details & Lifecycle History...</p>
-                        </div>
-                    ) : assetSummary ? (
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                            {/* Main Content Area - Left 2 Columns */}
-                            <div className="lg:col-span-2 space-y-6">
-                                {/* Asset Details Card */}
-                                <div className="glass shadow-premium rounded-[2rem] p-6 md:p-8 bg-white border border-slate-100 space-y-5">
-                                    <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                                        <span className="text-sm font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
-                                            <MdInfoOutline size={20} className="text-primary-600" />
-                                            Asset Specifications & Customer Details
-                                        </span>
-                                        <div className="flex gap-2">
-                                            <span className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider border ${assetSummary.asset?.status === 'SOLD' ? 'bg-blue-50 text-blue-600 border-blue-200' : assetSummary.asset?.status === 'IN_STOCK' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-amber-50 text-amber-600 border-amber-200'}`}>Status: {assetSummary.asset?.status || 'IN_STOCK'}</span>
-                                            <span className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider border ${assetSummary.warranty?.status === 'Active' || assetSummary.amc?.status === 'Active' ? 'bg-teal-50 text-teal-600 border-teal-200' : 'bg-rose-50 text-rose-500 border-rose-200'}`}>{assetSummary.warranty?.status === 'Active' || assetSummary.amc?.status === 'Active' ? 'Covered' : 'Out of Warranty/AMC'}</span>
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-xs font-semibold text-slate-600">
-                                        <div className="p-3.5 bg-slate-50 border border-slate-100 rounded-2xl">
-                                            <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">Serial Number</span>
-                                            <span className="text-slate-900 font-mono text-sm font-bold">{assetSummary.asset?.serialNumber}</span>
-                                        </div>
-                                        <div className="p-3.5 bg-slate-50 border border-slate-100 rounded-2xl">
-                                            <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">Product Name</span>
-                                            <span className="text-slate-900 text-sm font-bold">{assetSummary.asset?.productId?.productName || assetSummary.asset?.productName || 'N/A'}</span>
-                                        </div>
-                                        <div className="p-3.5 bg-slate-50 border border-slate-100 rounded-2xl">
-                                            <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">Product Code</span>
-                                            <span className="text-slate-900 font-mono text-sm font-bold">{assetSummary.asset?.productId?.productCode || assetSummary.asset?.productCode || 'N/A'}</span>
-                                        </div>
-                                        <div className="p-3.5 bg-slate-50 border border-slate-100 rounded-2xl">
-                                            <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">Customer Code</span>
-                                            <span className="text-slate-900 font-mono text-sm font-bold">{assetSummary.asset?.customerId?.externalCode || assetSummary.asset?.customerCode || 'N/A'}</span>
-                                        </div>
-                                        <div className="p-3.5 bg-slate-50 border border-slate-100 rounded-2xl">
-                                            <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">Customer Name</span>
-                                            <span className="text-slate-900 text-sm font-bold">{assetSummary.asset?.customerId?.companyName || assetSummary.asset?.customerId?.customerName || assetSummary.asset?.customerNameStr || 'Stock (Unsold)'}</span>
-                                        </div>
-                                        <div className="p-3.5 bg-slate-50 border border-slate-100 rounded-2xl">
-                                            <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">Invoice Ref</span>
-                                            <span className="text-slate-900 text-sm font-bold">{assetSummary.asset?.invoiceNumber || 'N/A'}</span>
-                                        </div>
-                                        <div className="p-3.5 bg-slate-50 border border-slate-100 rounded-2xl">
-                                            <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">Date of Sale</span>
-                                            <span className="text-slate-900 text-sm font-bold">{assetSummary.asset?.saleDate || assetSummary.asset?.invoiceDate ? new Date(assetSummary.asset.saleDate || assetSummary.asset.invoiceDate).toLocaleDateString('en-IN') : 'N/A'}</span>
-                                        </div>
-                                        <div className="p-3.5 bg-slate-50 border border-slate-100 rounded-2xl">
-                                            <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">Postal Code (Customer Master)</span>
-                                            <span className="text-slate-900 text-sm font-bold">{assetSummary.asset?.customerId?.billingAddress?.pincode || assetSummary.asset?.customerId?.pincode || assetSummary.asset?.customerPostalCode || 'N/A'}</span>
-                                        </div>
-                                        <div className="p-3.5 bg-slate-50 border border-slate-100 rounded-2xl">
-                                            <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">Location</span>
-                                            <span className="text-slate-900 text-sm font-bold">{assetSummary.asset?.location || 'N/A'}</span>
-                                        </div>
-                                        <div className="p-3.5 bg-slate-50 border border-slate-100 rounded-2xl">
-                                            <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">Indicator Field</span>
-                                            <span className="text-slate-900 text-sm font-bold">{assetSummary.asset?.indicatorField || 'N/A'}</span>
-                                        </div>
-                                    </div>
-
-                                    {(assetSummary.asset?.mgr1 || assetSummary.asset?.mgr2 || assetSummary.asset?.mgr3 || assetSummary.asset?.mgr4 || assetSummary.asset?.mgr5) && (
-                                        <div className="pt-3 border-t border-slate-100">
-                                            <span className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">Product Managers / Classifications</span>
-                                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 text-xs">
-                                                {['mgr1', 'mgr2', 'mgr3', 'mgr4', 'mgr5'].map((mgrKey, i) => (
-                                                    assetSummary.asset[mgrKey] ? (
-                                                        <div key={mgrKey} className="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
-                                                            <span className="block text-[8px] font-black uppercase tracking-widest text-slate-400">Mgr {i + 1}</span>
-                                                            <span className="font-semibold text-slate-800 text-xs">{typeof assetSummary.asset[mgrKey] === 'object' ? (assetSummary.asset[mgrKey]?.name || assetSummary.asset[mgrKey]?.title || JSON.stringify(assetSummary.asset[mgrKey])) : assetSummary.asset[mgrKey]}</span>
-                                                        </div>
-                                                    ) : null
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Sales Return Form Section */}
-                                {assetSummary.asset?.status !== 'RETURN' && assetSummary.asset?.status !== 'RETURNED' ? (
-                                    <div className="glass shadow-premium rounded-[2rem] p-6 md:p-8 bg-gradient-to-br from-amber-50/90 to-amber-100/50 border border-amber-200 space-y-4">
-                                        <div className="flex items-center justify-between border-b border-amber-200/70 pb-3">
-                                            <span className="text-sm font-black uppercase tracking-wider text-amber-900 flex items-center gap-2">
-                                                <MdUndo size={22} className="text-amber-600" />
-                                                Process Sales Return
-                                            </span>
-                                            <span className="text-xs font-bold text-amber-800 bg-amber-200/60 px-3 py-1 rounded-full uppercase">Action</span>
-                                        </div>
-                                        <div className="space-y-4 pt-1">
-                                            <div>
-                                                <label className="block text-xs font-black uppercase tracking-widest text-amber-900 mb-2">
-                                                    Return Reason *
-                                                </label>
-                                                <textarea
-                                                    rows={3}
-                                                    required
-                                                    placeholder="Enter reason for sales return (e.g. Defective unit, customer order cancelled)..."
-                                                    value={returnReason}
-                                                    onChange={(e) => setReturnReason(e.target.value)}
-                                                    className="w-full p-4 bg-white border border-amber-300 rounded-2xl focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all outline-none text-xs font-semibold text-slate-900 placeholder:text-slate-400 shadow-sm"
-                                                />
-                                            </div>
-                                            <div className="flex justify-end">
-                                                <button
-                                                    type="button"
-                                                    disabled={returnSaving || !returnReason.trim()}
-                                                    onClick={async () => {
-                                                        if (!returnReason.trim()) return toast.error('Please enter return reason');
-                                                        setReturnSaving(true);
-                                                        try {
-                                                            await csmService.returnAsset(assetSummary.asset._id, returnReason);
-                                                            toast.success(`Sales return recorded for Serial: ${assetSummary.asset.serialNumber}`);
-                                                            setReturnReason('');
-                                                            const res = await csmService.getAssetSummary({ serialNumber: assetSummary.asset.serialNumber });
-                                                            setAssetSummary(res.data);
-                                                            fetchData();
-                                                            if (activeTab === 'returns') fetchReturnHistory();
-                                                        } catch (err) {
-                                                            console.error('Sales return error:', err);
-                                                            toast.error(err.response?.data?.message || 'Failed to process sales return');
-                                                        } finally {
-                                                            setReturnSaving(false);
-                                                        }
-                                                    }}
-                                                    className="px-8 py-3.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-black text-xs uppercase tracking-widest rounded-2xl transition-all shadow-lg shadow-amber-600/20 active:scale-95 cursor-pointer flex items-center justify-center gap-2"
-                                                >
-                                                    <MdUndo size={18} />
-                                                    <span>{returnSaving ? 'Processing Sales Return...' : 'Confirm & Process Sales Return'}</span>
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="p-5 bg-amber-50 border border-amber-200 rounded-2xl flex items-center gap-3 text-amber-900 font-bold text-xs">
-                                        <MdUndo size={22} className="text-amber-600 shrink-0" />
-                                        <span>This asset has already been processed as a Sales Return.</span>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Right Column - Lifecycle History Log */}
-                            <div className="space-y-6">
-                                <div className="glass shadow-premium rounded-[2rem] p-6 bg-white border border-slate-100 space-y-4">
-                                    <span className="block text-sm font-black uppercase tracking-wider text-slate-800 border-b border-slate-100 pb-3">📜 Lifecycle History Log</span>
-                                    {assetSummary.history && assetSummary.history.length > 0 ? (
-                                        <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
-                                            {assetSummary.history.map((h, index) => (
-                                                <div key={h._id || index} className="p-4 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-2 text-xs">
-                                                    <div className="flex items-center justify-between">
-                                                        <span className={`px-2.5 py-0.5 rounded-full font-black text-[9px] uppercase border ${h.transactionType === 'RETURN' ? 'bg-amber-100 text-amber-800 border-amber-200' : 'bg-blue-100 text-blue-800 border-blue-200'}`}>{h.transactionType || h.status}</span>
-                                                        <span className="text-[10px] font-semibold text-slate-400">{new Date(h.createdAt).toLocaleDateString('en-IN')}</span>
-                                                    </div>
-                                                    <p className="font-bold text-slate-800">{h.customerName || 'Customer'} | Invoice: {h.invoiceNumber || 'N/A'}</p>
-                                                    {h.returnReason && <p className="text-amber-700 italic bg-amber-50 p-2 rounded-xl border border-amber-200/60 mt-1">Reason: {h.returnReason}</p>}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <p className="text-xs text-slate-400 font-medium py-4 text-center">No previous history records available.</p>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="glass shadow-premium rounded-[2rem] p-12 text-center text-slate-400 text-sm bg-white border border-slate-100">
-                            Failed to load detailed asset information.
-                        </div>
-                    )}
                 </div>
             )}
 
@@ -1121,15 +645,16 @@ const SerialNoMaster = () => {
                                 <option value="RETURN">Returned</option>
                                 <option value="SCRAPPED">Scrapped</option>
                             </select>
-                            <SearchableSelect
-                                options={productFilterOptions}
+                            <select
                                 value={selectedProduct}
-                                onChange={(val) => setSelectedProduct(val || 'ALL')}
-                                placeholder="All Products"
-                                noResultsText="No matching product"
-                                inputClass="px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-xs font-bold text-slate-700 flex items-center justify-between gap-2 cursor-pointer min-w-[180px]"
-                                menuClass="max-h-60"
-                            />
+                                onChange={(e) => setSelectedProduct(e.target.value)}
+                                className="px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-xs font-bold text-slate-700 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all max-w-[200px] truncate"
+                            >
+                                <option value="ALL">All Products</option>
+                                {products.map(p => (
+                                    <option key={p._id} value={p._id}>{p.productName}</option>
+                                ))}
+                            </select>
                         </div>
                     )}
                 </div>
@@ -1239,8 +764,8 @@ const SerialNoMaster = () => {
                                                         )}
                                                     </td>
                                                     <td className="p-4">
-                                                        <span className="block text-sm font-bold text-slate-800">{asset.productId?.productName || asset.productName || 'N/A'}</span>
-                                                        <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">{asset.productId?.productCode || asset.productCode || 'N/A'}</span>
+                                                        <span className="block text-sm font-bold text-slate-800">{asset.productId?.productName || 'N/A'}</span>
+                                                        <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">{asset.productId?.productCode || 'N/A'}</span>
                                                     </td>
                                                     <td className="p-4">
                                                         <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
@@ -1257,17 +782,12 @@ const SerialNoMaster = () => {
                                                     </td>
                                                     <td className="p-4 text-sm font-semibold text-slate-700">
                                                         {custDisplay ? (
-                                                            <div>
-                                                                <span>{custDisplay}</span>
-                                                                {(asset.customerId?.externalCode || asset.customerCode) && (
-                                                                    <span className="block text-[10px] text-primary-600 font-mono font-bold">Code: {asset.customerId?.externalCode || asset.customerCode}</span>
-                                                                )}
-                                                            </div>
+                                                            <span>{custDisplay}</span>
                                                         ) : (
                                                             <span className="text-slate-400 font-normal italic">Stock (Unsold)</span>
                                                         )}
-                                                        {(asset.customerId?.billingAddress?.pincode || asset.customerId?.pincode || asset.customerPostalCode) && (
-                                                            <span className="block text-[10px] text-slate-400 font-bold">Pin: {asset.customerId?.billingAddress?.pincode || asset.customerId?.pincode || asset.customerPostalCode}</span>
+                                                        {asset.customerPostalCode && (
+                                                            <span className="block text-[10px] text-slate-400 font-bold">Pin: {asset.customerPostalCode}</span>
                                                         )}
                                                     </td>
                                                     <td className="p-4 text-sm font-bold text-slate-800">
@@ -1284,20 +804,30 @@ const SerialNoMaster = () => {
                                                     <td className="p-4 text-xs font-semibold text-slate-600">
                                                         {asset.location || '-'}
                                                     </td>
-                                                    {/* Actions Column: View Info (i) button contains Sales Return & details, Delete Entry */}
+                                                    {/* Actions Column: View Info, Sales Return, Delete Entry (Requirement #6, #11, #12, #16) */}
                                                     <td className="p-4 text-right">
                                                         <div className="flex justify-end items-center gap-1.5">
                                                             <button
                                                                 onClick={() => handleViewDetail(asset.serialNumber)}
-                                                                className="p-2 text-primary-600 hover:bg-primary-100 bg-primary-50/80 rounded-xl transition-all flex items-center gap-1 text-xs font-bold"
-                                                                title="View Details & Actions"
+                                                                className="p-2 text-primary-600 hover:bg-primary-50 rounded-lg transition-all"
+                                                                title="View Details"
                                                             >
                                                                 <MdInfoOutline size={18} />
                                                             </button>
+                                                            {asset.status === 'SOLD' && (
+                                                                <button
+                                                                    onClick={() => handleOpenReturnModal(asset)}
+                                                                    className="flex items-center gap-1 px-2.5 py-1 text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg text-xs font-bold transition-all active:scale-95"
+                                                                    title="Sales Return"
+                                                                >
+                                                                    <MdUndo size={16} />
+                                                                    <span>Sales Return</span>
+                                                                </button>
+                                                            )}
                                                             {canDelete && (
                                                                 <button
                                                                     onClick={() => handleDeleteEntry(asset)}
-                                                                    className="p-2 text-rose-600 hover:bg-rose-100 bg-rose-50/60 rounded-xl transition-all"
+                                                                    className="p-2 text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
                                                                     title="Delete Entry (Admin Restricted)"
                                                                 >
                                                                     <MdDelete size={18} />
@@ -1326,7 +856,116 @@ const SerialNoMaster = () => {
             </>
             )}
 
+            {/* Asset Detail Modal */}
+            <Modal isOpen={isDetailModalOpen} onClose={() => setIsDetailModalOpen(false)} title="Asset Lifecycle Detail" maxWidth="max-w-xl" footer={<button onClick={() => setIsDetailModalOpen(false)} className="bg-slate-900 hover:bg-black text-white px-8 py-3 rounded-2xl font-black transition-all shadow-xl uppercase text-[10px] tracking-widest active:scale-95">Close</button>}>
+                {loadingSummary ? (
+                    <div className="py-12 text-center text-slate-400 font-medium"><div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-primary-500 border-t-transparent mb-4"></div><p className="text-xs uppercase font-black tracking-widest">Fetching Asset History...</p></div>
+                ) : assetSummary ? (
+                    <div className="space-y-6">
+                        <div className="p-5 bg-gradient-to-br from-slate-50 to-slate-100/50 border border-slate-200 rounded-3xl space-y-4">
+                            <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                                <span className="text-xs font-black uppercase tracking-wider text-slate-700">🔎 Asset Details</span>
+                                <div className="flex gap-2">
+                                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${assetSummary.asset?.status === 'SOLD' ? 'bg-blue-50 text-blue-600 border-blue-200' : assetSummary.asset?.status === 'IN_STOCK' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-slate-50 text-slate-600 border-slate-200'}`}>Status: {assetSummary.asset?.status || 'IN_STOCK'}</span>
+                                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${assetSummary.warranty?.status === 'Active' || assetSummary.amc?.status === 'Active' ? 'bg-teal-50 text-teal-600 border-teal-200' : 'bg-rose-50 text-rose-500 border-rose-200'}`}>{assetSummary.warranty?.status === 'Active' || assetSummary.amc?.status === 'Active' ? 'Covered' : 'Out of Warranty/AMC'}</span>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4 text-xs font-semibold text-slate-600">
+                                <div><span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Customer</span><span className="text-slate-900 text-sm font-bold">{assetSummary.asset?.customerId?.companyName || assetSummary.asset?.customerId?.customerName || assetSummary.asset?.customerNameStr || 'Stock (Unsold)'}</span></div>
+                                <div><span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Product Name</span><span className="text-slate-900 text-sm font-bold">{assetSummary.asset?.productId?.productName || 'N/A'}</span></div>
+                                <div><span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Serial Number</span><span className="text-slate-900 font-mono text-sm font-bold">{assetSummary.asset?.serialNumber}</span></div>
+                                <div><span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Invoice Number</span><span className="text-slate-900 text-sm font-bold">{assetSummary.asset?.invoiceNumber || 'N/A'}</span></div>
+                                <div><span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Date of Sale</span><span className="text-slate-900 text-sm font-bold">{assetSummary.asset?.saleDate || assetSummary.asset?.invoiceDate ? new Date(assetSummary.asset.saleDate || assetSummary.asset.invoiceDate).toLocaleDateString('en-IN') : 'N/A'}</span></div>
+                                <div><span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Postal Code</span><span className="text-slate-900 text-sm font-bold">{assetSummary.asset?.customerPostalCode || 'N/A'}</span></div>
+                            </div>
+                        </div>
 
+                        {/* Transaction History Log (Requirement #8, #9, #17) */}
+                        {assetSummary.history && assetSummary.history.length > 0 && (
+                            <div className="p-5 bg-white border border-slate-200 rounded-3xl space-y-3">
+                                <span className="block text-xs font-black uppercase tracking-wider text-slate-700">📜 Lifecycle Transaction History</span>
+                                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                                    {assetSummary.history.map((h, index) => (
+                                        <div key={h._id || index} className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-between text-xs">
+                                            <div>
+                                                <span className={`px-2 py-0.5 rounded font-black text-[9px] uppercase ${h.transactionType === 'RETURN' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'}`}>{h.transactionType || h.status}</span>
+                                                <p className="font-bold text-slate-800 mt-1">{h.customerName || 'Customer'} | Invoice: {h.invoiceNumber || 'N/A'}</p>
+                                                {h.returnReason && <p className="text-amber-700 italic mt-0.5">Reason: {h.returnReason}</p>}
+                                            </div>
+                                            <span className="text-[10px] font-semibold text-slate-400">{new Date(h.createdAt).toLocaleDateString('en-IN')}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                ) : (<div className="py-8 text-center text-slate-400 text-sm">Failed to load detailed asset information.</div>)}
+            </Modal>
+
+
+
+            {/* --- SALES RETURN FORM MODAL (Requirement #6) --- */}
+            <Modal
+                isOpen={isReturnModalOpen}
+                onClose={() => { setIsReturnModalOpen(false); setReturnTargetAsset(null); }}
+                title="Sales Return Form"
+                maxWidth="max-w-lg"
+            >
+                {returnTargetAsset && (
+                    <div className="space-y-4">
+                        <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2 text-xs font-semibold text-slate-700">
+                            <div className="flex justify-between">
+                                <span className="text-slate-400 uppercase font-black text-[9px]">Serial Number:</span>
+                                <span className="font-mono font-black text-slate-900">{returnTargetAsset.serialNumber}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-slate-400 uppercase font-black text-[9px]">Product Code / Name:</span>
+                                <span className="font-bold text-slate-900">{returnTargetAsset.productId?.productCode} - {returnTargetAsset.productId?.productName}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-slate-400 uppercase font-black text-[9px]">Customer Name:</span>
+                                <span className="font-bold text-slate-900">{returnTargetAsset.customerId?.companyName || returnTargetAsset.customerId?.customerName || returnTargetAsset.customerNameStr || 'N/A'}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-slate-400 uppercase font-black text-[9px]">Invoice Ref:</span>
+                                <span className="font-bold text-slate-900">{returnTargetAsset.invoiceNumber || 'N/A'}</span>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-xs font-black uppercase tracking-widest text-slate-700 mb-1.5">
+                                Return Reason *
+                            </label>
+                            <textarea
+                                required
+                                rows={4}
+                                placeholder="Explain why the product was returned (e.g. Customer reported product fault)..."
+                                value={returnReason}
+                                onChange={(e) => setReturnReason(e.target.value)}
+                                className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-amber-500 outline-none text-sm font-semibold text-slate-800 placeholder:text-slate-400"
+                            />
+                        </div>
+
+                        <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+                            <button
+                                type="button"
+                                onClick={() => { setIsReturnModalOpen(false); setReturnTargetAsset(null); }}
+                                className="px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-bold uppercase text-xs"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleSalesReturnSubmit}
+                                disabled={returnSaving || !returnReason.trim()}
+                                className="px-8 py-3 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded-2xl font-black uppercase text-xs tracking-wider shadow-lg shadow-amber-600/20 active:scale-95"
+                            >
+                                {returnSaving ? 'Processing...' : 'Confirm Sales Return'}
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </Modal>
 
             {/* Import Modal */}
             <ImportModal
@@ -1336,6 +975,7 @@ const SerialNoMaster = () => {
                     fetchData();
                 }}
                 title="Import Invoice Bulk Upload Records"
+
                 type="assets"
                 onImport={importService.importAssets}
                 onDownloadTemplate={importService.getAssetTemplate}
