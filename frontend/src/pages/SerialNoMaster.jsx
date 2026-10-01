@@ -41,6 +41,7 @@ const SerialNoMaster = () => {
     const [assetSummary, setAssetSummary] = useState(null);
     const [loadingSummary, setLoadingSummary] = useState(false);
     const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+    const [openActionMenuAssetId, setOpenActionMenuAssetId] = useState(null);
 
     // Page View State: 'list' | 'single'
     const [pageView, setPageView] = useState('list');
@@ -804,34 +805,55 @@ const SerialNoMaster = () => {
                                                     <td className="p-4 text-xs font-semibold text-slate-600">
                                                         {asset.location || '-'}
                                                     </td>
-                                                    {/* Actions Column: View Info, Sales Return, Delete Entry (Requirement #6, #11, #12, #16) */}
+                                                    {/* Actions are grouped under the row's information control. */}
                                                     <td className="p-4 text-right">
-                                                        <div className="flex justify-end items-center gap-1.5">
+                                                        <div className="relative inline-flex justify-end">
                                                             <button
-                                                                onClick={() => handleViewDetail(asset.serialNumber)}
+                                                                onClick={() => setOpenActionMenuAssetId(current => current === asset._id ? null : asset._id)}
                                                                 className="p-2 text-primary-600 hover:bg-primary-50 rounded-lg transition-all"
-                                                                title="View Details"
+                                                                title="View details and actions"
+                                                                aria-label={`Open actions for ${asset.serialNumber}`}
+                                                                aria-expanded={openActionMenuAssetId === asset._id}
                                                             >
                                                                 <MdInfoOutline size={18} />
                                                             </button>
-                                                            {asset.status === 'SOLD' && (
-                                                                <button
-                                                                    onClick={() => handleOpenReturnModal(asset)}
-                                                                    className="flex items-center gap-1 px-2.5 py-1 text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg text-xs font-bold transition-all active:scale-95"
-                                                                    title="Sales Return"
-                                                                >
-                                                                    <MdUndo size={16} />
-                                                                    <span>Sales Return</span>
-                                                                </button>
-                                                            )}
-                                                            {canDelete && (
-                                                                <button
-                                                                    onClick={() => handleDeleteEntry(asset)}
-                                                                    className="p-2 text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
-                                                                    title="Delete Entry (Admin Restricted)"
-                                                                >
-                                                                    <MdDelete size={18} />
-                                                                </button>
+                                                            {openActionMenuAssetId === asset._id && (
+                                                                <div className="absolute right-0 top-full z-20 mt-1 w-44 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 text-left shadow-lg">
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            setOpenActionMenuAssetId(null);
+                                                                            handleViewDetail(asset.serialNumber);
+                                                                        }}
+                                                                        className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                                                                    >
+                                                                        <MdInfoOutline size={16} />
+                                                                        View details
+                                                                    </button>
+                                                                    {asset.status === 'SOLD' && (
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                setOpenActionMenuAssetId(null);
+                                                                                handleOpenReturnModal(asset);
+                                                                            }}
+                                                                            className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-50"
+                                                                        >
+                                                                            <MdUndo size={16} />
+                                                                            Sales return
+                                                                        </button>
+                                                                    )}
+                                                                    {canDelete && (
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                setOpenActionMenuAssetId(null);
+                                                                                handleDeleteEntry(asset);
+                                                                            }}
+                                                                            className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50"
+                                                                        >
+                                                                            <MdDelete size={16} />
+                                                                            Delete entry
+                                                                        </button>
+                                                                    )}
+                                                                </div>
                                                             )}
                                                         </div>
                                                     </td>

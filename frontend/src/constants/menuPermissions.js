@@ -182,6 +182,7 @@ export const MENU_PERMISSION_GROUPS = [
             { key: 'sales_reports', label: 'Sales Reports', description: 'Sales revenue and performance reports', defaultRoute: '/sales/reports' },
             { key: 'sales_analytics', label: 'Sales Analytics', description: 'Pipeline velocity and salesperson analytics', defaultRoute: '/sales/analytics' },
             { key: 'sales_revenue_analytics', label: 'Revenue Analytics', description: 'Revenue streams and customer cohort analytics', defaultRoute: '/sales/revenue-analytics' },
+            { key: 'csm_rca', label: 'Why-Why Analysis', description: 'Five-why root cause and CAPA analytics dashboard', defaultRoute: '/analytics/why-why' },
             { key: 'sales_competitors', label: 'Competitor Intel', description: 'Market competitor analysis', defaultRoute: '/sales/competitors' },
             { key: 'sales_ai_pricing', label: 'AI Pricing Insights', description: 'AI-driven pricing optimization insights', defaultRoute: '/sales/ai-pricing' }
         ]

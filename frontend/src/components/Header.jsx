@@ -82,7 +82,7 @@ const searchablePages = [
     { label: 'Knowledge Base', path: '/csm/kb', permissionKey: 'csm_kb', keywords: ['kb'] },
     { label: 'CSM Config', path: '/csm/masters', permissionKey: 'csm_masters', keywords: ['csm masters'] },
     { label: 'Service Reports', path: '/csm/reports', permissionKey: 'csm_reports', keywords: ['csm reports'] },
-    { label: 'RCA Report', path: '/csm/rca', permissionKey: 'csm_rca', keywords: ['rca', 'root cause analysis', 'capa'] },
+    { label: 'Why-Why Analysis', path: '/analytics/why-why', permissionKey: 'csm_rca', keywords: ['why why', 'rca', 'root cause analysis', 'capa', 'analytics'] },
     { label: 'Super Admin', path: '/super-admin', superAdminOnly: true, keywords: ['platform admin'] },
     { label: 'System Updates', path: '/system-updates', superAdminOnly: true, keywords: ['updates', 'release notes'] },
 ];

@@ -80,6 +80,7 @@ const KnowledgeBase = lazy(() => import('./pages/KnowledgeBase'));
 const CSMMasters = lazy(() => import('./pages/CSMMasters'));
 const CSMReports = lazy(() => import('./pages/CSMReports'));
 const CSMRcaReport = lazy(() => import('./pages/CSMRcaReport'));
+const WhyWhyAnalytics = lazy(() => import('./pages/WhyWhyAnalytics'));
 const SalesDashboard = lazy(() => import('./pages/SalesDashboard'));
 const DealBoard = lazy(() => import('./pages/DealBoard'));
 const DealDetail = lazy(() => import('./pages/DealDetail'));
@@ -373,6 +374,7 @@ function App() {
             <Route path="/csm/masters/new" element={<PermissionRoute permissionKey="csm_masters"><Layout><CSMMasters isCreatePage={true} /></Layout></PermissionRoute>} />
             <Route path="/csm/reports" element={<PermissionRoute permissionKey="csm_reports"><Layout><CSMReports /></Layout></PermissionRoute>} />
             <Route path="/csm/rca" element={<PermissionRoute permissionKey="csm_rca"><Layout><CSMRcaReport /></Layout></PermissionRoute>} />
+            <Route path="/analytics/why-why" element={<PermissionRoute permissionKey="csm_rca"><Layout><WhyWhyAnalytics /></Layout></PermissionRoute>} />
             
             {/* Tender Routes */}
             <Route path="/tender/dashboard" element={<PermissionRoute permissionKey="tender_dashboard"><Layout><TenderDashboard /></Layout></PermissionRoute>} />
