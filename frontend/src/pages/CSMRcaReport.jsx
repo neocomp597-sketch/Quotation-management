@@ -29,6 +29,13 @@ const INITIAL_FORM = {
     priority: 'Medium',
     problemStatement: '',
     impact: '',
+    productCode: '',
+    productDescription: '',
+    serialNumber: '',
+    customerName: '',
+    postalCode: '',
+    yyyNumber: '',
+    yyyDate: '',
     sectionCell: '',
     machineNo: '',
     machineDescription: '',
@@ -193,6 +200,13 @@ const CSMRcaReport = () => {
             priority: report.priority || 'Medium',
             problemStatement: report.problemStatement || '',
             impact: report.impact || '',
+            productCode: report.productCode || '',
+            productDescription: report.productDescription || '',
+            serialNumber: report.serialNumber || '',
+            customerName: report.customerName || '',
+            postalCode: report.postalCode || '',
+            yyyNumber: report.yyyNumber || '',
+            yyyDate: report.yyyDate ? new Date(report.yyyDate).toISOString().split('T')[0] : '',
             sectionCell: report.sectionCell || '',
             machineNo: report.machineNo || '',
             machineDescription: report.machineDescription || '',
@@ -289,8 +303,8 @@ const CSMRcaReport = () => {
                     imgHeight
                 );
 
-                const docName = targetReport?.rcaNumber || formData.rcaNumber || 'RCA-Report';
-                pdf.save(`${docName.replace(/\//g, '-')}.pdf`);
+                const yyyNum = targetReport?.yyyNumber || formData.yyyNumber || targetReport?.rcaNumber || formData.rcaNumber || '001';
+                pdf.save(`Why_Why_Analysis_${yyyNum.replace(/\//g, '-')}.pdf`);
                 toast.success('RCA Report downloaded successfully as PDF!');
             } catch (err) {
                 console.error('PDF Download Error:', err);
@@ -312,7 +326,7 @@ const CSMRcaReport = () => {
                 const url = URL.createObjectURL(new Blob([res.data]));
                 const link = document.createElement('a');
                 link.href = url;
-                link.download = `${(targetReport.rcaNumber || 'RCA-Report').replace(/\//g, '-')}.xlsx`;
+                link.download = `Why_Why_Analysis_${(targetReport.yyyNumber || targetReport.rcaNumber || '001').replace(/\//g, '-')}.xlsx`;
                 document.body.appendChild(link);
                 link.click();
                 link.remove();
@@ -334,6 +348,13 @@ const CSMRcaReport = () => {
                 rows.push({ Section: 'Document Header', Field: 'Date', Detail: targetReport.date || '' });
                 rows.push({ Section: 'Document Header', Field: 'Department', Detail: targetReport.department || '' });
                 rows.push({ Section: 'Document Header', Field: 'Priority', Detail: targetReport.priority || '' });
+                rows.push({ Section: 'Document Header', Field: 'YYY Number', Detail: targetReport.yyyNumber || '' });
+                rows.push({ Section: 'Document Header', Field: 'YYY Date', Detail: targetReport.yyyDate || '' });
+                rows.push({ Section: 'Product & Customer', Field: 'Product Code', Detail: targetReport.productCode || '' });
+                rows.push({ Section: 'Product & Customer', Field: 'Product Description', Detail: targetReport.productDescription || '' });
+                rows.push({ Section: 'Product & Customer', Field: 'Serial Number', Detail: targetReport.serialNumber || '' });
+                rows.push({ Section: 'Product & Customer', Field: 'Customer Name', Detail: targetReport.customerName || '' });
+                rows.push({ Section: 'Product & Customer', Field: 'Postal Code', Detail: targetReport.postalCode || '' });
                 rows.push({ Section: 'Incident', Field: 'Breakdown (Physical Phenomenon)', Detail: targetReport.problemStatement || '' });
                 rows.push({ Section: 'Incident', Field: 'Impact', Detail: targetReport.impact || '' });
 
@@ -390,7 +411,7 @@ const CSMRcaReport = () => {
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, 'RCA Report');
 
-            const fileName = `${(targetReport?.rcaNumber || 'RCA-Report').replace(/\//g, '-')}.xlsx`;
+            const fileName = `Why_Why_Analysis_${(targetReport?.yyyNumber || targetReport?.rcaNumber || '001').replace(/\//g, '-')}.xlsx`;
             XLSX.writeFile(workbook, fileName);
             toast.success('RCA Report downloaded successfully as Excel!');
         } catch (err) {
@@ -790,7 +811,7 @@ const CSMRcaReport = () => {
                         style={{ width: `${SHEET_WIDTH + 16}px` }}
                     >
                         <WhyWhySheet
-                            data={{ ...formData, breakdownDate: sheetDate(formData.breakdownDate || formData.date) }}
+                            data={{ ...formData, breakdownDate: sheetDate(formData.breakdownDate || formData.date), yyyDate: formData.yyyDate }}
                             logo={branding.logo}
                             leftLogo={branding.leftLogo}
                             companyName={branding.companyName}
@@ -929,7 +950,32 @@ const CSMRcaReport = () => {
                                 </select>
                             </div>
 
-                            <div className="md:col-span-2">
+                            <div>
+                                <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
+                                    YYY Number
+                                </label>
+                                <input
+                                    type="text"
+                                    value={formData.yyyNumber}
+                                    onChange={(e) => handleInputChange('yyyNumber', e.target.value)}
+                                    className="w-full p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-semibold text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all outline-none"
+                                    placeholder="YYY-2026-001"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
+                                    YYY Date
+                                </label>
+                                <input
+                                    type="date"
+                                    value={formData.yyyDate}
+                                    onChange={(e) => handleInputChange('yyyDate', e.target.value)}
+                                    className="w-full p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-semibold text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all outline-none"
+                                />
+                            </div>
+
+                            <div className="md:col-span-3">
                                 <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
                                     Breakdown (Physical Phenomenon)
                                 </label>
@@ -942,7 +988,7 @@ const CSMRcaReport = () => {
                                 ></textarea>
                             </div>
 
-                            <div className="md:col-span-2">
+                            <div className="md:col-span-3">
                                 <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
                                     Impact
                                 </label>
@@ -953,6 +999,71 @@ const CSMRcaReport = () => {
                                     placeholder="Describe business/production/customer impact..."
                                     className="w-full p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-semibold text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all outline-none min-h-[90px] resize-y"
                                 ></textarea>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
+                                    Product Code
+                                </label>
+                                <input
+                                    type="text"
+                                    value={formData.productCode}
+                                    onChange={(e) => handleInputChange('productCode', e.target.value)}
+                                    className="w-full p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-semibold text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all outline-none"
+                                    placeholder="e.g. STL-VCB-11KV-630A"
+                                />
+                            </div>
+
+                            <div className="md:col-span-2">
+                                <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
+                                    Product Description
+                                </label>
+                                <input
+                                    type="text"
+                                    value={formData.productDescription}
+                                    onChange={(e) => handleInputChange('productDescription', e.target.value)}
+                                    className="w-full p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-semibold text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all outline-none"
+                                    placeholder="e.g. 11kV Vacuum Circuit Breaker, 630A"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
+                                    Serial Number
+                                </label>
+                                <input
+                                    type="text"
+                                    value={formData.serialNumber}
+                                    onChange={(e) => handleInputChange('serialNumber', e.target.value)}
+                                    className="w-full p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-semibold text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all outline-none"
+                                    placeholder="e.g. SN-2026-00123"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
+                                    Customer Name
+                                </label>
+                                <input
+                                    type="text"
+                                    value={formData.customerName}
+                                    onChange={(e) => handleInputChange('customerName', e.target.value)}
+                                    className="w-full p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-semibold text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all outline-none"
+                                    placeholder="e.g. Bajaj Auto Ltd."
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
+                                    Postal Code
+                                </label>
+                                <input
+                                    type="text"
+                                    value={formData.postalCode}
+                                    onChange={(e) => handleInputChange('postalCode', e.target.value)}
+                                    className="w-full p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-semibold text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all outline-none"
+                                    placeholder="e.g. 410501"
+                                />
                             </div>
                         </div>
                     </div>

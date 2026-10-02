@@ -48,6 +48,12 @@ const ReasonRow = ({ text, chosen, style = {} }) => (
 );
 
 const WhyWhySheet = ({ data = {}, logo = null, leftLogo = null, companyName = '' }) => {
+    const sheetDate = (v) => {
+        if (!v) return '';
+        const d = new Date(v);
+        if (Number.isNaN(d.getTime())) return String(v);
+        return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
+    };
     const whys = Array.isArray(data.fiveWhys) && data.fiveWhys.length
         ? data.fiveWhys
         : [1, 2, 3, 4, 5].map((whyNo) => ({ whyNo, analysis: '' }));
@@ -109,6 +115,18 @@ const WhyWhySheet = ({ data = {}, logo = null, leftLogo = null, companyName = ''
                 </tr>
                 <tr>
                     <td style={cell({ height: '30px' })}><Filled text="Section / Cell :">{data.sectionCell}</Filled></td>
+                </tr>
+
+                {/* Product, Customer, YYY Number & Date */}
+                <tr>
+                    <td colSpan={2} style={cell({ height: '22px', fontSize: '11px' })}><Filled text="Product Code :">{data.productCode}</Filled></td>
+                    <td style={cell({ fontSize: '11px' })}><Filled text="Serial No. :">{data.serialNumber}</Filled></td>
+                    <td colSpan={2} style={cell({ fontSize: '11px' })}><Filled text="YYY No. :">{data.yyyNumber}</Filled></td>
+                </tr>
+                <tr>
+                    <td colSpan={2} style={cell({ height: '22px', fontSize: '11px' })}><Filled text="Product Desc. :">{data.productDescription}</Filled></td>
+                    <td style={cell({ fontSize: '11px' })}><Filled text="Customer :">{data.customerName}{data.postalCode ? ` (${data.postalCode})` : ''}</Filled></td>
+                    <td colSpan={2} style={cell({ fontSize: '11px' })}><Filled text="YYY Date :">{sheetDate(data.yyyDate)}</Filled></td>
                 </tr>
 
                 {/* Machine, date of breakdown and the list of five root causes */}

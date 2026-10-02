@@ -24,6 +24,16 @@ const CSMRcaReportSchema = new mongoose.Schema({
     problemStatement: { type: String, default: '' },
     impact: { type: String, default: '' },
 
+    // Product & Customer identification for the Why-Why Analysis sheet.
+    productCode: { type: String, default: '' },
+    productDescription: { type: String, default: '' },
+    serialNumber: { type: String, default: '' },
+    customerName: { type: String, default: '' },
+    postalCode: { type: String, default: '' },
+    // YYY (Why-Why-Why) Analysis number and date, printed on the sheet header.
+    yyyNumber: { type: String, default: '' },
+    yyyDate: { type: Date, default: null },
+
     // Fields of the Stelmec "Why Why Analysis Sheet (Maintenance)" the report prints as.
     sectionCell: { type: String, default: '' },
     machineNo: { type: String, default: '' },
