@@ -3,11 +3,13 @@
  * for the user super@gmail.com
  *
  * Usage:  node seed_rca_report.js
+ * Also registers the report's serial (SN-VMC03-2026-09174) via seed_rca_asset.js
  */
 const mongoose = require('mongoose');
 require('dotenv').config();
 
 const CSMRcaReport = require('./models/CSMRcaReport');
+const { ensureRcaDemoAsset } = require('./seed_rca_asset');
 const User = mongoose.model('User', new mongoose.Schema({}, { strict: false }));
 
 (async () => {
@@ -22,6 +24,15 @@ const User = mongoose.model('User', new mongoose.Schema({}, { strict: false }));
             process.exit(1);
         }
         console.log(`👤 Found user: ${user.name || user.email}  (companyId: ${user.companyId || 'none'})`);
+
+        // ── Register the demo serial as a real asset ───────────────────
+        // The report's serial must exist in the Serial Master (Asset) so the
+        // Raise Ticket serial search can find it and auto-fill details.
+        if (user.companyId) {
+            await ensureRcaDemoAsset({ companyId: user.companyId, userId: user._id, log: (m) => console.log('   ' + m) });
+        } else {
+            console.warn('⚠️  User has no companyId – skipping asset registration');
+        }
 
         // Remove the old report if it exists so we get a clean re-seed.
         const deleted = await CSMRcaReport.deleteMany({ rcaNumber: 'RCA-2026-001' });
