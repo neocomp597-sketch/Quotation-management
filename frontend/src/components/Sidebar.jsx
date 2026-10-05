@@ -242,7 +242,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                 { key: 'inventory_dashboard', name: 'Dashboard', icon: <MdDashboard size={18} />, path: '/inventory/dashboard' },
                 { key: 'inventory_items', name: 'Items & Matrix', icon: <MdInventory size={18} />, path: '/inventory/stock' },
                 { key: 'inventory_warehouses', name: 'Warehouses', icon: <MdStorefront size={18} />, path: '/inventory/warehouses' },
-                { key: 'purchase_grn', name: 'Goods Receipt Note (GRN)', icon: <MdLocalShipping size={18} />, path: '/grn' },
+                { key: 'purchase_grn', name: 'GRN', icon: <MdLocalShipping size={18} />, path: '/grn' },
                 { key: 'inventory_transfers', name: 'Stock Transfers', icon: <MdCompareArrows size={18} />, path: '/inventory/transfers' },
                 { key: 'inventory_adjustments', name: 'Adjustments', icon: <MdTune size={18} />, path: '/inventory/adjustments' },
                 { key: 'inventory_stock_counts', name: 'Physical Audit', icon: <MdFactCheck size={18} />, path: '/inventory/counts' },
