@@ -40,6 +40,8 @@ const StockLedgerSchema = new mongoose.Schema({
 
 StockLedgerSchema.index({ companyId: 1, productId: 1, warehouseId: 1 });
 StockLedgerSchema.index({ companyId: 1, transactionNumber: 1 }, { unique: true });
+// Branch that owns this record; filled from the active branch on create and used for branch scoping (see tenantPlugin).
+StockLedgerSchema.add({ branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null, index: true } });
 StockLedgerSchema.plugin(tenantPlugin);
 
 module.exports = mongoose.model('StockLedger', StockLedgerSchema);

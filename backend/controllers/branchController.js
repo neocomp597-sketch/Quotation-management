@@ -20,11 +20,11 @@ exports.getAllBranches = async (req, res) => {
         const query = companyId ? { companyId } : {};
 
         // Branch-restricted users only get the branches assigned to them, so the
-        // branch switcher cannot be used to reach another branch's data.
-        const { getScopedBranches } = require('../middlewares/tenantContext');
-        const scopedBranchIds = getScopedBranches();
-        if (scopedBranchIds) {
-            query._id = { $in: scopedBranchIds };
+        // branch switcher cannot be used to reach another branch's data. This is the
+        // full list they may pick from, not just the branch currently active, so the
+        // switcher can always offer every allowed branch.
+        if (Array.isArray(req.user?.allowedBranchIds) && req.user.allowedBranchIds.length > 0) {
+            query._id = { $in: req.user.allowedBranchIds };
         }
 
         const branches = await Branch.find(query)

@@ -38,6 +38,8 @@ const StockAdjustmentSchema = new mongoose.Schema({
 });
 
 StockAdjustmentSchema.index({ companyId: 1, adjustmentNumber: 1 }, { unique: true });
+// Branch that owns this record; filled from the active branch on create and used for branch scoping (see tenantPlugin).
+StockAdjustmentSchema.add({ branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null, index: true } });
 StockAdjustmentSchema.plugin(tenantPlugin);
 
 StockAdjustmentSchema.pre('save', function (next) {

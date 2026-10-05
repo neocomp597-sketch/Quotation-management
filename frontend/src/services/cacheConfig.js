@@ -49,10 +49,23 @@ export const ttlFor = (url, config = {}) => {
   return entry ? entry.ttl : null;
 };
 
-/** Cache identity: the URL plus its query params, so page 1 and page 2 stay separate. */
+/** The branch the requests are scoped to; every cached list is specific to it. */
+const activeBranchScope = () => {
+  try {
+    return localStorage.getItem('activeBranchId') || 'all';
+  } catch {
+    return 'all';
+  }
+};
+
+/**
+ * Cache identity: the active branch, the URL and its query params, so page 1 and
+ * page 2 stay separate and a list cached while working in NASHIK is never served
+ * after switching to OTHER.
+ */
 export const cacheKeyFor = (url, config = {}) => {
   const params = config.params ? JSON.stringify(config.params) : '';
-  return `GET:${url}|${params}`;
+  return `GET:${url}|branch=${activeBranchScope()}|${params}`;
 };
 
 export const API_CACHE_DEBUG = Boolean(import.meta.env?.DEV);

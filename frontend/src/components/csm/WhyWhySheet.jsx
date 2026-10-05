@@ -11,7 +11,7 @@ import React from 'react';
 
 const SHEET_WIDTH = 1120;
 
-const BORDER = '1.5px solid #000000';
+const BORDER = '2px solid #000000';
 const FONT = "Arial, 'Helvetica Neue', Helvetica, sans-serif";
 
 const cell = (extra = {}) => ({
@@ -71,7 +71,7 @@ const WhyWhySheet = ({ data = {}, logo = null, leftLogo = null, companyName = ''
             style={{
                 width: `${SHEET_WIDTH}px`,
                 borderCollapse: 'collapse',
-                border: '2px solid #000000',
+                border: '3px solid #000000',
                 background: '#ffffff',
                 tableLayout: 'fixed'
             }}
@@ -94,7 +94,7 @@ const WhyWhySheet = ({ data = {}, logo = null, leftLogo = null, companyName = ''
                                 <img src={leftLogo} alt="TPM" crossOrigin="anonymous" style={{ width: '46px', height: '46px', objectFit: 'contain', flexShrink: 0 }} />
                             ) : (
                                 <div style={{
-                                    width: '42px', height: '42px', border: '1px solid #000000', borderRadius: '3px',
+                                    width: '42px', height: '42px', border: '1.5px solid #000000', borderRadius: '3px',
                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                                     fontWeight: 900, fontSize: '13px', letterSpacing: '0.5px', flexShrink: 0
                                 }}>
@@ -163,7 +163,7 @@ const WhyWhySheet = ({ data = {}, logo = null, leftLogo = null, companyName = ''
                     <td style={cell({ textAlign: 'center', verticalAlign: 'middle', height: '62px' })}>
                         <span style={{
                             display: 'inline-block', width: '44px', height: '16px',
-                            border: '1px solid #000000',
+                            border: '1.5px solid #000000',
                             background: data.sparePartReplaced ? '#000000' : '#ffffff'
                         }} />
                     </td>
@@ -177,7 +177,7 @@ const WhyWhySheet = ({ data = {}, logo = null, leftLogo = null, companyName = ''
                     <td style={cell({ textAlign: 'center', verticalAlign: 'middle', height: '62px' })}>
                         <span style={{
                             display: 'inline-block', width: '44px', height: '16px',
-                            border: '1px solid #000000',
+                            border: '1.5px solid #000000',
                             background: data.sparePartReplaced ? '#ffffff' : '#000000'
                         }} />
                     </td>

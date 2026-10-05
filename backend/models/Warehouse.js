@@ -32,6 +32,8 @@ const WarehouseSchema = new mongoose.Schema({
 });
 
 WarehouseSchema.index({ companyId: 1, warehouseCode: 1 }, { unique: true });
+// Branch that owns this record; filled from the active branch on create and used for branch scoping (see tenantPlugin).
+WarehouseSchema.add({ branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null, index: true } });
 WarehouseSchema.plugin(tenantPlugin);
 
 WarehouseSchema.pre('save', function (next) {

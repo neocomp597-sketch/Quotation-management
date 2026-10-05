@@ -13,6 +13,8 @@ const UserSchema = new mongoose.Schema({
     reportsTo: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null },
     assignedBranches: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Branch' }],
+    // Branch the user is currently working in; drives server-side branch scoping (see authMiddleware).
+    activeBranchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null },
     status: { type: Boolean, default: true },
     isActive: { type: Boolean, default: true },
     personalNote: { type: String, default: '' },

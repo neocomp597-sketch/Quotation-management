@@ -275,7 +275,7 @@ const CSMRcaReport = () => {
 
             try {
                 const canvas = await html2canvas(element, {
-                    scale: 2,
+                    scale: 3,
                     useCORS: true,
                     logging: false,
                     backgroundColor: '#ffffff'

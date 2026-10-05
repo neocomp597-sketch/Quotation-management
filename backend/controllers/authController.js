@@ -6,7 +6,14 @@ const Company = require('../models/Company');
 const Branch = require('../models/Branch');
 const { getRedis } = require('../config/redis');
 const { enqueueLegacyRefreshSession } = require('../queues/authSessionQueue');
-const { isSuperAdminRole } = require('../middlewares/authMiddleware');
+const { isSuperAdminRole, invalidateAuthUserCache } = require('../middlewares/authMiddleware');
+const {
+    BRANCH_SUMMARY_FIELDS,
+    idOf,
+    normalizeBranchId,
+    canUseBranch,
+    listSelectableBranches,
+} = require('../utils/branchScope');
 
 const ACCESS_TOKEN_TTL = process.env.ACCESS_TOKEN_TTL || '20m';
 const REFRESH_TOKEN_DAYS = Number(process.env.REFRESH_TOKEN_DAYS || 30);
@@ -17,15 +24,33 @@ const DEVICE_COOKIE_NAME = 'deviceId';
 const getJwtSecret = () => process.env.JWT_SECRET || 'secret123';
 const getRefreshSecret = () => process.env.JWT_REFRESH_SECRET || `${getJwtSecret()}_refresh`;
 
-const normalizeUser = (user, fallbackBranches = []) => {
+const branchSummary = (branch) => {
+    if (!branch || typeof branch !== 'object' || !branch._id) return null;
+    const { _id, name, code, branchPrefix, address, city, state } = branch;
+    return { _id, name, code, branchPrefix, address, city, state };
+};
+
+/**
+ * The user as the frontend sees it. `selectableBranches` is the list the user may
+ * work in (their assignment, or every company branch for admins without one); the
+ * persisted active branch is only reported while it is still in that list.
+ */
+const normalizeUser = (user, selectableBranches = []) => {
     let assigned = [];
-    if (Array.isArray(user.assignedBranches) && user.assignedBranches.length > 0) {
+    if (Array.isArray(selectableBranches) && selectableBranches.length > 0) {
+        assigned = selectableBranches;
+    } else if (Array.isArray(user.assignedBranches) && user.assignedBranches.length > 0) {
         assigned = user.assignedBranches;
-    } else if (fallbackBranches && fallbackBranches.length > 0) {
-        assigned = fallbackBranches;
     } else if (user.branchId) {
         assigned = [user.branchId];
     }
+
+    const assignedIds = assigned.map(idOf).filter(Boolean);
+    const activeBranchId = idOf(user.activeBranchId);
+    const activeBranchAllowed = Boolean(activeBranchId) && (assignedIds.length === 0 || assignedIds.includes(activeBranchId));
+    const activeBranch = activeBranchAllowed
+        ? (branchSummary(user.activeBranchId) || branchSummary(assigned.find((branch) => idOf(branch) === activeBranchId)))
+        : null;
 
     return {
         id: user._id,
@@ -35,10 +60,33 @@ const normalizeUser = (user, fallbackBranches = []) => {
         companyId: user.companyId,
         branchId: user.branchId?._id || user.branchId || (assigned[0]?._id || assigned[0] || null),
         assignedBranches: assigned,
+        activeBranchId: activeBranchAllowed ? activeBranchId : null,
+        activeBranch,
         vendorId: user.vendorId || null,
         mustChangePassword: !!user.mustChangePassword,
     };
 };
+
+const resolveSessionCompanyId = async (user) => {
+    const companyId = idOf(user.companyId);
+    if (companyId) return companyId;
+    // Platform super admins carry no company; they work in the first company by default,
+    // which is also what the auth middleware resolves for them.
+    const firstCompany = await Company.findOne().select('_id').lean();
+    return firstCompany ? firstCompany._id.toString() : null;
+};
+
+const buildSessionUser = async (user) => {
+    const companyId = await resolveSessionCompanyId(user);
+    const selectableBranches = await listSelectableBranches(user, companyId);
+    return normalizeUser(user, selectableBranches);
+};
+
+const BRANCH_POPULATE = [
+    { path: 'assignedBranches', select: BRANCH_SUMMARY_FIELDS, options: { bypassTenant: true } },
+    { path: 'branchId', select: BRANCH_SUMMARY_FIELDS, options: { bypassTenant: true } },
+    { path: 'activeBranchId', select: BRANCH_SUMMARY_FIELDS, options: { bypassTenant: true } },
+];
 
 const ensureLoginAllowed = async (user) => {
     if (user.status === false || user.isActive === false) {
@@ -249,14 +297,7 @@ const issueSession = async (user, res, req, deviceId = getDeviceId(req)) => {
     setDeviceCookie(res, deviceId, req);
     setRefreshCookie(res, refreshToken, req);
 
-    let fallbackBranches = [];
-    if ((!user.assignedBranches || user.assignedBranches.length === 0) && user.companyId) {
-        fallbackBranches = await Branch.find({ companyId: user.companyId, status: { $ne: 'Inactive' } })
-            .select('_id name code branchPrefix address city state')
-            .lean();
-    }
-
-    return { accessToken, deviceId, user: normalizeUser(user, fallbackBranches) };
+    return { accessToken, deviceId, user: await buildSessionUser(user) };
 };
 
 exports.register = async (req, res) => {
@@ -305,8 +346,7 @@ exports.login = async (req, res) => {
         const normalizedEmail = email ? String(email).trim().toLowerCase() : '';
 
         const user = await User.findOne({ email: { $regex: new RegExp("^" + normalizedEmail.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + "$", "i") } })
-            .populate('assignedBranches', '_id name code branchPrefix address city state')
-            .populate('branchId', '_id name code branchPrefix address city state');
+            .populate(BRANCH_POPULATE);
         if (!user) {
             return res.status(400).json({ message: 'Invalid credentials' });
         }
@@ -339,8 +379,7 @@ exports.refresh = async (req, res) => {
 
         const decoded = jwt.verify(refreshToken, getRefreshSecret());
         const user = await User.findById(decoded.id)
-            .populate('assignedBranches', '_id name code branchPrefix address city state')
-            .populate('branchId', '_id name code branchPrefix address city state');
+            .populate(BRANCH_POPULATE);
         const deviceId = getDeviceId(req, decoded);
         const redisSession = await loadRefreshSession(decoded.id, deviceId);
         const hasValidRedisSession = redisSession?.tokenHash === hashToken(refreshToken);
@@ -370,7 +409,7 @@ exports.refresh = async (req, res) => {
         res.json({
             accessToken: createAccessToken(user),
             deviceId,
-            user: normalizeUser(user),
+            user: await buildSessionUser(user),
         });
     } catch (error) {
         clearRefreshCookie(res, req);
@@ -432,11 +471,71 @@ exports.logoutAll = async (req, res) => {
 exports.getMe = async (req, res) => {
     try {
         const user = await User.findById(req.user.id)
-            .select('_id name email role status companyId vendorId mustChangePassword createdAt updatedAt')
+            .select('_id name email role status companyId vendorId branchId assignedBranches activeBranchId mustChangePassword createdAt updatedAt')
+            .populate(BRANCH_POPULATE)
             .lean();
-        res.json(user);
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+        const session = await buildSessionUser(user);
+        res.json({
+            ...session,
+            _id: user._id,
+            status: user.status,
+            createdAt: user.createdAt,
+            updatedAt: user.updatedAt,
+        });
     } catch (error) {
         res.status(500).json({ message: 'Server Error' });
+    }
+};
+
+/**
+ * GET /auth/branches - the branches this user may work in, plus the branch the
+ * server currently treats as active for them.
+ */
+exports.getBranchOptions = async (req, res) => {
+    try {
+        const branches = await listSelectableBranches(req.user, req.user.companyId);
+        res.json({
+            activeBranchId: req.user.activeBranchId || null,
+            branches: branches.map(branchSummary).filter(Boolean),
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to load branches', error: error.message });
+    }
+};
+
+/**
+ * PUT /auth/active-branch - persists the branch the user is working in. From here
+ * on every branch-dependent query for this user is scoped to it, whether or not
+ * the client sends the x-active-branch header.
+ */
+exports.setActiveBranch = async (req, res) => {
+    try {
+        const branchId = normalizeBranchId(req.body?.branchId);
+        if (!branchId) {
+            return res.status(400).json({ message: 'branchId is required' });
+        }
+
+        if (!(await canUseBranch(req.user, branchId, req.user.companyId))) {
+            return res.status(403).json({
+                message: 'This branch is not assigned to you',
+                code: 'ACTIVE_BRANCH_INVALID'
+            });
+        }
+
+        await User.updateOne({ _id: req.user.id }, { $set: { activeBranchId: branchId } });
+        await invalidateAuthUserCache(req.user.id);
+
+        const activeBranch = await Branch.findById(branchId)
+            .select(BRANCH_SUMMARY_FIELDS)
+            .setOptions({ bypassTenant: true })
+            .lean();
+
+        res.json({ activeBranchId: branchId, activeBranch: branchSummary(activeBranch) });
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to set active branch', error: error.message });
     }
 };
 
@@ -465,7 +564,7 @@ exports.changePassword = async (req, res) => {
         user.passwordChangedAt = new Date();
         await user.save();
 
-        res.json({ message: 'Password updated successfully', user: normalizeUser(user) });
+        res.json({ message: 'Password updated successfully', user: await buildSessionUser(user) });
     } catch (error) {
         res.status(500).json({ message: 'Failed to change password', error: error.message });
     }

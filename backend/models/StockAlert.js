@@ -28,6 +28,8 @@ const StockAlertSchema = new mongoose.Schema({
 });
 
 StockAlertSchema.index({ companyId: 1, productId: 1, alertType: 1, isResolved: 1 });
+// Branch that owns this record; filled from the active branch on create and used for branch scoping (see tenantPlugin).
+StockAlertSchema.add({ branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null, index: true } });
 StockAlertSchema.plugin(tenantPlugin);
 
 module.exports = mongoose.model('StockAlert', StockAlertSchema);

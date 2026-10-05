@@ -18,6 +18,8 @@ CustomerContactSchema.pre('save', function () {
 });
 
 CustomerContactSchema.index({ companyId: 1, customerId: 1, contactName: 1 });
+// Branch that owns this record; filled from the active branch on create and used for branch scoping (see tenantPlugin).
+CustomerContactSchema.add({ branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null, index: true } });
 CustomerContactSchema.plugin(tenantPlugin);
 
 module.exports = mongoose.model('CustomerContact', CustomerContactSchema);

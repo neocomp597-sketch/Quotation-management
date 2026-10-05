@@ -33,6 +33,8 @@ const StockCountSchema = new mongoose.Schema({
 });
 
 StockCountSchema.index({ companyId: 1, countNumber: 1 }, { unique: true });
+// Branch that owns this record; filled from the active branch on create and used for branch scoping (see tenantPlugin).
+StockCountSchema.add({ branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null, index: true } });
 StockCountSchema.plugin(tenantPlugin);
 
 StockCountSchema.pre('save', function (next) {

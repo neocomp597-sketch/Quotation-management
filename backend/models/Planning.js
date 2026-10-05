@@ -43,5 +43,7 @@ PlanningSchema.pre('findByIdAndUpdate', function() {
 });
 
 const tenantPlugin = require('./plugins/tenantPlugin');
+// Branch that owns this record; filled from the active branch on create and used for branch scoping (see tenantPlugin).
+PlanningSchema.add({ branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null, index: true } });
 PlanningSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('Planning', PlanningSchema);

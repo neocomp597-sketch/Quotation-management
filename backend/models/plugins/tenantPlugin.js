@@ -1,4 +1,10 @@
-const { getTenantId, isTenantBypassed, getScopedBranches } = require('../../middlewares/tenantContext');
+const {
+    getTenantId,
+    isTenantBypassed,
+    isBranchBypassed,
+    getScopedBranches,
+    getActiveBranchId,
+} = require('../../middlewares/tenantContext');
 const mongoose = require('mongoose');
 
 const TENANT_QUERY_HOOKS = [
@@ -16,12 +22,27 @@ const TENANT_QUERY_HOOKS = [
     'updateOne',
 ];
 
-const hasBypass = (options = {}) => Boolean(options.bypassTenant) || isTenantBypassed();
+/**
+ * Tenant (company) bypass: an explicit per-query option, or the request-level
+ * bypass that super admins get so they can work across companies.
+ */
+const hasTenantBypass = (options = {}) => Boolean(options.bypassTenant) || isTenantBypassed();
 
-const toObjectId = (companyId) => (
-    companyId instanceof mongoose.Types.ObjectId
-        ? companyId
-        : new mongoose.Types.ObjectId(companyId)
+/**
+ * Branch bypass. Deliberately NOT tied to the request-level tenant bypass: a
+ * super admin working in the "NASHIK" branch context still only sees NASHIK
+ * data. Only an explicit per-query option (used for id lookups that must be
+ * able to reach any record) or a request-level branch bypass (platform level
+ * super admin screens, background jobs) turns the branch filter off.
+ */
+const hasBranchBypass = (options = {}) => (
+    Boolean(options.bypassTenant) || Boolean(options.bypassBranch) || isBranchBypassed()
+);
+
+const toObjectId = (id) => (
+    id instanceof mongoose.Types.ObjectId
+        ? id
+        : new mongoose.Types.ObjectId(id)
 );
 
 const hasCompanyId = (obj) => {
@@ -48,29 +69,67 @@ const addTenantFilter = (query, companyId) => {
     query.setQuery({ $and: [currentQuery, { companyId }] });
 };
 
+const isBranchScopedSchema = (schema) => Boolean(schema.path('branchId') || schema.path('assignedBranches'));
+
 /**
- * Restricts a query to the branches the current user is assigned to.
- *
- * Applied on top of whatever the caller asked for (never instead of it), so a user
- * cannot widen their own access by passing a branchId of their choosing. Records
- * that carry no branch stay visible to everyone - they are not owned by a branch.
+ * The branch condition for the current request: records in one of the scoped
+ * branches, plus records that carry no branch at all. Unassigned records are not
+ * owned by any branch, so they stay reachable from every branch context instead of
+ * disappearing from the application entirely.
  */
-const addBranchFilter = (query, branchIds, schema) => {
+const buildBranchCondition = (branchIds, schema) => {
     const ids = branchIds.map(id => toObjectId(id));
-    const currentQuery = query.getQuery();
-    const branchOrConditions = [
-        { branchId: { $in: ids } }
-    ];
-    if (schema && schema.path('assignedBranches')) {
+    const branchOrConditions = [];
+    if (schema.path('branchId')) {
+        branchOrConditions.push({ branchId: { $in: ids } });
+    }
+    if (schema.path('assignedBranches')) {
         branchOrConditions.push({ assignedBranches: { $in: ids } });
     }
-    branchOrConditions.push({ branchId: null }, { branchId: { $exists: false } });
+    if (schema.path('branchId')) {
+        branchOrConditions.push({ branchId: null }, { branchId: { $exists: false } });
+    } else {
+        branchOrConditions.push({ assignedBranches: { $size: 0 } }, { assignedBranches: { $exists: false } });
+    }
+    return { $or: branchOrConditions };
+};
+
+/**
+ * Restricts a query to the branches of the current request.
+ *
+ * Applied on top of whatever the caller asked for (never instead of it), so a user
+ * cannot widen their own access by passing a branchId of their choosing.
+ */
+const addBranchFilter = (query, branchIds, schema) => {
+    const currentQuery = query.getQuery();
     query.setQuery({
         $and: [
             currentQuery,
-            { $or: branchOrConditions }
+            buildBranchCondition(branchIds, schema)
         ]
     });
+};
+
+const PIPELINE_HEAD_STAGES = ['$geoNear', '$search', '$vectorSearch'];
+
+const pipelineInsertIndex = (pipeline) => {
+    const firstStage = pipeline[0] || {};
+    const firstStageKey = Object.keys(firstStage)[0];
+    return PIPELINE_HEAD_STAGES.includes(firstStageKey) ? 1 : 0;
+};
+
+/**
+ * Fills in the branch of a new record from the active branch of the request, so
+ * everything created while working in "NASHIK" belongs to NASHIK. A branch the
+ * caller sets explicitly is always kept.
+ */
+const applyDefaultBranch = (doc, schema) => {
+    if (!doc || typeof doc !== 'object') return;
+    if (!schema.path('branchId')) return;
+    if (doc.branchId) return;
+    const activeBranchId = getActiveBranchId();
+    if (!activeBranchId || !mongoose.Types.ObjectId.isValid(activeBranchId)) return;
+    doc.branchId = toObjectId(activeBranchId);
 };
 
 module.exports = function tenantPlugin(schema, options = {}) {
@@ -102,6 +161,10 @@ module.exports = function tenantPlugin(schema, options = {}) {
                 throw new Error(`companyId is required for ${this.constructor.modelName} and no tenant context found`);
             }
         }
+
+        if (this.isNew && !this.$locals.bypassBranch && !isBranchBypassed()) {
+            applyDefaultBranch(this, schema);
+        }
     });
 
     schema.pre('insertMany', function (next, docs, insertOptions) {
@@ -115,7 +178,13 @@ module.exports = function tenantPlugin(schema, options = {}) {
             callback = null;
         }
 
-        if (hasBypass(actualOptions)) {
+        const docList = actualDocs ? (Array.isArray(actualDocs) ? actualDocs : [actualDocs]) : [];
+
+        if (!hasBranchBypass(actualOptions)) {
+            docList.forEach((doc) => applyDefaultBranch(doc, schema));
+        }
+
+        if (hasTenantBypass(actualOptions)) {
             if (callback) return callback();
             return;
         }
@@ -127,8 +196,7 @@ module.exports = function tenantPlugin(schema, options = {}) {
             throw err;
         }
 
-        if (companyId && actualDocs) {
-            const docList = Array.isArray(actualDocs) ? actualDocs : [actualDocs];
+        if (companyId) {
             docList.forEach((doc) => {
                 if (doc && typeof doc === 'object' && !doc.companyId) {
                     doc.companyId = companyId;
@@ -141,16 +209,16 @@ module.exports = function tenantPlugin(schema, options = {}) {
 
     TENANT_QUERY_HOOKS.forEach(type => {
         schema.pre(type, function () {
-            if (hasBypass(this.options)) {
-                return;
-            }
-
             // Only models that actually carry a branch can be branch-scoped.
-            if (schema.path('branchId') || schema.path('assignedBranches')) {
+            if (isBranchScopedSchema(schema) && !hasBranchBypass(this.options)) {
                 const branchIds = getScopedBranches();
                 if (branchIds) {
                     addBranchFilter(this, branchIds, schema);
                 }
+            }
+
+            if (hasTenantBypass(this.options)) {
+                return;
             }
 
             const companyId = getTenantId();
@@ -161,38 +229,42 @@ module.exports = function tenantPlugin(schema, options = {}) {
                 if (update && this.options.upsert) {
                     const hasAtomic = Object.keys(update).some(key => key.startsWith('$'));
                     let nextUpdate = { ...update };
-                    
+
                     if (!hasAtomic) {
                         // If it's a raw object, wrap it in $set
                         nextUpdate = { $set: update };
                     }
-                    
+
                     nextUpdate.$setOnInsert = {
                         ...(nextUpdate.$setOnInsert || {}),
                         companyId,
                     };
-                    
+
                     this.setUpdate(nextUpdate);
                 }
             }
-
         });
     });
 
     schema.pre('aggregate', function () {
-        if (hasBypass(this.options)) {
+        const pipeline = this.pipeline();
+
+        // Dashboards and reports aggregate directly, so the branch scope has to be
+        // enforced here as well or a super admin would see every branch's numbers.
+        if (isBranchScopedSchema(schema) && !hasBranchBypass(this.options)) {
+            const branchIds = getScopedBranches();
+            if (branchIds) {
+                pipeline.splice(pipelineInsertIndex(pipeline), 0, { $match: buildBranchCondition(branchIds, schema) });
+            }
+        }
+
+        if (hasTenantBypass(this.options)) {
             return;
         }
 
         const companyId = getTenantId();
         if (companyId) {
-            const tenantMatch = { $match: { companyId: toObjectId(companyId) } };
-            const pipeline = this.pipeline();
-            const firstStage = pipeline[0] || {};
-            const firstStageKey = Object.keys(firstStage)[0];
-            const insertIndex = ['$geoNear', '$search', '$vectorSearch'].includes(firstStageKey) ? 1 : 0;
-            pipeline.splice(insertIndex, 0, tenantMatch);
+            pipeline.splice(pipelineInsertIndex(pipeline), 0, { $match: { companyId: toObjectId(companyId) } });
         }
-
     });
 };

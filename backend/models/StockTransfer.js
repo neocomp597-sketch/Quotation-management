@@ -37,6 +37,8 @@ const StockTransferSchema = new mongoose.Schema({
 });
 
 StockTransferSchema.index({ companyId: 1, transferNumber: 1 }, { unique: true });
+// Branch that owns this record; filled from the active branch on create and used for branch scoping (see tenantPlugin).
+StockTransferSchema.add({ branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null, index: true } });
 StockTransferSchema.plugin(tenantPlugin);
 
 StockTransferSchema.pre('save', function (next) {

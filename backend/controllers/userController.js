@@ -40,6 +40,21 @@ exports.getAllUsers = async (req, res) => {
         const companyId = await getEffectiveCompanyId(req);
         const query = companyId ? { companyId } : {};
 
+        // The User model is not branch-scoped by tenantPlugin, so the active branch
+        // is applied here: users of the scoped branches plus users without a branch.
+        const { getScopedBranches } = require('../middlewares/tenantContext');
+        const scopedBranchIds = getScopedBranches();
+        if (scopedBranchIds) {
+            query.$or = [
+                { branchId: { $in: scopedBranchIds } },
+                { assignedBranches: { $in: scopedBranchIds } },
+                { branchId: null, assignedBranches: { $size: 0 } },
+                { branchId: null, assignedBranches: { $exists: false } },
+                { branchId: { $exists: false }, assignedBranches: { $size: 0 } },
+                { branchId: { $exists: false }, assignedBranches: { $exists: false } },
+            ];
+        }
+
         const users = await User.find(query)
             .select('_id name email role reportsTo branchId assignedBranches status companyId customPermissions vendorId createdAt')
             .populate('reportsTo', 'name email')

@@ -120,6 +120,8 @@ const ContactSchema = new mongoose.Schema(
     { timestamps: true }
 );
 
+// Branch that owns this record; filled from the active branch on create and used for branch scoping (see tenantPlugin).
+ContactSchema.add({ branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null, index: true } });
 ContactSchema.plugin(tenantPlugin);
 
 module.exports = mongoose.model('Contact', ContactSchema);

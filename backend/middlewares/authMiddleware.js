@@ -3,8 +3,16 @@ const User = require('../models/User');
 const { getRedis } = require('../config/redis');
 const { getCachedJson, setCachedJson } = require('../utils/apiCache');
 const { runWithTenant } = require('./tenantContext');
+const {
+    normalizeBranchId,
+    canUseBranch,
+    getAssignedBranchIds,
+    isBranchAdminRole,
+} = require('../utils/branchScope');
 
 const AUTH_USER_CACHE_TTL_SECONDS = Number(process.env.AUTH_USER_CACHE_TTL_SECONDS || 300);
+const AUTH_USER_FIELDS = '_id name email role tokenVersion companyId branchId assignedBranches activeBranchId status isActive vendorId customPermissions reportsTo';
+
 const isSuperAdminRole = (role) => {
     if (!role) return false;
     const normalized = role.toLowerCase();
@@ -19,6 +27,22 @@ const isAccessTokenBlacklisted = async (jti) => {
 
     return Boolean(await redis.get(`blacklist:access:${jti}`));
 };
+
+const authUserCacheKey = (userId, tokenVersion) => `auth:user:${userId}:v${tokenVersion ?? 0}`;
+
+/**
+ * Drops the cached auth snapshot of a user so the next request reads the user
+ * again (used when their active branch or assignments change).
+ */
+const invalidateAuthUserCache = async (userId) => {
+    if (!userId) return;
+    const { invalidateCache } = require('../utils/cacheInvalidation');
+    await invalidateCache(`auth:user:${userId}:*`);
+};
+
+// Platform-level super admin screens (companies, platform users, audit logs) are
+// not branch data, so they are the one place the branch scope is not applied.
+const isPlatformAdminRequest = (req) => /^\/api\/super-admin(\/|\?|$)/.test(req.originalUrl || '');
 
 exports.protect = async (req, res, next) => {
     let token;
@@ -40,13 +64,13 @@ exports.protect = async (req, res, next) => {
                 return res.status(401).json({ message: 'Not authorized, token revoked' });
             }
 
-            const cacheKey = `auth:user:${decoded.id}:v${decoded.tokenVersion ?? 0}`;
+            const cacheKey = authUserCacheKey(decoded.id, decoded.tokenVersion);
             const { redis, value: cachedUser } = await getCachedJson(cacheKey);
             let user = cachedUser;
 
             if (!user) {
                 user = await User.findById(decoded.id)
-                    .select('_id name email role tokenVersion companyId branchId assignedBranches status isActive vendorId customPermissions reportsTo')
+                    .select(AUTH_USER_FIELDS)
                     .lean();
                 if (user) {
                     await setCachedJson(redis, cacheKey, user, AUTH_USER_CACHE_TTL_SECONDS);
@@ -113,29 +137,57 @@ exports.protect = async (req, res, next) => {
                 reportsTo: user.reportsTo || null
             };
 
-            // Branch scoping: admins and super admins see every branch; everyone else is
-            // limited to the branches assigned to them, enforced for all queries by
-            // tenantPlugin so it cannot be bypassed by calling the API directly.
-            const { getScopedBranchIds } = require('../utils/accessControl');
-            const activeBranchHeader = req.headers['x-active-branch'] || req.headers['x-branch-id'] || req.query?.activeBranchId;
+            // ---- Active branch -------------------------------------------------
+            // The branch the UI shows in the header is sent on every request. It is
+            // validated against what this user may use; the branch persisted on the
+            // user is the fallback for clients that send no header (exports, API
+            // tools), so both always describe the same context.
+            const assignedBranchIds = getAssignedBranchIds(req.user);
+            const headerBranchId = normalizeBranchId(
+                req.headers['x-active-branch'] || req.headers['x-branch-id'] || req.query?.activeBranchId
+            );
+            const persistedBranchId = user.activeBranchId ? user.activeBranchId.toString() : null;
 
+            let activeBranchId = null;
+            if (headerBranchId) {
+                if (!(await canUseBranch(req.user, headerBranchId, resolvedCompanyId))) {
+                    return res.status(403).json({
+                        message: 'The selected active branch is not available for this user. Please select a branch again.',
+                        code: 'ACTIVE_BRANCH_INVALID'
+                    });
+                }
+                activeBranchId = headerBranchId;
+            } else if (persistedBranchId && await canUseBranch(req.user, persistedBranchId, resolvedCompanyId)) {
+                activeBranchId = persistedBranchId;
+            }
+
+            req.user.activeBranchId = activeBranchId;
+            // null = every branch of the company (admins without an assignment)
+            req.user.allowedBranchIds = assignedBranchIds.length > 0 ? assignedBranchIds : null;
+            req.activeBranchId = activeBranchId;
+
+            // Branch scoping, enforced for every query by tenantPlugin so it cannot be
+            // bypassed by calling the API directly:
+            //  - an active branch scopes everyone to that one branch, super admins included
+            //  - otherwise non-admins are limited to their assigned branches and
+            //    admins / super admins see every branch
             let branchIds = [];
             let branchScoped = false;
 
-            if (activeBranchHeader && activeBranchHeader !== 'all' && activeBranchHeader !== 'null' && activeBranchHeader !== 'undefined') {
+            if (activeBranchId) {
                 branchScoped = true;
-                branchIds = [activeBranchHeader.toString()];
+                branchIds = [activeBranchId];
             } else {
-                const isAdminRole = ['admin', 'company_admin'].includes(String(user.role || '').toLowerCase());
-                const userBranchIds = getScopedBranchIds(req.user);
-                branchScoped = !isSuperAdmin && !isAdminRole && userBranchIds.length > 0;
-                branchIds = userBranchIds;
+                branchScoped = !isBranchAdminRole(user.role) && assignedBranchIds.length > 0;
+                branchIds = assignedBranchIds;
             }
 
             runWithTenant(req.user.companyId, () => next(), {
                 bypassTenant: isSuperAdmin,
+                bypassBranch: isSuperAdmin && isPlatformAdminRequest(req),
                 branchScoped,
-                branchIds
+                branchIds,
+                activeBranchId
             });
         } catch (error) {
             if (error?.name === 'TokenExpiredError') {
@@ -173,5 +225,4 @@ exports.superAdmin = (req, res, next) => {
 };
 
 exports.isSuperAdminRole = isSuperAdminRole;
-
-
+exports.invalidateAuthUserCache = invalidateAuthUserCache;

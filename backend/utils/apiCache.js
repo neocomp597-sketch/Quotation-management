@@ -69,10 +69,14 @@ const hashValue = (value) => crypto
     .update(stableStringify(value))
     .digest('hex');
 
+// Cached lists are branch-filtered, so the active branch is part of the key:
+// switching the header from NASHIK to OTHER must never serve NASHIK's cached list.
+const getBranchCacheScope = (req) => `branch:${req.user?.activeBranchId || req.activeBranchId || 'all'}`;
+
 const getUserCacheScope = (req) => (
     req.user?.role === 'admin'
-        ? `tenant:${req.user?.companyId || 'unknown'}:admin`
-        : `tenant:${req.user?.companyId || 'unknown'}:user:${req.user?.id || 'anonymous'}`
+        ? `tenant:${req.user?.companyId || 'unknown'}:admin:${getBranchCacheScope(req)}`
+        : `tenant:${req.user?.companyId || 'unknown'}:user:${req.user?.id || 'anonymous'}:${getBranchCacheScope(req)}`
 );
 
 const makeCacheKey = (namespace, req, parts = {}) => (

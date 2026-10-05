@@ -205,7 +205,7 @@ exports.createTicket = async (req, res) => {
             ticketNo,
             companyId,
             createdBy: req.user?.id,
-            branchId: ticketBody.branchId || req.user?.branchId || null,
+            branchId: ticketBody.branchId || req.user?.activeBranchId || req.user?.branchId || null,
             pincode: cleanPincode,
             assignedSalespersonId: null, // Stop salesperson auto-assignment
             assignedEngineerId,

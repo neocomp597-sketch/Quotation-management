@@ -13,11 +13,24 @@ const isTenantBypassed = () => {
 };
 
 /**
+ * True when the current request must not be branch-filtered at all (platform
+ * level super admin screens, background jobs). Independent from the tenant
+ * bypass: a super admin bypasses the company filter but is still scoped to
+ * the branch they selected in the header.
+ */
+const isBranchBypassed = () => {
+    const store = tenantStorage.getStore();
+    return store ? Boolean(store.bypassBranch) : false;
+};
+
+/**
  * Branch scoping for the current request.
  *
- * Admins and super admins are not branch-scoped and see every branch. For anyone
- * else this returns the branches assigned to them, and models that carry a
- * `branchId` are filtered to those branches automatically (see tenantPlugin).
+ * When the user has picked an active branch (header / persisted on the user),
+ * this is exactly that one branch, for every role including super admin.
+ * Without an active branch, non-admin users are limited to their assigned
+ * branches and admins see every branch. Models that carry a `branchId` are
+ * filtered to these branches automatically (see tenantPlugin).
  * Returns null when the request is not branch-scoped.
  */
 const getScopedBranches = () => {
@@ -27,13 +40,22 @@ const getScopedBranches = () => {
     return Array.isArray(ids) && ids.length > 0 ? ids : null;
 };
 
-const runWithTenant = (companyId, callback, storeData = {}) => 
+/** The single branch selected for this request, or null. */
+const getActiveBranchId = () => {
+    const store = tenantStorage.getStore();
+    if (!store || !store.activeBranchId) return null;
+    return store.activeBranchId.toString();
+};
+
+const runWithTenant = (companyId, callback, storeData = {}) =>
     tenantStorage.run({ companyId, ...storeData }, callback);
 
 module.exports = {
     tenantStorage,
     getTenantId,
     isTenantBypassed,
+    isBranchBypassed,
     getScopedBranches,
+    getActiveBranchId,
     runWithTenant
 };
