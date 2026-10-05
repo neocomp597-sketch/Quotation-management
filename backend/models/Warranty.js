@@ -14,6 +14,8 @@ const WarrantySchema = new mongoose.Schema({
 });
 
 WarrantySchema.index({ customerId: 1, productId: 1 });
+// Branch that owns this record; copied from the ticket / customer on create and used for branch scoping (see tenantPlugin).
+WarrantySchema.add({ branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null, index: true } });
 WarrantySchema.plugin(tenantPlugin);
 
 module.exports = mongoose.model('Warranty', WarrantySchema);

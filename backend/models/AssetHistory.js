@@ -17,6 +17,8 @@ const AssetHistorySchema = new mongoose.Schema({
     returnDate: { type: Date },
     returnReason: { type: String, default: '' },
     location: { type: String, default: '' },
+    // Legacy: MGR 1-5 are no longer written here; reads derive them from `productId`
+    // (Product Master is the source of truth, see utils/productMgr.js).
     mgr1: { type: String, default: '' },
     mgr2: { type: String, default: '' },
     mgr3: { type: String, default: '' },
@@ -35,6 +37,8 @@ const AssetHistorySchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now }
 });
 
+// Branch that owns this record; filled from the active branch on create and used for branch scoping (see tenantPlugin).
+AssetHistorySchema.add({ branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null, index: true } });
 AssetHistorySchema.plugin(tenantPlugin);
 
 module.exports = mongoose.model('AssetHistory', AssetHistorySchema);

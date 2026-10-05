@@ -7,9 +7,11 @@ import Modal from './Modal';
 import { MdCheckCircle, MdNewReleases } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import FloatingNotepad from './FloatingNotepad';
+import { useAuth } from '../context/AuthContext';
 
 const Layout = ({ children }) => {
     const navigate = useNavigate();
+    const { activeBranchId } = useAuth();
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [footerPages, setFooterPages] = useState([
         { slug: 'privacy-policy', label: 'Privacy Policy' },
@@ -105,7 +107,9 @@ const Layout = ({ children }) => {
             <Header sidebarOpen={sidebarOpen} toggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
 
             <main className={`relative z-10 pt-28 pb-12 transition-all duration-300 min-h-[calc(100vh-8rem)] ${sidebarOpen ? 'md:ml-64' : 'md:ml-20'}`}>
-                <div className="px-4 md:px-8 w-full max-w-none">
+                {/* Keyed by the active branch: switching branch in the header remounts the
+                    page so every screen reloads its data in the new branch context. */}
+                <div className="px-4 md:px-8 w-full max-w-none" key={activeBranchId || 'all-branches'}>
                     {children}
                 </div>
             </main>

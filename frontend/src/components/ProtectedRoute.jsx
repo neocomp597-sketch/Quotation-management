@@ -2,8 +2,10 @@ import React from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
+const BRANCH_SELECT_PATH = '/select-branch';
+
 const ProtectedRoute = () => {
-    const { user, loading } = useAuth();
+    const { user, loading, needsBranchSelection } = useAuth();
     const location = useLocation();
 
     if (loading) {
@@ -17,6 +19,13 @@ const ProtectedRoute = () => {
         }
 
         return <Navigate to="/login" replace state={{ from: location }} />;
+    }
+
+    // Every branch-dependent screen needs an active branch. Until the user has
+    // picked one of their branches they only get the selection screen.
+    if (needsBranchSelection && location.pathname !== BRANCH_SELECT_PATH) {
+        const returnTo = `${location.pathname}${location.search}${location.hash}`;
+        return <Navigate to={BRANCH_SELECT_PATH} replace state={{ returnTo }} />;
     }
 
     return <Outlet />;

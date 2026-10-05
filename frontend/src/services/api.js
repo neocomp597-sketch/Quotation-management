@@ -89,12 +89,25 @@ api.interceptors.request.use((config) => {
   if (accessToken) {
     config.headers.Authorization = `Bearer ${accessToken}`;
   }
+  // The active branch travels with every request; the server validates it and
+  // scopes all branch-dependent queries to it. A header set explicitly by the
+  // caller (e.g. when switching branch) is kept.
   const activeBranchId = localStorage.getItem("activeBranchId");
-  if (activeBranchId) {
+  if (activeBranchId && !config.headers["x-active-branch"]) {
     config.headers["x-active-branch"] = activeBranchId;
   }
   return config;
 });
+
+const clearStoredActiveBranch = () => {
+  try {
+    localStorage.removeItem("activeBranchId");
+    localStorage.removeItem("activeBranch");
+    localStorage.removeItem("activeBranchName");
+  } catch {
+    // Ignore storage failures.
+  }
+};
 
 export const refreshAccessToken = async () => {
   if (!refreshPromise) {
@@ -131,6 +144,23 @@ api.interceptors.response.use(
     const isExpiredAuthError =
       error.response?.status === 401 &&
       /token expired|jwt expired|token failed|token invalid|no token|refresh token missing|refresh token invalid/i.test(message);
+
+    if (
+      error.response?.status === 403 &&
+      error.response?.data?.code === "ACTIVE_BRANCH_INVALID"
+    ) {
+      // The branch this session was working in is no longer available to the
+      // user. Drop it and make them pick again, so the header never claims a
+      // branch the server refuses to work in.
+      clearStoredActiveBranch();
+      if (
+        !originalRequest?.skipBranchRedirect &&
+        !["/select-branch", "/login"].includes(window.location.pathname)
+      ) {
+        window.location.assign("/select-branch");
+      }
+      return Promise.reject(error);
+    }
 
     if (
       error.response?.status === 403 &&
@@ -299,6 +329,15 @@ export const authService = {
   logoutAll: () => api.post("/auth/logout-all"),
   getMe: () => api.get("/auth/me"),
   changePassword: (data) => api.post("/auth/change-password", data),
+  // Branches this user may work in, plus the branch the server treats as active.
+  getBranchOptions: () => api.get("/auth/branches", { cache: false }),
+  // Persists the active branch server-side. The new branch is sent as the header
+  // too, so a stale branch in storage can never block the switch itself.
+  setActiveBranch: (branchId) =>
+    api.put("/auth/active-branch", { branchId }, {
+      headers: { "x-active-branch": branchId },
+      skipBranchRedirect: true,
+    }),
 };
 
 export const userService = {

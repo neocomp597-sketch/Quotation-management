@@ -733,6 +733,20 @@ exports.updateTicket = async (req, res) => {
             { new: true, runValidators: true }
         );
         if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
+
+        // Records that hang off the ticket live in the ticket's branch; keep them
+        // together when the ticket is moved to another branch.
+        const previousBranch = existingTicket.branchId ? existingTicket.branchId.toString() : null;
+        const nextBranch = ticket.branchId ? ticket.branchId.toString() : null;
+        if (ticketBody.branchId !== undefined && previousBranch !== nextBranch) {
+            const ServiceVisit = require('../models/ServiceVisit');
+            const CSMRcaReport = require('../models/CSMRcaReport');
+            await Promise.all([
+                ServiceVisit.updateMany({ ticketId: ticket._id, companyId }, { $set: { branchId: ticket.branchId || null } }).setOptions({ bypassBranch: true }),
+                CSMRcaReport.updateMany({ ticketNo: ticket.ticketNo, companyId }, { $set: { branchId: ticket.branchId || null } }),
+            ]);
+        }
+
         broadcastCrmUpdate('TICKET', 'UPDATE', ticket);
         res.json(ticket);
     } catch (error) {

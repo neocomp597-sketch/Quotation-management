@@ -13,6 +13,8 @@ const KnowledgeBaseSchema = new mongoose.Schema({
 
 KnowledgeBaseSchema.index({ category: 1 });
 KnowledgeBaseSchema.index({ title: 'text', content: 'text' });
+// Branch that owns this record; filled from the active branch on create and used for branch scoping (see tenantPlugin).
+KnowledgeBaseSchema.add({ branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null, index: true } });
 KnowledgeBaseSchema.plugin(tenantPlugin);
 
 module.exports = mongoose.model('KnowledgeBase', KnowledgeBaseSchema);

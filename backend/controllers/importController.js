@@ -3222,11 +3222,6 @@ const importAssets = async (req, res) => {
                 const location = pickFirstNonEmpty(row.Location, row.location, row.Branch, row.branch, defaultLocation);
                 const projectCode = getFlexibleRowValue(row, 'Project Code', 'ProjectCode', 'projectCode');
                 const projectName = getFlexibleRowValue(row, 'Project Name', 'ProjectName', 'projectName');
-                let mgr1 = '';
-                let mgr2 = '';
-                let mgr3 = '';
-                let mgr4 = '';
-                let mgr5 = '';
                 const rawIndicator = pickFirstNonEmpty(
                     row['Indicator_Field'], row.indicator_field, row.indicatorField, row.Indicator, row.indicator, ''
                 );
@@ -3247,19 +3242,11 @@ const importAssets = async (req, res) => {
                 // switchgear registers). Name matching is used only when no code is given.
                 // Products saved before tenancy carry no companyId and may be reused; another
                 // company's product is never borrowed just because the code matches.
-                const withMgrs = (query) => query
-                    .populate('mgr1', 'code description')
-                    .populate('mgr2', 'code description')
-                    .populate('mgr3', 'code description')
-                    .populate('mgr4', 'code description')
-                    .populate('mgr5', 'code description');
                 const legacyProductFilter = { $or: [{ companyId: null }, { companyId: { $exists: false } }] };
                 const findProductBy = async (field, value) => {
-                    let found = await withMgrs(Product.findOne({ ...companyFilter, [field]: buildExactRegex(value) }));
+                    let found = await Product.findOne({ ...companyFilter, [field]: buildExactRegex(value) });
                     if (!found && companyId) {
-                        found = await withMgrs(
-                            Product.findOne({ ...legacyProductFilter, [field]: buildExactRegex(value) }).setOptions({ bypassTenant: true })
-                        );
+                        found = await Product.findOne({ ...legacyProductFilter, [field]: buildExactRegex(value) }).setOptions({ bypassTenant: true });
                     }
                     return found;
                 };
@@ -3307,24 +3294,9 @@ const importAssets = async (req, res) => {
                         productName = product.productName || productName || productCode;
                     }
                 }
-
-                const formatMgrVal = (mgr) => {
-                    if (!mgr) return '';
-                    if (typeof mgr === 'string') return mgr;
-                    if (mgr.code && mgr.description && mgr.code.toLowerCase() !== mgr.description.toLowerCase()) {
-                        return `${mgr.code} - ${mgr.description}`;
-                    }
-                    return mgr.description || mgr.code || '';
-                };
-
-                // Automatically assign MGR 1 to MGR 5 from Product Master mapping
-                if (product) {
-                    if (product.mgr1) mgr1 = formatMgrVal(product.mgr1);
-                    if (product.mgr2) mgr2 = formatMgrVal(product.mgr2);
-                    if (product.mgr3) mgr3 = formatMgrVal(product.mgr3);
-                    if (product.mgr4) mgr4 = formatMgrVal(product.mgr4);
-                    if (product.mgr5) mgr5 = formatMgrVal(product.mgr5);
-                }
+                // MGR 1-5 are never copied onto the record. The Product Master is the source of
+                // truth and every read of an asset derives them from the linked product, so an
+                // MGR assigned or changed later shows on this record without re-uploading.
 
                 // Resolve customer from Customer Master using Customer Code or Customer Name
                 let customer = null;
@@ -3450,7 +3422,6 @@ const importAssets = async (req, res) => {
                         invoiceNumber: invoiceNumber || '',
                         saleDate: saleDate || new Date(),
                         location: location || '',
-                        mgr1, mgr2, mgr3, mgr4, mgr5,
                         indicatorField,
                         projectCode,
                         projectName,
@@ -3477,7 +3448,6 @@ const importAssets = async (req, res) => {
                         invoiceNumber: invoiceNumber || '',
                         saleDate: saleDate || new Date(),
                         location: location || '',
-                        mgr1, mgr2, mgr3, mgr4, mgr5,
                         indicatorField,
                         projectCode,
                         projectName,
@@ -3502,7 +3472,6 @@ const importAssets = async (req, res) => {
                         invoiceNumber: invoiceNumber || '',
                         saleDate: saleDate || (status === 'SOLD' ? new Date() : null),
                         location: location || '',
-                        mgr1, mgr2, mgr3, mgr4, mgr5,
                         indicatorField,
                         projectCode,
                         projectName,
@@ -3525,7 +3494,6 @@ const importAssets = async (req, res) => {
                         invoiceNumber: invoiceNumber || '',
                         saleDate: saleDate || (status === 'SOLD' ? new Date() : null),
                         location,
-                        mgr1, mgr2, mgr3, mgr4, mgr5,
                         indicatorField,
                         projectCode,
                         projectName,

@@ -20,7 +20,7 @@ const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const { login } = useAuth(); // Use Auth Context
+  const { login, setActiveBranch } = useAuth(); // Use Auth Context
 
   const { email, password } = formData;
 
@@ -74,7 +74,7 @@ const Login = () => {
 
       const assigned = session.user?.assignedBranches || [];
 
-      setTimeout(() => {
+      setTimeout(async () => {
         const storedReturnTo = sessionStorage.getItem("arcrm:returnTo");
         if (storedReturnTo) {
           sessionStorage.removeItem("arcrm:returnTo");
@@ -89,19 +89,23 @@ const Login = () => {
           ? storedReturnTo
           : location.state?.from?.pathname || fallbackTarget;
 
+        // Super admins and multi-branch users must pick the branch they will work
+        // in before anything else loads; a single-branch user gets it applied.
         if (isSuperAdmin || assigned.length > 1) {
           navigate("/select-branch", { state: { returnTo: target }, replace: true });
-        } else {
-          if (assigned.length === 1) {
-            const b = assigned[0];
-            const bId = b._id || b.id || b;
-            localStorage.setItem("activeBranchId", bId);
-            if (typeof b === "object") {
-              localStorage.setItem("activeBranch", JSON.stringify(b));
-            }
-          }
-          navigate(target, { replace: true });
+          return;
         }
+
+        if (assigned.length === 1) {
+          try {
+            await setActiveBranch(assigned[0]);
+          } catch (branchErr) {
+            console.warn("Could not apply the assigned branch:", branchErr);
+            navigate("/select-branch", { state: { returnTo: target }, replace: true });
+            return;
+          }
+        }
+        navigate(target, { replace: true });
       }, 800);
     } catch (err) {
       const errorMessage = err.response?.data?.message || "Login failed";

@@ -15,6 +15,8 @@ const CapaSchema = new mongoose.Schema({
 
 const CSMRcaReportSchema = new mongoose.Schema({
     companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company', required: false },
+    // Branch of the ticket this report belongs to; used for branch scoping in rcaReportController.
+    branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null, index: true },
     rcaNumber: { type: String, required: true },
     ticketNo: { type: String, default: '' },
     date: { type: Date, default: Date.now },

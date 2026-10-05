@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import React, { createContext, useCallback, useContext, useEffect, useState, useMemo } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useState, useMemo, useRef } from "react";
 import { useDispatch } from "react-redux";
 import { authService, authorizationService, setAccessToken, clearApiCache } from "../services/api";
 import { MENU_PERMISSION_GROUPS } from "../constants/menuPermissions";
@@ -18,6 +18,13 @@ const normalizeUser = (userData) => {
     };
 };
 
+/** Id of a branch given as an object or as a bare id. */
+const branchIdOf = (branch) => {
+    if (!branch) return null;
+    if (typeof branch === "object") return branch._id || branch.id || null;
+    return String(branch);
+};
+
 const readStoredUser = () => {
     try {
         const raw = localStorage.getItem("user");
@@ -30,6 +37,15 @@ const readStoredUser = () => {
 const readStoredAccessToken = () => {
     try {
         return localStorage.getItem("accessToken") || null;
+    } catch {
+        return null;
+    }
+};
+
+const readStoredActiveBranch = () => {
+    try {
+        const raw = localStorage.getItem("activeBranch");
+        return raw ? JSON.parse(raw) : null;
     } catch {
         return null;
     }
@@ -70,51 +86,94 @@ export const AuthProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
 
     const [activeBranchId, setActiveBranchIdState] = useState(() => localStorage.getItem("activeBranchId") || null);
-    const [activeBranch, setActiveBranchState] = useState(() => {
-        try {
-            const raw = localStorage.getItem("activeBranch");
-            return raw ? JSON.parse(raw) : null;
-        } catch {
-            return null;
-        }
-    });
+    const [activeBranch, setActiveBranchState] = useState(() => readStoredActiveBranch());
+    const autoSelectingBranch = useRef(false);
 
-    const setActiveBranch = useCallback((branchOrId) => {
-        if (!branchOrId) {
+    /**
+     * Local half of the active branch: state + storage. The storage value is what
+     * the API client sends as x-active-branch on every request, so this and the
+     * header can never disagree.
+     */
+    const storeActiveBranch = useCallback((branchOrId) => {
+        const id = branchIdOf(branchOrId);
+        if (!id) {
             setActiveBranchIdState(null);
             setActiveBranchState(null);
             localStorage.removeItem("activeBranchId");
             localStorage.removeItem("activeBranch");
+            localStorage.removeItem("activeBranchName");
             return;
         }
 
+        setActiveBranchIdState(id);
+        localStorage.setItem("activeBranchId", id);
+
         if (typeof branchOrId === "object") {
-            const id = branchOrId._id || branchOrId.id;
-            setActiveBranchIdState(id);
             setActiveBranchState(branchOrId);
-            localStorage.setItem("activeBranchId", id);
             localStorage.setItem("activeBranch", JSON.stringify(branchOrId));
+            if (branchOrId.name) {
+                localStorage.setItem("activeBranchName", branchOrId.name);
+            }
         } else {
-            setActiveBranchIdState(branchOrId);
-            localStorage.setItem("activeBranchId", branchOrId);
+            setActiveBranchState((prev) => (branchIdOf(prev) === id ? prev : null));
+            if (branchIdOf(readStoredActiveBranch()) !== id) {
+                localStorage.removeItem("activeBranch");
+                localStorage.removeItem("activeBranchName");
+            }
+        }
+    }, []);
+
+    /**
+     * Switches the branch the user works in. The branch is persisted on the server
+     * first (which also validates it), so the backend operates in the same branch
+     * the header shows. Cached lists are dropped and branch-dependent screens are
+     * notified so they reload. Throws when the server rejects the branch.
+     */
+    const setActiveBranch = useCallback(async (branchOrId, { persist = true } = {}) => {
+        const id = branchIdOf(branchOrId);
+        if (!id) {
+            storeActiveBranch(null);
+            clearApiCache();
+            return null;
         }
 
-        window.dispatchEvent(new CustomEvent('onActiveBranchChange', { detail: { branchId: typeof branchOrId === "object" ? branchOrId._id : branchOrId } }));
+        let branch = typeof branchOrId === "object" ? branchOrId : null;
+        if (persist) {
+            const res = await authService.setActiveBranch(id);
+            branch = res.data?.activeBranch || branch;
+        }
+
+        storeActiveBranch(branch || id);
+        clearApiCache(); // lists cached for the previous branch must not survive the switch
+
+        window.dispatchEvent(new CustomEvent('onActiveBranchChange', { detail: { branchId: id, branch } }));
         window.dispatchEvent(new CustomEvent('onCrmSocketUpdate', { detail: { entity: 'BRANCH', action: 'BRANCH_SWITCH' } }));
-    }, []);
+        return branch || id;
+    }, [storeActiveBranch]);
+
+    /**
+     * Adopts the branch the server has persisted for the user when this browser has
+     * none yet (new device, cleared storage). When storage already holds a branch it
+     * wins: it is what the header shows and what every request has been sent with.
+     */
+    const syncActiveBranchFromSession = useCallback((sessionUser) => {
+        if (!sessionUser) return;
+        const serverBranchId = sessionUser.activeBranchId ? String(sessionUser.activeBranchId) : null;
+        const localBranchId = localStorage.getItem("activeBranchId");
+        if (!localBranchId && serverBranchId) {
+            storeActiveBranch(sessionUser.activeBranch || serverBranchId);
+        }
+    }, [storeActiveBranch]);
 
     const clearSession = useCallback(() => {
         clearApiCache(); // never let the next user see this session's cached data
         setAccessToken(null);
         localStorage.removeItem("user");
-        localStorage.removeItem("activeBranchId");
-        localStorage.removeItem("activeBranch");
+        storeActiveBranch(null);
         setUser(null);
-        setActiveBranchIdState(null);
-        setActiveBranchState(null);
         setPermissions({});
         dispatch(clearCredentials());
-    }, [dispatch]);
+    }, [dispatch, storeActiveBranch]);
 
     const refreshSession = useCallback(async () => {
         setLoading(true);
@@ -126,6 +185,7 @@ export const AuthProvider = ({ children }) => {
             setAccessToken(session.accessToken);
             localStorage.setItem("user", JSON.stringify(nextUser));
             setUser(nextUser);
+            syncActiveBranchFromSession(nextUser);
 
             // Fetch permissions separately so a failure here
             // doesn't wipe the authenticated session.
@@ -144,7 +204,7 @@ export const AuthProvider = ({ children }) => {
                 user: nextUser,
                 permissions: nextPermissions,
             };
-        } catch (error) {
+        } catch {
             if (!readStoredUser()) {
                 clearSession();
             }
@@ -152,7 +212,7 @@ export const AuthProvider = ({ children }) => {
         } finally {
             setLoading(false);
         }
-    }, [clearSession, dispatch]);
+    }, [clearSession, dispatch, syncActiveBranchFromSession]);
 
     const bootstrapFromStoredSession = useCallback(async () => {
         const storedUser = readStoredUser();
@@ -161,6 +221,7 @@ export const AuthProvider = ({ children }) => {
         if (storedUser && storedToken && isTokenValidForBoot(storedToken)) {
             setAccessToken(storedToken);
             setUser(storedUser);
+            syncActiveBranchFromSession(storedUser);
 
             let nextPermissions = {};
             try {
@@ -177,7 +238,7 @@ export const AuthProvider = ({ children }) => {
         }
 
         await refreshSession();
-    }, [dispatch, refreshSession]);
+    }, [dispatch, refreshSession, syncActiveBranchFromSession]);
 
     useEffect(() => {
         bootstrapFromStoredSession();
@@ -188,6 +249,11 @@ export const AuthProvider = ({ children }) => {
             ? { accessToken: sessionOrToken, user: maybeUserData }
             : sessionOrToken;
         const normalizedUser = normalizeUser(session?.user);
+
+        // A branch left behind by a previous session belongs to that session. Every
+        // login starts without one; the login flow then selects (or asks for) it.
+        clearApiCache();
+        storeActiveBranch(null);
 
         setAccessToken(session?.accessToken);
         localStorage.setItem("user", JSON.stringify(normalizedUser));
@@ -204,7 +270,7 @@ export const AuthProvider = ({ children }) => {
         window.dispatchEvent(new CustomEvent('onCrmSocketUpdate', { detail: { entity: 'SYSTEM', action: 'LOGIN_REFRESH' } }));
 
         return { user: normalizedUser, permissions: nextPermissions };
-    }, [dispatch]);
+    }, [dispatch, storeActiveBranch]);
 
     const logout = useCallback(async () => {
         try {
@@ -303,6 +369,10 @@ export const AuthProvider = ({ children }) => {
         });
     }, []);
 
+    /**
+     * Branches the user may work in. The server fills this with the user's
+     * assignment, or with every company branch for admins without one.
+     */
     const assignedBranches = useMemo(() => {
         if (!user) return [];
         if (Array.isArray(user.assignedBranches) && user.assignedBranches.length > 0) {
@@ -313,6 +383,27 @@ export const AuthProvider = ({ children }) => {
         }
         return [];
     }, [user]);
+
+    /**
+     * True while a logged-in user who has branches to choose from has not picked one
+     * (or holds a branch that is no longer in their list). ProtectedRoute sends them
+     * to the selection screen before any branch-dependent page renders.
+     */
+    const needsBranchSelection = useMemo(() => {
+        if (!user || assignedBranches.length === 0) return false;
+        if (!activeBranchId) return true;
+        const allowedIds = assignedBranches.map(branchIdOf).filter(Boolean).map(String);
+        return allowedIds.length > 0 && !allowedIds.includes(String(activeBranchId));
+    }, [user, assignedBranches, activeBranchId]);
+
+    // A user with exactly one branch has nothing to choose: apply it without a screen.
+    useEffect(() => {
+        if (loading || !needsBranchSelection || assignedBranches.length !== 1 || autoSelectingBranch.current) return;
+        autoSelectingBranch.current = true;
+        setActiveBranch(assignedBranches[0])
+            .catch((err) => console.warn("Could not apply the user's only branch:", err))
+            .finally(() => { autoSelectingBranch.current = false; });
+    }, [loading, needsBranchSelection, assignedBranches, setActiveBranch]);
 
     return (
         <AuthContext.Provider
@@ -329,6 +420,7 @@ export const AuthProvider = ({ children }) => {
                 activeBranchId,
                 setActiveBranch,
                 assignedBranches,
+                needsBranchSelection,
                 isAdmin: user?.role === "admin" || user?.role === "Admin",
                 isSuperAdmin: user?.role === "SUPER_ADMIN" || user?.role === "super_admin",
             }}

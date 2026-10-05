@@ -45,7 +45,9 @@ exports.createVisit = async (req, res) => {
             ...req.body,
             visitNo,
             companyId,
-            status: 'Scheduled'
+            status: 'Scheduled',
+            // A visit belongs to its ticket's branch, so it is only visible where the ticket is.
+            branchId: ticket.branchId || req.user?.activeBranchId || null
         };
 
         const visit = await ServiceVisit.create(visitData);

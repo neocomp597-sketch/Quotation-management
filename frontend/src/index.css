@@ -673,6 +673,14 @@ html.dark table td {
   border-color: #1e293b !important;
 }
 
+/* The Why-Why Analysis Sheet (RCA report) is a printed form: its rules stay black in
+   both themes, on screen, in print and in the PDF, instead of the soft table borders
+   above. */
+#rca-document-sheet table td,
+#rca-document-sheet table th {
+  border-color: #000000 !important;
+}
+
 html.dark table tr:hover {
   background-color: #1e293b !important;
 }

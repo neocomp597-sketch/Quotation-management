@@ -14,6 +14,8 @@ const AMCSchema = new mongoose.Schema({
 });
 
 AMCSchema.index({ customerId: 1, status: 1 });
+// Branch that owns this record; copied from the ticket / customer on create and used for branch scoping (see tenantPlugin).
+AMCSchema.add({ branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null, index: true } });
 AMCSchema.plugin(tenantPlugin);
 
 module.exports = mongoose.model('AMC', AMCSchema);

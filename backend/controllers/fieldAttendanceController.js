@@ -1,6 +1,7 @@
 const FieldAttendance = require('../models/FieldAttendance');
 const Company = require('../models/Company');
 const User = require('../models/User');
+const { scopedBranchCondition } = require('../utils/branchScope');
 
 // Start of day helper
 const getStartOfDay = (date = new Date()) => {
@@ -64,6 +65,8 @@ exports.checkIn = async (req, res) => {
 
         const newAttendance = await FieldAttendance.create({
             companyId: companyId || null,
+            // The check-in belongs to the branch the engineer is working in.
+            branchId: req.user?.activeBranchId || null,
             engineerId: engineerId || null,
             employeeName,
             attendanceDate: todayStart,
@@ -155,8 +158,16 @@ exports.checkOut = async (req, res) => {
 exports.getAttendance = async (req, res) => {
     try {
         const companyId = await resolveCompanyId(req);
+        const { engineerId, date } = req.query;
         const userRole = String(req.user?.role || '').toLowerCase();
         const isAdmin = userRole === 'admin' || userRole === 'super_admin' || userRole === 'superadmin';
+
+        const filter = {};
+        if (companyId) filter.companyId = companyId;
+
+        // FieldAttendance is not run through tenantPlugin, so the active branch is applied here.
+        const branchCondition = scopedBranchCondition();
+        if (branchCondition) Object.assign(filter, branchCondition);
 
         if (!isAdmin) {
             // Non-admin users are strictly restricted to their own attendance records

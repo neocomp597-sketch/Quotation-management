@@ -6,6 +6,7 @@ const Product = require('../models/Product');
 const Customer = require('../models/Customer');
 const RolePermission = require('../models/RolePermission');
 const mongoose = require('mongoose');
+const { productMgrPopulate, applyProductMgrs, applyProductMgrsToAll, stripMgrFields } = require('../utils/productMgr');
 
 // Utility for regex matching
 const buildExactRegex = (str) => {
@@ -21,10 +22,23 @@ const isValidObjectId = (id) => {
     return mongoose.Types.ObjectId.isValid(str) && /^[0-9a-fA-F]{24}$/.test(str);
 };
 
+/**
+ * Warranties and AMCs belong to the branch of their customer; when the customer has
+ * none they belong to the branch the user is working in.
+ */
+const resolveEntitlementBranch = async (customerId, req) => {
+    if (isValidObjectId(customerId)) {
+        const customer = await Customer.findById(customerId).select('branchId').setOptions({ bypassTenant: true }).lean();
+        if (customer?.branchId) return customer.branchId;
+    }
+    return req.user?.activeBranchId || null;
+};
+
 // Warranty CRUD
 exports.createWarranty = async (req, res) => {
     try {
-        const doc = await Warranty.create({ ...req.body, companyId: req.user?.companyId });
+        const branchId = req.body.branchId || await resolveEntitlementBranch(req.body.customerId, req);
+        const doc = await Warranty.create({ ...req.body, branchId, companyId: req.user?.companyId });
         res.status(201).json(doc);
     } catch (error) {
         res.status(400).json({ message: error.message });
@@ -48,7 +62,8 @@ exports.getWarranties = async (req, res) => {
 // AMC CRUD
 exports.createAmc = async (req, res) => {
     try {
-        const doc = await AMC.create({ ...req.body, companyId: req.user?.companyId });
+        const branchId = req.body.branchId || await resolveEntitlementBranch(req.body.customerId, req);
+        const doc = await AMC.create({ ...req.body, branchId, companyId: req.user?.companyId });
         res.status(201).json(doc);
     } catch (error) {
         res.status(400).json({ message: error.message });
@@ -146,7 +161,8 @@ exports.createAsset = async (req, res) => {
                 return res.status(400).json({ message: `Duplicate entry: Serial Number (${cleanSN}) already exists in the system. Serial Numbers must be unique.` });
             }
         }
-        const doc = await Asset.create({ ...req.body, companyId: req.user?.companyId });
+        const branchId = req.body.branchId || await resolveEntitlementBranch(req.body.customerId, req);
+        const doc = await Asset.create({ ...stripMgrFields(req.body), branchId, companyId: req.user?.companyId });
         res.status(201).json(doc);
     } catch (error) {
         res.status(400).json({ message: error.message });
@@ -170,11 +186,6 @@ exports.createSingleAsset = async (req, res) => {
             invoiceNumber = '',
             saleDate,
             location = '',
-            mgr1 = '',
-            mgr2 = '',
-            mgr3 = '',
-            mgr4 = '',
-            mgr5 = '',
             indicatorField = ''
         } = req.body;
 
@@ -198,42 +209,22 @@ exports.createSingleAsset = async (req, res) => {
         let product = await Product.findOne({
             companyId,
             productCode: buildExactRegex(cleanProductCode)
-        })
-        .populate('mgr1', 'code description')
-        .populate('mgr2', 'code description')
-        .populate('mgr3', 'code description')
-        .populate('mgr4', 'code description')
-        .populate('mgr5', 'code description');
+        });
 
         if (!product && productName) {
             product = await Product.findOne({
                 companyId,
                 productName: buildExactRegex(productName)
-            })
-            .populate('mgr1', 'code description')
-            .populate('mgr2', 'code description')
-            .populate('mgr3', 'code description')
-            .populate('mgr4', 'code description')
-            .populate('mgr5', 'code description');
+            });
         }
 
         if (!product && cleanProductCode) {
             product = await Product.findOne({ productCode: buildExactRegex(cleanProductCode) })
-                .setOptions({ bypassTenant: true })
-                .populate('mgr1', 'code description')
-                .populate('mgr2', 'code description')
-                .populate('mgr3', 'code description')
-                .populate('mgr4', 'code description')
-                .populate('mgr5', 'code description');
+                .setOptions({ bypassTenant: true });
         }
         if (!product && productName) {
             product = await Product.findOne({ productName: buildExactRegex(productName) })
-                .setOptions({ bypassTenant: true })
-                .populate('mgr1', 'code description')
-                .populate('mgr2', 'code description')
-                .populate('mgr3', 'code description')
-                .populate('mgr4', 'code description')
-                .populate('mgr5', 'code description');
+                .setOptions({ bypassTenant: true });
         }
 
         if (!product) {
@@ -251,33 +242,13 @@ exports.createSingleAsset = async (req, res) => {
                 });
             } catch (createErr) {
                 product = await Product.findOne({ productCode: buildExactRegex(cleanProductCode) })
-                    .setOptions({ bypassTenant: true })
-                    .populate('mgr1', 'code description')
-                    .populate('mgr2', 'code description')
-                    .populate('mgr3', 'code description')
-                    .populate('mgr4', 'code description')
-                    .populate('mgr5', 'code description');
+                    .setOptions({ bypassTenant: true });
                 if (!product) {
                     throw createErr;
                 }
             }
         }
-
-        const formatMgrVal = (mgr) => {
-            if (!mgr) return '';
-            if (typeof mgr === 'string') return mgr;
-            if (mgr.code && mgr.description && mgr.code.toLowerCase() !== mgr.description.toLowerCase()) {
-                return `${mgr.code} - ${mgr.description}`;
-            }
-            return mgr.description || mgr.code || '';
-        };
-
-        // Auto-fill Mgr 1 to Mgr 5 from Product Master if not explicitly provided
-        const finalMgr1 = mgr1 || (product ? formatMgrVal(product.mgr1) : '');
-        const finalMgr2 = mgr2 || (product ? formatMgrVal(product.mgr2) : '');
-        const finalMgr3 = mgr3 || (product ? formatMgrVal(product.mgr3) : '');
-        const finalMgr4 = mgr4 || (product ? formatMgrVal(product.mgr4) : '');
-        const finalMgr5 = mgr5 || (product ? formatMgrVal(product.mgr5) : '');
+        // MGR 1-5 are not stored on the asset: every read derives them from the Product Master.
 
         // Resolve customer from Customer Master using Customer Code or Customer Name
         let customer = null;
@@ -358,20 +329,18 @@ exports.createSingleAsset = async (req, res) => {
                 invoiceNumber,
                 saleDate: saleDate ? new Date(saleDate) : (status === 'SOLD' ? new Date() : null),
                 location,
-                mgr1: finalMgr1,
-                mgr2: finalMgr2,
-                mgr3: finalMgr3,
-                mgr4: finalMgr4,
-                mgr5: finalMgr5,
                 indicatorField: cleanIndicator,
                 returnReason: '',
-                returnedAt: null
+                returnedAt: null,
+                // A re-sold serial moves to the new customer's branch (else the active branch).
+                branchId: customer?.branchId || matchedReturnedAsset.branchId || req.user?.activeBranchId || null
             };
 
             await Asset.findByIdAndUpdate(matchedReturnedAsset._id, updatePayload);
 
             await AssetHistory.create({
                 companyId,
+                branchId: updatePayload.branchId,
                 assetId: matchedReturnedAsset._id,
                 serialNumber: cleanSN,
                 productCode: product.productCode,
@@ -385,18 +354,15 @@ exports.createSingleAsset = async (req, res) => {
                 invoiceNumber,
                 saleDate: saleDate ? new Date(saleDate) : (status === 'SOLD' ? new Date() : null),
                 location,
-                mgr1: finalMgr1,
-                mgr2: finalMgr2,
-                mgr3: finalMgr3,
-                mgr4: finalMgr4,
-                mgr5: finalMgr5,
                 indicatorField: cleanIndicator,
                 transactionType: 'SINGLE_ENTRY_RESELL',
                 status: status === 'RETURN' ? 'SOLD' : status,
                 createdBy: req.user?.id || null
             });
 
-            const updatedDoc = await Asset.findById(matchedReturnedAsset._id).populate('customerId').populate('productId');
+            const updatedDoc = applyProductMgrs(
+                await Asset.findById(matchedReturnedAsset._id).populate('customerId').populate(productMgrPopulate()).lean()
+            );
             return res.status(200).json({
                 message: 'Serial asset entry updated successfully (Re-use of returned serial)',
                 data: updatedDoc
@@ -406,6 +372,8 @@ exports.createSingleAsset = async (req, res) => {
         // Case 1 / Case 3: Create new asset entry
         const newAsset = await Asset.create({
             companyId,
+            // An asset belongs to its customer's branch, else to the branch being worked in.
+            branchId: customer?.branchId || req.user?.activeBranchId || null,
             productId: product._id,
             productCode: product.productCode || cleanProductCode || '',
             productName: product.productName || productName || cleanProductCode || '',
@@ -419,17 +387,13 @@ exports.createSingleAsset = async (req, res) => {
             invoiceNumber,
             saleDate: saleDate ? new Date(saleDate) : (status === 'SOLD' ? new Date() : null),
             location,
-            mgr1: finalMgr1,
-            mgr2: finalMgr2,
-            mgr3: finalMgr3,
-            mgr4: finalMgr4,
-            mgr5: finalMgr5,
             indicatorField: cleanIndicator,
             createdBy: req.user?.id || null
         });
 
         await AssetHistory.create({
             companyId,
+            branchId: newAsset.branchId || null,
             assetId: newAsset._id,
             serialNumber: cleanSN,
             productCode: product.productCode,
@@ -443,18 +407,15 @@ exports.createSingleAsset = async (req, res) => {
             invoiceNumber,
             saleDate: saleDate ? new Date(saleDate) : (status === 'SOLD' ? new Date() : null),
             location,
-            mgr1: finalMgr1,
-            mgr2: finalMgr2,
-            mgr3: finalMgr3,
-            mgr4: finalMgr4,
-            mgr5: finalMgr5,
             indicatorField: cleanIndicator,
             transactionType: 'SINGLE_ENTRY',
             status,
             createdBy: req.user?.id || null
         });
 
-        const createdDoc = await Asset.findById(newAsset._id).populate('customerId').populate('productId');
+        const createdDoc = applyProductMgrs(
+            await Asset.findById(newAsset._id).populate('customerId').populate(productMgrPopulate()).lean()
+        );
         res.status(201).json({ message: 'Single entry added successfully', data: createdDoc });
     } catch (error) {
         console.error('createSingleAsset error:', error);
@@ -490,6 +451,7 @@ exports.returnAsset = async (req, res) => {
         // Create transaction history record for RETURN
         await AssetHistory.create({
             companyId,
+            branchId: asset.branchId || null,
             assetId: asset._id,
             serialNumber: asset.serialNumber,
             productCode: asset.productId?.productCode || '',
@@ -503,11 +465,6 @@ exports.returnAsset = async (req, res) => {
             returnDate: now,
             returnReason: cleanReason,
             location: asset.location || '',
-            mgr1: asset.mgr1 || '',
-            mgr2: asset.mgr2 || '',
-            mgr3: asset.mgr3 || '',
-            mgr4: asset.mgr4 || '',
-            mgr5: asset.mgr5 || '',
             indicatorField: asset.indicatorField || '',
             transactionType: 'RETURN',
             status: 'RETURN',
@@ -534,22 +491,11 @@ exports.getReturnHistory = async (req, res) => {
             ]
         })
         .populate({ path: 'customerId', select: 'customerName companyName externalCode pincode mobile', options: { bypassTenant: true } })
-        .populate({
-            path: 'productId',
-            select: 'productName productCode mgr1 mgr2 mgr3 mgr4 mgr5',
-            options: { bypassTenant: true },
-            populate: [
-                { path: 'mgr1', select: 'code description', options: { bypassTenant: true } },
-                { path: 'mgr2', select: 'code description', options: { bypassTenant: true } },
-                { path: 'mgr3', select: 'code description', options: { bypassTenant: true } },
-                { path: 'mgr4', select: 'code description', options: { bypassTenant: true } },
-                { path: 'mgr5', select: 'code description', options: { bypassTenant: true } }
-            ]
-        })
+        .populate(productMgrPopulate())
         .sort({ returnDate: -1, createdAt: -1 })
         .lean();
 
-        res.json(historyDocs);
+        res.json(applyProductMgrsToAll(historyDocs));
     } catch (error) {
         console.error('getReturnHistory error:', error);
         res.status(500).json({ message: error.message || 'Error fetching return history' });
@@ -598,22 +544,11 @@ exports.getAssets = async (req, res) => {
 
         const docs = await Asset.find(filter)
             .populate({ path: 'customerId', select: 'customerName companyName externalCode billingAddress pincode mobile', options: { bypassTenant: true } })
-            .populate({
-                path: 'productId',
-                select: 'productName productCode mgr1 mgr2 mgr3 mgr4 mgr5',
-                options: { bypassTenant: true },
-                populate: [
-                    { path: 'mgr1', select: 'code description', options: { bypassTenant: true } },
-                    { path: 'mgr2', select: 'code description', options: { bypassTenant: true } },
-                    { path: 'mgr3', select: 'code description', options: { bypassTenant: true } },
-                    { path: 'mgr4', select: 'code description', options: { bypassTenant: true } },
-                    { path: 'mgr5', select: 'code description', options: { bypassTenant: true } }
-                ]
-            })
+            .populate(productMgrPopulate())
             .sort({ createdAt: -1 })
             .lean();
 
-        res.json(docs);
+        res.json(applyProductMgrsToAll(docs));
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
@@ -631,18 +566,7 @@ exports.getAssetSummary = async (req, res) => {
         if (assetId && isValidObjectId(assetId)) {
             asset = await Asset.findOne({ _id: assetId, companyId })
                 .populate({ path: 'customerId', select: 'customerName companyName gstin billingAddress mobile email', options: { bypassTenant: true } })
-                .populate({
-                    path: 'productId',
-                    select: 'productName productCode basePrice mrp catalogType mgr1 mgr2 mgr3 mgr4 mgr5',
-                    options: { bypassTenant: true },
-                    populate: [
-                        { path: 'mgr1', select: 'code description', options: { bypassTenant: true } },
-                        { path: 'mgr2', select: 'code description', options: { bypassTenant: true } },
-                        { path: 'mgr3', select: 'code description', options: { bypassTenant: true } },
-                        { path: 'mgr4', select: 'code description', options: { bypassTenant: true } },
-                        { path: 'mgr5', select: 'code description', options: { bypassTenant: true } }
-                    ]
-                })
+                .populate(productMgrPopulate('basePrice mrp catalogType'))
                 .populate('invoiceId', 'voucherNumber date')
                 .lean();
         } else if (serialNumber) {
@@ -653,18 +577,7 @@ exports.getAssetSummary = async (req, res) => {
 
             let matches = await Asset.find(assetQuery)
             .populate({ path: 'customerId', select: 'customerName companyName gstin billingAddress mobile email', options: { bypassTenant: true } })
-            .populate({
-                path: 'productId',
-                select: 'productName productCode basePrice mrp catalogType mgr1 mgr2 mgr3 mgr4 mgr5',
-                options: { bypassTenant: true },
-                populate: [
-                    { path: 'mgr1', select: 'code description', options: { bypassTenant: true } },
-                    { path: 'mgr2', select: 'code description', options: { bypassTenant: true } },
-                    { path: 'mgr3', select: 'code description', options: { bypassTenant: true } },
-                    { path: 'mgr4', select: 'code description', options: { bypassTenant: true } },
-                    { path: 'mgr5', select: 'code description', options: { bypassTenant: true } }
-                ]
-            })
+            .populate(productMgrPopulate('basePrice mrp catalogType'))
             .populate('invoiceId', 'voucherNumber date')
             .lean();
 
@@ -673,18 +586,7 @@ exports.getAssetSummary = async (req, res) => {
                 matches = await Asset.find({ serialNumber: { $regex: new RegExp("^" + escapedSN + "$", "i") } })
                 .setOptions({ bypassTenant: true })
                 .populate({ path: 'customerId', select: 'customerName companyName gstin billingAddress mobile email', options: { bypassTenant: true } })
-                .populate({
-                    path: 'productId',
-                    select: 'productName productCode basePrice mrp catalogType mgr1 mgr2 mgr3 mgr4 mgr5',
-                    options: { bypassTenant: true },
-                    populate: [
-                        { path: 'mgr1', select: 'code description', options: { bypassTenant: true } },
-                        { path: 'mgr2', select: 'code description', options: { bypassTenant: true } },
-                        { path: 'mgr3', select: 'code description', options: { bypassTenant: true } },
-                        { path: 'mgr4', select: 'code description', options: { bypassTenant: true } },
-                        { path: 'mgr5', select: 'code description', options: { bypassTenant: true } }
-                    ]
-                })
+                .populate(productMgrPopulate('basePrice mrp catalogType'))
                 .populate('invoiceId', 'voucherNumber date')
                 .lean();
             }
@@ -729,7 +631,7 @@ exports.getAssetSummary = async (req, res) => {
                 let historyDoc = await AssetHistory.findOne(historyQuery)
                 .sort({ createdAt: -1 })
                 .populate('customerId', 'customerName companyName gstin billingAddress mobile email')
-                .populate('productId', 'productName productCode basePrice mrp catalogType')
+                .populate(productMgrPopulate('basePrice mrp catalogType'))
                 .lean();
 
                 if (!historyDoc && companyId) {
@@ -737,7 +639,7 @@ exports.getAssetSummary = async (req, res) => {
                     .setOptions({ bypassTenant: true })
                     .sort({ createdAt: -1 })
                     .populate('customerId', 'customerName companyName gstin billingAddress mobile email')
-                    .populate('productId', 'productName productCode basePrice mrp catalogType')
+                    .populate(productMgrPopulate('basePrice mrp catalogType'))
                     .lean();
                 }
 
@@ -852,6 +754,9 @@ exports.getAssetSummary = async (req, res) => {
             serialNumber: buildExactRegex(asset.serialNumber)
         }).sort({ createdAt: -1 }).lean();
 
+        // MGR 1-5 always reflect the current Product Master assignment.
+        applyProductMgrs(asset);
+
         res.json({
             asset,
             warranty,
@@ -890,7 +795,7 @@ exports.searchSerialNumbers = async (req, res) => {
         .sort({ createdAt: -1, serialNumber: 1 })
         .limit(100)
         .populate({ path: 'customerId', select: 'customerName companyName billingAddress mobile email gstin', options: { bypassTenant: true } })
-        .populate({ path: 'productId', select: 'productName productCode basePrice mrp', options: { bypassTenant: true } })
+        .populate(productMgrPopulate('basePrice mrp'))
         .populate('invoiceId', 'voucherNumber date')
         .lean();
 
@@ -902,7 +807,7 @@ exports.searchSerialNumbers = async (req, res) => {
         .sort({ createdAt: -1 })
         .limit(100)
         .populate({ path: 'customerId', select: 'customerName companyName billingAddress mobile email gstin', options: { bypassTenant: true } })
-        .populate({ path: 'productId', select: 'productName productCode basePrice mrp', options: { bypassTenant: true } })
+        .populate(productMgrPopulate('basePrice mrp'))
         .lean();
 
         const combinedResults = [];
@@ -925,6 +830,7 @@ exports.searchSerialNumbers = async (req, res) => {
 
         // Add active assets from Invoice Bulk Upload
         for (const a of assets) {
+            applyProductMgrs(a);
             const cleanSN = String(a.serialNumber || '').trim().toLowerCase();
             const snKey = buildSNKey(
                 a.serialNumber,
@@ -960,6 +866,7 @@ exports.searchSerialNumbers = async (req, res) => {
 
         // Add historical records if not already in active list
         for (const h of historyDocs) {
+            applyProductMgrs(h);
             const cleanSN = String(h.serialNumber || '').trim().toLowerCase();
             const snKey = buildSNKey(
                 h.serialNumber,

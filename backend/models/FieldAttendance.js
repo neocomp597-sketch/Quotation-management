@@ -6,6 +6,13 @@ const fieldAttendanceSchema = new mongoose.Schema({
         ref: 'Company',
         index: true
     },
+    // Branch the engineer was working in when checking in; used for branch scoping in fieldAttendanceController.
+    branchId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Branch',
+        default: null,
+        index: true
+    },
     engineerId: {
         type: mongoose.Schema.Types.Mixed,
         ref: 'User',

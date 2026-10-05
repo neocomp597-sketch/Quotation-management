@@ -21,5 +21,7 @@ const NotificationSchema = new mongoose.Schema({
 });
 
 const tenantPlugin = require('./plugins/tenantPlugin');
+// Branch that owns this record; filled from the active branch on create and used for branch scoping (see tenantPlugin).
+NotificationSchema.add({ branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null, index: true } });
 NotificationSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('Notification', NotificationSchema);

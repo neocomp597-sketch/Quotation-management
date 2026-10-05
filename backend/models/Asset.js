@@ -26,6 +26,9 @@ const AssetSchema = new mongoose.Schema({
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     installationDate: { type: Date, default: Date.now },
     location: { type: String, default: '' },
+    // Legacy: MGR 1-5 are no longer written here. The Product Master is the source of
+    // truth and every read derives these from `productId` (see utils/productMgr.js).
+    // The fields remain only so documents saved before that change still load.
     mgr1: { type: String, default: '' },
     mgr2: { type: String, default: '' },
     mgr3: { type: String, default: '' },
@@ -40,6 +43,8 @@ const AssetSchema = new mongoose.Schema({
 });
 
 AssetSchema.index({ customerId: 1, serialNumber: 1 });
+// Branch that owns this record; filled from the active branch on create and used for branch scoping (see tenantPlugin).
+AssetSchema.add({ branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null, index: true } });
 AssetSchema.plugin(tenantPlugin);
 
 module.exports = mongoose.model('Asset', AssetSchema);

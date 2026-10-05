@@ -780,10 +780,17 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
                                                     <button
                                                         key={bId}
                                                         type="button"
-                                                        onClick={() => {
-                                                            setActiveBranch(b);
+                                                        onClick={async () => {
                                                             setIsBranchDropdownOpen(false);
-                                                            toast.info(`Switched active branch to ${b.name}`);
+                                                            if (isActive) return;
+                                                            try {
+                                                                // Persisted server-side first; the page content then
+                                                                // remounts in the new branch context (see Layout).
+                                                                await setActiveBranch(b);
+                                                                toast.info(`Switched active branch to ${b.name}`);
+                                                            } catch (err) {
+                                                                toast.error(err.response?.data?.message || `Could not switch to ${b.name}`);
+                                                            }
                                                         }}
                                                         className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-between transition-colors ${
                                                             isActive

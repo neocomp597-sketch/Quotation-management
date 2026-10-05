@@ -11,7 +11,7 @@ import React from 'react';
 
 const SHEET_WIDTH = 1120;
 
-const BORDER = '2px solid #000000';
+const BORDER = '3px solid #000000';
 const FONT = "Arial, 'Helvetica Neue', Helvetica, sans-serif";
 
 const cell = (extra = {}) => ({
@@ -71,7 +71,7 @@ const WhyWhySheet = ({ data = {}, logo = null, leftLogo = null, companyName = ''
             style={{
                 width: `${SHEET_WIDTH}px`,
                 borderCollapse: 'collapse',
-                border: '3px solid #000000',
+                border: '4px solid #000000',
                 background: '#ffffff',
                 tableLayout: 'fixed'
             }}

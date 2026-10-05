@@ -80,6 +80,8 @@ ServiceVisitSchema.index({ ticketId: 1 });
 ServiceVisitSchema.index({ engineerId: 1, scheduledDate: 1 });
 ServiceVisitSchema.index({ companyId: 1, visitNo: 1 }, { unique: true });
 
+// Branch that owns this record; copied from the ticket / customer on create and used for branch scoping (see tenantPlugin).
+ServiceVisitSchema.add({ branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null, index: true } });
 ServiceVisitSchema.plugin(tenantPlugin);
 
 module.exports = mongoose.model('ServiceVisit', ServiceVisitSchema);

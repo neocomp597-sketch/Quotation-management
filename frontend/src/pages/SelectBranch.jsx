@@ -1,18 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { branchService } from '../services/api';
+import { authService, branchService } from '../services/api';
 import { toast } from 'react-toastify';
 import { MdStorefront, MdCheckCircle, MdArrowForward, MdLocationOn, MdDomain, MdShield } from 'react-icons/md';
+
+const branchIdOf = (branch) => (typeof branch === 'object' && branch ? (branch._id || branch.id) : branch);
 
 const SelectBranch = () => {
     const navigate = useNavigate();
     const location = useLocation();
-    const { user, assignedBranches, setActiveBranch, activeBranchId, isSuperAdmin } = useAuth();
+    const { user, assignedBranches, setActiveBranch, activeBranchId } = useAuth();
 
     const [availableBranches, setAvailableBranches] = useState([]);
     const [selectedBranch, setSelectedBranch] = useState(null);
     const [loadingBranches, setLoadingBranches] = useState(true);
+    const [saving, setSaving] = useState(false);
 
     useEffect(() => {
         if (!user) {
@@ -21,23 +24,36 @@ const SelectBranch = () => {
         }
 
         let isMounted = true;
+        const pickCurrent = (list) => list.find(b => String(branchIdOf(b)) === String(activeBranchId)) || list[0] || null;
+
         const loadBranches = async () => {
             setLoadingBranches(true);
             try {
-                if (isSuperAdmin || !assignedBranches || assignedBranches.length === 0) {
-                    const res = await branchService.getAll();
-                    const list = res.data?.branches || res.data?.data || (Array.isArray(res.data) ? res.data : []);
-                    if (isMounted) {
-                        setAvailableBranches(list);
-                        const current = list.find(b => (b._id || b.id) === activeBranchId) || list[0] || null;
-                        setSelectedBranch(current);
-                    }
-                } else {
+                // The session already carries the branches this user may work in
+                // (their assignment, or every company branch for admins without one).
+                const hasBranchObjects = Array.isArray(assignedBranches)
+                    && assignedBranches.length > 0
+                    && assignedBranches.every(b => typeof b === 'object' && b);
+                if (hasBranchObjects) {
                     if (isMounted) {
                         setAvailableBranches(assignedBranches);
-                        const current = assignedBranches.find(b => (typeof b === 'object' ? (b._id || b.id) : b) === activeBranchId) || assignedBranches[0];
-                        setSelectedBranch(current);
+                        setSelectedBranch(pickCurrent(assignedBranches));
                     }
+                    return;
+                }
+
+                // Otherwise ask the server which branches this user may select.
+                let list = [];
+                try {
+                    const res = await authService.getBranchOptions();
+                    list = res.data?.branches || [];
+                } catch {
+                    const res = await branchService.getAll();
+                    list = res.data?.branches || res.data?.data || (Array.isArray(res.data) ? res.data : []);
+                }
+                if (isMounted) {
+                    setAvailableBranches(list);
+                    setSelectedBranch(pickCurrent(list));
                 }
             } catch (err) {
                 console.error("Error loading branches for selection:", err);
@@ -52,20 +68,33 @@ const SelectBranch = () => {
 
         loadBranches();
         return () => { isMounted = false; };
-    }, [user, assignedBranches, activeBranchId, isSuperAdmin, navigate]);
+    }, [user, assignedBranches, activeBranchId, navigate]);
 
-    const handleContinue = () => {
+    const handleContinue = async () => {
         if (!selectedBranch) {
             toast.error('Please select a branch to proceed.');
             return;
         }
+        if (saving) return;
 
-        setActiveBranch(selectedBranch);
+        setSaving(true);
+        try {
+            // Persisted on the server before we move on, so the dashboard that opens
+            // next is already served in this branch's context.
+            const applied = await setActiveBranch(selectedBranch);
+            const name = (typeof applied === 'object' && applied?.name)
+                || (typeof selectedBranch === 'object' ? selectedBranch.name : null)
+                || 'Selected Branch';
+            toast.success(`Active branch set to ${name}`);
 
-        const target = location.state?.returnTo || '/dashboard';
-        const name = typeof selectedBranch === 'object' ? selectedBranch.name : 'Selected Branch';
-        toast.success(`Active branch set to ${name || 'Selected Branch'}`);
-        navigate(target, { replace: true });
+            const target = location.state?.returnTo || '/dashboard';
+            navigate(target === '/select-branch' ? '/dashboard' : target, { replace: true });
+        } catch (err) {
+            console.error('Failed to set active branch:', err);
+            toast.error(err.response?.data?.message || 'Could not set the active branch. Please try again.');
+        } finally {
+            setSaving(false);
+        }
     };
 
     return (

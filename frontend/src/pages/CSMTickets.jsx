@@ -1483,20 +1483,20 @@ const CSMTickets = () => {
                     }
                 }
                 
-                // Derive MGR4 category from asset or product
+                // Derive MGR4 category. The Product Master is the source of truth, so the
+                // linked product's MGR4 wins; the asset's own value is only a fallback for
+                // records whose product could not be resolved.
                 let mgr4Val = '';
-                if (asset.mgr4) {
+                if (asset.productId && typeof asset.productId === 'object' && asset.productId.mgr4) {
+                    mgr4Val = typeof asset.productId.mgr4 === 'object'
+                        ? (asset.productId.mgr4.code || asset.productId.mgr4.description || '')
+                        : String(asset.productId.mgr4);
+                }
+                if (!mgr4Val && asset.mgr4) {
                     if (typeof asset.mgr4 === 'object' && asset.mgr4 !== null) {
                         mgr4Val = asset.mgr4.code || asset.mgr4.description || '';
                     } else {
                         mgr4Val = String(asset.mgr4);
-                    }
-                }
-                if (!mgr4Val && asset.productId) {
-                    if (typeof asset.productId === 'object' && asset.productId.mgr4) {
-                        mgr4Val = typeof asset.productId.mgr4 === 'object' 
-                            ? (asset.productId.mgr4.code || asset.productId.mgr4.description || '') 
-                            : String(asset.productId.mgr4);
                     }
                 }
                 if (!mgr4Val && targetProdId) {

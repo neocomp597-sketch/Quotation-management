@@ -1,10 +1,29 @@
 const CSMRcaReport = require('../models/CSMRcaReport');
+const Ticket = require('../models/Ticket');
 const { buildRcaSheetWorkbook } = require('../services/rcaSheetExcel');
+const { scopedBranchCondition } = require('../utils/branchScope');
+
+// CSMRcaReport is not run through tenantPlugin, so the active branch is applied here.
+const withBranchScope = (filter) => {
+    const branchCondition = scopedBranchCondition();
+    return branchCondition ? { ...filter, ...branchCondition } : filter;
+};
+
+/** The branch an RCA report belongs to: its ticket's branch, else the active branch. */
+const resolveReportBranch = async (ticketNo, companyId, req) => {
+    if (ticketNo) {
+        const ticketFilter = { ticketNo: String(ticketNo).trim() };
+        if (companyId) ticketFilter.companyId = companyId;
+        const ticket = await Ticket.findOne(ticketFilter).select('branchId').setOptions({ bypassBranch: true }).lean();
+        if (ticket?.branchId) return ticket.branchId;
+    }
+    return req.user?.activeBranchId || null;
+};
 
 exports.getReports = async (req, res) => {
     try {
         const companyId = req.user?.companyId;
-        const filter = companyId ? { companyId } : {};
+        const filter = withBranchScope(companyId ? { companyId } : {});
         const reports = await CSMRcaReport.find(filter)
             .populate('createdBy', 'name email')
             .sort({ createdAt: -1 });
@@ -21,7 +40,7 @@ exports.getReportById = async (req, res) => {
         const filter = { _id: req.params.id };
         if (companyId) filter.companyId = companyId;
 
-        const report = await CSMRcaReport.findOne(filter)
+        const report = await CSMRcaReport.findOne(withBranchScope(filter))
             .populate('createdBy', 'name email');
         if (!report) {
             return res.status(404).json({ message: 'RCA report not found' });
@@ -48,6 +67,7 @@ exports.createReport = async (req, res) => {
             ...req.body,
             rcaNumber,
             companyId,
+            branchId: req.body.branchId || await resolveReportBranch(req.body.ticketNo, companyId, req),
             createdBy: req.user?._id
         });
 

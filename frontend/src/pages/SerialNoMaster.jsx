@@ -14,6 +14,54 @@ import PaginationControls from '../components/PaginationControls';
 
 const PAGE_SIZE = 15;
 
+// MGR 1-5 belong to the Product Master, which is the single source of truth. Invoice
+// Bulk Upload records never keep their own copy: the API derives asset.mgrN from the
+// linked product on every read, and the helpers below prefer the product object so a
+// stale value can never win over the master.
+const MGR_FIELDS = [
+    { key: 'mgr1', label: 'MGR 1' },
+    { key: 'mgr2', label: 'MGR 2' },
+    { key: 'mgr3', label: 'MGR 3' },
+    { key: 'mgr4', label: 'MGR 4' },
+    { key: 'mgr5', label: 'MGR 5' }
+];
+
+const formatMgrVal = (mgr) => {
+    if (!mgr) return '';
+    if (typeof mgr === 'string') return mgr;
+    if (mgr.code && mgr.description && mgr.code.toLowerCase() !== mgr.description.toLowerCase()) {
+        return `${mgr.code} - ${mgr.description}`;
+    }
+    return mgr.description || mgr.code || '';
+};
+
+const resolveAssetMgr = (record, key) => {
+    const product = record?.productId;
+    if (product && typeof product === 'object') return formatMgrVal(product[key]);
+    return formatMgrVal(record?.[key]);
+};
+
+const assignedMgrsOf = (record) =>
+    MGR_FIELDS.map((field) => ({ ...field, value: resolveAssetMgr(record, field.key) })).filter((field) => field.value);
+
+const findProductByCode = (products, code) => {
+    const clean = String(code || '').trim().toLowerCase();
+    if (!clean) return null;
+    return products.find((p) => String(p.productCode || '').trim().toLowerCase() === clean) || null;
+};
+
+// Compact "MGR 1: … · MGR 2: …" line for a table row; renders nothing when none is assigned.
+const MgrLine = ({ record }) => {
+    const assigned = assignedMgrsOf(record);
+    if (assigned.length === 0) return null;
+    const text = assigned.map((m) => `${m.label}: ${m.value}`);
+    return (
+        <span className="block text-[10px] text-teal-700 font-semibold mt-1 max-w-[260px] truncate" title={text.join(' | ')}>
+            {text.join(' · ')}
+        </span>
+    );
+};
+
 const SerialNoMaster = () => {
     const { user, isAdmin, isSuperAdmin } = useAuth();
     const [assets, setAssets] = useState([]);
@@ -56,13 +104,15 @@ const SerialNoMaster = () => {
         invoiceNumber: '',
         saleDate: '',
         location: '',
-        mgr1: '',
-        mgr2: '',
-        mgr3: '',
-        mgr4: '',
-        mgr5: '',
         indicatorField: ''
     });
+
+    // MGR 1-5 on the single-entry form come straight from the Product Master record that
+    // matches the typed Product Code. They are display-only and never submitted.
+    const singleFormProduct = useMemo(
+        () => findProductByCode(products, singleForm.productCode),
+        [products, singleForm.productCode]
+    );
 
     // --- SALES RETURN MODAL ---
     const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
@@ -120,15 +170,6 @@ const SerialNoMaster = () => {
             return;
         }
 
-        const formatMgrVal = (mgr) => {
-            if (!mgr) return '';
-            if (typeof mgr === 'string') return mgr;
-            if (mgr.code && mgr.description && mgr.code.toLowerCase() !== mgr.description.toLowerCase()) {
-                return `${mgr.code} - ${mgr.description}`;
-            }
-            return mgr.description || mgr.code || '';
-        };
-
         const exportData = dataToExport.map(asset => {
             const prodName = asset.productId?.productName || asset.productName || '';
             const prodCode = asset.productId?.productCode || asset.productCode || '';
@@ -145,11 +186,11 @@ const SerialNoMaster = () => {
                 'Invoice Ref': asset.invoiceNumber || '',
                 'Sale Date': sDate ? new Date(sDate).toLocaleDateString('en-IN') : '',
                 'Location': asset.location || '',
-                'Mgr 1': formatMgrVal(asset.mgr1) || formatMgrVal(asset.productId?.mgr1) || '',
-                'Mgr 2': formatMgrVal(asset.mgr2) || formatMgrVal(asset.productId?.mgr2) || '',
-                'Mgr 3': formatMgrVal(asset.mgr3) || formatMgrVal(asset.productId?.mgr3) || '',
-                'Mgr 4': formatMgrVal(asset.mgr4) || formatMgrVal(asset.productId?.mgr4) || '',
-                'Mgr 5': formatMgrVal(asset.mgr5) || formatMgrVal(asset.productId?.mgr5) || '',
+                'Mgr 1': resolveAssetMgr(asset, 'mgr1'),
+                'Mgr 2': resolveAssetMgr(asset, 'mgr2'),
+                'Mgr 3': resolveAssetMgr(asset, 'mgr3'),
+                'Mgr 4': resolveAssetMgr(asset, 'mgr4'),
+                'Mgr 5': resolveAssetMgr(asset, 'mgr5'),
                 'Indicator_Field': asset.indicatorField || '',
                 'Project Code': asset.projectCode || '',
                 'Project Name': asset.projectName || ''
@@ -248,11 +289,6 @@ const SerialNoMaster = () => {
                 invoiceNumber: '',
                 saleDate: '',
                 location: '',
-                mgr1: '',
-                mgr2: '',
-                mgr3: '',
-                mgr4: '',
-                mgr5: '',
                 indicatorField: ''
             });
             fetchData();
@@ -471,55 +507,36 @@ const SerialNoMaster = () => {
                                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
                                     />
                                 </div>
-                                <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Mgr 1</label>
-                                    <input
-                                        type="text"
-                                        placeholder="Mgr 1"
-                                        value={singleForm.mgr1}
-                                        onChange={(e) => setSingleForm({ ...singleForm, mgr1: e.target.value })}
-                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Mgr 2</label>
-                                    <input
-                                        type="text"
-                                        placeholder="Mgr 2"
-                                        value={singleForm.mgr2}
-                                        onChange={(e) => setSingleForm({ ...singleForm, mgr2: e.target.value })}
-                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Mgr 3</label>
-                                    <input
-                                        type="text"
-                                        placeholder="Mgr 3"
-                                        value={singleForm.mgr3}
-                                        onChange={(e) => setSingleForm({ ...singleForm, mgr3: e.target.value })}
-                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Mgr 4</label>
-                                    <input
-                                        type="text"
-                                        placeholder="Mgr 4"
-                                        value={singleForm.mgr4}
-                                        onChange={(e) => setSingleForm({ ...singleForm, mgr4: e.target.value })}
-                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Mgr 5</label>
-                                    <input
-                                        type="text"
-                                        placeholder="Mgr 5"
-                                        value={singleForm.mgr5}
-                                        onChange={(e) => setSingleForm({ ...singleForm, mgr5: e.target.value })}
-                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
-                                    />
+                                <div className="col-span-full p-4 bg-slate-50 border border-slate-200 rounded-xl">
+                                    <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">MGR 1 – 5 (from Product Master)</span>
+                                        <span className="text-[10px] font-semibold text-slate-400">
+                                            {singleFormProduct
+                                                ? `Linked to ${singleFormProduct.productCode}`
+                                                : (singleForm.productCode.trim()
+                                                    ? 'New product: assign its MGR in Product Master after saving'
+                                                    : 'Enter a Product Code to see its MGR')}
+                                        </span>
+                                    </div>
+                                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                                        {MGR_FIELDS.map(({ key, label }) => {
+                                            const value = singleFormProduct ? formatMgrVal(singleFormProduct[key]) : '';
+                                            return (
+                                                <div key={key}>
+                                                    <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">{label}</span>
+                                                    <span
+                                                        className={`block text-xs truncate ${value ? 'font-bold text-slate-900' : 'font-normal italic text-slate-400'}`}
+                                                        title={value || 'Not assigned'}
+                                                    >
+                                                        {value || 'Not assigned'}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                    <p className="mt-3 text-[10px] text-slate-400 font-semibold">
+                                        MGR is maintained in the Product Master and stays linked: assigning, changing or removing it there updates this record automatically.
+                                    </p>
                                 </div>
                                 <div>
                                     <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Indicator Field (Max 20 chars)</label>
@@ -709,6 +726,7 @@ const SerialNoMaster = () => {
                                                     <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">
                                                         {item.productId?.productCode || item.productCode || 'N/A'}
                                                     </span>
+                                                    <MgrLine record={item} />
                                                 </td>
                                                 <td className="p-4 text-sm font-semibold text-slate-700">
                                                     {item.customerId?.companyName || item.customerId?.customerName || item.customerName || 'Customer'}
@@ -778,6 +796,7 @@ const SerialNoMaster = () => {
                                                     <td className="p-4">
                                                         <span className="block text-sm font-bold text-slate-800">{asset.productId?.productName || 'N/A'}</span>
                                                         <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">{asset.productId?.productCode || 'N/A'}</span>
+                                                        <MgrLine record={asset} />
                                                     </td>
                                                     <td className="p-4">
                                                         <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
@@ -915,6 +934,22 @@ const SerialNoMaster = () => {
                                 <div><span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Invoice Number</span><span className="text-slate-900 text-sm font-bold">{assetSummary.asset?.invoiceNumber || 'N/A'}</span></div>
                                 <div><span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Date of Sale</span><span className="text-slate-900 text-sm font-bold">{assetSummary.asset?.saleDate || assetSummary.asset?.invoiceDate ? new Date(assetSummary.asset.saleDate || assetSummary.asset.invoiceDate).toLocaleDateString('en-IN') : 'N/A'}</span></div>
                                 <div><span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Postal Code</span><span className="text-slate-900 text-sm font-bold">{assetSummary.asset?.customerPostalCode || 'N/A'}</span></div>
+                                <div className="col-span-2">
+                                    <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">MGR 1 – 5 (from Product Master)</span>
+                                    <div className="flex flex-wrap gap-1.5 mt-1">
+                                        {MGR_FIELDS.map(({ key, label }) => {
+                                            const value = resolveAssetMgr(assetSummary.asset, key);
+                                            return (
+                                                <span
+                                                    key={key}
+                                                    className={`px-2 py-0.5 rounded-md border text-[10px] ${value ? 'bg-teal-50 text-teal-700 border-teal-200 font-bold' : 'bg-slate-50 text-slate-400 border-slate-200 font-normal italic'}`}
+                                                >
+                                                    {label}: {value || 'Not assigned'}
+                                                </span>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
                             </div>
                         </div>
 

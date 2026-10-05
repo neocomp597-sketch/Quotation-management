@@ -13,6 +13,7 @@
  */
 const mongoose = require('mongoose');
 const Branch = require('../models/Branch');
+const { getScopedBranches } = require('../middlewares/tenantContext');
 
 const BRANCH_ADMIN_ROLES = ['admin', 'company_admin', 'super_admin', 'superadmin'];
 
@@ -114,8 +115,23 @@ const listSelectableBranches = async (user, companyId) => {
         .lean();
 };
 
+/**
+ * The branch condition of the current request for models that are not run through
+ * tenantPlugin (they filter explicitly): records in the scoped branches plus records
+ * without a branch. Returns null when the request is not branch-scoped.
+ */
+const scopedBranchCondition = () => {
+    const branchIds = getScopedBranches();
+    if (!branchIds) return null;
+    const ids = branchIds
+        .filter((id) => mongoose.Types.ObjectId.isValid(id))
+        .map((id) => new mongoose.Types.ObjectId(id));
+    return { $or: [{ branchId: { $in: ids } }, { branchId: null }, { branchId: { $exists: false } }] };
+};
+
 module.exports = {
     BRANCH_SUMMARY_FIELDS,
+    scopedBranchCondition,
     isBranchAdminRole,
     idOf,
     isObjectIdString,
