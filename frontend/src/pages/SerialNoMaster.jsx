@@ -120,6 +120,15 @@ const SerialNoMaster = () => {
             return;
         }
 
+        const formatMgrVal = (mgr) => {
+            if (!mgr) return '';
+            if (typeof mgr === 'string') return mgr;
+            if (mgr.code && mgr.description && mgr.code.toLowerCase() !== mgr.description.toLowerCase()) {
+                return `${mgr.code} - ${mgr.description}`;
+            }
+            return mgr.description || mgr.code || '';
+        };
+
         const exportData = dataToExport.map(asset => {
             const prodName = asset.productId?.productName || asset.productName || '';
             const prodCode = asset.productId?.productCode || asset.productCode || '';
@@ -136,11 +145,11 @@ const SerialNoMaster = () => {
                 'Invoice Ref': asset.invoiceNumber || '',
                 'Sale Date': sDate ? new Date(sDate).toLocaleDateString('en-IN') : '',
                 'Location': asset.location || '',
-                'Mgr 1': asset.mgr1 || '',
-                'Mgr 2': asset.mgr2 || '',
-                'Mgr 3': asset.mgr3 || '',
-                'Mgr 4': asset.mgr4 || '',
-                'Mgr 5': asset.mgr5 || '',
+                'Mgr 1': formatMgrVal(asset.mgr1) || formatMgrVal(asset.productId?.mgr1) || '',
+                'Mgr 2': formatMgrVal(asset.mgr2) || formatMgrVal(asset.productId?.mgr2) || '',
+                'Mgr 3': formatMgrVal(asset.mgr3) || formatMgrVal(asset.productId?.mgr3) || '',
+                'Mgr 4': formatMgrVal(asset.mgr4) || formatMgrVal(asset.productId?.mgr4) || '',
+                'Mgr 5': formatMgrVal(asset.mgr5) || formatMgrVal(asset.productId?.mgr5) || '',
                 'Indicator_Field': asset.indicatorField || ''
             };
         });
