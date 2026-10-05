@@ -32,6 +32,8 @@ const AssetSchema = new mongoose.Schema({
     mgr4: { type: String, default: '' },
     mgr5: { type: String, default: '' },
     indicatorField: { type: String, default: '' },
+    projectCode: { type: String, default: '' },
+    projectName: { type: String, default: '' },
     returnReason: { type: String, default: '' },
     returnedAt: { type: Date },
     createdAt: { type: Date, default: Date.now }

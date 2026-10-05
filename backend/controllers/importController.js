@@ -3157,6 +3157,16 @@ const importAssets = async (req, res) => {
         const companyId = req.user?.companyId;
         const companyFilter = companyId ? { companyId } : {};
 
+        // Rows without a Location are tagged with the branch the upload is made from:
+        // the active branch selected in the header, else the user's own branch.
+        let defaultLocation = '';
+        const activeBranchRaw = req.headers?.['x-active-branch'] || req.headers?.['x-branch-id'] || req.user?.branchId || '';
+        const activeBranchId = String(activeBranchRaw || '').trim();
+        if (/^[a-f\d]{24}$/i.test(activeBranchId)) {
+            const activeBranch = await Branch.findOne({ _id: activeBranchId, ...companyFilter }).select('name').lean();
+            if (activeBranch?.name) defaultLocation = String(activeBranch.name).trim();
+        }
+
         const seenSerialsInFile = new Set();
 
         for (let i = 0; i < data.length; i++) {
@@ -3194,17 +3204,24 @@ const importAssets = async (req, res) => {
                 const customerLookup = pickFirstNonEmpty(
                     row['Customer Code'], row.customerCode, row['Customer Name'], row.customerName, row['Company Name'], row.companyName, row['Customer']
                 );
-                const customerMobile = pickFirstNonEmpty(
+                const customerNameInput = pickFirstNonEmpty(
+                    row['Customer Name'], row.customerName, row['Company Name'], row.companyName, row['Customer']
+                );
+                // Mobile is optional on the sheet: a blank value falls back to the Customer
+                // Master further down. A value that is present must be a 10-digit number.
+                let customerMobile = pickFirstNonEmpty(
                     row['Mobile Number *'], row['Mobile Number'], row.mobileNumber, row['Mobile No'], row.mobileNo, row['Phone Number'], row.phoneNumber, row['Mobile'], row.mobile, row['Phone'], row.phone, ''
                 );
-                if (!customerMobile || !/^\d{10}$/.test(String(customerMobile).trim())) {
-                    throw new Error(`Mobile Number is mandatory and must be a valid 10-digit number. (Got: "${customerMobile || 'blank'}")`);
+                if (customerMobile && !/^\d{10}$/.test(String(customerMobile).trim())) {
+                    throw new Error(`Mobile Number must be a valid 10-digit number when provided. (Got: "${customerMobile}")`);
                 }
-                const invoiceNumber = pickFirstNonEmpty(
-                    row['Invoice Ref'], row.invoiceRef, row['Invoice Number'], row.invoiceNumber, row['Invoice'], row.invoice
+                const invoiceNumber = getFlexibleRowValue(
+                    row, 'Invoice Ref', 'invoiceRef', 'Invoice Ref No', 'Invoice Number', 'invoiceNumber', 'Invoice No', 'Invoice'
                 );
                 const rawSaleDate = row['Sale Date'] || row.saleDate || row['Invoice Date'] || row.invoiceDate;
-                const location = pickFirstNonEmpty(row.Location, row.location, '');
+                const location = pickFirstNonEmpty(row.Location, row.location, row.Branch, row.branch, defaultLocation);
+                const projectCode = getFlexibleRowValue(row, 'Project Code', 'ProjectCode', 'projectCode');
+                const projectName = getFlexibleRowValue(row, 'Project Name', 'ProjectName', 'projectName');
                 let mgr1 = '';
                 let mgr2 = '';
                 let mgr3 = '';
@@ -3224,41 +3241,34 @@ const importAssets = async (req, res) => {
                 else if (normStatus.includes('RETURN')) status = 'RETURN';
                 else if (normStatus.includes('SCRAP')) status = 'SCRAPPED';
 
-                // Resolve product
+                // Resolve product. The Product Code is the identifier: when the sheet gives one
+                // we match on it alone and create the product if it is new. Falling back to the
+                // name would merge different codes that share one description (common in
+                // switchgear registers). Name matching is used only when no code is given.
+                // Products saved before tenancy carry no companyId and may be reused; another
+                // company's product is never borrowed just because the code matches.
+                const withMgrs = (query) => query
+                    .populate('mgr1', 'code description')
+                    .populate('mgr2', 'code description')
+                    .populate('mgr3', 'code description')
+                    .populate('mgr4', 'code description')
+                    .populate('mgr5', 'code description');
+                const legacyProductFilter = { $or: [{ companyId: null }, { companyId: { $exists: false } }] };
+                const findProductBy = async (field, value) => {
+                    let found = await withMgrs(Product.findOne({ ...companyFilter, [field]: buildExactRegex(value) }));
+                    if (!found && companyId) {
+                        found = await withMgrs(
+                            Product.findOne({ ...legacyProductFilter, [field]: buildExactRegex(value) }).setOptions({ bypassTenant: true })
+                        );
+                    }
+                    return found;
+                };
+
                 let product = null;
                 if (productCode) {
-                    product = await Product.findOne({ ...companyFilter, productCode: buildExactRegex(productCode) })
-                        .populate('mgr1', 'code description')
-                        .populate('mgr2', 'code description')
-                        .populate('mgr3', 'code description')
-                        .populate('mgr4', 'code description')
-                        .populate('mgr5', 'code description');
-                }
-                if (!product && productName) {
-                    product = await Product.findOne({ ...companyFilter, productName: buildExactRegex(productName) })
-                        .populate('mgr1', 'code description')
-                        .populate('mgr2', 'code description')
-                        .populate('mgr3', 'code description')
-                        .populate('mgr4', 'code description')
-                        .populate('mgr5', 'code description');
-                }
-                if (!product && productCode) {
-                    product = await Product.findOne({ productCode: buildExactRegex(productCode) })
-                        .setOptions({ bypassTenant: true })
-                        .populate('mgr1', 'code description')
-                        .populate('mgr2', 'code description')
-                        .populate('mgr3', 'code description')
-                        .populate('mgr4', 'code description')
-                        .populate('mgr5', 'code description');
-                }
-                if (!product && productName) {
-                    product = await Product.findOne({ productName: buildExactRegex(productName) })
-                        .setOptions({ bypassTenant: true })
-                        .populate('mgr1', 'code description')
-                        .populate('mgr2', 'code description')
-                        .populate('mgr3', 'code description')
-                        .populate('mgr4', 'code description')
-                        .populate('mgr5', 'code description');
+                    product = await findProductBy('productCode', productCode);
+                } else if (productName) {
+                    product = await findProductBy('productName', productName);
                 }
 
                 if (!product) {
@@ -3275,13 +3285,8 @@ const importAssets = async (req, res) => {
                             status: 'Active'
                         });
                     } catch (createErr) {
-                        product = await Product.findOne({ productCode: buildExactRegex(productCode || 'PROD-001') })
-                            .setOptions({ bypassTenant: true })
-                            .populate('mgr1', 'code description')
-                            .populate('mgr2', 'code description')
-                            .populate('mgr3', 'code description')
-                            .populate('mgr4', 'code description')
-                            .populate('mgr5', 'code description');
+                        // (companyId, productCode) is unique: another row may have created it first.
+                        product = await findProductBy('productCode', productCode || 'PROD-001');
                         if (!product) {
                             throw createErr;
                         }
@@ -3349,11 +3354,13 @@ const importAssets = async (req, res) => {
 
                     if (!customer) {
                         try {
+                            // A customer missing from the master is created from the sheet: the
+                            // code becomes its external code and the sheet's name becomes its name.
                             customer = await Customer.create({
                                 ...companyFilter,
                                 externalCode: searchTarget,
-                                customerName: customerLookup || searchTarget,
-                                companyName: customerLookup || searchTarget,
+                                customerName: customerNameInput || customerLookup || searchTarget,
+                                companyName: customerNameInput || customerLookup || searchTarget,
                                 mobile: customerMobile || '',
                                 createdBy: req.user?.id || null
                             });
@@ -3373,6 +3380,9 @@ const importAssets = async (req, res) => {
                     }
 
                     if (customer) {
+                        if (!customerMobile && customer.mobile) {
+                            customerMobile = String(customer.mobile).trim();
+                        }
                         if (!customer.externalCode && customerCodeInput) {
                             customer.externalCode = String(customerCodeInput).trim();
                             await customer.save();
@@ -3442,6 +3452,8 @@ const importAssets = async (req, res) => {
                         location: location || '',
                         mgr1, mgr2, mgr3, mgr4, mgr5,
                         indicatorField,
+                        projectCode,
+                        projectName,
                         returnReason: '',
                         returnedAt: null
                     };
@@ -3467,6 +3479,8 @@ const importAssets = async (req, res) => {
                         location: location || '',
                         mgr1, mgr2, mgr3, mgr4, mgr5,
                         indicatorField,
+                        projectCode,
+                        projectName,
                         transactionType: 'IMPORT_RESELL',
                         status: status === 'RETURN' ? 'SOLD' : status,
                         createdBy: req.user?.id || null
@@ -3490,6 +3504,8 @@ const importAssets = async (req, res) => {
                         location: location || '',
                         mgr1, mgr2, mgr3, mgr4, mgr5,
                         indicatorField,
+                        projectCode,
+                        projectName,
                         createdBy: req.user?.id || null
                     });
                     results.created++;
@@ -3511,6 +3527,8 @@ const importAssets = async (req, res) => {
                         location,
                         mgr1, mgr2, mgr3, mgr4, mgr5,
                         indicatorField,
+                        projectCode,
+                        projectName,
                         transactionType: 'IMPORT',
                         status,
                         createdBy: req.user?.id || null
@@ -3568,6 +3586,9 @@ const getAssetTemplate = async (req, res) => {
                 'Mobile Number': '',
                 'Invoice Ref': '',
                 'Sale Date': '',
+                'Location': '',
+                'Project Code': '',
+                'Project Name': '',
                 'Indicator_Field': 'SALE'
             },
             {
@@ -3580,6 +3601,9 @@ const getAssetTemplate = async (req, res) => {
                 'Mobile Number': '9823012345',
                 'Invoice Ref': 'INV-2026-001',
                 'Sale Date': '2026-03-15',
+                'Location': 'Main Branch',
+                'Project Code': 'PRJ-2026-01',
+                'Project Name': 'Substation Upgrade',
                 'Indicator_Field': 'SALE'
             }
         ];

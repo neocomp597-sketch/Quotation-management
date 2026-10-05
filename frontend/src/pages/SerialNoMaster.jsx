@@ -150,7 +150,9 @@ const SerialNoMaster = () => {
                 'Mgr 3': formatMgrVal(asset.mgr3) || formatMgrVal(asset.productId?.mgr3) || '',
                 'Mgr 4': formatMgrVal(asset.mgr4) || formatMgrVal(asset.productId?.mgr4) || '',
                 'Mgr 5': formatMgrVal(asset.mgr5) || formatMgrVal(asset.productId?.mgr5) || '',
-                'Indicator_Field': asset.indicatorField || ''
+                'Indicator_Field': asset.indicatorField || '',
+                'Project Code': asset.projectCode || '',
+                'Project Name': asset.projectName || ''
             };
         });
 
@@ -804,6 +806,11 @@ const SerialNoMaster = () => {
                                                         {asset.invoiceNumber ? (
                                                             <span className="font-mono bg-slate-100 px-2 py-1 rounded border border-slate-200 text-xs">{asset.invoiceNumber}</span>
                                                         ) : <span className="text-slate-300 font-normal">-</span>}
+                                                        {(asset.projectCode || asset.projectName) && (
+                                                            <span className="block text-[10px] text-slate-400 font-bold mt-1">
+                                                                Project: {[asset.projectCode, asset.projectName].filter(Boolean).join(' - ')}
+                                                            </span>
+                                                        )}
                                                     </td>
                                                     <td className="p-4 text-sm font-medium text-slate-600">
                                                         {asset.saleDate || asset.invoiceDate
