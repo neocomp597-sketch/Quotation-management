@@ -29,7 +29,9 @@ const MENU_GROUPS = [
             { key: 'master_serials', label: 'Invoice Bulk Upload', description: 'Invoice bulk upload and serial asset management' },
             { key: 'invoice_bulk_upload_delete', label: 'Delete Invoice Bulk Upload Entry', description: 'Permission to delete invoice bulk upload entries' },
             { key: 'state_master_create', label: 'State Master', description: 'State master management' },
-            { key: 'city_master', label: 'City Master', description: 'City master management' }
+            { key: 'city_master', label: 'City Master', description: 'City master management' },
+            { key: 'csm_masters', label: 'Engineers Master', description: 'Field service engineers master' },
+            { key: 'flowchart_view', label: 'Flowchart Builder', description: 'Visual process flowchart builder' }
         ]
     },
     {
@@ -76,32 +78,38 @@ const MENU_GROUPS = [
         ]
     },
     {
-        key: 'quotation',
-        label: 'Sales',
-        description: 'Catalog, Price Books, CPQ Engine, Quotations, Approvals, Contracts, and Orders',
+        key: 'cpq_masters',
+        label: 'Catalog',
+        description: 'Price books, pricing rules, discount policies, promotions, and currency rates',
         children: [
-            { key: 'sales_catalog', label: 'Catalog Management', description: 'Manage Products, Services, Subscriptions, and Bundles' },
-            { key: 'sales_price_management', label: 'Price Management', description: 'Manage Price Books, Pricing Rules, Discount Policies, and Currency Rates' },
-            { key: 'sales_cpq', label: 'CPQ Engine', description: 'Access Guided Selling, configurators, and simulators' },
-            { key: 'quotation_list', label: 'Quotations', description: 'Quotation list and creation screens' },
-            { key: 'sales_approvals', label: 'Approvals Workflow', description: 'Review low-margin and price-override approvals' },
-            { key: 'sales_contracts', label: 'Contracts Agreements', description: 'Manage locked price contracts for customers' },
-            { key: 'sales_orders', label: 'Sales Orders', description: 'Access Sales Order conversion and invoice logs' },
-            { key: 'sales_revenue_analytics', label: 'Revenue Analytics', description: 'Analytics dashboards for margins and price books' },
-            { key: 'sales_competitors', label: 'Competitor Intelligence', description: 'Track competitor pricing and differentials' },
-            { key: 'sales_ai_pricing', label: 'AI Pricing Insights', description: 'AI-driven win rates and margin suggestions' }
+            { key: 'sales_price_management', label: 'Price Books & Rules', description: 'Manage price books, pricing rules, discount policies and promotions' }
         ]
     },
     {
-        key: 'sale',
-        label: 'Material Received',
-        description: 'Material received navigation group',
-        children: []
+        key: 'quotation',
+        label: 'Quotations',
+        description: 'Quotation registers, CPQ tools, invoices, approvals, and orders',
+        children: [
+            { key: 'quotation_list', label: 'Quotation Register', description: 'View, create, and manage trade quotations' },
+            { key: 'reports_main', label: 'Quote Conversion Report', description: 'Quotation conversion analytics' },
+            { key: 'sales_cpq', label: 'Guided Selling & Configurator', description: 'Interactive product configurator and quote simulator' },
+            { key: 'sale_invoices', label: 'Invoices', description: 'Billing invoices and payment schedules' },
+            { key: 'sales_approvals', label: 'Approvals Queue', description: 'Manage discount and high-value quotation approvals' },
+            { key: 'sales_orders', label: 'Sales Orders', description: 'Sales order processing and status tracking' }
+        ]
+    },
+    {
+        key: 'clm',
+        label: 'Contracts',
+        description: 'Contract Lifecycle Management (CLM), templates, clause library, and renewals',
+        children: [
+            { key: 'sales_contracts', label: 'Contract Management', description: 'CLM dashboard, contracts list, templates, and clause library' }
+        ]
     },
     {
         key: 'purchase',
         label: 'Material',
-        description: 'Purchase and GRN navigation group',
+        description: 'Material received and Goods receipt note (GRN)',
         children: [
             { key: 'purchase_grn', label: 'GRN Register', description: 'Goods receipt note and material tracking screens' }
         ]
@@ -114,6 +122,7 @@ const MENU_GROUPS = [
             { key: 'inventory_dashboard', label: 'Dashboard', description: 'Stock valuation, movement feed, and KPI metrics' },
             { key: 'inventory_items', label: 'Items & Stock Matrix', description: 'Warehouse-wise stock and batch details' },
             { key: 'inventory_warehouses', label: 'Warehouses', description: 'Manage warehouses and storage bins' },
+            { key: 'purchase_grn', label: 'GRN / Inward Goods', description: 'Goods receipt note and material tracking screens' },
             { key: 'inventory_stock_in', label: 'Stock In / GRN', description: 'Record inward goods receipts' },
             { key: 'inventory_stock_out', label: 'Stock Out / Dispatch', description: 'Record outward material issues' },
             { key: 'inventory_transfers', label: 'Stock Transfers', description: 'Inter-warehouse transfers and approvals' },
@@ -141,7 +150,13 @@ const MENU_GROUPS = [
         label: 'Reports',
         description: 'Reporting, analytics and data exports',
         children: [
-            { key: 'reports_main', label: 'Reports', description: 'Reporting screens' }
+            { key: 'reports_main', label: 'Reports', description: 'Reporting screens' },
+            { key: 'sales_reports', label: 'Sales Reports', description: 'Sales revenue and performance reports' },
+            { key: 'sales_analytics', label: 'Sales Analytics', description: 'Pipeline velocity and salesperson analytics' },
+            { key: 'sales_revenue_analytics', label: 'Revenue Analytics', description: 'Revenue streams and customer cohort analytics' },
+            { key: 'csm_rca', label: 'Why-Why Analysis', description: 'Five-why root cause and CAPA analytics dashboard' },
+            { key: 'sales_competitors', label: 'Competitor Intel', description: 'Market competitor analysis' },
+            { key: 'sales_ai_pricing', label: 'AI Pricing Insights', description: 'AI-driven pricing optimization insights' }
         ]
     },
     {

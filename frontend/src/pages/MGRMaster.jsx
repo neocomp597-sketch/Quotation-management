@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { MdAdd, MdEdit, MdDelete, MdArrowBack } from 'react-icons/md';
+import { MdAdd, MdEdit, MdDelete, MdArrowBack, MdInfo } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import { mgrService } from '../services/api';
 import Modal from '../components/Modal';
 import PaginationControls from '../components/PaginationControls';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 const LIST_PAGE_SIZE = 20;
 
 const MGRMaster = ({ isCreatePage = false, isEditPage = false }) => {
     const navigate = useNavigate();
     const { id } = useParams();
+    const { isAdmin, isSuperAdmin } = useAuth();
     const [mgrs, setMgrs] = useState([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('MGR1');
@@ -18,6 +20,13 @@ const MGRMaster = ({ isCreatePage = false, isEditPage = false }) => {
     const [pagination, setPagination] = useState({ page: 1, limit: LIST_PAGE_SIZE, total: 0, pages: 1 });
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingMGR, setEditingMGR] = useState(null);
+
+    // MGR Information Modal State
+    const [showInfoModal, setShowInfoModal] = useState(false);
+    const [infoText, setInfoText] = useState('');
+    const [isEditingInfo, setIsEditingInfo] = useState(false);
+    const [editingInfoText, setEditingInfoText] = useState('');
+    const [savingInfo, setSavingInfo] = useState(false);
 
     const [formData, setFormData] = useState({
         code: '',
@@ -50,6 +59,34 @@ const MGRMaster = ({ isCreatePage = false, isEditPage = false }) => {
             });
         }
     }, [isEditPage, id]);
+
+    const fetchInfoText = async () => {
+        try {
+            const res = await mgrService.getInfo();
+            setInfoText(res.data?.infoText || '');
+            setEditingInfoText(res.data?.infoText || '');
+        } catch (err) {
+            console.error("Error fetching MGR Info:", err);
+        }
+    };
+
+    useEffect(() => {
+        fetchInfoText();
+    }, []);
+
+    const handleSaveInfoText = async () => {
+        setSavingInfo(true);
+        try {
+            await mgrService.updateInfo(editingInfoText);
+            setInfoText(editingInfoText);
+            setIsEditingInfo(false);
+            toast.success("MGR Information updated successfully!");
+        } catch (err) {
+            toast.error("Failed to update MGR Information");
+        } finally {
+            setSavingInfo(false);
+        }
+    };
 
     useEffect(() => {
         setPage(1);
@@ -205,7 +242,17 @@ const MGRMaster = ({ isCreatePage = false, isEditPage = false }) => {
                 <>
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-black text-slate-900 tracking-tight">Product MGR Master</h1>
+                    <div className="flex items-center gap-2">
+                        <h1 className="text-3xl font-black text-slate-900 tracking-tight">Product MGR Master</h1>
+                        <button
+                            type="button"
+                            onClick={() => setShowInfoModal(true)}
+                            className="p-1 rounded-full text-primary-600 hover:text-primary-800 hover:bg-primary-50 transition-all cursor-pointer"
+                            title="MGR Master Information & Hierarchy"
+                        >
+                            <MdInfo size={24} />
+                        </button>
+                    </div>
                     <p className="text-slate-500 font-medium">Manage MGRs for product grouping.</p>
                 </div>
                 <div className="flex gap-3">
@@ -492,6 +539,64 @@ const MGRMaster = ({ isCreatePage = false, isEditPage = false }) => {
                             </form>
                         </div>
                 </div>
+            )}
+            {/* MGR Information Modal */}
+            {showInfoModal && (
+                <Modal
+                    isOpen={showInfoModal}
+                    onClose={() => { setShowInfoModal(false); setIsEditingInfo(false); }}
+                    title="MGR Master Information & Hierarchy"
+                >
+                    <div className="space-y-4 text-slate-700 text-sm leading-relaxed p-2">
+                        {isEditingInfo ? (
+                            <div className="space-y-3">
+                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                    Edit Information Text (Admin Only)
+                                </label>
+                                <textarea
+                                    value={editingInfoText}
+                                    onChange={(e) => setEditingInfoText(e.target.value)}
+                                    rows={8}
+                                    className="w-full p-4 border border-slate-200 rounded-2xl bg-slate-50 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                />
+                                <div className="flex justify-end gap-2 pt-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => { setIsEditingInfo(false); setEditingInfoText(infoText); }}
+                                        className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold transition-all"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleSaveInfoText}
+                                        disabled={savingInfo}
+                                        className="px-5 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-bold shadow-md transition-all"
+                                    >
+                                        {savingInfo ? "Saving..." : "Save Changes"}
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <>
+                                <div className="whitespace-pre-wrap font-medium bg-slate-50 p-4 rounded-2xl border border-slate-100 text-slate-800 leading-relaxed">
+                                    {infoText}
+                                </div>
+                                {(isAdmin || isSuperAdmin) && (
+                                    <div className="flex justify-end pt-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsEditingInfo(true)}
+                                            className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md transition-all"
+                                        >
+                                            <MdEdit size={16} /> Edit Information
+                                        </button>
+                                    </div>
+                                )}
+                            </>
+                        )}
+                    </div>
+                </Modal>
             )}
         </div>
     );

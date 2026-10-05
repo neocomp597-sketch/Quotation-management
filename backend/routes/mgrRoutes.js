@@ -5,6 +5,9 @@ const { protect } = require('../middlewares/authMiddleware');
 
 router.use(protect);
 
+router.get('/info', mgrController.getMGRInfoText);
+router.put('/info', mgrController.updateMGRInfoText);
+
 router.get('/', mgrController.getAllMGRs);
 router.get('/:id', mgrController.getMGRById);
 router.post('/', mgrController.createMGR);

@@ -89,7 +89,7 @@ const Login = () => {
           ? storedReturnTo
           : location.state?.from?.pathname || fallbackTarget;
 
-        if (assigned.length > 1) {
+        if (isSuperAdmin || assigned.length > 1) {
           navigate("/select-branch", { state: { returnTo: target }, replace: true });
         } else {
           if (assigned.length === 1) {

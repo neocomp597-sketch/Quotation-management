@@ -55,19 +55,20 @@ const addTenantFilter = (query, companyId) => {
  * cannot widen their own access by passing a branchId of their choosing. Records
  * that carry no branch stay visible to everyone - they are not owned by a branch.
  */
-const addBranchFilter = (query, branchIds) => {
+const addBranchFilter = (query, branchIds, schema) => {
     const ids = branchIds.map(id => toObjectId(id));
     const currentQuery = query.getQuery();
+    const branchOrConditions = [
+        { branchId: { $in: ids } }
+    ];
+    if (schema && schema.path('assignedBranches')) {
+        branchOrConditions.push({ assignedBranches: { $in: ids } });
+    }
+    branchOrConditions.push({ branchId: null }, { branchId: { $exists: false } });
     query.setQuery({
         $and: [
             currentQuery,
-            {
-                $or: [
-                    { branchId: { $in: ids } },
-                    { branchId: null },
-                    { branchId: { $exists: false } }
-                ]
-            }
+            { $or: branchOrConditions }
         ]
     });
 };
@@ -145,10 +146,10 @@ module.exports = function tenantPlugin(schema, options = {}) {
             }
 
             // Only models that actually carry a branch can be branch-scoped.
-            if (schema.path('branchId')) {
+            if (schema.path('branchId') || schema.path('assignedBranches')) {
                 const branchIds = getScopedBranches();
                 if (branchIds) {
-                    addBranchFilter(this, branchIds);
+                    addBranchFilter(this, branchIds, schema);
                 }
             }
 

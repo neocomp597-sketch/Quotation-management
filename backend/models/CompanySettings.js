@@ -58,6 +58,12 @@ const CompanySettingsSchema = new mongoose.Schema({
     // Default Terms & Conditions
     defaultTerms: { type: String },
 
+    // MGR Master Information Text
+    mgrInfoText: {
+        type: String,
+        default: 'MGR (Master Group & Sub-Group Hierarchy) defines the 5-level classification matrix (MGR1 to MGR5) for all products, components, and inventory items across the organization.\n\n• MGR1: Product Category / Division\n• MGR2: Product Sub-Category\n• MGR3: Product Line / Group\n• MGR4: Model Series & Specifications\n• MGR5: Spares & Component Parts\n\nUse this screen to manage MGR codes, descriptions, and hierarchy levels.'
+    },
+
     // Quotation prefix settings
     quotationPrefix: { type: String, default: 'ARM/QTN' },
 

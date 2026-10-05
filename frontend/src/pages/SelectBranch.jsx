@@ -1,15 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { branchService } from '../services/api';
 import { toast } from 'react-toastify';
 import { MdStorefront, MdCheckCircle, MdArrowForward, MdLocationOn, MdDomain, MdShield } from 'react-icons/md';
 
 const SelectBranch = () => {
     const navigate = useNavigate();
     const location = useLocation();
-    const { user, assignedBranches, setActiveBranch, activeBranchId } = useAuth();
+    const { user, assignedBranches, setActiveBranch, activeBranchId, isSuperAdmin } = useAuth();
 
+    const [availableBranches, setAvailableBranches] = useState([]);
     const [selectedBranch, setSelectedBranch] = useState(null);
+    const [loadingBranches, setLoadingBranches] = useState(true);
 
     useEffect(() => {
         if (!user) {
@@ -17,12 +20,39 @@ const SelectBranch = () => {
             return;
         }
 
-        // Pre-select currently active branch or first assigned branch
-        if (assignedBranches && assignedBranches.length > 0) {
-            const current = assignedBranches.find(b => (typeof b === 'object' ? (b._id || b.id) : b) === activeBranchId) || assignedBranches[0];
-            setSelectedBranch(current);
-        }
-    }, [user, assignedBranches, activeBranchId, navigate]);
+        let isMounted = true;
+        const loadBranches = async () => {
+            setLoadingBranches(true);
+            try {
+                if (isSuperAdmin || !assignedBranches || assignedBranches.length === 0) {
+                    const res = await branchService.getAll();
+                    const list = res.data?.branches || res.data?.data || (Array.isArray(res.data) ? res.data : []);
+                    if (isMounted) {
+                        setAvailableBranches(list);
+                        const current = list.find(b => (b._id || b.id) === activeBranchId) || list[0] || null;
+                        setSelectedBranch(current);
+                    }
+                } else {
+                    if (isMounted) {
+                        setAvailableBranches(assignedBranches);
+                        const current = assignedBranches.find(b => (typeof b === 'object' ? (b._id || b.id) : b) === activeBranchId) || assignedBranches[0];
+                        setSelectedBranch(current);
+                    }
+                }
+            } catch (err) {
+                console.error("Error loading branches for selection:", err);
+                if (isMounted && assignedBranches && assignedBranches.length > 0) {
+                    setAvailableBranches(assignedBranches);
+                    setSelectedBranch(assignedBranches[0]);
+                }
+            } finally {
+                if (isMounted) setLoadingBranches(false);
+            }
+        };
+
+        loadBranches();
+        return () => { isMounted = false; };
+    }, [user, assignedBranches, activeBranchId, isSuperAdmin, navigate]);
 
     const handleContinue = () => {
         if (!selectedBranch) {
@@ -63,7 +93,7 @@ const SelectBranch = () => {
                 <div className="bg-white/90 dark:bg-slate-900/80 backdrop-blur-xl border border-slate-200/80 dark:border-teal-500/20 rounded-3xl p-6 sm:p-8 shadow-2xl shadow-slate-200/60 dark:shadow-teal-950/50 transition-colors duration-300">
                     <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100 dark:border-slate-800">
                         <span className="text-xs font-black uppercase tracking-widest text-teal-700 dark:text-teal-400 flex items-center gap-2">
-                            <MdDomain size={18} className="text-teal-600 dark:text-teal-400" /> Assigned Branches ({assignedBranches?.length || 0})
+                            <MdDomain size={18} className="text-teal-600 dark:text-teal-400" /> Available Branches ({availableBranches?.length || 0})
                         </span>
                         <span className="text-xs font-bold text-teal-800 dark:text-teal-300 bg-teal-50 dark:bg-teal-950/60 px-3 py-1 rounded-full border border-teal-200 dark:border-teal-800/80">
                             Required Selection
@@ -71,8 +101,12 @@ const SelectBranch = () => {
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
-                        {assignedBranches && assignedBranches.length > 0 ? (
-                            assignedBranches.map((branch, idx) => {
+                        {loadingBranches ? (
+                            <div className="col-span-2 text-center py-8 text-slate-500 dark:text-slate-400 font-semibold animate-pulse">
+                                Loading available branches...
+                            </div>
+                        ) : availableBranches && availableBranches.length > 0 ? (
+                            availableBranches.map((branch, idx) => {
                                 const branchId = typeof branch === 'object' ? (branch._id || branch.id) : branch;
                                 const branchName = typeof branch === 'object' ? (branch.name || 'Branch') : `Branch (${branch})`;
                                 const branchCode = typeof branch === 'object' ? branch.code : '';

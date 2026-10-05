@@ -117,9 +117,20 @@ exports.protect = async (req, res, next) => {
             // limited to the branches assigned to them, enforced for all queries by
             // tenantPlugin so it cannot be bypassed by calling the API directly.
             const { getScopedBranchIds } = require('../utils/accessControl');
-            const isAdminRole = ['admin', 'company_admin'].includes(String(user.role || '').toLowerCase());
-            const branchIds = getScopedBranchIds(req.user);
-            const branchScoped = !isSuperAdmin && !isAdminRole && branchIds.length > 0;
+            const activeBranchHeader = req.headers['x-active-branch'] || req.headers['x-branch-id'] || req.query?.activeBranchId;
+
+            let branchIds = [];
+            let branchScoped = false;
+
+            if (activeBranchHeader && activeBranchHeader !== 'all' && activeBranchHeader !== 'null' && activeBranchHeader !== 'undefined') {
+                branchScoped = true;
+                branchIds = [activeBranchHeader.toString()];
+            } else {
+                const isAdminRole = ['admin', 'company_admin'].includes(String(user.role || '').toLowerCase());
+                const userBranchIds = getScopedBranchIds(req.user);
+                branchScoped = !isSuperAdmin && !isAdminRole && userBranchIds.length > 0;
+                branchIds = userBranchIds;
+            }
 
             runWithTenant(req.user.companyId, () => next(), {
                 bypassTenant: isSuperAdmin,

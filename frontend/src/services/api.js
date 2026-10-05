@@ -348,6 +348,8 @@ export const superAdminService = {
 export const mgrService = {
   getAll: (type, params = {}) => api.get("/mgrs", { params: { ...(type ? { type } : {}), ...params } }),
   getById: (id) => api.get(`/mgrs/${id}`),
+  getInfo: () => api.get("/mgrs/info"),
+  updateInfo: (infoText) => api.put("/mgrs/info", { infoText }),
   create: (data) => api.post("/mgrs", data),
   update: (id, data) => api.put(`/mgrs/${id}`, data),
   delete: (id) => api.delete(`/mgrs/${id}`),

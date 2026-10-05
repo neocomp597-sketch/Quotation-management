@@ -11,7 +11,7 @@ import React from 'react';
 
 const SHEET_WIDTH = 1120;
 
-const BORDER = '1px solid #000000';
+const BORDER = '1.5px solid #000000';
 const FONT = "Arial, 'Helvetica Neue', Helvetica, sans-serif";
 
 const cell = (extra = {}) => ({

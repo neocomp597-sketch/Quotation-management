@@ -104,23 +104,15 @@ export const MENU_PERMISSION_GROUPS = [
         ]
     },
     {
-        key: 'purchase',
-        label: 'Material',
-        description: 'Goods Receipt Note (GRN) and material tracking',
-        defaultRoute: '/grn',
-        children: [
-            { key: 'purchase_grn', label: 'GRN Register', description: 'Goods receipt note and material tracking screens', defaultRoute: '/grn' }
-        ]
-    },
-    {
         key: 'inventory',
         label: 'Inventory',
-        description: 'Stock matrix, warehouses, stock transfers, adjustments, audits, alerts, and valuation',
+        description: 'Stock matrix, warehouses, GRN inward goods, stock transfers, adjustments, audits, alerts, and valuation',
         defaultRoute: '/inventory/dashboard',
         children: [
             { key: 'inventory_dashboard', label: 'Inventory Dashboard', description: 'Stock valuation, movement feed, and KPI metrics', defaultRoute: '/inventory/dashboard' },
             { key: 'inventory_items', label: 'Items & Matrix', description: 'Warehouse-wise stock and batch details', defaultRoute: '/inventory/stock' },
             { key: 'inventory_warehouses', label: 'Warehouses', description: 'Manage warehouses and storage bins', defaultRoute: '/inventory/warehouses' },
+            { key: 'purchase_grn', label: 'Goods Receipt Note (GRN)', description: 'Goods receipt note and material tracking screens', defaultRoute: '/grn' },
             { key: 'inventory_transfers', label: 'Stock Transfers', description: 'Inter-warehouse transfers and approvals', defaultRoute: '/inventory/transfers' },
             { key: 'inventory_adjustments', label: 'Adjustments', description: 'Damage, loss, and physical audit adjustments', defaultRoute: '/inventory/adjustments' },
             { key: 'inventory_stock_counts', label: 'Physical Audit', description: 'Physical count sessions and reconciliation', defaultRoute: '/inventory/counts' },

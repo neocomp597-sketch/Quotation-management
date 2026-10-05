@@ -2,13 +2,15 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { csmService, userService, uploadService, mgrService, productService } from '../services/api';
 import { toast } from 'react-toastify';
+import { jsPDF } from 'jspdf';
+import * as XLSX from 'xlsx';
 import { 
     MdAssignment, MdPerson, MdCalendarMonth, 
     MdFeedback, MdArrowBack, MdSave, 
     MdWarning, MdCheckCircleOutline, MdCheckCircle, MdChat,
     MdMyLocation, MdLocationOn, MdStar, MdStarBorder, MdMap, MdOpenInNew,
     MdPhotoCamera, MdCloudUpload, MdDelete, MdAssignmentTurnedIn,
-    MdZoomIn, MdClose, MdAccountTree
+    MdZoomIn, MdClose, MdAccountTree, MdFileDownload
 } from 'react-icons/md';
 import ComplaintBOMPanel from '../components/bom/ComplaintBOMPanel';
 import Modal from '../components/Modal';
@@ -1322,7 +1324,93 @@ const TicketDetail = () => {
                                     ))}
                                     
                                     <div className="border-t border-slate-50 pt-4 mt-4">
-                                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-3">Audit Activity Log</span>
+                                        <div className="flex items-center justify-between mb-3">
+                                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block">Audit Activity Log</span>
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        if (!ticket || !ticket.timeline || ticket.timeline.length === 0) {
+                                                            toast.info('No audit log entries to export');
+                                                            return;
+                                                        }
+                                                        try {
+                                                            const doc = new jsPDF();
+                                                            const activeBranchName = localStorage.getItem('activeBranchName') || localStorage.getItem('activeBranchId') || 'All Branches';
+                                                            
+                                                            doc.setFontSize(16);
+                                                            doc.text(`Audit Activity Log - Ticket #${ticket.ticketNo}`, 14, 20);
+                                                            
+                                                            doc.setFontSize(10);
+                                                            doc.text(`Customer: ${ticket.customerId?.customerName || 'N/A'}`, 14, 28);
+                                                            doc.text(`Branch: ${activeBranchName}`, 14, 34);
+                                                            doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 40);
+
+                                                            let y = 50;
+                                                            doc.setFontSize(11);
+                                                            doc.text('Activity Details:', 14, y);
+                                                            y += 8;
+
+                                                            doc.setFontSize(9);
+                                                            ticket.timeline.forEach((t, idx) => {
+                                                                const dateStr = new Date(t.createdAt).toLocaleString();
+                                                                const text = `${idx + 1}. [${dateStr}] ${t.activityType}: ${t.description || ''}`;
+                                                                const lines = doc.splitTextToSize(text, 180);
+                                                                if (y + lines.length * 6 > 280) {
+                                                                    doc.addPage();
+                                                                    y = 20;
+                                                                }
+                                                                doc.text(lines, 14, y);
+                                                                y += lines.length * 6 + 2;
+                                                            });
+
+                                                            doc.save(`Audit_Log_Ticket_${ticket.ticketNo}.pdf`);
+                                                            toast.success('Audit log PDF exported successfully');
+                                                        } catch (err) {
+                                                            console.error('Export PDF error:', err);
+                                                            toast.error('Failed to export PDF');
+                                                        }
+                                                    }}
+                                                    className="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 shadow-2xs cursor-pointer"
+                                                    title="Export Audit Activity Log to PDF"
+                                                >
+                                                    <MdFileDownload size={14} /> PDF
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        if (!ticket || !ticket.timeline || ticket.timeline.length === 0) {
+                                                            toast.info('No audit log entries to export');
+                                                            return;
+                                                        }
+                                                        try {
+                                                            const activeBranchName = localStorage.getItem('activeBranchName') || localStorage.getItem('activeBranchId') || 'All Branches';
+                                                            const data = ticket.timeline.map((t, idx) => ({
+                                                                'S.No': idx + 1,
+                                                                'Ticket No': ticket.ticketNo,
+                                                                'Date & Time': new Date(t.createdAt).toLocaleString(),
+                                                                'Activity Type': t.activityType,
+                                                                'Description': t.description || '',
+                                                                'Active Branch': activeBranchName
+                                                            }));
+
+                                                            const worksheet = XLSX.utils.json_to_sheet(data);
+                                                            const workbook = XLSX.utils.book_new();
+                                                            XLSX.utils.book_append_sheet(workbook, worksheet, 'Audit Activity Log');
+                                                            XLSX.writeFile(workbook, `Audit_Log_Ticket_${ticket.ticketNo}.xlsx`);
+                                                            toast.success('Audit log Excel exported successfully');
+                                                        } catch (err) {
+                                                            console.error('Export Excel error:', err);
+                                                            toast.error('Failed to export Excel');
+                                                        }
+                                                    }}
+                                                    className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 shadow-2xs cursor-pointer"
+                                                    title="Export Audit Activity Log to Excel"
+                                                >
+                                                    <MdFileDownload size={14} /> Excel
+                                                </button>
+                                            </div>
+                                        </div>
                                         <div className="space-y-3 border-l-2 border-slate-100 ml-2 pl-4">
                                             {ticket.timeline?.map((t, idx) => {
                                                 let displayDesc = t.description || '';
@@ -1372,6 +1460,7 @@ const TicketDetail = () => {
                                                 const lat = coordMatch ? coordMatch[1] : null;
                                                 const lng = coordMatch ? coordMatch[2] : null;
                                                 const mapUrl = (lat && lng) ? `https://www.google.com/maps?q=${lat},${lng}` : null;
+                                                const timestampStr = new Date(t.createdAt).toLocaleString();
 
                                                 return (
                                                     <div key={idx} className="relative pb-2.5">
@@ -1379,8 +1468,7 @@ const TicketDetail = () => {
                                                         <div className="text-xs flex items-start justify-between gap-3">
                                                             <div className="flex-1">
                                                                 <span className="font-bold text-slate-900">{t.activityType}: </span>
-                                                                <span className="text-slate-600 font-medium">{displayDesc}</span>
-                                                                <span className="text-[9px] text-slate-400 block mt-0.5">{new Date(t.createdAt).toLocaleString()}</span>
+                                                                <span className="text-slate-600 font-medium">{displayDesc} — <span className="text-[10px] text-slate-400 font-normal">{timestampStr}</span></span>
                                                             </div>
                                                             {mapUrl && (
                                                                 <a

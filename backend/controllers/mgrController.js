@@ -115,3 +115,46 @@ exports.deleteMGR = async (req, res) => {
         res.status(500).json({ message: err.message });
     }
 };
+
+// Get MGR Info Text
+exports.getMGRInfoText = async (req, res) => {
+    try {
+        const CompanySettings = require('../models/CompanySettings');
+        const companyId = req.query?.companyId || req.user?.companyId;
+        const query = companyId ? { companyId } : {};
+        let settings = await CompanySettings.findOne(query).lean();
+        if (!settings) {
+            settings = await CompanySettings.findOne().lean();
+        }
+        res.json({
+            infoText: settings?.mgrInfoText || 'MGR (Master Group & Sub-Group Hierarchy) defines the 5-level classification matrix (MGR1 to MGR5) for all products, components, and inventory items across the organization.\n\n• MGR1: Product Category / Division\n• MGR2: Product Sub-Category\n• MGR3: Product Line / Group\n• MGR4: Model Series & Specifications\n• MGR5: Spares & Component Parts\n\nUse this screen to manage MGR codes, descriptions, and hierarchy levels.'
+        });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+};
+
+// Update MGR Info Text
+exports.updateMGRInfoText = async (req, res) => {
+    try {
+        const CompanySettings = require('../models/CompanySettings');
+        const { infoText } = req.body;
+        if (typeof infoText !== 'string') {
+            return res.status(400).json({ message: 'infoText string is required' });
+        }
+        const companyId = req.query?.companyId || req.user?.companyId;
+        const query = companyId ? { companyId } : {};
+        let settings = await CompanySettings.findOne(query);
+        if (!settings) {
+            settings = await CompanySettings.findOne();
+        }
+        if (!settings) {
+            return res.status(404).json({ message: 'Company settings not found' });
+        }
+        settings.mgrInfoText = infoText;
+        await settings.save();
+        res.json({ message: 'MGR information text updated successfully', infoText: settings.mgrInfoText });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+};
