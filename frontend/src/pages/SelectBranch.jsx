@@ -10,7 +10,9 @@ const branchIdOf = (branch) => (typeof branch === 'object' && branch ? (branch._
 const SelectBranch = () => {
     const navigate = useNavigate();
     const location = useLocation();
-    const { user, assignedBranches, setActiveBranch, activeBranchId } = useAuth();
+    const { user, assignedBranches, setActiveBranch, activeBranchId, isAdmin, isSuperAdmin } = useAuth();
+    const isAdminUser = Boolean(isAdmin || isSuperAdmin);
+    const homeBranchId = branchIdOf(user?.branchId) ? String(branchIdOf(user?.branchId)) : null;
 
     const [availableBranches, setAvailableBranches] = useState([]);
     const [selectedBranch, setSelectedBranch] = useState(null);
@@ -24,7 +26,19 @@ const SelectBranch = () => {
         }
 
         let isMounted = true;
-        const pickCurrent = (list) => list.find(b => String(branchIdOf(b)) === String(activeBranchId)) || list[0] || null;
+        // Preselect the branch this session works in, else the branch persisted on the
+        // user (their last choice), else their home branch, else the first in the list.
+        const preferredIds = [activeBranchId, user?.activeBranchId, user?.branchId]
+            .map(branchIdOf)
+            .filter(Boolean)
+            .map(String);
+        const pickCurrent = (list) => {
+            for (const id of preferredIds) {
+                const match = list.find(b => String(branchIdOf(b)) === id);
+                if (match) return match;
+            }
+            return list[0] || null;
+        };
 
         const loadBranches = async () => {
             setLoadingBranches(true);
@@ -114,7 +128,10 @@ const SelectBranch = () => {
                         Select Active Branch
                     </h1>
                     <p className="text-sm font-semibold text-slate-600 dark:text-slate-400 mt-2 max-w-md mx-auto">
-                        Welcome back, <span className="text-teal-700 dark:text-teal-300 font-bold">{user?.name}</span>! You have access to multiple branches. Choose one to scope your session.
+                        Welcome back, <span className="text-teal-700 dark:text-teal-300 font-bold">{user?.name}</span>!{' '}
+                        {isAdminUser
+                            ? 'As an admin you can work in any branch of the company. Choose the one to start in; you can switch from the header at any time.'
+                            : 'You have access to multiple branches. Choose one to scope your session.'}
                     </p>
                 </div>
 
@@ -142,7 +159,7 @@ const SelectBranch = () => {
                                 const branchPrefix = typeof branch === 'object' ? branch.branchPrefix : '';
                                 const selectedId = typeof selectedBranch === 'object' ? (selectedBranch?._id || selectedBranch?.id) : selectedBranch;
                                 const isSelected = selectedId === branchId;
-                                const isPrimary = idx === 0;
+                                const isHome = Boolean(homeBranchId) && String(branchId) === homeBranchId;
 
                                 return (
                                     <div
@@ -192,13 +209,13 @@ const SelectBranch = () => {
                                         )}
 
                                         <div className="mt-3 flex items-center justify-between">
-                                            {isPrimary ? (
+                                            {isHome ? (
                                                 <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-100 dark:bg-emerald-500/15 text-emerald-800 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/30 px-2 py-0.5 rounded-md">
-                                                    Primary Branch
+                                                    Your Home Branch
                                                 </span>
                                             ) : (
                                                 <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-                                                    Assigned Branch
+                                                    {isAdminUser ? 'Company Branch' : 'Assigned Branch'}
                                                 </span>
                                             )}
                                         </div>

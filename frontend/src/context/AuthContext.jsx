@@ -165,6 +165,35 @@ export const AuthProvider = ({ children }) => {
         }
     }, [storeActiveBranch]);
 
+    /**
+     * Re-reads the branches this user may work in from the server and stores them on
+     * the session user. A session opened before a branch was added, or before the
+     * user's role changed, would otherwise keep its stale list until the next login.
+     */
+    const syncBranchOptions = useCallback(async () => {
+        try {
+            const res = await authService.getBranchOptions();
+            const branches = Array.isArray(res.data?.branches) ? res.data.branches : null;
+            if (!branches) return;
+            const serverActiveId = res.data?.activeBranchId ? String(res.data.activeBranchId) : null;
+
+            setUser((prev) => {
+                if (!prev) return prev;
+                const next = { ...prev, assignedBranches: branches, activeBranchId: serverActiveId || prev.activeBranchId || null };
+                localStorage.setItem("user", JSON.stringify(next));
+                return next;
+            });
+
+            if (!localStorage.getItem("activeBranchId") && serverActiveId) {
+                storeActiveBranch(branches.find((b) => String(branchIdOf(b)) === serverActiveId) || serverActiveId);
+            }
+        } catch (err) {
+            // An unusable stored branch answers 403; the API client then clears it and
+            // returns to the selection screen. Anything else keeps the stored list.
+            console.warn("Could not refresh branch options:", err);
+        }
+    }, [storeActiveBranch]);
+
     const clearSession = useCallback(() => {
         clearApiCache(); // never let the next user see this session's cached data
         setAccessToken(null);
@@ -222,6 +251,8 @@ export const AuthProvider = ({ children }) => {
             setAccessToken(storedToken);
             setUser(storedUser);
             syncActiveBranchFromSession(storedUser);
+            // The branch list saved with the session may be stale; the server's answer wins.
+            await syncBranchOptions();
 
             let nextPermissions = {};
             try {
@@ -238,7 +269,7 @@ export const AuthProvider = ({ children }) => {
         }
 
         await refreshSession();
-    }, [dispatch, refreshSession, syncActiveBranchFromSession]);
+    }, [dispatch, refreshSession, syncActiveBranchFromSession, syncBranchOptions]);
 
     useEffect(() => {
         bootstrapFromStoredSession();

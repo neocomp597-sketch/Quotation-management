@@ -4,9 +4,10 @@
  *
  * Vocabulary:
  *  - assigned branches: Branch ids on the user (assignedBranches, else branchId)
- *  - selectable branches: what the user may pick as active branch. Users with an
- *    assignment pick from it; admins / super admins / users without any assignment
- *    pick from every branch of the company.
+ *  - selectable branches: what the user may pick as active branch. Non-admin users
+ *    with an assignment pick from it; admins / super admins (whatever branch their
+ *    own record carries) and users without any assignment pick from every branch
+ *    of the company.
  *  - active branch: the single branch the user is working in right now. It is sent
  *    by the UI on every request (x-active-branch) and persisted on the user so API
  *    clients without the header, exports and background work share the context.
@@ -53,8 +54,13 @@ const getAssignedBranchIds = (user) => {
     return primary ? [primary] : [];
 };
 
-/** Branch ids the user may select; null means every branch of the company. */
+/**
+ * Branch ids the user may select; null means every branch of the company.
+ * Admins and super admins always get every branch: the branch on their own record
+ * is only their home branch (attendance, HR), never a limit on what they may see.
+ */
 const getSelectableBranchIds = (user) => {
+    if (isBranchAdminRole(user?.role)) return null;
     const assigned = getAssignedBranchIds(user);
     return assigned.length > 0 ? assigned : null;
 };
@@ -83,16 +89,16 @@ const forgetBranchLookups = () => branchLookupCache.clear();
 
 /**
  * Whether `branchId` may be the active branch of `user`.
- * Users with assigned branches must stay inside them; everyone else may use any
- * branch of the company they are working in.
+ * Non-admin users with assigned branches must stay inside them; admins and users
+ * without an assignment may use any branch of the company they are working in.
  */
 const canUseBranch = async (user, branchId, companyId) => {
     const normalized = normalizeBranchId(branchId);
     if (!normalized || !isObjectIdString(normalized)) return false;
 
-    const assigned = getAssignedBranchIds(user);
-    if (assigned.length > 0) {
-        return assigned.includes(normalized);
+    const selectable = getSelectableBranchIds(user);
+    if (selectable) {
+        return selectable.includes(normalized);
     }
     return branchExistsInCompany(normalized, companyId || idOf(user?.companyId));
 };

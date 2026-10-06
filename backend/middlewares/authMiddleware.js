@@ -7,6 +7,7 @@ const {
     normalizeBranchId,
     canUseBranch,
     getAssignedBranchIds,
+    getSelectableBranchIds,
     isBranchAdminRole,
 } = require('../utils/branchScope');
 
@@ -162,8 +163,8 @@ exports.protect = async (req, res, next) => {
             }
 
             req.user.activeBranchId = activeBranchId;
-            // null = every branch of the company (admins without an assignment)
-            req.user.allowedBranchIds = assignedBranchIds.length > 0 ? assignedBranchIds : null;
+            // null = every branch of the company (admins, and users without an assignment)
+            req.user.allowedBranchIds = getSelectableBranchIds(req.user);
             req.activeBranchId = activeBranchId;
 
             // Branch scoping, enforced for every query by tenantPlugin so it cannot be

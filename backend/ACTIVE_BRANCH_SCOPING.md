@@ -6,11 +6,16 @@ query to. This applies to every role, super admin included.
 
 ## Flow
 
-1. Login returns `user.assignedBranches` (the branches the user may work in: their
-   assignment, or every company branch for admins / super admins without one),
+1. Login returns `user.assignedBranches` (the branches the user may work in: every
+   company branch for admins / super admins, whatever branch their own record
+   carries, since that is only their home branch; the assignment for everyone else),
    `user.activeBranchId` and `user.activeBranch`.
-2. A super admin or a multi-branch user is sent to **Select Active Branch**. A
-   single-branch user gets their branch applied automatically.
+2. A user with more than one branch to choose from (every admin of a multi-branch
+   company) is sent to **Select Active Branch**, preselected to the branch they last
+   worked in, else their home branch. A single-branch user gets their branch applied
+   automatically. A session that is already open re-reads `GET /api/auth/branches`
+   at startup, so branches added later (or a changed role) show up in the header
+   switcher without logging in again.
 3. `PUT /api/auth/active-branch { branchId }` validates the branch against the user's
    selectable branches and persists it on the user (`User.activeBranchId`).
 4. The frontend sends `x-active-branch: <branchId>` on every request. Switching the
