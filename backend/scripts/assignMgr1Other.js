@@ -1,8 +1,9 @@
 /**
  * One-time migration: assign MGR 1 = OTHER to Product Master records.
  *
- * For each company it makes sure an MGR1 master entry with code "OTHER" exists
- * (created as "OTHER - Other" when missing), then sets products' mgr1 to it.
+ * For each company it uses the existing "other" MGR1 entry (code OTH / OTHER / OTHERS,
+ * or description Other), creating "OTHER - Other" only when none exists, then sets
+ * products' mgr1 to it.
  *
  * By default only products WITHOUT an MGR 1 (null / missing / pointing at a deleted
  * MGR) are changed, so legitimate assignments are kept. Pass --overwrite to set
@@ -54,11 +55,16 @@ const run = async () => {
     console.log(`${APPLY ? 'APPLY' : 'DRY RUN'} | mode: ${OVERWRITE ? 'overwrite every product' : 'only products without MGR 1'}`);
 
     for (const companyId of companyIds) {
+        // Reuse the company's existing "other" MGR1 (Stelmec keeps OTH - OTHER) before
+        // creating one, so a re-run never adds a duplicate.
         let other = await mgrs.findOne({
             companyId,
             mgrType: 'MGR1',
-            code: { $regex: `^${OTHER_CODE}$`, $options: 'i' }
-        });
+            $or: [
+                { code: { $regex: '^(OTH|OTHER|OTHERS)$', $options: 'i' } },
+                { description: { $regex: '^others?$', $options: 'i' } }
+            ]
+        }, { sort: { createdAt: 1 } });
 
         if (!other) {
             console.log(`[${companyId}] MGR1 "${OTHER_CODE}" does not exist${APPLY ? ' - creating it' : ' - would be created'}`);

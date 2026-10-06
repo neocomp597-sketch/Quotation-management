@@ -110,6 +110,37 @@ exports.deleteDivision = async (req, res) => {
 
 // ─── SEGMENT MASTER ──────────────────────────────────────────────────────────
 
+/**
+ * Rule: an Active Division keeps at least one Active Segment. A change that would take an
+ * Active Division from one active segment to none (deactivating, deleting or moving its
+ * last active segment) is refused. A Division that has no segments yet (e.g. EXP / CCD
+ * while their segments are still to be defined) is not blocked: it can exist and stay
+ * Active, and Invoice Bulk Upload simply cannot save an entry under it until a segment
+ * is added. Deactivating a Division never breaks the rule, so it is always allowed.
+ */
+const assertDivisionKeepsActiveSegment = async (divisionId, leavingSegmentId) => {
+    if (!divisionId) return;
+    const division = await Division.findById(divisionId).select("code status").lean();
+    if (!division || division.status !== "Active") return;
+    const remaining = await Segment.countDocuments({
+        divisionId,
+        status: "Active",
+        _id: { $ne: leavingSegmentId }
+    });
+    if (remaining === 0) {
+        throw Object.assign(
+            new Error(`Division ${division.code} is Active and must keep at least one Active Segment. Add or activate another ${division.code} segment first.`),
+            { statusCode: 400 }
+        );
+    }
+};
+
+// Whether saving `next` over `current` takes the segment out of its division's active list.
+const leavesDivisionActiveList = (current, next) => (
+    current.status === "Active"
+    && (next.status !== "Active" || String(next.divisionId) !== String(current.divisionId))
+);
+
 exports.getSegments = async (req, res) => {
     try {
         const filter = {};
@@ -162,6 +193,11 @@ exports.createSegment = async (req, res) => {
 exports.updateSegment = async (req, res) => {
     try {
         const data = await readSegmentBody(req.body);
+        const current = await Segment.findById(req.params.id).select("divisionId status").lean();
+        if (!current) return res.status(404).json({ message: "Segment not found" });
+        if (leavesDivisionActiveList(current, data)) {
+            await assertDivisionKeepsActiveSegment(current.divisionId, current._id);
+        }
         const segment = await Segment.findByIdAndUpdate(
             req.params.id,
             { ...data, updatedAt: new Date() },
@@ -190,11 +226,16 @@ exports.deleteSegment = async (req, res) => {
         if (assetCount) {
             return res.status(400).json({ message: `Segment is used by ${assetCount} invoice record(s). Set it Inactive instead.` });
         }
+        const current = await Segment.findById(id).select("divisionId status").lean();
+        if (!current) return res.status(404).json({ message: "Segment not found" });
+        if (current.status === "Active") {
+            await assertDivisionKeepsActiveSegment(current.divisionId, current._id);
+        }
         const segment = await Segment.findByIdAndDelete(id);
         if (!segment) return res.status(404).json({ message: 'Segment not found' });
         res.json({ message: 'Segment deleted' });
     } catch (err) {
-        res.status(500).json({ message: err.message || 'Error deleting segment' });
+        res.status(err.statusCode || 500).json({ message: err.message || 'Error deleting segment' });
     }
 };
 
@@ -321,7 +362,13 @@ exports.importSegments = async (req, res) => {
                     const update = { divisionId: division._id, updatedAt: new Date() };
                     if (description) update.description = description;
                     if (statusRaw) update.status = normalizeStatus(statusRaw);
+                    const nextState = { status: update.status || existing.status, divisionId: division._id };
+                    if (leavesDivisionActiveList(existing, nextState)) {
+                        await assertDivisionKeepsActiveSegment(existing.divisionId, existing._id);
+                    }
                     await Segment.updateOne({ _id: existing._id }, { $set: update });
+                    // Keep the in-memory list current so later rows see this change.
+                    lookup.segmentByCode.set(segmentCode, { ...existing, ...update });
                     if (String(existing.divisionId) !== String(division._id)) {
                         await Asset.updateMany({ segmentId: existing._id }, { $set: { divisionId: division._id } }).setOptions({ bypassBranch: true });
                     }

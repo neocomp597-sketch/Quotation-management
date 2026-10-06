@@ -19,6 +19,10 @@ const DEFAULT_DIVISIONS = [
     { code: 'OTHERS', description: 'Others' }
 ];
 
+// Shown when a Division has no active segment yet (e.g. EXP / CCD before their segments
+// are defined): no Invoice Bulk Upload entry can be saved under it.
+const NO_ACTIVE_SEGMENTS_MESSAGE = 'No active segments are configured for this Division. Please contact the administrator.';
+
 const normalizeCode = (value) => String(value ?? '').trim().toUpperCase();
 
 /** "IND - IND" — how a division or segment is shown wherever the user picks one. */
@@ -131,7 +135,14 @@ const resolveDivisionSegment = (lookup, input = {}, { required = false } = {}) =
 
     if (required) {
         if (!division) throw validationError('Division is required.');
-        if (!segment) throw validationError('Segment is required.');
+        if (!segment) {
+            const hasActiveSegment = [...lookup.segmentById.values()].some(
+                (s) => String(s.divisionId) === String(division._id) && s.status === 'Active'
+            );
+            throw validationError(hasActiveSegment
+                ? 'Segment is required.'
+                : NO_ACTIVE_SEGMENTS_MESSAGE);
+        }
     }
 
     return { division, segment };
@@ -219,6 +230,7 @@ const addDivisionSegmentDropdowns = (workbook, worksheet, {
 
 module.exports = {
     DEFAULT_DIVISIONS,
+    NO_ACTIVE_SEGMENTS_MESSAGE,
     normalizeCode,
     formatCodeLabel,
     seedDefaultDivisions,

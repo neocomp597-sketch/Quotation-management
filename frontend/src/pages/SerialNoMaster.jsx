@@ -52,6 +52,10 @@ const codeLabel = (doc) => {
 
 const idOf = (value) => String(value?._id || value || '');
 
+// Same wording as the backend: an entry cannot be saved under a Division that has no
+// active segment yet (e.g. EXP / CCD until their segments are defined).
+const NO_ACTIVE_SEGMENTS_MESSAGE = "No active segments are configured for this Division. Please contact the administrator.";
+
 const EMPTY_SINGLE_FORM = {
     serialNumber: '',
     productCode: '',
@@ -134,6 +138,9 @@ const SerialNoMaster = () => {
             ? segments.filter(sg => idOf(sg.divisionId) === singleForm.divisionId && (sg.status === 'Active' || idOf(sg) === singleForm.segmentId))
             : []),
         [segments, singleForm.divisionId, singleForm.segmentId]
+    );
+    const divisionHasNoActiveSegments = Boolean(singleForm.divisionId) && !segments.some(
+        sg => idOf(sg.divisionId) === singleForm.divisionId && sg.status === "Active"
     );
 
     // MGR 1-5 on the single-entry form come straight from the Product Master record that
@@ -349,6 +356,9 @@ const SerialNoMaster = () => {
         if (!singleForm.divisionId) {
             return toast.error('Division is required');
         }
+        if (divisionHasNoActiveSegments) {
+            return toast.error(NO_ACTIVE_SEGMENTS_MESSAGE);
+        }
         if (!singleForm.segmentId) {
             return toast.error('Segment is required');
         }
@@ -472,7 +482,7 @@ const SerialNoMaster = () => {
                             <button
                                 type="submit"
                                 form="single-entry-form"
-                                disabled={singleSaving}
+                                disabled={singleSaving || divisionHasNoActiveSegments}
                                 className="px-6 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-emerald-600/20 active:scale-95 disabled:opacity-50 cursor-pointer"
                             >
                                 {singleSaving ? 'Saving Entry...' : (editingAsset ? 'Update Entry' : 'Save Single Entry')}
@@ -605,12 +615,15 @@ const SerialNoMaster = () => {
                                         <option value="">
                                             {!singleForm.divisionId
                                                 ? 'Select Division first'
-                                                : (divisionSegments.length ? 'Select Segment' : 'No segments for this Division')}
+                                                : (divisionHasNoActiveSegments ? 'No active segments' : 'Select Segment')}
                                         </option>
                                         {divisionSegments.map(sg => (
                                             <option key={sg._id} value={sg._id}>{codeLabel(sg)}</option>
                                         ))}
                                     </select>
+                                    {divisionHasNoActiveSegments && (
+                                        <p className="mt-1.5 text-[10px] font-bold text-rose-600">{NO_ACTIVE_SEGMENTS_MESSAGE}</p>
+                                    )}
                                 </div>
                                 <div className="hidden lg:block" aria-hidden="true" />
                                 <div className="col-span-full p-4 bg-slate-50 border border-slate-200 rounded-xl">
