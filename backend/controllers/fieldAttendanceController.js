@@ -112,7 +112,8 @@ exports.checkOut = async (req, res) => {
 
         let attendance = null;
         if (attendanceId) {
-            const query = { _id: attendanceId };
+            // A user can only check out their own attendance record.
+            const query = { _id: attendanceId, engineerId };
             if (companyId) query.companyId = companyId;
             attendance = await FieldAttendance.findOne(query);
         } else {
@@ -158,9 +159,7 @@ exports.checkOut = async (req, res) => {
 exports.getAttendance = async (req, res) => {
     try {
         const companyId = await resolveCompanyId(req);
-        const { engineerId, date } = req.query;
-        const userRole = String(req.user?.role || '').toLowerCase();
-        const isAdmin = userRole === 'admin' || userRole === 'super_admin' || userRole === 'superadmin';
+        const { date } = req.query;
 
         const filter = {};
         if (companyId) filter.companyId = companyId;
@@ -169,12 +168,11 @@ exports.getAttendance = async (req, res) => {
         const branchCondition = scopedBranchCondition();
         if (branchCondition) Object.assign(filter, branchCondition);
 
-        if (!isAdmin) {
-            // Non-admin users are strictly restricted to their own attendance records
-            filter.engineerId = req.user?.id || req.user?._id;
-        } else if (engineerId && engineerId !== 'all') {
-            filter.engineerId = engineerId;
-        }
+        // Every user, admins included, sees only their own attendance records. An
+        // ?engineerId= from the client is ignored so nobody can read another user's log.
+        const selfId = req.user?.id || req.user?._id;
+        if (!selfId) return res.status(401).json({ message: 'Not authorized' });
+        filter.engineerId = selfId;
 
         if (date) {
             const start = getStartOfDay(new Date(date));

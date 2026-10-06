@@ -355,7 +355,6 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
     const [submittingCheckIn, setSubmittingCheckIn] = useState(false);
     const [submittingCheckOut, setSubmittingCheckOut] = useState(false);
     const [attendanceDateFilter, setAttendanceDateFilter] = useState('');
-    const [attendanceEngineerFilter, setAttendanceEngineerFilter] = useState('all');
     const [selectedAttendanceSelfie, setSelectedAttendanceSelfie] = useState(null);
 
     // Check-Out Form State & Logic
@@ -566,15 +565,7 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
             const params = {};
             if (attendanceDateFilter) params.date = attendanceDateFilter;
 
-            const userRole = String(currentUser?.role || '').toLowerCase();
-            const isAdmin = ['admin', 'super_admin', 'superadmin'].includes(userRole);
-
-            if (!isAdmin && (currentUser?._id || currentUser?.id)) {
-                params.engineerId = currentUser._id || currentUser.id;
-            } else if (attendanceEngineerFilter && attendanceEngineerFilter !== 'all') {
-                params.engineerId = attendanceEngineerFilter;
-            }
-
+            // The register shows only the signed-in user's own attendance (enforced by the API).
             const res = await csmService.getAttendance(params);
             const data = Array.isArray(res.data) ? res.data : (res.data?.data || []);
             setAttendanceList(data);
@@ -907,7 +898,7 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
         if (activeTab === 'attendance') {
             fetchAttendanceRecords();
         }
-    }, [activeTab, attendanceDateFilter, attendanceEngineerFilter]);
+    }, [activeTab, attendanceDateFilter]);
 
     // Open create visit modal
     const handleOpenCreateModal = async (preselectedTicketId = '') => {
@@ -2445,10 +2436,10 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
                             <div>
                                 <h3 className="text-lg font-black text-slate-900 font-outfit uppercase">
-                                    Field Engineer Attendance Register
+                                    My Attendance Register
                                 </h3>
                                 <p className="text-xs text-slate-500 font-semibold">
-                                    Historical log of field check-ins, check-outs, area locations, and selfie captures.
+                                    Your own field check-ins, check-outs, area locations, and selfie captures.
                                 </p>
                             </div>
 
@@ -2459,19 +2450,6 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
                                     onChange={(e) => setAttendanceDateFilter(e.target.value)}
                                     className="px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500"
                                 />
-
-                                {['admin', 'super_admin', 'superadmin'].includes(String(currentUser?.role || '').toLowerCase()) && (
-                                    <select
-                                        value={attendanceEngineerFilter}
-                                        onChange={(e) => setAttendanceEngineerFilter(e.target.value)}
-                                        className="px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500"
-                                    >
-                                        <option value="all">All Engineers</option>
-                                        {engineers.map(e => (
-                                            <option key={e._id} value={e._id}>{e.name}</option>
-                                        ))}
-                                    </select>
-                                )}
 
                                 <button
                                     onClick={fetchAttendanceRecords}
