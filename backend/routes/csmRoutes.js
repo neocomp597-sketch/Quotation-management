@@ -64,6 +64,7 @@ router.post('/amcs', protect, warrantyAmcController.createAmc);
 router.get('/amcs', protect, warrantyAmcController.getAmcs);
 router.post('/assets/single', protect, warrantyAmcController.createSingleAsset);
 router.post('/assets/:id/return', protect, warrantyAmcController.returnAsset);
+router.put('/assets/:id', protect, warrantyAmcController.updateAsset);
 router.delete('/assets/:id', protect, warrantyAmcController.deleteAsset);
 router.post('/assets', protect, warrantyAmcController.createAsset);
 router.get('/assets', protect, warrantyAmcController.getAssets);

@@ -7,6 +7,10 @@ const User = require('../models/User');
 const CustomerContact = require('../models/CustomerContact');
 const { broadcastCrmUpdate } = require('../config/socket');
 
+// Tickets are visible from every branch (see models/Ticket.js), so the customer, contact and
+// serial a ticket points to must resolve even when they belong to another branch.
+const CROSS_BRANCH = { bypassBranch: true };
+
 const generateTicketNumber = async (companyId) => {
     const year = new Date().getFullYear();
     const prefix = 'CSM';
@@ -394,14 +398,11 @@ exports.getTickets = async (req, res) => {
             }
         }
 
-        const { getScopedBranchIds } = require('../utils/accessControl');
-        const userBranchIds = getScopedBranchIds(req.user);
-        const isAdmin = ['SUPER_ADMIN', 'ADMIN', 'COMPANY_ADMIN'].includes((req.user?.role || '').toUpperCase());
-
-        if (req.query.branchId) {
+        // Support Tickets are a company-wide register: a ticket raised in any branch is
+        // listed from every branch. Visibility is still limited by the my/team/all
+        // hierarchy rules below; ?branchId= narrows the register on request.
+        if (req.query.branchId && mongoose.Types.ObjectId.isValid(req.query.branchId)) {
             filter.branchId = req.query.branchId;
-        } else if (!isAdmin && userBranchIds.length > 0) {
-            filter.branchId = { $in: userBranchIds };
         }
 
         const andConditions = [];
@@ -513,13 +514,13 @@ exports.getTickets = async (req, res) => {
             const Salesperson = require('../models/Salesperson');
 
             const [customerIds, assetIds, invoiceIds, engineerIds, productIds, salespersonIds, contactIds] = await Promise.all([
-                Customer.find({ companyId, $or: [{ customerName: regex }, { companyName: regex }, { mobile: regex }, { email: regex }] }).distinct('_id'),
-                Asset.find({ companyId, serialNumber: regex }).distinct('_id'),
+                Customer.find({ companyId, $or: [{ customerName: regex }, { companyName: regex }, { mobile: regex }, { email: regex }] }).setOptions({ bypassBranch: true }).distinct('_id'),
+                Asset.find({ companyId, serialNumber: regex }).setOptions({ bypassBranch: true }).distinct('_id'),
                 Voucher.find({ companyId, $or: [{ voucherNumber: regex }, { invoiceNumber: regex }] }).distinct('_id'),
                 Engineer.find({ companyId, $or: [{ name: regex }, { email: regex }] }).distinct('_id'),
                 Product.find({ companyId, $or: [{ productName: regex }, { productCode: regex }] }).distinct('_id'),
                 Salesperson.find({ companyId, name: regex }).distinct('_id'),
-                CustomerContact.find({ companyId, $or: [{ contactName: regex }, { mobileNo: regex }, { email: regex }] }).distinct('_id')
+                CustomerContact.find({ companyId, $or: [{ contactName: regex }, { mobileNo: regex }, { email: regex }] }).setOptions({ bypassBranch: true }).distinct('_id')
             ]);
 
             andConditions.push({
@@ -563,7 +564,7 @@ exports.getTickets = async (req, res) => {
 
         const [tickets, total] = await Promise.all([
             Ticket.find(filter)
-                .populate('customerId', 'customerName companyName email mobile')
+                .populate({ path: 'customerId', select: 'customerName companyName email mobile', options: CROSS_BRANCH })
                 .populate('contactDesignationId', 'name')
                 .populate('categoryId', 'name')
                 .populate('typeId', 'name')
@@ -572,7 +573,7 @@ exports.getTickets = async (req, res) => {
                 .populate('assignedEngineerId', 'name email mobile')
                 .populate('assignedEngineerIds', 'name email mobile status')
                 .populate('productId', 'productName productCode')
-                .populate('assetId', 'serialNumber')
+                .populate({ path: 'assetId', select: 'serialNumber', options: CROSS_BRANCH })
                 .populate('invoiceId', 'voucherNumber invoiceNumber')
                 .populate('assignedSalespersonId', 'name email mobile')
                 .populate('branchId', 'name code branchPrefix')
@@ -607,11 +608,11 @@ exports.getTicketById = async (req, res) => {
             return res.status(400).json({ message: 'Invalid ticket ID format' });
         }
         const ticket = await Ticket.findOne({ _id: req.params.id, companyId: req.user?.companyId })
-            .populate('customerId')
-            .populate('contactId')
+            .populate({ path: 'customerId', options: CROSS_BRANCH })
+            .populate({ path: 'contactId', options: CROSS_BRANCH })
             .populate('contactDesignationId')
             .populate('productId')
-            .populate('assetId')
+            .populate({ path: 'assetId', options: CROSS_BRANCH })
             .populate('invoiceId')
             .populate('categoryId')
             .populate('typeId')
@@ -825,11 +826,11 @@ exports.assignTicket = async (req, res) => {
         await ticket.save();
 
         const updatedTicket = await Ticket.findById(ticket._id)
-            .populate('customerId')
-            .populate('contactId')
+            .populate({ path: 'customerId', options: CROSS_BRANCH })
+            .populate({ path: 'contactId', options: CROSS_BRANCH })
             .populate('contactDesignationId')
             .populate('productId')
-            .populate('assetId')
+            .populate({ path: 'assetId', options: CROSS_BRANCH })
             .populate('invoiceId')
             .populate('categoryId')
             .populate('typeId')
@@ -1268,8 +1269,8 @@ exports.getTicketCustomers = async (req, res) => {
         
         const customers = await Customer.find({ 
             _id: { $in: uniqueCustomerIds },
-            companyId 
-        }).select('customerName companyName email mobile').lean();
+            companyId
+        }).select('customerName companyName email mobile').setOptions(CROSS_BRANCH).lean();
         
         res.json(customers);
     } catch (error) {

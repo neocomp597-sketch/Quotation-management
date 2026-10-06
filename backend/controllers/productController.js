@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Product = require('../models/Product');
 const Vendor = require('../models/Vendor');
 const {
@@ -13,6 +14,9 @@ const PRODUCTS_CACHE_KEY = 'products:all';
 const PRODUCTS_CACHE_TTL_SECONDS = 10 * 60;
 const PRODUCTS_LIST_CACHE_TTL_SECONDS = Number(process.env.PRODUCTS_LIST_CACHE_TTL_SECONDS || 300);
 const PRODUCTS_DETAIL_CACHE_TTL_SECONDS = Number(process.env.PRODUCTS_DETAIL_CACHE_TTL_SECONDS || 300);
+// Product reads are cached in Redis only: an edit (e.g. a changed MGR) must be visible
+// from every server instance at once, not after the in-process cache expires.
+const PRODUCT_CACHE_OPTIONS = { memory: false };
 
 const escapeRegex = (value = '') => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -324,7 +328,7 @@ const getAllProducts = async (req, res) => {
         const cacheKey = listParams
             ? makeCacheKey('products:list', req)
             : makeCacheKey('products:all', req);
-        const { redis, value: cachedProducts } = await getCachedJson(cacheKey);
+        const { redis, value: cachedProducts } = await getCachedJson(cacheKey, PRODUCT_CACHE_OPTIONS);
         if (cachedProducts) {
             return res.json(cachedProducts);
         }
@@ -356,13 +360,13 @@ const getAllProducts = async (req, res) => {
                     pages: Math.ceil(total / limit) || 1,
                 },
             };
-            await setCachedJson(redis, cacheKey, response, PRODUCTS_LIST_CACHE_TTL_SECONDS);
+            await setCachedJson(redis, cacheKey, response, PRODUCTS_LIST_CACHE_TTL_SECONDS, PRODUCT_CACHE_OPTIONS);
             return res.json(response);
         }
 
         const products = await productsQuery.lean();
         const response = products.map(buildProductResponse).filter(Boolean);
-        await setCachedJson(redis, cacheKey, response, PRODUCTS_CACHE_TTL_SECONDS);
+        await setCachedJson(redis, cacheKey, response, PRODUCTS_CACHE_TTL_SECONDS, PRODUCT_CACHE_OPTIONS);
 
         res.json(response);
     } catch (error) {
@@ -375,7 +379,7 @@ const getAllProducts = async (req, res) => {
 const getProductById = async (req, res) => {
     try {
         const cacheKey = `products:detail:${req.user?.companyId || 'unknown'}:${req.params.id}`;
-        const { redis, value: cachedProduct } = await getCachedJson(cacheKey);
+        const { redis, value: cachedProduct } = await getCachedJson(cacheKey, PRODUCT_CACHE_OPTIONS);
         if (cachedProduct) {
             return res.json(cachedProduct);
         }
@@ -385,7 +389,7 @@ const getProductById = async (req, res) => {
             return res.status(404).json({ message: 'Product not found' });
         }
         const response = buildProductResponse(product);
-        await setCachedJson(redis, cacheKey, response, PRODUCTS_DETAIL_CACHE_TTL_SECONDS);
+        await setCachedJson(redis, cacheKey, response, PRODUCTS_DETAIL_CACHE_TTL_SECONDS, PRODUCT_CACHE_OPTIONS);
         res.json(response);
     } catch (error) {
         console.error(error);
@@ -478,11 +482,6 @@ const updateProduct = async (req, res) => {
             uom,
             productImageUrl,
             status,
-            mgr1: mgr1 || undefined,
-            mgr2: mgr2 || undefined,
-            mgr3: mgr3 || undefined,
-            mgr4: mgr4 || undefined,
-            mgr5: mgr5 || undefined,
             attributes: attributes || [],
             catalogType,
             subscriptionDetails,
@@ -494,6 +493,23 @@ const updateProduct = async (req, res) => {
             repairTroubleshootingUrl: repairTroubleshootingUrl ?? '',
             updatedAt: new Date()
         };
+
+        // MGR 1-5: a key sent in the body is always written, so changing an MGR stores the
+        // new id and choosing "Select MGR n" (empty) clears it. A key left out of the body
+        // keeps the stored value.
+        const mgrInput = { mgr1, mgr2, mgr3, mgr4, mgr5 };
+        for (const key of Object.keys(mgrInput)) {
+            if (!Object.prototype.hasOwnProperty.call(req.body, key)) continue;
+            const raw = mgrInput[key];
+            const id = raw && typeof raw === 'object' ? raw._id : raw;
+            if (!id) {
+                updateData[key] = null;
+            } else if (mongoose.Types.ObjectId.isValid(String(id))) {
+                updateData[key] = String(id);
+            } else {
+                return res.status(400).json({ message: `Invalid ${key.toUpperCase()} value` });
+            }
+        }
 
         if (Object.prototype.hasOwnProperty.call(req.body, 'vendors')) {
             const preparedVendors = await validateAndPrepareVendors(vendors || [], { allowEmpty: true });

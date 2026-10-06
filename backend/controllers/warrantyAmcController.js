@@ -7,6 +7,11 @@ const Customer = require('../models/Customer');
 const RolePermission = require('../models/RolePermission');
 const mongoose = require('mongoose');
 const { productMgrPopulate, applyProductMgrs, applyProductMgrsToAll, stripMgrFields } = require('../utils/productMgr');
+const { loadDivisionSegmentLookup, resolveDivisionSegment } = require('../utils/divisionSegment');
+
+// Division / Segment of an Invoice Bulk Upload record, shown as code + description.
+const DIVISION_POPULATE = { path: 'divisionId', select: 'code description status' };
+const SEGMENT_POPULATE = { path: 'segmentId', select: 'code description status divisionId' };
 
 // Utility for regex matching
 const buildExactRegex = (str) => {
@@ -186,7 +191,9 @@ exports.createSingleAsset = async (req, res) => {
             invoiceNumber = '',
             saleDate,
             location = '',
-            indicatorField = ''
+            indicatorField = '',
+            divisionId,
+            segmentId
         } = req.body;
 
         if (!serialNumber || !String(serialNumber).trim()) {
@@ -195,11 +202,24 @@ exports.createSingleAsset = async (req, res) => {
         if (!productCode || !String(productCode).trim()) {
             return res.status(400).json({ message: 'Product Code is required' });
         }
+        // Mobile is optional (the single entry form has no mobile field); a blank value is
+        // filled from the Customer Master below when the customer has one.
         const rawMobile = customerMobile || customerPhone || mobileNumber || '';
-        const cleanMobile = String(rawMobile).trim();
-        if (!cleanMobile) {
-            return res.status(400).json({ message: 'Mobile Number is mandatory' });
+        let cleanMobile = String(rawMobile).trim();
+
+        // Division and Segment are mandatory on a single entry; the segment must belong to
+        // the division.
+        let divisionSegment;
+        try {
+            const lookup = await loadDivisionSegmentLookup(companyId);
+            divisionSegment = resolveDivisionSegment(lookup, { divisionId, segmentId }, { required: true });
+        } catch (err) {
+            return res.status(err.statusCode || 400).json({ message: err.message });
         }
+        const divisionSegmentFields = {
+            divisionId: divisionSegment.division._id,
+            segmentId: divisionSegment.segment._id
+        };
 
         const cleanSN = String(serialNumber).trim();
         const cleanProductCode = String(productCode).trim();
@@ -281,6 +301,7 @@ exports.createSingleAsset = async (req, res) => {
             }
 
             if (customer) {
+                if (!cleanMobile && customer.mobile) cleanMobile = String(customer.mobile).trim();
                 if (!customer.externalCode && finalCustomerCode) {
                     customer.externalCode = finalCustomerCode;
                     await customer.save();
@@ -330,6 +351,7 @@ exports.createSingleAsset = async (req, res) => {
                 saleDate: saleDate ? new Date(saleDate) : (status === 'SOLD' ? new Date() : null),
                 location,
                 indicatorField: cleanIndicator,
+                ...divisionSegmentFields,
                 returnReason: '',
                 returnedAt: null,
                 // A re-sold serial moves to the new customer's branch (else the active branch).
@@ -361,7 +383,7 @@ exports.createSingleAsset = async (req, res) => {
             });
 
             const updatedDoc = applyProductMgrs(
-                await Asset.findById(matchedReturnedAsset._id).populate('customerId').populate(productMgrPopulate()).lean()
+                await Asset.findById(matchedReturnedAsset._id).populate('customerId').populate(productMgrPopulate()).populate(DIVISION_POPULATE).populate(SEGMENT_POPULATE).lean()
             );
             return res.status(200).json({
                 message: 'Serial asset entry updated successfully (Re-use of returned serial)',
@@ -388,6 +410,7 @@ exports.createSingleAsset = async (req, res) => {
             saleDate: saleDate ? new Date(saleDate) : (status === 'SOLD' ? new Date() : null),
             location,
             indicatorField: cleanIndicator,
+            ...divisionSegmentFields,
             createdBy: req.user?.id || null
         });
 
@@ -414,12 +437,169 @@ exports.createSingleAsset = async (req, res) => {
         });
 
         const createdDoc = applyProductMgrs(
-            await Asset.findById(newAsset._id).populate('customerId').populate(productMgrPopulate()).lean()
+            await Asset.findById(newAsset._id).populate('customerId').populate(productMgrPopulate()).populate(DIVISION_POPULATE).populate(SEGMENT_POPULATE).lean()
         );
         res.status(201).json({ message: 'Single entry added successfully', data: createdDoc });
     } catch (error) {
         console.error('createSingleAsset error:', error);
         res.status(500).json({ message: error.message || 'Error creating single entry' });
+    }
+};
+
+// Edit Single Entry: updates one Invoice Bulk Upload record in place.
+exports.updateAsset = async (req, res) => {
+    try {
+        const companyId = req.user?.companyId;
+        const { id } = req.params;
+        if (!isValidObjectId(id)) {
+            return res.status(400).json({ message: 'Invalid entry id' });
+        }
+
+        const asset = await Asset.findOne({ _id: id, companyId });
+        if (!asset) {
+            return res.status(404).json({ message: 'Entry not found' });
+        }
+
+        const body = req.body || {};
+        const has = (key) => Object.prototype.hasOwnProperty.call(body, key);
+
+        // Division / Segment stay mandatory, the segment must belong to the division.
+        let divisionSegment;
+        try {
+            const lookup = await loadDivisionSegmentLookup(companyId);
+            divisionSegment = resolveDivisionSegment(lookup, {
+                divisionId: has('divisionId') ? body.divisionId : asset.divisionId,
+                segmentId: has('segmentId') ? body.segmentId : asset.segmentId
+            }, { required: true });
+        } catch (err) {
+            return res.status(err.statusCode || 400).json({ message: err.message });
+        }
+
+        const update = {
+            divisionId: divisionSegment.division._id,
+            segmentId: divisionSegment.segment._id
+        };
+
+        if (has('serialNumber')) {
+            const cleanSN = String(body.serialNumber || '').trim();
+            if (!cleanSN) return res.status(400).json({ message: 'Serial Number is required' });
+            if (cleanSN.toLowerCase() !== String(asset.serialNumber || '').toLowerCase()) {
+                const duplicate = await Asset.findOne({
+                    _id: { $ne: asset._id },
+                    serialNumber: buildExactRegex(cleanSN),
+                    status: { $nin: ['RETURN', 'RETURNED'] }
+                }).setOptions({ bypassTenant: true }).select('_id').lean();
+                if (duplicate) {
+                    return res.status(400).json({ message: `Duplicate entry: Serial Number (${cleanSN}) already exists in the system.` });
+                }
+            }
+            update.serialNumber = cleanSN;
+        }
+
+        if (has('productCode')) {
+            const cleanProductCode = String(body.productCode || '').trim();
+            if (!cleanProductCode) return res.status(400).json({ message: 'Product Code is required' });
+            let product = await Product.findOne({ companyId, productCode: buildExactRegex(cleanProductCode) });
+            if (!product) {
+                product = await Product.create({
+                    companyId,
+                    productCode: cleanProductCode,
+                    productName: String(body.productName || '').trim() || cleanProductCode,
+                    hsnCode: 'N/A',
+                    gstPercentage: 18,
+                    basePrice: 0,
+                    mrp: 0,
+                    uom: 'Nos',
+                    status: 'Active'
+                });
+            }
+            update.productId = product._id;
+            update.productCode = product.productCode;
+            update.productName = product.productName;
+        }
+
+        if (has('status')) {
+            const allowed = Asset.schema.path('status').enumValues;
+            if (!allowed.includes(body.status)) return res.status(400).json({ message: 'Invalid status' });
+            update.status = body.status;
+        }
+
+        if (has('customer') || has('customerCode')) {
+            const searchTarget = String(body.customerCode || body.customer || '').trim();
+            if (!searchTarget) {
+                Object.assign(update, { customerId: null, customerCode: '', customerNameStr: '', customerPostalCode: '' });
+            } else {
+                let customer = await Customer.findOne({
+                    companyId,
+                    $or: [
+                        { externalCode: buildExactRegex(searchTarget) },
+                        { customerName: buildExactRegex(searchTarget) },
+                        { companyName: buildExactRegex(searchTarget) }
+                    ]
+                }).setOptions({ bypassBranch: true });
+                if (!customer) {
+                    customer = await Customer.create({
+                        companyId,
+                        externalCode: searchTarget,
+                        customerName: String(body.customer || searchTarget).trim(),
+                        companyName: String(body.customer || searchTarget).trim(),
+                        createdBy: req.user?.id || null
+                    });
+                }
+                const rawPin = customer.billingAddress?.pincode || customer.pincode || '';
+                Object.assign(update, {
+                    customerId: customer._id,
+                    customerCode: customer.externalCode || searchTarget,
+                    customerNameStr: customer.companyName || customer.customerName || searchTarget,
+                    customerPostalCode: String(rawPin).trim(),
+                    customerMobile: asset.customerMobile || customer.mobile || ''
+                });
+            }
+        }
+
+        if (has('invoiceNumber')) update.invoiceNumber = String(body.invoiceNumber || '').trim();
+        if (has('saleDate')) update.saleDate = body.saleDate ? new Date(body.saleDate) : null;
+        if (has('location')) update.location = String(body.location || '').trim();
+        if (has('indicatorField')) update.indicatorField = String(body.indicatorField || '').trim().slice(0, 20);
+        if (has('projectCode')) update.projectCode = String(body.projectCode || '').trim();
+        if (has('projectName')) update.projectName = String(body.projectName || '').trim();
+
+        await Asset.updateOne({ _id: asset._id }, { $set: update });
+
+        const updatedDoc = applyProductMgrs(
+            await Asset.findById(asset._id)
+                .populate({ path: 'customerId', select: 'customerName companyName externalCode billingAddress pincode mobile', options: { bypassTenant: true } })
+                .populate(productMgrPopulate())
+                .populate(DIVISION_POPULATE)
+                .populate(SEGMENT_POPULATE)
+                .lean()
+        );
+
+        await AssetHistory.create({
+            companyId,
+            branchId: updatedDoc.branchId || null,
+            assetId: updatedDoc._id,
+            serialNumber: updatedDoc.serialNumber,
+            productCode: updatedDoc.productId?.productCode || updatedDoc.productCode || '',
+            productName: updatedDoc.productId?.productName || updatedDoc.productName || '',
+            productId: updatedDoc.productId?._id || null,
+            customerId: updatedDoc.customerId?._id || null,
+            customerCode: updatedDoc.customerCode || '',
+            customerName: updatedDoc.customerNameStr || '',
+            customerPostalCode: updatedDoc.customerPostalCode || '',
+            invoiceNumber: updatedDoc.invoiceNumber || '',
+            saleDate: updatedDoc.saleDate || null,
+            location: updatedDoc.location || '',
+            indicatorField: updatedDoc.indicatorField || '',
+            transactionType: 'UPDATE',
+            status: updatedDoc.status,
+            createdBy: req.user?.id || null
+        });
+
+        res.json({ message: 'Entry updated successfully', data: updatedDoc });
+    } catch (error) {
+        console.error('updateAsset error:', error);
+        res.status(500).json({ message: error.message || 'Error updating entry' });
     }
 };
 
@@ -545,6 +725,8 @@ exports.getAssets = async (req, res) => {
         const docs = await Asset.find(filter)
             .populate({ path: 'customerId', select: 'customerName companyName externalCode billingAddress pincode mobile', options: { bypassTenant: true } })
             .populate(productMgrPopulate())
+            .populate(DIVISION_POPULATE)
+            .populate(SEGMENT_POPULATE)
             .sort({ createdAt: -1 })
             .lean();
 
@@ -568,6 +750,8 @@ exports.getAssetSummary = async (req, res) => {
                 .populate({ path: 'customerId', select: 'customerName companyName gstin billingAddress mobile email', options: { bypassTenant: true } })
                 .populate(productMgrPopulate('basePrice mrp catalogType'))
                 .populate('invoiceId', 'voucherNumber date')
+                .populate(DIVISION_POPULATE)
+                .populate(SEGMENT_POPULATE)
                 .lean();
         } else if (serialNumber) {
             const cleanSN = String(serialNumber).trim();
@@ -579,6 +763,8 @@ exports.getAssetSummary = async (req, res) => {
             .populate({ path: 'customerId', select: 'customerName companyName gstin billingAddress mobile email', options: { bypassTenant: true } })
             .populate(productMgrPopulate('basePrice mrp catalogType'))
             .populate('invoiceId', 'voucherNumber date')
+            .populate(DIVISION_POPULATE)
+            .populate(SEGMENT_POPULATE)
             .lean();
 
             // Fallback search across tenant boundary if no matches found

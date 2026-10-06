@@ -134,6 +134,8 @@ TicketSchema.index({ assignedEngineerId: 1 });
 TicketSchema.index({ assignedEngineerIds: 1 });
 TicketSchema.index({ companyId: 1, ticketNo: 1 }, { unique: true });
 
-TicketSchema.plugin(tenantPlugin);
+// Support Tickets are one company-wide register: a ticket keeps the branch it was raised
+// in (branchId) but is visible from every branch. Other modules stay branch isolated.
+TicketSchema.plugin(tenantPlugin, { branchScoped: false });
 
 module.exports = mongoose.model('Ticket', TicketSchema);

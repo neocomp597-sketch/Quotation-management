@@ -35,6 +35,9 @@ const AssetSchema = new mongoose.Schema({
     mgr4: { type: String, default: '' },
     mgr5: { type: String, default: '' },
     indicatorField: { type: String, default: '' },
+    // Division / Segment Master references; Excel import/export uses their codes.
+    divisionId: { type: mongoose.Schema.Types.ObjectId, ref: 'Division', default: null },
+    segmentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Segment', default: null },
     projectCode: { type: String, default: '' },
     projectName: { type: String, default: '' },
     returnReason: { type: String, default: '' },

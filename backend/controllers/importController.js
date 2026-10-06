@@ -3118,6 +3118,12 @@ const getTenderTemplate = async (req, res) => {
 };
 
 const AssetHistory = require('../models/AssetHistory');
+const ExcelJS = require('exceljs');
+const {
+    loadDivisionSegmentLookup,
+    resolveDivisionSegment,
+    addDivisionSegmentDropdowns
+} = require('../utils/divisionSegment');
 
 const importAssets = async (req, res) => {
     try {
@@ -3168,6 +3174,9 @@ const importAssets = async (req, res) => {
         }
 
         const seenSerialsInFile = new Set();
+
+        // Division / Segment Master, loaded once for the whole file.
+        const divisionSegmentLookup = await loadDivisionSegmentLookup(companyId);
 
         for (let i = 0; i < data.length; i++) {
             const row = data[i];
@@ -3226,6 +3235,19 @@ const importAssets = async (req, res) => {
                     row['Indicator_Field'], row.indicator_field, row.indicatorField, row.Indicator, row.indicator, ''
                 );
                 const indicatorField = String(rawIndicator).trim().slice(0, 20);
+
+                // Division_Code / Segment_Code are optional on a row, but when given they must
+                // exist and the segment must belong to the division (whatever the Excel
+                // dropdowns allowed).
+                const divisionCodeInput = getFlexibleRowValue(row, 'Division_Code', 'Division Code', 'DivisionCode', 'Division');
+                const segmentCodeInput = getFlexibleRowValue(row, 'Segment_Code', 'Segment Code', 'SegmentCode', 'Segment');
+                const { division, segment } = resolveDivisionSegment(divisionSegmentLookup, {
+                    divisionCode: divisionCodeInput,
+                    segmentCode: segmentCodeInput
+                });
+                const divisionSegmentFields = (division || segment)
+                    ? { divisionId: division ? division._id : null, segmentId: segment ? segment._id : null }
+                    : {};
 
                 // Map status
                 let status = 'IN_STOCK';
@@ -3423,6 +3445,7 @@ const importAssets = async (req, res) => {
                         saleDate: saleDate || new Date(),
                         location: location || '',
                         indicatorField,
+                        ...divisionSegmentFields,
                         projectCode,
                         projectName,
                         returnReason: '',
@@ -3473,6 +3496,7 @@ const importAssets = async (req, res) => {
                         saleDate: saleDate || (status === 'SOLD' ? new Date() : null),
                         location: location || '',
                         indicatorField,
+                        ...divisionSegmentFields,
                         projectCode,
                         projectName,
                         createdBy: req.user?.id || null
@@ -3543,48 +3567,67 @@ const importAssets = async (req, res) => {
 
 const getAssetTemplate = async (req, res) => {
     try {
-        const templateData = [
-            {
-                'Serial Number': 'SN-100201',
-                'Product Name': '10KVA Transformer',
-                'Product Code': 'PROD-001',
-                'Status': 'IN_STOCK',
-                'Customer Code': '',
-                'Customer Name': '',
-                'Mobile Number': '',
-                'Invoice Ref': '',
-                'Sale Date': '',
-                'Location': '',
-                'Project Code': '',
-                'Project Name': '',
-                'Indicator_Field': 'SALE'
-            },
-            {
-                'Serial Number': 'SN-100202',
-                'Product Name': '10KVA Transformer',
-                'Product Code': 'PROD-001',
-                'Status': 'SOLD',
-                'Customer Code': 'CUST-101',
-                'Customer Name': 'Apex Industrial Solutions',
-                'Mobile Number': '9823012345',
-                'Invoice Ref': 'INV-2026-001',
-                'Sale Date': '2026-03-15',
-                'Location': 'Main Branch',
-                'Project Code': 'PRJ-2026-01',
-                'Project Name': 'Substation Upgrade',
-                'Indicator_Field': 'SALE'
-            }
+        const columns = [
+            { header: 'Serial Number', key: 'serialNumber', width: 18 },
+            { header: 'Product Name', key: 'productName', width: 32 },
+            { header: 'Product Code', key: 'productCode', width: 16 },
+            { header: 'Status', key: 'status', width: 12 },
+            { header: 'Customer Code', key: 'customerCode', width: 16 },
+            { header: 'Customer Name', key: 'customerName', width: 30 },
+            { header: 'Mobile Number', key: 'mobile', width: 15 },
+            { header: 'Invoice Ref', key: 'invoiceRef', width: 16 },
+            { header: 'Sale Date', key: 'saleDate', width: 12 },
+            { header: 'Location', key: 'location', width: 16 },
+            { header: 'Division_Code', key: 'divisionCode', width: 15 },
+            { header: 'Segment_Code', key: 'segmentCode', width: 15 },
+            { header: 'Project Code', key: 'projectCode', width: 14 },
+            { header: 'Project Name', key: 'projectName', width: 22 },
+            { header: 'Indicator_Field', key: 'indicatorField', width: 15 }
         ];
 
-        const ws = XLSX.utils.json_to_sheet(templateData);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Invoice Bulk Upload Template');
+        // Dropdown values come from the Division and Segment Masters, never from code.
+        const lookup = await loadDivisionSegmentLookup(req.user?.companyId);
+        const activeDivisions = lookup.divisions.filter((d) => d.status === 'Active');
+        const sampleSegment = lookup.segments.find((seg) => seg.status === 'Active');
+        const sampleDivision = sampleSegment
+            ? lookup.divisionById.get(String(sampleSegment.divisionId))
+            : activeDivisions[0];
 
-        const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+        const workbook = new ExcelJS.Workbook();
+        const sheet = workbook.addWorksheet('Invoice Bulk Upload Template');
+        sheet.columns = columns;
+        sheet.addRow({
+            serialNumber: 'SN-100201', productName: '10KVA Transformer', productCode: 'PROD-001', status: 'IN_STOCK',
+            divisionCode: sampleDivision?.code || '', segmentCode: sampleSegment?.code || '', indicatorField: 'SALE'
+        });
+        sheet.addRow({
+            serialNumber: 'SN-100202', productName: '10KVA Transformer', productCode: 'PROD-001', status: 'SOLD',
+            customerCode: 'CUST-101', customerName: 'Apex Industrial Solutions', mobile: '9823012345', invoiceRef: 'INV-2026-001',
+            saleDate: '2026-03-15', location: 'Main Branch',
+            divisionCode: sampleDivision?.code || '', segmentCode: sampleSegment?.code || '',
+            projectCode: 'PRJ-2026-01', projectName: 'Substation Upgrade', indicatorField: 'SALE'
+        });
+        const header = sheet.getRow(1);
+        header.font = { bold: true };
+        header.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2F3EF' } };
+        sheet.views = [{ state: 'frozen', ySplit: 1 }];
+
+        const columnIndex = (key) => columns.findIndex((c) => c.key === key) + 1;
+        addDivisionSegmentDropdowns(workbook, sheet, {
+            divisions: lookup.divisions,
+            segments: lookup.segments,
+            divisionColumn: columnIndex('divisionCode'),
+            segmentColumn: columnIndex('segmentCode'),
+            firstRow: 2,
+            lastRow: 5000
+        });
+
+        const buffer = await workbook.xlsx.writeBuffer();
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         res.setHeader('Content-Disposition', 'attachment; filename=Invoice_Bulk_Upload_Template.xlsx');
-        res.send(buffer);
+        res.send(Buffer.from(buffer));
     } catch (err) {
+        console.error('getAssetTemplate error:', err);
         res.status(500).json({ message: 'Error generating invoice bulk upload template' });
     }
 };

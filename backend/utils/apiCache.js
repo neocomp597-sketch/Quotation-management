@@ -86,8 +86,15 @@ const makeCacheKey = (namespace, req, parts = {}) => (
     })}`
 );
 
-const getCachedJson = async (key) => {
-    const memory = getMemoryCache(key);
+/**
+ * `options.memory: false` skips the in-process layer. Use it for data that is edited
+ * often (the Product Master): invalidation only clears the memory cache of the process
+ * that handled the write, so with several server instances another one could keep
+ * serving the old record. Redis is shared and is invalidated for every instance.
+ */
+const getCachedJson = async (key, options = {}) => {
+    const useMemory = options.memory !== false;
+    const memory = useMemory ? getMemoryCache(key) : { hit: false };
     if (memory.hit) {
         return { hit: true, redis: null, value: memory.value };
     }
@@ -105,7 +112,7 @@ const getCachedJson = async (key) => {
 
     try {
         const value = JSON.parse(cached);
-        setMemoryCache(key, value, Number(process.env.MEMORY_CACHE_REDIS_HIT_TTL_SECONDS || 30));
+        if (useMemory) setMemoryCache(key, value, Number(process.env.MEMORY_CACHE_REDIS_HIT_TTL_SECONDS || 30));
         return { hit: true, redis, value };
     } catch {
         await redis.del(key);
@@ -113,8 +120,8 @@ const getCachedJson = async (key) => {
     }
 };
 
-const setCachedJson = async (redis, key, value, ttlSeconds) => {
-    setMemoryCache(key, value, ttlSeconds);
+const setCachedJson = async (redis, key, value, ttlSeconds, options = {}) => {
+    if (options.memory !== false) setMemoryCache(key, value, ttlSeconds);
     if (!redis) return;
     try {
         await withTimeout(redis.set(key, JSON.stringify(value), { EX: ttlSeconds }));

@@ -15,6 +15,8 @@ const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Customers = lazy(() => import('./pages/Customers'));
 const Products = lazy(() => import('./pages/Products'));
 const MGRMaster = lazy(() => import('./pages/MGRMaster'));
+const DivisionMaster = lazy(() => import('./pages/DivisionMaster'));
+const SegmentMaster = lazy(() => import('./pages/SegmentMaster'));
 const BOMMaster = lazy(() => import('./pages/BOMMaster'));
 const BOMForm = lazy(() => import('./pages/BOMForm'));
 const BOMDetails = lazy(() => import('./pages/BOMDetails'));
@@ -252,6 +254,8 @@ function App() {
             <Route path="/mgrs" element={<PermissionRoute permissionKey="master_mgrs"><Layout><MGRMaster /></Layout></PermissionRoute>} />
             <Route path="/mgrs/new" element={<PermissionRoute permissionKey="master_mgrs"><Layout><MGRMaster isCreatePage={true} /></Layout></PermissionRoute>} />
             <Route path="/mgrs/edit/:id" element={<PermissionRoute permissionKey="master_mgrs"><Layout><MGRMaster isEditPage={true} /></Layout></PermissionRoute>} />
+            <Route path="/divisions" element={<PermissionRoute permissionKey="master_divisions"><Layout><DivisionMaster /></Layout></PermissionRoute>} />
+            <Route path="/segments" element={<PermissionRoute permissionKey="master_segments"><Layout><SegmentMaster /></Layout></PermissionRoute>} />
             <Route path="/bom-master" element={<PermissionRoute permissionKey="master_bom"><Layout><BOMMaster /></Layout></PermissionRoute>} />
             <Route path="/bom-master/new" element={<PermissionRoute permissionKey="master_bom"><Layout><BOMForm key="new" /></Layout></PermissionRoute>} />
             <Route path="/bom-master/:id/edit" element={<PermissionRoute permissionKey="master_bom"><Layout><BOMForm /></Layout></PermissionRoute>} />

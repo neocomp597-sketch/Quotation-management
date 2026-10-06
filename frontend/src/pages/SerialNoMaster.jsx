@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { csmService, productService, importService } from '../services/api';
+import { csmService, productService, importService, divisionService, segmentService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
 import {
     MdSearch, MdTag, MdInfoOutline, MdSync,
     MdLocalOffer, MdPeople, MdReceipt, MdAssignmentTurnedIn,
-    MdFileUpload, MdFileDownload, MdAdd, MdUndo, MdDelete, MdHistory
+    MdFileUpload, MdFileDownload, MdAdd, MdUndo, MdDelete, MdHistory, MdEdit
 } from 'react-icons/md';
 import Modal from '../components/Modal';
 import ImportModal from '../components/ImportModal';
@@ -43,6 +43,29 @@ const resolveAssetMgr = (record, key) => {
 
 const assignedMgrsOf = (record) =>
     MGR_FIELDS.map((field) => ({ ...field, value: resolveAssetMgr(record, field.key) })).filter((field) => field.value);
+
+// Division / Segment are shown as "CODE - Description" wherever they are picked or viewed.
+const codeLabel = (doc) => {
+    if (!doc || typeof doc !== 'object') return '';
+    return [doc.code, doc.description].filter(Boolean).join(' - ');
+};
+
+const idOf = (value) => String(value?._id || value || '');
+
+const EMPTY_SINGLE_FORM = {
+    serialNumber: '',
+    productCode: '',
+    productName: '',
+    status: 'IN_STOCK',
+    customer: '',
+    customerPostalCode: '',
+    invoiceNumber: '',
+    saleDate: '',
+    location: '',
+    divisionId: '',
+    segmentId: '',
+    indicatorField: ''
+};
 
 const findProductByCode = (products, code) => {
     const clean = String(code || '').trim().toLowerCase();
@@ -94,18 +117,24 @@ const SerialNoMaster = () => {
     // Page View State: 'list' | 'single'
     const [pageView, setPageView] = useState('list');
     const [singleSaving, setSingleSaving] = useState(false);
-    const [singleForm, setSingleForm] = useState({
-        serialNumber: '',
-        productCode: '',
-        productName: '',
-        status: 'IN_STOCK',
-        customer: '',
-        customerPostalCode: '',
-        invoiceNumber: '',
-        saleDate: '',
-        location: '',
-        indicatorField: ''
-    });
+    const [singleForm, setSingleForm] = useState(EMPTY_SINGLE_FORM);
+    // The record being edited; null while adding a new single entry.
+    const [editingAsset, setEditingAsset] = useState(null);
+
+    // Division Master -> Division dropdown -> Segment Master -> Segment dropdown.
+    const [divisions, setDivisions] = useState([]);
+    const [segments, setSegments] = useState([]);
+    const activeDivisions = useMemo(
+        () => divisions.filter(d => d.status === 'Active' || idOf(d) === singleForm.divisionId),
+        [divisions, singleForm.divisionId]
+    );
+    // Only the segments of the selected division can be chosen.
+    const divisionSegments = useMemo(
+        () => (singleForm.divisionId
+            ? segments.filter(sg => idOf(sg.divisionId) === singleForm.divisionId && (sg.status === 'Active' || idOf(sg) === singleForm.segmentId))
+            : []),
+        [segments, singleForm.divisionId, singleForm.segmentId]
+    );
 
     // MGR 1-5 on the single-entry form come straight from the Product Master record that
     // matches the typed Product Code. They are display-only and never submitted.
@@ -127,12 +156,16 @@ const SerialNoMaster = () => {
     const fetchData = async () => {
         setLoading(true);
         try {
-            const [assetsRes, productsRes] = await Promise.all([
+            const [assetsRes, productsRes, divisionsRes, segmentsRes] = await Promise.all([
                 csmService.getAssets(),
-                productService.getAll()
+                productService.getAll(),
+                divisionService.getAll(),
+                segmentService.getAll()
             ]);
             setAssets(assetsRes.data || []);
             setProducts(productsRes.data || []);
+            setDivisions(divisionsRes.data || []);
+            setSegments(segmentsRes.data || []);
         } catch (err) {
             console.error('Error fetching Invoice Bulk Upload data:', err);
             toast.error('Failed to load invoice bulk upload data');
@@ -181,11 +214,16 @@ const SerialNoMaster = () => {
                 'Product Name': prodName,
                 'Product Code': prodCode,
                 'Status': asset.status || 'IN_STOCK',
+                'Customer Code': asset.customerCode || asset.customerId?.externalCode || '',
                 'Customer': custName,
                 'Customer Postal Code': asset.customerPostalCode || '',
                 'Invoice Ref': asset.invoiceNumber || '',
                 'Sale Date': sDate ? new Date(sDate).toLocaleDateString('en-IN') : '',
                 'Location': asset.location || '',
+                'Division_Code': asset.divisionId?.code || '',
+                'Division_Desc': asset.divisionId?.description || '',
+                'Segment_Code': asset.segmentId?.code || '',
+                'Segment_Desc': asset.segmentId?.description || '',
                 'Mgr 1': resolveAssetMgr(asset, 'mgr1'),
                 'Mgr 2': resolveAssetMgr(asset, 'mgr2'),
                 'Mgr 3': resolveAssetMgr(asset, 'mgr3'),
@@ -268,33 +306,67 @@ const SerialNoMaster = () => {
     };
 
     // Single Entry Submit (Requirement #15)
+    const openSingleEntry = (asset = null) => {
+        setEditingAsset(asset);
+        if (asset) {
+            const sDate = asset.saleDate || asset.invoiceDate;
+            setSingleForm({
+                serialNumber: asset.serialNumber || '',
+                productCode: asset.productId?.productCode || asset.productCode || '',
+                productName: asset.productId?.productName || asset.productName || '',
+                status: asset.status || 'IN_STOCK',
+                customer: asset.customerCode || asset.customerId?.externalCode || asset.customerNameStr || asset.customerId?.companyName || '',
+                customerPostalCode: asset.customerPostalCode || '',
+                invoiceNumber: asset.invoiceNumber || '',
+                saleDate: sDate ? new Date(sDate).toISOString().slice(0, 10) : '',
+                location: asset.location || '',
+                divisionId: idOf(asset.divisionId),
+                segmentId: idOf(asset.segmentId),
+                indicatorField: asset.indicatorField || ''
+            });
+        } else {
+            setSingleForm(EMPTY_SINGLE_FORM);
+        }
+        setPageView('single');
+    };
+
+    const closeSingleEntry = () => {
+        setPageView('list');
+        setEditingAsset(null);
+        setSingleForm(EMPTY_SINGLE_FORM);
+    };
+
+    const handleDivisionChange = (divisionId) => {
+        // A segment from the previous division can no longer be valid.
+        setSingleForm(prev => ({ ...prev, divisionId, segmentId: '' }));
+    };
+
     const handleSingleEntrySubmit = async (e) => {
         e.preventDefault();
         if (!singleForm.serialNumber.trim() || !singleForm.productCode.trim()) {
             return toast.error('Serial Number and Product Code are required');
         }
+        if (!singleForm.divisionId) {
+            return toast.error('Division is required');
+        }
+        if (!singleForm.segmentId) {
+            return toast.error('Segment is required');
+        }
 
         setSingleSaving(true);
         try {
-            await csmService.createSingleAsset(singleForm);
-            toast.success('Single entry created successfully!');
-            setPageView('list');
-            setSingleForm({
-                serialNumber: '',
-                productCode: '',
-                productName: '',
-                status: 'IN_STOCK',
-                customer: '',
-                customerPostalCode: '',
-                invoiceNumber: '',
-                saleDate: '',
-                location: '',
-                indicatorField: ''
-            });
+            if (editingAsset) {
+                await csmService.updateAsset(editingAsset._id, singleForm);
+                toast.success('Entry updated successfully!');
+            } else {
+                await csmService.createSingleAsset(singleForm);
+                toast.success('Single entry created successfully!');
+            }
+            closeSingleEntry();
             fetchData();
         } catch (err) {
-            console.error('Single entry creation error:', err);
-            toast.error(err.response?.data?.message || 'Failed to create single entry');
+            console.error('Single entry save error:', err);
+            toast.error(err.response?.data?.message || 'Failed to save single entry');
         } finally {
             setSingleSaving(false);
         }
@@ -377,13 +449,13 @@ const SerialNoMaster = () => {
                         <div>
                             <button
                                 type="button"
-                                onClick={() => setPageView('list')}
+                                onClick={closeSingleEntry}
                                 className="text-xs font-black uppercase tracking-widest text-primary-600 hover:text-primary-700 mb-2 flex items-center gap-1 transition-all cursor-pointer"
                             >
                                 ← Back to Invoice Bulk Upload
                             </button>
                             <h1 className="text-3xl font-black tracking-tight text-slate-900 font-outfit uppercase">
-                                Add Single Entry
+                                {editingAsset ? 'Edit Single Entry' : 'Add Single Entry'}
                             </h1>
                             <p className="text-slate-500 font-semibold text-sm">
                                 Manually enter one invoice, product, or serial record into the system without uploading an Excel file.
@@ -392,7 +464,7 @@ const SerialNoMaster = () => {
                         <div className="flex items-center gap-3">
                             <button
                                 type="button"
-                                onClick={() => setPageView('list')}
+                                onClick={closeSingleEntry}
                                 className="px-6 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer"
                             >
                                 Cancel
@@ -403,7 +475,7 @@ const SerialNoMaster = () => {
                                 disabled={singleSaving}
                                 className="px-6 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-emerald-600/20 active:scale-95 disabled:opacity-50 cursor-pointer"
                             >
-                                {singleSaving ? 'Saving Entry...' : 'Save Single Entry'}
+                                {singleSaving ? 'Saving Entry...' : (editingAsset ? 'Update Entry' : 'Save Single Entry')}
                             </button>
                         </div>
                     </div>
@@ -507,6 +579,40 @@ const SerialNoMaster = () => {
                                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
                                     />
                                 </div>
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Division *</label>
+                                    <select
+                                        required
+                                        value={singleForm.divisionId}
+                                        onChange={(e) => handleDivisionChange(e.target.value)}
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
+                                    >
+                                        <option value="">Select Division</option>
+                                        {activeDivisions.map(d => (
+                                            <option key={d._id} value={d._id}>{codeLabel(d)}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Segment *</label>
+                                    <select
+                                        required
+                                        value={singleForm.segmentId}
+                                        disabled={!singleForm.divisionId}
+                                        onChange={(e) => setSingleForm({ ...singleForm, segmentId: e.target.value })}
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900 disabled:opacity-60"
+                                    >
+                                        <option value="">
+                                            {!singleForm.divisionId
+                                                ? 'Select Division first'
+                                                : (divisionSegments.length ? 'Select Segment' : 'No segments for this Division')}
+                                        </option>
+                                        {divisionSegments.map(sg => (
+                                            <option key={sg._id} value={sg._id}>{codeLabel(sg)}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="hidden lg:block" aria-hidden="true" />
                                 <div className="col-span-full p-4 bg-slate-50 border border-slate-200 rounded-xl">
                                     <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                                         <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">MGR 1 – 5 (from Product Master)</span>
@@ -568,7 +674,7 @@ const SerialNoMaster = () => {
                 </div>
                 <div className="flex flex-wrap gap-3 items-center justify-start md:justify-end">
                     <button
-                        onClick={() => setPageView('single')}
+                        onClick={() => openSingleEntry()}
                         className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-2xl font-black transition-all uppercase text-[10px] tracking-widest active:scale-95 shadow-md shadow-emerald-600/10 cursor-pointer"
                         title="Add Single Invoice/Serial Record"
                     >
@@ -839,6 +945,11 @@ const SerialNoMaster = () => {
                                                     </td>
                                                     <td className="p-4 text-xs font-semibold text-slate-600">
                                                         {asset.location || '-'}
+                                                        {(asset.divisionId?.code || asset.segmentId?.code) && (
+                                                            <span className="block text-[10px] text-slate-400 font-bold mt-1">
+                                                                {[asset.divisionId?.code, asset.segmentId?.code].filter(Boolean).join(' / ')}
+                                                            </span>
+                                                        )}
                                                     </td>
                                                     {/* Actions are grouped under the row's information control. */}
                                                     <td className="p-4 text-right">
@@ -863,6 +974,16 @@ const SerialNoMaster = () => {
                                                                     >
                                                                         <MdInfoOutline size={16} />
                                                                         View details
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            setOpenActionMenuAssetId(null);
+                                                                            openSingleEntry(asset);
+                                                                        }}
+                                                                        className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                                                                    >
+                                                                        <MdEdit size={16} />
+                                                                        Edit entry
                                                                     </button>
                                                                     {asset.status === 'SOLD' && (
                                                                         <button
@@ -934,6 +1055,8 @@ const SerialNoMaster = () => {
                                 <div><span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Invoice Number</span><span className="text-slate-900 text-sm font-bold">{assetSummary.asset?.invoiceNumber || 'N/A'}</span></div>
                                 <div><span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Date of Sale</span><span className="text-slate-900 text-sm font-bold">{assetSummary.asset?.saleDate || assetSummary.asset?.invoiceDate ? new Date(assetSummary.asset.saleDate || assetSummary.asset.invoiceDate).toLocaleDateString('en-IN') : 'N/A'}</span></div>
                                 <div><span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Postal Code</span><span className="text-slate-900 text-sm font-bold">{assetSummary.asset?.customerPostalCode || 'N/A'}</span></div>
+                                <div><span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Division</span><span className="text-slate-900 text-sm font-bold">{codeLabel(assetSummary.asset?.divisionId) || 'N/A'}</span></div>
+                                <div><span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Segment</span><span className="text-slate-900 text-sm font-bold">{codeLabel(assetSummary.asset?.segmentId) || 'N/A'}</span></div>
                                 <div className="col-span-2">
                                     <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">MGR 1 – 5 (from Product Master)</span>
                                     <div className="flex flex-wrap gap-1.5 mt-1">

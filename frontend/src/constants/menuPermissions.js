@@ -29,6 +29,8 @@ export const MENU_PERMISSION_GROUPS = [
             { key: 'master_bom', label: 'Product BOM Master', description: 'Create, edit and view serial-number-wise BOMs', defaultRoute: '/bom-master' },
             { key: 'master_products', label: 'Product Master', description: 'Product master records', defaultRoute: '/products' },
             { key: 'master_mgrs', label: 'Product MGR Master', description: 'MGR master hierarchy', defaultRoute: '/mgrs' },
+            { key: 'master_divisions', label: 'Division Master', description: 'Division codes used by segments and invoice records', defaultRoute: '/divisions' },
+            { key: 'master_segments', label: 'Segment Master', description: 'Division-wise segment codes', defaultRoute: '/segments' },
             { key: 'state_master_create', label: 'State Master', description: 'State master management', defaultRoute: '/state-master' },
             { key: 'master_statuses', label: 'Status Master', description: 'Status master definitions for planning', defaultRoute: '/status-master' },
             { key: 'master_terms', label: 'Terms & Conditions', description: 'Terms and conditions master', defaultRoute: '/terms' },

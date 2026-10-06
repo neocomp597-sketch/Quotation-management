@@ -359,17 +359,18 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                 }
             };
 
+            // Show the list copy straight away, then always replace it with the record from
+            // the backend so the form edits the stored MGR 1-5, not a stale list entry.
             const found = products.find(p => p._id === routeId);
             if (found) {
                 populateForm(found);
-            } else {
-                productService.getById(routeId).then(res => {
-                    const item = res.data?.data || res.data;
-                    if (item) {
-                        populateForm(item);
-                    }
-                }).catch(err => console.error("Failed to load product details", err));
             }
+            productService.getById(routeId).then(res => {
+                const item = res.data?.data || res.data;
+                if (item) {
+                    populateForm(item);
+                }
+            }).catch(err => console.error("Failed to load product details", err));
         }
     }, [isCreatePage, isEditPage, routeId]);
 
@@ -667,7 +668,17 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
 
             if (editingProduct) {
                 await productService.update(editingProduct._id, payload);
-                toast.success('Product updated successfully!');
+                // Re-read the product from the backend and confirm the MGRs were stored.
+                const saved = await productService.getById(editingProduct._id);
+                const savedProduct = saved.data?.data || saved.data || {};
+                const idOf = (value) => String(value?._id || value || '');
+                const mismatched = ['mgr1', 'mgr2', 'mgr3', 'mgr4', 'mgr5']
+                    .filter(key => idOf(savedProduct[key]) !== idOf(payload[key]));
+                if (mismatched.length) {
+                    toast.error(`Product saved, but ${mismatched.map(k => k.toUpperCase()).join(', ')} did not update. Please try again.`);
+                } else {
+                    toast.success('Product updated successfully!');
+                }
             } else {
                 await productService.create(payload);
                 toast.success('Product created successfully!');

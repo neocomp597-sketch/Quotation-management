@@ -81,14 +81,18 @@ exports.getVisits = async (req, res) => {
             filter.ticketId = { $in: customerTickets.map(t => t._id) };
         }
 
+        // Support Tickets are visible from every branch, so the visits of one ticket are
+        // shown with it wherever it is opened. The general visit list stays branch scoped.
+        const singleTicket = Boolean(req.query.ticketId) && !req.query.customerId;
         const visits = await ServiceVisit.find(filter)
+            .setOptions(singleTicket ? { bypassBranch: true } : {})
             .populate({
                 path: 'ticketId',
                 select: 'ticketNo issueTitle customerId status invoiceId manualInvoiceNo assetId pincode',
                 populate: [
-                    { path: 'customerId', select: 'customerName companyName' },
+                    { path: 'customerId', select: 'customerName companyName', options: singleTicket ? { bypassBranch: true } : {} },
                     { path: 'invoiceId', select: 'voucherNumber invoiceNumber' },
-                    { path: 'assetId', select: 'serialNumber' }
+                    { path: 'assetId', select: 'serialNumber', options: singleTicket ? { bypassBranch: true } : {} }
                 ]
             })
             .populate('engineerId', 'name email')

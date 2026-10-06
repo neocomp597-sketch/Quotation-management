@@ -21,6 +21,8 @@ const MENU_GROUPS = [
             { key: 'master_bom', label: 'Product BOM Master', description: 'Create, edit and view serial-number-wise BOMs' },
             { key: 'master_contacts', label: 'Contacts', description: 'Contact management records' },
             { key: 'master_mgrs', label: 'Product MGR Master', description: 'MGR master hierarchy' },
+            { key: 'master_divisions', label: 'Division Master', description: 'Division codes used by segments and invoice records' },
+            { key: 'master_segments', label: 'Segment Master', description: 'Division-wise segment codes' },
             { key: 'master_attributes', label: 'Attributes', description: 'Attribute master definitions' },
             { key: 'master_statuses', label: 'Status Master', description: 'Status master definitions for planning' },
             { key: 'master_terms', label: 'Terms & Conditions', description: 'Terms and conditions master' },
@@ -255,7 +257,9 @@ const FULL_ACCESS_KEYS = getAllPermissionKeys();
 // so existing users keep their access until an admin sets the new key explicitly.
 const LEGACY_PERMISSION_FALLBACKS = {
     csm_rca: 'csm_dashboard',
-    master_bom: 'master_products'
+    master_bom: 'master_products',
+    master_divisions: 'master_mgrs',
+    master_segments: 'master_mgrs'
 };
 
 const getLegacyFallback = (input, key) => {

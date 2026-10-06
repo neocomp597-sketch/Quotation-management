@@ -132,8 +132,17 @@ const applyDefaultBranch = (doc, schema) => {
     doc.branchId = toObjectId(activeBranchId);
 };
 
+/**
+ * Options:
+ *   required     - companyId is mandatory (default true)
+ *   branchScoped - false for company-wide registers (Support Tickets): the record still
+ *                  carries the branch it was created in, but reads are never filtered by
+ *                  the active branch, so a ticket raised in NASHIK is visible from USGOAN.
+ */
 module.exports = function tenantPlugin(schema, options = {}) {
     const required = options.required !== false;
+    const branchScoped = options.branchScoped !== false;
+    const isScopedByBranch = () => branchScoped && isBranchScopedSchema(schema);
 
     if (!schema.path('companyId')) {
         schema.add({
@@ -210,7 +219,7 @@ module.exports = function tenantPlugin(schema, options = {}) {
     TENANT_QUERY_HOOKS.forEach(type => {
         schema.pre(type, function () {
             // Only models that actually carry a branch can be branch-scoped.
-            if (isBranchScopedSchema(schema) && !hasBranchBypass(this.options)) {
+            if (isScopedByBranch() && !hasBranchBypass(this.options)) {
                 const branchIds = getScopedBranches();
                 if (branchIds) {
                     addBranchFilter(this, branchIds, schema);
@@ -251,7 +260,7 @@ module.exports = function tenantPlugin(schema, options = {}) {
 
         // Dashboards and reports aggregate directly, so the branch scope has to be
         // enforced here as well or a super admin would see every branch's numbers.
-        if (isBranchScopedSchema(schema) && !hasBranchBypass(this.options)) {
+        if (isScopedByBranch() && !hasBranchBypass(this.options)) {
             const branchIds = getScopedBranches();
             if (branchIds) {
                 pipeline.splice(pipelineInsertIndex(pipeline), 0, { $match: buildBranchCondition(branchIds, schema) });

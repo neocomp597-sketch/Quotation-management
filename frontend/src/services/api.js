@@ -384,6 +384,28 @@ export const superAdminService = {
 };
 
 
+// Division Master and Segment Master (Division -> Segment).
+export const divisionService = {
+  getAll: (params = {}) => api.get("/divisions", { params }),
+  create: (data) => api.post("/divisions", data),
+  update: (id, data) => api.put(`/divisions/${id}`, data),
+  delete: (id) => api.delete(`/divisions/${id}`),
+};
+
+export const segmentService = {
+  getAll: (params = {}) => api.get("/segments", { params }),
+  create: (data) => api.post("/segments", data),
+  update: (id, data) => api.put(`/segments/${id}`, data),
+  delete: (id) => api.delete(`/segments/${id}`),
+  getTemplate: () => api.get("/segments/template", { responseType: "blob" }),
+  exportAll: () => api.get("/segments/export", { responseType: "blob" }),
+  import: (file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return api.post("/segments/import", formData, { headers: { "Content-Type": "multipart/form-data" } });
+  },
+};
+
 export const mgrService = {
   getAll: (type, params = {}) => api.get("/mgrs", { params: { ...(type ? { type } : {}), ...params } }),
   getById: (id) => api.get(`/mgrs/${id}`),
@@ -920,6 +942,7 @@ export const csmService = {
   getAssets: (params = {}) => api.get("/csm/assets", { params }),
   createAsset: (data) => api.post("/csm/assets", data),
   createSingleAsset: (data) => api.post("/csm/assets/single", data),
+  updateAsset: (id, data) => api.put(`/csm/assets/${id}`, data),
   returnAsset: (id, returnReason) => api.post(`/csm/assets/${id}/return`, { returnReason }),
   getReturnHistory: () => api.get("/csm/assets/return-history"),
   deleteAsset: (id) => api.delete(`/csm/assets/${id}`),

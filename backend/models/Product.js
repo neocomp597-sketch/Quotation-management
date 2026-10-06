@@ -110,6 +110,9 @@ ProductSchema.pre('save', function () {
     this.updatedAt = new Date();
 });
 
-ProductSchema.plugin(tenantPlugin);
+// The Product Master is one company-wide catalog: a product created or edited in any
+// branch is the same record in every branch. It carries no branchId and must never be
+// branch filtered (branchScoped: false keeps it that way even if a branch field is added).
+ProductSchema.plugin(tenantPlugin, { branchScoped: false });
 
 module.exports = mongoose.model('Product', ProductSchema);

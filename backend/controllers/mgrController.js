@@ -79,7 +79,7 @@ exports.createMGR = async (req, res) => {
     const mgr = new MGR(req.body);
     try {
         const newMGR = await mgr.save();
-        await invalidateViaQueueOrNow('mgrs:*', 'planning:*');
+        await invalidateViaQueueOrNow('mgrs:*', 'planning:*', 'products:*');
         res.status(201).json(newMGR);
     } catch (err) {
         if (err.code === 11000) {
@@ -94,7 +94,7 @@ exports.updateMGR = async (req, res) => {
     try {
         const updatedMGR = await MGR.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
         if (!updatedMGR) return res.status(404).json({ message: 'MGR not found' });
-        await invalidateViaQueueOrNow('mgrs:*', 'planning:*');
+        await invalidateViaQueueOrNow('mgrs:*', 'planning:*', 'products:*');
         res.json(updatedMGR);
     } catch (err) {
         if (err.code === 11000) {
@@ -109,7 +109,7 @@ exports.deleteMGR = async (req, res) => {
     try {
         const deletedMGR = await MGR.findByIdAndDelete(req.params.id);
         if (!deletedMGR) return res.status(404).json({ message: 'MGR not found' });
-        await invalidateViaQueueOrNow('mgrs:*', 'planning:*');
+        await invalidateViaQueueOrNow('mgrs:*', 'planning:*', 'products:*');
         res.json({ message: 'MGR deleted' });
     } catch (err) {
         res.status(500).json({ message: err.message });
