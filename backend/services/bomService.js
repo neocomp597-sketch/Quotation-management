@@ -21,7 +21,7 @@ const findProductsByCode = async (codes, { withMgrs = false } = {}) => {
     if (!variants.size) return new Map();
 
     let query = Product.find({ productCode: { $in: [...variants] } })
-        .select(`productCode productName description ${MGR_FIELDS.join(' ')}`);
+        .select(`productCode productName description uom ${MGR_FIELDS.join(' ')}`);
     if (withMgrs) query = query.populate(MGR_FIELDS.map((path) => ({ path, select: 'code description' })));
     const products = await query.lean();
 
@@ -48,7 +48,7 @@ const searchMaterials = async (term, limit = 20) => {
         ? { $or: [{ productCode: new RegExp(`^${escapeRegex(q)}`, 'i') }, { productName: new RegExp(escapeRegex(q), 'i') }] }
         : {};
     const products = await Product.find(query)
-        .select(`productCode productName description ${MGR_FIELDS.join(' ')}`)
+        .select(`productCode productName description uom ${MGR_FIELDS.join(' ')}`)
         .populate(MGR_FIELDS.map((path) => ({ path, select: 'code description' })))
         .sort({ productCode: 1 })
         .limit(limit)
@@ -57,81 +57,101 @@ const searchMaterials = async (term, limit = 20) => {
         productId: product._id,
         code: product.productCode,
         description: masterDescription(product),
+        uom: cleanText(product.uom),
         ...Object.fromEntries(MGR_FIELDS.map((field) => [field, product[field] ? { code: product[field].code, description: product[field].description } : null]))
     }));
 };
 
 /**
- * Validates and resolves a BOM entered on the form. Description comes from Product Master when
- * the item code is found, otherwise the entered description is kept; MGR1-MGR5 come from
- * Product Master. Returns { errors, master, items }.
+ * Validates and resolves a BOM. A BOM belongs to a Parent Item Code (fgItemCode) and lists its
+ * components as Item Code, Item Name, UOM and Quantity, the layout of the BOM relationship
+ * sheet. Item Name comes from Product Master when the code is found, otherwise the entered
+ * name is kept; UOM falls back to Product Master; MGR1-MGR5 always come from Product Master.
+ *
+ * The FG serial number is optional: a BOM without one is an item-level BOM and is keyed by
+ * its parent item code (fgSerialNumber = parent item code), which is how the BOM sheet is
+ * imported. A BOM tied to a real serial keeps that serial.
+ *
+ * The same item may appear on more than one line (BOM sheets repeat parts).
+ *
+ * options.lenient (bulk import): a component line that cannot be used is skipped and reported
+ * in `warnings` instead of failing the whole BOM.
+ *
+ * Returns { errors, warnings, master, items }.
  */
-const prepareBOM = async (body) => {
+const prepareBOM = async (body, { lenient = false } = {}) => {
     const errors = [];
+    const warnings = [];
     const fgItemCode = cleanText(body.fgItemCode);
-    const fgSerialNumber = cleanText(body.fgSerialNumber);
-    if (!fgItemCode) errors.push('FG Item Code is required.');
-    if (!fgSerialNumber) errors.push('FG Serial Number is required.');
+    const fgSerialNumber = cleanText(body.fgSerialNumber) || fgItemCode;
+    if (!fgItemCode) errors.push('Parent Item Code is required.');
 
     const rows = (Array.isArray(body.items) ? body.items : [])
         .map((row) => ({
+            rowLabel: row.rowNumber ? `Row ${row.rowNumber}` : '',
             itemCode: cleanText(row.itemCode),
             itemDescription: cleanText(row.itemDescription),
-            qtyText: cleanText(row.qty),
+            uom: cleanText(row.uom),
+            qtyText: cleanText(row.qty).replace(/,/g, ''),
             componentSerialNumber: cleanText(row.componentSerialNumber),
             batchNumber: cleanText(row.batchNumber),
             remarks: cleanText(row.remarks)
         }))
         // Rows left completely empty on the form are ignored.
-        .filter((row) => row.itemCode || row.itemDescription || row.qtyText || row.componentSerialNumber || row.batchNumber || row.remarks);
-    if (!rows.length) errors.push('Add at least one component.');
+        .filter((row) => row.itemCode || row.itemDescription || row.qtyText || row.uom);
 
     const productsByCode = await findProductsByCode([fgItemCode, ...rows.map((row) => row.itemCode)]);
-    const seen = new Map();
 
-    const items = rows.map((row, index) => {
-        const label = `Row ${index + 1}${row.itemCode ? ` (${row.itemCode})` : ''}`;
+    const items = [];
+    rows.forEach((row, index) => {
+        const label = `${row.rowLabel || `Row ${index + 1}`}${row.itemCode ? ` (${row.itemCode})` : ''}`;
         const product = productsByCode.get(toKey(row.itemCode));
         const qty = Number(row.qtyText);
+        const rowErrors = [];
 
-        if (!row.itemCode) errors.push(`${label}: Item Code is required.`);
-        if (row.qtyText === '') errors.push(`${label}: Qty is required.`);
-        else if (!Number.isFinite(qty)) errors.push(`${label}: Qty "${row.qtyText}" is not a number.`);
-        else if (qty <= 0) errors.push(`${label}: Qty must be greater than 0.`);
-        if (row.itemCode && !product && !row.itemDescription) {
-            errors.push(`${label}: Description is required because the item code is not in Product Master.`);
+        if (!row.itemCode) rowErrors.push('Item Code is required.');
+        if (row.qtyText === '') rowErrors.push('Quantity is required.');
+        else if (!Number.isFinite(qty)) rowErrors.push(`Quantity "${row.qtyText}" is not a number.`);
+        else if (qty <= 0) rowErrors.push('Quantity must be greater than 0.');
+        if (!lenient && row.itemCode && !product && !row.itemDescription) {
+            rowErrors.push('Item Name is required because the item code is not in Product Master.');
         }
 
-        const duplicateKey = [row.itemCode, row.componentSerialNumber, row.batchNumber].map(toKey).join('|');
-        if (row.itemCode && seen.has(duplicateKey)) {
-            errors.push(`${label}: same Item Code, Serial No and Batch as row ${seen.get(duplicateKey)}.`);
-        } else if (row.itemCode) {
-            seen.set(duplicateKey, index + 1);
+        if (rowErrors.length) {
+            const message = `${label}: ${rowErrors.join(' ')}`;
+            if (lenient) warnings.push(`${message} Line skipped.`);
+            else errors.push(message);
+            return;
         }
 
         const item = {
-            lineNo: index + 1,
+            lineNo: items.length + 1,
             itemCode: product ? product.productCode : row.itemCode,
             itemDescription: masterDescription(product) || row.itemDescription,
             enteredDescription: row.itemDescription,
             productId: product?._id || null,
+            uom: row.uom || cleanText(product?.uom),
             qty,
             componentSerialNumber: row.componentSerialNumber,
             batchNumber: row.batchNumber,
             remarks: row.remarks
         };
         MGR_FIELDS.forEach((field) => { item[field] = product?.[field] || null; });
-        return item;
+        items.push(item);
     });
 
+    if (!items.length && !errors.length) errors.push('Add at least one component.');
+
     const fgProduct = productsByCode.get(toKey(fgItemCode));
-    const asset = await findAssetBySerial(fgSerialNumber);
+    // Only a real serial is looked up in Invoice Bulk Upload; an item-level BOM has none.
+    const asset = toKey(fgSerialNumber) !== toKey(fgItemCode) ? await findAssetBySerial(fgSerialNumber) : null;
 
     return {
         errors,
+        warnings,
         master: {
             fgItemCode: fgProduct ? fgProduct.productCode : fgItemCode,
-            fgItemDescription: masterDescription(fgProduct),
+            fgItemDescription: masterDescription(fgProduct) || cleanText(body.fgItemDescription),
             fgProductId: fgProduct?._id || null,
             fgSerialNumber,
             fgSerialKey: toKey(fgSerialNumber),

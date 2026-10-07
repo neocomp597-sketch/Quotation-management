@@ -960,6 +960,123 @@ exports.getAssetSummary = async (req, res) => {
     }
 };
 
+const LIFECYCLE_LABELS = {
+    IMPORT: 'Imported (Excel)',
+    IMPORT_RESELL: 'Re-sold (Excel import)',
+    SINGLE_ENTRY: 'Added (Single Entry)',
+    SINGLE_ENTRY_RESELL: 'Re-sold (Single Entry)',
+    UPDATE: 'Entry edited',
+    RETURN: 'Sales return',
+    SALE: 'Sale'
+};
+
+/**
+ * Activity log of one serial number, newest first: its Invoice Bulk Upload lifecycle
+ * (import, single entry, edits, returns, re-sales), the support tickets raised for it
+ * and the service visits of those tickets. Tickets are company-wide, so the ticket and
+ * visit lookups are not limited to the active branch.
+ */
+exports.getAssetActivity = async (req, res) => {
+    try {
+        const companyId = req.user?.companyId;
+        const cleanSN = String(req.query.serialNumber || '').trim();
+        if (!cleanSN) {
+            return res.status(400).json({ message: 'serialNumber is required' });
+        }
+        const snRegex = buildExactRegex(cleanSN);
+        const Ticket = require('../models/Ticket');
+        const ServiceVisit = require('../models/ServiceVisit');
+        // Models referenced by the populates below.
+        require('../models/User');
+        require('../models/Engineer');
+        require('../models/Branch');
+        const CROSS_BRANCH = { bypassBranch: true };
+
+        const [assets, history] = await Promise.all([
+            Asset.find({ companyId, serialNumber: snRegex }).select('_id').setOptions(CROSS_BRANCH).lean(),
+            AssetHistory.find({ companyId, serialNumber: snRegex })
+                .populate({ path: 'createdBy', select: 'name email', options: CROSS_BRANCH })
+                .setOptions(CROSS_BRANCH)
+                .lean()
+        ]);
+        const assetIds = assets.map(a => a._id);
+
+        const tickets = await Ticket.find({
+            companyId,
+            $or: [{ serialNumber: snRegex }, ...(assetIds.length ? [{ assetId: { $in: assetIds } }] : [])]
+        })
+            .select('ticketNo issueTitle status createdAt resolvedAt closedAt createdBy assignedEngineerId branchId')
+            .populate({ path: 'createdBy', select: 'name', options: CROSS_BRANCH })
+            .populate('assignedEngineerId', 'name')
+            .populate('branchId', 'name')
+            .lean();
+
+        const visits = tickets.length
+            ? await ServiceVisit.find({ companyId, ticketId: { $in: tickets.map(t => t._id) } })
+                .select('visitNo ticketId scheduledDate status engineerId')
+                .populate('engineerId', 'name')
+                .setOptions(CROSS_BRANCH)
+                .lean()
+            : [];
+        const ticketNoById = new Map(tickets.map(t => [String(t._id), t.ticketNo]));
+
+        const activity = [];
+        history.forEach((h) => {
+            const details = [
+                h.returnReason ? `Reason: ${h.returnReason}` : '',
+                h.location ? `Location: ${h.location}` : '',
+                h.projectCode || h.projectName ? `Project: ${[h.projectCode, h.projectName].filter(Boolean).join(' - ')}` : ''
+            ].filter(Boolean).join(' | ');
+            activity.push({
+                date: h.returnDate || h.createdAt,
+                category: 'Lifecycle',
+                action: LIFECYCLE_LABELS[h.transactionType] || h.transactionType || 'Lifecycle',
+                reference: h.invoiceNumber ? `Invoice ${h.invoiceNumber}` : '',
+                customer: h.customerName || '',
+                status: h.status || '',
+                details,
+                by: h.createdBy?.name || ''
+            });
+        });
+        tickets.forEach((t) => {
+            const base = {
+                category: 'Ticket',
+                reference: t.ticketNo,
+                customer: '',
+                by: ''
+            };
+            activity.push({
+                ...base,
+                date: t.createdAt,
+                action: 'Ticket raised',
+                status: t.status,
+                details: [t.issueTitle, t.branchId?.name ? `Branch: ${t.branchId.name}` : '', t.assignedEngineerId?.name ? `Engineer: ${t.assignedEngineerId.name}` : ''].filter(Boolean).join(' | '),
+                by: t.createdBy?.name || ''
+            });
+            if (t.resolvedAt) activity.push({ ...base, date: t.resolvedAt, action: 'Ticket resolved', status: 'Resolved', details: t.issueTitle || '' });
+            if (t.closedAt) activity.push({ ...base, date: t.closedAt, action: 'Ticket closed', status: 'Closed', details: t.issueTitle || '' });
+        });
+        visits.forEach((v) => {
+            activity.push({
+                date: v.scheduledDate,
+                category: 'Service Visit',
+                action: 'Service visit',
+                reference: [v.visitNo, ticketNoById.get(String(v.ticketId))].filter(Boolean).join(' / '),
+                customer: '',
+                status: v.status || '',
+                details: v.engineerId?.name ? `Engineer: ${v.engineerId.name}` : '',
+                by: ''
+            });
+        });
+
+        activity.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+        res.json({ serialNumber: cleanSN, activity });
+    } catch (error) {
+        console.error('getAssetActivity error:', error);
+        res.status(500).json({ message: error.message || 'Error fetching serial activity' });
+    }
+};
+
 // Search Serial Numbers for Complaint Registration & Customer Service (Requirement: Invoice Bulk Upload source of truth)
 exports.searchSerialNumbers = async (req, res) => {
     try {

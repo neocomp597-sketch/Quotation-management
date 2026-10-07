@@ -56,6 +56,7 @@ router.get('/attendance/active', protect, fieldAttendanceController.getActiveSta
 // ─── ENTITLEMENTS (WARRANTY / AMC / ASSETS) ─────────────────────────────────
 router.get('/entitlements/verify', protect, warrantyAmcController.verifyEntitlements);
 router.get('/assets/summary', protect, warrantyAmcController.getAssetSummary);
+router.get('/assets/activity', protect, warrantyAmcController.getAssetActivity);
 router.get('/assets/search-serials', protect, warrantyAmcController.searchSerialNumbers);
 router.get('/assets/return-history', protect, warrantyAmcController.getReturnHistory);
 router.post('/warranties', protect, warrantyAmcController.createWarranty);

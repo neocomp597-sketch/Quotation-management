@@ -65,16 +65,18 @@ const ComplaintBOMPanel = ({ ticketId, serialNumber }) => {
             <div className="flex flex-wrap items-center gap-x-8 gap-y-2 rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
                 <MdAccountTree className="text-primary-600" size={20} />
                 <div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">FG Item Code</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Parent Item Code</p>
                     <p className="text-sm font-bold text-slate-800">
                         {bom.fgItemCode}
                         {bom.fgItemDescription && <span className="ml-2 font-medium text-slate-500">{bom.fgItemDescription}</span>}
                     </p>
                 </div>
-                <div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">FG Serial No</p>
-                    <p className="text-sm font-bold text-slate-800">{bom.fgSerialNumber}</p>
-                </div>
+                {String(bom.fgSerialNumber || '').toUpperCase() !== String(bom.fgItemCode || '').toUpperCase() && (
+                    <div>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">FG Serial No</p>
+                        <p className="text-sm font-bold text-slate-800">{bom.fgSerialNumber}</p>
+                    </div>
+                )}
                 <div>
                     <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Components</p>
                     <p className="text-sm font-bold text-slate-800">{bom.items?.length || 0}</p>

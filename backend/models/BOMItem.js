@@ -9,6 +9,8 @@ const BOMItemSchema = new mongoose.Schema({
     itemDescription: { type: String, trim: true, default: '' },
     enteredDescription: { type: String, trim: true, default: '' },
     productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', default: null },
+    // Unit of measure as given on the BOM sheet (NOS, KGS, MTR...); Product Master UOM is the fallback.
+    uom: { type: String, trim: true, default: '' },
     qty: { type: Number, required: true, min: 0 },
     componentSerialNumber: { type: String, trim: true, default: '' },
     batchNumber: { type: String, trim: true, default: '' },

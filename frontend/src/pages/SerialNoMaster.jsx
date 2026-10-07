@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { csmService, productService, importService, divisionService, segmentService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
 import {
@@ -91,6 +92,7 @@ const MgrLine = ({ record }) => {
 
 const SerialNoMaster = () => {
     const { user, isAdmin, isSuperAdmin } = useAuth();
+    const navigate = useNavigate();
     const [assets, setAssets] = useState([]);
     const [returnHistory, setReturnHistory] = useState([]);
     const [products, setProducts] = useState([]);
@@ -111,11 +113,6 @@ const SerialNoMaster = () => {
         return Boolean(perms.invoice_bulk_upload_delete || perms.master_serials_delete);
     }, [user, isAdmin, isSuperAdmin]);
 
-    // Detailed modal view
-    const [selectedAssetSerial, setSelectedAssetSerial] = useState(null);
-    const [assetSummary, setAssetSummary] = useState(null);
-    const [loadingSummary, setLoadingSummary] = useState(false);
-    const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
     const [openActionMenuAssetId, setOpenActionMenuAssetId] = useState(null);
 
     // Page View State: 'list' | 'single'
@@ -249,20 +246,9 @@ const SerialNoMaster = () => {
         toast.success(`Exported ${exportData.length} records`);
     };
 
-    const handleViewDetail = async (serialNumber) => {
-        setSelectedAssetSerial(serialNumber);
-        setIsDetailModalOpen(true);
-        setLoadingSummary(true);
-        setAssetSummary(null);
-        try {
-            const res = await csmService.getAssetSummary({ serialNumber });
-            setAssetSummary(res.data);
-        } catch (err) {
-            console.error('Error fetching asset summary:', err);
-            toast.error('Failed to load asset details');
-        } finally {
-            setLoadingSummary(false);
-        }
+    // Asset Lifecycle Detail is a full page with the serial's activity log and exports.
+    const handleViewDetail = (serialNumber) => {
+        navigate(`/serial-no-master/view/${encodeURIComponent(serialNumber)}`);
     };
 
     // Open Sales Return Modal (Requirement #6)
@@ -1046,72 +1032,6 @@ const SerialNoMaster = () => {
             </div>
             </>
             )}
-
-            {/* Asset Detail Modal */}
-            <Modal isOpen={isDetailModalOpen} onClose={() => setIsDetailModalOpen(false)} title="Asset Lifecycle Detail" maxWidth="max-w-xl" footer={<button onClick={() => setIsDetailModalOpen(false)} className="bg-slate-900 hover:bg-black text-white px-8 py-3 rounded-2xl font-black transition-all shadow-xl uppercase text-[10px] tracking-widest active:scale-95">Close</button>}>
-                {loadingSummary ? (
-                    <div className="py-12 text-center text-slate-400 font-medium"><div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-primary-500 border-t-transparent mb-4"></div><p className="text-xs uppercase font-black tracking-widest">Fetching Asset History...</p></div>
-                ) : assetSummary ? (
-                    <div className="space-y-6">
-                        <div className="p-5 bg-gradient-to-br from-slate-50 to-slate-100/50 border border-slate-200 rounded-3xl space-y-4">
-                            <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-                                <span className="text-xs font-black uppercase tracking-wider text-slate-700">🔎 Asset Details</span>
-                                <div className="flex gap-2">
-                                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${assetSummary.asset?.status === 'SOLD' ? 'bg-blue-50 text-blue-600 border-blue-200' : assetSummary.asset?.status === 'IN_STOCK' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-slate-50 text-slate-600 border-slate-200'}`}>Status: {assetSummary.asset?.status || 'IN_STOCK'}</span>
-                                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${assetSummary.warranty?.status === 'Active' || assetSummary.amc?.status === 'Active' ? 'bg-teal-50 text-teal-600 border-teal-200' : 'bg-rose-50 text-rose-500 border-rose-200'}`}>{assetSummary.warranty?.status === 'Active' || assetSummary.amc?.status === 'Active' ? 'Covered' : 'Out of Warranty/AMC'}</span>
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4 text-xs font-semibold text-slate-600">
-                                <div><span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Customer</span><span className="text-slate-900 text-sm font-bold">{assetSummary.asset?.customerId?.companyName || assetSummary.asset?.customerId?.customerName || assetSummary.asset?.customerNameStr || 'Stock (Unsold)'}</span></div>
-                                <div><span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Product Name</span><span className="text-slate-900 text-sm font-bold">{assetSummary.asset?.productId?.productName || 'N/A'}</span></div>
-                                <div><span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Serial Number</span><span className="text-slate-900 font-mono text-sm font-bold">{assetSummary.asset?.serialNumber}</span></div>
-                                <div><span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Invoice Number</span><span className="text-slate-900 text-sm font-bold">{assetSummary.asset?.invoiceNumber || 'N/A'}</span></div>
-                                <div><span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Date of Sale</span><span className="text-slate-900 text-sm font-bold">{assetSummary.asset?.saleDate || assetSummary.asset?.invoiceDate ? new Date(assetSummary.asset.saleDate || assetSummary.asset.invoiceDate).toLocaleDateString('en-IN') : 'N/A'}</span></div>
-                                <div><span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Postal Code</span><span className="text-slate-900 text-sm font-bold">{assetSummary.asset?.customerPostalCode || 'N/A'}</span></div>
-                                <div><span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Division</span><span className="text-slate-900 text-sm font-bold">{codeLabel(assetSummary.asset?.divisionId) || 'N/A'}</span></div>
-                                <div><span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Segment</span><span className="text-slate-900 text-sm font-bold">{codeLabel(assetSummary.asset?.segmentId) || 'N/A'}</span></div>
-                                <div className="col-span-2">
-                                    <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">MGR 1 – 5 (from Product Master)</span>
-                                    <div className="flex flex-wrap gap-1.5 mt-1">
-                                        {MGR_FIELDS.map(({ key, label }) => {
-                                            const value = resolveAssetMgr(assetSummary.asset, key);
-                                            return (
-                                                <span
-                                                    key={key}
-                                                    className={`px-2 py-0.5 rounded-md border text-[10px] ${value ? 'bg-teal-50 text-teal-700 border-teal-200 font-bold' : 'bg-slate-50 text-slate-400 border-slate-200 font-normal italic'}`}
-                                                >
-                                                    {label}: {value || 'Not assigned'}
-                                                </span>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Transaction History Log (Requirement #8, #9, #17) */}
-                        {assetSummary.history && assetSummary.history.length > 0 && (
-                            <div className="p-5 bg-white border border-slate-200 rounded-3xl space-y-3">
-                                <span className="block text-xs font-black uppercase tracking-wider text-slate-700">📜 Lifecycle Transaction History</span>
-                                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                                    {assetSummary.history.map((h, index) => (
-                                        <div key={h._id || index} className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-between text-xs">
-                                            <div>
-                                                <span className={`px-2 py-0.5 rounded font-black text-[9px] uppercase ${h.transactionType === 'RETURN' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'}`}>{h.transactionType || h.status}</span>
-                                                <p className="font-bold text-slate-800 mt-1">{h.customerName || 'Customer'} | Invoice: {h.invoiceNumber || 'N/A'}</p>
-                                                {h.returnReason && <p className="text-amber-700 italic mt-0.5">Reason: {h.returnReason}</p>}
-                                            </div>
-                                            <span className="text-[10px] font-semibold text-slate-400">{new Date(h.createdAt).toLocaleDateString('en-IN')}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                ) : (<div className="py-8 text-center text-slate-400 text-sm">Failed to load detailed asset information.</div>)}
-            </Modal>
-
-
 
             {/* --- SALES RETURN FORM MODAL (Requirement #6) --- */}
             <Modal

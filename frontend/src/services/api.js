@@ -947,6 +947,7 @@ export const csmService = {
   getReturnHistory: () => api.get("/csm/assets/return-history"),
   deleteAsset: (id) => api.delete(`/csm/assets/${id}`),
   getAssetSummary: (params = {}) => api.get("/csm/assets/summary", { params }),
+  getAssetActivity: (serialNumber) => api.get("/csm/assets/activity", { params: { serialNumber } }),
   searchSerialNumbers: (q) => api.get("/csm/assets/search-serials", { params: { q } }),
 
   getArticles: (params = {}) => api.get("/csm/kb", { params }),

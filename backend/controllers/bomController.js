@@ -8,7 +8,7 @@ const Asset = require('../models/Asset');
 const { canViewTicketDetails } = require('./ticketController');
 const { isSuperAdminRole } = require('../middlewares/authMiddleware');
 const {
-    prepareBOM, searchMaterials, findProductsByCode, masterDescription, MGR_FIELDS,
+    prepareBOM, searchMaterials, findProductsByCode, findAssetBySerial, masterDescription, MGR_FIELDS,
     toKey, cleanText, escapeRegex
 } = require('../services/bomService');
 const { importBOMWorkbook, buildTemplateBuffer } = require('../services/bomImportService');
@@ -79,16 +79,28 @@ const loadBOM = async (master) => {
                 itemDescription: product
                     ? masterDescription(product)
                     : (item.enteredDescription || item.itemDescription),
+                uom: item.uom || cleanText(product?.uom),
                 ...mgrsOf(product || item)
             };
         })
     };
 };
 
+/**
+ * BOM shown on a complaint: the BOM entered for that serial number, otherwise the item-level
+ * BOM (imported from the BOM relationship sheet) of the product the serial was sold as.
+ */
 const findBOMBySerial = async (serialNumber) => {
     const key = toKey(serialNumber);
     if (!key) return null;
-    const master = await BOMMaster.findOne({ fgSerialKey: key, status: 'Active' }).lean();
+    let master = await BOMMaster.findOne({ fgSerialKey: key, status: 'Active' }).lean();
+    if (!master) {
+        const asset = await findAssetBySerial(serialNumber);
+        const productCode = toKey(asset?.productCode);
+        if (productCode) {
+            master = await BOMMaster.findOne({ fgSerialKey: productCode, status: 'Active' }).lean();
+        }
+    }
     return loadBOM(master);
 };
 
@@ -100,7 +112,7 @@ const loadBOMById = async (id) => {
     return loadBOM(master);
 };
 
-const serialTakenMessage = (serial) => `A BOM already exists for FG serial number ${serial}. Open it from the list to change it.`;
+const serialTakenMessage = (serial) => `A BOM already exists for ${serial}. Open it from the list to change it.`;
 
 exports.searchMaterials = async (req, res) => {
     try {
@@ -353,13 +365,13 @@ exports.uploadBOM = async (req, res) => {
     }
 };
 
-/** Exports one BOM to Excel: FG columns and MGR1-5, then a row per component. */
 /**
- * A component is a sub-BOM when it has a BOM of its own: first by its serial number, and
- * failing that by its item code when exactly one BOM exists for that code. Nesting is
- * followed a few levels deep, and a serial already printed is never expanded twice.
+ * A component is a sub-BOM (sub-assembly) when it has a BOM of its own: first by its serial
+ * number, then by the item-level BOM of its item code (the BOM imported for that Parent Item
+ * Code), and failing that by its item code when exactly one BOM exists for that code. Nesting
+ * is followed down the whole tree, and a BOM already expanded is never expanded twice.
  */
-const MAX_SUB_BOM_DEPTH = 3;
+const MAX_SUB_BOM_DEPTH = 8;
 
 const loadSubBOMs = async (bom, seen, depth = 1) => {
     if (depth > MAX_SUB_BOM_DEPTH) return [];
@@ -375,17 +387,20 @@ const loadSubBOMs = async (bom, seen, depth = 1) => {
     }).lean();
 
     const bySerial = new Map();
+    const itemLevel = new Map();
     const byItemCode = new Map();
     candidates.forEach((candidate) => {
         bySerial.set(candidate.fgSerialKey, candidate);
         const key = toKey(candidate.fgItemCode);
+        if (candidate.fgSerialKey === key) itemLevel.set(key, candidate);
         // Only an unambiguous item code is used; several serials for one code is not a match.
         byItemCode.set(key, byItemCode.has(key) ? null : candidate);
     });
 
     const result = [];
     for (const item of items) {
-        const match = bySerial.get(toKey(item.componentSerialNumber)) || byItemCode.get(toKey(item.itemCode));
+        const code = toKey(item.itemCode);
+        const match = bySerial.get(toKey(item.componentSerialNumber)) || itemLevel.get(code) || byItemCode.get(code);
         if (!match || seen.has(String(match._id))) continue;
         seen.add(String(match._id));
 
@@ -417,6 +432,11 @@ exports.getBOMForPrint = async (req, res) => {
     }
 };
 
+/**
+ * Exports a BOM to Excel in the BOM relationship layout (Parent Item Code, Item Code, Item
+ * Name, UOM, Quantity): its own lines followed by the lines of every sub-assembly below it,
+ * so the file can be uploaded again unchanged.
+ */
 exports.exportBOM = async (req, res) => {
     try {
         if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
@@ -425,42 +445,25 @@ exports.exportBOM = async (req, res) => {
         const bom = await loadBOMById(req.params.id);
         if (!bom) return res.status(404).json({ message: 'BOM not found' });
 
-        const label = (mgr) => (mgr ? (mgr.description || mgr.code || '') : '');
-        const rows = (bom.items || []).map((item) => ({
-            'FG_Item Code': bom.fgItemCode || '',
-            'FG_Desc': bom.fgItemDescription || '',
-            'FG_Serial Number': bom.fgSerialNumber || '',
-            'FG_MGR1': label(bom.fgMgr?.mgr1),
-            'FG_MGR2': label(bom.fgMgr?.mgr2),
-            'FG_MGR3': label(bom.fgMgr?.mgr3),
-            'FG_MGR4': label(bom.fgMgr?.mgr4),
-            'FG_MGR5': label(bom.fgMgr?.mgr5),
-            'BOM_Item Code': item.itemCode || '',
-            'BOM_Desc': item.itemDescription || '',
-            'BOM_Batch': item.batchNumber || '',
-            'BOM_Serial Number': item.componentSerialNumber || '',
-            'BOM_Qty': item.qty ?? '',
-            'BOM_MGR1': label(item.mgr1),
-            'BOM_MGR2': label(item.mgr2),
-            'BOM_MGR3': label(item.mgr3),
-            'BOM_MGR4': label(item.mgr4),
-            'BOM_MGR5': label(item.mgr5),
-            'BOM_Remarks': item.remarks || ''
-        }));
+        const subBoms = await loadSubBOMs(bom, new Set([String(bom._id)]));
+        const linesOf = (entry) => (entry.items || []).map((item) => [
+            entry.fgItemCode || '',
+            item.itemCode || '',
+            item.itemDescription || '',
+            item.uom || '',
+            item.qty ?? ''
+        ]);
+        const rows = [bom, ...subBoms.map((sub) => sub.bom).filter(Boolean)].flatMap(linesOf);
 
-        const headers = Object.keys(rows[0] || {
-            'FG_Item Code': '', 'FG_Desc': '', 'FG_Serial Number': '', 'FG_MGR1': '', 'FG_MGR2': '', 'FG_MGR3': '',
-            'FG_MGR4': '', 'FG_MGR5': '', 'BOM_Item Code': '', 'BOM_Desc': '', 'BOM_Batch': '', 'BOM_Serial Number': '',
-            'BOM_Qty': '', 'BOM_MGR1': '', 'BOM_MGR2': '', 'BOM_MGR3': '', 'BOM_MGR4': '', 'BOM_MGR5': '', 'BOM_Remarks': ''
-        });
-        const sheet = XLSX.utils.json_to_sheet(rows, { header: headers });
-        sheet['!cols'] = headers.map((header) => ({ wch: /Desc/.test(header) ? 42 : 18 }));
+        const headers = ['Parent Item Code', 'Item Code', 'Item Name', 'UOM', 'Quantity'];
+        const sheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+        sheet['!cols'] = [{ wch: 18 }, { wch: 16 }, { wch: 70 }, { wch: 10 }, { wch: 10 }];
         const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, sheet, 'BOM');
+        XLSX.utils.book_append_sheet(workbook, sheet, 'BOM Relationships');
 
-        const safeSerial = String(bom.fgSerialNumber || 'bom').replace(/[^A-Za-z0-9._-]+/g, '-');
+        const safeName = String(bom.fgSerialNumber || bom.fgItemCode || 'bom').replace(/[^A-Za-z0-9._-]+/g, '-');
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        res.setHeader('Content-Disposition', `attachment; filename=BOM_${safeSerial}.xlsx`);
+        res.setHeader('Content-Disposition', `attachment; filename=BOM_${safeName}.xlsx`);
         return res.send(XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }));
     } catch (error) {
         return res.status(500).json({ message: 'Failed to export BOM', error: error.message });

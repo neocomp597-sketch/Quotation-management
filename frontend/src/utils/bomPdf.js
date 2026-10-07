@@ -1,9 +1,10 @@
 /**
  * Export to PDF for a BOM, laid out like the BOM Details screen.
  *
- * The sheet carries the finished good with its invoice, customer and MGR1-MGR5, then the
- * components, then any sub-BOM (a component that has a BOM of its own) underneath in a
- * smaller font, one size down per level of nesting.
+ * The sheet carries the parent item with its MGR1-MGR5, then the components in the BOM
+ * relationship sheet's columns (Item Code, Item Name, UOM, Quantity) plus MGR1-MGR5, then
+ * any sub-assembly (a component that has a BOM of its own) underneath in a smaller font,
+ * one size down per level of nesting.
  *
  * jsPDF is imported on demand so the 400 KB library is only fetched when someone exports.
  */
@@ -21,23 +22,23 @@ const HEAD_FILL = [241, 245, 249]; // slate-100
 // from Word, for instance) is folded down to plain ASCII rather than printed as a blob.
 const ASCII = { '\u2013': '-', '\u2014': '-', '\u2018': "'", '\u2019': "'", '\u201c': '\"', '\u201d': '\"', '\u2022': '-', '\u00b7': '-', '\u2026': '...', '\u00a0': ' ' };
 const text = (value) => (value === 0 ? '0' : String(value ?? '').replace(/[\u2013\u2014\u2018\u2019\u201c\u201d\u2022\u00b7\u2026\u00a0]/g, (c) => ASCII[c]).trim());
-const dateOnly = (value) => (value ? new Date(value).toLocaleDateString('en-IN') : '');
 const mgrLabel = (mgr) => (mgr ? (mgr.description || mgr.code || '') : '');
+const sameKey = (a, b) => text(a).toUpperCase() === text(b).toUpperCase();
+// A BOM tied to a real FG serial carries it; an item-level BOM stores its item code there.
+const realSerial = (bom) => (bom && !sameKey(bom.fgSerialNumber, bom.fgItemCode) ? text(bom.fgSerialNumber) : '');
 
-// #, Item Code, Description, Qty, Batch, Serial No, Remarks, MGR1-MGR5 — the screen's order.
+// #, Item Code, Item Name, UOM, Quantity, MGR1-MGR5 — the screen's order.
 const COLUMNS = [
     { key: 'lineNo', label: '#', width: 8 },
-    { key: 'itemCode', label: 'Item Code', width: 26 },
-    { key: 'itemDescription', label: 'Description', width: 60 },
-    { key: 'qty', label: 'Qty', width: 12, align: 'right' },
-    { key: 'batchNumber', label: 'Batch', width: 22 },
-    { key: 'componentSerialNumber', label: 'Serial No', width: 28 },
-    { key: 'remarks', label: 'Remarks', width: 34 },
-    { key: 'mgr1', label: 'MGR1', width: 17 },
-    { key: 'mgr2', label: 'MGR2', width: 17 },
-    { key: 'mgr3', label: 'MGR3', width: 17 },
-    { key: 'mgr4', label: 'MGR4', width: 17 },
-    { key: 'mgr5', label: 'MGR5', width: 17 },
+    { key: 'itemCode', label: 'Item Code', width: 28 },
+    { key: 'itemDescription', label: 'Item Name', width: 106 },
+    { key: 'uom', label: 'UOM', width: 17 },
+    { key: 'qty', label: 'Quantity', width: 18, align: 'right' },
+    { key: 'mgr1', label: 'MGR1', width: 20 },
+    { key: 'mgr2', label: 'MGR2', width: 20 },
+    { key: 'mgr3', label: 'MGR3', width: 20 },
+    { key: 'mgr4', label: 'MGR4', width: 20 },
+    { key: 'mgr5', label: 'MGR5', width: 20 },
 ];
 
 const cellValue = (item, key, index) => {
@@ -67,7 +68,7 @@ class Sheet {
         doc.setFont('helvetica', 'bold').setFontSize(15);
         doc.text('BOM Details', MARGIN, this.y + 5);
         doc.setFont('helvetica', 'normal').setFontSize(9).setTextColor(...MUTED);
-        doc.text(`FG serial ${text(bom.fgSerialNumber)}`, MARGIN, this.y + 10.5);
+        doc.text([`Parent Item Code ${text(bom.fgItemCode)}`, realSerial(bom) ? `serial ${realSerial(bom)}` : ''].filter(Boolean).join('   |   '), MARGIN, this.y + 10.5);
         this.y += 15;
     }
 
@@ -171,24 +172,17 @@ class Sheet {
 export const buildBOMPdf = async ({ bom, subBoms = [] }) => {
     const { default: jsPDF } = await import('jspdf');
     const doc = new jsPDF('l', 'mm', 'a4');
-    const sheet = new Sheet(doc, `BOM ${text(bom.fgSerialNumber)}`);
+    const sheet = new Sheet(doc, `BOM ${text(bom.fgItemCode)}${realSerial(bom) ? ` / ${realSerial(bom)}` : ''}`);
     const mgr = bom.fgMgr || {};
 
     sheet.heading(bom);
     sheet.fields([
         [
-            { label: 'FG Item Code', value: bom.fgItemCode },
-            { label: 'FG Description', value: bom.fgItemDescription },
-            { label: 'FG Serial Number', value: bom.fgSerialNumber },
+            { label: 'Parent Item Code', value: bom.fgItemCode },
+            { label: 'Item Name', value: bom.fgItemDescription },
+            { label: realSerial(bom) ? 'FG Serial Number' : '', value: realSerial(bom) },
             { label: 'Components', value: (bom.items || []).length },
             { label: 'Status', value: bom.status },
-        ],
-        [
-            { label: 'Invoice No', value: bom.invoice?.invoiceNumber },
-            { label: 'Invoice Date', value: dateOnly(bom.invoice?.invoiceDate) },
-            { label: 'Customer Code', value: bom.invoice?.customerCode },
-            { label: 'Customer Name', value: bom.invoice?.customerName },
-            { label: '', value: '' },
         ],
         [1, 2, 3, 4, 5].map((n) => ({ label: `MGR${n}`, value: mgrLabel(mgr[`mgr${n}`]) })),
     ]);
@@ -204,8 +198,8 @@ export const buildBOMPdf = async ({ bom, subBoms = [] }) => {
         // The sub-BOM's own FG serial is named, because a component without a serial is
         // matched on its item code and would otherwise be ambiguous.
         const label = [
-            `SUB BOM - ${text(entry.forItemCode)}`,
-            entry.bom?.fgSerialNumber ? `serial ${text(entry.bom.fgSerialNumber)}` : '',
+            `SUB-ASSEMBLY - ${text(entry.forItemCode)}`,
+            realSerial(entry.bom) ? `serial ${realSerial(entry.bom)}` : '',
             text(entry.bom?.fgItemDescription),
         ].filter(Boolean).join('   |   ');
         sheet.sectionTitle(label, fontSize + 1, indent);

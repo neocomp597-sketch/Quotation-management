@@ -13,8 +13,14 @@ const Field = ({ label, children }) => (
 );
 
 const formatDateTime = (value) => (value ? new Date(value).toLocaleString('en-IN') : '');
-const formatDate = (value) => (value ? new Date(value).toLocaleDateString('en-IN') : '');
 const mgrLabel = (mgr) => (mgr ? (mgr.description || mgr.code || '') : '');
+const sameKey = (a, b) => String(a || '').trim().toUpperCase() === String(b || '').trim().toUpperCase();
+
+// A BOM is identified by its Parent Item Code; one tied to a real FG serial also names the serial.
+const bomName = (bom) => (bom && !sameKey(bom.fgSerialNumber, bom.fgItemCode)
+    ? `parent item ${bom.fgItemCode}, serial ${bom.fgSerialNumber}`
+    : `parent item ${bom?.fgItemCode || ''}`);
+const fileName = (bom) => String(bom.fgSerialNumber || bom.fgItemCode || bom._id).replace(/[^A-Za-z0-9._-]+/g, '-');
 
 const BOMDetails = () => {
     const navigate = useNavigate();
@@ -43,7 +49,7 @@ const BOMDetails = () => {
                 import('../utils/bomPdf'),
             ]);
             const doc = await buildBOMPdf(data);
-            doc.save(`BOM_${bom.fgSerialNumber || bom._id}.pdf`);
+            doc.save(`BOM_${fileName(bom)}.pdf`);
         } catch (err) {
             toast.error(err.response?.data?.message || 'Could not export the BOM as PDF.');
         } finally {
@@ -57,7 +63,7 @@ const BOMDetails = () => {
             const url = URL.createObjectURL(new Blob([res.data]));
             const link = document.createElement('a');
             link.href = url;
-            link.download = `BOM_${bom.fgSerialNumber || bom._id}.xlsx`;
+            link.download = `BOM_${fileName(bom)}.xlsx`;
             document.body.appendChild(link);
             link.click();
             link.remove();
@@ -102,7 +108,7 @@ const BOMDetails = () => {
                 <div>
                     <h1 className="text-xl font-black text-slate-900">BOM Details</h1>
                     <p className="text-xs text-slate-500 font-medium mt-0.5">
-                        {bom ? `FG serial ${bom.fgSerialNumber}` : 'Finished-good bill of materials'}
+                        {bom ? `Parent Item Code ${bom.fgItemCode}` : 'Bill of materials'}
                     </p>
                 </div>
                 {bom && (
@@ -152,8 +158,8 @@ const BOMDetails = () => {
                         </h2>
                         <p className="mt-2 text-sm font-medium text-slate-500">
                             {nextStatus === 'Inactive'
-                                ? `FG serial ${bom.fgSerialNumber} stays in the register with its components, but is no longer shown on complaints. You can switch it back on at any time.`
-                                : `FG serial ${bom.fgSerialNumber} will be shown on complaints again.`}
+                                ? `The BOM of ${bomName(bom)} stays in the register with its components, but is no longer shown on complaints. You can switch it back on at any time.`
+                                : `The BOM of ${bomName(bom)} will be shown on complaints again.`}
                         </p>
                         <label className="mt-5 block text-[10px] font-black uppercase tracking-widest text-slate-400">Reason (optional)</label>
                         <input
@@ -194,21 +200,17 @@ const BOMDetails = () => {
             ) : (
                 <>
                     <div className="grid grid-cols-2 gap-6 rounded-3xl border border-slate-100 bg-white p-6 shadow-sm md:grid-cols-4">
-                        <Field label="FG Item Code">
-                            {bom.fgItemCode}
-                            {bom.fgItemDescription && <span className="block text-xs font-medium text-slate-500">{bom.fgItemDescription}</span>}
-                        </Field>
-                        <Field label="FG Serial Number">{bom.fgSerialNumber}</Field>
+                        <Field label="Parent Item Code">{bom.fgItemCode}</Field>
+                        <Field label="Item Name">{bom.fgItemDescription}</Field>
                         <Field label="Components">{String(bom.items?.length || 0)}</Field>
                         <Field label="Status">
                             <span className={`inline-block rounded-lg px-3 py-1 text-[10px] font-black uppercase tracking-widest ${bom.status === 'Active' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
                                 {bom.status}
                             </span>
                         </Field>
-                        <Field label="Invoice No">{bom.invoice?.invoiceNumber}</Field>
-                        <Field label="Invoice Date">{formatDate(bom.invoice?.invoiceDate)}</Field>
-                        <Field label="Customer Code">{bom.invoice?.customerCode}</Field>
-                        <Field label="Customer Name">{bom.invoice?.customerName}</Field>
+                        {!sameKey(bom.fgSerialNumber, bom.fgItemCode) && (
+                            <Field label="FG Serial Number">{bom.fgSerialNumber}</Field>
+                        )}
                         {[1, 2, 3, 4, 5].map((n) => (
                             <Field key={n} label={`MGR${n}`}>{mgrLabel(bom.fgMgr?.[`mgr${n}`])}</Field>
                         ))}

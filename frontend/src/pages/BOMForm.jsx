@@ -12,14 +12,13 @@ const cellClass = 'w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-
 const labelClass = 'text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1';
 
 let rowSeq = 0;
+// Component lines follow the BOM relationship sheet: Item Code, Item Name, UOM, Quantity.
 const emptyRow = () => ({
     key: `row-${Date.now()}-${rowSeq++}`,
     itemCode: '',
     itemDescription: '',
+    uom: '',
     qty: 1,
-    componentSerialNumber: '',
-    batchNumber: '',
-    remarks: '',
     // Set when the item code was picked from Product Master; its description and MGRs then come from there.
     fromMaster: false,
     mgrs: {}
@@ -29,10 +28,8 @@ const rowFromSaved = (item) => ({
     ...emptyRow(),
     itemCode: item.itemCode,
     itemDescription: item.itemDescription,
+    uom: item.uom || '',
     qty: item.qty,
-    componentSerialNumber: item.componentSerialNumber || '',
-    batchNumber: item.batchNumber || '',
-    remarks: item.remarks || '',
     fromMaster: Boolean(item.inProductMaster),
     mgrs: Object.fromEntries(MGR_KEYS.map((key) => [key, item[key]]))
 });
@@ -56,7 +53,9 @@ const BOMForm = () => {
             .then((res) => {
                 if (cancelled) return;
                 const bom = res.data;
-                setFg({ fgItemCode: bom.fgItemCode, fgItemDescription: bom.fgItemDescription || '', fgSerialNumber: bom.fgSerialNumber });
+                // An item-level BOM stores its parent item code as the serial; the form shows it blank.
+                const sameAsCode = String(bom.fgSerialNumber || '').toUpperCase() === String(bom.fgItemCode || '').toUpperCase();
+                setFg({ fgItemCode: bom.fgItemCode, fgItemDescription: bom.fgItemDescription || '', fgSerialNumber: sameAsCode ? '' : bom.fgSerialNumber });
                 setRows(bom.items?.length ? bom.items.map(rowFromSaved) : [emptyRow()]);
                 setLoadedId(id);
             })
@@ -77,13 +76,11 @@ const BOMForm = () => {
         const payload = {
             fgItemCode: fg.fgItemCode,
             fgSerialNumber: fg.fgSerialNumber,
-            items: rows.map(({ itemCode, itemDescription, qty, componentSerialNumber, batchNumber, remarks }) => ({
-                itemCode, itemDescription, qty, componentSerialNumber, batchNumber, remarks
-            }))
+            items: rows.map(({ itemCode, itemDescription, uom, qty }) => ({ itemCode, itemDescription, uom, qty }))
         };
         try {
             const res = isEdit ? await bomService.update(id, payload) : await bomService.create(payload);
-            toast.success(`BOM saved for FG serial ${res.data.fgSerialNumber}`);
+            toast.success(`BOM saved for parent item ${res.data.fgItemCode}`);
             navigate(`/bom-master/${res.data._id}`);
         } catch (err) {
             const data = err.response?.data;
@@ -119,7 +116,7 @@ const BOMForm = () => {
                     <div>
                         <h1 className="text-xl font-black text-slate-900">{isEdit ? 'Edit BOM' : 'New BOM'}</h1>
                         <p className="text-xs text-slate-500 font-medium mt-0.5">
-                            {isEdit ? `FG serial ${fg.fgSerialNumber}` : 'Components for one finished-good serial number'}
+                            {isEdit ? `Parent Item Code ${fg.fgItemCode}` : 'Components of one parent item'}
                         </p>
                     </div>
                 </div>
@@ -155,10 +152,10 @@ const BOMForm = () => {
             <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                     <div className="space-y-2">
-                        <label className={labelClass}>FG Item Code <span className="text-rose-500">*</span></label>
+                        <label className={labelClass}>Parent Item Code <span className="text-rose-500">*</span></label>
                         <MaterialSearchInput
                             value={fg.fgItemCode}
-                            placeholder="Search FG item code"
+                            placeholder="Search parent item code"
                             className={inputClass}
                             onChange={(value) => setFg((prev) => ({ ...prev, fgItemCode: value, fgItemDescription: '' }))}
                             onSelect={(material) => setFg((prev) => ({ ...prev, fgItemCode: material.code, fgItemDescription: material.description }))}
@@ -166,7 +163,7 @@ const BOMForm = () => {
                         {fg.fgItemDescription && <p className="ml-1 text-xs font-medium text-slate-500">{fg.fgItemDescription}</p>}
                     </div>
                     <div className="space-y-2">
-                        <label className={labelClass}>FG Serial Number <span className="text-rose-500">*</span></label>
+                        <label className={labelClass}>FG Serial Number <span className="font-semibold normal-case tracking-normal text-slate-400">(optional)</span></label>
                         <SerialSearchInput
                             value={fg.fgSerialNumber}
                             className={inputClass}
@@ -189,7 +186,7 @@ const BOMForm = () => {
                             </p>
                         ) : (
                             <p className="ml-1 text-xs font-medium text-slate-400">
-                                Pick a serial from Invoice Bulk Upload so the BOM can be found from a complaint.
+                                Leave blank for a BOM that applies to every serial of this item. Pick a serial only for a BOM specific to one unit.
                             </p>
                         )}
                     </div>
@@ -201,7 +198,7 @@ const BOMForm = () => {
                 <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
                     <div>
                         <h2 className="text-xs font-black uppercase tracking-widest text-slate-500">BOM Components</h2>
-                        <p className="mt-1 text-xs text-slate-400">Pick the item code from Product Master to fill the description and MGR1–MGR5. For items not in Product Master, type the description.</p>
+                        <p className="mt-1 text-xs text-slate-400">Pick the item code from Product Master to fill the item name and MGR1–MGR5. For items not in Product Master, type the item name.</p>
                     </div>
                     <button
                         type="button"
@@ -212,10 +209,10 @@ const BOMForm = () => {
                     </button>
                 </div>
                 <div className="overflow-x-auto p-4">
-                    <table className="w-full min-w-[1100px] text-left border-collapse">
+                    <table className="w-full min-w-[960px] text-left border-collapse">
                         <thead>
                             <tr className="bg-slate-50">
-                                {['#', 'Item Code *', 'Description', 'Qty *', 'Batch', 'Serial No', 'Remarks', 'MGR1', 'MGR2', 'MGR3', 'MGR4', 'MGR5', ''].map((label) => (
+                                {['#', 'Item Code *', 'Item Name', 'UOM', 'Quantity *', 'MGR1', 'MGR2', 'MGR3', 'MGR4', 'MGR5', ''].map((label) => (
                                     <th key={label} className="px-3 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">{label}</th>
                                 ))}
                             </tr>
@@ -233,32 +230,27 @@ const BOMForm = () => {
                                             onSelect={(material) => updateRow(index, {
                                                 itemCode: material.code,
                                                 itemDescription: material.description,
+                                                uom: row.uom || material.uom || '',
                                                 fromMaster: true,
                                                 mgrs: Object.fromEntries(MGR_KEYS.map((key) => [key, material[key]]))
                                             })}
                                         />
                                     </td>
-                                    <td className="px-2 py-2 min-w-[12rem]">
+                                    <td className="px-2 py-2 min-w-[16rem]">
                                         <input
                                             className={cellClass}
                                             value={row.itemDescription}
                                             readOnly={row.fromMaster}
                                             title={row.fromMaster ? 'Taken from Product Master' : ''}
                                             onChange={(e) => updateRow(index, { itemDescription: e.target.value })}
-                                            placeholder="Description"
+                                            placeholder="Item name"
                                         />
                                     </td>
-                                    <td className="px-2 py-2 w-24">
+                                    <td className="px-2 py-2 w-28">
+                                        <input className={cellClass} value={row.uom} onChange={(e) => updateRow(index, { uom: e.target.value })} placeholder="NOS" />
+                                    </td>
+                                    <td className="px-2 py-2 w-28">
                                         <input className={cellClass} type="number" min="0" step="any" value={row.qty} onChange={(e) => updateRow(index, { qty: e.target.value })} />
-                                    </td>
-                                    <td className="px-2 py-2 min-w-[7rem]">
-                                        <input className={cellClass} value={row.batchNumber} onChange={(e) => updateRow(index, { batchNumber: e.target.value })} placeholder="Optional" />
-                                    </td>
-                                    <td className="px-2 py-2 min-w-[8rem]">
-                                        <input className={cellClass} value={row.componentSerialNumber} onChange={(e) => updateRow(index, { componentSerialNumber: e.target.value })} placeholder="Optional" />
-                                    </td>
-                                    <td className="px-2 py-2 min-w-[10rem]">
-                                        <input className={cellClass} value={row.remarks} onChange={(e) => updateRow(index, { remarks: e.target.value })} placeholder="Remarks" />
                                     </td>
                                     {MGR_KEYS.map((key) => (
                                         <td key={key} className="px-3 py-2 pt-4 text-xs text-slate-500 whitespace-nowrap">
