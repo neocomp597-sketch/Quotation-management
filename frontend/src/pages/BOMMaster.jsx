@@ -72,7 +72,7 @@ const BOMMaster = () => {
 
     useEffect(() => {
         let cancelled = false;
-        bomService.getAll({ page, limit: LIST_PAGE_SIZE, search: debouncedSearch || undefined, status: statusFilter || undefined })
+        bomService.getProducts({ page, limit: LIST_PAGE_SIZE, search: debouncedSearch || undefined, status: statusFilter || undefined })
             .then((res) => {
                 if (cancelled) return;
                 setBoms(res.data?.data || []);
@@ -94,7 +94,7 @@ const BOMMaster = () => {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-black text-slate-900 tracking-tight">Product BOM Master</h1>
-                    <p className="text-slate-500 font-medium">Bill of materials for each finished-good serial number.</p>
+                    <p className="text-slate-500 font-medium">Products and their bill of materials. Open a product to see its assemblies.</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
                 <button
@@ -152,7 +152,7 @@ const BOMMaster = () => {
                                 type="text"
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
-                                placeholder="Search FG serial number or item code"
+                                placeholder="Search product code or name"
                                 className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-medium"
                             />
                         </div>
@@ -180,7 +180,7 @@ const BOMMaster = () => {
                                 <table className="w-full text-left border-collapse">
                                     <thead>
                                         <tr className="bg-slate-50">
-                                            {['Sr No', 'FG Item Code', 'FG Serial Number', 'Components', 'Status', 'Last Updated'].map((label) => (
+                                            {['Sr No', 'Product Code', 'Product Name', 'Components', 'Status', 'Last Updated'].map((label) => (
                                                 <th key={label} className="p-4 text-xs font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">{label}</th>
                                             ))}
                                             <th className="p-4 text-xs font-black text-slate-400 uppercase tracking-widest text-right">Actions</th>
@@ -194,11 +194,13 @@ const BOMMaster = () => {
                                                 className="cursor-pointer border-b last:border-0 border-slate-50 hover:bg-slate-50/50 transition-colors"
                                             >
                                                 <td className="p-4 text-sm font-bold text-slate-400">{offset + index + 1}</td>
-                                                <td className="p-4 text-sm">
+                                                <td className="p-4 text-sm whitespace-nowrap">
                                                     <span className="font-bold text-slate-800">{bom.fgItemCode}</span>
-                                                    {bom.fgItemDescription && <span className="block text-xs text-slate-500">{bom.fgItemDescription}</span>}
+                                                    {String(bom.fgSerialNumber || '').toUpperCase() !== String(bom.fgItemCode || '').toUpperCase() && (
+                                                        <span className="block text-xs text-slate-500">Serial {bom.fgSerialNumber}</span>
+                                                    )}
                                                 </td>
-                                                <td className="p-4 text-sm font-bold text-slate-700">{bom.fgSerialNumber}</td>
+                                                <td className="p-4 text-sm text-slate-600">{bom.fgItemDescription || '-'}</td>
                                                 <td className="p-4 text-sm font-bold text-slate-700">{bom.componentCount}</td>
                                                 <td className="p-4">
                                                     <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${bom.status === 'Active' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
@@ -231,7 +233,7 @@ const BOMMaster = () => {
                                         {boms.length === 0 && (
                                             <tr>
                                                 <td colSpan={7} className="p-8 text-center text-slate-400 text-sm font-medium">
-                                                    {debouncedSearch ? 'No BOMs match your search.' : 'No BOMs yet. Click New BOM to add one.'}
+                                                    {debouncedSearch ? 'No products match your search. Assemblies are listed inside their product.' : 'No products yet. Click New BOM to add one.'}
                                                 </td>
                                             </tr>
                                         )}

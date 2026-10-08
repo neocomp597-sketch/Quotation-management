@@ -14,7 +14,9 @@ import { useSubmitGuard } from '../hooks/useSubmitGuard';
 
 const LIST_PAGE_SIZE = 20;
 
-const Customers = ({ isCreatePage, isEditPage }) => {
+// `embedded` shows only the New Customer form inside another screen (Serial No Transfer):
+// the saved customer is handed to onSaved instead of returning to the customer list.
+const Customers = ({ isCreatePage, isEditPage, embedded = false, onSaved, onCancel }) => {
     const navigate = useNavigate();
     const { id: routeId } = useParams();
     const [customers, setCustomers] = useState([]);
@@ -97,7 +99,7 @@ const Customers = ({ isCreatePage, isEditPage }) => {
     }, [searchTerm]);
 
     useEffect(() => {
-        fetchCustomers();
+        if (!embedded) fetchCustomers();
     }, [page, debouncedSearch, selectedTerritory]);
 
     const fetchCustomers = async () => {
@@ -278,14 +280,25 @@ const Customers = ({ isCreatePage, isEditPage }) => {
                 await customerService.update(editingCustomer._id, payload);
                 toast.success('Customer updated successfully!');
             } else {
-                await customerService.create(payload);
+                const created = await customerService.create(payload);
                 toast.success('Customer created successfully!');
+                if (embedded) {
+                    onSaved?.(created.data);
+                    return;
+                }
             }
             fetchCustomers();
             setIsModalOpen(false);
             navigate('/customers');
         } catch (err) {
             console.error("Error saving customer:", err);
+            // Embedded: a customer already in the master is selected rather than duplicated.
+            if (embedded && err.response?.status === 409 && err.response.data?.duplicate) {
+                const existing = err.response.data.duplicate;
+                toast.info(`${existing.companyName || existing.customerName} already exists in Customer Master and has been selected.`);
+                onSaved?.(existing);
+                return;
+            }
             toast.error(err.response?.data?.message || 'Error saving customer data');
         }
     });
@@ -698,7 +711,7 @@ const Customers = ({ isCreatePage, isEditPage }) => {
                             <div className="flex items-center gap-4">
                                 <button
                                     type="button"
-                                    onClick={() => { setIsModalOpen(false); navigate('/customers'); }}
+                                    onClick={() => { if (embedded) { onCancel?.(); return; } setIsModalOpen(false); navigate('/customers'); }}
                                     className="p-3 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-2xl transition-all border border-slate-200"
                                 >
                                     <MdArrowBack size={20} />
@@ -715,7 +728,7 @@ const Customers = ({ isCreatePage, isEditPage }) => {
                             <div className="flex items-center gap-3">
                                 <button
                                     type="button"
-                                    onClick={() => { setIsModalOpen(false); navigate('/customers'); }}
+                                    onClick={() => { if (embedded) { onCancel?.(); return; } setIsModalOpen(false); navigate('/customers'); }}
                                     className="px-6 py-3 rounded-2xl border border-slate-200 text-slate-600 font-black uppercase text-xs tracking-widest hover:bg-slate-50 transition-all"
                                 >
                                     Cancel

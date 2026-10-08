@@ -50,7 +50,8 @@ import {
     MdCheckCircle,
     MdAssessment,
     MdClose,
-    MdHowToReg
+    MdHowToReg,
+    MdSwapHoriz,
 } from 'react-icons/md';
 import { useAuth } from '../context/AuthContext';
 import { companySettingsService } from '../services/api';
@@ -215,6 +216,8 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                 { key: 'sales_cpq', name: 'Quote Simulator', icon: <MdSpeed size={18} />, path: '/sales/cpq/simulator' },
                 { key: 'sale_invoices', name: 'Invoices', icon: <MdReceipt size={18} />, path: '/invoices' },
                 { key: 'master_serials', name: 'Invoice Bulk Upload', icon: <MdTag size={18} />, path: '/serial-no-master' },
+                // Sorted as if named after Invoice Bulk Upload so it sits directly below it.
+                { key: 'master_serials', name: 'Serial No Transfer', sortName: 'Invoice Bulk Upload 2', icon: <MdSwapHoriz size={18} />, path: '/serial-no-transfer' },
                 { key: 'sales_approvals', name: 'Approvals', icon: <MdLock size={18} />, path: '/sales/approvals' },
                 { key: 'sales_orders', name: 'Orders', icon: <MdShoppingCart size={18} />, path: '/sales/orders' },
             ]
@@ -352,7 +355,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                         if (child.superAdminOnly) return isSuperAdmin;
                         return child.adminOnly ? (isAdmin || isSuperAdmin) : hasAccess(child.key);
                     })
-                    .sort((a, b) => a.name.localeCompare(b.name, 'en', { sensitivity: 'base' })),
+                    .sort((a, b) => (a.sortName || a.name).localeCompare(b.sortName || b.name, 'en', { sensitivity: 'base' })),
             };
         }).filter((item) => {
             if (item.type === 'link') {

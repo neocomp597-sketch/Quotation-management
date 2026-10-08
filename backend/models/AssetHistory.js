@@ -29,7 +29,7 @@ const AssetHistorySchema = new mongoose.Schema({
     projectName: { type: String, default: '' },
     transactionType: {
         type: String,
-        enum: ['SALE', 'RETURN', 'IMPORT', 'IMPORT_RESELL', 'SINGLE_ENTRY', 'SINGLE_ENTRY_RESELL', 'UPDATE'],
+        enum: ['SALE', 'RETURN', 'IMPORT', 'IMPORT_RESELL', 'SINGLE_ENTRY', 'SINGLE_ENTRY_RESELL', 'UPDATE', 'TRANSFER'],
         default: 'SALE'
     },
     status: { type: String, default: 'SOLD' },

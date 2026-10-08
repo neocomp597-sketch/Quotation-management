@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { MdArrowBack, MdEdit, MdFileDownload, MdPictureAsPdf, MdToggleOff, MdToggleOn, MdHistory, MdUploadFile } from 'react-icons/md';
+import { MdArrowBack, MdEdit, MdFileDownload, MdPictureAsPdf, MdToggleOff, MdToggleOn, MdHistory, MdUploadFile, MdAdd, MdChevronRight } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import { bomService } from '../services/api';
 import BOMComponentsTable from '../components/bom/BOMComponentsTable';
@@ -127,34 +127,76 @@ const BOMDetails = () => {
             const res = await bomService.importComponents(bom._id, importFile, importMode);
             const { bom: updated, ...summary } = res.data || {};
             if (updated) setResult({ id, bom: updated, error: '' });
-            setImportSummary(summary);
+            setImportSummary({ ...summary, bomId: id });
             closeImport();
             toast.success(`${summary.imported || 0} component(s) imported`);
             if (summary.skippedLines) toast.info(`${summary.skippedLines} line(s) skipped; see the import summary.`);
         } catch (err) {
             const data = err.response?.data;
             toast.error(data?.message || 'Could not import the components.');
-            if (data?.warnings?.length) setImportSummary({ fileName: importFile.name, failed: data.message, warnings: data.warnings });
+            if (data?.warnings?.length) setImportSummary({ fileName: importFile.name, failed: data.message, warnings: data.warnings, bomId: id });
         } finally {
             setImporting(false);
         }
     };
+
+    // Create Assembly: adds an assembly under this product and opens it to load its components.
+    const [assemblyOpen, setAssemblyOpen] = useState(false);
+    const [assemblySaving, setAssemblySaving] = useState(false);
+    const [assembly, setAssembly] = useState({ itemCode: '', itemName: '', qty: '1' });
+
+    const closeAssembly = () => { setAssemblyOpen(false); setAssembly({ itemCode: '', itemName: '', qty: '1' }); };
+
+    const handleCreateAssembly = async (event) => {
+        event.preventDefault();
+        setAssemblySaving(true);
+        try {
+            const res = await bomService.createAssembly(bom._id, assembly);
+            toast.success(`Assembly ${assembly.itemCode.trim()} added to ${bom.fgItemCode}`);
+            closeAssembly();
+            navigate(`/bom-master/${res.data.assemblyId}`);
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Could not create the assembly.');
+        } finally {
+            setAssemblySaving(false);
+        }
+    };
+
+    const isProduct = bom?.level !== 'Assembly';
+    const levelLabel = isProduct ? 'Product' : 'Assembly';
+    const ancestors = bom?.ancestors || [];
+    const goBack = () => navigate(ancestors.length ? `/bom-master/${ancestors[ancestors.length - 1]._id}` : '/bom-master');
+    const showSummary = importSummary && importSummary.bomId === id;
 
     return (
         <div className="space-y-6">
             <div className="flex flex-wrap items-center gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
                 <button
                     type="button"
-                    onClick={() => navigate('/bom-master')}
+                    onClick={goBack}
                     className="p-3 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-2xl transition-all border border-slate-200"
                 >
                     <MdArrowBack size={20} />
                 </button>
                 <div>
-                    <h1 className="text-xl font-black text-slate-900">BOM Details</h1>
-                    <p className="text-xs text-slate-500 font-medium mt-0.5">
-                        {bom ? `Parent Item Code ${bom.fgItemCode}` : 'Bill of materials'}
-                    </p>
+                    <h1 className="text-xl font-black text-slate-900">{bom ? `${levelLabel} Details` : 'BOM Details'}</h1>
+                    <nav className="mt-0.5 flex flex-wrap items-center gap-1 text-xs font-medium text-slate-500">
+                        <button type="button" onClick={() => navigate('/bom-master')} className="hover:text-primary-600">Product BOM Master</button>
+                        {ancestors.map((entry) => (
+                            <React.Fragment key={entry._id}>
+                                <MdChevronRight size={14} className="text-slate-300" />
+                                <button type="button" onClick={() => navigate(`/bom-master/${entry._id}`)} className="hover:text-primary-600">
+                                    {entry.fgItemCode}
+                                </button>
+                            </React.Fragment>
+                        ))}
+                        {bom && (
+                            <>
+                                <MdChevronRight size={14} className="text-slate-300" />
+                                <span className="font-bold text-slate-700">{bom.fgItemCode}</span>
+                            </>
+                        )}
+                    </nav>
                 </div>
                 {bom && (
                     <div className="ml-auto flex gap-3">
@@ -239,9 +281,9 @@ const BOMDetails = () => {
             {importOpen && bom && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
                     <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl">
-                        <h2 className="text-lg font-black text-slate-900">Import components</h2>
+                        <h2 className="text-lg font-black text-slate-900">Import data</h2>
                         <p className="mt-2 text-sm font-medium text-slate-500">
-                            Upload an Excel or CSV file with Item Code, Item Name, UOM and Quantity for parent item {bom.fgItemCode}.
+                            Upload an Excel or CSV file with Item Code, Item Name, UOM and Quantity for {levelLabel.toLowerCase()} {bom.fgItemCode}.
                             Lines for other parent items in the file are skipped.
                         </p>
                         <div className="mt-5 grid grid-cols-2 gap-3">
@@ -293,6 +335,55 @@ const BOMDetails = () => {
                 </div>
             )}
 
+            {assemblyOpen && bom && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+                    <form onSubmit={handleCreateAssembly} className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl">
+                        <h2 className="text-lg font-black text-slate-900">Create assembly</h2>
+                        <p className="mt-2 text-sm font-medium text-slate-500">
+                            The assembly is added to product {bom.fgItemCode}. Its components can then be imported on the assembly page.
+                        </p>
+                        {[
+                            ['itemCode', 'Assembly Code', 'e.g. 2A872010001', true],
+                            ['itemName', 'Assembly Name', 'Taken from Product Master when the code is there', false],
+                            ['qty', 'Quantity in product', '1', true],
+                        ].map(([name, label, placeholder, required]) => (
+                            <div key={name}>
+                                <label className="mt-4 block text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</label>
+                                <input
+                                    name={name}
+                                    value={assembly[name]}
+                                    required={required}
+                                    autoFocus={name === 'itemCode'}
+                                    type={name === 'qty' ? 'number' : 'text'}
+                                    min={name === 'qty' ? '0' : undefined}
+                                    step={name === 'qty' ? 'any' : undefined}
+                                    onChange={(e) => setAssembly((prev) => ({ ...prev, [name]: e.target.value }))}
+                                    placeholder={placeholder}
+                                    className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium outline-none focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10"
+                                />
+                            </div>
+                        ))}
+                        <div className="mt-6 flex justify-end gap-3">
+                            <button
+                                type="button"
+                                onClick={closeAssembly}
+                                disabled={assemblySaving}
+                                className="px-5 py-3 rounded-2xl border border-slate-200 text-slate-600 font-black uppercase text-xs tracking-widest hover:bg-slate-50 transition-all disabled:opacity-60"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={assemblySaving || !assembly.itemCode.trim()}
+                                className="px-6 py-3 rounded-2xl bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-xs tracking-widest transition-all disabled:opacity-60"
+                            >
+                                {assemblySaving ? 'Creating…' : 'Create'}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            )}
+
             {loading ? (
                 <div className="py-20 text-center">
                     <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-primary-500 border-t-transparent"></div>
@@ -302,8 +393,8 @@ const BOMDetails = () => {
             ) : (
                 <>
                     <div className="grid grid-cols-2 gap-6 rounded-3xl border border-slate-100 bg-white p-6 shadow-sm md:grid-cols-4">
-                        <Field label="Parent Item Code">{bom.fgItemCode}</Field>
-                        <Field label="Item Name">{bom.fgItemDescription}</Field>
+                        <Field label={`${levelLabel} Code`}>{bom.fgItemCode}</Field>
+                        <Field label={`${levelLabel} Name`}>{bom.fgItemDescription}</Field>
                         <Field label="Components">{String(bom.items?.length || 0)}</Field>
                         <Field label="Status">
                             <span className={`inline-block rounded-lg px-3 py-1 text-[10px] font-black uppercase tracking-widest ${bom.status === 'Active' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
@@ -320,16 +411,29 @@ const BOMDetails = () => {
 
                     <div className="rounded-3xl border border-slate-100 bg-white shadow-sm">
                         <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 px-6 py-4">
-                            <h2 className="text-xs font-black uppercase tracking-widest text-slate-500">BOM Components</h2>
-                            <button
-                                type="button"
-                                onClick={() => setImportOpen(true)}
-                                className="ml-auto flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-black uppercase text-[10px] tracking-widest hover:bg-slate-50 transition-all"
-                            >
-                                <MdUploadFile size={16} /> Import Components
-                            </button>
+                            <h2 className="text-xs font-black uppercase tracking-widest text-slate-500">
+                                {isProduct ? 'Assemblies' : 'Components / F.G. Items'}
+                            </h2>
+                            <div className="ml-auto flex flex-wrap gap-2">
+                                {isProduct && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setAssemblyOpen(true)}
+                                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-[10px] tracking-widest transition-all"
+                                    >
+                                        <MdAdd size={16} /> Create Assembly
+                                    </button>
+                                )}
+                                <button
+                                    type="button"
+                                    onClick={() => setImportOpen(true)}
+                                    className="flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-black uppercase text-[10px] tracking-widest hover:bg-slate-50 transition-all"
+                                >
+                                    <MdUploadFile size={16} /> Import Data
+                                </button>
+                            </div>
                         </div>
-                        {importSummary && (
+                        {showSummary && (
                             <div className="border-b border-slate-100 bg-slate-50/60 px-6 py-4">
                                 <div className="flex items-start justify-between gap-4">
                                     <p className="text-sm font-semibold text-slate-600">
@@ -350,7 +454,7 @@ const BOMDetails = () => {
                                 )}
                             </div>
                         )}
-                        <BOMComponentsTable items={bom.items || []} />
+                        <BOMComponentsTable items={bom.items || []} onOpen={(subBomId) => navigate(`/bom-master/${subBomId}`)} />
                     </div>
 
                     {bom.statusHistory?.length > 0 && (

@@ -106,12 +106,78 @@ const findBOMBySerial = async (serialNumber) => {
     return loadBOM(master);
 };
 
+/**
+ * Product -> Assembly -> F.G. Item hierarchy, read from the BOM lines themselves: a BOM is an
+ * assembly when its parent item code is a component of another BOM, and a product when it is
+ * not a component anywhere. Codes are compared upper-cased, as fgSerialKey is.
+ */
+const MAX_HIERARCHY_DEPTH = 8;
+
+// Every item code used as a component. aggregate() is tenant-scoped; distinct() is not.
+const componentCodes = async () => {
+    const rows = await BOMItem.aggregate([{ $group: { _id: '$itemCode' } }]);
+    const codes = new Set();
+    rows.forEach(({ _id }) => {
+        if (!_id) return;
+        codes.add(_id);
+        codes.add(toKey(_id));
+    });
+    return [...codes];
+};
+
+// BOMs that list this item code as one of their components.
+const findParentBOMs = async (itemCode) => {
+    const key = toKey(itemCode);
+    if (!key) return [];
+    const lines = await BOMItem.find({ itemCode: { $in: [...new Set([cleanText(itemCode), key])] } })
+        .select('bomMasterId')
+        .lean();
+    if (!lines.length) return [];
+    return BOMMaster.find({ _id: { $in: [...new Set(lines.map((line) => String(line.bomMasterId)))] } })
+        .select('fgItemCode fgItemDescription fgSerialNumber status')
+        .sort({ status: 1, fgItemCode: 1 })
+        .lean();
+};
+
+const addHierarchy = async (bom) => {
+    if (!bom) return bom;
+
+    // A component with an item-level BOM of its own opens that BOM.
+    const keys = [...new Set((bom.items || []).map((item) => toKey(item.itemCode)).filter(Boolean))];
+    const subBoms = keys.length
+        ? await BOMMaster.find({ fgSerialKey: { $in: keys } }).select('fgSerialKey componentCount').lean()
+        : [];
+    const subByKey = new Map(subBoms.map((sub) => [sub.fgSerialKey, sub]));
+
+    // Walk up through the first parent of each level for the breadcrumb, root first.
+    const ancestors = [];
+    const seen = new Set([String(bom._id)]);
+    let code = bom.fgItemCode;
+    for (let depth = 0; depth < MAX_HIERARCHY_DEPTH; depth++) {
+        const [parent] = await findParentBOMs(code);
+        if (!parent || seen.has(String(parent._id))) break;
+        seen.add(String(parent._id));
+        ancestors.unshift({ _id: parent._id, fgItemCode: parent.fgItemCode, fgItemDescription: parent.fgItemDescription });
+        code = parent.fgItemCode;
+    }
+
+    return {
+        ...bom,
+        level: ancestors.length ? 'Assembly' : 'Product',
+        ancestors,
+        items: (bom.items || []).map((item) => {
+            const sub = subByKey.get(toKey(item.itemCode));
+            return { ...item, subBomId: sub?._id || null, subBomComponents: sub?.componentCount || 0 };
+        })
+    };
+};
+
 const loadBOMById = async (id) => {
     const master = await BOMMaster.findById(id)
         .populate('createdBy', 'name')
         .populate('updatedBy', 'name')
         .lean();
-    return loadBOM(master);
+    return addHierarchy(await loadBOM(master));
 };
 
 const serialTakenMessage = (serial) => `A BOM already exists for ${serial}. Open it from the list to change it.`;
@@ -135,6 +201,10 @@ exports.listBOMs = async (req, res) => {
         }
         if (req.query.status) {
             query.status = req.query.status;
+        }
+        // The dashboard lists products only; assemblies are reached through their product.
+        if (req.query.level === 'product') {
+            query.fgItemCode = { $nin: await componentCodes() };
         }
 
         const [boms, total] = await Promise.all([
@@ -364,6 +434,88 @@ exports.uploadBOM = async (req, res) => {
         return res.status(summary.failed && !summary.created && !summary.updated ? 400 : 200).json(summary);
     } catch (error) {
         return res.status(error.status || 500).json({ message: error.message || 'Failed to import the BOM file' });
+    }
+};
+
+/**
+ * Create Assembly on a product's BOM Details: adds the assembly as a component of this BOM and
+ * gives it an (empty) item-level BOM of its own, whose components are then entered or imported
+ * on the assembly's page. An assembly code that already has a BOM is linked instead of recreated.
+ */
+exports.createAssembly = async (req, res) => {
+    try {
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+            return res.status(400).json({ message: 'Invalid BOM ID' });
+        }
+        const parent = await BOMMaster.findById(req.params.id).lean();
+        if (!parent) {
+            return res.status(404).json({ message: 'BOM not found' });
+        }
+
+        const itemCode = cleanText(req.body.itemCode);
+        const itemName = cleanText(req.body.itemName);
+        const qty = req.body.qty === undefined || req.body.qty === '' ? 1 : req.body.qty;
+        if (!itemCode) {
+            return res.status(400).json({ message: 'Assembly code is required.' });
+        }
+        if (toKey(itemCode) === toKey(parent.fgItemCode)) {
+            return res.status(400).json({ message: 'An assembly cannot have the same code as its product.' });
+        }
+
+        const parentItems = await BOMItem.find({ bomMasterId: parent._id }).sort({ lineNo: 1 }).lean();
+        if (parentItems.some((item) => toKey(item.itemCode) === toKey(itemCode))) {
+            return res.status(409).json({ message: `${itemCode} is already a component of ${parent.fgItemCode}.` });
+        }
+
+        // The parent keeps its lines and gets the assembly added at the end, validated like the form.
+        const { errors, master, items } = await prepareBOM({
+            fgItemCode: parent.fgItemCode,
+            fgItemDescription: parent.fgItemDescription,
+            fgSerialNumber: parent.fgSerialNumber,
+            items: [
+                ...parentItems.map((item) => ({
+                    itemCode: item.itemCode,
+                    itemDescription: item.enteredDescription || item.itemDescription,
+                    uom: item.uom,
+                    qty: item.qty,
+                    componentSerialNumber: item.componentSerialNumber,
+                    batchNumber: item.batchNumber,
+                    remarks: item.remarks
+                })),
+                { itemCode, itemDescription: itemName, uom: cleanText(req.body.uom) || 'NOS', qty }
+            ]
+        });
+        if (errors.length) {
+            return res.status(400).json({ message: errors.join(' '), errors });
+        }
+        const added = items[items.length - 1];
+
+        let assembly = await BOMMaster.findOne({ fgSerialKey: toKey(added.itemCode) }).select('_id').lean();
+        if (!assembly) {
+            assembly = await BOMMaster.create({
+                fgItemCode: added.itemCode,
+                fgItemDescription: added.itemDescription,
+                fgProductId: added.productId,
+                fgSerialNumber: added.itemCode,
+                fgSerialKey: toKey(added.itemCode),
+                componentCount: 0,
+                status: 'Active',
+                statusHistory: [statusEntry('Active', `Assembly created under ${parent.fgItemCode}`, req)],
+                createdBy: req.user?.id,
+                updatedBy: req.user?.id
+            });
+        }
+
+        const inserted = await BOMItem.insertMany(items.map((item) => ({ ...item, bomMasterId: parent._id })));
+        await BOMItem.deleteMany({ bomMasterId: parent._id, _id: { $nin: inserted.map((item) => item._id) } });
+        await BOMMaster.updateOne({ _id: parent._id }, { $set: { componentCount: master.componentCount, updatedBy: req.user?.id } });
+
+        return res.status(201).json({ assemblyId: assembly._id, bom: await loadBOMById(parent._id) });
+    } catch (error) {
+        if (error.code === 11000) {
+            return res.status(409).json({ message: 'A BOM already exists for that assembly code.' });
+        }
+        return res.status(500).json({ message: 'Failed to create the assembly', error: error.message });
     }
 };
 

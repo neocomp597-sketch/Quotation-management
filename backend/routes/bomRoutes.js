@@ -30,6 +30,7 @@ router.post('/upload', canManageBOM, upload.single('file'), bomController.upload
 router.get('/', canManageBOM, bomController.listBOMs);
 router.post('/', canManageBOM, bomController.createBOM);
 router.get('/components/template', canManageBOM, bomController.downloadComponentTemplate);
+router.post('/:id/assemblies', canManageBOM, bomController.createAssembly);
 router.post('/:id/components/import', canManageBOM, upload.single('file'), bomController.importComponents);
 router.get('/:id/export', canManageBOM, bomController.exportBOM);
 router.get('/:id/print', canManageBOM, bomController.getBOMForPrint);

@@ -52,6 +52,7 @@ const StateMaster = lazy(() => import('./pages/StateMaster'));
 const CityMaster = lazy(() => import('./pages/CityMaster'));
 const SerialNoMaster = lazy(() => import('./pages/SerialNoMaster'));
 const AssetLifecycle = lazy(() => import('./pages/AssetLifecycle'));
+const SerialNoTransfer = lazy(() => import('./pages/SerialNoTransfer'));
 const Contacts = lazy(() => import('./pages/Contacts'));
 const Contact360Workspace = lazy(() => import('./pages/Contact360Workspace'));
 const SuperAdmin = lazy(() => import('./pages/SuperAdmin'));
@@ -288,6 +289,7 @@ function App() {
             <Route path="/city-master/edit/:id" element={<PermissionRoute permissionKey="master_branches"><Layout><CityMaster isEditPage={true} /></Layout></PermissionRoute>} />
             <Route path="/masters/city" element={<PermissionRoute permissionKey="master_branches"><Layout><CityMaster /></Layout></PermissionRoute>} />
             <Route path="/serial-no-master" element={<PermissionRoute permissionKey="master_serials"><Layout><SerialNoMaster /></Layout></PermissionRoute>} />
+            <Route path="/serial-no-transfer" element={<PermissionRoute permissionKey="master_serials"><Layout><SerialNoTransfer /></Layout></PermissionRoute>} />
             <Route path="/serial-no-master/view/:serialNumber" element={<PermissionRoute permissionKey="master_serials"><Layout><AssetLifecycle /></Layout></PermissionRoute>} />
             <Route path="/flowcharts" element={<PermissionRoute permissionKey="flowchart_view"><Layout><Flowcharts /></Layout></PermissionRoute>} />
             <Route path="/settings" element={<PermissionRoute permissionKey="settings_profile"><Layout><Settings /></Layout></PermissionRoute>} />

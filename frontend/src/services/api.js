@@ -435,6 +435,10 @@ export const bomService = {
     form.append("file", file);
     return api.post("/bom/upload", form, { headers: { "Content-Type": "multipart/form-data" } });
   },
+  // Products only (BOMs that are not a component of another BOM); assemblies open from their product.
+  getProducts: (params = {}) => api.get("/bom", { params: { ...params, level: "product" } }),
+  // Adds an assembly under a product's BOM and gives it a BOM of its own.
+  createAssembly: (id, data) => api.post(`/bom/${id}/assemblies`, data),
   // Import Components on BOM Details: mode 'replace' or 'append'.
   downloadComponentTemplate: () => api.get("/bom/components/template", { responseType: "blob" }),
   importComponents: (id, file, mode = "replace") => {
@@ -445,6 +449,14 @@ export const bomService = {
   },
   getBySerial: (serialNumber) => api.get(`/bom/serial/${encodeURIComponent(serialNumber)}`),
   getForTicket: (ticketId) => api.get(`/bom/ticket/${ticketId}`),
+};
+
+// Serial No Transfer: customer-wise ownership history of sold serial numbers.
+export const serialTransferService = {
+  listSerials: (params = {}) => api.get("/serial-transfers/serials", { params }),
+  getSerial: (assetId) => api.get(`/serial-transfers/serials/${assetId}`),
+  transfer: (assetId, data) => api.post(`/serial-transfers/serials/${assetId}/transfer`, data),
+  listHistory: (params = {}) => api.get("/serial-transfers/history", { params }),
 };
 
 export const companySettingsService = {

@@ -49,6 +49,7 @@ const searchablePages = [
     { label: 'Territory Master', path: '/territory-master', permissionKey: 'master_territories', keywords: ['territory'] },
     { label: 'Branch Master', path: '/branches', keywords: ['branch', 'office', 'branches', 'branch master'] },
     { label: 'Invoice Bulk Upload', path: '/serial-no-master', permissionKey: 'master_serials', keywords: ['invoice bulk upload', 'serial number', 'assets', 'stock serials'] },
+    { label: 'Serial No Transfer', path: '/serial-no-transfer', permissionKey: 'master_serials', keywords: ['serial no transfer', 'serial transfer', 'ownership history', 'transfer history'] },
     { label: 'Settings', path: '/settings', permissionKey: 'settings_profile', keywords: ['profile'] },
     { label: 'Org Chart & My Team', path: '/settings?tab=org-chart', permissionKey: 'payroll_org_chart', keywords: ['org chart', 'my team', 'team', 'hierarchy', 'tree'] },
     { label: 'Authorization', path: '/admin/authorization', permissionKey: 'admin_authorization', keywords: ['permissions', 'roles'] },
