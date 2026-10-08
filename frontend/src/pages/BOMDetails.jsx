@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { MdArrowBack, MdEdit, MdFileDownload, MdPictureAsPdf, MdToggleOff, MdToggleOn, MdHistory } from 'react-icons/md';
+import { MdArrowBack, MdEdit, MdFileDownload, MdPictureAsPdf, MdToggleOff, MdToggleOn, MdHistory, MdUploadFile } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import { bomService } from '../services/api';
 import BOMComponentsTable from '../components/bom/BOMComponentsTable';
@@ -92,6 +92,51 @@ const BOMDetails = () => {
             toast.error(err.response?.data?.message || 'Could not change the BOM status');
         } finally {
             setSaving(false);
+        }
+    };
+
+    // Import Components: load component lines for this BOM from a workbook.
+    const [importing, setImporting] = useState(false);
+    const [importOpen, setImportOpen] = useState(false);
+    const [importMode, setImportMode] = useState('replace');
+    const [importFile, setImportFile] = useState(null);
+    const [importSummary, setImportSummary] = useState(null);
+
+    const closeImport = () => { setImportOpen(false); setImportFile(null); setImportMode('replace'); };
+
+    const handleComponentTemplate = async () => {
+        try {
+            const res = await bomService.downloadComponentTemplate();
+            const url = URL.createObjectURL(new Blob([res.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'bom_components_template.xlsx';
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(url);
+        } catch {
+            toast.error('Could not download the template.');
+        }
+    };
+
+    const handleImportComponents = async () => {
+        if (!importFile) return;
+        setImporting(true);
+        try {
+            const res = await bomService.importComponents(bom._id, importFile, importMode);
+            const { bom: updated, ...summary } = res.data || {};
+            if (updated) setResult({ id, bom: updated, error: '' });
+            setImportSummary(summary);
+            closeImport();
+            toast.success(`${summary.imported || 0} component(s) imported`);
+            if (summary.skippedLines) toast.info(`${summary.skippedLines} line(s) skipped; see the import summary.`);
+        } catch (err) {
+            const data = err.response?.data;
+            toast.error(data?.message || 'Could not import the components.');
+            if (data?.warnings?.length) setImportSummary({ fileName: importFile.name, failed: data.message, warnings: data.warnings });
+        } finally {
+            setImporting(false);
         }
     };
 
@@ -191,6 +236,63 @@ const BOMDetails = () => {
                 </div>
             )}
 
+            {importOpen && bom && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+                    <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl">
+                        <h2 className="text-lg font-black text-slate-900">Import components</h2>
+                        <p className="mt-2 text-sm font-medium text-slate-500">
+                            Upload an Excel or CSV file with Item Code, Item Name, UOM and Quantity for parent item {bom.fgItemCode}.
+                            Lines for other parent items in the file are skipped.
+                        </p>
+                        <div className="mt-5 grid grid-cols-2 gap-3">
+                            {[
+                                ['replace', 'Replace components', 'The file becomes the full component list.'],
+                                ['append', 'Add to components', 'File lines are added after the current ones.'],
+                            ].map(([value, title, hint]) => (
+                                <label
+                                    key={value}
+                                    className={`cursor-pointer rounded-2xl border p-4 transition-all ${importMode === value ? 'border-primary-500 bg-primary-50/50 ring-4 ring-primary-500/10' : 'border-slate-200 hover:bg-slate-50'}`}
+                                >
+                                    <input type="radio" name="importMode" value={value} checked={importMode === value} onChange={() => setImportMode(value)} className="sr-only" />
+                                    <p className="text-xs font-black uppercase tracking-widest text-slate-700">{title}</p>
+                                    <p className="mt-1 text-xs font-medium text-slate-500">{hint}</p>
+                                </label>
+                            ))}
+                        </div>
+                        <label className="mt-5 flex cursor-pointer items-center gap-3 rounded-2xl border border-dashed border-slate-300 px-4 py-4 text-sm font-semibold text-slate-600 hover:bg-slate-50">
+                            <MdUploadFile size={22} className="text-slate-400" />
+                            <span className="truncate">{importFile ? importFile.name : 'Choose .xlsx, .xls or .csv file'}</span>
+                            <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={(e) => setImportFile(e.target.files?.[0] || null)} />
+                        </label>
+                        <button
+                            type="button"
+                            onClick={handleComponentTemplate}
+                            className="mt-3 flex items-center gap-1 text-xs font-black uppercase tracking-widest text-primary-600 hover:text-primary-700"
+                        >
+                            <MdFileDownload size={16} /> Download template
+                        </button>
+                        <div className="mt-6 flex justify-end gap-3">
+                            <button
+                                type="button"
+                                onClick={closeImport}
+                                disabled={importing}
+                                className="px-5 py-3 rounded-2xl border border-slate-200 text-slate-600 font-black uppercase text-xs tracking-widest hover:bg-slate-50 transition-all disabled:opacity-60"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleImportComponents}
+                                disabled={!importFile || importing}
+                                className="px-6 py-3 rounded-2xl bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-xs tracking-widest transition-all disabled:opacity-60"
+                            >
+                                {importing ? 'Importing…' : 'Import'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {loading ? (
                 <div className="py-20 text-center">
                     <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-primary-500 border-t-transparent"></div>
@@ -217,9 +319,37 @@ const BOMDetails = () => {
                     </div>
 
                     <div className="rounded-3xl border border-slate-100 bg-white shadow-sm">
-                        <div className="border-b border-slate-100 px-6 py-4">
+                        <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 px-6 py-4">
                             <h2 className="text-xs font-black uppercase tracking-widest text-slate-500">BOM Components</h2>
+                            <button
+                                type="button"
+                                onClick={() => setImportOpen(true)}
+                                className="ml-auto flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-black uppercase text-[10px] tracking-widest hover:bg-slate-50 transition-all"
+                            >
+                                <MdUploadFile size={16} /> Import Components
+                            </button>
                         </div>
+                        {importSummary && (
+                            <div className="border-b border-slate-100 bg-slate-50/60 px-6 py-4">
+                                <div className="flex items-start justify-between gap-4">
+                                    <p className="text-sm font-semibold text-slate-600">
+                                        {importSummary.fileName ? `${importSummary.fileName} — ` : ''}
+                                        {importSummary.failed
+                                            ? importSummary.failed
+                                            : `${importSummary.imported || 0} component(s) ${importSummary.mode === 'append' ? 'added' : 'imported'}, ${importSummary.components || 0} in BOM`}
+                                        {importSummary.skippedLines ? `, ${importSummary.skippedLines} line(s) skipped` : ''}
+                                    </p>
+                                    <button type="button" onClick={() => setImportSummary(null)} className="text-xs font-black uppercase tracking-widest text-slate-400 hover:text-slate-700">Close</button>
+                                </div>
+                                {importSummary.warnings?.length > 0 && (
+                                    <ul className="mt-2 max-h-40 space-y-1 overflow-auto text-xs font-semibold text-amber-600">
+                                        {importSummary.warnings.map((warning, index) => (
+                                            <li key={index}>{warning.row ? `Row ${warning.row}: ` : ''}{warning.message}</li>
+                                        ))}
+                                    </ul>
+                                )}
+                            </div>
+                        )}
                         <BOMComponentsTable items={bom.items || []} />
                     </div>
 

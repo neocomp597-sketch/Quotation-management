@@ -11,7 +11,9 @@ const {
     prepareBOM, searchMaterials, findProductsByCode, findAssetBySerial, masterDescription, MGR_FIELDS,
     toKey, cleanText, escapeRegex
 } = require('../services/bomService');
-const { importBOMWorkbook, buildTemplateBuffer } = require('../services/bomImportService');
+const {
+    importBOMWorkbook, buildTemplateBuffer, importBOMComponents, buildComponentTemplateBuffer
+} = require('../services/bomImportService');
 
 const MGR_POPULATE = 'code description';
 
@@ -362,6 +364,40 @@ exports.uploadBOM = async (req, res) => {
         return res.status(summary.failed && !summary.created && !summary.updated ? 400 : 200).json(summary);
     } catch (error) {
         return res.status(error.status || 500).json({ message: error.message || 'Failed to import the BOM file' });
+    }
+};
+
+/** Template for Import Components on BOM Details: Item Code, Item Name, UOM, Quantity. */
+exports.downloadComponentTemplate = async (req, res) => {
+    try {
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename=bom_components_template.xlsx');
+        return res.send(buildComponentTemplateBuffer());
+    } catch (error) {
+        return res.status(500).json({ message: 'Failed to build the components template', error: error.message });
+    }
+};
+
+/** Imports component lines from a workbook into one BOM, replacing or appending to its components. */
+exports.importComponents = async (req, res) => {
+    try {
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+            return res.status(400).json({ message: 'Invalid BOM ID' });
+        }
+        if (!req.file?.buffer?.length) {
+            return res.status(400).json({ message: 'Choose an .xlsx, .xls or .csv file to upload.' });
+        }
+        const summary = await importBOMComponents(req.file.buffer, req.params.id, {
+            mode: req.body?.mode === 'append' ? 'append' : 'replace',
+            fileName: req.file.originalname || '',
+            userId: req.user?.id || null
+        });
+        return res.json({ ...summary, bom: await loadBOMById(req.params.id) });
+    } catch (error) {
+        return res.status(error.status || 500).json({
+            message: error.message || 'Failed to import the components',
+            warnings: error.warnings || []
+        });
     }
 };
 

@@ -73,7 +73,7 @@ const REQUIRED_COLUMNS = {
 };
 
 /** Maps column indexes to fields. */
-const mapHeaders = (headerRow = []) => {
+const mapHeaders = (headerRow = [], required = REQUIRED_COLUMNS) => {
     const columns = {};
     const genericSerialColumns = [];
 
@@ -93,7 +93,7 @@ const mapHeaders = (headerRow = []) => {
         else if (columns.componentSerialNumber === undefined) columns.componentSerialNumber = index;
     });
 
-    const missing = Object.entries(REQUIRED_COLUMNS)
+    const missing = Object.entries(required)
         .filter(([field]) => columns[field] === undefined)
         .map(([, label]) => label);
 
@@ -101,15 +101,15 @@ const mapHeaders = (headerRow = []) => {
 };
 
 // The header is normally the first row, but SAP exports can carry a title line or two above it.
-const findHeaderRow = (matrix) => {
+const findHeaderRow = (matrix, required = REQUIRED_COLUMNS) => {
     for (let i = 0; i < Math.min(matrix.length, 10); i++) {
-        const mapped = mapHeaders(matrix[i] || []);
+        const mapped = mapHeaders(matrix[i] || [], required);
         if (!mapped.missing.length) return { index: i, ...mapped };
     }
-    return { index: 0, ...mapHeaders(matrix[0] || []) };
+    return { index: 0, ...mapHeaders(matrix[0] || [], required) };
 };
 
-const readRows = (buffer) => {
+const readMatrix = (buffer) => {
     const workbook = XLSX.read(buffer, { type: 'buffer' });
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     if (!sheet) {
@@ -121,7 +121,11 @@ const readRows = (buffer) => {
     if (!matrix.length) {
         throw Object.assign(new Error('The file is empty.'), { status: 400 });
     }
+    return matrix;
+};
 
+const readRows = (buffer) => {
+    const matrix = readMatrix(buffer);
     const { index: headerIndex, columns, missing } = findHeaderRow(matrix);
     if (missing.length) {
         throw Object.assign(
@@ -279,6 +283,119 @@ const importBOMWorkbook = async (buffer, { fileName = '', userId = null, userNam
     return summary;
 };
 
+/**
+ * Imports component lines into one existing BOM (BOM Details > Import Components).
+ *
+ * Only Item Code and Quantity are required; Item Name, UOM and the other component columns are
+ * read when present. A file in the full relationship layout is accepted too: lines whose Parent
+ * Item Code is another item belong to a different BOM and are skipped.
+ *
+ * mode 'replace' swaps the BOM's components for the file's; 'append' adds them after the
+ * existing ones. Lines that cannot be used are skipped and reported, as in the bulk import.
+ */
+const COMPONENT_COLUMNS = { itemCode: 'Item Code', qty: 'Quantity' };
+const COMPONENT_TEMPLATE_HEADERS = ['Item Code', 'Item Name', 'UOM', 'Quantity'];
+
+const importBOMComponents = async (buffer, bomId, { mode = 'replace', fileName = '', userId = null } = {}) => {
+    const master = await BOMMaster.findById(bomId).lean();
+    if (!master) {
+        throw Object.assign(new Error('BOM not found'), { status: 404 });
+    }
+
+    const matrix = readMatrix(buffer);
+    const { index: headerIndex, columns, missing } = findHeaderRow(matrix, COMPONENT_COLUMNS);
+    if (missing.length) {
+        throw Object.assign(
+            new Error(`Missing required column(s): ${missing.join(', ')}. Expected columns: ${COMPONENT_TEMPLATE_HEADERS.join(', ')}. Download the template for the layout.`),
+            { status: 400 }
+        );
+    }
+
+    const parentKey = toKey(master.fgItemCode);
+    const warnings = [];
+    const otherParents = new Map();
+    const fileRows = [];
+    for (let i = headerIndex + 1; i < matrix.length; i++) {
+        const raw = matrix[i] || [];
+        const row = { rowNumber: i + 1 };
+        Object.entries(columns).forEach(([field, index]) => {
+            row[field] = cleanCell(raw[index]);
+        });
+        if (!row.fgItemCode && !row.itemCode && !row.itemDescription && !row.qty) continue;
+
+        if (!row.qty && !row.uom && !row.itemDescription) {
+            warnings.push({ row: row.rowNumber, serial: row.itemCode, message: `Not a BOM line ("${row.itemCode || row.fgItemCode}"), skipped.` });
+            continue;
+        }
+        if (row.fgItemCode && toKey(row.fgItemCode) !== parentKey) {
+            const other = otherParents.get(row.fgItemCode) || { row: row.rowNumber, count: 0 };
+            other.count++;
+            otherParents.set(row.fgItemCode, other);
+            continue;
+        }
+        fileRows.push(row);
+    }
+    otherParents.forEach(({ row, count }, code) => {
+        warnings.push({ row, serial: code, message: `${count} line(s) belong to parent item ${code}, not this BOM; skipped.` });
+    });
+
+    if (!fileRows.length) {
+        throw Object.assign(new Error(`No component lines for parent item ${master.fgItemCode} found in the file.`), { status: 400 });
+    }
+
+    const existing = mode === 'append'
+        ? (await BOMItem.find({ bomMasterId: master._id }).sort({ lineNo: 1 }).lean()).map((item) => ({
+            itemCode: item.itemCode,
+            itemDescription: item.enteredDescription || item.itemDescription,
+            uom: item.uom,
+            qty: item.qty,
+            componentSerialNumber: item.componentSerialNumber,
+            batchNumber: item.batchNumber,
+            remarks: item.remarks
+        }))
+        : [];
+
+    const prepared = await prepareBOM({
+        fgItemCode: master.fgItemCode,
+        fgItemDescription: master.fgItemDescription,
+        fgSerialNumber: master.fgSerialNumber,
+        items: [...existing, ...fileRows]
+    }, { lenient: true });
+    prepared.warnings.forEach((message) => warnings.push({ row: '', serial: master.fgItemCode, message }));
+    if (prepared.errors.length) {
+        throw Object.assign(new Error(prepared.errors.join(' ')), { status: 400, warnings });
+    }
+
+    // New lines go in before the old ones are removed, so a failure never empties the BOM.
+    const inserted = await BOMItem.insertMany(prepared.items.map((item) => ({ ...item, bomMasterId: master._id })));
+    await BOMItem.deleteMany({ bomMasterId: master._id, _id: { $nin: inserted.map((item) => item._id) } });
+    await BOMMaster.updateOne(
+        { _id: master._id },
+        { $set: { componentCount: prepared.items.length, sourceFileName: fileName || master.sourceFileName, updatedBy: userId } }
+    );
+
+    return {
+        fileName,
+        mode: mode === 'append' ? 'append' : 'replace',
+        imported: prepared.items.length - existing.length,
+        components: prepared.items.length,
+        skippedLines: warnings.length,
+        warnings
+    };
+};
+
+const buildComponentTemplateBuffer = () => {
+    const sheet = XLSX.utils.aoa_to_sheet([
+        COMPONENT_TEMPLATE_HEADERS,
+        ['2606010051', 'Sheet Metal_Part_Ms_Assly V Drive Handle_S213R120607', 'NOS', 1],
+        ['2803020013', 'Copper_Strip_Ec Grade_12 X 3Mm', 'KGS', 0.04]
+    ]);
+    sheet['!cols'] = [{ wch: 16 }, { wch: 60 }, { wch: 10 }, { wch: 10 }];
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, sheet, 'BOM Components');
+    return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+};
+
 /** Builds the upload template in the BOM relationship layout, plus a short guide sheet. */
 const buildTemplateBuffer = () => {
     const sample = [
@@ -309,4 +426,6 @@ const buildTemplateBuffer = () => {
     return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
 };
 
-module.exports = { importBOMWorkbook, buildTemplateBuffer, mapHeaders, readRows, groupRows, TEMPLATE_HEADERS };
+module.exports = {
+    importBOMWorkbook, buildTemplateBuffer, importBOMComponents, buildComponentTemplateBuffer, mapHeaders, readRows, groupRows, TEMPLATE_HEADERS
+};

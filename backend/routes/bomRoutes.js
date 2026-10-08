@@ -29,6 +29,8 @@ router.get('/template', canManageBOM, bomController.downloadTemplate);
 router.post('/upload', canManageBOM, upload.single('file'), bomController.uploadBOM);
 router.get('/', canManageBOM, bomController.listBOMs);
 router.post('/', canManageBOM, bomController.createBOM);
+router.get('/components/template', canManageBOM, bomController.downloadComponentTemplate);
+router.post('/:id/components/import', canManageBOM, upload.single('file'), bomController.importComponents);
 router.get('/:id/export', canManageBOM, bomController.exportBOM);
 router.get('/:id/print', canManageBOM, bomController.getBOMForPrint);
 router.patch('/:id/status', canManageBOM, bomController.setBOMStatus);

@@ -435,6 +435,14 @@ export const bomService = {
     form.append("file", file);
     return api.post("/bom/upload", form, { headers: { "Content-Type": "multipart/form-data" } });
   },
+  // Import Components on BOM Details: mode 'replace' or 'append'.
+  downloadComponentTemplate: () => api.get("/bom/components/template", { responseType: "blob" }),
+  importComponents: (id, file, mode = "replace") => {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("mode", mode);
+    return api.post(`/bom/${id}/components/import`, form, { headers: { "Content-Type": "multipart/form-data" } });
+  },
   getBySerial: (serialNumber) => api.get(`/bom/serial/${encodeURIComponent(serialNumber)}`),
   getForTicket: (ticketId) => api.get(`/bom/ticket/${ticketId}`),
 };
