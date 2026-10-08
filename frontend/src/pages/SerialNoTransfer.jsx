@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { MdSearch, MdSwapHoriz, MdVisibility, MdClose, MdPersonAdd, MdHistory, MdCheckCircle } from 'react-icons/md';
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { MdSearch, MdSwapHoriz, MdVisibility, MdArrowBack, MdPersonAdd, MdHistory, MdCheckCircle } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import { serialTransferService, customerService } from '../services/api';
 import PaginationControls from '../components/PaginationControls';
@@ -66,6 +66,23 @@ const useList = (load, params) => {
     return { ...state, loading: state.key !== requestKey };
 };
 
+// Search and filters survive opening a serial and coming back (per browser tab only).
+const useStoredState = (key, initial) => {
+    const [value, setValue] = useState(() => {
+        try {
+            const stored = sessionStorage.getItem(`serialTransfer.${key}`);
+            return stored === null ? initial : JSON.parse(stored);
+        } catch {
+            return initial;
+        }
+    });
+    const update = (next) => {
+        setValue(next);
+        try { sessionStorage.setItem(`serialTransfer.${key}`, JSON.stringify(next)); } catch { /* storage unavailable */ }
+    };
+    return [value, update];
+};
+
 const useDebounced = (value, delay = 300) => {
     const [debounced, setDebounced] = useState(value);
     useEffect(() => {
@@ -75,15 +92,15 @@ const useDebounced = (value, delay = 300) => {
     return debounced;
 };
 
-const SerialListTab = ({ refreshCount, onOpen, onTransfer }) => {
-    const [search, setSearch] = useState('');
-    const [field, setField] = useState('');
-    const [status, setStatus] = useState('');
-    const [page, setPage] = useState(1);
+const SerialListTab = ({ onOpen, onTransfer }) => {
+    const [search, setSearch] = useStoredState('list.search', '');
+    const [field, setField] = useStoredState('list.field', '');
+    const [status, setStatus] = useStoredState('list.status', '');
+    const [page, setPage] = useStoredState('list.page', 1);
     const debouncedSearch = useDebounced(search.trim());
 
     const { rows, pagination, loading } = useList(serialTransferService.listSerials, {
-        page, limit: PAGE_SIZE, search: debouncedSearch || undefined, field: field || undefined, status: status || undefined, refreshCount,
+        page, limit: PAGE_SIZE, search: debouncedSearch || undefined, field: field || undefined, status: status || undefined,
     });
     const offset = (pagination.page - 1) * pagination.limit;
 
@@ -165,15 +182,15 @@ const SerialListTab = ({ refreshCount, onOpen, onTransfer }) => {
     );
 };
 
-const HistoryTab = ({ refreshCount, onOpen }) => {
-    const [search, setSearch] = useState('');
-    const [flag, setFlag] = useState('');
-    const [entryType, setEntryType] = useState('');
-    const [page, setPage] = useState(1);
+const HistoryTab = ({ onOpen }) => {
+    const [search, setSearch] = useStoredState('history.search', '');
+    const [flag, setFlag] = useStoredState('history.flag', '');
+    const [entryType, setEntryType] = useStoredState('history.entryType', '');
+    const [page, setPage] = useStoredState('history.page', 1);
     const debouncedSearch = useDebounced(search.trim());
 
     const { rows, pagination, loading } = useList(serialTransferService.listHistory, {
-        page, limit: PAGE_SIZE, search: debouncedSearch || undefined, flag: flag || undefined, entryType: entryType || undefined, refreshCount,
+        page, limit: PAGE_SIZE, search: debouncedSearch || undefined, flag: flag || undefined, entryType: entryType || undefined,
     });
 
     return (
@@ -256,10 +273,16 @@ const Spinner = () => (
     </div>
 );
 
-// One serial number: its customer history (oldest first) and the transfer form.
-const SerialPanel = ({ assetId, startWithTransfer, onClose, onTransferred }) => {
+// One serial number as a page: its customer history (oldest first), or with `transfer` the
+// transfer form (/serial-no-transfer/:assetId and /serial-no-transfer/:assetId/transfer).
+export const SerialNoDetails = ({ transfer = false }) => {
+    const { assetId } = useParams();
+    const navigate = useNavigate();
+    const location = useLocation();
     const [result, setResult] = useState({ id: null, data: null, error: '' });
-    const [mode, setMode] = useState(startWithTransfer ? 'transfer' : 'history');
+    const mode = transfer ? 'transfer' : 'history';
+    // Back returns to wherever the page was opened from (list filters, history tab), else the list.
+    const goBack = () => (location.key !== 'default' ? navigate(-1) : navigate('/serial-no-transfer'));
 
     useEffect(() => {
         let cancelled = false;
@@ -273,45 +296,53 @@ const SerialPanel = ({ assetId, startWithTransfer, onClose, onTransferred }) => 
     const { data, error } = result;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4">
-            <div className="my-8 w-full max-w-5xl rounded-3xl bg-white shadow-2xl">
-                <div className="flex items-start justify-between gap-4 border-b border-slate-100 p-6">
-                    <div>
-                        <h2 className="text-lg font-black text-slate-900">
-                            {mode === 'transfer' ? 'Transfer Serial No' : 'Serial No History'}
-                            {data && <span className="ml-2 text-primary-600">{data.asset.serialNumber}</span>}
-                        </h2>
-                        {data && (
-                            <p className="mt-1 text-sm font-medium text-slate-500">
-                                {data.asset.productCode}{data.asset.productName ? ` · ${data.asset.productName}` : ''} · Current customer <span className="font-bold text-slate-700">{data.asset.customerName || '-'}</span>
-                            </p>
-                        )}
-                    </div>
-                    <button type="button" onClick={onClose} className="p-2 rounded-xl text-slate-400 hover:bg-slate-100 hover:text-slate-700"><MdClose size={22} /></button>
+        <div className="space-y-6">
+            <div className="flex flex-wrap items-center gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+                <button
+                    type="button"
+                    onClick={goBack}
+                    className="p-3 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-2xl transition-all border border-slate-200"
+                >
+                    <MdArrowBack size={20} />
+                </button>
+                <div className="min-w-0 flex-1">
+                    <h1 className="text-xl font-black text-slate-900">
+                        {mode === 'transfer' ? 'Transfer Serial No' : 'Serial No History'}
+                        {data && <span className="ml-2 text-primary-600">{data.asset.serialNumber}</span>}
+                    </h1>
+                    {data && (
+                        <p className="mt-0.5 text-xs font-medium text-slate-500">
+                            {data.asset.productCode}{data.asset.productName ? ` · ${data.asset.productName}` : ''} · Current customer <span className="font-bold text-slate-700">{data.asset.customerName || '-'}</span>
+                        </p>
+                    )}
                 </div>
+                {data && mode === 'history' && (
+                    <button
+                        type="button"
+                        onClick={() => navigate(`/serial-no-transfer/${assetId}/transfer`)}
+                        className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-2xl font-black transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
+                    >
+                        <MdSwapHoriz size={18} /> Transfer Serial No
+                    </button>
+                )}
+            </div>
+
+            <div className="rounded-3xl border border-slate-100 bg-white shadow-sm">
 
                 {loading ? <Spinner /> : error ? (
                     <p className="p-8 text-center text-sm font-medium text-rose-500">{error}</p>
                 ) : mode === 'transfer' ? (
                     <TransferForm
                         data={data}
-                        onCancel={() => (startWithTransfer ? onClose() : setMode('history'))}
-                        onSaved={(updated) => { setResult({ id: assetId, data: updated, error: '' }); setMode('history'); onTransferred(); }}
+                        onCancel={goBack}
+                        // The history page replaces the form, so Back from it does not reopen the form.
+                        onSaved={() => navigate(`/serial-no-transfer/${assetId}`, { replace: true })}
                     />
                 ) : (
                     <div className="p-6 space-y-4">
-                        <div className="flex items-center justify-between gap-3">
-                            <h3 className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-500">
-                                <MdHistory size={16} /> Customer history ({data.history.length})
-                            </h3>
-                            <button
-                                type="button"
-                                onClick={() => setMode('transfer')}
-                                className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-5 py-3 rounded-2xl font-black uppercase text-xs tracking-widest transition-all shadow-xl shadow-primary-600/20"
-                            >
-                                <MdSwapHoriz size={18} /> Transfer Serial No
-                            </button>
-                        </div>
+                        <h3 className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-500">
+                            <MdHistory size={16} /> Customer history ({data.history.length})
+                        </h3>
                         <div className="overflow-x-auto rounded-2xl border border-slate-100">
                             <table className="w-full text-left border-collapse">
                                 <thead>
@@ -389,6 +420,21 @@ const TransferForm = ({ data, onCancel, onSaved }) => {
             setSaving(false);
         }
     };
+
+    // The same New Customer form as Customer Master, shown in place of the transfer form; the
+    // transfer details entered so far are kept and the saved customer is selected.
+    if (addingCustomer) {
+        return (
+            <div className="bg-slate-50 p-4 md:p-6 rounded-3xl">
+                <Customers
+                    isCreatePage
+                    embedded
+                    onCancel={() => { setAddingCustomer(false); setCustomerMode('existing'); }}
+                    onSaved={(saved) => { setCustomer(saved); setAddingCustomer(false); setCustomerMode('existing'); }}
+                />
+            </div>
+        );
+    }
 
     const label = 'block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2';
     const readOnly = 'rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700';
@@ -505,17 +551,6 @@ const TransferForm = ({ data, onCancel, onSaved }) => {
             </div>
         </form>
 
-            {addingCustomer && (
-                // The same New Customer form as Customer Master; the saved customer is selected here.
-                <div className="fixed inset-0 z-[60] overflow-y-auto bg-slate-100 p-4 md:p-8">
-                    <Customers
-                        isCreatePage
-                        embedded
-                        onCancel={() => { setAddingCustomer(false); setCustomerMode('existing'); }}
-                        onSaved={(saved) => { setCustomer(saved); setAddingCustomer(false); setCustomerMode('existing'); }}
-                    />
-                </div>
-            )}
         </>
     );
 };
@@ -523,8 +558,8 @@ const TransferForm = ({ data, onCancel, onSaved }) => {
 const SerialNoTransfer = () => {
     const [searchParams, setSearchParams] = useSearchParams();
     const tab = searchParams.get('tab') === 'history' ? 'history' : 'serials';
-    const [panel, setPanel] = useState(null);
-    const [refreshCount, setRefreshCount] = useState(0);
+    const navigate = useNavigate();
+    const openSerial = (assetId) => navigate(`/serial-no-transfer/${assetId}`);
 
     return (
         <div className="space-y-6">
@@ -547,25 +582,11 @@ const SerialNoTransfer = () => {
                     ))}
                 </div>
                 {tab === 'serials' ? (
-                    <SerialListTab
-                        refreshCount={refreshCount}
-                        onOpen={(assetId) => setPanel({ assetId, transfer: false })}
-                        onTransfer={(assetId) => setPanel({ assetId, transfer: true })}
-                    />
+                    <SerialListTab onOpen={openSerial} onTransfer={(assetId) => navigate(`/serial-no-transfer/${assetId}/transfer`)} />
                 ) : (
-                    <HistoryTab refreshCount={refreshCount} onOpen={(assetId) => setPanel({ assetId, transfer: false })} />
+                    <HistoryTab onOpen={openSerial} />
                 )}
             </div>
-
-            {panel && (
-                <SerialPanel
-                    key={`${panel.assetId}-${panel.transfer}`}
-                    assetId={panel.assetId}
-                    startWithTransfer={panel.transfer}
-                    onClose={() => setPanel(null)}
-                    onTransferred={() => setRefreshCount((count) => count + 1)}
-                />
-            )}
         </div>
     );
 };
