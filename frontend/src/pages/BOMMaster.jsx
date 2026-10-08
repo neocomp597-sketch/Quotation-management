@@ -46,8 +46,7 @@ const BOMMaster = () => {
             setUploadSummary(summary);
             const saved = (summary.created || 0) + (summary.updated || 0);
             if (saved) toast.success(`${saved} BOM(s) imported from ${file.name}.`);
-            if (summary.failed) toast.warn(`${summary.failed} BOM(s) could not be imported.`);
-            if (summary.skippedLines) toast.info(`${summary.skippedLines} line(s) skipped; see the import summary.`);
+            if (summary.failed) toast.warn(`${summary.failed} serial(s) could not be imported.`);
             setRefreshCount((count) => count + 1);
         } catch (error) {
             const data = error.response?.data;
@@ -95,7 +94,7 @@ const BOMMaster = () => {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-black text-slate-900 tracking-tight">Product BOM Master</h1>
-                    <p className="text-slate-500 font-medium">Bill of materials per parent item: Parent Item Code, Item Code, Item Name, UOM, Quantity.</p>
+                    <p className="text-slate-500 font-medium">Bill of materials for each finished-good serial number.</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
                 <button
@@ -130,7 +129,6 @@ const BOMMaster = () => {
                                 {uploadSummary.fileName ? `${uploadSummary.fileName} — ` : ''}
                                 {uploadSummary.created || 0} created, {uploadSummary.updated || 0} updated, {uploadSummary.failed || 0} failed
                                 {uploadSummary.components ? `, ${uploadSummary.components} component(s)` : ''}
-                                {uploadSummary.skippedLines ? `, ${uploadSummary.skippedLines} line(s) skipped` : ''}
                             </p>
                         </div>
                         <button type="button" onClick={() => setUploadSummary(null)} className="text-xs font-black uppercase tracking-widest text-slate-400 hover:text-slate-700">Close</button>
@@ -139,13 +137,6 @@ const BOMMaster = () => {
                         <ul className="mt-3 max-h-48 space-y-1 overflow-auto text-xs font-semibold text-rose-600">
                             {uploadSummary.errors.map((err, index) => (
                                 <li key={index}>Row {err.row}{err.serial ? ` (${err.serial})` : ''}: {err.message}</li>
-                            ))}
-                        </ul>
-                    )}
-                    {uploadSummary.warnings?.length > 0 && (
-                        <ul className="mt-3 max-h-48 space-y-1 overflow-auto text-xs font-semibold text-amber-600">
-                            {uploadSummary.warnings.map((warning, index) => (
-                                <li key={index}>Row {warning.row}{warning.serial ? ` (${warning.serial})` : ''}: {warning.message}</li>
                             ))}
                         </ul>
                     )}
@@ -161,7 +152,7 @@ const BOMMaster = () => {
                                 type="text"
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
-                                placeholder="Search parent item code, name or serial"
+                                placeholder="Search FG serial number or item code"
                                 className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-medium"
                             />
                         </div>
@@ -189,7 +180,7 @@ const BOMMaster = () => {
                                 <table className="w-full text-left border-collapse">
                                     <thead>
                                         <tr className="bg-slate-50">
-                                            {['Sr No', 'Parent Item Code', 'Item Name', 'Components', 'Status', 'Last Updated'].map((label) => (
+                                            {['Sr No', 'FG Item Code', 'FG Serial Number', 'Components', 'Status', 'Last Updated'].map((label) => (
                                                 <th key={label} className="p-4 text-xs font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">{label}</th>
                                             ))}
                                             <th className="p-4 text-xs font-black text-slate-400 uppercase tracking-widest text-right">Actions</th>
@@ -203,13 +194,11 @@ const BOMMaster = () => {
                                                 className="cursor-pointer border-b last:border-0 border-slate-50 hover:bg-slate-50/50 transition-colors"
                                             >
                                                 <td className="p-4 text-sm font-bold text-slate-400">{offset + index + 1}</td>
-                                                <td className="p-4 text-sm whitespace-nowrap">
+                                                <td className="p-4 text-sm">
                                                     <span className="font-bold text-slate-800">{bom.fgItemCode}</span>
-                                                    {String(bom.fgSerialNumber || '').toUpperCase() !== String(bom.fgItemCode || '').toUpperCase() && (
-                                                        <span className="block text-xs text-slate-500">Serial {bom.fgSerialNumber}</span>
-                                                    )}
+                                                    {bom.fgItemDescription && <span className="block text-xs text-slate-500">{bom.fgItemDescription}</span>}
                                                 </td>
-                                                <td className="p-4 text-sm text-slate-600">{bom.fgItemDescription || '-'}</td>
+                                                <td className="p-4 text-sm font-bold text-slate-700">{bom.fgSerialNumber}</td>
                                                 <td className="p-4 text-sm font-bold text-slate-700">{bom.componentCount}</td>
                                                 <td className="p-4">
                                                     <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${bom.status === 'Active' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
