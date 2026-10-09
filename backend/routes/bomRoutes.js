@@ -25,6 +25,7 @@ router.get('/serial/:serialNumber', bomController.getBOMBySerial);
 router.get('/ticket/:ticketId', bomController.getBOMForTicket);
 
 router.get('/materials', canManageBOM, bomController.searchMaterials);
+router.get('/check-product', canManageBOM, bomController.checkProduct);
 router.get('/template', canManageBOM, bomController.downloadTemplate);
 router.post('/upload', canManageBOM, upload.single('file'), bomController.uploadBOM);
 router.get('/', canManageBOM, bomController.listBOMs);

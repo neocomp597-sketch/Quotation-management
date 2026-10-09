@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { MdSearch, MdSwapHoriz, MdVisibility, MdArrowBack, MdPersonAdd, MdHistory, MdCheckCircle } from 'react-icons/md';
 import { toast } from 'react-toastify';
-import { serialTransferService, customerService } from '../services/api';
+import { serialTransferService, customerService, csmService } from '../services/api';
+import AssetActivityLog from '../components/AssetActivityLog';
 import PaginationControls from '../components/PaginationControls';
 import Customers from './Customers';
 
@@ -295,6 +296,19 @@ export const SerialNoDetails = ({ transfer = false }) => {
     const loading = result.id !== assetId;
     const { data, error } = result;
 
+    // The serial's common activity log, the same one Asset Lifecycle Detail shows.
+    const serialNumber = data?.asset?.serialNumber || '';
+    const [activity, setActivity] = useState({ serial: null, rows: [] });
+    const [category, setCategory] = useState('All');
+    useEffect(() => {
+        if (!serialNumber) return undefined;
+        let cancelled = false;
+        csmService.getAssetActivity(serialNumber)
+            .then((res) => { if (!cancelled) setActivity({ serial: serialNumber, rows: res.data?.activity || [] }); })
+            .catch(() => { if (!cancelled) setActivity({ serial: serialNumber, rows: [] }); });
+        return () => { cancelled = true; };
+    }, [serialNumber]);
+
     return (
         <div className="space-y-6">
             <div className="flex flex-wrap items-center gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
@@ -373,6 +387,16 @@ export const SerialNoDetails = ({ transfer = false }) => {
                     </div>
                 )}
             </div>
+
+            {data && (
+                <AssetActivityLog
+                    title={`Activity Log · ${data.asset.serialNumber}`}
+                    activity={activity.rows}
+                    loading={activity.serial !== serialNumber}
+                    category={category}
+                    onCategoryChange={setCategory}
+                />
+            )}
         </div>
     );
 };

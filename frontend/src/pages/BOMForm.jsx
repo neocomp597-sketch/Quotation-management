@@ -4,7 +4,6 @@ import { MdAdd, MdArrowBack, MdDelete } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import { bomService } from '../services/api';
 import MaterialSearchInput from '../components/bom/MaterialSearchInput';
-import SerialSearchInput from '../components/bom/SerialSearchInput';
 
 const MGR_KEYS = ['mgr1', 'mgr2', 'mgr3', 'mgr4', 'mgr5'];
 const inputClass = 'w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-medium transition-all disabled:text-slate-500';
@@ -41,6 +40,8 @@ const BOMForm = () => {
 
     const [loadedId, setLoadedId] = useState(isEdit ? null : 'new');
     const [fg, setFg] = useState({ fgItemCode: '', fgItemDescription: '', fgSerialNumber: '' });
+    // Product the BOM was opened with; editing it never clashes with itself.
+    const [savedCode, setSavedCode] = useState('');
     const [rows, setRows] = useState(() => [emptyRow()]);
     const [errors, setErrors] = useState([]);
     const [saving, setSaving] = useState(false);
@@ -56,6 +57,7 @@ const BOMForm = () => {
                 // An item-level BOM stores its parent item code as the serial; the form shows it blank.
                 const sameAsCode = String(bom.fgSerialNumber || '').toUpperCase() === String(bom.fgItemCode || '').toUpperCase();
                 setFg({ fgItemCode: bom.fgItemCode, fgItemDescription: bom.fgItemDescription || '', fgSerialNumber: sameAsCode ? '' : bom.fgSerialNumber });
+                setSavedCode(bom.fgItemCode);
                 setRows(bom.items?.length ? bom.items.map(rowFromSaved) : [emptyRow()]);
                 setLoadedId(id);
             })
@@ -67,10 +69,30 @@ const BOMForm = () => {
         return () => { cancelled = true; };
     }, [id, isEdit, navigate]);
 
+    // One BOM per product: as soon as a product is chosen, say so if it already has a BOM.
+    const productCode = fg.fgItemCode.trim();
+    const needsCheck = Boolean(productCode) && productCode.toUpperCase() !== savedCode.toUpperCase();
+    const [productCheck, setProductCheck] = useState({ code: '', bom: null });
+    useEffect(() => {
+        if (!needsCheck) return undefined;
+        let cancelled = false;
+        const timer = setTimeout(() => {
+            bomService.checkProduct(productCode, isEdit ? id : undefined)
+                .then((res) => { if (!cancelled) setProductCheck({ code: productCode, bom: res.data?.bom || null }); })
+                .catch(() => { if (!cancelled) setProductCheck({ code: productCode, bom: null }); });
+        }, 300);
+        return () => { cancelled = true; clearTimeout(timer); };
+    }, [productCode, needsCheck, isEdit, id]);
+    const existingBom = needsCheck && productCheck.code === productCode ? productCheck.bom : null;
+
     const updateRow = (index, patch) => setRows((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)));
     const removeRow = (index) => setRows((prev) => (prev.length === 1 ? [emptyRow()] : prev.filter((_, i) => i !== index)));
 
     const handleSave = async () => {
+        if (existingBom) {
+            setErrors(['A BOM already exists for this product.']);
+            return;
+        }
         setErrors([]);
         setSaving(true);
         const payload = {
@@ -131,7 +153,7 @@ const BOMForm = () => {
                     <button
                         type="button"
                         onClick={handleSave}
-                        disabled={saving}
+                        disabled={saving || Boolean(existingBom)}
                         className="bg-primary-600 hover:bg-primary-700 text-white px-8 py-3 rounded-2xl font-black transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95 disabled:opacity-50"
                     >
                         {saving ? 'Saving...' : 'Save'}
@@ -161,35 +183,22 @@ const BOMForm = () => {
                             onSelect={(material) => setFg((prev) => ({ ...prev, fgItemCode: material.code, fgItemDescription: material.description }))}
                         />
                         {fg.fgItemDescription && <p className="ml-1 text-xs font-medium text-slate-500">{fg.fgItemDescription}</p>}
-                    </div>
-                    <div className="space-y-2">
-                        <label className={labelClass}>FG Serial Number <span className="font-semibold normal-case tracking-normal text-slate-400">(optional)</span></label>
-                        <SerialSearchInput
-                            value={fg.fgSerialNumber}
-                            className={inputClass}
-                            placeholder="Search the serial number (e.g. SR454213)"
-                            onChange={(value) => setFg((prev) => ({ ...prev, fgSerialNumber: value, serialMatched: false, serialCustomer: '' }))}
-                            onSelect={(asset) => setFg((prev) => ({
-                                ...prev,
-                                fgSerialNumber: asset.serialNumber || prev.fgSerialNumber,
-                                // Take the finished good from the registered serial so the BOM
-                                // is attached to the product that was actually sold.
-                                fgItemCode: asset.productId?.productCode || prev.fgItemCode,
-                                fgItemDescription: asset.productId?.productName || prev.fgItemDescription,
-                                serialMatched: true,
-                                serialCustomer: asset.customerId?.customerName || asset.customerId?.companyName || ''
-                            }))}
-                        />
-                        {fg.serialMatched ? (
-                            <p className="ml-1 text-xs font-medium text-emerald-600">
-                                Registered serial{fg.serialCustomer ? ` · ${fg.serialCustomer}` : ''}
-                            </p>
-                        ) : (
-                            <p className="ml-1 text-xs font-medium text-slate-400">
-                                Leave blank for a BOM that applies to every serial of this item. Pick a serial only for a BOM specific to one unit.
+                        {existingBom && (
+                            <p className="ml-1 text-xs font-bold text-rose-600">
+                                A BOM already exists for this product.{' '}
+                                <button type="button" onClick={() => navigate(`/bom-master/${existingBom._id}`)} className="underline hover:text-rose-700">
+                                    Open it
+                                </button>
                             </p>
                         )}
                     </div>
+                    {isEdit && fg.fgSerialNumber && (
+                        <div className="space-y-2">
+                            <label className={labelClass}>FG Serial Number</label>
+                            <p className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3.5 text-sm font-bold text-slate-700">{fg.fgSerialNumber}</p>
+                            <p className="ml-1 text-xs font-medium text-slate-400">This BOM was saved for one serial; the serial is kept as it is.</p>
+                        </div>
+                    )}
                 </div>
             </div>
 

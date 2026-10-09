@@ -284,25 +284,39 @@ exports.transferSerial = async (req, res) => {
             }
         });
 
-        // Also shown in the serial's lifecycle under Invoice Bulk Upload. Not needed for the transfer itself.
-        AssetHistory.create({
-            assetId: asset._id,
-            serialNumber: asset.serialNumber,
-            productId: asset.productId || undefined,
-            productCode: asset.productCode,
-            productName: asset.productName,
-            customerId: customer._id,
-            customerCode: created.customerCode,
-            customerName: created.companyName,
-            customerPostalCode: created.customerPincode,
-            customerMobile: created.customerMobile,
-            invoiceNumber: asset.invoiceNumber,
-            saleDate: transferDate,
-            transactionType: 'TRANSFER',
-            status: 'SOLD',
-            createdBy: req.user?.id,
-            branchId: asset.branchId || null
-        }).catch((error) => console.error('Serial transfer: asset history not written:', error.message));
+        // The serial's activity log (Asset Lifecycle Detail, Serial No Transfer) reads AssetHistory.
+        // Keyed by the transfer record, so a transfer never produces two log entries.
+        try {
+            await AssetHistory.updateOne({ transferId: created._id }, {
+                $setOnInsert: {
+                    transferId: created._id,
+                    assetId: asset._id,
+                    serialNumber: asset.serialNumber,
+                    productId: asset.productId || undefined,
+                    productCode: asset.productCode,
+                    productName: asset.productName,
+                    customerId: customer._id,
+                    customerCode: created.customerCode,
+                    customerName: created.companyName,
+                    customerPostalCode: created.customerPincode,
+                    customerMobile: created.customerMobile,
+                    previousCustomerId: current?.customerId || null,
+                    previousCustomerCode: current?.customerCode || '',
+                    previousCustomerName: current?.companyName || current?.customerName || '',
+                    remarks: created.remarks,
+                    invoiceNumber: asset.invoiceNumber,
+                    saleDate: transferDate,
+                    transactionType: 'TRANSFER',
+                    status: 'SOLD',
+                    createdBy: req.user?.id,
+                    createdAt: new Date(),
+                    branchId: asset.branchId || null
+                }
+            }, { upsert: true });
+        } catch (error) {
+            // The transfer itself is saved; only the log entry is missing.
+            console.error('Serial transfer: activity log entry not written:', error.message);
+        }
 
         return res.status(201).json(await loadSerial(asset._id));
     } catch (error) {

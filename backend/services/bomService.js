@@ -162,7 +162,24 @@ const prepareBOM = async (body, { lenient = false } = {}) => {
     };
 };
 
+/**
+ * One BOM per product: the BOM saved for this parent item code, if any (case-insensitive).
+ * Where old data still holds more than one, the item-level BOM (keyed by the code) wins.
+ */
+const PRODUCT_TAKEN_MESSAGE = 'A BOM already exists for this product.';
+
+const findBOMForProduct = async (fgItemCode, { excludeId = null } = {}) => {
+    const BOMMaster = require('../models/BOMMaster');
+    const key = toKey(fgItemCode);
+    if (!key) return null;
+    const query = { fgItemCode: new RegExp(`^${escapeRegex(cleanText(fgItemCode))}$`, 'i') };
+    if (excludeId) query._id = { $ne: excludeId };
+    const matches = await BOMMaster.find(query).select('_id fgItemCode fgItemDescription fgSerialKey status').lean();
+    return matches.find((bom) => bom.fgSerialKey === key) || matches[0] || null;
+};
+
 module.exports = {
+    findBOMForProduct, PRODUCT_TAKEN_MESSAGE,
     prepareBOM, searchMaterials, findAssetBySerial, findProductsByCode, masterDescription,
     MGR_FIELDS, toKey, cleanText, escapeRegex
 };

@@ -426,6 +426,8 @@ export const bomService = {
   setStatus: (id, status, reason = "") => api.patch(`/bom/${id}/status`, { status, reason }),
   delete: (id) => api.delete(`/bom/${id}`),
   searchMaterials: (q) => api.get("/bom/materials", { params: { q } }),
+  // One BOM per product: the BOM this product already has, if any.
+  checkProduct: (code, excludeId) => api.get("/bom/check-product", { params: { code, excludeId } }),
   exportToExcel: (id) => api.get(`/bom/${id}/export`, { responseType: "blob" }),
   // BOM plus its sub-BOMs, for Export to PDF.
   getForPrint: (id) => api.get(`/bom/${id}/print`),

@@ -9,6 +9,7 @@ const { canViewTicketDetails } = require('./ticketController');
 const { isSuperAdminRole } = require('../middlewares/authMiddleware');
 const {
     prepareBOM, searchMaterials, findProductsByCode, findAssetBySerial, masterDescription, MGR_FIELDS,
+    findBOMForProduct, PRODUCT_TAKEN_MESSAGE,
     toKey, cleanText, escapeRegex
 } = require('../services/bomService');
 const {
@@ -182,6 +183,17 @@ const loadBOMById = async (id) => {
 
 const serialTakenMessage = (serial) => `A BOM already exists for ${serial}. Open it from the list to change it.`;
 
+/** For the BOM form: the BOM a product already has, so a second one is not started. */
+exports.checkProduct = async (req, res) => {
+    try {
+        const excludeId = mongoose.Types.ObjectId.isValid(req.query.excludeId) ? req.query.excludeId : null;
+        const bom = await findBOMForProduct(req.query.code, { excludeId });
+        return res.json({ exists: Boolean(bom), bom, message: bom ? PRODUCT_TAKEN_MESSAGE : '' });
+    } catch (error) {
+        return res.status(500).json({ message: 'Could not check the product', error: error.message });
+    }
+};
+
 exports.searchMaterials = async (req, res) => {
     try {
         return res.json(await searchMaterials(req.query.q, Math.min(50, Number(req.query.limit) || 20)));
@@ -248,6 +260,10 @@ exports.createBOM = async (req, res) => {
         if (errors.length) {
             return res.status(400).json({ message: 'Please correct the following.', errors });
         }
+        const taken = await findBOMForProduct(master.fgItemCode);
+        if (taken) {
+            return res.status(409).json({ message: PRODUCT_TAKEN_MESSAGE, bomId: taken._id });
+        }
         if (await BOMMaster.exists({ fgSerialKey: master.fgSerialKey })) {
             return res.status(409).json({ message: serialTakenMessage(master.fgSerialNumber) });
         }
@@ -279,7 +295,7 @@ exports.updateBOM = async (req, res) => {
         if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
             return res.status(400).json({ message: 'Invalid BOM ID' });
         }
-        const existing = await BOMMaster.findById(req.params.id).select('_id').lean();
+        const existing = await BOMMaster.findById(req.params.id).select('_id fgItemCode').lean();
         if (!existing) {
             return res.status(404).json({ message: 'BOM not found' });
         }
@@ -287,6 +303,11 @@ exports.updateBOM = async (req, res) => {
         const { errors, master, items } = await prepareBOM(req.body);
         if (errors.length) {
             return res.status(400).json({ message: 'Please correct the following.', errors });
+        }
+        // Moving a BOM to another product is refused when that product already has one.
+        if (toKey(master.fgItemCode) !== toKey(existing.fgItemCode)) {
+            const taken = await findBOMForProduct(master.fgItemCode, { excludeId: existing._id });
+            if (taken) return res.status(409).json({ message: PRODUCT_TAKEN_MESSAGE, bomId: taken._id });
         }
         if (await BOMMaster.exists({ fgSerialKey: master.fgSerialKey, _id: { $ne: existing._id } })) {
             return res.status(409).json({ message: serialTakenMessage(master.fgSerialNumber) });
@@ -490,7 +511,7 @@ exports.createAssembly = async (req, res) => {
         }
         const added = items[items.length - 1];
 
-        let assembly = await BOMMaster.findOne({ fgSerialKey: toKey(added.itemCode) }).select('_id').lean();
+        let assembly = await findBOMForProduct(added.itemCode);
         if (!assembly) {
             assembly = await BOMMaster.create({
                 fgItemCode: added.itemCode,

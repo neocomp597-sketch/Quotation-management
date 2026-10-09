@@ -1,7 +1,7 @@
 const XLSX = require('xlsx');
 const BOMMaster = require('../models/BOMMaster');
 const BOMItem = require('../models/BOMItem');
-const { prepareBOM, toKey } = require('./bomService');
+const { prepareBOM, toKey, findBOMForProduct, PRODUCT_TAKEN_MESSAGE } = require('./bomService');
 
 /**
  * Bulk BOM import from an Excel/CSV workbook.
@@ -230,8 +230,21 @@ const importBOMWorkbook = async (buffer, { fileName = '', userId = null, userNam
         warnings: [...skipped]
     };
 
+    const productsInFile = new Map();
     for (const group of groups) {
         const label = `Parent ${group.fgItemCode || '(blank)'}${toKey(group.fgSerialNumber) !== toKey(group.fgItemCode) ? ` / serial ${group.fgSerialNumber}` : ''}`;
+        // One BOM per product: a second set of lines for the same product in this file is refused.
+        const productKey = toKey(group.fgItemCode);
+        if (productKey && productsInFile.has(productKey)) {
+            summary.failed++;
+            summary.errors.push({
+                serial: group.fgItemCode,
+                row: group.firstRow,
+                message: `${label}: ${PRODUCT_TAKEN_MESSAGE} Its lines start at row ${productsInFile.get(productKey)} of this file.`
+            });
+            continue;
+        }
+        if (productKey) productsInFile.set(productKey, group.firstRow);
         try {
             const { errors, warnings, master, items } = await prepareBOM(group, { lenient: true });
             warnings.forEach((message) => {
@@ -244,12 +257,15 @@ const importBOMWorkbook = async (buffer, { fileName = '', userId = null, userNam
                 continue;
             }
 
-            const existing = await BOMMaster.findOne({ fgSerialKey: master.fgSerialKey });
+            // The product's existing BOM is updated, whatever serial it was saved under.
+            const existing = await findBOMForProduct(master.fgItemCode) || await BOMMaster.findOne({ fgSerialKey: master.fgSerialKey }).lean();
             if (existing) {
                 // New lines go in before the old ones are removed, so a failure never empties the BOM.
                 const inserted = await BOMItem.insertMany(items.map((item) => ({ ...item, bomMasterId: existing._id })));
                 await BOMItem.deleteMany({ bomMasterId: existing._id, _id: { $nin: inserted.map((item) => item._id) } });
-                const update = { $set: { ...master, sourceFileName: fileName, status: 'Active', updatedBy: userId } };
+                // The BOM keeps the serial it was saved under; only its product details and lines change.
+                const { fgSerialNumber, fgSerialKey, assetId, ...productFields } = master;
+                const update = { $set: { ...productFields, sourceFileName: fileName, status: 'Active', updatedBy: userId } };
                 // Re-uploading brings a switched-off BOM back; that is a status change and is logged.
                 if (existing.status !== 'Active') {
                     update.$push = { statusHistory: statusLog(`Reactivated by upload${fileName ? ` of ${fileName}` : ''}`, userId, userName) };

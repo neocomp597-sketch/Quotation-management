@@ -967,7 +967,8 @@ const LIFECYCLE_LABELS = {
     SINGLE_ENTRY_RESELL: 'Re-sold (Single Entry)',
     UPDATE: 'Entry edited',
     RETURN: 'Sales return',
-    SALE: 'Sale'
+    SALE: 'Sale',
+    TRANSFER: 'Customer transfer'
 };
 
 /**
@@ -1022,6 +1023,26 @@ exports.getAssetActivity = async (req, res) => {
 
         const activity = [];
         history.forEach((h) => {
+            if (h.transactionType === 'TRANSFER') {
+                const previous = [h.previousCustomerName, h.previousCustomerCode ? `(${h.previousCustomerCode})` : ''].filter(Boolean).join(' ');
+                const current = [h.customerName, h.customerCode ? `(${h.customerCode})` : ''].filter(Boolean).join(' ');
+                activity.push({
+                    date: h.createdAt,
+                    category: 'Customer',
+                    action: LIFECYCLE_LABELS.TRANSFER,
+                    reference: h.invoiceNumber ? `Invoice ${h.invoiceNumber}` : '',
+                    customer: h.customerName || '',
+                    status: 'Transferred',
+                    details: [
+                        `From: ${previous || '-'}`,
+                        `To: ${current || '-'}`,
+                        h.saleDate ? `Transfer date: ${new Date(h.saleDate).toLocaleDateString('en-IN')}` : '',
+                        h.remarks ? `Remarks: ${h.remarks}` : ''
+                    ].filter(Boolean).join(' | '),
+                    by: h.createdBy?.name || ''
+                });
+                return;
+            }
             const details = [
                 h.returnReason ? `Reason: ${h.returnReason}` : '',
                 h.location ? `Location: ${h.location}` : '',
