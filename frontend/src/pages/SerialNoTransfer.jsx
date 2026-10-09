@@ -274,14 +274,16 @@ const Spinner = () => (
     </div>
 );
 
-// One serial number as a page: its customer history (oldest first), or with `transfer` the
-// transfer form (/serial-no-transfer/:assetId and /serial-no-transfer/:assetId/transfer).
+// One serial number as a page (/serial-no-transfer/:assetId, or .../transfer to open the form):
+// the current customer, the transfer form in place, the date-wise sale history and the customer
+// activity log. After a save the page stays put and both tables reload.
 export const SerialNoDetails = ({ transfer = false }) => {
     const { assetId } = useParams();
     const navigate = useNavigate();
     const location = useLocation();
     const [result, setResult] = useState({ id: null, data: null, error: '' });
-    const mode = transfer ? 'transfer' : 'history';
+    const [formOpen, setFormOpen] = useState(transfer);
+    const [refreshCount, setRefreshCount] = useState(0);
     // Back returns to wherever the page was opened from (list filters, history tab), else the list.
     const goBack = () => (location.key !== 'default' ? navigate(-1) : navigate('/serial-no-transfer'));
 
@@ -296,18 +298,29 @@ export const SerialNoDetails = ({ transfer = false }) => {
     const loading = result.id !== assetId;
     const { data, error } = result;
 
-    // The serial's common activity log, the same one Asset Lifecycle Detail shows.
+    // Customer entries of the serial's common activity log (the same records Asset Lifecycle Detail shows).
     const serialNumber = data?.asset?.serialNumber || '';
-    const [activity, setActivity] = useState({ serial: null, rows: [] });
-    const [category, setCategory] = useState('All');
+    const activityKey = `${serialNumber}|${refreshCount}`;
+    const [activity, setActivity] = useState({ key: null, rows: [] });
     useEffect(() => {
         if (!serialNumber) return undefined;
         let cancelled = false;
         csmService.getAssetActivity(serialNumber)
-            .then((res) => { if (!cancelled) setActivity({ serial: serialNumber, rows: res.data?.activity || [] }); })
-            .catch(() => { if (!cancelled) setActivity({ serial: serialNumber, rows: [] }); });
+            .then((res) => { if (!cancelled) setActivity({ key: activityKey, rows: res.data?.activity || [] }); })
+            .catch(() => { if (!cancelled) setActivity({ key: activityKey, rows: [] }); });
         return () => { cancelled = true; };
-    }, [serialNumber]);
+    }, [serialNumber, activityKey]);
+
+    const handleSaved = (updated) => {
+        setResult({ id: assetId, data: updated, error: '' });
+        setFormOpen(false);
+        setRefreshCount((count) => count + 1);
+        if (transfer) navigate(`/serial-no-transfer/${assetId}`, { replace: true });
+    };
+
+    const history = data ? [...data.history].reverse() : [];
+    const current = history.find((entry) => entry.isActive);
+    const label = 'block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1';
 
     return (
         <div className="space-y-6">
@@ -321,19 +334,19 @@ export const SerialNoDetails = ({ transfer = false }) => {
                 </button>
                 <div className="min-w-0 flex-1">
                     <h1 className="text-xl font-black text-slate-900">
-                        {mode === 'transfer' ? 'Transfer Serial No' : 'Serial No History'}
+                        Serial No Transfer
                         {data && <span className="ml-2 text-primary-600">{data.asset.serialNumber}</span>}
                     </h1>
                     {data && (
                         <p className="mt-0.5 text-xs font-medium text-slate-500">
-                            {data.asset.productCode}{data.asset.productName ? ` · ${data.asset.productName}` : ''} · Current customer <span className="font-bold text-slate-700">{data.asset.customerName || '-'}</span>
+                            {data.asset.productCode}{data.asset.productName ? ` · ${data.asset.productName}` : ''}
                         </p>
                     )}
                 </div>
-                {data && mode === 'history' && (
+                {data && !formOpen && (
                     <button
                         type="button"
-                        onClick={() => navigate(`/serial-no-transfer/${assetId}/transfer`)}
+                        onClick={() => setFormOpen(true)}
                         className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-2xl font-black transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
                     >
                         <MdSwapHoriz size={18} /> Transfer Serial No
@@ -341,41 +354,50 @@ export const SerialNoDetails = ({ transfer = false }) => {
                 )}
             </div>
 
-            <div className="rounded-3xl border border-slate-100 bg-white shadow-sm">
+            {loading ? <Spinner /> : error ? (
+                <p className="rounded-3xl bg-white p-8 text-center text-sm font-medium text-rose-500">{error}</p>
+            ) : (
+                <>
+                    <div className="rounded-3xl border border-slate-100 bg-white shadow-sm">
+                        {formOpen ? (
+                            <TransferForm data={data} onCancel={() => (transfer ? goBack() : setFormOpen(false))} onSaved={handleSaved} />
+                        ) : (
+                            <div className="grid grid-cols-1 gap-6 p-6 md:grid-cols-4">
+                                <div><span className={label}>Serial Number</span><p className="text-sm font-bold text-slate-800">{data.asset.serialNumber}</p></div>
+                                <div><span className={label}>Product</span><p className="text-sm font-bold text-slate-800">{data.asset.productCode}</p><p className="text-xs text-slate-500">{data.asset.productName}</p></div>
+                                <div>
+                                    <span className={label}>Current Customer</span>
+                                    <p className="text-sm font-bold text-slate-800">{current?.companyName || data.asset.customerName || '-'}</p>
+                                    <p className="text-xs text-slate-500">{[current?.customerCode || data.asset.customerCode, current?.customerMobile, current?.customerCity].filter(Boolean).join(' · ')}</p>
+                                </div>
+                                <div><span className={label}>Since</span><p className="text-sm font-bold text-slate-800">{formatDate(current?.transferDate || data.asset.saleDate)}</p></div>
+                            </div>
+                        )}
+                    </div>
 
-                {loading ? <Spinner /> : error ? (
-                    <p className="p-8 text-center text-sm font-medium text-rose-500">{error}</p>
-                ) : mode === 'transfer' ? (
-                    <TransferForm
-                        data={data}
-                        onCancel={goBack}
-                        // The history page replaces the form, so Back from it does not reopen the form.
-                        onSaved={() => navigate(`/serial-no-transfer/${assetId}`, { replace: true })}
-                    />
-                ) : (
-                    <div className="p-6 space-y-4">
-                        <h3 className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-500">
-                            <MdHistory size={16} /> Customer history ({data.history.length})
+                    <div className="rounded-3xl border border-slate-100 bg-white shadow-sm">
+                        <h3 className="flex items-center gap-2 border-b border-slate-100 px-6 py-4 text-xs font-black uppercase tracking-widest text-slate-500">
+                            <MdHistory size={16} /> Serial Number Sale History ({history.length})
                         </h3>
-                        <div className="overflow-x-auto rounded-2xl border border-slate-100">
+                        <div className="overflow-x-auto p-4">
                             <table className="w-full text-left border-collapse">
                                 <thead>
                                     <tr className="bg-slate-50">
-                                        {['#', 'Date', 'Customer', 'Status', 'Flag', 'Remarks', 'Recorded By'].map((label) => (
-                                            <th key={label} className={thClass}>{label}</th>
+                                        {['Product', 'Date', 'Customer', 'Status', 'Flag', 'Remarks', 'Recorded By'].map((text) => (
+                                            <th key={text} className={thClass}>{text}</th>
                                         ))}
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {data.history.map((entry, index) => (
+                                    {history.map((entry) => (
                                         <tr key={entry._id || 'sale'} className={`border-b last:border-0 border-slate-50 text-sm ${entry.isActive ? 'bg-emerald-50/40' : ''}`}>
-                                            <td className="p-4 font-bold text-slate-400">{index + 1}</td>
+                                            <td className="p-4 text-slate-600">
+                                                <span className="font-bold text-slate-700">{entry.productCode}</span>
+                                                {entry.productName && <span className="block text-xs text-slate-500">{entry.productName}</span>}
+                                            </td>
                                             <td className="p-4 text-slate-600 whitespace-nowrap">{formatDate(entry.transferDate)}</td>
                                             <td className="p-4"><CustomerCell entry={entry} /></td>
-                                            <td className="p-4">
-                                                <TypeBadge type={entry.entryType} />
-                                                {entry.isActive && <span className="ml-2 text-[10px] font-black uppercase tracking-widest text-emerald-600">Current</span>}
-                                            </td>
+                                            <td className="p-4"><TypeBadge type={entry.entryType} /></td>
                                             <td className="p-4"><FlagBadge active={entry.isActive} /></td>
                                             <td className="p-4 text-slate-500">{entry.remarks || (entry.invoiceNumber && entry.entryType === 'Sold' ? `Invoice ${entry.invoiceNumber}` : '-')}</td>
                                             <td className="p-4 text-slate-500 whitespace-nowrap">{entry.pending ? 'Invoice Bulk Upload' : (entry.createdByName || '-')}</td>
@@ -385,21 +407,22 @@ export const SerialNoDetails = ({ transfer = false }) => {
                             </table>
                         </div>
                     </div>
-                )}
-            </div>
 
-            {data && (
-                <AssetActivityLog
-                    title={`Activity Log · ${data.asset.serialNumber}`}
-                    activity={activity.rows}
-                    loading={activity.serial !== serialNumber}
-                    category={category}
-                    onCategoryChange={setCategory}
-                />
+                    <AssetActivityLog
+                        variant="customer"
+                        title="Customer Activity Log"
+                        activity={activity.rows}
+                        loading={activity.key !== activityKey}
+                    />
+                </>
             )}
         </div>
     );
 };
+
+const newRequestId = () => (globalThis.crypto?.randomUUID
+    ? globalThis.crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
 const TransferForm = ({ data, onCancel, onSaved }) => {
     const [customerMode, setCustomerMode] = useState('existing');
@@ -411,6 +434,8 @@ const TransferForm = ({ data, onCancel, onSaved }) => {
     const [transferDate, setTransferDate] = useState(todayInput());
     const [remarks, setRemarks] = useState('');
     const [saving, setSaving] = useState(false);
+    const [saveError, setSaveError] = useState('');
+    const [requestId] = useState(newRequestId);
 
     useEffect(() => {
         if (!debouncedQuery) return undefined;
@@ -434,12 +459,18 @@ const TransferForm = ({ data, onCancel, onSaved }) => {
             return;
         }
         setSaving(true);
+        setSaveError('');
         try {
-            const res = await serialTransferService.transfer(data.asset._id, { customerId: customer._id, transferDate, remarks: remarks.trim() });
-            toast.success(`${data.asset.serialNumber} transferred to ${customerTitle(customer)}`);
+            const res = await serialTransferService.transfer(data.asset._id, {
+                customerId: customer._id, transferDate, remarks: remarks.trim(), requestId
+            });
+            toast.success(`${data.asset.serialNumber} assigned to ${customerTitle(customer)}`);
             onSaved(res.data);
         } catch (err) {
-            toast.error(err.response?.data?.message || 'Could not save the transfer.');
+            // Kept on the form so the reason stays visible.
+            const message = err.response?.data?.message || (err.response ? 'Could not save the transfer.' : 'The server could not be reached. Check that the backend is running and try again.');
+            setSaveError(message);
+            toast.error(message);
         } finally {
             setSaving(false);
         }
@@ -564,6 +595,10 @@ const TransferForm = ({ data, onCancel, onSaved }) => {
             <p className="text-xs font-medium text-slate-500">
                 Saving keeps every earlier customer in the history as Inactive and makes the new customer the only Active one.
             </p>
+
+            {saveError && (
+                <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">{saveError}</p>
+            )}
 
             <div className="flex justify-end gap-3">
                 <button type="button" onClick={onCancel} disabled={saving} className="px-5 py-3 rounded-2xl border border-slate-200 text-slate-600 font-black uppercase text-xs tracking-widest hover:bg-slate-50 transition-all disabled:opacity-60">

@@ -1,6 +1,5 @@
 const mongoose = require('mongoose');
 const Asset = require('../models/Asset');
-const AssetHistory = require('../models/AssetHistory');
 const Customer = require('../models/Customer');
 const SerialTransfer = require('../models/SerialTransfer');
 
@@ -195,132 +194,113 @@ exports.getSerial = async (req, res) => {
     }
 };
 
+const httpError = (status, message) => Object.assign(new Error(message), { status });
+
+// The chosen day at the time the transfer is recorded, so the history has a date and a time.
+const transferMoment = (value) => {
+    const now = new Date();
+    if (!value) return now;
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value).trim());
+    const date = match
+        ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), now.getHours(), now.getMinutes(), now.getSeconds())
+        : new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const startOfDay = (value) => new Date(new Date(value).setHours(0, 0, 0, 0));
+
 /**
- * Transfers a serial number to another customer. The current record becomes inactive and a
- * new active record is added for the new customer; nothing earlier is changed or removed.
+ * Assigns a serial number to another customer. In one transaction: the original sale is saved
+ * as the first record if this is the first change, the current record becomes inactive, a new
+ * active record is added for the new customer and the asset moves to that customer. Either all
+ * of it is saved or none of it. Nothing earlier is changed or removed.
+ *
+ * The form sends a requestId with each save; repeating a request returns the record it already
+ * created instead of adding a second one.
  */
 exports.transferSerial = async (req, res) => {
+    const { assetId } = req.params;
+    const requestId = cleanText(req.body.requestId).slice(0, 100) || undefined;
+    let session;
     try {
-        const { assetId } = req.params;
-        if (!mongoose.Types.ObjectId.isValid(assetId)) {
-            return res.status(400).json({ message: 'Invalid serial record' });
-        }
+        if (!mongoose.Types.ObjectId.isValid(assetId)) throw httpError(400, 'Invalid serial record');
         const customerId = req.body.customerId;
-        if (!mongoose.Types.ObjectId.isValid(customerId)) {
-            return res.status(400).json({ message: 'Select the new customer.' });
-        }
-        const transferDate = req.body.transferDate ? new Date(req.body.transferDate) : new Date();
-        if (Number.isNaN(transferDate.getTime())) {
-            return res.status(400).json({ message: 'Transfer date is not a valid date.' });
-        }
-        const endOfToday = new Date();
-        endOfToday.setHours(23, 59, 59, 999);
-        if (transferDate > endOfToday) {
-            return res.status(400).json({ message: 'Transfer date cannot be in the future.' });
+        if (!mongoose.Types.ObjectId.isValid(customerId)) throw httpError(400, 'Select the new customer.');
+        const transferDate = transferMoment(req.body.transferDate);
+        if (!transferDate) throw httpError(400, 'Transfer date is not a valid date.');
+        if (startOfDay(transferDate) > startOfDay(new Date())) throw httpError(400, 'Transfer date cannot be in the future.');
+
+        if (requestId && await SerialTransfer.exists({ requestId })) {
+            return res.json(await loadSerial(assetId));
         }
 
         const asset = await Asset.findOne({ _id: assetId, status: 'SOLD' }).populate(customerPopulate).lean();
-        if (!asset) return res.status(404).json({ message: 'Sold serial number not found' });
-
+        if (!asset) throw httpError(404, 'Sold serial number not found');
         const customer = await Customer.findById(customerId).select(CUSTOMER_SELECT).lean();
-        if (!customer) return res.status(404).json({ message: 'Customer not found in Customer Master.' });
+        if (!customer) throw httpError(404, 'Customer not found in Customer Master.');
+        const user = { createdBy: req.user?.id || null, createdByName: req.user?.name || '' };
 
-        // The original sale becomes the first history record on the first transfer.
-        if (!(await SerialTransfer.exists({ assetId: asset._id }))) {
-            try {
-                await SerialTransfer.create({ ...saleRecord(asset), createdBy: req.user?.id || null, createdByName: req.user?.name || '' });
-            } catch (error) {
-                if (error.code !== 11000) throw error;
+        session = await mongoose.startSession();
+        await session.withTransaction(async () => {
+            let current = await SerialTransfer.findOne({ assetId: asset._id, isActive: true }).session(session).lean();
+            if (!current && !(await SerialTransfer.exists({ assetId: asset._id }).session(session))) {
+                // The original sale becomes the first record of the history.
+                [current] = await SerialTransfer.create([{ ...saleRecord(asset), ...user }], { session });
             }
-        }
+            if (current?.customerId && String(current.customerId) === String(customer._id)) {
+                throw httpError(400, `${customerLabel(customer)} is already the current customer of ${asset.serialNumber}.`);
+            }
+            if (current && transferDate < startOfDay(current.transferDate)) {
+                throw httpError(400, `Transfer date cannot be before ${new Date(current.transferDate).toLocaleDateString('en-IN')}, when the current customer (${current.companyName || current.customerName || 'previous customer'}) received it.`);
+            }
 
-        const current = await SerialTransfer.findOne({ assetId: asset._id, isActive: true }).lean();
-        if (current?.customerId && String(current.customerId) === String(customer._id)) {
-            return res.status(400).json({ message: `${customerLabel(customer)} is already the current customer of ${asset.serialNumber}.` });
-        }
-        if (current && transferDate < new Date(new Date(current.transferDate).setHours(0, 0, 0, 0))) {
-            return res.status(400).json({
-                message: `Transfer date cannot be before ${new Date(current.transferDate).toLocaleDateString('en-IN')}, when the current customer received it.`
-            });
-        }
-
-        if (current) {
-            await SerialTransfer.updateOne({ _id: current._id }, { $set: { isActive: false, endedAt: transferDate } });
-        }
-        let created;
-        try {
-            created = await SerialTransfer.create({
+            if (current) {
+                await SerialTransfer.updateOne({ _id: current._id }, { $set: { isActive: false, endedAt: transferDate } }, { session });
+            }
+            const snapshot = customerSnapshot(customer);
+            await SerialTransfer.create([{
                 assetId: asset._id,
                 serialNumber: asset.serialNumber,
                 serialKey: toKey(asset.serialNumber),
-                productId: asset.productId || null,
+                productId: asset.productId?._id || asset.productId || null,
                 productCode: asset.productCode || '',
                 productName: asset.productName || '',
-                ...customerSnapshot(customer),
+                ...snapshot,
+                previousCustomerId: current?.customerId || null,
+                previousCustomerCode: current?.customerCode || '',
+                previousCustomerName: current?.companyName || current?.customerName || '',
                 entryType: 'Transferred',
                 transferDate,
                 isActive: true,
                 remarks: cleanText(req.body.remarks),
-                createdBy: req.user?.id || null,
-                createdByName: req.user?.name || '',
-                branchId: asset.branchId || null
-            });
-        } catch (error) {
-            // Put the previous customer back so the serial is never left without one.
-            if (current) await SerialTransfer.updateOne({ _id: current._id }, { $set: { isActive: true, endedAt: null } });
-            if (error.code === 11000) {
-                return res.status(409).json({ message: 'This serial number was just transferred by someone else. Reload and try again.' });
-            }
-            throw error;
-        }
+                requestId,
+                ...user,
+                branchId: asset.branchId || current?.branchId || null
+            }], { session });
 
-        await Asset.updateOne({ _id: asset._id }, {
-            $set: {
-                customerId: customer._id,
-                customerCode: created.customerCode,
-                customerNameStr: created.companyName,
-                customerMobile: created.customerMobile,
-                customerPostalCode: created.customerPincode
-            }
-        });
-
-        // The serial's activity log (Asset Lifecycle Detail, Serial No Transfer) reads AssetHistory.
-        // Keyed by the transfer record, so a transfer never produces two log entries.
-        try {
-            await AssetHistory.updateOne({ transferId: created._id }, {
-                $setOnInsert: {
-                    transferId: created._id,
-                    assetId: asset._id,
-                    serialNumber: asset.serialNumber,
-                    productId: asset.productId || undefined,
-                    productCode: asset.productCode,
-                    productName: asset.productName,
+            await Asset.updateOne({ _id: asset._id }, {
+                $set: {
                     customerId: customer._id,
-                    customerCode: created.customerCode,
-                    customerName: created.companyName,
-                    customerPostalCode: created.customerPincode,
-                    customerMobile: created.customerMobile,
-                    previousCustomerId: current?.customerId || null,
-                    previousCustomerCode: current?.customerCode || '',
-                    previousCustomerName: current?.companyName || current?.customerName || '',
-                    remarks: created.remarks,
-                    invoiceNumber: asset.invoiceNumber,
-                    saleDate: transferDate,
-                    transactionType: 'TRANSFER',
-                    status: 'SOLD',
-                    createdBy: req.user?.id,
-                    createdAt: new Date(),
-                    branchId: asset.branchId || null
+                    customerCode: snapshot.customerCode,
+                    customerNameStr: snapshot.companyName,
+                    customerMobile: snapshot.customerMobile,
+                    customerPostalCode: snapshot.customerPincode
                 }
-            }, { upsert: true });
-        } catch (error) {
-            // The transfer itself is saved; only the log entry is missing.
-            console.error('Serial transfer: activity log entry not written:', error.message);
-        }
+            }, { session });
+        });
 
         return res.status(201).json(await loadSerial(asset._id));
     } catch (error) {
-        return res.status(500).json({ message: 'Failed to transfer the serial number', error: error.message });
+        if (error.status) return res.status(error.status).json({ message: error.message });
+        if (error.code === 11000) {
+            // Same request sent twice: the first one saved it.
+            if (requestId && await SerialTransfer.exists({ requestId })) return res.json(await loadSerial(assetId));
+            return res.status(409).json({ message: 'This serial number was just changed by someone else. Reload the page and try again.' });
+        }
+        console.error('Serial transfer failed:', error);
+        return res.status(500).json({ message: `Failed to transfer the serial number: ${error.message}` });
+    } finally {
+        if (session) await session.endSession();
     }
 };
 

@@ -12,8 +12,12 @@ const CATEGORY_STYLES = {
     'Service Visit': 'bg-teal-50 text-teal-700 border-teal-200'
 };
 
-const AssetActivityLog = ({ activity = [], category = 'All', onCategoryChange, loading = false, title = 'Activity Log' }) => {
-    const visible = filterActivity(activity, category);
+// variant "customer": only the customer entries (added / transferred), with their own columns.
+const CUSTOMER_COLUMNS = ['Date & Time', 'Serial Number', 'Previous Customer', 'New Customer', 'Activity', 'Remarks', 'Flag', 'Performed By'];
+
+const AssetActivityLog = ({ activity = [], category = 'All', onCategoryChange, loading = false, title = 'Activity Log', variant = 'all' }) => {
+    const isCustomer = variant === 'customer';
+    const visible = filterActivity(activity, isCustomer ? 'Customer' : category);
 
     return (
         <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden">
@@ -22,7 +26,7 @@ const AssetActivityLog = ({ activity = [], category = 'All', onCategoryChange, l
                     <MdHistory size={18} className="text-primary-600" /> {title}
                     <span className="px-2 py-0.5 rounded-full text-[10px] bg-slate-100 text-slate-600">{visible.length}</span>
                 </span>
-                {onCategoryChange && (
+                {onCategoryChange && !isCustomer && (
                     <div className="flex flex-wrap gap-2">
                         {ACTIVITY_CATEGORIES.map((c) => (
                             <button
@@ -38,6 +42,38 @@ const AssetActivityLog = ({ activity = [], category = 'All', onCategoryChange, l
                 )}
             </div>
             <div className="overflow-x-auto p-4">
+                {isCustomer ? (
+                <table className="w-full text-left border-collapse">
+                    <thead>
+                        <tr className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                            {CUSTOMER_COLUMNS.map((text) => <th key={text} className="p-3 whitespace-nowrap">{text}</th>)}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {visible.map((a, i) => (
+                            <tr key={`${a.date}-${i}`} className={`border-b last:border-0 border-slate-50 text-xs ${a.flag === 'Active' ? 'bg-emerald-50/40' : ''}`}>
+                                <td className="p-3 font-semibold text-slate-600 whitespace-nowrap">{formatActivityDate(a.date) || '-'}</td>
+                                <td className="p-3 font-mono font-bold text-slate-700 whitespace-nowrap">{a.serialNumber || '-'}</td>
+                                <td className="p-3 text-slate-600">{a.previousCustomer || '-'}</td>
+                                <td className="p-3 font-semibold text-slate-800">{a.newCustomer || a.customer || '-'}</td>
+                                <td className="p-3 font-bold text-slate-900 whitespace-nowrap">{a.action}</td>
+                                <td className="p-3 text-slate-600 max-w-xs">{a.remarks || a.reference || '-'}</td>
+                                <td className="p-3">
+                                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${a.flag === 'Active' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>{a.flag || '-'}</span>
+                                </td>
+                                <td className="p-3 font-semibold text-slate-600 whitespace-nowrap">{a.by || '-'}</td>
+                            </tr>
+                        ))}
+                        {!visible.length && (
+                            <tr>
+                                <td colSpan={CUSTOMER_COLUMNS.length} className="p-10 text-center text-slate-400 text-sm font-medium">
+                                    {loading ? 'Loading activity…' : 'No customer activity recorded for this serial.'}
+                                </td>
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
+                ) : (
                 <table className="w-full text-left border-collapse">
                     <thead>
                         <tr className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
@@ -75,6 +111,7 @@ const AssetActivityLog = ({ activity = [], category = 'All', onCategoryChange, l
                         )}
                     </tbody>
                 </table>
+                )}
             </div>
         </div>
     );

@@ -29,27 +29,16 @@ const AssetHistorySchema = new mongoose.Schema({
     projectName: { type: String, default: '' },
     transactionType: {
         type: String,
-        enum: ['SALE', 'RETURN', 'IMPORT', 'IMPORT_RESELL', 'SINGLE_ENTRY', 'SINGLE_ENTRY_RESELL', 'UPDATE', 'TRANSFER'],
+        enum: ['SALE', 'RETURN', 'IMPORT', 'IMPORT_RESELL', 'SINGLE_ENTRY', 'SINGLE_ENTRY_RESELL', 'UPDATE'],
         default: 'SALE'
     },
     status: { type: String, default: 'SOLD' },
-    // TRANSFER (Serial No Transfer): who held the serial before, the remarks, and the
-    // SerialTransfer record this entry was written for (one entry per transfer).
-    previousCustomerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', default: null },
-    previousCustomerCode: { type: String, default: '' },
-    previousCustomerName: { type: String, default: '' },
-    remarks: { type: String, default: '' },
-    transferId: { type: mongoose.Schema.Types.ObjectId, ref: 'SerialTransfer', default: null },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     createdAt: { type: Date, default: Date.now }
 });
 
 // Branch that owns this record; filled from the active branch on create and used for branch scoping (see tenantPlugin).
 AssetHistorySchema.add({ branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null, index: true } });
-AssetHistorySchema.index(
-    { companyId: 1, transferId: 1 },
-    { unique: true, partialFilterExpression: { transferId: { $type: 'objectId' } }, name: 'one_entry_per_transfer' }
-);
 AssetHistorySchema.plugin(tenantPlugin);
 
 module.exports = mongoose.model('AssetHistory', AssetHistorySchema);

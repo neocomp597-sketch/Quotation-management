@@ -28,6 +28,10 @@ const SerialTransferSchema = new mongoose.Schema({
     customerCity: { type: String, default: '' },
     customerState: { type: String, default: '' },
     customerPincode: { type: String, default: '' },
+    // Who held the serial before this record (blank on the original sale).
+    previousCustomerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', default: null },
+    previousCustomerCode: { type: String, default: '' },
+    previousCustomerName: { type: String, default: '' },
     entryType: { type: String, enum: ['Sold', 'Transferred'], required: true },
     transferDate: { type: Date, required: true },
     isActive: { type: Boolean, default: true },
@@ -37,6 +41,8 @@ const SerialTransferSchema = new mongoose.Schema({
     endedAt: { type: Date, default: null },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     createdByName: { type: String, default: '' },
+    // Sent by the transfer form with each save; a retried request finds its record instead of adding another.
+    requestId: { type: String, default: undefined },
     branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null, index: true }
 }, { timestamps: true });
 
@@ -47,6 +53,11 @@ SerialTransferSchema.index({ companyId: 1, createdAt: -1 });
 SerialTransferSchema.index(
     { companyId: 1, serialKey: 1 },
     { unique: true, partialFilterExpression: { isActive: true }, name: 'one_active_per_serial' }
+);
+
+SerialTransferSchema.index(
+    { companyId: 1, requestId: 1 },
+    { unique: true, partialFilterExpression: { requestId: { $type: 'string' } }, name: 'one_record_per_request' }
 );
 
 SerialTransferSchema.plugin(tenantPlugin);

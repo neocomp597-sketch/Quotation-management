@@ -967,8 +967,63 @@ const LIFECYCLE_LABELS = {
     SINGLE_ENTRY_RESELL: 'Re-sold (Single Entry)',
     UPDATE: 'Entry edited',
     RETURN: 'Sales return',
-    SALE: 'Sale',
-    TRANSFER: 'Customer transfer'
+    SALE: 'Sale'
+};
+
+const customerText = (name, code) => [name, code ? `(${code})` : ''].filter(Boolean).join(' ');
+
+/**
+ * Customer entries of the activity log, from the Serial No Transfer history (SerialTransfer):
+ * "Customer Added" for the first customer and "Customer Transferred" for every change after
+ * it. A serial that was never transferred shows its invoice customer as the one added.
+ */
+const customerActivity = async (assetDocs, serialNumber) => {
+    const SerialTransfer = require('../models/SerialTransfer');
+    const records = assetDocs.length
+        ? await SerialTransfer.find({ assetId: { $in: assetDocs.map((a) => a._id) } })
+            .setOptions({ bypassBranch: true })
+            .sort({ transferDate: 1, createdAt: 1 })
+            .lean()
+        : [];
+
+    const entries = records.length ? records : assetDocs
+        .filter((a) => a.status === 'SOLD' && (a.customerId || a.customerNameStr))
+        .map((a) => ({
+            serialNumber: a.serialNumber,
+            entryType: 'Sold',
+            transferDate: a.saleDate || a.invoiceDate || a.createdAt,
+            companyName: a.customerId?.companyName || a.customerId?.customerName || a.customerNameStr || '',
+            customerCode: a.customerId?.externalCode || a.customerCode || '',
+            invoiceNumber: a.invoiceNumber || '',
+            isActive: true,
+            createdByName: 'Invoice Bulk Upload'
+        }));
+
+    return entries.map((r) => {
+        const added = r.entryType === 'Sold';
+        const newCustomer = customerText(r.companyName || r.customerName, r.customerCode);
+        const previousCustomer = added ? '' : customerText(r.previousCustomerName, r.previousCustomerCode);
+        return {
+            date: r.transferDate,
+            category: 'Customer',
+            action: added ? 'Customer Added' : 'Customer Transferred',
+            reference: r.invoiceNumber ? `Invoice ${r.invoiceNumber}` : '',
+            customer: r.companyName || r.customerName || '',
+            status: added ? 'Sold' : 'Transferred',
+            flag: r.isActive ? 'Active' : 'Inactive',
+            serialNumber: r.serialNumber || serialNumber,
+            previousCustomer,
+            newCustomer,
+            remarks: r.remarks || '',
+            details: [
+                previousCustomer ? `From: ${previousCustomer}` : '',
+                `To: ${newCustomer || '-'}`,
+                r.remarks ? `Remarks: ${r.remarks}` : '',
+                r.isActive ? 'Current customer' : ''
+            ].filter(Boolean).join(' | '),
+            by: r.createdByName || ''
+        };
+    });
 };
 
 /**
@@ -994,7 +1049,11 @@ exports.getAssetActivity = async (req, res) => {
         const CROSS_BRANCH = { bypassBranch: true };
 
         const [assets, history] = await Promise.all([
-            Asset.find({ companyId, serialNumber: snRegex }).select('_id').setOptions(CROSS_BRANCH).lean(),
+            Asset.find({ companyId, serialNumber: snRegex })
+                .select('_id serialNumber status customerId customerCode customerNameStr invoiceNumber saleDate invoiceDate createdAt')
+                .populate({ path: 'customerId', select: 'companyName customerName externalCode', options: { bypassTenant: true } })
+                .setOptions(CROSS_BRANCH)
+                .lean(),
             AssetHistory.find({ companyId, serialNumber: snRegex })
                 .populate({ path: 'createdBy', select: 'name email', options: CROSS_BRANCH })
                 .setOptions(CROSS_BRANCH)
@@ -1021,28 +1080,8 @@ exports.getAssetActivity = async (req, res) => {
             : [];
         const ticketNoById = new Map(tickets.map(t => [String(t._id), t.ticketNo]));
 
-        const activity = [];
+        const activity = await customerActivity(assets, cleanSN);
         history.forEach((h) => {
-            if (h.transactionType === 'TRANSFER') {
-                const previous = [h.previousCustomerName, h.previousCustomerCode ? `(${h.previousCustomerCode})` : ''].filter(Boolean).join(' ');
-                const current = [h.customerName, h.customerCode ? `(${h.customerCode})` : ''].filter(Boolean).join(' ');
-                activity.push({
-                    date: h.createdAt,
-                    category: 'Customer',
-                    action: LIFECYCLE_LABELS.TRANSFER,
-                    reference: h.invoiceNumber ? `Invoice ${h.invoiceNumber}` : '',
-                    customer: h.customerName || '',
-                    status: 'Transferred',
-                    details: [
-                        `From: ${previous || '-'}`,
-                        `To: ${current || '-'}`,
-                        h.saleDate ? `Transfer date: ${new Date(h.saleDate).toLocaleDateString('en-IN')}` : '',
-                        h.remarks ? `Remarks: ${h.remarks}` : ''
-                    ].filter(Boolean).join(' | '),
-                    by: h.createdBy?.name || ''
-                });
-                return;
-            }
             const details = [
                 h.returnReason ? `Reason: ${h.returnReason}` : '',
                 h.location ? `Location: ${h.location}` : '',
