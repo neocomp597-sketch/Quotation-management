@@ -29,6 +29,8 @@ const rowFromSaved = (item) => ({
     itemDescription: item.itemDescription,
     uom: item.uom || '',
     qty: item.qty,
+    drawingNo: item.drawingNo || '',
+    revisionNo: item.revisionNo || '',
     fromMaster: Boolean(item.inProductMaster),
     mgrs: Object.fromEntries(MGR_KEYS.map((key) => [key, item[key]]))
 });
@@ -98,7 +100,7 @@ const BOMForm = () => {
         const payload = {
             fgItemCode: fg.fgItemCode,
             fgSerialNumber: fg.fgSerialNumber,
-            items: rows.map(({ itemCode, itemDescription, uom, qty }) => ({ itemCode, itemDescription, uom, qty }))
+            items: rows.map(({ itemCode, itemDescription, uom, qty, drawingNo, revisionNo }) => ({ itemCode, itemDescription, uom, qty, drawingNo, revisionNo }))
         };
         try {
             const res = isEdit ? await bomService.update(id, payload) : await bomService.create(payload);

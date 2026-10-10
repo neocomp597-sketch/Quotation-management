@@ -60,6 +60,11 @@ const HEADER_ALIASES = {
     batch: 'batchNumber',
     remarks: 'remarks',
     remark: 'remarks',
+    drawingno: 'drawingNo',
+    drawingnumber: 'drawingNo',
+    revisionno: 'revisionNo',
+    revisionnumber: 'revisionNo',
+    revno: 'revisionNo',
     note: 'remarks',
     notes: 'remarks'
 };
@@ -195,10 +200,160 @@ const groupRows = (rows, hasSerialColumn) => {
             qty: row.qty,
             componentSerialNumber: row.componentSerialNumber,
             batchNumber: row.batchNumber,
-            remarks: row.remarks
+            remarks: row.remarks,
+            drawingNo: row.drawingNo,
+            revisionNo: row.revisionNo
         });
     });
     return [...groups.values()];
+};
+
+/**
+ * SAP "BOM Costing Report": the product code and name in the title block, then one numbered line
+ * per item (#, Item Code, Item Name, UOM, Drawing No, Revision No, BOM Type, Quantity), where
+ * "2.6.2" is the second line under 2.6. Every line that has lines under it (BOM Type P) is an
+ * assembly with a BOM of its own; the product's BOM holds the top-level lines. Line order is kept,
+ * so the BOMs show the report's sequence. A sub-assembly that appears in more than one place is
+ * imported once; if its lines differ between places the later ones are reported, not imported.
+ */
+const SEQ_PATTERN = /^\d+(\.\d+)*$/;
+const COSTING_COLUMNS = {
+    seq: ['#', 'sno', 'srno', 'slno'],
+    itemCode: ['itemcode'],
+    itemDescription: ['itemname', 'itemdescription', 'description'],
+    uom: ['uom', 'unit'],
+    drawingNo: ['drawingno', 'drawingnumber'],
+    revisionNo: ['revisionno', 'revisionnumber', 'revno'],
+    bomType: ['bomtype', 'type'],
+    qty: ['quantity', 'qty']
+};
+
+const findCostingHeader = (matrix) => {
+    for (let i = 0; i < Math.min(matrix.length, 10); i++) {
+        const cells = (matrix[i] || []).map((cell) => (String(cell).trim() === '#' ? '#' : normalizeHeader(cell)));
+        const columns = {};
+        Object.entries(COSTING_COLUMNS).forEach(([field, names]) => {
+            const index = cells.findIndex((cell) => names.includes(cell));
+            if (index >= 0) columns[field] = index;
+        });
+        if (columns.seq !== undefined && columns.itemCode !== undefined && columns.qty !== undefined && columns.bomType !== undefined) {
+            return { index: i, columns };
+        }
+    }
+    return null;
+};
+
+// "Item Code / Item Name / Quantity" labels with ": value" lines beside them in the title block.
+const costingProduct = (matrix, headerIndex) => {
+    for (let i = 0; i < headerIndex; i++) {
+        const row = matrix[i] || [];
+        for (let c = 0; c < row.length - 1; c++) {
+            const labels = String(row[c]).split(/\r?\n/).map(normalizeHeader);
+            const at = labels.indexOf('itemcode');
+            if (at < 0) continue;
+            const values = String(row[c + 1]).split(/\r?\n/).map((value) => cleanCell(value).replace(/^:\s*/, ''));
+            const nameAt = labels.indexOf('itemname');
+            return { code: values[at] || '', name: nameAt >= 0 ? values[nameAt] || '' : '' };
+        }
+    }
+    return { code: '', name: '' };
+};
+
+const readCostingReport = (matrix) => {
+    const header = findCostingHeader(matrix);
+    if (!header) return null;
+    const { index: headerIndex, columns } = header;
+    const product = costingProduct(matrix, headerIndex);
+    if (!product.code) {
+        throw Object.assign(new Error('BOM Costing Report: the product Item Code was not found in the title block.'), { status: 400 });
+    }
+
+    const skipped = [];
+    const nodes = [];
+    for (let i = headerIndex + 1; i < matrix.length; i++) {
+        const raw = matrix[i] || [];
+        const seq = cleanCell(raw[columns.seq]);
+        const pick = (field) => (columns[field] === undefined ? '' : cleanCell(raw[columns[field]]));
+        if (!SEQ_PATTERN.test(seq)) {
+            if (raw.some((cell) => cleanCell(cell))) {
+                skipped.push({ row: i + 1, serial: product.code, message: `Not a BOM line ("${cleanCell(raw[0]) || cleanCell(raw[1])}"), skipped.` });
+            }
+            continue;
+        }
+        nodes.push({
+            rowNumber: i + 1,
+            seq,
+            parentSeq: seq.includes('.') ? seq.slice(0, seq.lastIndexOf('.')) : '',
+            itemCode: pick('itemCode'),
+            itemDescription: pick('itemDescription'),
+            uom: pick('uom'),
+            drawingNo: pick('drawingNo'),
+            revisionNo: pick('revisionNo'),
+            bomType: pick('bomType').toUpperCase(),
+            qty: pick('qty')
+        });
+    }
+
+    const bySeq = new Map(nodes.map((node) => [node.seq, node]));
+    const children = new Map();
+    nodes.forEach((node) => {
+        if (node.parentSeq && !bySeq.has(node.parentSeq)) {
+            skipped.push({ row: node.rowNumber, serial: product.code, message: `Line ${node.seq} has no line ${node.parentSeq} above it, skipped.` });
+            return;
+        }
+        if (!children.has(node.parentSeq)) children.set(node.parentSeq, []);
+        children.get(node.parentSeq).push(node);
+    });
+
+    const line = (node) => ({
+        rowNumber: node.rowNumber,
+        itemCode: node.itemCode,
+        itemDescription: node.itemDescription,
+        uom: node.uom,
+        qty: node.qty,
+        drawingNo: node.drawingNo,
+        revisionNo: node.revisionNo
+    });
+    const signature = (lines) => JSON.stringify(lines.map((l) => [toKey(l.itemCode), String(l.qty), toKey(l.uom)]));
+
+    const groups = [{
+        fgItemCode: product.code,
+        fgItemDescription: product.name,
+        fgSerialNumber: product.code,
+        firstRow: headerIndex + 2,
+        items: (children.get('') || []).map(line)
+    }];
+    const seen = new Map();
+    nodes.forEach((node) => {
+        const lines = (children.get(node.seq) || []).map(line);
+        if (!lines.length) {
+            if (node.bomType === 'P') {
+                skipped.push({ row: node.rowNumber, serial: node.itemCode, message: `Line ${node.seq} (${node.itemCode}) is BOM Type P but has no lines under it; kept as a component only.` });
+            }
+            return;
+        }
+        const key = toKey(node.itemCode);
+        if (seen.has(key)) {
+            if (seen.get(key).signature !== signature(lines)) {
+                skipped.push({
+                    row: node.rowNumber,
+                    serial: node.itemCode,
+                    message: `Line ${node.seq} (${node.itemCode}) lists different lines than line ${seen.get(key).seq}; the BOM from line ${seen.get(key).seq} is used.`
+                });
+            }
+            return;
+        }
+        seen.set(key, { seq: node.seq, signature: signature(lines) });
+        groups.push({
+            fgItemCode: node.itemCode,
+            fgItemDescription: node.itemDescription,
+            fgSerialNumber: node.itemCode,
+            firstRow: node.rowNumber,
+            items: lines
+        });
+    });
+
+    return { groups, skipped, product };
 };
 
 const statusLog = (reason, userId, userName) => ({
@@ -211,8 +366,17 @@ const statusLog = (reason, userId, userName) => ({
  * that could not be saved, and the lines that were skipped.
  */
 const importBOMWorkbook = async (buffer, { fileName = '', userId = null, userName = '' } = {}) => {
-    const { rows, skipped, hasSerialColumn } = readRows(buffer);
-    const groups = groupRows(rows, hasSerialColumn);
+    // A SAP BOM Costing Report (numbered tree) or the flat Parent Item Code layout.
+    const costing = readCostingReport(readMatrix(buffer));
+    let groups;
+    let skipped;
+    if (costing) {
+        ({ groups, skipped } = costing);
+    } else {
+        const read = readRows(buffer);
+        skipped = read.skipped;
+        groups = groupRows(read.rows, read.hasSerialColumn);
+    }
     if (!groups.length) {
         throw Object.assign(new Error('No BOM lines found in the file.'), { status: 400 });
     }
@@ -367,7 +531,9 @@ const importBOMComponents = async (buffer, bomId, { mode = 'replace', fileName =
             qty: item.qty,
             componentSerialNumber: item.componentSerialNumber,
             batchNumber: item.batchNumber,
-            remarks: item.remarks
+            remarks: item.remarks,
+            drawingNo: item.drawingNo,
+            revisionNo: item.revisionNo
         }))
         : [];
 
@@ -443,5 +609,6 @@ const buildTemplateBuffer = () => {
 };
 
 module.exports = {
+    readCostingReport, readMatrix,
     importBOMWorkbook, buildTemplateBuffer, importBOMComponents, buildComponentTemplateBuffer, mapHeaders, readRows, groupRows, TEMPLATE_HEADERS
 };

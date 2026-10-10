@@ -419,7 +419,8 @@ export const mgrService = {
 // One BOM per FG serial number, entered on the BOM Master form; complaint screens only read it.
 export const bomService = {
   getAll: (params = {}) => api.get("/bom", { params }),
-  getById: (id) => api.get(`/bom/${id}`),
+  // `parent`: the BOM the page was opened from, so sequence numbers follow that path.
+  getById: (id, parent) => api.get(`/bom/${id}`, { params: parent ? { parent } : {} }),
   create: (data) => api.post("/bom", data),
   update: (id, data) => api.put(`/bom/${id}`, data),
   // BOM screens deactivate instead of deleting; the hard delete stays for administrators.
@@ -458,6 +459,8 @@ export const serialTransferService = {
   listSerials: (params = {}) => api.get("/serial-transfers/serials", { params }),
   getSerial: (assetId) => api.get(`/serial-transfers/serials/${assetId}`),
   transfer: (assetId, data) => api.post(`/serial-transfers/serials/${assetId}/transfer`, data),
+  // An earlier customer recorded afterwards; stays inactive.
+  addPastEntry: (assetId, data) => api.post(`/serial-transfers/serials/${assetId}/past-entry`, data),
   listHistory: (params = {}) => api.get("/serial-transfers/history", { params }),
 };
 

@@ -32,7 +32,9 @@ const SerialTransferSchema = new mongoose.Schema({
     previousCustomerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', default: null },
     previousCustomerCode: { type: String, default: '' },
     previousCustomerName: { type: String, default: '' },
-    entryType: { type: String, enum: ['Sold', 'Transferred'], required: true },
+    // Sold: the invoice sale. Transferred: a change of customer. Past Entry: an earlier customer
+    // recorded afterwards; always inactive and never changes the current customer.
+    entryType: { type: String, enum: ['Sold', 'Transferred', 'Past Entry'], required: true },
     transferDate: { type: Date, required: true },
     isActive: { type: Boolean, default: true },
     invoiceNumber: { type: String, default: '' },

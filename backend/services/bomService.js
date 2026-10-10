@@ -95,7 +95,9 @@ const prepareBOM = async (body, { lenient = false } = {}) => {
             qtyText: cleanText(row.qty).replace(/,/g, ''),
             componentSerialNumber: cleanText(row.componentSerialNumber),
             batchNumber: cleanText(row.batchNumber),
-            remarks: cleanText(row.remarks)
+            remarks: cleanText(row.remarks),
+            drawingNo: cleanText(row.drawingNo),
+            revisionNo: cleanText(row.revisionNo)
         }))
         // Rows left completely empty on the form are ignored.
         .filter((row) => row.itemCode || row.itemDescription || row.qtyText || row.uom);
@@ -134,7 +136,9 @@ const prepareBOM = async (body, { lenient = false } = {}) => {
             qty,
             componentSerialNumber: row.componentSerialNumber,
             batchNumber: row.batchNumber,
-            remarks: row.remarks
+            remarks: row.remarks,
+            drawingNo: row.drawingNo,
+            revisionNo: row.revisionNo
         };
         MGR_FIELDS.forEach((field) => { item[field] = product?.[field] || null; });
         items.push(item);

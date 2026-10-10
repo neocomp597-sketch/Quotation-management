@@ -999,17 +999,20 @@ const customerActivity = async (assetDocs, serialNumber) => {
             createdByName: 'Invoice Bulk Upload'
         }));
 
-    return entries.map((r) => {
-        const added = r.entryType === 'Sold';
+    return entries.map((r, index) => {
+        const before = entries[index - 1];
+        const first = index === 0;
         const newCustomer = customerText(r.companyName || r.customerName, r.customerCode);
-        const previousCustomer = added ? '' : customerText(r.previousCustomerName, r.previousCustomerCode);
+        const previousCustomer = first ? '' : customerText(before.companyName || before.customerName, before.customerCode);
+        const suffix = { 'Past Entry': ' (Past Entry)', Sold: first ? '' : ' (Invoice Sale)' }[r.entryType] || '';
+        const action = `${first ? 'Customer Added' : 'Customer Transferred'}${suffix}`;
         return {
             date: r.transferDate,
             category: 'Customer',
-            action: added ? 'Customer Added' : 'Customer Transferred',
+            action,
             reference: r.invoiceNumber ? `Invoice ${r.invoiceNumber}` : '',
             customer: r.companyName || r.customerName || '',
-            status: added ? 'Sold' : 'Transferred',
+            status: r.entryType === 'Transferred' ? 'Transferred' : r.entryType,
             flag: r.isActive ? 'Active' : 'Inactive',
             serialNumber: r.serialNumber || serialNumber,
             previousCustomer,

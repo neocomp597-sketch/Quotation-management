@@ -12,6 +12,7 @@ router.use(protect, canManageSerials);
 router.get('/serials', serialTransferController.listSerials);
 router.get('/serials/:assetId', serialTransferController.getSerial);
 router.post('/serials/:assetId/transfer', serialTransferController.transferSerial);
+router.post('/serials/:assetId/past-entry', serialTransferController.addPastEntry);
 router.get('/history', serialTransferController.listHistory);
 
 module.exports = router;

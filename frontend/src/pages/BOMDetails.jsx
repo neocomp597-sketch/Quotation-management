@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { MdArrowBack, MdEdit, MdFileDownload, MdPictureAsPdf, MdToggleOff, MdToggleOn, MdHistory, MdUploadFile, MdAdd, MdChevronRight } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import { bomService } from '../services/api';
@@ -25,19 +25,21 @@ const fileName = (bom) => String(bom.fgSerialNumber || bom.fgItemCode || bom._id
 const BOMDetails = () => {
     const navigate = useNavigate();
     const { id } = useParams();
+    const [searchParams] = useSearchParams();
+    const parentId = searchParams.get('parent') || '';
     const [result, setResult] = useState({ id: null, bom: null, error: '' });
     const loading = result.id !== id;
     const { bom, error } = result;
 
     useEffect(() => {
         let cancelled = false;
-        bomService.getById(id)
+        bomService.getById(id, parentId)
             .then((res) => { if (!cancelled) setResult({ id, bom: res.data, error: '' }); })
             .catch((err) => {
                 if (!cancelled) setResult({ id, bom: null, error: err.response?.data?.message || 'Failed to load BOM' });
             });
         return () => { cancelled = true; };
-    }, [id]);
+    }, [id, parentId]);
 
     // The PDF carries the BOM and any sub-BOM underneath it, so it needs the print payload.
     const [printing, setPrinting] = useState(false);
@@ -454,7 +456,7 @@ const BOMDetails = () => {
                                 )}
                             </div>
                         )}
-                        <BOMComponentsTable items={bom.items || []} onOpen={(subBomId) => navigate(`/bom-master/${subBomId}`)} />
+                        <BOMComponentsTable items={bom.items || []} onOpen={(subBomId) => navigate(`/bom-master/${subBomId}?parent=${bom._id}`)} />
                     </div>
 
                     {bom.statusHistory?.length > 0 && (

@@ -304,6 +304,73 @@ exports.transferSerial = async (req, res) => {
     }
 };
 
+/**
+ * Records an earlier customer of a serial number (Add Past Entry). The record is inactive and
+ * dated on or before the current customer's date; the current customer and the asset are not
+ * changed. The original sale is saved as a record first if the serial has no history yet.
+ */
+exports.addPastEntry = async (req, res) => {
+    const { assetId } = req.params;
+    const requestId = cleanText(req.body.requestId).slice(0, 100) || undefined;
+    let session;
+    try {
+        if (!mongoose.Types.ObjectId.isValid(assetId)) throw httpError(400, 'Invalid serial record');
+        if (!mongoose.Types.ObjectId.isValid(req.body.customerId)) throw httpError(400, 'Select the customer.');
+        if (!req.body.entryDate) throw httpError(400, 'Enter the date of the past entry.');
+        const entryDate = transferMoment(req.body.entryDate);
+        if (!entryDate) throw httpError(400, 'Date is not a valid date.');
+        if (startOfDay(entryDate) > startOfDay(new Date())) throw httpError(400, 'A past entry cannot be dated in the future.');
+
+        if (requestId && await SerialTransfer.exists({ requestId })) {
+            return res.json(await loadSerial(assetId));
+        }
+
+        const asset = await Asset.findOne({ _id: assetId, status: 'SOLD' }).populate(customerPopulate).lean();
+        if (!asset) throw httpError(404, 'Sold serial number not found');
+        const customer = await Customer.findById(req.body.customerId).select(CUSTOMER_SELECT).lean();
+        if (!customer) throw httpError(404, 'Customer not found in Customer Master.');
+        const user = { createdBy: req.user?.id || null, createdByName: req.user?.name || '' };
+
+        session = await mongoose.startSession();
+        await session.withTransaction(async () => {
+            let current = await SerialTransfer.findOne({ assetId: asset._id, isActive: true }).session(session).lean();
+            if (!current && !(await SerialTransfer.exists({ assetId: asset._id }).session(session))) {
+                [current] = await SerialTransfer.create([{ ...saleRecord(asset), ...user }], { session });
+            }
+            if (current && startOfDay(entryDate) > startOfDay(current.transferDate)) {
+                throw httpError(400, `A past entry must be dated on or before ${new Date(current.transferDate).toLocaleDateString('en-IN')}, when the current customer (${current.companyName || current.customerName || 'current customer'}) received it. Use Transfer Serial No for a newer customer.`);
+            }
+            await SerialTransfer.create([{
+                assetId: asset._id,
+                serialNumber: asset.serialNumber,
+                serialKey: toKey(asset.serialNumber),
+                productId: asset.productId?._id || asset.productId || null,
+                productCode: asset.productCode || '',
+                productName: asset.productName || '',
+                ...customerSnapshot(customer),
+                entryType: 'Past Entry',
+                transferDate: entryDate,
+                isActive: false,
+                remarks: cleanText(req.body.remarks),
+                requestId,
+                ...user,
+                branchId: asset.branchId || current?.branchId || null
+            }], { session });
+        });
+
+        return res.status(201).json(await loadSerial(asset._id));
+    } catch (error) {
+        if (error.status) return res.status(error.status).json({ message: error.message });
+        if (error.code === 11000 && requestId && await SerialTransfer.exists({ requestId })) {
+            return res.json(await loadSerial(assetId));
+        }
+        console.error('Serial past entry failed:', error);
+        return res.status(500).json({ message: `Failed to save the past entry: ${error.message}` });
+    } finally {
+        if (session) await session.endSession();
+    }
+};
+
 /** Transfer History: every saved record, newest first, with search and Active/Inactive filter. */
 exports.listHistory = async (req, res) => {
     try {
@@ -319,7 +386,7 @@ exports.listHistory = async (req, res) => {
         }
         if (req.query.flag === 'Active') query.isActive = true;
         if (req.query.flag === 'Inactive') query.isActive = false;
-        if (req.query.entryType === 'Sold' || req.query.entryType === 'Transferred') query.entryType = req.query.entryType;
+        if (['Sold', 'Transferred', 'Past Entry'].includes(req.query.entryType)) query.entryType = req.query.entryType;
 
         const [data, total] = await Promise.all([
             SerialTransfer.find(query).sort({ createdAt: -1, _id: -1 }).skip(skip).limit(limit).lean(),

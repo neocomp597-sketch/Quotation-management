@@ -15,6 +15,9 @@ const BOMItemSchema = new mongoose.Schema({
     componentSerialNumber: { type: String, trim: true, default: '' },
     batchNumber: { type: String, trim: true, default: '' },
     remarks: { type: String, trim: true, default: '' },
+    // Drawing and revision numbers from the SAP BOM Costing Report.
+    drawingNo: { type: String, trim: true, default: '' },
+    revisionNo: { type: String, trim: true, default: '' },
     mgr1: { type: mongoose.Schema.Types.ObjectId, ref: 'MGR', default: null },
     mgr2: { type: mongoose.Schema.Types.ObjectId, ref: 'MGR', default: null },
     mgr3: { type: mongoose.Schema.Types.ObjectId, ref: 'MGR', default: null },

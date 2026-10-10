@@ -140,7 +140,22 @@ const findParentBOMs = async (itemCode) => {
         .lean();
 };
 
-const addHierarchy = async (bom) => {
+// Line number of an item code inside a parent BOM (its place in the report's sequence).
+const lineOf = async (parentId, itemCode) => {
+    const line = await BOMItem.findOne({ bomMasterId: parentId, itemCode: { $in: [...new Set([cleanText(itemCode), toKey(itemCode)])] } })
+        .sort({ lineNo: 1 })
+        .select('lineNo')
+        .lean();
+    return line?.lineNo || null;
+};
+
+/**
+ * Adds the breadcrumb (ancestors, root first), the level and the sequence numbers. Sequence
+ * numbers follow the BOM Costing Report: a product's lines are 1, 2, 3...; the lines of the
+ * assembly at line 2 are 2.1, 2.2...; below that 2.6.1 and so on. `parentId` is the BOM the
+ * page was opened from, so an assembly used in two places is numbered along the path taken.
+ */
+const addHierarchy = async (bom, { parentId = null } = {}) => {
     if (!bom) return bom;
 
     // A component with an item-level BOM of its own opens that BOM.
@@ -152,33 +167,45 @@ const addHierarchy = async (bom) => {
 
     // Walk up through the first parent of each level for the breadcrumb, root first.
     const ancestors = [];
+    const positions = [];
     const seen = new Set([String(bom._id)]);
     let code = bom.fgItemCode;
     for (let depth = 0; depth < MAX_HIERARCHY_DEPTH; depth++) {
-        const [parent] = await findParentBOMs(code);
+        const parents = await findParentBOMs(code);
+        const parent = (depth === 0 && parentId && parents.find((p) => String(p._id) === String(parentId))) || parents[0];
         if (!parent || seen.has(String(parent._id))) break;
         seen.add(String(parent._id));
         ancestors.unshift({ _id: parent._id, fgItemCode: parent.fgItemCode, fgItemDescription: parent.fgItemDescription });
+        positions.unshift(await lineOf(parent._id, code));
         code = parent.fgItemCode;
     }
+    // Numbered only when every step of the path is known.
+    const seqPrefix = positions.every(Boolean) ? positions.join('.') : '';
 
     return {
         ...bom,
         level: ancestors.length ? 'Assembly' : 'Product',
         ancestors,
-        items: (bom.items || []).map((item) => {
+        seqPrefix,
+        items: (bom.items || []).map((item, index) => {
             const sub = subByKey.get(toKey(item.itemCode));
-            return { ...item, subBomId: sub?._id || null, subBomComponents: sub?.componentCount || 0 };
+            const lineNo = item.lineNo || index + 1;
+            return {
+                ...item,
+                seqNo: ancestors.length && !seqPrefix ? String(lineNo) : [seqPrefix, lineNo].filter(Boolean).join('.'),
+                subBomId: sub?._id || null,
+                subBomComponents: sub?.componentCount || 0
+            };
         })
     };
 };
 
-const loadBOMById = async (id) => {
+const loadBOMById = async (id, options = {}) => {
     const master = await BOMMaster.findById(id)
         .populate('createdBy', 'name')
         .populate('updatedBy', 'name')
         .lean();
-    return addHierarchy(await loadBOM(master));
+    return addHierarchy(await loadBOM(master), options);
 };
 
 const serialTakenMessage = (serial) => `A BOM already exists for ${serial}. Open it from the list to change it.`;
@@ -244,7 +271,8 @@ exports.getBOMById = async (req, res) => {
         if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
             return res.status(400).json({ message: 'Invalid BOM ID' });
         }
-        const bom = await loadBOMById(req.params.id);
+        const parentId = mongoose.Types.ObjectId.isValid(req.query.parent) ? req.query.parent : null;
+        const bom = await loadBOMById(req.params.id, { parentId });
         if (!bom) {
             return res.status(404).json({ message: 'BOM not found' });
         }
@@ -501,7 +529,9 @@ exports.createAssembly = async (req, res) => {
                     qty: item.qty,
                     componentSerialNumber: item.componentSerialNumber,
                     batchNumber: item.batchNumber,
-                    remarks: item.remarks
+                    remarks: item.remarks,
+                    drawingNo: item.drawingNo,
+                    revisionNo: item.revisionNo
                 })),
                 { itemCode, itemDescription: itemName, uom: cleanText(req.body.uom) || 'NOS', qty }
             ]

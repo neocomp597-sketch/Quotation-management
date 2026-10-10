@@ -29,8 +29,10 @@ const FlagBadge = ({ active }) => (
     </span>
 );
 
+const TYPE_STYLES = { Transferred: 'bg-amber-50 text-amber-600', 'Past Entry': 'bg-violet-50 text-violet-600' };
+
 const TypeBadge = ({ type }) => (
-    <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${type === 'Transferred' ? 'bg-amber-50 text-amber-600' : 'bg-sky-50 text-sky-600'}`}>
+    <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest whitespace-nowrap ${TYPE_STYLES[type] || 'bg-sky-50 text-sky-600'}`}>
         {type}
     </span>
 );
@@ -208,9 +210,10 @@ const HistoryTab = ({ onOpen }) => {
                     />
                 </div>
                 <select value={entryType} onChange={(e) => { setEntryType(e.target.value); setPage(1); }} className={`${inputClass} w-auto font-semibold`}>
-                    <option value="">Sold and transferred</option>
+                    <option value="">All entries</option>
                     <option value="Sold">Sold</option>
                     <option value="Transferred">Transferred</option>
+                    <option value="Past Entry">Past Entry</option>
                 </select>
                 <select value={flag} onChange={(e) => { setFlag(e.target.value); setPage(1); }} className={`${inputClass} w-auto font-semibold`}>
                     <option value="">Active and inactive</option>
@@ -282,7 +285,8 @@ export const SerialNoDetails = ({ transfer = false }) => {
     const navigate = useNavigate();
     const location = useLocation();
     const [result, setResult] = useState({ id: null, data: null, error: '' });
-    const [formOpen, setFormOpen] = useState(transfer);
+    // Open form: 'transfer' (new current customer) or 'past' (an earlier customer, inactive).
+    const [formMode, setFormMode] = useState(transfer ? 'transfer' : null);
     const [refreshCount, setRefreshCount] = useState(0);
     // Back returns to wherever the page was opened from (list filters, history tab), else the list.
     const goBack = () => (location.key !== 'default' ? navigate(-1) : navigate('/serial-no-transfer'));
@@ -313,7 +317,7 @@ export const SerialNoDetails = ({ transfer = false }) => {
 
     const handleSaved = (updated) => {
         setResult({ id: assetId, data: updated, error: '' });
-        setFormOpen(false);
+        setFormMode(null);
         setRefreshCount((count) => count + 1);
         if (transfer) navigate(`/serial-no-transfer/${assetId}`, { replace: true });
     };
@@ -343,14 +347,23 @@ export const SerialNoDetails = ({ transfer = false }) => {
                         </p>
                     )}
                 </div>
-                {data && !formOpen && (
-                    <button
-                        type="button"
-                        onClick={() => setFormOpen(true)}
-                        className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-2xl font-black transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
-                    >
-                        <MdSwapHoriz size={18} /> Transfer Serial No
-                    </button>
+                {data && !formMode && (
+                    <div className="flex flex-wrap gap-3">
+                        <button
+                            type="button"
+                            onClick={() => setFormMode('past')}
+                            className="flex items-center gap-2 px-5 py-3 rounded-2xl border border-slate-200 bg-white text-slate-600 font-black uppercase text-xs tracking-widest hover:bg-slate-50 transition-all"
+                        >
+                            <MdHistory size={18} /> Add Past Entry
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setFormMode('transfer')}
+                            className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-2xl font-black transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
+                        >
+                            <MdSwapHoriz size={18} /> Transfer Serial No
+                        </button>
+                    </div>
                 )}
             </div>
 
@@ -359,8 +372,15 @@ export const SerialNoDetails = ({ transfer = false }) => {
             ) : (
                 <>
                     <div className="rounded-3xl border border-slate-100 bg-white shadow-sm">
-                        {formOpen ? (
-                            <TransferForm data={data} onCancel={() => (transfer ? goBack() : setFormOpen(false))} onSaved={handleSaved} />
+                        {formMode ? (
+                            <TransferForm
+                                key={formMode}
+                                mode={formMode}
+                                data={data}
+                                currentSince={current?.transferDate || data.asset.saleDate}
+                                onCancel={() => (transfer ? goBack() : setFormMode(null))}
+                                onSaved={handleSaved}
+                            />
                         ) : (
                             <div className="grid grid-cols-1 gap-6 p-6 md:grid-cols-4">
                                 <div><span className={label}>Serial Number</span><p className="text-sm font-bold text-slate-800">{data.asset.serialNumber}</p></div>
@@ -424,14 +444,23 @@ const newRequestId = () => (globalThis.crypto?.randomUUID
     ? globalThis.crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
-const TransferForm = ({ data, onCancel, onSaved }) => {
+// mode "transfer": the new current customer. mode "past": an earlier customer, saved as inactive
+// history and dated on or before the current customer's date.
+const toDateInput = (value) => {
+    const date = new Date(value);
+    return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+};
+
+const TransferForm = ({ mode = 'transfer', data, currentSince, onCancel, onSaved }) => {
+    const past = mode === 'past';
+    const latestPastDate = currentSince ? toDateInput(currentSince) : todayInput();
     const [customerMode, setCustomerMode] = useState('existing');
     const [query, setQuery] = useState('');
     const debouncedQuery = useDebounced(query.trim());
     const [matches, setMatches] = useState({ key: null, rows: [] });
     const [customer, setCustomer] = useState(null);
     const [addingCustomer, setAddingCustomer] = useState(false);
-    const [transferDate, setTransferDate] = useState(todayInput());
+    const [transferDate, setTransferDate] = useState(past ? '' : todayInput());
     const [remarks, setRemarks] = useState('');
     const [saving, setSaving] = useState(false);
     const [saveError, setSaveError] = useState('');
@@ -461,10 +490,12 @@ const TransferForm = ({ data, onCancel, onSaved }) => {
         setSaving(true);
         setSaveError('');
         try {
-            const res = await serialTransferService.transfer(data.asset._id, {
-                customerId: customer._id, transferDate, remarks: remarks.trim(), requestId
-            });
-            toast.success(`${data.asset.serialNumber} assigned to ${customerTitle(customer)}`);
+            const res = past
+                ? await serialTransferService.addPastEntry(data.asset._id, { customerId: customer._id, entryDate: transferDate, remarks: remarks.trim(), requestId })
+                : await serialTransferService.transfer(data.asset._id, { customerId: customer._id, transferDate, remarks: remarks.trim(), requestId });
+            toast.success(past
+                ? `Past entry for ${customerTitle(customer)} added to ${data.asset.serialNumber}`
+                : `${data.asset.serialNumber} assigned to ${customerTitle(customer)}`);
             onSaved(res.data);
         } catch (err) {
             // Kept on the form so the reason stays visible.
@@ -500,11 +531,11 @@ const TransferForm = ({ data, onCancel, onSaved }) => {
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <div><span className={label}>Serial Number</span><p className={readOnly}>{data.asset.serialNumber}</p></div>
                 <div><span className={label}>Product</span><p className={readOnly}>{data.asset.productCode}{data.asset.productName ? ` · ${data.asset.productName}` : ''}</p></div>
-                <div><span className={label}>Previous Customer</span><p className={readOnly}>{data.asset.customerName || '-'}{data.asset.customerCode ? ` (${data.asset.customerCode})` : ''}</p></div>
+                <div><span className={label}>{past ? 'Current Customer (stays active)' : 'Previous Customer'}</span><p className={readOnly}>{data.asset.customerName || '-'}{data.asset.customerCode ? ` (${data.asset.customerCode})` : ''}</p></div>
             </div>
 
             <div>
-                <span className={label}>New Customer <span className="text-rose-500">*</span></span>
+                <span className={label}>{past ? 'Earlier Customer' : 'New Customer'} <span className="text-rose-500">*</span></span>
                 {customer ? (
                     <div className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/50 px-4 py-3">
                         <div className="flex items-center gap-3">
@@ -546,7 +577,8 @@ const TransferForm = ({ data, onCancel, onSaved }) => {
                                     <ul className="mt-2 max-h-64 overflow-auto rounded-2xl border border-slate-100 bg-white shadow-sm">
                                         {searching && <li className="px-4 py-3 text-sm text-slate-400">Searching…</li>}
                                         {!searching && matches.rows.map((c) => {
-                                            const isCurrent = currentId && String(c._id) === String(currentId);
+                                            // A transfer cannot go to the current customer; a past entry may name them.
+                                            const isCurrent = !past && currentId && String(c._id) === String(currentId);
                                             return (
                                                 <li key={c._id}>
                                                     <button
@@ -583,8 +615,8 @@ const TransferForm = ({ data, onCancel, onSaved }) => {
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <div>
-                    <label className={label} htmlFor="transferDate">Transfer Date <span className="text-rose-500">*</span></label>
-                    <input id="transferDate" type="date" required max={todayInput()} value={transferDate} onChange={(e) => setTransferDate(e.target.value)} className={inputClass} />
+                    <label className={label} htmlFor="transferDate">{past ? 'Date With This Customer' : 'Transfer Date'} <span className="text-rose-500">*</span></label>
+                    <input id="transferDate" type="date" required max={past ? latestPastDate : todayInput()} value={transferDate} onChange={(e) => setTransferDate(e.target.value)} className={inputClass} />
                 </div>
                 <div className="md:col-span-2">
                     <label className={label} htmlFor="remarks">Remarks</label>
@@ -593,7 +625,9 @@ const TransferForm = ({ data, onCancel, onSaved }) => {
             </div>
 
             <p className="text-xs font-medium text-slate-500">
-                Saving keeps every earlier customer in the history as Inactive and makes the new customer the only Active one.
+                {past
+                    ? `A past entry records an earlier customer as Inactive history, dated on or before ${formatDate(currentSince)} (when the current customer received it). The current customer stays Active.`
+                    : 'Saving keeps every earlier customer in the history as Inactive and makes the new customer the only Active one.'}
             </p>
 
             {saveError && (
@@ -605,7 +639,7 @@ const TransferForm = ({ data, onCancel, onSaved }) => {
                     Cancel
                 </button>
                 <button type="submit" disabled={saving || !customer} className="px-6 py-3 rounded-2xl bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-xs tracking-widest transition-all disabled:opacity-60">
-                    {saving ? 'Saving…' : 'Save Transfer'}
+                    {saving ? 'Saving…' : past ? 'Save Past Entry' : 'Save Transfer'}
                 </button>
             </div>
         </form>

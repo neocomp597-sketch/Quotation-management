@@ -24,7 +24,7 @@ const BOMComponentsTable = ({ items = [], compact = false, onOpen }) => {
             <table className="w-full text-left border-collapse">
                 <thead>
                     <tr className="bg-slate-50">
-                        {['#', 'Item Code', 'Item Name', 'UOM', 'Quantity', 'MGR1', 'MGR2', 'MGR3', 'MGR4', 'MGR5'].map((label) => (
+                        {['#', 'Item Code', 'Item Name', 'UOM', 'Drawing No', 'Rev', 'Quantity', 'MGR1', 'MGR2', 'MGR3', 'MGR4', 'MGR5'].map((label) => (
                             <th key={label} className={`${cell} text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap ${label === 'Quantity' ? 'text-right' : ''}`}>{label}</th>
                         ))}
                     </tr>
@@ -38,7 +38,7 @@ const BOMComponentsTable = ({ items = [], compact = false, onOpen }) => {
                             onClick={open || undefined}
                             className={`border-b last:border-0 border-slate-50 text-sm ${open ? 'cursor-pointer hover:bg-slate-50/70' : ''}`}
                         >
-                            <td className={`${cell} text-slate-400 font-bold`}>{item.lineNo || index + 1}</td>
+                            <td className={`${cell} text-slate-400 font-bold whitespace-nowrap`}>{item.seqNo || item.lineNo || index + 1}</td>
                             <td className={`${cell} font-bold whitespace-nowrap ${open ? 'text-primary-600 underline decoration-dotted underline-offset-4' : 'text-slate-800'}`}>
                                 {item.itemCode}
                                 {open && (
@@ -59,6 +59,8 @@ const BOMComponentsTable = ({ items = [], compact = false, onOpen }) => {
                                 )}
                             </td>
                             <td className={`${cell} text-slate-600 whitespace-nowrap`}>{item.uom || '-'}</td>
+                            <td className={`${cell} text-slate-600 whitespace-nowrap`}>{item.drawingNo || '-'}</td>
+                            <td className={`${cell} text-slate-600 whitespace-nowrap`}>{item.revisionNo || '-'}</td>
                             <td className={`${cell} font-bold text-slate-700 text-right whitespace-nowrap`}>{item.qty}</td>
                             {MGR_KEYS.map((key) => (
                                 <td key={key} className={`${cell} text-slate-600 whitespace-nowrap`}><MgrCell mgr={item[key]} /></td>
