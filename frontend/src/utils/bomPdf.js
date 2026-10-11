@@ -29,9 +29,9 @@ const realSerial = (bom) => (bom && !sameKey(bom.fgSerialNumber, bom.fgItemCode)
 
 // #, Item Code, Item Name, UOM, Quantity, MGR1-MGR5 — the screen's order.
 const COLUMNS = [
-    { key: 'lineNo', label: '#', width: 8 },
+    { key: 'lineNo', label: '#', width: 16 },
     { key: 'itemCode', label: 'Item Code', width: 28 },
-    { key: 'itemDescription', label: 'Item Name', width: 106 },
+    { key: 'itemDescription', label: 'Item Name', width: 98 },
     { key: 'uom', label: 'UOM', width: 17 },
     { key: 'qty', label: 'Quantity', width: 18, align: 'right' },
     { key: 'mgr1', label: 'MGR1', width: 20 },
@@ -42,7 +42,8 @@ const COLUMNS = [
 ];
 
 const cellValue = (item, key, index) => {
-    if (key === 'lineNo') return text(item.lineNo || index + 1);
+    // The BOM Costing Report's numbering (1, 1.1, 1.38.1) when known.
+    if (key === 'lineNo') return text(item.seqNo || item.lineNo || index + 1);
     if (key.startsWith('mgr')) return mgrLabel(item[key]);
     return text(item[key]);
 };
@@ -198,7 +199,7 @@ export const buildBOMPdf = async ({ bom, subBoms = [] }) => {
         // The sub-BOM's own FG serial is named, because a component without a serial is
         // matched on its item code and would otherwise be ambiguous.
         const label = [
-            `SUB-ASSEMBLY - ${text(entry.forItemCode)}`,
+            `SUB-ASSEMBLY ${entry.forSeqNo ? `${text(entry.forSeqNo)} ` : ''}- ${text(entry.forItemCode)}`,
             realSerial(entry.bom) ? `serial ${realSerial(entry.bom)}` : '',
             text(entry.bom?.fgItemDescription),
         ].filter(Boolean).join('   |   ');

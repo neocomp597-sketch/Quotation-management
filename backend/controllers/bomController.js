@@ -612,7 +612,11 @@ exports.importComponents = async (req, res) => {
  */
 const MAX_SUB_BOM_DEPTH = 8;
 
-const loadSubBOMs = async (bom, seen, depth = 1) => {
+// perPath (PDF): a sub-assembly used in several places is printed under each of them, like the
+// BOM Costing Report, and `seen` is only the path above it (so a loop still stops). Without it
+// (Excel export) every sub-BOM appears once, so the file can be uploaded again unchanged.
+// Sequence numbers continue from the line the sub-assembly sits on: line 1.38 -> 1.38.1, 1.38.2.
+const loadSubBOMs = async (bom, seen, depth = 1, { perPath = false, cache = new Map() } = {}) => {
     if (depth > MAX_SUB_BOM_DEPTH) return [];
 
     const items = bom.items || [];
@@ -640,17 +644,29 @@ const loadSubBOMs = async (bom, seen, depth = 1) => {
     for (const item of items) {
         const code = toKey(item.itemCode);
         const match = bySerial.get(toKey(item.componentSerialNumber)) || itemLevel.get(code) || byItemCode.get(code);
-        if (!match || seen.has(String(match._id))) continue;
-        seen.add(String(match._id));
+        if (!match) continue;
+        const matchId = String(match._id);
+        if (seen.has(matchId)) continue;
+        if (!perPath) seen.add(matchId);
 
-        const child = await loadBOM(match);
+        if (!cache.has(matchId)) cache.set(matchId, await loadBOM(match));
+        const loaded = cache.get(matchId);
+        const child = {
+            ...loaded,
+            items: (loaded.items || []).map((line, index) => ({
+                ...line,
+                seqNo: item.seqNo ? `${item.seqNo}.${line.lineNo || index + 1}` : line.seqNo
+            }))
+        };
         result.push({
             level: depth,
             forItemCode: item.itemCode,
+            forSeqNo: item.seqNo || '',
             forSerialNumber: item.componentSerialNumber || '',
             bom: child
         });
-        result.push(...await loadSubBOMs(child, seen, depth + 1));
+        const below = perPath ? new Set([...seen, matchId]) : seen;
+        result.push(...await loadSubBOMs(child, below, depth + 1, { perPath, cache }));
     }
     return result;
 };
@@ -664,7 +680,7 @@ exports.getBOMForPrint = async (req, res) => {
         const bom = await loadBOMById(req.params.id);
         if (!bom) return res.status(404).json({ message: 'BOM not found' });
 
-        const subBoms = await loadSubBOMs(bom, new Set([String(bom._id)]));
+        const subBoms = await loadSubBOMs(bom, new Set([String(bom._id)]), 1, { perPath: true });
         return res.json({ bom, subBoms });
     } catch (error) {
         return res.status(500).json({ message: 'Failed to prepare the BOM for printing', error: error.message });
