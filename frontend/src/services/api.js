@@ -442,6 +442,12 @@ export const bomService = {
   getProducts: (params = {}) => api.get("/bom", { params: { ...params, level: "product" } }),
   // Adds an assembly under a product's BOM and gives it a BOM of its own.
   createAssembly: (id, data) => api.post(`/bom/${id}/assemblies`, data),
+  // Component lines. The backend assigns the hierarchical number; parent is the BOM the page was
+  // opened from, so the returned numbers follow the same path as the screen.
+  addComponent: (id, data, parent) => api.post(`/bom/${id}/components`, data, { params: parent ? { parent } : {} }),
+  moveComponent: (id, lineId, targetBomId, parent) =>
+    api.post(`/bom/${id}/components/${lineId}/move`, { targetBomId }, { params: parent ? { parent } : {} }),
+  renumberComponents: (id, parent) => api.post(`/bom/${id}/renumber`, {}, { params: parent ? { parent } : {} }),
   // Import Components on BOM Details: mode 'replace' or 'append'.
   downloadComponentTemplate: () => api.get("/bom/components/template", { responseType: "blob" }),
   importComponents: (id, file, mode = "replace") => {

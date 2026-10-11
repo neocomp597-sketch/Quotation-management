@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { MdArrowBack, MdEdit, MdFileDownload, MdPictureAsPdf, MdToggleOff, MdToggleOn, MdHistory, MdUploadFile, MdAdd, MdChevronRight } from 'react-icons/md';
+import { MdArrowBack, MdEdit, MdFileDownload, MdPictureAsPdf, MdToggleOff, MdToggleOn, MdHistory, MdUploadFile, MdAdd, MdChevronRight, MdFormatListNumbered } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import { bomService } from '../services/api';
 import BOMComponentsTable from '../components/bom/BOMComponentsTable';
@@ -154,13 +154,91 @@ const BOMDetails = () => {
         setAssemblySaving(true);
         try {
             const res = await bomService.createAssembly(bom._id, assembly);
-            toast.success(`Assembly ${assembly.itemCode.trim()} added to ${bom.fgItemCode}`);
+            const added = res.data.bom?.items?.find((item) => String(item._id) === String(res.data.lineId));
+            toast.success(`Assembly ${assembly.itemCode.trim()} added to ${bom.fgItemCode}${added?.seqNo ? ` as ${added.seqNo}` : ''}`);
             closeAssembly();
-            navigate(`/bom-master/${res.data.assemblyId}`);
+            navigate(`/bom-master/${res.data.assemblyId}?parent=${bom._id}`);
         } catch (err) {
             toast.error(err.response?.data?.message || 'Could not create the assembly.');
         } finally {
             setAssemblySaving(false);
+        }
+    };
+
+    // Add Component: one line under this BOM. The backend gives it the next number (1.3.3 after
+    // 1.3.2) and the refreshed BOM comes back with it, so nothing is numbered on this screen.
+    const emptyComponent = { itemCode: '', itemName: '', uom: '', qty: '1' };
+    const [componentOpen, setComponentOpen] = useState(false);
+    const [componentSaving, setComponentSaving] = useState(false);
+    const [component, setComponent] = useState(emptyComponent);
+    const closeComponent = () => { setComponentOpen(false); setComponent(emptyComponent); };
+
+    const handleAddComponent = async (event) => {
+        event.preventDefault();
+        setComponentSaving(true);
+        try {
+            const res = await bomService.addComponent(bom._id, component, parentId);
+            setResult({ id, bom: res.data.bom, error: '' });
+            toast.success(`${component.itemCode.trim()} added as ${res.data.seqNo}`);
+            closeComponent();
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Could not add the component.');
+        } finally {
+            setComponentSaving(false);
+        }
+    };
+
+    // Move: a component (with its sub-assembly below it) goes under another parent BOM, where it
+    // takes the next number; everything under it follows. The backend does it in one transaction.
+    const [moving, setMoving] = useState(null);
+    const [moveSearch, setMoveSearch] = useState('');
+    const [moveOptions, setMoveOptions] = useState([]);
+    const [moveTarget, setMoveTarget] = useState(null);
+    const [moveSaving, setMoveSaving] = useState(false);
+    const closeMove = () => { setMoving(null); setMoveSearch(''); setMoveOptions([]); setMoveTarget(null); };
+
+    useEffect(() => {
+        if (!moving) return undefined;
+        let cancelled = false;
+        const timer = setTimeout(() => {
+            bomService.getAll({ search: moveSearch.trim(), limit: 10 })
+                .then((res) => {
+                    if (!cancelled) setMoveOptions((res.data?.data || []).filter((option) => String(option._id) !== String(bom?._id)));
+                })
+                .catch(() => { if (!cancelled) setMoveOptions([]); });
+        }, 250);
+        return () => { cancelled = true; clearTimeout(timer); };
+    }, [moving, moveSearch, bom?._id]);
+
+    const handleMove = async () => {
+        if (!moving || !moveTarget) return;
+        setMoveSaving(true);
+        try {
+            const res = await bomService.moveComponent(bom._id, moving._id, moveTarget._id, parentId);
+            setResult({ id, bom: res.data.bom, error: '' });
+            toast.success(`${moving.itemCode} moved to ${res.data.targetItemCode || moveTarget.fgItemCode} as ${res.data.seqNo}`);
+            closeMove();
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Could not move the component.');
+        } finally {
+            setMoveSaving(false);
+        }
+    };
+
+    // Renumber only when asked: this BOM's lines become 1, 2, 3... in their current order.
+    const [renumberOpen, setRenumberOpen] = useState(false);
+    const [renumbering, setRenumbering] = useState(false);
+    const handleRenumber = async () => {
+        setRenumbering(true);
+        try {
+            const res = await bomService.renumberComponents(bom._id, parentId);
+            setResult({ id, bom: res.data.bom, error: '' });
+            toast.success(res.data.renumbered ? `${res.data.renumbered} line(s) renumbered` : 'The lines were already numbered without gaps');
+            setRenumberOpen(false);
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Could not renumber the components.');
+        } finally {
+            setRenumbering(false);
         }
     };
 
@@ -337,17 +415,151 @@ const BOMDetails = () => {
                 </div>
             )}
 
+            {componentOpen && bom && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+                    <form onSubmit={handleAddComponent} className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl">
+                        <h2 className="text-lg font-black text-slate-900">Add component</h2>
+                        <p className="mt-2 text-sm font-medium text-slate-500">
+                            Added under {levelLabel.toLowerCase()} {bom.fgItemCode}. It is numbered automatically after the existing components.
+                        </p>
+                        {[
+                            ['itemCode', 'Item Code', 'e.g. 2609050295', true, 'text'],
+                            ['itemName', 'Item Name', 'Taken from Product Master when the code is there', false, 'text'],
+                            ['uom', 'UOM', 'From Product Master when left blank', false, 'text'],
+                            ['qty', 'Quantity', '1', true, 'number'],
+                        ].map(([name, label, placeholder, required, type]) => (
+                            <div key={name}>
+                                <label className="mt-4 block text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</label>
+                                <input
+                                    name={name}
+                                    value={component[name]}
+                                    required={required}
+                                    autoFocus={name === 'itemCode'}
+                                    type={type}
+                                    min={type === 'number' ? '0' : undefined}
+                                    step={type === 'number' ? 'any' : undefined}
+                                    onChange={(e) => setComponent((prev) => ({ ...prev, [name]: e.target.value }))}
+                                    placeholder={placeholder}
+                                    className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium outline-none focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10"
+                                />
+                            </div>
+                        ))}
+                        <div className="mt-6 flex justify-end gap-3">
+                            <button
+                                type="button"
+                                onClick={closeComponent}
+                                disabled={componentSaving}
+                                className="px-5 py-3 rounded-2xl border border-slate-200 text-slate-600 font-black uppercase text-xs tracking-widest hover:bg-slate-50 transition-all disabled:opacity-60"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={componentSaving || !component.itemCode.trim()}
+                                className="px-6 py-3 rounded-2xl bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-xs tracking-widest transition-all disabled:opacity-60"
+                            >
+                                {componentSaving ? 'Adding…' : 'Add'}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            )}
+
+            {moving && bom && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+                    <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl">
+                        <h2 className="text-lg font-black text-slate-900">Move {moving.seqNo} {moving.itemCode}</h2>
+                        <p className="mt-2 text-sm font-medium text-slate-500">
+                            Choose the parent to move it under. It takes the next number there, and any components below it move with it.
+                            The other lines of {bom.fgItemCode} keep their numbers.
+                        </p>
+                        <input
+                            autoFocus
+                            value={moveSearch}
+                            onChange={(e) => { setMoveSearch(e.target.value); setMoveTarget(null); }}
+                            placeholder="Search parent item code or name"
+                            className="mt-5 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium outline-none focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10"
+                        />
+                        <ul className="mt-3 max-h-60 divide-y divide-slate-50 overflow-auto rounded-2xl border border-slate-100">
+                            {moveOptions.length === 0 && (
+                                <li className="px-4 py-3 text-sm font-medium text-slate-400">No BOMs found.</li>
+                            )}
+                            {moveOptions.map((option) => (
+                                <li key={option._id}>
+                                    <button
+                                        type="button"
+                                        onClick={() => setMoveTarget(option)}
+                                        className={`w-full px-4 py-3 text-left text-sm transition-all ${moveTarget?._id === option._id ? 'bg-primary-50' : 'hover:bg-slate-50'}`}
+                                    >
+                                        <span className="font-bold text-slate-800">{option.fgItemCode}</span>
+                                        <span className="ml-2 text-slate-500">{option.fgItemDescription}</span>
+                                    </button>
+                                </li>
+                            ))}
+                        </ul>
+                        <div className="mt-6 flex justify-end gap-3">
+                            <button
+                                type="button"
+                                onClick={closeMove}
+                                disabled={moveSaving}
+                                className="px-5 py-3 rounded-2xl border border-slate-200 text-slate-600 font-black uppercase text-xs tracking-widest hover:bg-slate-50 transition-all disabled:opacity-60"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleMove}
+                                disabled={moveSaving || !moveTarget}
+                                className="px-6 py-3 rounded-2xl bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-xs tracking-widest transition-all disabled:opacity-60"
+                            >
+                                {moveSaving ? 'Moving…' : 'Move'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {renumberOpen && bom && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+                    <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl">
+                        <h2 className="text-lg font-black text-slate-900">Renumber the components?</h2>
+                        <p className="mt-2 text-sm font-medium text-slate-500">
+                            The lines of {bom.fgItemCode} are numbered 1, 2, 3… in their current order, closing gaps left by removed lines.
+                            Numbers already quoted elsewhere for these lines, and for the components below them, will change.
+                        </p>
+                        <div className="mt-6 flex justify-end gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setRenumberOpen(false)}
+                                disabled={renumbering}
+                                className="px-5 py-3 rounded-2xl border border-slate-200 text-slate-600 font-black uppercase text-xs tracking-widest hover:bg-slate-50 transition-all disabled:opacity-60"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleRenumber}
+                                disabled={renumbering}
+                                className="px-6 py-3 rounded-2xl bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-xs tracking-widest transition-all disabled:opacity-60"
+                            >
+                                {renumbering ? 'Renumbering…' : 'Renumber'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {assemblyOpen && bom && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
                     <form onSubmit={handleCreateAssembly} className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl">
-                        <h2 className="text-lg font-black text-slate-900">Create assembly</h2>
+                        <h2 className="text-lg font-black text-slate-900">{isProduct ? 'Create assembly' : 'Create sub-assembly'}</h2>
                         <p className="mt-2 text-sm font-medium text-slate-500">
-                            The assembly is added to product {bom.fgItemCode}. Its components can then be imported on the assembly page.
+                            It is added to {levelLabel.toLowerCase()} {bom.fgItemCode} with the next number. Its components can then be added or imported on its own page.
                         </p>
                         {[
                             ['itemCode', 'Assembly Code', 'e.g. 2A872010001', true],
                             ['itemName', 'Assembly Name', 'Taken from Product Master when the code is there', false],
-                            ['qty', 'Quantity in product', '1', true],
+                            ['qty', `Quantity in ${levelLabel.toLowerCase()}`, '1', true],
                         ].map(([name, label, placeholder, required]) => (
                             <div key={name}>
                                 <label className="mt-4 block text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</label>
@@ -417,13 +629,32 @@ const BOMDetails = () => {
                                 {isProduct ? 'Assemblies' : 'Components / F.G. Items'}
                             </h2>
                             <div className="ml-auto flex flex-wrap gap-2">
-                                {isProduct && (
+                                {!isProduct && (
                                     <button
                                         type="button"
-                                        onClick={() => setAssemblyOpen(true)}
+                                        onClick={() => setComponentOpen(true)}
                                         className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-[10px] tracking-widest transition-all"
                                     >
-                                        <MdAdd size={16} /> Create Assembly
+                                        <MdAdd size={16} /> Add Component
+                                    </button>
+                                )}
+                                <button
+                                    type="button"
+                                    onClick={() => setAssemblyOpen(true)}
+                                    className={isProduct
+                                        ? 'flex items-center gap-2 px-4 py-2 rounded-xl bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-[10px] tracking-widest transition-all'
+                                        : 'flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-black uppercase text-[10px] tracking-widest hover:bg-slate-50 transition-all'}
+                                >
+                                    <MdAdd size={16} /> {isProduct ? 'Create Assembly' : 'Create Sub-Assembly'}
+                                </button>
+                                {(bom.items?.length || 0) > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setRenumberOpen(true)}
+                                        className="flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-black uppercase text-[10px] tracking-widest hover:bg-slate-50 transition-all"
+                                        title="Number the lines 1, 2, 3… in their current order"
+                                    >
+                                        <MdFormatListNumbered size={16} /> Renumber
                                     </button>
                                 )}
                                 <button
@@ -456,7 +687,11 @@ const BOMDetails = () => {
                                 )}
                             </div>
                         )}
-                        <BOMComponentsTable items={bom.items || []} onOpen={(subBomId) => navigate(`/bom-master/${subBomId}?parent=${bom._id}`)} />
+                        <BOMComponentsTable
+                            items={bom.items || []}
+                            onOpen={(subBomId) => navigate(`/bom-master/${subBomId}?parent=${bom._id}`)}
+                            onMove={(item) => setMoving(item)}
+                        />
                     </div>
 
                     {bom.statusHistory?.length > 0 && (

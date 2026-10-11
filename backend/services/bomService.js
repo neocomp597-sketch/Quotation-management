@@ -79,7 +79,17 @@ const searchMaterials = async (term, limit = 20) => {
  *
  * Returns { errors, warnings, master, items }.
  */
-const prepareBOM = async (body, { lenient = false } = {}) => {
+const SEQ_PATTERN = /^\d+(\.\d+)*$/;
+// Last part of a hierarchical number: "1.38.2" -> 2. Used to keep an imported file's numbering.
+const lastSegment = (seq) => {
+    const text = cleanText(seq);
+    if (!SEQ_PATTERN.test(text)) return null;
+    const value = Number(text.split('.').pop());
+    return Number.isInteger(value) && value > 0 ? value : null;
+};
+const isObjectIdText = (value) => /^[a-f0-9]{24}$/i.test(String(value ?? ''));
+
+const prepareBOM = async (body, { lenient = false, allowRequestedNumbers = false } = {}) => {
     const errors = [];
     const warnings = [];
     const fgItemCode = cleanText(body.fgItemCode);
@@ -89,6 +99,12 @@ const prepareBOM = async (body, { lenient = false } = {}) => {
     const rows = (Array.isArray(body.items) ? body.items : [])
         .map((row) => ({
             rowLabel: row.rowNumber ? `Row ${row.rowNumber}` : '',
+            // The saved line this row edits; it keeps its number. Checked against the BOM on save.
+            lineId: isObjectIdText(row._id) ? String(row._id) : null,
+            // Only imported files may ask for a number (the "#" / Seq No column); screens never do.
+            requestedLineNo: allowRequestedNumbers
+                ? (Number.isInteger(Number(row.lineNo)) && Number(row.lineNo) > 0 ? Number(row.lineNo) : lastSegment(row.seqNo))
+                : null,
             itemCode: cleanText(row.itemCode),
             itemDescription: cleanText(row.itemDescription),
             uom: cleanText(row.uom),
@@ -126,8 +142,10 @@ const prepareBOM = async (body, { lenient = false } = {}) => {
             return;
         }
 
+        // No lineNo here: numbers are given out by bomLineService when the lines are saved.
         const item = {
-            lineNo: items.length + 1,
+            lineId: row.lineId,
+            requestedLineNo: row.requestedLineNo,
             itemCode: product ? product.productCode : row.itemCode,
             itemDescription: masterDescription(product) || row.itemDescription,
             enteredDescription: row.itemDescription,
@@ -185,5 +203,5 @@ const findBOMForProduct = async (fgItemCode, { excludeId = null } = {}) => {
 module.exports = {
     findBOMForProduct, PRODUCT_TAKEN_MESSAGE,
     prepareBOM, searchMaterials, findAssetBySerial, findProductsByCode, masterDescription,
-    MGR_FIELDS, toKey, cleanText, escapeRegex
+    MGR_FIELDS, toKey, cleanText, escapeRegex, lastSegment, SEQ_PATTERN
 };

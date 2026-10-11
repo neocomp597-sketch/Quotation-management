@@ -15,6 +15,10 @@ const {
 const {
     importBOMWorkbook, buildTemplateBuffer, importBOMComponents, buildComponentTemplateBuffer
 } = require('../services/bomImportService');
+const {
+    childSeq, inTransaction, writeLines, saveLines, createBOMWithLines, moveLine, renumberLines,
+    assertNoCircularCodes
+} = require('../services/bomLineService');
 
 const MGR_POPULATE = 'code description';
 
@@ -187,12 +191,12 @@ const addHierarchy = async (bom, { parentId = null } = {}) => {
         level: ancestors.length ? 'Assembly' : 'Product',
         ancestors,
         seqPrefix,
-        items: (bom.items || []).map((item, index) => {
+        items: (bom.items || []).map((item) => {
             const sub = subByKey.get(toKey(item.itemCode));
-            const lineNo = item.lineNo || index + 1;
             return {
                 ...item,
-                seqNo: ancestors.length && !seqPrefix ? String(lineNo) : [seqPrefix, lineNo].filter(Boolean).join('.'),
+                // Same rule as the PDF and Excel export (bomLineService.childSeq).
+                seqNo: childSeq(seqPrefix, item.lineNo),
                 subBomId: sub?._id || null,
                 subBomComponents: sub?.componentCount || 0
             };
@@ -295,22 +299,21 @@ exports.createBOM = async (req, res) => {
         if (await BOMMaster.exists({ fgSerialKey: master.fgSerialKey })) {
             return res.status(409).json({ message: serialTakenMessage(master.fgSerialNumber) });
         }
+        await assertNoCircularCodes(master.fgItemCode, items.map((item) => item.itemCode));
 
-        const created = await BOMMaster.create({
+        // The BOM and its lines are written together; lines are numbered 1, 2, 3...
+        const { master: created } = await createBOMWithLines({
             ...master,
             status: 'Active',
             statusHistory: [statusEntry('Active', 'BOM created', req)],
             createdBy: req.user?.id,
             updatedBy: req.user?.id
-        });
-        try {
-            await BOMItem.insertMany(items.map((item) => ({ ...item, bomMasterId: created._id })));
-        } catch (itemError) {
-            await BOMMaster.deleteOne({ _id: created._id });
-            throw itemError;
-        }
+        }, items);
         return res.status(201).json(await loadBOMById(created._id));
     } catch (error) {
+        if (error.status) {
+            return res.status(error.status).json({ message: error.message, errors: error.errors });
+        }
         if (error.code === 11000) {
             return res.status(409).json({ message: serialTakenMessage(cleanText(req.body.fgSerialNumber)) });
         }
@@ -340,13 +343,17 @@ exports.updateBOM = async (req, res) => {
         if (await BOMMaster.exists({ fgSerialKey: master.fgSerialKey, _id: { $ne: existing._id } })) {
             return res.status(409).json({ message: serialTakenMessage(master.fgSerialNumber) });
         }
+        await assertNoCircularCodes(master.fgItemCode, items.map((item) => item.itemCode));
 
-        // Insert the new lines before removing the old ones so a failure never leaves the BOM empty.
-        const inserted = await BOMItem.insertMany(items.map((item) => ({ ...item, bomMasterId: existing._id })));
-        await BOMItem.deleteMany({ bomMasterId: existing._id, _id: { $nin: inserted.map((item) => item._id) } });
-        await BOMMaster.updateOne({ _id: existing._id }, { $set: { ...master, updatedBy: req.user?.id } });
+        // Saved lines keep their numbers, new rows get the next ones, removed rows are deleted;
+        // nothing is renumbered. All in one transaction, so a failure changes nothing.
+        const { componentCount, ...masterFields } = master;
+        await saveLines(existing._id, items, { mode: 'sync', masterSet: { ...masterFields, updatedBy: req.user?.id } });
         return res.json(await loadBOMById(existing._id));
     } catch (error) {
+        if (error.status) {
+            return res.status(error.status).json({ message: error.message, errors: error.errors });
+        }
         if (error.code === 11000) {
             return res.status(409).json({ message: serialTakenMessage(cleanText(req.body.fgSerialNumber)) });
         }
@@ -516,53 +523,47 @@ exports.createAssembly = async (req, res) => {
             return res.status(409).json({ message: `${itemCode} is already a component of ${parent.fgItemCode}.` });
         }
 
-        // The parent keeps its lines and gets the assembly added at the end, validated like the form.
-        const { errors, master, items } = await prepareBOM({
+        // The assembly line is validated like a form row and added after the parent's lines,
+        // with the next number; the parent's other lines are not touched.
+        const { errors, items } = await prepareBOM({
             fgItemCode: parent.fgItemCode,
-            fgItemDescription: parent.fgItemDescription,
             fgSerialNumber: parent.fgSerialNumber,
-            items: [
-                ...parentItems.map((item) => ({
-                    itemCode: item.itemCode,
-                    itemDescription: item.enteredDescription || item.itemDescription,
-                    uom: item.uom,
-                    qty: item.qty,
-                    componentSerialNumber: item.componentSerialNumber,
-                    batchNumber: item.batchNumber,
-                    remarks: item.remarks,
-                    drawingNo: item.drawingNo,
-                    revisionNo: item.revisionNo
-                })),
-                { itemCode, itemDescription: itemName, uom: cleanText(req.body.uom) || 'NOS', qty }
-            ]
+            items: [{ itemCode, itemDescription: itemName, uom: cleanText(req.body.uom) || 'NOS', qty }]
         });
         if (errors.length) {
             return res.status(400).json({ message: errors.join(' '), errors });
         }
-        const added = items[items.length - 1];
+        const [added] = items;
+        await assertNoCircularCodes(parent.fgItemCode, [added.itemCode]);
 
-        let assembly = await findBOMForProduct(added.itemCode);
-        if (!assembly) {
-            assembly = await BOMMaster.create({
-                fgItemCode: added.itemCode,
-                fgItemDescription: added.itemDescription,
-                fgProductId: added.productId,
-                fgSerialNumber: added.itemCode,
-                fgSerialKey: toKey(added.itemCode),
-                componentCount: 0,
-                status: 'Active',
-                statusHistory: [statusEntry('Active', `Assembly created under ${parent.fgItemCode}`, req)],
-                createdBy: req.user?.id,
-                updatedBy: req.user?.id
-            });
-        }
+        const existingAssembly = await findBOMForProduct(added.itemCode);
+        // The assembly's own BOM and the parent's new line are created together.
+        const { assemblyId, line } = await inTransaction(async (session) => {
+            let assemblyId = existingAssembly?._id;
+            if (!assemblyId) {
+                const [created] = await BOMMaster.create([{
+                    fgItemCode: added.itemCode,
+                    fgItemDescription: added.itemDescription,
+                    fgProductId: added.productId,
+                    fgSerialNumber: added.itemCode,
+                    fgSerialKey: toKey(added.itemCode),
+                    componentCount: 0,
+                    status: 'Active',
+                    statusHistory: [statusEntry('Active', `Assembly created under ${parent.fgItemCode}`, req)],
+                    createdBy: req.user?.id,
+                    updatedBy: req.user?.id
+                }], { session });
+                assemblyId = created._id;
+            }
+            const { lines } = await writeLines(parent._id, [added], { session, mode: 'append', masterSet: { updatedBy: req.user?.id } });
+            return { assemblyId, line: lines[lines.length - 1] };
+        });
 
-        const inserted = await BOMItem.insertMany(items.map((item) => ({ ...item, bomMasterId: parent._id })));
-        await BOMItem.deleteMany({ bomMasterId: parent._id, _id: { $nin: inserted.map((item) => item._id) } });
-        await BOMMaster.updateOne({ _id: parent._id }, { $set: { componentCount: master.componentCount, updatedBy: req.user?.id } });
-
-        return res.status(201).json({ assemblyId: assembly._id, bom: await loadBOMById(parent._id) });
+        return res.status(201).json({ assemblyId, lineId: line?._id, lineNo: line?.lineNo, bom: await loadBOMById(parent._id) });
     } catch (error) {
+        if (error.status) {
+            return res.status(error.status).json({ message: error.message, errors: error.errors });
+        }
         if (error.code === 11000) {
             return res.status(409).json({ message: 'A BOM already exists for that assembly code.' });
         }
@@ -653,9 +654,9 @@ const loadSubBOMs = async (bom, seen, depth = 1, { perPath = false, cache = new 
         const loaded = cache.get(matchId);
         const child = {
             ...loaded,
-            items: (loaded.items || []).map((line, index) => ({
+            items: (loaded.items || []).map((line) => ({
                 ...line,
-                seqNo: item.seqNo ? `${item.seqNo}.${line.lineNo || index + 1}` : line.seqNo
+                seqNo: item.seqNo ? childSeq(item.seqNo, line.lineNo) : line.seqNo
             }))
         };
         result.push({
@@ -687,6 +688,105 @@ exports.getBOMForPrint = async (req, res) => {
     }
 };
 
+const sendError = (res, error, fallback) => {
+    if (error.status) return res.status(error.status).json({ message: error.message, errors: error.errors });
+    if (error.code === 11000) {
+        return res.status(409).json({ message: 'Another change to this BOM was saved at the same time. Reload the BOM and try again.' });
+    }
+    return res.status(500).json({ message: fallback, error: error.message });
+};
+
+/**
+ * Add Component on BOM Details: one line added under this BOM. The backend gives it the next
+ * number under the parent (1.3 with 1.3.1 and 1.3.2 -> 1.3.3); the number comes back with the BOM.
+ */
+exports.addComponent = async (req, res) => {
+    try {
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+            return res.status(400).json({ message: 'Invalid BOM ID' });
+        }
+        const parent = await BOMMaster.findById(req.params.id).select('_id fgItemCode fgSerialNumber').lean();
+        if (!parent) return res.status(404).json({ message: 'BOM not found' });
+
+        const row = req.body || {};
+        const { errors, items } = await prepareBOM({
+            fgItemCode: parent.fgItemCode,
+            fgSerialNumber: parent.fgSerialNumber,
+            items: [{
+                itemCode: row.itemCode,
+                itemDescription: row.itemName ?? row.itemDescription,
+                uom: row.uom,
+                qty: row.qty === undefined || row.qty === '' ? 1 : row.qty,
+                componentSerialNumber: row.componentSerialNumber,
+                batchNumber: row.batchNumber,
+                remarks: row.remarks,
+                drawingNo: row.drawingNo,
+                revisionNo: row.revisionNo
+            }]
+        });
+        if (errors.length) return res.status(400).json({ message: errors.join(' '), errors });
+        await assertNoCircularCodes(parent.fgItemCode, items.map((item) => item.itemCode));
+
+        const { lines } = await saveLines(parent._id, items, { mode: 'append', masterSet: { updatedBy: req.user?.id } });
+        const line = lines[lines.length - 1];
+        const bom = await loadBOMById(parent._id, {
+            parentId: mongoose.Types.ObjectId.isValid(req.query.parent) ? req.query.parent : null
+        });
+        const shown = bom.items.find((item) => String(item._id) === String(line._id));
+        return res.status(201).json({ lineId: line._id, lineNo: line.lineNo, seqNo: shown?.seqNo || String(line.lineNo), bom });
+    } catch (error) {
+        return sendError(res, error, 'Failed to add the component');
+    }
+};
+
+/**
+ * Moves a component (and its sub-assembly below it) under another parent BOM. It takes the next
+ * number there; its descendants' numbers follow from the new path. Done in one transaction.
+ */
+exports.moveComponent = async (req, res) => {
+    try {
+        const { id, lineId } = req.params;
+        const targetId = req.body?.targetBomId;
+        if (![id, lineId, targetId].every((value) => mongoose.Types.ObjectId.isValid(value))) {
+            return res.status(400).json({ message: 'Choose the BOM to move the component to.' });
+        }
+        const moved = await moveLine(id, lineId, targetId);
+        const bom = await loadBOMById(id, {
+            parentId: mongoose.Types.ObjectId.isValid(req.query.parent) ? req.query.parent : null
+        });
+        const target = await loadBOMById(targetId);
+        const shown = target?.items.find((item) => String(item._id) === String(moved.lineId));
+        return res.json({
+            ...moved,
+            seqNo: shown?.seqNo || String(moved.lineNo),
+            targetItemCode: target?.fgItemCode || '',
+            bom
+        });
+    } catch (error) {
+        return sendError(res, error, 'Failed to move the component');
+    }
+};
+
+/**
+ * Renumber, only when the user asks for it: this BOM's lines become 1, 2, 3... in their current
+ * order, closing gaps left by deleted lines.
+ */
+exports.renumberComponents = async (req, res) => {
+    try {
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+            return res.status(400).json({ message: 'Invalid BOM ID' });
+        }
+        const summary = await renumberLines(req.params.id);
+        await BOMMaster.updateOne({ _id: req.params.id }, { $set: { updatedBy: req.user?.id } });
+        const bom = await loadBOMById(req.params.id, {
+            parentId: mongoose.Types.ObjectId.isValid(req.query.parent) ? req.query.parent : null
+        });
+        return res.json({ ...summary, bom });
+    } catch (error) {
+        return sendError(res, error, 'Failed to renumber the components');
+    }
+};
+
 /**
  * Exports a BOM to Excel in the BOM relationship layout (Parent Item Code, Item Code, Item
  * Name, UOM, Quantity): its own lines followed by the lines of every sub-assembly below it,
@@ -701,7 +801,10 @@ exports.exportBOM = async (req, res) => {
         if (!bom) return res.status(404).json({ message: 'BOM not found' });
 
         const subBoms = await loadSubBOMs(bom, new Set([String(bom._id)]));
+        // "#" is the same hierarchical number as the screen and the PDF (1, 1.3, 1.3.2). Lines are
+        // grouped under their parent assembly. On re-upload the number's last part is kept as the line's number.
         const linesOf = (entry) => (entry.items || []).map((item) => [
+            item.seqNo || String(item.lineNo || ''),
             entry.fgItemCode || '',
             item.itemCode || '',
             item.itemDescription || '',
@@ -710,9 +813,9 @@ exports.exportBOM = async (req, res) => {
         ]);
         const rows = [bom, ...subBoms.map((sub) => sub.bom).filter(Boolean)].flatMap(linesOf);
 
-        const headers = ['Parent Item Code', 'Item Code', 'Item Name', 'UOM', 'Quantity'];
+        const headers = ['#', 'Parent Item Code', 'Item Code', 'Item Name', 'UOM', 'Quantity'];
         const sheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-        sheet['!cols'] = [{ wch: 18 }, { wch: 16 }, { wch: 70 }, { wch: 10 }, { wch: 10 }];
+        sheet['!cols'] = [{ wch: 12 }, { wch: 18 }, { wch: 16 }, { wch: 70 }, { wch: 10 }, { wch: 10 }];
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, sheet, 'BOM Relationships');
 

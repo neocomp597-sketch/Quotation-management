@@ -11,6 +11,11 @@ const BOMMasterSchema = new mongoose.Schema({
     fgSerialKey: { type: String, required: true },
     assetId: { type: mongoose.Schema.Types.ObjectId, ref: 'Asset', default: null },
     componentCount: { type: Number, default: 0 },
+    // Highest line number ever given out in this BOM. New lines continue after it, so a number
+    // freed by a deleted line is not silently handed to a different component.
+    lastLineNo: { type: Number, default: 0 },
+    // Written by every change to the component lines; also serialises concurrent changes.
+    linesUpdatedAt: { type: Date, default: null },
     // Name of the workbook a bulk-uploaded BOM came from (blank for manual entry)
     sourceFileName: { type: String, default: '' },
     status: { type: String, enum: ['Active', 'Inactive'], default: 'Active' },

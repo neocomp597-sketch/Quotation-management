@@ -1,7 +1,7 @@
 const XLSX = require('xlsx');
 const BOMMaster = require('../models/BOMMaster');
-const BOMItem = require('../models/BOMItem');
 const { prepareBOM, toKey, findBOMForProduct, PRODUCT_TAKEN_MESSAGE } = require('./bomService');
+const { inTransaction, writeLines, saveLines, createBOMWithLines, findCircularCodes, circularMessage } = require('./bomLineService');
 
 /**
  * Bulk BOM import from an Excel/CSV workbook.
@@ -66,7 +66,12 @@ const HEADER_ALIASES = {
     revisionnumber: 'revisionNo',
     revno: 'revisionNo',
     note: 'remarks',
-    notes: 'remarks'
+    notes: 'remarks',
+    // Hierarchical number ("#" in Export to Excel). Its last part is kept as the line's number.
+    seqno: 'seqNo',
+    sequenceno: 'seqNo',
+    sequence: 'seqNo',
+    lineno: 'seqNo'
 };
 
 const GENERIC_SERIAL_HEADERS = ['serialnumber', 'serialno', 'srno', 'slno'];
@@ -83,6 +88,10 @@ const mapHeaders = (headerRow = [], required = REQUIRED_COLUMNS) => {
     const genericSerialColumns = [];
 
     headerRow.forEach((header, index) => {
+        if (cleanCell(header) === '#') {
+            if (columns.seqNo === undefined) columns.seqNo = index;
+            return;
+        }
         const normalized = normalizeHeader(header);
         if (!normalized) return;
         if (GENERIC_SERIAL_HEADERS.includes(normalized)) {
@@ -194,6 +203,7 @@ const groupRows = (rows, hasSerialColumn) => {
         if (!group.fgItemCode && row.fgItemCode) group.fgItemCode = row.fgItemCode;
         group.items.push({
             rowNumber: row.rowNumber,
+            seqNo: row.seqNo,
             itemCode: row.itemCode,
             itemDescription: row.itemDescription,
             uom: row.uom,
@@ -307,6 +317,8 @@ const readCostingReport = (matrix) => {
 
     const line = (node) => ({
         rowNumber: node.rowNumber,
+        // 2.6.2 is line 2 of the BOM of 2.6: the report's numbering is kept, gaps included.
+        seqNo: node.seq,
         itemCode: node.itemCode,
         itemDescription: node.itemDescription,
         uom: node.uom,
@@ -410,7 +422,8 @@ const importBOMWorkbook = async (buffer, { fileName = '', userId = null, userNam
         }
         if (productKey) productsInFile.set(productKey, group.firstRow);
         try {
-            const { errors, warnings, master, items } = await prepareBOM(group, { lenient: true });
+            const prepared = await prepareBOM(group, { lenient: true, allowRequestedNumbers: true });
+            const { errors, warnings, master } = prepared;
             warnings.forEach((message) => {
                 summary.skippedLines++;
                 summary.warnings.push({ row: group.firstRow, serial: group.fgItemCode, message });
@@ -420,37 +433,50 @@ const importBOMWorkbook = async (buffer, { fileName = '', userId = null, userNam
                 summary.errors.push({ serial: group.fgItemCode, row: group.firstRow, message: `${label}: ${errors.join(' ')}` });
                 continue;
             }
+            // A line that would make the BOM its own ancestor is skipped, like any unusable line.
+            const circular = new Set(await findCircularCodes(master.fgItemCode, prepared.items.map((item) => item.itemCode)));
+            const items = prepared.items.filter((item) => !circular.has(toKey(item.itemCode)));
+            if (circular.size) {
+                summary.skippedLines += prepared.items.length - items.length;
+                summary.warnings.push({ row: group.firstRow, serial: group.fgItemCode, message: `${circularMessage(master.fgItemCode, [...circular])} Line(s) skipped.` });
+            }
+            if (!items.length) {
+                summary.failed++;
+                summary.errors.push({ serial: group.fgItemCode, row: group.firstRow, message: `${label}: no usable component lines.` });
+                continue;
+            }
 
             // The product's existing BOM is updated, whatever serial it was saved under.
             const existing = await findBOMForProduct(master.fgItemCode) || await BOMMaster.findOne({ fgSerialKey: master.fgSerialKey }).lean();
             if (existing) {
-                // New lines go in before the old ones are removed, so a failure never empties the BOM.
-                const inserted = await BOMItem.insertMany(items.map((item) => ({ ...item, bomMasterId: existing._id })));
-                await BOMItem.deleteMany({ bomMasterId: existing._id, _id: { $nin: inserted.map((item) => item._id) } });
-                // The BOM keeps the serial it was saved under; only its product details and lines change.
-                const { fgSerialNumber, fgSerialKey, assetId, ...productFields } = master;
-                const update = { $set: { ...productFields, sourceFileName: fileName, status: 'Active', updatedBy: userId } };
-                // Re-uploading brings a switched-off BOM back; that is a status change and is logged.
-                if (existing.status !== 'Active') {
-                    update.$push = { statusHistory: statusLog(`Reactivated by upload${fileName ? ` of ${fileName}` : ''}`, userId, userName) };
-                }
-                await BOMMaster.updateOne({ _id: existing._id }, update);
+                // The file becomes the component list, numbered by the file's "#" column when it has
+                // one. Lines, product details and the status log change together or not at all.
+                const { fgSerialNumber, fgSerialKey, assetId, componentCount, ...productFields } = master;
+                await inTransaction(async (session) => {
+                    await writeLines(existing._id, items, {
+                        session,
+                        mode: 'replace',
+                        masterSet: { ...productFields, sourceFileName: fileName, status: 'Active', updatedBy: userId }
+                    });
+                    // Re-uploading brings a switched-off BOM back; that is a status change and is logged.
+                    if (existing.status !== 'Active') {
+                        await BOMMaster.updateOne(
+                            { _id: existing._id },
+                            { $push: { statusHistory: statusLog(`Reactivated by upload${fileName ? ` of ${fileName}` : ''}`, userId, userName) } },
+                            { session }
+                        );
+                    }
+                });
                 summary.updated++;
             } else {
-                const created = await BOMMaster.create({
+                await createBOMWithLines({
                     ...master,
                     sourceFileName: fileName,
                     status: 'Active',
                     statusHistory: [statusLog(`Created by upload${fileName ? ` of ${fileName}` : ''}`, userId, userName)],
                     createdBy: userId,
                     updatedBy: userId
-                });
-                try {
-                    await BOMItem.insertMany(items.map((item) => ({ ...item, bomMasterId: created._id })));
-                } catch (itemError) {
-                    await BOMMaster.deleteOne({ _id: created._id });
-                    throw itemError;
-                }
+                }, items);
                 summary.created++;
             }
             summary.components += items.length;
@@ -523,44 +549,37 @@ const importBOMComponents = async (buffer, bomId, { mode = 'replace', fileName =
         throw Object.assign(new Error(`No component lines for parent item ${master.fgItemCode} found in the file.`), { status: 400 });
     }
 
-    const existing = mode === 'append'
-        ? (await BOMItem.find({ bomMasterId: master._id }).sort({ lineNo: 1 }).lean()).map((item) => ({
-            itemCode: item.itemCode,
-            itemDescription: item.enteredDescription || item.itemDescription,
-            uom: item.uom,
-            qty: item.qty,
-            componentSerialNumber: item.componentSerialNumber,
-            batchNumber: item.batchNumber,
-            remarks: item.remarks,
-            drawingNo: item.drawingNo,
-            revisionNo: item.revisionNo
-        }))
-        : [];
-
     const prepared = await prepareBOM({
         fgItemCode: master.fgItemCode,
         fgItemDescription: master.fgItemDescription,
         fgSerialNumber: master.fgSerialNumber,
-        items: [...existing, ...fileRows]
-    }, { lenient: true });
+        items: fileRows
+    }, { lenient: true, allowRequestedNumbers: true });
     prepared.warnings.forEach((message) => warnings.push({ row: '', serial: master.fgItemCode, message }));
     if (prepared.errors.length) {
         throw Object.assign(new Error(prepared.errors.join(' ')), { status: 400, warnings });
     }
+    const circular = new Set(await findCircularCodes(master.fgItemCode, prepared.items.map((item) => item.itemCode)));
+    const items = prepared.items.filter((item) => !circular.has(toKey(item.itemCode)));
+    if (circular.size) {
+        warnings.push({ row: '', serial: master.fgItemCode, message: `${circularMessage(master.fgItemCode, [...circular])} Line(s) skipped.` });
+    }
+    if (!items.length) {
+        throw Object.assign(new Error(`No usable component lines for parent item ${master.fgItemCode} in the file.`), { status: 400, warnings });
+    }
 
-    // New lines go in before the old ones are removed, so a failure never empties the BOM.
-    const inserted = await BOMItem.insertMany(prepared.items.map((item) => ({ ...item, bomMasterId: master._id })));
-    await BOMItem.deleteMany({ bomMasterId: master._id, _id: { $nin: inserted.map((item) => item._id) } });
-    await BOMMaster.updateOne(
-        { _id: master._id },
-        { $set: { componentCount: prepared.items.length, sourceFileName: fileName || master.sourceFileName, updatedBy: userId } }
-    );
+    // append: existing lines keep their numbers and the file's lines follow them.
+    // replace: the file becomes the list, numbered by its "#" column or 1, 2, 3...
+    const result = await saveLines(master._id, items, {
+        mode: mode === 'append' ? 'append' : 'replace',
+        masterSet: { sourceFileName: fileName || master.sourceFileName, updatedBy: userId }
+    });
 
     return {
         fileName,
         mode: mode === 'append' ? 'append' : 'replace',
-        imported: prepared.items.length - existing.length,
-        components: prepared.items.length,
+        imported: result.added,
+        components: result.lines.length,
         skippedLines: warnings.length,
         warnings
     };

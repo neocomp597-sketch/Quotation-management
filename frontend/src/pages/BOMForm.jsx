@@ -23,8 +23,11 @@ const emptyRow = () => ({
     mgrs: {}
 });
 
+// A saved line keeps its id, so it keeps its number when the BOM is saved again.
 const rowFromSaved = (item) => ({
     ...emptyRow(),
+    _id: item._id,
+    seqNo: item.seqNo || (item.lineNo ? String(item.lineNo) : ''),
     itemCode: item.itemCode,
     itemDescription: item.itemDescription,
     uom: item.uom || '',
@@ -100,7 +103,9 @@ const BOMForm = () => {
         const payload = {
             fgItemCode: fg.fgItemCode,
             fgSerialNumber: fg.fgSerialNumber,
-            items: rows.map(({ itemCode, itemDescription, uom, qty, drawingNo, revisionNo }) => ({ itemCode, itemDescription, uom, qty, drawingNo, revisionNo }))
+            // No numbers are sent: saved lines are identified by _id and keep theirs, and the
+            // backend gives new lines the next numbers. Removed lines do not renumber the rest.
+            items: rows.map(({ _id, itemCode, itemDescription, uom, qty, drawingNo, revisionNo }) => ({ _id, itemCode, itemDescription, uom, qty, drawingNo, revisionNo }))
         };
         try {
             const res = isEdit ? await bomService.update(id, payload) : await bomService.create(payload);
@@ -231,7 +236,9 @@ const BOMForm = () => {
                         <tbody>
                             {rows.map((row, index) => (
                                 <tr key={row.key} className="border-b last:border-0 border-slate-50 align-top">
-                                    <td className="px-3 py-2 pt-4 text-sm font-bold text-slate-400">{index + 1}</td>
+                                    <td className="px-3 py-2 pt-4 text-sm font-bold text-slate-400 whitespace-nowrap" title={row.seqNo ? '' : 'Numbered when the BOM is saved'}>
+                                        {row.seqNo || <span className="rounded-md bg-primary-50 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-primary-600">New</span>}
+                                    </td>
                                     <td className="px-2 py-2 min-w-[10rem]">
                                         <MaterialSearchInput
                                             value={row.itemCode}

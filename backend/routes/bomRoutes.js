@@ -33,6 +33,10 @@ router.post('/', canManageBOM, bomController.createBOM);
 router.get('/components/template', canManageBOM, bomController.downloadComponentTemplate);
 router.post('/:id/assemblies', canManageBOM, bomController.createAssembly);
 router.post('/:id/components/import', canManageBOM, upload.single('file'), bomController.importComponents);
+// Component lines: the backend assigns every hierarchical number (1.3 -> 1.3.1, 1.3.2...).
+router.post('/:id/components', canManageBOM, bomController.addComponent);
+router.post('/:id/components/:lineId/move', canManageBOM, bomController.moveComponent);
+router.post('/:id/renumber', canManageBOM, bomController.renumberComponents);
 router.get('/:id/export', canManageBOM, bomController.exportBOM);
 router.get('/:id/print', canManageBOM, bomController.getBOMForPrint);
 router.patch('/:id/status', canManageBOM, bomController.setBOMStatus);

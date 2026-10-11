@@ -1,4 +1,5 @@
 import React from 'react';
+import { MdDriveFileMove } from 'react-icons/md';
 
 const MGR_KEYS = ['mgr1', 'mgr2', 'mgr3', 'mgr4', 'mgr5'];
 
@@ -11,8 +12,11 @@ const MgrCell = ({ mgr }) => (
 // Display-only list of BOM components, in the BOM relationship sheet's columns
 // (Item Code, Item Name, UOM, Quantity) followed by MGR1-MGR5 from Product Master.
 // Deliberately has no edit/delete controls. With onOpen, a component that has a BOM of its own
-// (an assembly) opens it when clicked.
-const BOMComponentsTable = ({ items = [], compact = false, onOpen }) => {
+// (an assembly) opens it when clicked. With onMove (BOM Details only), each line offers Move.
+//
+// "#" is the hierarchical number assigned by the backend (1, 1.3, 1.3.2); the screen never
+// works one out itself, so it always matches the PDF and the Excel export.
+const BOMComponentsTable = ({ items = [], compact = false, onOpen, onMove }) => {
     const cell = compact ? 'px-3 py-2' : 'p-4';
 
     if (!items.length) {
@@ -24,8 +28,8 @@ const BOMComponentsTable = ({ items = [], compact = false, onOpen }) => {
             <table className="w-full text-left border-collapse">
                 <thead>
                     <tr className="bg-slate-50">
-                        {['#', 'Item Code', 'Item Name', 'UOM', 'Drawing No', 'Rev', 'Quantity', 'MGR1', 'MGR2', 'MGR3', 'MGR4', 'MGR5'].map((label) => (
-                            <th key={label} className={`${cell} text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap ${label === 'Quantity' ? 'text-right' : ''}`}>{label}</th>
+                        {['#', 'Item Code', 'Item Name', 'UOM', 'Drawing No', 'Rev', 'Quantity', 'MGR1', 'MGR2', 'MGR3', 'MGR4', 'MGR5', ...(onMove ? [''] : [])].map((label) => (
+                            <th key={label || 'actions'} className={`${cell} text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap ${label === 'Quantity' ? 'text-right' : ''}`}>{label}</th>
                         ))}
                     </tr>
                 </thead>
@@ -38,7 +42,7 @@ const BOMComponentsTable = ({ items = [], compact = false, onOpen }) => {
                             onClick={open || undefined}
                             className={`border-b last:border-0 border-slate-50 text-sm ${open ? 'cursor-pointer hover:bg-slate-50/70' : ''}`}
                         >
-                            <td className={`${cell} text-slate-400 font-bold whitespace-nowrap`}>{item.seqNo || item.lineNo || index + 1}</td>
+                            <td className={`${cell} text-slate-400 font-bold whitespace-nowrap`}>{item.seqNo || item.lineNo || '-'}</td>
                             <td className={`${cell} font-bold whitespace-nowrap ${open ? 'text-primary-600 underline decoration-dotted underline-offset-4' : 'text-slate-800'}`}>
                                 {item.itemCode}
                                 {open && (
@@ -65,6 +69,18 @@ const BOMComponentsTable = ({ items = [], compact = false, onOpen }) => {
                             {MGR_KEYS.map((key) => (
                                 <td key={key} className={`${cell} text-slate-600 whitespace-nowrap`}><MgrCell mgr={item[key]} /></td>
                             ))}
+                            {onMove && (
+                                <td className={`${cell} text-right`}>
+                                    <button
+                                        type="button"
+                                        onClick={(event) => { event.stopPropagation(); onMove(item); }}
+                                        className="rounded-lg p-1.5 text-slate-400 transition-all hover:bg-slate-100 hover:text-primary-600"
+                                        title="Move to another parent"
+                                    >
+                                        <MdDriveFileMove size={18} />
+                                    </button>
+                                </td>
+                            )}
                         </tr>
                         );
                     })}

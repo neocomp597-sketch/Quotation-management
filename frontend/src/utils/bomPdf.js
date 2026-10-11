@@ -41,9 +41,9 @@ const COLUMNS = [
     { key: 'mgr5', label: 'MGR5', width: 20 },
 ];
 
-const cellValue = (item, key, index) => {
-    // The BOM Costing Report's numbering (1, 1.1, 1.38.1) when known.
-    if (key === 'lineNo') return text(item.seqNo || item.lineNo || index + 1);
+const cellValue = (item, key) => {
+    // The hierarchical number assigned by the backend (1, 1.1, 1.38.1), the same as the screen and Excel.
+    if (key === 'lineNo') return text(item.seqNo || item.lineNo || '');
     if (key.startsWith('mgr')) return mgrLabel(item[key]);
     return text(item[key]);
 };
@@ -134,9 +134,9 @@ class Sheet {
             return;
         }
 
-        items.forEach((item, index) => {
+        items.forEach((item) => {
             doc.setFont('helvetica', 'normal').setFontSize(fontSize);
-            const cells = columns.map((column) => doc.splitTextToSize(cellValue(item, column.key, index) || '-', column.width - 3));
+            const cells = columns.map((column) => doc.splitTextToSize(cellValue(item, column.key) || '-', column.width - 3));
             const lines = Math.max(1, ...cells.map((cell) => cell.length));
             const rowHeight = lines * lineHeight + padding * 2;
 
