@@ -351,17 +351,24 @@ const blobErrorMessage = async (err, fallback) => {
     return err.response ? (data?.message || fallback) : 'The server could not be reached. Check that the backend is running and try again.';
 };
 
+const SERIAL_OWNERSHIP_HINTS = { Active: 'Current customer of this serial number', Inactive: 'Earlier customers of this serial number' };
+
 // Customer Activity Log: Active (current owners) or Inactive (earlier owners) of sold serials,
 // with search and a Customer Since date range; Download Excel exports every matching row.
-const ActivityTab = ({ onOpen }) => {
-    const [ownership, setOwnership] = useStoredState('activity.ownership', 'Active');
-    const [search, setSearch] = useStoredState('activity.search', '');
-    const [page, setPage] = useStoredState('activity.page', 1);
-    const range = useDateRange('activity');
+// With `assetId` it is the log of that one serial number (its details page): the server filters
+// by the serial, and search and dates are not shown.
+const ActivityTab = ({ onOpen, assetId }) => {
+    const prefix = assetId ? `activity.${assetId}` : 'activity';
+    const [ownership, setOwnership] = useStoredState(`${prefix}.ownership`, 'Active');
+    const [search, setSearch] = useStoredState(`${prefix}.search`, '');
+    const [page, setPage] = useStoredState(`${prefix}.page`, 1);
+    const range = useDateRange(prefix);
     const debouncedSearch = useDebounced(search.trim());
     const [downloading, setDownloading] = useState(false);
 
-    const filters = { ownership, search: debouncedSearch || undefined, ...range.params };
+    const filters = assetId
+        ? { ownership, assetId }
+        : { ownership, search: debouncedSearch || undefined, ...range.params };
     const { rows, pagination, loading } = useList(serialTransferService.listActivity, { ...filters, page, limit: PAGE_SIZE }, !range.invalid);
     const offset = (pagination.page - 1) * pagination.limit;
     const inactive = ownership === 'Inactive';
@@ -393,7 +400,7 @@ const ActivityTab = ({ onOpen }) => {
                         >
                             <input
                                 type="radio"
-                                name="activityOwnership"
+                                name={`activityOwnership-${assetId || 'all'}`}
                                 value={option.value}
                                 checked={ownership === option.value}
                                 onChange={() => { setOwnership(option.value); setPage(1); }}
@@ -401,7 +408,7 @@ const ActivityTab = ({ onOpen }) => {
                             />
                             <span>
                                 <span className="block text-xs font-black uppercase tracking-widest text-slate-700">{option.label}</span>
-                                <span className="block text-xs text-slate-500">{option.hint}</span>
+                                <span className="block text-xs text-slate-500">{assetId ? SERIAL_OWNERSHIP_HINTS[option.value] : option.hint}</span>
                             </span>
                         </label>
                     ))}
@@ -414,19 +421,21 @@ const ActivityTab = ({ onOpen }) => {
                         <MdFileDownload size={18} /> {downloading ? 'Preparing…' : 'Download Excel'}
                     </button>
                 </div>
-                <div className="flex flex-wrap items-end gap-3">
-                    <div className="relative w-full max-w-md">
-                        <MdSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-                        <input
-                            type="text"
-                            value={search}
-                            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-                            placeholder="Search serial no, product or customer"
-                            className={`${inputClass} pl-11`}
-                        />
+                {!assetId && (
+                    <div className="flex flex-wrap items-end gap-3">
+                        <div className="relative w-full max-w-md">
+                            <MdSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+                            <input
+                                type="text"
+                                value={search}
+                                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                                placeholder="Search serial no, product or customer"
+                                className={`${inputClass} pl-11`}
+                            />
+                        </div>
+                        <DateRangeFilter range={range} field="Customer Since" onChange={() => setPage(1)} />
                     </div>
-                    <DateRangeFilter range={range} field="Customer Since" onChange={() => setPage(1)} />
-                </div>
+                )}
             </div>
             <div className="p-6">
                 {loading ? <Spinner /> : (
@@ -445,7 +454,7 @@ const ActivityTab = ({ onOpen }) => {
                                 </thead>
                                 <tbody>
                                     {rows.map((row, index) => (
-                                        <tr key={row._id} onClick={() => onOpen(row.assetId)} className="cursor-pointer border-b last:border-0 border-slate-50 hover:bg-slate-50/50 transition-colors text-sm">
+                                        <tr key={row._id} onClick={onOpen ? () => onOpen(row.assetId) : undefined} className={`${onOpen ? 'cursor-pointer ' : ''}border-b last:border-0 border-slate-50 hover:bg-slate-50/50 transition-colors text-sm`}>
                                             <td className="p-4 font-bold text-slate-400">{offset + index + 1}</td>
                                             <td className="p-4 font-bold text-slate-800 whitespace-nowrap">{row.serialNumber}</td>
                                             <td className="p-4 text-slate-600 min-w-[14rem]">
@@ -473,9 +482,11 @@ const ActivityTab = ({ onOpen }) => {
                                     {!rows.length && (
                                         <tr>
                                             <td colSpan={9} className="p-8 text-center text-slate-400 text-sm font-medium">
-                                                {range.invalid ? 'Correct the date range to see results.'
-                                                    : inactive && !debouncedSearch && !range.fromDate && !range.toDate ? 'No earlier customers yet. A customer becomes inactive when the serial is transferred.'
-                                                        : 'No customer records match.'}
+                                                {assetId
+                                                    ? (inactive ? 'This serial number has never been transferred, so it has no inactive (earlier) customers to download.' : 'No current customer found for this serial number.')
+                                                    : range.invalid ? 'Correct the date range to see results.'
+                                                        : inactive && !debouncedSearch && !range.fromDate && !range.toDate ? 'No earlier customers yet. A customer becomes inactive when the serial is transferred.'
+                                                            : 'No customer records match.'}
                                             </td>
                                         </tr>
                                     )}
@@ -646,6 +657,14 @@ export const SerialNoDetails = ({ transfer = false }) => {
                                 </tbody>
                             </table>
                         </div>
+                    </div>
+
+                    <div className="rounded-3xl border border-slate-100 bg-white shadow-sm overflow-hidden">
+                        <h3 className="flex items-center gap-2 border-b border-slate-100 px-6 py-4 text-xs font-black uppercase tracking-widest text-slate-500">
+                            <MdFileDownload size={16} /> Customer Activity Log Download — {data.asset.serialNumber}
+                        </h3>
+                        {/* Remounted after a transfer so the Active/Inactive lists reload. */}
+                        <ActivityTab key={`${assetId}-${refreshCount}`} assetId={assetId} />
                     </div>
 
                     <AssetActivityLog

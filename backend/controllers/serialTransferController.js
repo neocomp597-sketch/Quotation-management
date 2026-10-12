@@ -470,8 +470,10 @@ exports.listHistory = async (req, res) => {
  */
 const OWNERSHIPS = ['Active', 'Inactive'];
 
-const activeOwners = async ({ search, range, skip, limit }) => {
+const activeOwners = async ({ search, range, assetId, skip, limit }) => {
     const match = { status: 'SOLD' };
+    // Aggregation does not cast, so the id must already be an ObjectId.
+    if (assetId) match._id = new mongoose.Types.ObjectId(String(assetId));
     if (search) {
         const pattern = new RegExp(escapeRegex(search), 'i');
         match.$or = [
@@ -526,8 +528,9 @@ const activeOwners = async ({ search, range, skip, limit }) => {
     return { rows, total: result?.total?.[0]?.count || 0 };
 };
 
-const inactiveOwners = async ({ search, range, skip, limit }) => {
+const inactiveOwners = async ({ search, range, assetId, skip, limit }) => {
     const query = { isActive: false };
+    if (assetId) query.assetId = assetId;
     if (search) {
         const pattern = new RegExp(escapeRegex(search), 'i');
         query.$or = [
@@ -608,14 +611,24 @@ const withMasterData = async (rows) => {
     });
 };
 
-const loadActivity = async (query, paging = {}) => {
-    const ownership = OWNERSHIPS.includes(query.ownership) ? query.ownership : 'Active';
-    const options = { search: cleanText(query.search), range: dateRange(query), ...paging };
-    const { rows, total } = await (ownership === 'Active' ? activeOwners(options) : inactiveOwners(options));
-    return { ownership, rows: await withMasterData(rows), total };
+// ?assetId limits the log to one serial number (the serial's details page).
+const activitySerial = async (assetId) => {
+    if (!assetId) return null;
+    if (!mongoose.Types.ObjectId.isValid(assetId)) throw httpError(400, 'Invalid serial record');
+    const asset = await Asset.findOne({ _id: assetId, status: 'SOLD' }).select('serialNumber').lean();
+    if (!asset) throw httpError(404, 'Sold serial number not found');
+    return asset;
 };
 
-/** Customer Activity Log, one page (?ownership=Active|Inactive&search&fromDate&toDate). */
+const loadActivity = async (query, paging = {}) => {
+    const ownership = OWNERSHIPS.includes(query.ownership) ? query.ownership : 'Active';
+    const serial = await activitySerial(query.assetId);
+    const options = { search: cleanText(query.search), range: dateRange(query), assetId: serial?._id, ...paging };
+    const { rows, total } = await (ownership === 'Active' ? activeOwners(options) : inactiveOwners(options));
+    return { ownership, serial, rows: await withMasterData(rows), total };
+};
+
+/** Customer Activity Log, one page (?ownership=Active|Inactive&assetId&search&fromDate&toDate). */
 exports.listActivity = async (req, res) => {
     try {
         const { page, limit, skip } = getPagination(req.query);
@@ -656,7 +669,7 @@ const ACTIVITY_COLUMNS = [
 /** Customer Activity Log as .xlsx: every row matching the filters, not just one page. */
 exports.exportActivity = async (req, res) => {
     try {
-        const { ownership, rows } = await loadActivity(req.query);
+        const { ownership, serial, rows } = await loadActivity(req.query);
 
         const workbook = new ExcelJS.Workbook();
         const sheet = workbook.addWorksheet(`${ownership} Customers`);
@@ -675,7 +688,8 @@ exports.exportActivity = async (req, res) => {
         }
 
         const today = excelDay(new Date()).toISOString().slice(0, 10).replace(/-/g, '');
-        const fileName = `Customer_Activity_${ownership}_${today}.xlsx`;
+        const serialPart = serial ? `${String(serial.serialNumber).replace(/[^A-Za-z0-9._-]+/g, '-')}_` : '';
+        const fileName = `Customer_Activity_${ownership}_${serialPart}${today}.xlsx`;
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
         res.setHeader('X-Total-Count', String(rows.length));
