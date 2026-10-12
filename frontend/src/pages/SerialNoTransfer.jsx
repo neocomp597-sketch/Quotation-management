@@ -5,6 +5,7 @@ import { toast } from 'react-toastify';
 import { serialTransferService, customerService, csmService } from '../services/api';
 import AssetActivityLog from '../components/AssetActivityLog';
 import PaginationControls from '../components/PaginationControls';
+import Modal from '../components/Modal';
 import Customers from './Customers';
 import { formatDate } from '../utils/helpers';
 
@@ -157,9 +158,12 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
         page, limit: PAGE_SIZE, search: debouncedSearch || undefined, field: field || undefined, status: status || undefined, ...range.params,
     }, !range.invalid);
     const offset = (pagination.page - 1) * pagination.limit;
+    // The row whose Download Customer Activity Log dialog is open.
+    const [downloadFor, setDownloadFor] = useState(null);
 
     return (
         <>
+            {downloadFor && <SerialActivityDownloadDialog serial={downloadFor} onClose={() => setDownloadFor(null)} />}
             <div className="p-4 border-b border-slate-100 bg-slate-50 flex flex-wrap items-center gap-3">
                 <div className="relative w-full max-w-md">
                     <MdSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
@@ -216,6 +220,9 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
                                             <td className="p-4 text-right whitespace-nowrap">
                                                 <button type="button" title="View history" onClick={(e) => { e.stopPropagation(); onOpen(row._id); }} className="p-2 text-primary-600 hover:bg-primary-50 rounded-lg transition-all">
                                                     <MdVisibility size={18} />
+                                                </button>
+                                                <button type="button" title="Download Customer Activity Log" aria-label={`Download customer activity log of ${row.serialNumber}`} onClick={(e) => { e.stopPropagation(); setDownloadFor(row); }} className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all">
+                                                    <MdFileDownload size={18} />
                                                 </button>
                                                 <button type="button" onClick={(e) => { e.stopPropagation(); onTransfer(row._id); }} className="ml-1 inline-flex items-center gap-1 px-3 py-2 rounded-xl border border-slate-200 text-slate-600 font-black uppercase text-[10px] tracking-widest hover:bg-slate-50 transition-all">
                                                     <MdSwapHoriz size={16} /> Transfer
@@ -353,6 +360,95 @@ const blobErrorMessage = async (err, fallback) => {
 
 const SERIAL_OWNERSHIP_HINTS = { Active: 'Current customer of this serial number', Inactive: 'Earlier customers of this serial number' };
 
+// Downloads the Customer Activity Log Excel for the given filters (ownership, assetId or search/dates).
+const downloadActivityExcel = async (filters) => {
+    const res = await serialTransferService.exportActivity(filters);
+    const fileName = /filename="([^"]+)"/.exec(res.headers?.['content-disposition'] || '')?.[1]
+        || `Customer_Activity_${filters.ownership}_${todayInput().replace(/-/g, '')}.xlsx`;
+    saveBlob(res.data, fileName);
+    const count = res.headers?.['x-total-count'];
+    toast.success(`${fileName} downloaded${count ? ` (${count} records)` : ''}`);
+};
+
+// Serial No List row action: choose Active or Inactive, then download that serial's log only.
+const SerialActivityDownloadDialog = ({ serial, onClose }) => {
+    const [ownership, setOwnership] = useState('Active');
+    const [downloading, setDownloading] = useState(false);
+    const [message, setMessage] = useState('');
+
+    const download = async () => {
+        setDownloading(true);
+        setMessage('');
+        try {
+            const filters = { ownership, assetId: serial._id };
+            // Checked first so an empty selection gets a message instead of an empty file.
+            const { data } = await serialTransferService.listActivity({ ...filters, limit: 1 });
+            if (!data?.pagination?.total) {
+                setMessage(ownership === 'Inactive'
+                    ? 'No inactive customer records found for this serial number.'
+                    : 'No active customer record found for this serial number.');
+                return;
+            }
+            await downloadActivityExcel(filters);
+            onClose();
+        } catch (err) {
+            setMessage(await blobErrorMessage(err, 'Could not download the Excel file.'));
+        } finally {
+            setDownloading(false);
+        }
+    };
+
+    return (
+        <Modal
+            isOpen
+            onClose={onClose}
+            title="Download Customer Activity Log"
+            maxWidth="max-w-lg"
+            footer={
+                <>
+                    <button type="button" onClick={onClose} disabled={downloading} className="flex-1 w-full py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-60">
+                        Cancel
+                    </button>
+                    <button type="button" onClick={download} disabled={downloading} className="flex-1 w-full flex items-center justify-center gap-2 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg disabled:opacity-60">
+                        <MdFileDownload size={16} /> {downloading ? 'Preparing…' : 'Download Excel'}
+                    </button>
+                </>
+            }
+        >
+            <div className="space-y-4">
+                <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
+                    <p className="text-sm font-black text-slate-800">{serial.serialNumber}</p>
+                    <p className="text-xs text-slate-500">{[serial.productCode, serial.productName].filter(Boolean).join(' · ')}</p>
+                </div>
+                <div className="space-y-2" role="radiogroup" aria-label="Customer activity log">
+                    {OWNERSHIP_OPTIONS.map((option) => (
+                        <label
+                            key={option.value}
+                            className={`flex cursor-pointer items-center gap-3 rounded-2xl border px-4 py-3 transition-all ${ownership === option.value ? 'border-primary-500 bg-primary-50/60' : 'border-slate-200 bg-white hover:bg-slate-50'}`}
+                        >
+                            <input
+                                type="radio"
+                                name={`serialDownload-${serial._id}`}
+                                value={option.value}
+                                checked={ownership === option.value}
+                                onChange={() => { setOwnership(option.value); setMessage(''); }}
+                                className="h-4 w-4 accent-primary-600"
+                            />
+                            <span>
+                                <span className="block text-xs font-black uppercase tracking-widest text-slate-700">{option.value === 'Active' ? 'Active Customer' : 'Inactive Customer'}</span>
+                                <span className="block text-xs text-slate-500">{SERIAL_OWNERSHIP_HINTS[option.value]}</span>
+                            </span>
+                        </label>
+                    ))}
+                </div>
+                {message && (
+                    <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">{message}</p>
+                )}
+            </div>
+        </Modal>
+    );
+};
+
 // Customer Activity Log: Active (current owners) or Inactive (earlier owners) of sold serials,
 // with search and a Customer Since date range; Download Excel exports every matching row.
 // With `assetId` it is the log of that one serial number (its details page): the server filters
@@ -376,12 +472,7 @@ const ActivityTab = ({ onOpen, assetId }) => {
     const download = async () => {
         setDownloading(true);
         try {
-            const res = await serialTransferService.exportActivity(filters);
-            const fileName = /filename="([^"]+)"/.exec(res.headers?.['content-disposition'] || '')?.[1]
-                || `Customer_Activity_${ownership}_${todayInput().replace(/-/g, '')}.xlsx`;
-            saveBlob(res.data, fileName);
-            const count = res.headers?.['x-total-count'];
-            toast.success(`${fileName} downloaded${count ? ` (${count} records)` : ''}`);
+            await downloadActivityExcel(filters);
         } catch (err) {
             toast.error(await blobErrorMessage(err, 'Could not download the Excel file.'));
         } finally {
